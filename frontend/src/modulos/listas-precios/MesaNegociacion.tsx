@@ -509,7 +509,7 @@ export function MesaNegociacion({
         costoMesa={datos?.costoSimulado ?? null}
         cantidadRenglones={renglonesApi.length}
         guardando={guardar.isPending}
-        alGuardar={(acuerdo) => {
+        alGuardar={(acuerdo, alGuardado) => {
           guardar.mutate(
             {
               idLinea,
@@ -518,6 +518,11 @@ export function MesaNegociacion({
             {
               onSuccess: () => {
                 toast.success('Mesa guardada: los costos estimados quedaron en el historial.');
+                // 🔴 El diálogo queda MONTADO al cerrarse: sin vaciar su comentario, el texto de la
+                // constancia anterior seguía ahí y volver a abrir + Guardar creaba una segunda casi
+                // idéntica de un clic (y cada guardado es INMUTABLE, D3: no se puede deshacer).
+                // Sólo se limpia cuando el guardado SALIÓ BIEN — si falló, el texto se conserva.
+                alGuardado();
                 setGuardarAbierto(false);
               },
               onError: (error) => toast.error(error.message),
@@ -734,7 +739,8 @@ function DialogoGuardarMesa({
   costoMesa: number | null;
   cantidadRenglones: number;
   guardando: boolean;
-  alGuardar: (acuerdo: string) => void;
+  /** Recibe el comentario y un `alGuardado()` que vacía el campo SÓLO si el guardado salió bien. */
+  alGuardar: (acuerdo: string, alGuardado: () => void) => void;
 }): React.JSX.Element {
   const [acuerdo, setAcuerdo] = useState('');
 
@@ -788,7 +794,7 @@ function DialogoGuardarMesa({
                 );
                 return;
               }
-              alGuardar(acuerdo.trim());
+              alGuardar(acuerdo.trim(), () => setAcuerdo(''));
             }}
             data-testid="confirmar-guardar-mesa"
           >

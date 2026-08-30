@@ -32,13 +32,13 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.060 · 30-ago-2026 · 🔨 **AÚN NO ESTÁ EN PRUEBA** — La mesa de negociación con su forma real, y **los estimados se quedan**
+## 0.060 · 31-ago-2026 · **en prueba** — La mesa de negociación con su forma real, y **los estimados se quedan**
 
-> ⚠️ **Esta entrada se escribió al construir la versión, y la versión NO llegó a `prueba`.** La sesión
-> se cambió a media etapa (Daniel, 30-ago): está construida en la rama
-> `trabajo/v1-e8w-mesa-forma-real` pero **sin revisar y sin verificar**. **Nada de lo que se cuenta
-> abajo se puede usar todavía.** Cuando la etapa cierre de verdad, se corrige este encabezado a
-> «en prueba» — y si algo cambió al revisarla, se corrige también el relato.
+> 📌 **Esta versión se construyó un día y se revisó al siguiente.** El 30-ago se cambió de sesión a
+> media etapa y quedó construida pero **sin revisar**; la entrada se dejó marcada «aún no está en
+> prueba» para que nadie la creyera lista. El 31-ago se corrieron por fin las pruebas y pasó por una
+> revisión independiente: **salieron nueve cosas, todas arregladas antes de subirla**. Dos de ellas se
+> cuentan abajo, porque cambian lo que puedes esperar del sistema.
 
 ### Qué se puede hacer ahora que antes no
 
@@ -106,6 +106,18 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 - **Al desplegar hace falta re-sembrar los catálogos** (`SEED_ON_START=true`): sin eso el concepto de
   costo «Empaque» no existe y **no se podrá generar ningún precosto nuevo**. No hay permisos nuevos.
+
+- 🔴 **Dos cosas que la revisión alcanzó a tapar antes de que llegaran aquí**, y conviene saberlas
+  porque las dos tocaban lo que Daniel pidió:
+
+  1. **El desglose con el que cerraste una negociación se perdía si después quitabas ese modelo de la
+     lista.** Quedaba guardado el total —los $34.45— pero **no de qué se componía**. Y el desglose es
+     justamente para lo que lo pediste: *«entre los costos que fui dando y los comentarios que voy
+     metiendo es como se va a armar la nueva receta»*. Un total pelón no sirve para eso. Ya queda
+     completo en la bitácora, aunque el renglón se borre.
+  2. **Los precios unitarios de cada tela y cada avío del desglose podían acabar viéndose por quien no
+     debe.** Hoy están bien escondidos; lo que faltaba era la prueba que impide que dejen de estarlo el
+     día que alguien toque esa pantalla. Ya está puesta.
 
 ### Qué sigue pendiente o roto
 

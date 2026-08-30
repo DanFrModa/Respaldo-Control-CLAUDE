@@ -475,6 +475,31 @@ describe('MesaNegociacion — el renglón en vivo', () => {
   });
 
   /**
+   * 🔴 **EL COMENTARIO NO SE QUEDA PEGADO.** El diálogo se cierra pero queda MONTADO, así que su
+   * texto sobrevivía al guardado: volver a abrirlo y pulsar Guardar creaba —de un solo clic y sin
+   * teclear nada— una SEGUNDA constancia casi idéntica de la primera. Y cada guardado es INMUTABLE
+   * (D3): una constancia de más no se borra, se queda en el historial confundiendo con cuál se
+   * vendió. Se limpia sólo en el `onSuccess` (si el guardado falla, el texto se conserva).
+   */
+  it('🔴 tras guardar, el comentario se VACÍA: reabrir y pulsar no duplica la constancia', async () => {
+    const usuario = userEvent.setup();
+    renderMesa(CON_MARGEN);
+    await screen.findByLabelText('Maquila');
+
+    await usuario.click(screen.getByTestId('abrir-guardar-mesa'));
+    await usuario.type(screen.getByTestId('guardar-mesa-acuerdo'), 'Cerramos en 106');
+    await usuario.click(screen.getByTestId('confirmar-guardar-mesa'));
+    expect(guardados).toHaveLength(1);
+
+    // Se reabre: el campo está EN BLANCO (no arrastra el acuerdo anterior)…
+    await usuario.click(screen.getByTestId('abrir-guardar-mesa'));
+    expect(await screen.findByTestId('guardar-mesa-acuerdo')).toHaveValue('');
+    // …y por lo tanto el botón no manda una segunda constancia sin que se escriba nada.
+    await usuario.click(screen.getByTestId('confirmar-guardar-mesa'));
+    expect(guardados).toHaveLength(1);
+  });
+
+  /**
    * 🔴 §Post-F9.125(b), ratificado el 29-ago-2026 (*«Nadie mas que yo ve los factores por favor….»*):
    * sin `listas.aprobar` el veredicto NO se pinta —ni el margen ni el precio sugerido, que dividido
    * entre el costo delataría el multiplicador de los factores— y se dice a quién le toca. El renglón

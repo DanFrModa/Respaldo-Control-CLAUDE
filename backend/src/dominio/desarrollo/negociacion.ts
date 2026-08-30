@@ -59,7 +59,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { num, numOrNull, redondear2 } from '../costos/decimales.js';
+import { num, numOrNull, redondear2, redondear4 } from '../costos/decimales.js';
 import {
   calcularPrecioLista,
   simularMargenNegociacion,
@@ -568,7 +568,11 @@ export async function simularMesa(
 
   // La aritmética se hace EN EL SERVIDOR (A1 / lección F5-E7: nunca se pivotea en el cliente): el
   // PRODUCTO consumo × precio de cada renglón, la SUMA por concepto y el total.
-  const { renglones, grupos, total: costoSimulado } = resolverRenglonesMesa(datos.renglones);
+  const {
+    renglones: resueltos,
+    grupos,
+    total: costoSimulado,
+  } = resolverRenglonesMesa(datos.renglones);
   const costoVigente = num(linea.costoUnit);
   const factores: FactoresLista = factoresANumeros(linea.lista);
   const verFactores = puedeVerFactoresDePrecio(sesion);
@@ -583,7 +587,9 @@ export async function simularMesa(
     precioSugerido: verFactores ? calcularPrecioLista(costoSimulado, factores) : null,
     // Dirección 1: el margen del precio capturado, por la MISMA guarda que la calculadora de §4.8.
     ...proyectarMargen(sesion, costoSimulado, datos.precioObjetivo, factores),
-    renglones,
+    // La pantalla sólo necesita el importe de cada renglón (el consumo y el precio los tiene ella,
+    // que los tecleó); los normalizados completos son para el guardado.
+    renglones: resueltos.map((r) => ({ etiqueta: r.etiqueta, importe: r.importe })),
     grupos,
     // ⭐ §Post-F9.150 — el TARGET del cliente, SIN el candado de los factores: es un número que puso
     // el cliente contra otro que teclea quien pregunta; ninguna división entre ellos despeja
@@ -592,6 +598,20 @@ export async function simularMesa(
     precioTarget,
     cumpleTarget: precioTarget === null ? null : datos.precioObjetivo >= precioTarget,
   };
+}
+
+/**
+ * Un renglón de la mesa **ya normalizado a la escala de su columna** y con su importe resuelto: es
+ * lo ÚNICO que se persiste y lo único que se pinta. Se declara aquí (y no en el contrato) porque el
+ * simulador sólo devuelve `etiqueta` + `importe`: los otros campos son para el guardado.
+ */
+interface RenglonMesaResuelto {
+  conceptoCodigo: string;
+  conceptoNombre: string;
+  etiqueta: string;
+  consumo: number | null;
+  precioUnit: number;
+  importe: number;
 }
 
 /**
@@ -605,21 +625,41 @@ export async function simularMesa(
  * que el precosto calcula sus importes (`Decimal(12,2)` por renglón) y con el que `congelarVersion`
  * arma el `costoTotal`: sumar en fino y redondear al final daría un total que no cuadra con la
  * columna de importes que se está mirando.
+ *
+ * ⚠️ **Y cada número se normaliza a la escala de SU columna ANTES de multiplicar** (ver el comentario
+ * del bucle): lo que se guarda y lo que se usa para derivar el importe tienen que ser EL MISMO
+ * número, o la constancia queda diciendo un total que sus propios renglones no dan.
  */
 function resolverRenglonesMesa(entradas: readonly RenglonMesa[]): {
-  renglones: SimulacionMesa['renglones'];
+  renglones: RenglonMesaResuelto[];
   grupos: SimulacionMesa['grupos'];
   total: number;
 } {
-  const renglones: SimulacionMesa['renglones'] = [];
+  const renglones: RenglonMesaResuelto[] = [];
   // `Map` conserva el orden de inserción ⇒ los grupos salen en el orden de PRIMERA APARICIÓN, que es
   // el orden en el que la mesa los pintó (y ése viene del orden de catálogo del desglose).
   const porConcepto = new Map<string, { codigo: string; nombre: string; subtotal: number }>();
   let total = 0;
 
   for (const r of entradas) {
-    const importe = redondear2(r.consumo === null ? r.precioUnit : r.consumo * r.precioUnit);
-    renglones.push({ etiqueta: r.etiqueta, importe });
+    // 🔴 **LA ESCALA MANDA DESDE EL DESTINO, y se normaliza ANTES de multiplicar** (cicatriz del
+    // proyecto; mismo criterio que `agregarLineaManual`). Las columnas de `NegociacionEventoCosto`
+    // son `Decimal(12,4)` para el consumo Y para el precio —a diferencia de `PrecostoLinea`, cuyo
+    // precio es `(12,2)`—, así que las dos van con `redondear4`. Si el importe se calculara con el
+    // valor CRUDO, Postgres redondearía al escribir y la constancia quedaría mintiéndose sola:
+    // `consumo 0.00005 × precio 100000` guardaba `importe 5.00` junto a un consumo que la base deja
+    // en `0.0001` (0.0001 × 100000 = 10). Lo guardado tiene que multiplicar.
+    const consumo = r.consumo === null ? null : redondear4(r.consumo);
+    const precioUnit = redondear4(r.precioUnit);
+    const importe = redondear2(consumo === null ? precioUnit : consumo * precioUnit);
+    renglones.push({
+      conceptoCodigo: r.conceptoCodigo,
+      conceptoNombre: r.conceptoNombre,
+      etiqueta: r.etiqueta,
+      consumo,
+      precioUnit,
+      importe,
+    });
     total += importe;
     const acc = porConcepto.get(r.conceptoCodigo) ?? {
       codigo: r.conceptoCodigo,
@@ -691,7 +731,11 @@ export async function guardarMesa(
     });
 
     await tx.negociacionEventoCosto.createMany({
-      data: datos.renglones.map((r, i) => ({
+      // 🔴 Se persiste LO QUE RESOLVIÓ el resolvedor, no el payload crudo: consumo y precio ya
+      // vienen normalizados a la escala de su columna y el importe es su producto. Tomar los
+      // números del payload y el importe de aquí mezclaba dos criterios, y el que Postgres
+      // redondeaba al escribir era justo el que no se usó para multiplicar.
+      data: renglones.map((r, i) => ({
         idEvento: evento.id,
         orden: i,
         conceptoCodigo: r.conceptoCodigo,
@@ -699,9 +743,7 @@ export async function guardarMesa(
         etiqueta: r.etiqueta,
         consumo: r.consumo,
         precioUnit: r.precioUnit,
-        // El importe se toma del resolvedor, NO se recalcula aquí: un segundo cálculo es un segundo
-        // criterio esperando a divergir.
-        importe: renglones[i]?.importe ?? 0,
+        importe: r.importe,
       })),
     });
 

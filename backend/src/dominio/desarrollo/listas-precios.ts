@@ -828,9 +828,10 @@ export async function fijarPrecioTargetLinea(
  *
  * D3 (nada desaparece en silencio): el renglón se borra FÍSICO —tiene que hacerlo, o el unique lo
  * seguiría reteniendo— pero antes queda ÍNTEGRO en la bitácora: el objeto completo del `antes` con
- * todos sus importes y su aprobación, MÁS todos sus eventos de negociación (que se irían por
- * cascada). Nada de conteos: lo que se guarda es lo que había, tal cual, y con eso se puede
- * reconstruir el renglón entero.
+ * todos sus importes y su aprobación, MÁS todos sus eventos de negociación **con el DESGLOSE de
+ * costos de cada uno** (que se irían por cascada). Nada de conteos: lo que se guarda es lo que
+ * había, tal cual, y con eso se puede reconstruir el renglón entero — incluida la mesa con la que
+ * se vendió (§Post-F9.149).
  *
  * Guardas: `listas.administrar`, empresa activa (A9 — un renglón ajeno da 404, no 409) y lista NO
  * cerrada (una lista en estado de cierre es historia; para tocarla hay que reabrirla, que es un
@@ -859,6 +860,13 @@ export async function quitarLineaLista(
     const eventos = await tx.negociacionEvento.findMany({
       where: { idListaLinea: idLinea },
       orderBy: { id: 'asc' },
+      // 🔴🔴 CON SU DESGLOSE, no sólo el escalar (V1-E8w, ronda de corrección).
+      // `NegociacionEventoCosto` cuelga del evento con `onDelete: Cascade`, así que se va en el
+      // mismo borrado; sin este `include` la foto guardaba el `costoEstimado` y el comentario, y el
+      // desglose —tela 1.2×20, maquila 5, jareta 3.25…— desaparecía SIN RASTRO. Es exactamente lo
+      // que §Post-F9.149 declara insuficiente: *«un total sin desglose no sirve para eso»*, porque
+      // con el desglose es como Desarrollo arma la receta nueva.
+      include: { costos: { orderBy: { orden: 'asc' } } },
     });
 
     await tx.listaPreciosLinea.delete({ where: { id: idLinea } });
@@ -890,7 +898,8 @@ export async function quitarLineaLista(
  * retenía a TODOS sus desarrollos, y ninguno podía entrar a la lista buena.
  *
  * D3: el `antes` que queda en bitácora es la lista ENTERA —encabezado con sus factores, cada
- * renglón con sus importes y su aprobación, y cada evento de negociación—, no un conteo.
+ * renglón con sus importes y su aprobación, y cada evento de negociación **con su desglose de
+ * costos**—, no un conteo.
  *
  * Guardas: `listas.administrar`, empresa activa (A9) y estado NO de cierre. Una lista `cerrada` o
  * `ya-pedida` es un compromiso con el cliente: para borrarla hay que reabrirla primero (cambio de
@@ -933,6 +942,10 @@ export async function eliminarLista(
     const eventos = await tx.negociacionEvento.findMany({
       where: { idListaLinea: { in: lineas.map((l) => l.id) } },
       orderBy: { id: 'asc' },
+      // 🔴🔴 CON SU DESGLOSE (V1-E8w, ronda de corrección) — ver el mismo `include` en
+      // `quitarLineaLista`: los `NegociacionEventoCosto` se van por cascada y sin fotografiarlos el
+      // `antes` guardaba un total mudo.
+      include: { costos: { orderBy: { orden: 'asc' } } },
     });
 
     // V1-E7c: una lista que ya produjo cotizaciones SÍ se borra. El documento emitido no depende de

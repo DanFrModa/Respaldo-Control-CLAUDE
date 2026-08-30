@@ -151,7 +151,7 @@
 > | Versión | Qué trae | Decisión |
 > |---|---|---|
 > | **0.059** ✅ | La incompleta sale del tránsito | §Post-F9.147 |
-> | **0.060** 🔨 **CONSTRUIDA, SIN VERIFICAR — NO MERGEAR SIN REVISAR** (rama `trabajo/v1-e8w-mesa-forma-real`, commit `7e5171c9`; ver el recuadro de alto en su ficha) | **La mesa con su forma real + el guardado.** Tela con **precio y consumo separados** y movibles · **avíos desglosados** y movibles · **foto** principal del modelo · **TARGET PRICE** del cliente (lo captura Aurora en el renglón de la lista; **informa, NO bloquea**) · **encabezado** (hoy se parte palabra por palabra) · **costo de EMPAQUE** como **tercera ancla fija** junto a maquila y corte (`CONCEPTOS_ANCLA`), con **default 2.20 en `ConfiguracionEmpresa`, NO hardcodeado** · y encima **los estimados SE GUARDAN** (último estado, desglose por concepto, al cerrar la negociación; **NO** autosave por tecla). **LLEVA MIGRACIÓN.** ⚠️ **Ya existe y NO se reconstruye:** el editor de renglones con `consumo`/`precioUnit`/`ajustado` (`DialogoPrecosto.tsx`); `desgloseCostoLinea` **aplasta por concepto** — el defecto es que agrupa, no que falte el dato | §Post-F9.149 · .150 · **.153** |
+> | **0.060** ✅ | **La mesa con su forma real + el guardado.** Tela con **precio y consumo separados** y movibles · **avíos desglosados** y movibles · **foto** principal del modelo · **TARGET PRICE** del cliente (lo captura Aurora en el renglón de la lista; **informa, NO bloquea**) · **encabezado** (hoy se parte palabra por palabra) · **costo de EMPAQUE** como **tercera ancla fija** junto a maquila y corte (`CONCEPTOS_ANCLA`), con **default 2.20 en `ConfiguracionEmpresa`, NO hardcodeado** · y encima **los estimados SE GUARDAN** (último estado, desglose por concepto, al cerrar la negociación; **NO** autosave por tecla). **LLEVA MIGRACIÓN.** ⚠️ **Ya existe y NO se reconstruye:** el editor de renglones con `consumo`/`precioUnit`/`ajustado` (`DialogoPrecosto.tsx`); `desgloseCostoLinea` **aplasta por concepto** — el defecto es que agrupa, no que falte el dato | §Post-F9.149 · .150 · **.153** |
 > | **0.061** ⬜ | **La incompleta sale de Tránsito como merma + su costo se reparte.** (a) merma automática en la **misma transacción** del recibo, auditada, reversible al cancelar, **no** retroactiva al histórico migrado. (b) **default de `baseProrrateo` de `cortado` → `recibido`**. ⚠️ Ese default vive en **DOS** lados (`costo-orden.ts:199` y la UI, que «la manda siempre») — cambiar uno solo = deriva. ⚠️ **División entre cero** con una orden cortada y sin recibir: la pantalla debe decir «aún no hay piezas recibidas» | §Post-F9.147 (deuda) |
 > | **0.062** ⬜ | **Cuatro estados por MODELO** dentro de la lista: **Abierto → En negociación → Cerrado → Dropeado**. «Dropeado» es palabra de Daniel, **no traducir**. Son del **RENGLÓN**, distintos de los cuatro de la LISTA (`EstadoLista`) aunque tres nombres se parezcan | §Post-F9.151 |
 > | **0.063** ⬜ | **Cotizar en la cita un modelo que no existe** — desde cero o **copiando** uno ya desarrollado. ⚠️ El motor **ya existe** (`crearDesarrolloConModeloNuevo` mintea el código, `copiarBom`, `copiarArteDeOtroModelo`): el trabajo es **abrir el camino desde la mesa**. Obligatorios reales: `codigo` + `idGenero` + `idTipoProducto` (**tres**; el alta de desarrollo no pide `codigo` porque lo mintea) ⇒ **copiar un modelo los trae todos: cero fricción**. **+ la COMPRADORA**: contactos por cliente/departamento (patrón `ProveedorContacto`; hoy los clientes **no guardan a nadie**) **+ el LUGAR de la cita + un campo abierto de pendientes** | §Post-F9.152 |
@@ -214,7 +214,7 @@
 > despejarlo tampoco me preocupa tanto»*). **Pasa a importar el día que negocie alguien más que él**;
 > hoy sólo negocia Daniel. §Post-F9.148.
 >
-> 🔨 **`V1-E8w` · LA MESA CON SU FORMA REAL + EL GUARDADO ⭐⭐** (30-ago, **0.060**) — **CONSTRUIDA pero SIN VERIFICAR: no pasó por reviewer ni tiene gates confirmados; ver el recuadro de alto en su ficha antes de tocarla.** §Post-F9.149 ·
+> ✅ **`V1-E8w` · LA MESA CON SU FORMA REAL + EL GUARDADO ⭐⭐** (30-ago, **0.060**) — §Post-F9.149 ·
 > .150 · **.153**. Daniel probó la mesa de la 0.058 y pidió **cinco cosas de forma y una de costeo**;
 > van todas juntas porque las de forma cambian **qué hay que persistir** (guardar antes de reacomodar
 > = dos migraciones). Lo que trae: **la tela con precio y consumo SEPARADOS** (*"muchas veces voy
@@ -237,6 +237,25 @@
 > **base cero** y el `flex-wrap` del header nunca llegaba a dispararse.
 > ⚠️ **Su deploy exige `SEED_ON_START=true`** (concepto de costo `empaque`; sin él no se genera ni un
 > precosto) y ⚠️ **el empaque SUBE $2.20 el costo de toda receta NUEVA** — las congeladas no se mueven.
+> 🔴 **La etapa se construyó en una sesión y se VERIFICÓ en otra** (31-ago): el coder fue detenido
+> justo antes de correr las suites, y la sesión anterior hizo lo correcto —**comitear la ficha
+> corregida a «CONSTRUIDA, SIN VERIFICAR»** en vez de dejarla diciendo «hecha»—. Al correr por fin los
+> **10 gates** saltaron **dos rojos** que habrían tumbado el CI: `format:check` del backend, y una
+> prueba que afirmaba que el alta manual *«oculta SOLO maquila/corte»* y **se quedó atrás al entrar la
+> tercera ancla** — el código estaba bien (es el hallazgo (a) de arriba), la prueba era la vieja.
+> ⭐ **La revisión independiente RECHAZÓ la etapa con 7 hallazgos, y los dos primeros valen la pena:**
+> **(H1)** al quitar el renglón de la lista o borrarla, el **desglose de la mesa se perdía SIN RASTRO**
+> — las dos funciones fotografían el evento en la bitácora antes del borrado en cascada, pero el
+> `findMany` no traía los `costos`, así que quedaba **el total sin su desglose**, que es exactamente
+> lo que §Post-F9.149 declara inútil (*«un total sin desglose no sirve para eso»*); y era **peor que
+> antes de la etapa**, porque el evento sí sobrevivía y su hijo nuevo no. **(H2)** la reja de importes
+> del desglose recién abierto **no la sostenía ninguna prueba**: quitando los dos ternarios, los 2,208
+> tests seguían verdes — y como esa consulta sólo pide `listas.ver` (que cascadea hasta Secretarial)
+> mientras `consultas.ver-importes` se corta en Ventas, el precio unitario de cada tela y cada avío
+> podía empezar a filtrarse **sin que nada se pusiera rojo**. Los 7 se arreglaron en la misma ronda,
+> **ninguno archivado como «menor»**, más los dos nits del cierre. ⭐ **La lección, otra vez la misma:**
+> *un gate que no se corre no es un gate*, y **una prueba que no cae no protege nada** — las dos veces
+> el código estaba bien y lo que fallaba era lo que decía cuidarlo.
 > Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8w.
 >
 > ✅ **`V1-E8v` · LA INCOMPLETA SALE DEL TRÁNSITO ⭐⭐** (29-ago, **0.059**): §Post-F9.147, que

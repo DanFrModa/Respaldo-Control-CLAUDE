@@ -1359,6 +1359,49 @@ describe('⭐⭐ guardarMesa — los estimados SE QUEDAN (§Post-F9.149)', () =>
     expect(evento.costos.map((c) => c.importe)).toEqual(simulada.renglones.map((r) => r.importe));
   });
 
+  /**
+   * 🔴 **LO GUARDADO TIENE QUE MULTIPLICAR** (ronda de corrección de V1-E8w). `consumo` y
+   * `precio_unit` son `Decimal(12,4)`: si el importe se calcula con el valor CRUDO y Postgres
+   * redondea al escribir, la constancia queda mintiéndose sola — `0.00005 × 100000` guardaba
+   * `importe 5.00` junto a un consumo que la base deja en `0.0001` (y 0.0001 × 100000 = 10). Es la
+   * cicatriz de siempre: **la escala manda desde el destino**, y se normaliza ANTES de multiplicar.
+   *
+   * ⚠️ MUTACIÓN que la pone roja: quitar el `redondear4` de `consumo` en `resolverRenglonesMesa`
+   * (el importe vuelve a 5 mientras el consumo leído sigue siendo 0.0001).
+   */
+  it('🔴 normaliza a la escala de la columna ANTES de multiplicar (importe = lo guardado)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-GUARDA8');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    // Un consumo con MÁS decimales de los que la columna admite (5 → la base guarda 4).
+    const alFilo = [
+      { ...RECETA_MESA[0]!, consumo: 0.00005, precioUnit: 100_000 },
+    ] satisfies RenglonMesa[];
+
+    await guardarMesa(
+      sesion(),
+      idLinea,
+      { acuerdo: 'Al filo de la escala', renglones: alFilo, precioObjetivo: 92 },
+      bd(),
+    );
+
+    const evento = (await listarEventosDeLinea(sesion(), idLinea, bd()))[0]!;
+    const costo = evento.costos[0]!;
+    // Lo que quedó en la base es lo que multiplica: 0.0001 × 100000 = 10 (no 5).
+    expect(costo.consumo).toBe(0.0001);
+    expect(costo.precioUnit).toBe(100_000);
+    expect(costo.importe).toBe(10);
+    expect(evento.costoEstimado).toBe(10);
+    // Y el simulador enseña EXACTAMENTE lo mismo que se guardó (misma aritmética, A1).
+    const simulada = await simularMesa(
+      sesion(),
+      idLinea,
+      { renglones: alFilo, precioObjetivo: 92 },
+      bd(),
+    );
+    expect(simulada.costoSimulado).toBe(evento.costoEstimado);
+  });
+
   it('sin `consultas.ver-importes` el desglose guardado sale SIN números, pero se lee', async () => {
     const idDesarrollo = await desarrolloConPrecosto('MOD-GUARDA5');
     const lista = await crearListaCon(idDesarrollo);

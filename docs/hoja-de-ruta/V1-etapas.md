@@ -1218,45 +1218,54 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
-## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30-ago-2026, versión **0.060**) — 🔨 CONSTRUIDA, **SIN VERIFICAR**
+## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30/31-ago-2026, versión **0.060**) — ✅ HECHA
 
-> 🔴🔴 **ALTO — ESTA ETAPA NO ESTÁ TERMINADA. NO LA MERGEES SIN REVISAR.**
+> ✅ **VERIFICADA EL 31-AGO.** El recuadro de alto que vivía aquí —«construida, sin verificar»— hizo
+> su trabajo: la etapa se construyó el 30-ago y se detuvo justo antes de correr las suites, y la sesión
+> que la dejó así **comiteó la ficha corregida en vez de declararla hecha**. Lo que faltaba ya se hizo,
+> y esto es lo que encontró:
 >
-> La construcción se interrumpió **a propósito** (Daniel cambió de sesión el 30-ago ~15:35 UTC). El
-> código y esta ficha se escribieron enteros, pero **la etapa NUNCA pasó por un reviewer independiente
-> y sus gates NO están confirmados por el lead**. El coder fue detenido **justo antes** de correr las
-> suites de integración; su última línea fue *«Now let me run the affected integration suites cleanly»*.
+> **1. Los 10 gates, corridos por fin → DOS rojos.** `format:check` del backend, y una prueba del
+> frontend que afirmaba que el alta manual *«oculta SOLO maquila/corte»* y **dejó de ser cierta al
+> entrar `empaque` como tercera ancla**. 🔑 **El código no estaba mal** (el filtro cambió a propósito a
+> *«esconder el ancla sólo si ESTE precosto ya la tiene»*, sin lo cual ningún borrador viejo podría
+> recibir su empaque): **la prueba era la que se había quedado atrás**. Reescrita para cubrir las **dos
+> direcciones** de la regla, más un caso con las tres anclas puestas, y **confirmada por mutación** —
+> devolviendo el filtro a la regla vieja, cae. Antes no caía: por eso pasó inadvertido.
 >
-> ⚠️ **Lo que dice el resto de esta ficha sobre pruebas, mutaciones y gates es lo que el coder
-> PLANEABA o reportaba mientras construía — NO es una medición confirmada.** Trátalo como afirmación
-> por verificar, no como resultado. *(Cicatriz del proyecto: se verifica muy bien lo que se construye,
-> y no lo que se escribe SOBRE lo construido.)*
+> **2. La revisión independiente RECHAZÓ la etapa con 7 hallazgos.** Los siete se arreglaron en la
+> misma ronda —**ninguno archivado como «menor»**— más dos nits del cierre. Los dos que importan:
 >
-> **QUÉ FALTA, en orden:**
-> 1. Correr los **10 gates** (backend `test:unit`/`typecheck`/`lint`/`format:check`/`openapi`;
->    frontend `test`/`typecheck` con `tsc -b`/`lint`/`format:check`/`gen:api`) y la **integración
->    completa** contra Postgres 16 local. **Nada de esto está confirmado.**
-> 2. Ejecutar la **migración** `20260830160000_la_mesa_con_su_forma_real` de verdad sobre una BD con
->    datos. Es **aditiva** (4 cambios: `configuraciones_empresa.costo_empaque_base` DEFAULT 2.20 ·
->    `lista_precios_linea.precio_target` NULL · `negociacion_evento.costo_estimado` NULL · tabla nueva
->    `negociacion_evento_costo`), pero **no se ha corrido**.
-> 3. **Reviewer independiente** con el foco de las cicatrices de la 0.059, que son las que más pesan aquí:
->    **(a)** ⭐ **mutar en el punto donde viviría el defecto, no donde vive la regla** — lo que Daniel
->    pide VER (los avíos abiertos, la foto, el target, el empaque) **se prueba a nivel de RENDER**;
->    **(b)** **barrer a los CONSUMIDORES** de `desgloseCostoLinea`, que deja de aplastar por concepto:
->    ¿quién más leía ese subtotal, y qué hacía con él? Incluidas las **inversas algebraicas**;
->    **(c)** 🔴🔴 **los factores del cliente son SÓLO de Daniel** — van cuatro puertas cerradas a ese
->    dato; **verificar que abrir el desglose y mostrar el target no permita despejar margen/descuentos/
->    regalías/costo de ventas**. La cuarta puerta fue `precioSugerido`, que se despejaba dividiendo
->    precio entre costo. **La quinta no se abre por descuido.**
-> 4. Confirmar que **un precosto CONGELADO no se toca** y que cambiar el default de empaque **no
->    altera ninguna receta ya hecha** (probado, no leído).
+> - 🔴 **H1 · el desglose de la mesa se perdía SIN RASTRO** (`listas-precios.ts`, `quitarLineaLista` y
+>   `eliminarLista`). Las dos funciones fotografían el `NegociacionEvento` en la bitácora **antes** del
+>   borrado en cascada —ése es el mecanismo con el que el módulo compensa un borrado físico—, pero el
+>   `findMany` no traía los `costos`, que cuelgan del evento con `onDelete: Cascade`. Resultado: quedaba
+>   `costoEstimado: 34.45` **y el desglose desaparecía**, que es exactamente lo que §Post-F9.149 declara
+>   inútil (*«un total sin desglose no sirve para eso»*). ⭐ Y era **peor que antes de la etapa**: el
+>   evento sí sobrevivía a la bitácora, su hijo nuevo no. Arreglado con el `include` en las dos puertas,
+>   con dos pruebas de integración que guardan una mesa real y la buscan en la bitácora tras el borrado.
+> - 🔴 **H2 · la reja de importes del desglose no la sostenía NINGUNA prueba.** El código era correcto;
+>   el reviewer quitó los dos ternarios de `desgloseCostoLinea` y **los 2,208 tests siguieron verdes**.
+>   Pesa porque `GET /desglose-costo` sólo exige `listas.ver` —que cascadea hasta Secretarial— mientras
+>   `consultas.ver-importes` se corta en Ventas: el precio unitario de cada tela y cada avío podría
+>   empezar a filtrarse a Ventas/Logística/Asistente **sin que nada se pusiera rojo**. Cerrado con las
+>   aseveraciones que faltaban, incluida la mitad deliberada de la regla (`consumo` **no** nulo: la
+>   estructura sí se da).
 >
-> ⚠️ **`frontend/src/version.ts` ya dice `0.060` y el historial ya trae su entrada.** Es coherente
-> entre sí (hay test guardián), pero **describe una versión que todavía no está en `prueba`**.
+> Los otros cinco: falta de prueba de render del target de Aurora (H3, 7 pruebas nuevas), la escala sin
+> normalizar antes de multiplicar en `guardarMesa` (H4 — ⚠️ `NegociacionEventoCosto` es `Decimal(12,4)`
+> en sus **dos** columnas, no `(12,2)` como `PrecostoLinea`: *la escala manda desde el destino*), un
+> comentario que prometía una cobertura inexistente (H5, se aseveró en vez de recortarlo), el comentario
+> de la mesa que no se limpiaba tras guardar —dos constancias casi idénticas de un clic— (H6) y un
+> docstring desactualizado (H7, con su gemelo en `esAnclaFija` y un `select` muerto).
 >
-> Rama: `trabajo/v1-e8w-mesa-forma-real`, commit `7e5171c9` (**mensaje: «respaldo en curso» — ése es
-> el estado real**). 42 archivos, +7405 −565. **Sin PR abierto.**
+> ⭐⭐ **La lección de la etapa, y es la misma dos veces:** *un gate que no se corre no es un gate, y una
+> prueba que no cae no protege nada*. En los dos hallazgos grandes **el código estaba bien**: lo que
+> falló fue lo que decía cuidarlo.
+>
+> ⚠️ **Su deploy exige `SEED_ON_START=true`** — sin el concepto de costo `empaque` **no se genera ni un
+> precosto nuevo**. La migración `20260830160000_la_mesa_con_su_forma_real` es aditiva y se aplica sola.
+
 
 
 **El encargo, en palabras de Daniel — textuales, con sus erratas:**

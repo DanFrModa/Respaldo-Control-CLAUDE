@@ -7,7 +7,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { ClavePermiso } from '../../contrato/index.js';
+import type { ClavePermiso, RenglonMesa } from '../../contrato/index.js';
 import {
   ErrorConflicto,
   ErrorNoEncontrado,
@@ -30,7 +30,7 @@ import { apagarDesarrollo, crearDesarrollo, obtenerDesarrollo } from './desarrol
 import { crearProyecto } from './proyectos.js';
 import { congelarVersion, generarPrecosto } from './precostos.js';
 import { guardarFactoresCliente } from './cliente-factores.js';
-import { registrarRonda } from './negociacion.js';
+import { guardarMesa, registrarRonda } from './negociacion.js';
 import {
   ajustarPrecioLinea,
   aprobarLinea,
@@ -1015,7 +1015,22 @@ describe('desgloseCostoLinea — desglose de costo por concepto (§4.8)', () => 
     expect(maquila?.lineas[0]?.precioUnit).toBe(10);
   });
 
-  it('sin consultas.ver-importes oculta los subtotales y el total (null), pero da la estructura', async () => {
+  /**
+   * 🔴🔴 **LA REJA DE IMPORTES, RENGLÓN POR RENGLÓN** (ronda de corrección de V1-E8w). El desglose
+   * abierto NO es sólo subtotales desde esta etapa: trae el `precioUnit` y el `importe` de **cada
+   * tela y cada avío**, y ésos son el dato más sensible del módulo. La puerta del endpoint es
+   * `listas.ver`, que cascadea hasta Secretarial; el candado del dinero es `consultas.ver-importes`,
+   * que se corta en Ventas (`prisma/seed.ts`) — o sea que si los ternarios de `desgloseCostoLinea`
+   * se cayeran, el precio de cada material llegaría a Ventas/Logística/Asistente/Secretarial.
+   *
+   * La prueba anterior sólo miraba `costoTotal` y los subtotales: el reviewer quitó los dos
+   * ternarios de los campos NUEVOS y los 2208 tests seguían verdes. Aquí se aseveran los dos lados
+   * de la regla, que es lo que la hace caer por mutación:
+   *   • el DINERO (`precioUnit`/`importe`) sale `null`, y
+   *   • la ESTRUCTURA sí se da (`consumo` NO es null, y las etiquetas se leen) — es deliberado: el
+   *     consumo no es dinero (mismo criterio que el historial de la mesa).
+   */
+  it('sin consultas.ver-importes oculta los subtotales, el total Y el dinero de cada renglón', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-DESG-OCU');
     const lista = await crearLista(
@@ -1029,6 +1044,20 @@ describe('desgloseCostoLinea — desglose de costo por concepto (§4.8)', () => 
     expect(desglose.costoTotal).toBeNull();
     expect(desglose.grupos.every((g) => g.subtotal === null)).toBe(true);
     expect(desglose.grupos.map((g) => g.codigo)).toContain('tela');
+
+    // 🔴 Ni un solo importe ni un solo precio unitario, en NINGÚN renglón de NINGÚN grupo.
+    const todas = desglose.grupos.flatMap((g) => g.lineas);
+    expect(todas.length).toBeGreaterThan(0);
+    expect(todas.every((l) => l.precioUnit === null)).toBe(true);
+    expect(todas.every((l) => l.importe === null)).toBe(true);
+
+    // …y la ESTRUCTURA sí llega: la tela conserva su consumo (1.5) y su descripción.
+    const tela = desglose.grupos.find((g) => g.codigo === 'tela');
+    expect(tela?.lineas).toHaveLength(1);
+    expect(tela?.lineas[0]?.consumo).toBe(1.5);
+    expect(tela?.lineas[0]?.precioUnit).toBeNull();
+    expect(tela?.lineas[0]?.importe).toBeNull();
+    expect(tela?.lineas[0]?.descripcion).not.toBe('');
   });
 
   it('un renglón de OTRA empresa no existe (A9)', async () => {
@@ -1066,6 +1095,46 @@ describe('⭐ quitar un renglón / borrar una lista (V1-E4)', () => {
       bd(),
     );
     return { lista, idLinea: lista.lineas[0]!.id, idDesarrollo };
+  }
+
+  /**
+   * ⭐ V1-E8w — una mesa guardada de ejemplo (los mismos números de `negociacion.int.test.ts`): tela
+   * con sus DOS perillas (1.2 × 20) y tres costos a secas ⇒ 34.45.
+   */
+  const MESA_DE_PRUEBA = [
+    {
+      conceptoCodigo: 'tela',
+      conceptoNombre: 'Tela',
+      etiqueta: 'Felpa',
+      consumo: 1.2,
+      precioUnit: 20,
+    },
+    {
+      conceptoCodigo: 'maquila',
+      conceptoNombre: 'Maquila',
+      etiqueta: 'Maquila (estimado: sin cierre)',
+      consumo: null,
+      precioUnit: 5,
+    },
+    {
+      conceptoCodigo: 'avios',
+      conceptoNombre: 'Avíos',
+      etiqueta: 'Jareta más barata',
+      consumo: null,
+      precioUnit: 3.25,
+    },
+    {
+      conceptoCodigo: 'empaque',
+      conceptoNombre: 'Empaque',
+      etiqueta: 'Empaque',
+      consumo: null,
+      precioUnit: 2.2,
+    },
+  ] satisfies RenglonMesa[];
+
+  /** `PERM` NO trae `listas.negociar` (§Post-F9.125 los separa a propósito): guardar la mesa sí. */
+  function sesionQueNegociaListas(): SesionUsuario {
+    return sesion([...PERM, 'listas.negociar']);
   }
 
   it('quitar el renglón LIBERA al desarrollo: ya puede entrar a la lista correcta', async () => {
@@ -1154,6 +1223,105 @@ describe('⭐ quitar un renglón / borrar una lista (V1-E4)', () => {
     expect(datos.operacion).toBe('eliminar-lista');
     expect(datos.antes.folio).toBe(String(lista.folio));
     expect(datos.antes.lineas).toHaveLength(1);
+  });
+
+  /**
+   * 🔴🔴 **EL DESGLOSE DE LA MESA NO SE PIERDE AL QUITAR EL RENGLÓN** (ronda de corrección de
+   * V1-E8w). `NegociacionEventoCosto` cuelga del evento con `onDelete: Cascade`, así que el borrado
+   * físico del renglón se lo lleva; la bitácora es el ÚNICO sitio donde queda. Fotografiar los
+   * eventos sin sus costos guardaba el total (`costoEstimado: 34.45`) y el comentario, y perdía
+   * *con qué* se llegó a ese total — que es literalmente lo que Daniel pidió que se quedara
+   * (§Post-F9.149: *«Entre los costos que fui dando u los comentarios que voy metiendo es como se
+   * va a armar la nueva receta»*, y *«un total sin desglose no sirve para eso»*).
+   *
+   * ⚠️ MUTACIÓN que la pone roja: quitar el `include: { costos: … }` del `findMany` de
+   * `quitarLineaLista` ⇒ `eventosNegociacion[0].costos` llega `undefined`.
+   */
+  it('🔴 D3: al quitar el renglón, la mesa queda en bitácora CON SU DESGLOSE (no sólo el total)', async () => {
+    const { lista, idLinea } = await listaConUnRenglon('MOD-QUITAR-MESA');
+    await guardarMesa(
+      sesionQueNegociaListas(),
+      idLinea,
+      { acuerdo: 'Le quitamos el cierre', renglones: MESA_DE_PRUEBA, precioObjetivo: 92 },
+      bd(),
+    );
+
+    await quitarLineaLista(sesion(), idLinea, bd());
+
+    const registro = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'ListaPrecios', idEntidad: String(lista.id), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    const datos = registro.datos as {
+      operacion: string;
+      eventosNegociacion: {
+        acuerdo: string | null;
+        costoEstimado: number | null;
+        costos?: {
+          conceptoCodigo: string;
+          etiqueta: string;
+          consumo: number | null;
+          precioUnit: number;
+          importe: number;
+        }[];
+      }[];
+    };
+    expect(datos.operacion).toBe('quitar-linea');
+    expect(datos.eventosNegociacion).toHaveLength(1);
+    const evento = datos.eventosNegociacion[0]!;
+    expect(evento.acuerdo).toBe('Le quitamos el cierre');
+    expect(evento.costoEstimado).toBe(34.45); // 1.2×20 + 5 + 3.25 + 2.20
+    // 🔴 EL DESGLOSE, renglón por renglón: sin el `include` esto es `undefined`.
+    expect(evento.costos).toHaveLength(4);
+    expect(evento.costos?.[0]).toMatchObject({
+      conceptoCodigo: 'tela',
+      etiqueta: 'Felpa',
+      consumo: 1.2,
+      precioUnit: 20,
+      importe: 24,
+    });
+    expect(evento.costos?.map((c) => c.etiqueta)).toEqual([
+      'Felpa',
+      'Maquila (estimado: sin cierre)',
+      'Jareta más barata',
+      'Empaque',
+    ]);
+    // Números, no cadenas (los `Decimal` pasan por `aJsonBitacora`).
+    expect(typeof evento.costos?.[0]?.importe).toBe('number');
+    // Y en la base ya no queda nada: la bitácora es el único rastro.
+    expect(await cliente.negociacionEventoCosto.count()).toBe(0);
+  });
+
+  /** El mismo agujero por la otra puerta: borrar la LISTA entera también arrastra los costos. */
+  it('🔴 D3: al BORRAR la lista, la mesa de cada renglón queda con su desglose', async () => {
+    const { lista, idLinea } = await listaConUnRenglon('MOD-BORRAR-MESA');
+    await guardarMesa(
+      sesionQueNegociaListas(),
+      idLinea,
+      { acuerdo: 'Así quedó', renglones: MESA_DE_PRUEBA, precioObjetivo: 92 },
+      bd(),
+    );
+
+    await eliminarLista(sesion(), lista.id, bd());
+
+    const registro = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'ListaPrecios', idEntidad: String(lista.id), accion: 'OTRO' },
+      orderBy: { id: 'desc' },
+    });
+    const datos = registro.datos as {
+      operacion: string;
+      antes: {
+        eventosNegociacion: {
+          costos?: { etiqueta: string; consumo: number | null; importe: number }[];
+        }[];
+      };
+    };
+    expect(datos.operacion).toBe('eliminar-lista');
+    expect(datos.antes.eventosNegociacion).toHaveLength(1);
+    const costos = datos.antes.eventosNegociacion[0]!.costos;
+    expect(costos).toHaveLength(4);
+    expect(costos?.[0]).toMatchObject({ etiqueta: 'Felpa', consumo: 1.2, importe: 24 });
+    expect(await cliente.negociacionEventoCosto.count()).toBe(0);
   });
 
   it('una lista en estado de CIERRE no se toca (hay que reabrirla primero)', async () => {

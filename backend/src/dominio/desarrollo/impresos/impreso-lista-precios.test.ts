@@ -50,8 +50,9 @@ function listaEjemplo(): ListaPreciosDetalle {
         costoUnit: 40,
         precioCalculado: 100,
         precioAprobado: 137,
-        // ⭐ V1-E8w: el target del cliente. En este renglón SÍ lo dio (≠ null a propósito: un
-        // fixture con los dos en null no probaría que el impreso lo ignora bien).
+        // ⭐ V1-E8w: el target del cliente. En este renglón SÍ lo dio (≠ null a propósito) y la
+        // prueba «el target NO se cuela en el papel» lo exige: con los dos en null, borrar la
+        // columna del impreso o añadirla pasarían igual de desapercibidas.
         precioTarget: 130,
         tieneTarget: true,
         aprobado: true,
@@ -132,6 +133,30 @@ describe('excelListaPrecios (Excel)', () => {
     expect(hoja.getCell('A3').value).toBe('MOD-B');
     expect(Number(hoja.getCell('D3').value)).toBe(155);
     expect(hoja.getCell('E3').value).toBe('Aprobado');
+  });
+
+  /**
+   * ⭐ **V1-E8w — EL TARGET DEL CLIENTE NO SALE EN EL PAPEL.** `precioTarget` es un número NUESTRO
+   * (lo que el cliente dijo que querría pagar, §Post-F9.150) y el impreso es justo lo que se le
+   * manda A ÉL: enseñárselo de vuelta sería regalarle la mano. `MOD-A` lo trae en 130 a propósito,
+   * así que si alguien agregara la columna —o el `addRow` lo colara— esto se pone rojo.
+   */
+  it('⭐ el TARGET del cliente no se cuela: mismas cinco columnas y ni rastro del 130', async () => {
+    const { buffer } = await excelListaPrecios(sesion, 1, undefined, {
+      obtenerLista: fakeObtener,
+    });
+
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(buffer as unknown as ArrayBuffer);
+    const hoja = libro.worksheets[0]!;
+    const valoresDe = (fila: number): unknown[] => (hoja.getRow(fila).values as unknown[]).slice(1);
+
+    // Las columnas son EXACTAMENTE las de siempre (ni una de target).
+    expect(valoresDe(1)).toEqual(['Modelo', 'Descripción', 'Nº cliente', 'Precio', 'Estado']);
+    expect(hoja.columnCount).toBe(5);
+    // Y la fila del renglón CON target trae su precio aprobado (137), no el target (130).
+    expect(valoresDe(2)).toEqual(['MOD-A', 'Jogger', 'CA-001', 137, 'Aprobado']);
+    expect(valoresDe(2)).not.toContain(130);
   });
 });
 

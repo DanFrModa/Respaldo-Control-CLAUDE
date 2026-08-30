@@ -248,9 +248,13 @@ const CONCEPTOS_ANCLA = ['maquila', 'corte', 'empaque'] as const;
 export const COSTO_EMPAQUE_DEFECTO = 2.2;
 
 /**
- * ¿Es un renglón ANCLA fijo (B8/B12)? Los renglones auto-creados de maquila y corte: origen `manual`
- * + concepto fijo `maquila`/`corte`. Son ÚNICOS por precosto, editables pero NO eliminables (a
- * diferencia del resto, que en un borrador sí se puede quitar en la calculadora de negociación).
+ * ¿Es un renglón ANCLA fijo (B8/B12)? Los renglones auto-creados de origen `manual` bajo uno de los
+ * conceptos de {@link CONCEPTOS_ANCLA} — hoy **tres**: `maquila`, `corte` y `empaque` (este último
+ * desde V1-E8w / §Post-F9.153). Son ÚNICOS por precosto, editables pero NO eliminables (a diferencia
+ * del resto, que en un borrador sí se puede quitar en la calculadora de negociación).
+ *
+ * ⚠️ La lista NO se repite aquí a propósito: se lee de `CONCEPTOS_ANCLA`, para que agregar una cuarta
+ * ancla no deje este docstring mintiendo — que es justo lo que pasó cuando entró `empaque`.
  */
 function esAnclaFija(origen: string, conceptoCodigo: string): boolean {
   return origen === 'manual' && (CONCEPTOS_ANCLA as readonly string[]).includes(conceptoCodigo);
@@ -844,12 +848,15 @@ export async function recalcularDesdeBom(
 }
 
 /**
- * Agrega un renglón MANUAL (estampado, otros procesos, otros…) contra un `ConceptoCosto` activo y NO
- * fijo. El importe = `consumo × precioUnit` (si hay consumo) o `precioUnit` a secas. Sólo sobre un
- * BORRADOR. Requiere `desarrollo.precostear`.
+ * Agrega un renglón MANUAL (estampado, otros procesos, otros…) contra un `ConceptoCosto` ACTIVO — el
+ * `fijo` del catálogo NO veta ya (lo que manda es la regla de las anclas de aquí abajo). El importe =
+ * `consumo × precioUnit` (si hay consumo) o `precioUnit` a secas. Sólo sobre un BORRADOR. Requiere
+ * `desarrollo.precostear`.
  *
- * Se RECHAZAN sólo los conceptos ANCLA (`maquila`/`corte`): son ÚNICOS por prenda y ya tienen su
- * renglón auto-creado (se EDITA, no se duplica). Cualquier otro concepto activo se puede agregar a
+ * De los TRES conceptos ANCLA (`maquila`/`corte`/`empaque`) sólo se rechaza el que YA ESTÉ PUESTO en
+ * este precosto: son ÚNICOS por prenda, así que el que ya tiene su renglón se EDITA, no se duplica —
+ * pero el que falta SÍ se puede agregar a mano (V1-E8w: `empaque` es ancla desde entonces, y los
+ * borradores anteriores nacieron sin él). Cualquier otro concepto activo se puede agregar a
  * mano — incluidos tela/avíos como renglón de la calculadora de negociación (R5, B12): un manual bajo
  * tela/avíos queda `origen:'manual'`, sobrevive al recalcular (no viene del BOM) y ES eliminable
  * (`eliminable = !esAncla`), así que no queda atrapado como antes.
@@ -882,7 +889,9 @@ export async function agregarLineaManual(
 
     const concepto = await tx.conceptoCosto.findUnique({
       where: { id: datos.idConceptoCosto },
-      select: { id: true, codigo: true, nombre: true, activo: true, fijo: true },
+      // `fijo` ya NO se trae: la regla de anclas mira `CONCEPTOS_ANCLA` + la presencia en ESTE
+      // precosto, no la bandera del catálogo (V1-E8w). Quedaba muerto en el select.
+      select: { id: true, codigo: true, nombre: true, activo: true },
     });
     if (concepto === null) {
       throw new ErrorNoEncontrado('ConceptoCosto', datos.idConceptoCosto);
