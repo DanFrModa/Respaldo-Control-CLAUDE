@@ -25,9 +25,15 @@ function fmt(n: number): string {
 
 /**
  * EXISTENCIAS EN PODER DEL MAQUILERO (F3-E5, form `MaqExis` del viejo): lo que cada maquilero tiene
- * pendiente de devolver = enviado − recibido, por orden y proceso (Σ de etapas, sin acumuladores).
- * Filtro por maquilero. RESPONSIVE: tabla en escritorio, tarjetas en móvil (consultar también es
- * móvil, regla del plan).
+ * pendiente de devolver = `enviado − recibido − incompletas`, por orden y proceso (Σ de etapas, sin
+ * acumuladores). Filtro por maquilero. RESPONSIVE: tabla en escritorio, tarjetas en móvil
+ * (consultar también es móvil, regla del plan).
+ *
+ * ⭐ V1-E8v (§Post-F9.147) — DANIEL, sobre esta pantalla: *"Al registrarlas como incompletas
+ * entregadas, dejan de estar en la maquila"*. Las prendas incompletas ya volvieron del taller, así
+ * que NO cuentan en «En poder» (antes sí, y la pantalla decía que el maquilero tenía piezas que ya
+ * había devuelto). Se muestran en su propia columna para que el renglón cuadre a la vista:
+ * `enviado = recibido + incompletas + en poder`.
  *
  * `produccion.wip-ver` gobierna el acceso a la pantalla. (Esta misma cuenta la reusa EsMa en F6.)
  */
@@ -52,9 +58,12 @@ export function ExistenciasMaquileroPagina(): React.JSX.Element {
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Existencias en poder del maquilero
           </h1>
+          {/* ⚠️ El subtítulo NO repite la fórmula. Decía «(enviado − recibido)» e invitaba a restar
+              las dos columnas: con 100 enviadas y 95 recibidas daba 5, mientras «En poder» decía 0
+              porque las otras 5 volvieron incompletas (V1-E8v). La pantalla se contradecía sola. */}
           <p className="text-[12.5px] text-muted-foreground">
-            Piezas enviadas que el maquilero aún no devuelve (enviado − recibido), por orden y
-            proceso.
+            Piezas que el maquilero todavía tiene en su taller, por orden y proceso. Las prendas
+            incompletas ya las devolvió: se cuentan aparte y no le siguen contando.
           </p>
         </div>
       </header>
@@ -114,8 +123,13 @@ export function ExistenciasMaquileroPagina(): React.JSX.Element {
                     <p className="text-xs text-muted-foreground">
                       #{f.folioOrden} · {f.codigoModelo} · {f.tipoProceso}
                     </p>
+                    {/* Las cuatro cubetas del renglón (§Post-F9.147): de lo enviado, esto volvió
+                        bueno, esto volvió incompleto —y se perdió— y el resto (`enPoder`, el número
+                        grande de la derecha) sigue en su taller. Las incompletas sólo se nombran
+                        cuando las hay: en el 99 % de los renglones son 0 y sobrarían. */}
                     <p className="text-xs text-muted-foreground">
                       {fmt(f.enviado)} enviadas · {fmt(f.recibido)} recibidas
+                      {f.incompletas > 0 ? ` · ${fmt(f.incompletas)} incompletas` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 text-right">
@@ -141,6 +155,7 @@ export function ExistenciasMaquileroPagina(): React.JSX.Element {
                   <TableHead>Proceso</TableHead>
                   <TableHead className="text-right">Enviado</TableHead>
                   <TableHead className="text-right">Recibido</TableHead>
+                  <TableHead className="text-right">Incompletas</TableHead>
                   <TableHead className="text-right">En poder</TableHead>
                 </TableRow>
               </TableHeader>
@@ -153,6 +168,10 @@ export function ExistenciasMaquileroPagina(): React.JSX.Element {
                     <TableCell>{f.tipoProceso}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(f.enviado)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(f.recibido)}</TableCell>
+                    {/* Cuarta cubeta (V1-E8v): volvieron del taller, pero se perdieron. Restan de
+                        «En poder» igual que las recibidas — por eso la fila cuadra
+                        `enviado = recibido + incompletas + en poder`. */}
+                    <TableCell className="text-right tabular-nums">{fmt(f.incompletas)}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">
                       {fmt(f.enPoder)}
                     </TableCell>

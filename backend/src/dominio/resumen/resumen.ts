@@ -179,6 +179,9 @@ async function contarOrdenesAbiertas(cliente: ClienteLectura, idEmpresa: number)
         COALESCE(SUM(d."cantidad") FILTER (WHERE e."tipo" = 'corte'), 0)::int          AS "cortado",
         COALESCE(SUM(d."cantidad") FILTER (WHERE e."tipo" = 'envio_maquila'), 0)::int  AS "enviado",
         COALESCE(SUM(d."cantidad") FILTER (WHERE e."tipo" = 'recibo_maquila'), 0)::int AS "recibido",
+        COALESCE(SUM(d."cantidad_incompletas") FILTER (
+          WHERE e."tipo" = 'recibo_maquila'
+        ), 0)::int AS "incompletas",
         COALESCE(SUM(d."cantidad") FILTER (
           WHERE e."tipo" = 'recibo_maquila' AND tp."genera_entrada_pt"
         ), 0)::int AS "recibido_costura",
@@ -193,7 +196,7 @@ async function contarOrdenesAbiertas(cliente: ClienteLectura, idEmpresa: number)
       AND (
         (s."pedido" - s."cortado") <> 0
         OR (s."cortado" - s."enviado") <> 0
-        OR (s."enviado" - s."recibido") <> 0
+        OR (s."enviado" - s."recibido" - s."incompletas") <> 0
         OR (s."recibido_costura" - s."entregado") <> 0
       )
   `);
@@ -201,8 +204,14 @@ async function contarOrdenesAbiertas(cliente: ClienteLectura, idEmpresa: number)
 }
 
 /**
- * Maquileros con saldo ≠ 0 en su poder (Σ enviado − recibido POR TERCERO, etapas vivas de órdenes
- * vivas — mismo universo que `agregadoWip`). El "en N maquileros" del pie de la tarjeta WIP.
+ * Maquileros con saldo ≠ 0 en su poder (Σ `enviado − buenas − incompletas` POR TERCERO, etapas vivas
+ * de órdenes vivas — mismo universo que `agregadoWip`). El "en N maquileros" del pie de la tarjeta
+ * WIP.
+ *
+ * ⭐ Las INCOMPLETAS restan (V1-E8v, §Post-F9.147): ya volvieron del taller, así que el maquilero
+ * que entregó 95 buenas + 5 incompletas de 100 NO tiene saldo en su poder y no debe contarse aquí.
+ * Es la misma regla de `pendientePorCelda` (`produccion/incompletas.ts`), en SQL porque esta cuenta
+ * se hace entera en la base.
  */
 async function contarMaquilerosConSaldo(
   cliente: ClienteLectura,
@@ -222,7 +231,10 @@ async function contarMaquilerosConSaldo(
         AND o."estado" <> 'cancelada'
       GROUP BY e."id_tercero"
       HAVING SUM(
-        CASE WHEN e."tipo" = 'envio_maquila' THEN d."cantidad" ELSE -d."cantidad" END
+        CASE
+          WHEN e."tipo" = 'envio_maquila' THEN d."cantidad"
+          ELSE -(d."cantidad" + COALESCE(d."cantidad_incompletas", 0))
+        END
       ) <> 0
     ) saldos
   `);

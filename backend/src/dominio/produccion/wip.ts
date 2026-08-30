@@ -8,7 +8,7 @@
  * Fórmulas del avance por orden (form `Proceso` del viejo; cada una excluye canceladas):
  *  • Por cortar          = pedido(orden) − cortado
  *  • Cortado por enviar  = cortado − enviado            (por proceso/TipoProceso, D8)
- *  • Por recibir         = enviado − recibido           (por proceso/TipoProceso)
+ *  • Por recibir         = enviado − recibido − incompletas   (por proceso/TipoProceso)
  *  • Entregado a cliente = Σ entregas (etapa `entrega_cliente`)
  *  • Por entregar        = recibido(costura, procesos `generaEntradaPt`) − entregado a cliente
  *
@@ -27,7 +27,15 @@
  *
  * Las banderas/flags del querystring se re-validan en el dominio con esquemas LOCALES `z.boolean()`
  * (no el `stringbool` del contrato) — evita el 400 espurio del hotfix F2 (PR #56). La consulta del
- * maquilero la REUSARÁ EsMa en F6 (enviado − recibido = base del cargo/cuenta corriente).
+ * maquilero la REUSARÁ EsMa en F6 (base del cargo/cuenta corriente).
+ *
+ * ⭐ LAS PRENDAS INCOMPLETAS RESTAN DEL PENDIENTE (V1-E8v, §Post-F9.147). DANIEL: *"Al registrarlas
+ * como incompletas entregadas, dejan de estar en la maquila"*. Ya volvieron del taller, así que
+ * salen del tránsito aunque no se produzcan, no se inventaríen y no se paguen. Todas las fórmulas
+ * de "por recibir" / "en poder del maquilero" de este módulo restan `incompletas` por la MISMA
+ * función, {@link pendientePorCelda} (`produccion/incompletas.ts`), que es también el tope que
+ * valida el guardado bajo lock. Lo que queda en el pendiente es el FALTANTE: lo que nunca volvió y
+ * se le cobra.
  */
 import { z } from 'zod';
 
@@ -46,7 +54,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { recibiblePorCelda } from './incompletas.js';
+import { pendientePorCelda } from './incompletas.js';
 import { armarBusqueda } from './ordenes.js';
 
 /** Cliente de LECTURA (sin transacción) — el tipo del resultado de `clienteLectura`. */
@@ -60,16 +68,22 @@ function claveCelda(idColor: number, idTalla: number): string {
 }
 
 /**
- * Suma `EtapaMovimientoDet.cantidad` POR ORDEN (un total por orden) para un conjunto de órdenes y un
- * filtro de tipo (+ opcionalmente "solo procesos que meten a PT"), en UNA sola consulta agregada
- * (groupBy en la base; no trae el detalle a memoria). Solo etapas VIVAS (canceladas excluidas).
- * Devuelve `idOrden → total`; las órdenes sin etapas de ese tipo no aparecen (se proyectan con 0).
+ * Suma una columna de `EtapaMovimientoDet` POR ORDEN (un total por orden) para un conjunto de
+ * órdenes y un filtro de tipo (+ opcionalmente "solo procesos que meten a PT"), en UNA sola consulta
+ * agregada (groupBy en la base; no trae el detalle a memoria). Solo etapas VIVAS (canceladas
+ * excluidas). Devuelve `idOrden → total`; las órdenes sin etapas de ese tipo no aparecen (se
+ * proyectan con 0).
+ *
+ * `columna` elige QUÉ se suma: `cantidad` (piezas buenas, el caso normal) o `cantidadIncompletas`
+ * (las prendas incompletas del recibo, V1-E8v). Son columnas DISTINTAS a propósito: mezclarlas en
+ * una sola sería justo lo que §Post-F9.136 prohíbe (las incompletas no producen, no inventarían y
+ * no se pagan) — lo que sí comparten desde §Post-F9.147 es que las dos cierran el pendiente.
  */
 async function totalesPorOrden(
   cliente: ClienteLectura,
   idsOrden: number[],
   tipo: TipoEtapaMovimiento,
-  opciones: { soloEntradaPt?: boolean } = {},
+  opciones: { soloEntradaPt?: boolean; columna?: 'cantidad' | 'cantidadIncompletas' } = {},
 ): Promise<Map<number, number>> {
   const totales = new Map<number, number>();
   if (idsOrden.length === 0) {
@@ -83,10 +97,11 @@ async function totalesPorOrden(
       ...(opciones.soloEntradaPt ? { tipoProceso: { generaEntradaPt: true } } : {}),
     },
   };
+  const columna = opciones.columna ?? 'cantidad';
   const filas = await cliente.etapaMovimientoDet.groupBy({
     by: ['idEtapaMov'],
     where,
-    _sum: { cantidad: true },
+    _sum: { cantidad: true, cantidadIncompletas: true },
   });
   // groupBy por etapa da el total por etapa; reagrupamos por orden con un par (idEtapaMov, idOrden).
   const idsEtapa = filas.map((f) => f.idEtapaMov);
@@ -98,7 +113,7 @@ async function totalesPorOrden(
   for (const f of filas) {
     const idOrden = ordenPorEtapa.get(f.idEtapaMov);
     if (idOrden === undefined) continue;
-    totales.set(idOrden, (totales.get(idOrden) ?? 0) + (f._sum.cantidad ?? 0));
+    totales.set(idOrden, (totales.get(idOrden) ?? 0) + (f._sum[columna] ?? 0));
   }
   return totales;
 }
@@ -193,9 +208,10 @@ async function sumarCeldasPorTercero(
     },
   });
   // `celdas` = piezas BUENAS (lo producido/enviado); `incompletas` = las prendas incompletas que
-  // ese tercero entregó (V1-E8k, §Post-F9.136). Van SEPARADAS a propósito: las incompletas NO
-  // cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ consumen lo
-  // que todavía se le puede recibir. En envíos/cortes la columna es NULL y el mapa queda vacío.
+  // ese tercero entregó (V1-E8k). Van SEPARADAS a propósito, y NO porque cuenten distinto en el
+  // pendiente —desde V1-E8v las dos lo cierran igual (§Post-F9.147)—: separadas porque sólo las
+  // BUENAS producen, se inventarían y se pagan. En envíos/cortes la columna es NULL y el mapa
+  // queda vacío.
   const porTercero = new Map<
     number | null,
     { nombre: string; celdas: Map<string, number>; incompletas: Map<string, number> }
@@ -242,8 +258,9 @@ function plegarPorTercero(
 }
 
 /**
- * "Por recibir" de un proceso DESGLOSADO POR MAQUILERO: `enviado − recibido` de cada tercero, por
- * color×talla. Lo comparten el drill-down del WIP y los pendientes del recibo (`recibos.ts`) para
+ * "Por recibir" de un proceso DESGLOSADO POR MAQUILERO: `enviado − buenas − incompletas` de cada
+ * tercero, por color×talla (V1-E8v, §Post-F9.147: la incompleta ya volvió, así que sale del
+ * tránsito). Lo comparten el drill-down del WIP y los pendientes del recibo (`recibos.ts`) para
  * que las dos pantallas de recibo que existen ofrezcan y topen EXACTAMENTE lo mismo.
  *
  * Se enumeran los terceros que aparecen en envíos **o** en recibos vivos: un maquilero con recibos
@@ -261,7 +278,7 @@ export async function pendientePorMaquilero(
   porMaquilero: WipMaquileroPendiente[];
   enviado: Map<string, number>;
   recibido: Map<string, number>;
-  /** Prendas INCOMPLETAS ya entregadas, por celda (V1-E8k). NO restan del pendiente. */
+  /** Prendas INCOMPLETAS ya entregadas, por celda (V1-E8k). SÍ restan del pendiente (V1-E8v). */
   incompletas: Map<string, number>;
 }> {
   const enviadoPorTercero = await sumarCeldasPorTercero(
@@ -293,20 +310,18 @@ export async function pendientePorMaquilero(
         const m = metaPara(meta, clave);
         return {
           ...m,
-          // PENDIENTE = enviado − recibido BUENO. Las incompletas NO lo cierran (§Post-F9.136,
-          // decisión A: Daniel lo necesita abierto para cobrar el faltante); viajan al lado para
-          // que quien capture sepa que ya no puede recibirlas como buenas.
-          cantidad:
-            (grupoEnviado?.celdas.get(clave) ?? 0) - (grupoRecibido?.celdas.get(clave) ?? 0),
-          incompletas: grupoRecibido?.incompletas.get(clave) ?? 0,
-          // RECIBIBLE = lo que TODAVÍA se le puede recibir, por la MISMA función que usa el tope
-          // de `registrarReciboMaquila` bajo lock. La pantalla lo consume tal cual: si aquí se
-          // publicara solo el pendiente y el cliente hiciera la resta, sería la misma regla escrita
-          // en dos lados — que deriva.
-          recibible: recibiblePorCelda(
+          // PENDIENTE = enviado − buenas − incompletas, por la MISMA función que usa el tope de
+          // `registrarReciboMaquila` bajo lock (V1-E8v, §Post-F9.147). Es UN SOLO número: lo que el
+          // maquilero todavía tiene y lo que todavía se le puede recibir son lo mismo desde que la
+          // incompleta sale del tránsito. Lo que quede aquí cuando ya cerró su entrega es el
+          // FALTANTE, que es lo que se le cobra.
+          cantidad: pendientePorCelda(
             grupoEnviado?.celdas.get(clave) ?? 0,
             (grupoRecibido?.celdas.get(clave) ?? 0) + (grupoRecibido?.incompletas.get(clave) ?? 0),
           ),
+          // Las incompletas viajan al lado, informativas: la trazabilidad de las cuatro cubetas que
+          // pidió Daniel (enviado = primeras + segundas + faltantes + incompletas).
+          incompletas: grupoRecibido?.incompletas.get(clave) ?? 0,
         };
       }),
     )
@@ -316,9 +331,12 @@ export async function pendientePorMaquilero(
       idMaquilero: idTercero,
       maquilero: grupoEnviado?.nombre ?? grupoRecibido?.nombre ?? 'Sin asignar',
       celdas,
-      totalPendiente:
-        [...(grupoEnviado?.celdas.values() ?? [])].reduce((s, v) => s + v, 0) -
-        [...(grupoRecibido?.celdas.values() ?? [])].reduce((s, v) => s + v, 0),
+      // Mismo derivado que las celdas, en total: enviado − buenas − incompletas (V1-E8v).
+      totalPendiente: pendientePorCelda(
+        [...(grupoEnviado?.celdas.values() ?? [])].reduce((s, v) => s + v, 0),
+        [...(grupoRecibido?.celdas.values() ?? [])].reduce((s, v) => s + v, 0) +
+          [...(grupoRecibido?.incompletas.values() ?? [])].reduce((s, v) => s + v, 0),
+      ),
       totalIncompletas: [...(grupoRecibido?.incompletas.values() ?? [])].reduce((s, v) => s + v, 0),
     };
   });
@@ -361,7 +379,13 @@ export interface TotalesOrden {
   pedido: number;
   cortado: number;
   enviado: number;
+  /** Piezas BUENAS recibidas (primeras + segundas). NO incluye las incompletas. */
   recibido: number;
+  /**
+   * Prendas INCOMPLETAS entregadas (V1-E8v, §Post-F9.147). Ya volvieron del taller, así que cierran
+   * el pendiente por recibir aunque no se hayan producido ni inventariado.
+   */
+  incompletas: number;
   recibidoCostura: number;
   entregado: number;
 }
@@ -379,7 +403,12 @@ export function pendientesDerivados(t: TotalesOrden): {
   return {
     porCortar: t.pedido - t.cortado,
     cortadoPorEnviar: t.cortado - t.enviado,
-    porRecibir: t.enviado - t.recibido,
+    // enviado − buenas − incompletas (V1-E8v, §Post-F9.147: la incompleta ya volvió del taller y
+    // deja de estar en la maquila). Lo que queda es el FALTANTE, que se le cobra al maquilero.
+    // ⭐ Por la MISMA función que todas las demás puertas, no por la fórmula escrita a mano: la
+    // doctrina de la etapa es «guardas gemelas = la misma función, nunca un resumen suyo», y este
+    // sitio era el único de TypeScript que la reescribía inline (hallazgo del reviewer).
+    porRecibir: pendientePorCelda(t.enviado, t.recibido + t.incompletas),
     porEntregar: t.recibidoCostura - t.entregado,
   };
 }
@@ -426,22 +455,43 @@ export async function agregadoWip(
     });
     return r._sum.cantidad ?? 0;
   };
-  const [pedidoAgg, cortado, enviado, recibido, recibidoCostura, entregado] = await Promise.all([
-    cliente.ordenLineaTalla.aggregate({
-      where: { ordenLinea: { orden: where } },
-      _sum: { cantidad: true },
-    }),
-    sumaEtapa(TipoEtapaMovimiento.corte),
-    sumaEtapa(TipoEtapaMovimiento.envio_maquila),
-    sumaEtapa(TipoEtapaMovimiento.recibo_maquila),
-    sumaEtapa(TipoEtapaMovimiento.recibo_maquila, { soloEntradaPt: true }),
-    sumaEtapa(TipoEtapaMovimiento.entrega_cliente),
-  ]);
+  /**
+   * Σ de prendas INCOMPLETAS de los recibos vivos del universo filtrado (V1-E8v). Va aparte de
+   * `sumaEtapa` porque suma OTRA columna (`cantidadIncompletas`, que en corte/envío/entrega es
+   * NULL): mezclarla en `_sum.cantidad` sería justo lo que §Post-F9.136 prohíbe.
+   */
+  const sumaIncompletas = async (): Promise<number> => {
+    const r = await cliente.etapaMovimientoDet.aggregate({
+      where: {
+        etapaMov: {
+          tipo: TipoEtapaMovimiento.recibo_maquila,
+          canceladoEn: null,
+          orden: where,
+        },
+      },
+      _sum: { cantidadIncompletas: true },
+    });
+    return r._sum.cantidadIncompletas ?? 0;
+  };
+  const [pedidoAgg, cortado, enviado, recibido, incompletas, recibidoCostura, entregado] =
+    await Promise.all([
+      cliente.ordenLineaTalla.aggregate({
+        where: { ordenLinea: { orden: where } },
+        _sum: { cantidad: true },
+      }),
+      sumaEtapa(TipoEtapaMovimiento.corte),
+      sumaEtapa(TipoEtapaMovimiento.envio_maquila),
+      sumaEtapa(TipoEtapaMovimiento.recibo_maquila),
+      sumaIncompletas(),
+      sumaEtapa(TipoEtapaMovimiento.recibo_maquila, { soloEntradaPt: true }),
+      sumaEtapa(TipoEtapaMovimiento.entrega_cliente),
+    ]);
   const t: TotalesOrden = {
     pedido: pedidoAgg._sum.cantidad ?? 0,
     cortado,
     enviado,
     recibido,
+    incompletas,
     recibidoCostura,
     entregado,
   };
@@ -549,7 +599,15 @@ export async function consultarWip(
 
 /** Totales en cero (para órdenes sin etapas ni matriz). */
 function totalesVacios(): TotalesOrden {
-  return { pedido: 0, cortado: 0, enviado: 0, recibido: 0, recibidoCostura: 0, entregado: 0 };
+  return {
+    pedido: 0,
+    cortado: 0,
+    enviado: 0,
+    recibido: 0,
+    incompletas: 0,
+    recibidoCostura: 0,
+    entregado: 0,
+  };
 }
 
 /**
@@ -564,20 +622,27 @@ async function totalesDeOrdenes(
   if (idsOrden.length === 0) {
     return resultado;
   }
-  const [pedido, cortado, enviado, recibido, recibidoCostura, entregado] = await Promise.all([
-    pedidoPorOrden(cliente, idsOrden),
-    totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.corte),
-    totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.envio_maquila),
-    totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.recibo_maquila),
-    totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.recibo_maquila, { soloEntradaPt: true }),
-    totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.entrega_cliente),
-  ]);
+  const [pedido, cortado, enviado, recibido, incompletas, recibidoCostura, entregado] =
+    await Promise.all([
+      pedidoPorOrden(cliente, idsOrden),
+      totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.corte),
+      totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.envio_maquila),
+      totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.recibo_maquila),
+      totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.recibo_maquila, {
+        columna: 'cantidadIncompletas',
+      }),
+      totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.recibo_maquila, {
+        soloEntradaPt: true,
+      }),
+      totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.entrega_cliente),
+    ]);
   for (const id of idsOrden) {
     resultado.set(id, {
       pedido: pedido.get(id) ?? 0,
       cortado: cortado.get(id) ?? 0,
       enviado: enviado.get(id) ?? 0,
       recibido: recibido.get(id) ?? 0,
+      incompletas: incompletas.get(id) ?? 0,
       recibidoCostura: recibidoCostura.get(id) ?? 0,
       entregado: entregado.get(id) ?? 0,
     });
@@ -615,6 +680,7 @@ function aFilaTablero(
     cortado: t.cortado,
     enviado: t.enviado,
     recibido: t.recibido,
+    incompletas: t.incompletas,
     recibidoCostura: t.recibidoCostura,
     entregado: t.entregado,
     porCortar: p.porCortar,
@@ -779,11 +845,22 @@ export async function wipDeOrden(
   const porRecibir: WipOrden['porRecibir'] = [];
   let recibidoTotal = 0;
   let recibidoCostura = 0;
+  /**
+   * Σ ENVIADO a procesos que meten a PT (costura). Lo publica el SERVIDOR (A1) porque el stepper del
+   * panel de avance lo necesita y **despejarlo en el cliente es re-derivar una regla de negocio**:
+   * hasta V1-E8v la pantalla hacía `recibidoCostura + Σ totalPendiente`, que INVIERTE la fórmula del
+   * pendiente. En cuanto el pendiente empezó a restar las incompletas (§Post-F9.147) ese despeje
+   * empezó a devolver `enviado − incompletas` y la pantalla decía que al maquilero se le mandó menos
+   * de lo que se le mandó — y le regalaba esas piezas al conteo de Arte.
+   */
+  let enviadoCostura = 0;
+  /** Σ de prendas INCOMPLETAS entregadas en la orden (todas sus maquilas). Cuarta cubeta. */
+  let incompletasTotal = 0;
   for (const proc of procesos) {
     if (proc.idTipoProceso === null) continue;
     // Envío y recibo del proceso, DESGLOSADOS por maquilero y plegados a los totales del proceso:
     // una sola pasada por tipo de movimiento (el helper lo comparte con `pendientesPorRecibir`).
-    const { porMaquilero, enviado, recibido } = await pendientePorMaquilero(
+    const { porMaquilero, enviado, recibido, incompletas } = await pendientePorMaquilero(
       cliente,
       idOrden,
       proc.idTipoProceso,
@@ -791,8 +868,16 @@ export async function wipDeOrden(
     );
     const generaEntradaPt = proc.tipoProceso?.generaEntradaPt ?? false;
     const sumaRecibido = [...recibido.values()].reduce((s, v) => s + v, 0);
+    const sumaEnviado = [...enviado.values()].reduce((s, v) => s + v, 0);
     recibidoTotal += sumaRecibido;
-    if (generaEntradaPt) recibidoCostura += sumaRecibido;
+    if (generaEntradaPt) {
+      recibidoCostura += sumaRecibido;
+      // Suma DIRECTA de los envíos del proceso, no un despeje del pendiente (ver `enviadoCostura`).
+      enviadoCostura += sumaEnviado;
+    }
+    // Las incompletas de ESTE proceso, que restan del pendiente por recibir (V1-E8v) pero NUNCA
+    // de `recibido` (no se produjeron: regla 1 de §Post-F9.136).
+    incompletasTotal += [...incompletas.values()].reduce((s, v) => s + v, 0);
 
     const datosProceso = {
       idTipoProceso: proc.idTipoProceso,
@@ -819,12 +904,23 @@ export async function wipDeOrden(
         [...enviado.values()].reduce((s, v) => s + v, 0),
     });
 
-    // enviado − recibido a este proceso.
-    const clavesRec = new Set<string>([...enviado.keys(), ...recibido.keys()]);
+    // enviado − recibido − incompletas a este proceso (V1-E8v, §Post-F9.147: la incompleta ya
+    // volvió del taller, así que sale del tránsito). MISMA función que el tope del guardado.
+    const clavesRec = new Set<string>([
+      ...enviado.keys(),
+      ...recibido.keys(),
+      ...incompletas.keys(),
+    ]);
     const celdasRecibir = ordenarCeldas(
       [...clavesRec].map((clave) => {
         const m = metaPara(meta, clave);
-        return { ...m, cantidad: (enviado.get(clave) ?? 0) - (recibido.get(clave) ?? 0) };
+        return {
+          ...m,
+          cantidad: pendientePorCelda(
+            enviado.get(clave) ?? 0,
+            (recibido.get(clave) ?? 0) + (incompletas.get(clave) ?? 0),
+          ),
+        };
       }),
     )
       .filter((c) => c.cantidad !== 0)
@@ -834,9 +930,11 @@ export async function wipDeOrden(
       devuelveAPt: procesosQueDevuelven.has(proc.idTipoProceso),
       stockSinOrden: bucketPorProceso.get(proc.idTipoProceso) ?? false,
       celdas: celdasRecibir,
-      totalPendiente:
-        [...enviado.values()].reduce((s, v) => s + v, 0) -
-        [...recibido.values()].reduce((s, v) => s + v, 0),
+      totalPendiente: pendientePorCelda(
+        [...enviado.values()].reduce((s, v) => s + v, 0),
+        [...recibido.values()].reduce((s, v) => s + v, 0) +
+          [...incompletas.values()].reduce((s, v) => s + v, 0),
+      ),
       porMaquilero,
     });
   }
@@ -879,7 +977,15 @@ export async function wipDeOrden(
     cortado: totalCortado,
     enviado: totalEnviado,
     recibido: recibidoTotal,
+    enviadoCostura,
     recibidoCostura,
+    // Las dos cifras que completan la TRAZABILIDAD DE LAS CUATRO CUBETAS que pidió Daniel
+    // (§Post-F9.147: *"debemos de saber que paso con cada prenda despues"*):
+    //   enviado = buenas (`recibido`) + incompletas + faltante (`pendientePorRecibir`).
+    // Sin ellas el drill-down enseñaba `enviado` y `recibido` y el hueco entre los dos no tenía
+    // nombre: podían ser prendas en el taller o prendas perdidas, y son cosas distintas.
+    incompletas: incompletasTotal,
+    pendientePorRecibir: pendientePorCelda(totalEnviado, recibidoTotal + incompletasTotal),
     entregado: totalEntregado,
     porEntregar: recibidoCostura - totalEntregado,
     porCortar,
@@ -903,7 +1009,7 @@ async function totalEtapa(
   return agregado._sum.cantidad ?? 0;
 }
 
-// ── Existencias en poder del maquilero (enviado − recibido) ──────────────────────────────────────
+// ── Existencias en poder del maquilero (enviado − recibido − incompletas) ───────────────────────
 
 /**
  * Filtros de la consulta de EXISTENCIAS EN PODER DEL MAQUILERO EN DOMINIO (tipos nativos). La ruta
@@ -929,9 +1035,28 @@ function claveGrupoMaquilero(
 
 /**
  * EXISTENCIAS EN PODER DEL MAQUILERO (form `MaqExis` del viejo): por maquilero × proceso × orden, lo
- * que el maquilero tiene pendiente de devolver = enviado − recibido (Σ de `EtapaMovimientoDet`,
- * etapas vivas). Solo devuelve filas con saldo ≠ 0. Filtros por maquilero/proceso/orden. Filtra por
- * la empresa activa (A9). La REUSARÁ EsMa en F6 (esta cuenta es la base del cargo/saldo del maquilero).
+ * que el maquilero tiene pendiente de devolver = **enviado − buenas − incompletas** (Σ de
+ * `EtapaMovimientoDet`, etapas vivas). Solo devuelve filas con saldo ≠ 0. Filtros por
+ * maquilero/proceso/orden. Filtra por la empresa activa (A9). La REUSA EsMa (esta cuenta es la base
+ * del cargo/saldo del maquilero).
+ *
+ * ⭐ V1-E8v (§Post-F9.147) — ÉSTA ES LA PANTALLA QUE DANIEL DESCRIBIÓ LITERALMENTE: *"Al
+ * registrarlas como incompletas entregadas, dejan de estar en la maquila"*. Antes, el maquilero que
+ * devolvía 95 buenas + 5 incompletas de 100 seguía apareciendo aquí con 5 «en su poder», y no tenía
+ * nada. Ahora el saldo queda en 0 y la fila desaparece.
+ *
+ * 🔴 DECISIÓN, no descuido: el filtro `enPoder !== 0` se CONSERVA aunque eso haga desaparecer la
+ * columna «Incompletas» justo en el caso de Daniel (95 + 5 de 100). La pantalla se llama
+ * «Existencias EN PODER del maquilero» y contesta *"¿qué tiene fulano en su taller?"*: una fila con
+ * 0 en poder **no es una existencia**, y ampliar el filtro a `|| incompletas !== 0` la convertiría
+ * en un histórico de entregas, contradiciendo su propio título. ⇒ **La columna sirve para que la
+ * fila que SÍ existe cuadre a la vista** (`enviado = recibido + incompletas + en poder`), no para
+ * ser el registro de las incompletas.
+ *
+ * ⚠️ Dónde SÍ se ven siempre, sin filtro que las esconda: el **drill-down del tablero WIP** de la
+ * orden (las cuatro cubetas como métricas), el **tablero WIP de Indicadores** (columna y tarjeta) y
+ * el **estado de cuenta del maquilero** (bloque de incompletas de `incompletasDeMaquilero`, que es
+ * el registro de la regla 4 de §Post-F9.136 y NO depende de este saldo).
  *
  * Implementación: una sola lectura del detalle de envíos y recibos vivos (con su etapa: maquilero,
  * proceso, orden) y se restan en memoria agrupando por (maquilero, proceso, orden). El volumen por
@@ -957,6 +1082,7 @@ export async function consultarExistenciaMaquilero(
   // Detalle de envíos y recibos vivos con su etapa (maquilero/proceso/orden) y nombres legibles.
   const seleccion = {
     cantidad: true,
+    cantidadIncompletas: true,
     etapaMov: {
       select: {
         tipo: true,
@@ -991,6 +1117,7 @@ export async function consultarExistenciaMaquilero(
     codigoModelo: string;
     enviado: number;
     recibido: number;
+    incompletas: number;
   }
   const grupos = new Map<string, Acum>();
 
@@ -1010,6 +1137,7 @@ export async function consultarExistenciaMaquilero(
         codigoModelo: e.orden.modelo.codigo,
         enviado: 0,
         recibido: 0,
+        incompletas: 0,
       } satisfies Acum);
     grupos.set(clave, acum);
     return { clave, acum };
@@ -1021,7 +1149,11 @@ export async function consultarExistenciaMaquilero(
   }
   for (const fila of recibos) {
     const r = tomar(fila);
-    if (r !== null) r.acum.recibido += fila.cantidad;
+    if (r === null) continue;
+    r.acum.recibido += fila.cantidad;
+    // Las incompletas van a su propia cubeta: NO son "recibido" (no se produjeron ni se pagan),
+    // pero SÍ salieron del taller y por eso restan del saldo en poder (V1-E8v).
+    r.acum.incompletas += fila.cantidadIncompletas ?? 0;
   }
 
   const filas = [...grupos.values()]
@@ -1035,7 +1167,10 @@ export async function consultarExistenciaMaquilero(
       codigoModelo: g.codigoModelo,
       enviado: g.enviado,
       recibido: g.recibido,
-      enPoder: g.enviado - g.recibido,
+      incompletas: g.incompletas,
+      // MISMA regla que `pendientePorCelda` (aquí en total, no por celda): lo que le queda al
+      // maquilero es lo que NO volvió — el faltante que se le cobra.
+      enPoder: pendientePorCelda(g.enviado, g.recibido + g.incompletas),
     }))
     .filter((f) => f.enPoder !== 0)
     .sort(

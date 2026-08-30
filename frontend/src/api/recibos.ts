@@ -73,7 +73,7 @@ async function listarRecibosSemanales(query: RecibosSemanalesQuery): Promise<Rec
 
 // ── Hooks ───────────────────────────────────────────────────────────────────
 
-/** Pendientes por recibir derivados de una orden (enviado − recibido). `habilitado` corta la query. */
+/** Pendientes por recibir de una orden (enviado − recibido − incompletas). `habilitado` corta la query. */
 export function usePendientesRecibir(
   idOrden: number | undefined,
   habilitado = true,

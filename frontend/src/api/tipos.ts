@@ -1471,7 +1471,7 @@ export type WipProcesoPendiente = WipOrden['cortadoPorEnviar'][number];
 /** Existencias en poder del maquilero (`GET /api/produccion/existencias-maquilero`). */
 export type ExistenciaMaquilero =
   paths['/api/produccion/existencias-maquilero']['get']['responses']['200']['content']['application/json'];
-/** Una fila de existencia en poder del maquilero (enviado − recibido). */
+/** Una fila de existencia en poder del maquilero (enviado − recibido − incompletas). */
 export type ExistenciaMaquileroFila = ExistenciaMaquilero['filas'][number];
 /** Parámetros de las existencias en poder del maquilero (querystring). */
 export type ExistenciaMaquileroQuery = NonNullable<

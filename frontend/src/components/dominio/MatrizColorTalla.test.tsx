@@ -38,10 +38,10 @@ describe('estadoCaptura (cuadra / faltan / sobran)', () => {
     expect(estado.texto).toContain('Sobran 20');
   });
 
-  it('V1-E8k · el sustantivo de la referencia es configurable (en el recibo NO es «el pendiente»)', () => {
-    // Desde las prendas incompletas, en el recibo la referencia y el pendiente son dos números
-    // distintos: el pendiente sigue abierto (lo que se le cobra) y la matriz topa en lo recibible.
-    // Llamarlos igual ponía dos números con el mismo nombre en la misma pantalla.
+  it('el sustantivo de la referencia es configurable (el recibo lo nombra a su manera)', () => {
+    // El recibo llama a la referencia «lo que todavía se le puede recibir», que desde V1-E8v
+    // (§Post-F9.147) es EL MISMO número que el pendiente del maquilero: sólo cambia el nombre, en
+    // el idioma de esa pantalla.
     const recibible = 'lo que todavía se le puede recibir';
     expect(estadoCaptura(100, 100, recibible)).toEqual({
       tono: 'ok',

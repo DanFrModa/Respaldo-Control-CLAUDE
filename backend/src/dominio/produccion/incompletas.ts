@@ -1,31 +1,57 @@
 /**
- * PRENDAS INCOMPLETAS del recibo de maquila (V1-E8k; §Post-F9.136). El módulo ÚNICO donde vive la
- * aritmética del concepto, para que las puertas que lo tocan llamen a la MISMA función y no a un
- * resumen suyo (una copia reducida deriva antes de comitearse).
+ * PRENDAS INCOMPLETAS del recibo de maquila (V1-E8k / V1-E8v; §Post-F9.136 + §Post-F9.147). El
+ * módulo ÚNICO donde vive la aritmética del concepto, para que las puertas que lo tocan llamen a la
+ * MISMA función y no a un resumen suyo (una copia reducida deriva antes de comitearse).
  *
  * QUÉ ES. Una prenda a la que le faltó una pieza y NUNCA se terminó de coser. No es una segunda
  * (una segunda tiene defecto pero se vende más barata): es una NO-PRENDA. Daniel exige que el
- * maquilero se la lleve de vuelta —*"porque los faltantes se los cobro"*— y que el sistema deje
- * constancia de la entrega.
+ * maquilero se la lleve de vuelta y que el sistema deje constancia de la entrega.
  *
- * LAS CUATRO REGLAS (§Post-F9.136, opción A elegida por Daniel):
+ * ⭐ LA INVARIANTE DE LAS CUATRO CUBETAS (§Post-F9.147, DANIEL 29-ago-2026: *"siempre es
+ * indispensable tener la trazabilidad completa de lo que se manda a fabricar. Si se cortan 100 y se
+ * entregan 100 al maquilero, debemos de saber que paso con cada prenda despues (primers, segundas,
+ * faltantes (cobradas al maquilero), o incompletas)"*):
+ *
+ *     enviado = primeras + segundas + faltantes + incompletas
+ *
+ * Las cuatro cubetas son EXCLUYENTES y suman lo enviado. `primeras`+`segundas` son las buenas
+ * (`EtapaMovimientoDet.cantidad`); `incompletas` es su columna propia; el **faltante** es el
+ * residuo — lo que NO volvió — y es lo único que sigue en poder del maquilero.
+ *
+ * LAS CINCO REGLAS DEL CONCEPTO:
  *  1. NO cuenta como producida: de 100 mandadas con 95 buenas + 5 incompletas, la orden produjo 95.
- *  2. NO entra a ningún inventario (ni primeras, ni segundas, ni un almacén aparte).
+ *  2. NO entra a ningún inventario (ni primeras, ni segundas, ni un almacén aparte). Se pierden.
  *  3. NO se paga: no engorda el cargo EsMa.
  *  4. SÍ se registra y SÍ se ve, en el ESTADO DE CUENTA del maquilero, FUERA del cargo.
+ *  5. ⭐ **SALE DEL TRÁNSITO** (V1-E8v): la prenda YA VOLVIÓ físicamente, así que deja de contar
+ *     como pendiente de entregar. DANIEL: *"Al registrarlas como incompletas entregadas, dejan de
+ *     estar en la maquila. El ya termino de entregar las 100… Pro las incompletas, ya no quedan
+ *     como pendientes de entregar. Y tampoco entra al inventario…. es decir se pierden esas
+ *     prendas. Pero si seria bueno saber en algun lado que esas prendas que se perdieron estan
+ *     incompletas."*
+ *
+ * 🔴 LA REGLA 5 CORRIGE la decisión A de §Post-F9.136, que decía que el pendiente quedaba ABIERTO
+ * "para cobrarle el faltante". Ese razonamiento **confundía incompleta con faltante**: el FALTANTE
+ * es la prenda que nunca volvió (ésa sí queda abierta y se le cobra); la INCOMPLETA ya volvió. Toda
+ * la prosa que afirmaba lo contrario quedó retirada del repo en V1-E8v.
  *
  * CÓMO SE CUMPLEN 1-3 SIN ESCRIBIR NI UNA GUARDA: las incompletas viven en su propia columna
  * (`EtapaMovimientoDet.cantidadIncompletas`), fuera de `cantidad`. Todo lo que produce, inventaría
- * o cobra —el kardex de PT, `esma/cargos.ts`, `esma/conciliacion.ts`, el EDR, los KPIs, el WIP—
- * suma `cantidad` (o `cantidadPrimeras`/`cantidadSegundas`), así que las incompletas quedan fuera
- * POR CONSTRUCCIÓN, no por un filtro que alguien pueda olvidar mañana.
+ * o cobra —el kardex de PT, `esma/cargos.ts`, `esma/conciliacion.ts`, el EDR, los KPIs— suma
+ * `cantidad` (o `cantidadPrimeras`/`cantidadSegundas`), así que las incompletas quedan fuera POR
+ * CONSTRUCCIÓN, no por un filtro que alguien pueda olvidar mañana.
  *
- * LO ÚNICO QUE SÍ TOPAN es el total FÍSICAMENTE devuelto: no se pueden devolver más piezas de las
- * que salieron del taller. Ése es {@link piezasDevueltas} + {@link recibiblePorCelda}, y lo usan
- * las dos puertas de esa regla: el tope que valida `registrarReciboMaquila` bajo lock
- * (`produccion/recibos.ts`) y el pendiente que la pantalla de captura usa como referencia
- * (`pendientePorMaquilero`, `produccion/wip.ts`). ⚠️ El PENDIENTE por recibir NO se cierra con las
- * incompletas: Daniel lo necesita ABIERTO para cobrar el faltante (por eso descartó la opción B).
+ * LO QUE SÍ TOPAN, por la regla 5, es **el pendiente**, que desde V1-E8v es UN SOLO NÚMERO:
+ * {@link pendientePorCelda}. Antes había dos —"pendiente" (enviado − buenas) y "recibible"
+ * (enviado − buenas − incompletas)— y la pantalla tenía que llevar los dos; hoy son el mismo, y el
+ * campo `recibible` del contrato desapareció. Lo usan, todas por esta misma función:
+ *  • el tope que valida `registrarReciboMaquila` bajo lock (`produccion/recibos.ts`);
+ *  • el pendiente por maquilero y por proceso del WIP (`produccion/wip.ts`);
+ *  • los pendientes de la pantalla de captura (`produccion/recibos.ts::pendientesPorRecibir`);
+ *  • las existencias en poder del maquilero (`produccion/wip.ts::consultarExistenciaMaquilero`);
+ *  • el WIP por orden (`pendientesDerivados`), su agregado, la vista `kpi_wip` y el Resumen
+ *    operativo — ésos en SQL, que no puede llamar a esta función: su fórmula lleva el comentario
+ *    que apunta aquí.
  */
 import type { Prisma } from '../../datos/index.js';
 import { TipoEtapaMovimiento } from '../../datos/index.js';
@@ -35,7 +61,7 @@ import { type clienteLectura } from '../../comun/transaccion.js';
 /** Cliente de solo lectura (el singleton de Prisma o una transacción en curso). */
 type ClienteLectura = ReturnType<typeof clienteLectura>;
 
-// ── Aritmética compartida (la MISMA función en las dos puertas) ──────────────────────────────────
+// ── Aritmética compartida (la MISMA función en todas las puertas) ────────────────────────────────
 
 /** Lo mínimo que hay que leer de un detalle para saber cuántas piezas volvieron del taller. */
 export interface PiezasDelDetalle {
@@ -55,11 +81,16 @@ export function piezasDevueltas(det: PiezasDelDetalle): number {
 }
 
 /**
- * Lo que TODAVÍA se le puede recibir a un maquilero en una celda color×talla: lo que se le envió
- * menos lo que ya devolvió (bueno + incompletas). Puede salir negativo cuando el histórico migrado
- * tiene recibos sin envío; quien lo use decide si lo pisa a 0.
+ * EL PENDIENTE de una celda color×talla: lo que se le envió menos lo que ya devolvió (buenas +
+ * incompletas). Es a la vez *"lo que el maquilero todavía tiene en su taller"* y *"lo que todavía se
+ * le puede recibir"* — desde V1-E8v (regla 5) son **el mismo número**, y por eso hay una sola
+ * función y un solo campo en el contrato. Lo que quede aquí cuando el maquilero ya cerró su entrega
+ * es el FALTANTE, que es lo que se le cobra.
+ *
+ * Puede salir negativo cuando el histórico migrado tiene recibos sin envío; quien lo use decide si
+ * lo pisa a 0.
  */
-export function recibiblePorCelda(enviado: number, devuelto: number): number {
+export function pendientePorCelda(enviado: number, devuelto: number): number {
   return enviado - devuelto;
 }
 
@@ -92,7 +123,8 @@ function aDateColumna(valor: string): Date {
 /**
  * PRENDAS INCOMPLETAS que un maquilero entregó en el periodo, agrupadas por recibo (regla 4 de
  * §Post-F9.136: *"sólo quisiera ver reflejado en algún lado que sí las entrego, para revisar los
- * temas de pago"*). Solo lectura, sin importes: **no suman ni restan al saldo**.
+ * temas de pago"*, y regla 5 de §Post-F9.147: *"si seria bueno saber en algun lado que esas prendas
+ * que se perdieron estan incompletas"*). Solo lectura, sin importes: **no suman ni restan al saldo**.
  *
  * Es la MISMA función que alimenta el estado de cuenta unificado y el desglosado (y de ahí el PDF y
  * el Excel): un resumen aparte para cada uno acabaría diciendo números distintos.

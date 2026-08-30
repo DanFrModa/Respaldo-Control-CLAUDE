@@ -32,6 +32,94 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.059 · 29-ago-2026 · **en prueba** — La prenda **incompleta** ya no se queda "pendiente" con el maquilero
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Saber qué pasó con cada prenda que mandaste.** Tus palabras: *«siempre es indispensable tener la
+  trazabilidad completa de lo que se manda a fabricar»*. Ahora, al abrir una orden en el tablero de
+  producción, se leen **las cuatro cosas que pueden pasarle a una prenda**, una junto a otra:
+
+  > **Enviado 100** = **Recibido 95** (buenas) + **Incompletas 4** (volvieron, pero se perdieron) +
+  > **Por recibir 1** (el faltante: se lo quedó el maquilero y es lo que se le cobra)
+
+  Antes sólo se veían «Enviado» y «Recibido», y el hueco entre los dos **no tenía nombre**: no había cómo
+  saber si esas prendas seguían en el taller o si ya se habían perdido, que son cosas muy distintas.
+
+- ⭐ **Las cuatro cuentas también en el tablero de Indicadores y en el estado de cuenta.** La columna
+  **«Incompletas»** aparece ahora en el tablero WIP de Indicadores (pantalla, **Excel** y **PDF**) y en
+  la tabla de existencias del **estado de cuenta del maquilero** — que es el papel donde se discute el
+  pago con él. Antes ahí el hueco entre lo enviado y lo recibido se quedaba sin nombre.
+
+- ⭐ **«Existencias en poder del maquilero» por fin dice la verdad.** Esa pantalla es la que contesta
+  *«¿qué tiene fulano en su taller?»*. El maquilero que te entregó 95 buenas + 5 incompletas de 100
+  **ya no aparece ahí debiéndote 5**: no tiene nada, porque **te lo entregó todo**. Y mientras el renglón
+  exista, trae su propia columna de **Incompletas**, para que la cuenta cuadre a la vista.
+
+- **Las órdenes terminadas ahora se cierran.** Una orden que se entregó completa con algunas incompletas
+  se quedaba **abierta para siempre**, esperando prendas que ya nadie iba a traer. Ahora cierra sola, y
+  deja de contar en «órdenes abiertas» de la portada.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **El pendiente de tus maquileros va a BAJAR, y eso es lo correcto.** Es el cambio de fondo de esta
+  versión. Antes el sistema seguía reclamándole al maquilero las prendas incompletas que **ya te había
+  entregado**; ahora sólo le reclama **el faltante** — la prenda que de verdad no volvió. Si mirabas ese
+  número la semana pasada y hoy es más chico, no se perdió nada: **estaba mal contado antes**.
+  Se nota en cuatro lugares: el tablero de producción, «Existencias en poder del maquilero», el
+  «en N maquileros» de la portada y el tablero de Indicadores.
+
+- 🔴 **Un número del panel de avance estaba mal y ya se corrigió.** El paso «Entrega a maquila» del
+  avance de una orden mostraba **menos piezas de las que de verdad se mandaron** cuando el maquilero
+  había entregado incompletas (decía 1,706 de 1,726), y esas piezas se las sumaba de más al paso de
+  **Arte**. No era un problema de captura: la pantalla estaba **calculando lo enviado al revés**, a
+  partir de lo pendiente. Ahora lo enviado se lo dice el servidor directo, sin cuentas de por medio.
+
+- **La pantalla de recibir ya no maneja dos números.** Antes decía *«te faltan 2»* arriba y la matriz te
+  dejaba capturar 0, con un aviso amarillo explicando por qué. Eran dos cifras distintas con nombres
+  parecidos, y era confuso. **Ahora es un solo número**, el mismo arriba y en la matriz.
+
+- **El aviso amarillo sigue ahí, pero dice otra cosa.** Cuando el maquilero ya te entregó incompletas,
+  ahora avisa: *«ya salieron de su taller, así que el pendiente las descuenta; pero se pierden: no entran
+  a inventario y no se le pagan»*.
+
+- ⚠️ **Nada de lo demás cambió.** La prenda incompleta **sigue sin contar como producida, sin entrar a
+  ningún inventario y sin pagarse**, y **se sigue viendo en el estado de cuenta del maquilero**, igual
+  que en la 0.048. **Lo único que cambió es que deja de contar como pendiente de entregar.**
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Dónde NO vas a ver la columna «Incompletas»: en el renglón que ya cerró.** «Existencias en poder
+  del maquilero» sólo lista a quien **todavía tiene algo**. Si te entregó las 100 (95 buenas + 5
+  incompletas), su renglón desaparece de ahí — porque ya no tiene nada, que es justo lo que esa
+  pantalla contesta. El registro de esas 5 prendas vive, completo, en el **estado de cuenta del
+  maquilero** y en el **avance de la orden**.
+
+- ⚠️ **Un caso de esquina que conviene conocer.** Cuando mandas prendas **ya terminadas** a un proceso de
+  afuera (un estampado o un lavado **después** de la costura), esas prendas salen del almacén a un
+  "almacén de tránsito" y vuelven al recibirlas. Las que vuelvan **incompletas** se quedan ahí, en
+  tránsito, porque no entran a inventario. Se limpian a mano, como el faltante. **No se resolvió a
+  propósito:** darles salida automática significa inventar un movimiento de "merma" que tú no has pedido.
+  Además casi nunca pasa: una prenda incompleta es una que nunca se terminó de **coser**, así que aparece
+  en el recibo de costura, donde no hay tránsito.
+
+- ⚠️ **El indicador de calidad del maquilero sigue sin mirar las incompletas.** Un taller que te entrega
+  200 prendas incompletas conserva calidad perfecta, porque ese indicador compara primeras contra
+  segundas. **Puede ser lo que quieres** (no son un defecto, son piezas que faltaron) **o puede ser justo
+  lo que quieres medir**: es una pregunta abierta para ti, viene de la 0.048 y esta versión no la
+  contesta.
+
+- **Cinco cosas que pediste quedaron escritas, sin construir todavía** (cada una con su turno): que el
+  **candado del precio sugerido** se queda como está por ahora · que los **costos estimados de la
+  negociación se guarden**, con su desglose y al cerrar la negociación (**va en la próxima**) · el
+  **target price** que a veces te dan los clientes, para tenerlo a la vista al negociar (**también en la
+  próxima**) · los **cuatro estados por modelo** dentro de una lista —abierto, en negociación, cerrado y
+  **dropeado**— (**la siguiente**) · y **poder cotizar en la cita un modelo que no llevas en el
+  muestrario**, armándolo ahí con estimados o copiando uno ya desarrollado (**la de después**: necesita
+  primero que la mesa mueva los costos renglón por renglón).
+
+---
+
 ## 0.058 · 29-ago-2026 · **en prueba** — **La mesa**: mueves un costo y el margen se mueve solo
 
 ### Qué se puede hacer ahora que antes no

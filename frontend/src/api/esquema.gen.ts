@@ -264,9 +264,9 @@ export interface paths {
               } | null;
               /** @description Piezas en producción/maquila (permiso `produccion.wip-ver`; null sin permiso). */
               wipMaquila: {
-                /** @description Piezas en poder de maquila (enviado − recibido, vivos). */
+                /** @description Piezas en poder de maquila (enviado − recibido − incompletas, vivos; V1-E8v). */
                 piezas: number;
-                /** @description Maquileros con saldo ≠ 0 en su poder (enviado − recibido por tercero). */
+                /** @description Maquileros con saldo ≠ 0 en su poder (enviado − recibido − incompletas por tercero, V1-E8v). */
                 maquileros: number;
               } | null;
               /** @description Cortado esta semana (permiso `produccion.wip-ver`; null sin permiso). */
@@ -50068,7 +50068,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Pendientes por recibir de una orden (enviado − recibido, por proceso) */
+    /** Pendientes por recibir de una orden (enviado − recibido − incompletas, por proceso) */
     get: {
       parameters: {
         query?: never;
@@ -50092,7 +50092,7 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden. */
               folioOrden: number;
-              /** @description enviado − recibido, por proceso ya usado en la orden. */
+              /** @description enviado − buenas − incompletas, por proceso ya usado en la orden. */
               porRecibir: {
                 /** @description Id del tipo de proceso. */
                 idTipoProceso: number;
@@ -50106,7 +50106,7 @@ export interface paths {
                 devuelveAPt: boolean;
                 /** @description Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b). */
                 stockSinOrden: boolean;
-                /** @description enviado − recibido a este proceso, por color×talla (solo celdas ≠ 0). */
+                /** @description enviado − recibido − incompletas a este proceso, por color×talla. Se incluyen las celdas con pendiente **o** con incompletas entregadas (V1-E8v): una celda ya cerrada del todo —95 buenas + 5 incompletas de 100— viaja con pendiente 0 e incompletas 5, que es su historia. */
                 celdas: {
                   /** @description Id del color. */
                   idColor: number;
@@ -50116,16 +50116,14 @@ export interface paths {
                   idTalla: number;
                   /** @description Etiqueta visible de la talla. */
                   etiquetaTalla: string;
-                  /** @description Pendiente por recibir (enviado − recibido bueno). */
+                  /** @description Pendiente por recibir = enviado − buenas − incompletas (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico. */
                   cantidad: number;
-                  /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`. */
+                  /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). RESTAN del pendiente (ya volvieron del taller) y viajan aquí para la trazabilidad: una celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas. */
                   incompletas: number;
-                  /** @description Lo que TODAVÍA se puede recibir de esta celda (V1-E8k), calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`recibiblePorCelda`). */
-                  recibible: number;
                 }[];
                 /** @description Total pendiente por recibir de este proceso. */
                 totalPendiente: number;
-                /** @description Prendas incompletas ya entregadas a este proceso (no cierran el pendiente). */
+                /** @description Prendas incompletas ya entregadas a este proceso (SÍ cierran el pendiente, V1-E8v). */
                 totalIncompletas: number;
                 /** @description El mismo pendiente DESGLOSADO por maquilero (todo tercero con envío o recibo vivo). */
                 porMaquilero: {
@@ -50133,7 +50131,7 @@ export interface paths {
                   idMaquilero: number | null;
                   /** @description Nombre del maquilero (o "Sin asignar" en lo migrado sin dato). */
                   maquilero: string;
-                  /** @description enviado − recibido de ESE maquilero, por color×talla (solo celdas ≠ 0). */
+                  /** @description enviado − buenas − incompletas de ESE maquilero, por color×talla (celdas con pendiente o con incompletas entregadas). */
                   celdas: {
                     /** @description Id del color. */
                     idColor: number;
@@ -50143,16 +50141,14 @@ export interface paths {
                     idTalla: number;
                     /** @description Etiqueta visible de la talla. */
                     etiquetaTalla: string;
-                    /** @description Pendiente por recibir (enviado − recibido bueno). */
+                    /** @description Pendiente por recibir = enviado − buenas − incompletas (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico. */
                     cantidad: number;
-                    /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`. */
+                    /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). RESTAN del pendiente (ya volvieron del taller) y viajan aquí para la trazabilidad: una celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas. */
                     incompletas: number;
-                    /** @description Lo que TODAVÍA se puede recibir de esta celda (V1-E8k), calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`recibiblePorCelda`). */
-                    recibible: number;
                   }[];
                   /** @description Total pendiente de ese maquilero (NEGATIVO si recibió sin envío). */
                   totalPendiente: number;
-                  /** @description Prendas incompletas que ese maquilero ya entregó (no cierran el pendiente). */
+                  /** @description Prendas incompletas que ese maquilero ya entregó (SÍ cierran el pendiente, V1-E8v). */
                   totalIncompletas: number;
                 }[];
               }[];
@@ -51433,6 +51429,8 @@ export interface paths {
                 enviado: number;
                 /** @description Total recibido de maquila (Σ recibos vivos, todos los procesos). */
                 recibido: number;
+                /** @description Prendas INCOMPLETAS entregadas (V1-E8v, §Post-F9.147): volvieron del taller pero no se produjeron, no entraron a inventario y no se pagan. Van APARTE de `recibido` y RESTAN del pendiente por recibir — ya no están en la maquila. Cuarta cubeta de `enviado = primeras + segundas + faltantes + incompletas`. */
+                incompletas: number;
                 /** @description Recibido de procesos que meten a PT (costura) — base de "por entregar". */
                 recibidoCostura: number;
                 /** @description Total entregado a cliente (Σ entregas vivas). */
@@ -51441,7 +51439,7 @@ export interface paths {
                 porCortar: number;
                 /** @description cortado − enviado (total, todos los procesos). */
                 cortadoPorEnviar: number;
-                /** @description enviado − recibido (total, todos los procesos). */
+                /** @description enviado − recibido − incompletas (total, todos los procesos). Es el FALTANTE: lo que el maquilero todavía tiene en su taller (V1-E8v). */
                 porRecibir: number;
                 /** @description recibido(costura) − entregado a cliente (lo que falta entregar). */
                 porEntregar: number;
@@ -51456,6 +51454,8 @@ export interface paths {
                 enviado: number;
                 /** @description Total recibido de maquila (Σ recibos vivos). */
                 recibido: number;
+                /** @description Σ prendas INCOMPLETAS entregadas (V1-E8v): volvieron, pero no se produjeron. */
+                incompletas: number;
                 /** @description Recibido de procesos que meten a PT (costura). */
                 recibidoCostura: number;
                 /** @description Total entregado a cliente (Σ entregas vivas). */
@@ -51464,7 +51464,7 @@ export interface paths {
                 porCortar: number;
                 /** @description cortado − enviado (piezas por enviar a maquila). */
                 cortadoPorEnviar: number;
-                /** @description enviado − recibido (piezas en poder de maquila). */
+                /** @description enviado − recibido − incompletas (piezas realmente en poder de maquila, V1-E8v). */
                 porRecibir: number;
                 /** @description recibido(costura) − entregado (piezas por entregar). */
                 porEntregar: number;
@@ -51604,8 +51604,14 @@ export interface paths {
               cortado: number;
               /** @description Total enviado. */
               enviado: number;
-              /** @description Total recibido. */
+              /** @description Enviado a procesos que meten a PT (costura), por SUMA DIRECTA de sus envíos vivos. Lo publica el servidor (A1) para que el stepper del panel de avance no lo DESPEJE del pendiente: ese despeje invertía la fórmula del pendiente y, desde que éste resta las incompletas (V1-E8v), devolvía `enviado − incompletas`. */
+              enviadoCostura: number;
+              /** @description Total recibido BUENO (primeras + segundas). */
               recibido: number;
+              /** @description Total de prendas INCOMPLETAS entregadas en la orden (V1-E8v, §Post-F9.147). Volvieron del taller pero se perdieron: no se produjeron, no se inventariaron y no se pagan. */
+              incompletas: number;
+              /** @description enviado − recibido − incompletas: el FALTANTE, lo que el maquilero todavía tiene (y lo que se le cobra si ya cerró su entrega). Con `enviado`, `recibido` e `incompletas` cierra la trazabilidad que pidió Daniel: qué pasó con cada prenda que se mandó. */
+              pendientePorRecibir: number;
               /** @description Recibido de costura (mete a PT). */
               recibidoCostura: number;
               /** @description Total entregado a cliente. */
@@ -51664,7 +51670,7 @@ export interface paths {
                 /** @description Total pendiente de este proceso (derivado). */
                 totalPendiente: number;
               }[];
-              /** @description enviado − recibido por proceso, color×talla, con desglose por maquilero. */
+              /** @description enviado − buenas − incompletas por proceso, color×talla, con desglose por maquilero. */
               porRecibir: {
                 /** @description Id del tipo de proceso. */
                 idTipoProceso: number;
@@ -51693,7 +51699,7 @@ export interface paths {
                 devuelveAPt: boolean;
                 /** @description Esas prendas salieron del bucket de existencia «sin orden asignada» (histórico migrado / inventario de arranque) y ahí regresan. Fija el bucket de las entregas siguientes: no se pueden mezclar. */
                 stockSinOrden: boolean;
-                /** @description enviado − recibido por MAQUILERO (todo tercero con envío o recibo vivo del proceso). */
+                /** @description enviado − buenas − incompletas por MAQUILERO (todo tercero con envío o recibo vivo del proceso). */
                 porMaquilero: {
                   /** @description Maquilero (Proveedor), o null si el histórico migrado no lo trae. */
                   idMaquilero: number | null;
@@ -51711,14 +51717,12 @@ export interface paths {
                     etiquetaTalla: string;
                     /** @description Cantidad (puede ser negativa por sobre-corte). */
                     cantidad: number;
-                    /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136): prendas a las que les faltó una pieza y nunca se terminaron de coser. NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`. */
+                    /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136): prendas a las que les faltó una pieza y nunca se terminaron de coser. RESTAN del pendiente (V1-E8v: ya volvieron del taller) y viajan aquí para la trazabilidad — una celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas. */
                     incompletas: number;
-                    /** @description Lo que TODAVÍA se le puede recibir a ese maquilero en esta celda (V1-E8k). Lo calcula el SERVIDOR con la MISMA función (`recibiblePorCelda`) que usa el tope de `registrarReciboMaquila` bajo lock, para que la pantalla no re-derive la regla y acabe ofreciendo celdas que el guardado rechaza. Es el tope de la matriz de captura. */
-                    recibible: number;
                   }[];
-                  /** @description Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío). */
+                  /** @description Total pendiente de ese maquilero = enviado − buenas − incompletas (derivado; NEGATIVO si recibió sin envío). Es lo que TIENE y a la vez lo que todavía se le puede recibir. */
                   totalPendiente: number;
-                  /** @description Prendas incompletas que ya entregó (informativo; no cierran el pendiente). */
+                  /** @description Prendas incompletas que ya entregó (informativo; SÍ cierran el pendiente, V1-E8v). */
                   totalIncompletas: number;
                 }[];
               }[];
@@ -51819,7 +51823,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Existencias en poder del maquilero (enviado − recibido, por orden y proceso) */
+    /** Existencias del maquilero (enviado − recibido − incompletas, por orden y proceso) */
     get: {
       parameters: {
         query?: {
@@ -51836,7 +51840,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Existencias en poder del maquilero (enviado − recibido). */
+        /** @description Existencias en poder del maquilero (enviado − recibido − incompletas). */
         200: {
           headers: {
             [name: string]: unknown;
@@ -51861,9 +51865,11 @@ export interface paths {
                 codigoModelo: string;
                 /** @description Piezas enviadas (Σ envíos vivos). */
                 enviado: number;
-                /** @description Piezas recibidas (Σ recibos vivos). */
+                /** @description Piezas recibidas BUENAS (Σ recibos vivos). */
                 recibido: number;
-                /** @description enviado − recibido (lo que el maquilero tiene pendiente). */
+                /** @description Prendas INCOMPLETAS que devolvió (V1-E8v): ya no las tiene, pero tampoco se produjeron. */
+                incompletas: number;
+                /** @description enviado − recibido − incompletas (lo que el maquilero tiene de verdad). */
                 enPoder: number;
               }[];
               /** @description Total de piezas en poder de maquileros (derivado). */
@@ -80184,8 +80190,10 @@ export interface paths {
                 cortado: number;
                 /** @description Σ enviado a maquila. */
                 enviado: number;
-                /** @description Σ recibido de maquila. */
+                /** @description Σ recibido de maquila (BUENO: primeras + segundas). */
                 recibido: number;
+                /** @description Σ prendas INCOMPLETAS entregadas (V1-E8v): volvieron, pero no se produjeron. */
+                incompletas: number;
                 /** @description Σ recibido de procesos que meten a PT. */
                 recibidoCostura: number;
                 /** @description Σ entregado a cliente. */
@@ -80194,7 +80202,7 @@ export interface paths {
                 porCortar: number;
                 /** @description Σ (cortado − enviado). */
                 cortadoPorEnviar: number;
-                /** @description Σ (enviado − recibido). */
+                /** @description Σ (enviado − recibido − incompletas), V1-E8v. */
                 porRecibir: number;
                 /** @description Σ (recibido costura − entregado). */
                 porEntregar: number;
@@ -80219,8 +80227,10 @@ export interface paths {
                 cortado: number;
                 /** @description Enviado. */
                 enviado: number;
-                /** @description Recibido. */
+                /** @description Recibido BUENO (primeras + segundas). */
                 recibido: number;
+                /** @description Prendas INCOMPLETAS entregadas (V1-E8v): restan del pendiente, no del inventario. */
+                incompletas: number;
                 /** @description Recibido de costura (mete a PT). */
                 recibidoCostura: number;
                 /** @description Entregado a cliente. */
@@ -80229,7 +80239,7 @@ export interface paths {
                 porCortar: number;
                 /** @description cortado − enviado. */
                 cortadoPorEnviar: number;
-                /** @description enviado − recibido. */
+                /** @description enviado − recibido − incompletas (V1-E8v). */
                 porRecibir: number;
                 /** @description recibido costura − entregado. */
                 porEntregar: number;

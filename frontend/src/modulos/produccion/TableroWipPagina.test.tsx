@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,9 +58,13 @@ const DETALLE = {
   cliente: 'C&A',
   pedido: 1000,
   cortado: 500,
-  enviado: 0,
-  recibido: 0,
-  recibidoCostura: 0,
+  // Las CUATRO CUBETAS con números distinguibles (V1-E8v, §Post-F9.147):
+  // enviado 400 = recibido 300 + incompletas 20 + por recibir 80.
+  enviado: 400,
+  recibido: 300,
+  incompletas: 20,
+  pendientePorRecibir: 80,
+  recibidoCostura: 300,
   entregado: 0,
   porEntregar: 300,
   porCortar: [],
@@ -92,6 +96,27 @@ beforeEach(() => {
 const PERMISOS = ['produccion.wip-ver', 'produccion.corte', 'produccion.entrega'] as const;
 
 describe('<TableroWipPagina> · puertas a la acción', () => {
+  it('⭐ el drill-down MUESTRA las cuatro cubetas de lo enviado (V1-E8v, §Post-F9.147)', async () => {
+    // DANIEL: *"siempre es indispensable tener la trazabilidad completa de lo que se manda a
+    // fabricar… debemos de saber que paso con cada prenda despues"*. Antes de V1-E8v el drill-down
+    // enseñaba «Enviado 400» y «Recibido 300» y el hueco de 100 no tenía nombre: podían ser prendas
+    // en el taller o prendas perdidas. Ahora las cuatro se leen y CUADRAN a la vista.
+    const usuario = userEvent.setup();
+    renderConProveedores(<TableroWipPagina />, {
+      sesion: estadoSesionDePrueba([...PERMISOS]),
+    });
+
+    await usuario.click(screen.getAllByTestId('wip-detalle')[0] as HTMLElement);
+    // Acotado al bloque de totales: «Por recibir» también titula la sección de matrices de abajo,
+    // y buscarlo en toda la pantalla casaría con las dos.
+    const totales = within(await screen.findByTestId('wip-drill-totales'));
+    expect(totales.getByText('Enviado').closest('div')).toHaveTextContent('400');
+    expect(totales.getByText('Recibido').closest('div')).toHaveTextContent('300');
+    // Las dos que V1-E8v agregó: sin ellas la pantalla no dice qué pasó con las 100 restantes.
+    expect(totales.getByText('Incompletas').closest('div')).toHaveTextContent('20');
+    expect(totales.getByText('Por recibir').closest('div')).toHaveTextContent('80');
+  });
+
   it('el encabezado lleva a ENTREGAR (lo que pide el KPI «Por entregar»)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<TableroWipPagina />, {

@@ -58,18 +58,18 @@ export function aLineasApi(
  * puede dar 0 con celdas +5/−5 (recibo capturado en la talla equivocada en el Access) y entonces
  * decir "0 pza(s)" sería falso — sí hay 5 por recibir (hallazgo del reviewer).
  *
- * ⚠️ Se suma **`recibible`**, NO `cantidad` (V1-E8k, §Post-F9.136). `cantidad` es el PENDIENTE, que
- * desde las prendas incompletas sigue ABIERTO aunque ya no quede nada que recibir: es lo que se le
- * cobra al maquilero. Con 10 enviadas y 8 buenas + 2 incompletas, sumar `cantidad` hacía que el
- * selector anunciara *«2 pza(s) por recibirle»* y que la matriz, una pantalla después, topara en 0.
- * `recibible` lo calcula el servidor con la misma función que el tope (`recibiblePorCelda`).
+ * ⚠️ Suma **`cantidad`**, que desde V1-E8v (§Post-F9.147) es EL pendiente y a la vez EL tope de
+ * captura: son el mismo número. Hasta V1-E8k eran dos —el pendiente se dejaba abierto "para cobrar
+ * el faltante" y el tope viajaba en un campo `recibible` aparte—, pero Daniel corrigió el encuadre
+ * (*"al registrarlas como incompletas entregadas, dejan de estar en la maquila"*): la incompleta ya
+ * volvió del taller, así que cierra el pendiente. El campo `recibible` se retiró del contrato al
+ * volverse idéntico a éste — dos nombres para un número igual acaban divergiendo.
  *
- * 🔑 **No altera el caso ±5 del histórico migrado:** sin incompletas —todo lo migrado y el 99 % de
- * los recibos— `recibible === cantidad` por definición (`enviado − (recibido + 0)`), celda por
- * celda y con su signo. Sólo cambia donde hay incompletas, que es justo donde antes mentía.
+ * 🔑 Lo calcula el SERVIDOR con la misma función que el tope del guardado (`pendientePorCelda`);
+ * aquí NO se re-deriva nada, sólo se suman las celdas positivas.
  */
-export function piezasRecibibles(celdas: readonly { recibible: number }[]): number {
-  return celdas.reduce((s, c) => s + Math.max(0, c.recibible), 0);
+export function piezasRecibibles(celdas: readonly { cantidad: number }[]): number {
+  return celdas.reduce((s, c) => s + Math.max(0, c.cantidad), 0);
 }
 
 /**

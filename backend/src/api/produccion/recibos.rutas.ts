@@ -107,7 +107,8 @@ export const rutasRecibosProduccion: FastifyPluginCallbackZod = (app, _opciones,
     preHandler: app.conPermiso('produccion.wip-ver'),
     schema: {
       tags: ['produccion'],
-      summary: 'Pendientes por recibir de una orden (enviado − recibido, por proceso)',
+      summary:
+        'Pendientes por recibir de una orden (enviado − recibido − incompletas, por proceso)',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       response: { 200: esquemaPendientesRecibir, ...respuestasError },

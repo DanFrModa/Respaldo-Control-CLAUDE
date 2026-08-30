@@ -397,6 +397,8 @@ export async function generarPdfKpisWip(payload: PayloadPdfKpisWip): Promise<Buf
         { titulo: 'Cort.', ancho: 40, derecha: true },
         { titulo: 'Env.', ancho: 40, derecha: true },
         { titulo: 'Rec.', ancho: 40, derecha: true },
+        // Cuarta cubeta (V1-E8v): sin ella el impreso no cuadra lo enviado.
+        { titulo: 'Incompl.', ancho: 48, derecha: true },
         { titulo: 'Entr.', ancho: 40, derecha: true },
         { titulo: 'x recibir', ancho: 52, derecha: true },
         { titulo: 'x entregar', ancho: 56, derecha: true },
@@ -409,6 +411,7 @@ export async function generarPdfKpisWip(payload: PayloadPdfKpisWip): Promise<Buf
         String(o.cortado),
         String(o.enviado),
         String(o.recibido),
+        String(o.incompletas),
         String(o.entregado),
         String(o.porRecibir),
         String(o.porEntregar),

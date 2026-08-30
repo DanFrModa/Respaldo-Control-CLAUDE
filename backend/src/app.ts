@@ -287,7 +287,8 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // cancelación con inverso de kardex y comprobante PDF. RBAC produccion.entrega/.cancelar/.wip-ver.
   await app.register(rutasEntregasCliente, { prefix: '/api' });
   // Producción / WIP — TABLERO de avance + existencias en poder del maquilero (F3-E5): el WIP de las
-  // órdenes (derivado por suma) y lo enviado − recibido a cada maquilero. Solo lectura
+  // órdenes (derivado por suma) y lo que cada maquilero todavía tiene —enviado − recibido −
+  // incompletas, V1-E8v—. Solo lectura
   // (produccion.wip-ver).
   await app.register(rutasWip, { prefix: '/api' });
   // EsMa (F3-E4) — cola de validación de cargos de maquila derivados de los recibos (propuesto →

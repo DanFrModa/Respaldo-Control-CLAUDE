@@ -502,12 +502,21 @@ function DrillDownOrden({
 function DetalleAvance({ detalle }: { detalle: WipOrden }): React.JSX.Element {
   return (
     <div className="space-y-5">
-      {/* Resumen de totales. */}
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+      {/* Resumen de totales. Las cuatro métricas del bloque de maquila —enviado, recibido,
+          incompletas y por recibir— cierran la TRAZABILIDAD que pidió Daniel (§Post-F9.147:
+          *"debemos de saber que paso con cada prenda despues"*): de lo que se mandó, esto volvió
+          bueno, esto volvió incompleto (y se perdió) y esto sigue en el taller del maquilero.
+          `enviado = recibido + incompletas + por recibir`, siempre. */}
+      <dl
+        className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3"
+        data-testid="wip-drill-totales"
+      >
         <Metrica etiqueta="Pedido" valor={detalle.pedido} />
         <Metrica etiqueta="Cortado" valor={detalle.cortado} />
         <Metrica etiqueta="Enviado" valor={detalle.enviado} />
         <Metrica etiqueta="Recibido" valor={detalle.recibido} />
+        <Metrica etiqueta="Incompletas" valor={detalle.incompletas} />
+        <Metrica etiqueta="Por recibir" valor={detalle.pendientePorRecibir} resaltar />
         <Metrica etiqueta="Recibido costura" valor={detalle.recibidoCostura} />
         <Metrica etiqueta="Entregado" valor={detalle.entregado} />
         <Metrica etiqueta="Por entregar" valor={detalle.porEntregar} resaltar />

@@ -471,7 +471,8 @@ function IncompletasSeccion({
 }
 
 /**
- * Existencias EN PODER del maquilero (enviado − recibido, F3). Componente aparte para que el hook solo
+ * Existencias EN PODER del maquilero (enviado − recibido − incompletas, F3/V1-E8v). Componente aparte
+ * para que el hook solo
  * se dispare cuando hay maquilero elegido y el usuario tiene `produccion.wip-ver`.
  */
 function ExistenciasMaquileroSeccion({ idMaquilero }: { idMaquilero: number }): React.JSX.Element {
@@ -503,6 +504,11 @@ function ExistenciasMaquileroSeccion({ idMaquilero }: { idMaquilero: number }): 
                   <TablaDensaHead>Proceso</TablaDensaHead>
                   <TablaDensaHead numerica>Enviado</TablaDensaHead>
                   <TablaDensaHead numerica>Recibido</TablaDensaHead>
+                  {/* V1-E8v (§Post-F9.147): ÉSTE es el papel donde se discute el pago con el
+                      maquilero (regla 4 de §Post-F9.136). Sin esta columna, el hueco entre lo
+                      enviado y lo recibido se quedaba sin nombre justo en la conversación en la
+                      que hay que explicarlo. */}
+                  <TablaDensaHead numerica>Incompletas</TablaDensaHead>
                   <TablaDensaHead numerica>En poder</TablaDensaHead>
                 </TablaDensaFila>
               </TablaDensaEncabezado>
@@ -514,6 +520,9 @@ function ExistenciasMaquileroSeccion({ idMaquilero }: { idMaquilero: number }): 
                     <TablaDensaCelda>{f.tipoProceso}</TablaDensaCelda>
                     <TablaDensaCelda numerica>{f.enviado.toLocaleString('es-MX')}</TablaDensaCelda>
                     <TablaDensaCelda numerica>{f.recibido.toLocaleString('es-MX')}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {f.incompletas.toLocaleString('es-MX')}
+                    </TablaDensaCelda>
                     <TablaDensaCelda numerica className="font-semibold">
                       {f.enPoder.toLocaleString('es-MX')}
                     </TablaDensaCelda>

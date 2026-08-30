@@ -206,12 +206,16 @@ const esquemaWipTotales = z.object({
   pedido: z.number().int().describe('Σ pedido.'),
   cortado: z.number().int().describe('Σ cortado.'),
   enviado: z.number().int().describe('Σ enviado a maquila.'),
-  recibido: z.number().int().describe('Σ recibido de maquila.'),
+  recibido: z.number().int().describe('Σ recibido de maquila (BUENO: primeras + segundas).'),
+  incompletas: z
+    .number()
+    .int()
+    .describe('Σ prendas INCOMPLETAS entregadas (V1-E8v): volvieron, pero no se produjeron.'),
   recibidoCostura: z.number().int().describe('Σ recibido de procesos que meten a PT.'),
   entregado: z.number().int().describe('Σ entregado a cliente.'),
   porCortar: z.number().int().describe('Σ (pedido − cortado).'),
   cortadoPorEnviar: z.number().int().describe('Σ (cortado − enviado).'),
-  porRecibir: z.number().int().describe('Σ (enviado − recibido).'),
+  porRecibir: z.number().int().describe('Σ (enviado − recibido − incompletas), V1-E8v.'),
   porEntregar: z.number().int().describe('Σ (recibido costura − entregado).'),
 });
 
@@ -226,12 +230,16 @@ const esquemaWipFila = z.object({
   pedido: z.number().int().describe('Pedido.'),
   cortado: z.number().int().describe('Cortado.'),
   enviado: z.number().int().describe('Enviado.'),
-  recibido: z.number().int().describe('Recibido.'),
+  recibido: z.number().int().describe('Recibido BUENO (primeras + segundas).'),
+  incompletas: z
+    .number()
+    .int()
+    .describe('Prendas INCOMPLETAS entregadas (V1-E8v): restan del pendiente, no del inventario.'),
   recibidoCostura: z.number().int().describe('Recibido de costura (mete a PT).'),
   entregado: z.number().int().describe('Entregado a cliente.'),
   porCortar: z.number().int().describe('pedido − cortado.'),
   cortadoPorEnviar: z.number().int().describe('cortado − enviado.'),
-  porRecibir: z.number().int().describe('enviado − recibido.'),
+  porRecibir: z.number().int().describe('enviado − recibido − incompletas (V1-E8v).'),
   porEntregar: z.number().int().describe('recibido costura − entregado.'),
 });
 
