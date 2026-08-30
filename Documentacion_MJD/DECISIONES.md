@@ -9616,14 +9616,27 @@ Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
    vendió. **NO se traduce a «no vendido» ni se «mejora»**: las citas de Daniel van textuales, y aquí
    además es el nombre que **él va a leer en pantalla**.
 3. ⚠️ **Es un estado del RENGLÓN (`ListaPreciosLinea`), DISTINTO del estado de la LISTA**, aunque tres
-   de los nombres se parezcan. Hoy la **lista** tiene sus cuatro estados sembrados
-   (`abierta`/`en-negociacion`/`cerrada`/`ya-pedida`, catálogo `EstadoLista`) y los **renglones** no
-   tienen ninguno. Se anota explícito para que quien lo construya **no los confunda ni reuse
+   de los nombres se parezcan. Se anota explícito para que quien lo construya **no los confunda ni reuse
    `EstadoLista` sin pensarlo**: son dos ejes, uno del documento y otro de cada modelo dentro de él.
-4. **PLANIFICACIÓN: versión 0.061**, después de la 0.060. **No entra en la 0.060.**
+
+   🔴 **CORREGIDO al medirlo (30-ago, ver §Post-F9.155):** este punto decía que *«los renglones no
+   tienen ninguno»*, **y era falso**. El renglón YA tiene un eje de estado —**Aprobado / Pendiente**,
+   respaldado por `precioAprobado`— y **ya ocupa una columna «Estado» propia** en la pantalla de la
+   lista. Quien construya esto NO llega a lienzo en blanco: llega a una columna ya ocupada por otro
+   eje, y tiene que decidir si los cuatro estados la comparten, la sustituyen o abren una segunda.
+   ⚠️ Y el choque de nombres es peor de lo que decía este punto: **«En negociación» no se PARECE al de
+   la lista, ES EL MISMO STRING**, carácter por carácter — y las dos etiquetas van a convivir en la
+   misma pantalla (el chip de la lista arriba, el del renglón abajo) significando cosas distintas.
+
+   ⚠️ **El atajo equivocado que hay que evitar:** `EstadoLista` **no es un enum, es una tabla-catálogo
+   con CRUD y pantalla propia** (los estados de la lista son ampliables, decisión de Daniel). Así que
+   existe un camino trivial —**teclear «Dropeado» en ese catálogo**— que no pide ni migración y que
+   parecería resolver la versión. Es exactamente lo que este punto 3 prohíbe.
+4. **PLANIFICACIÓN: versión 0.062** (era 0.061; corrió un lugar cuando las decisiones del
+   30-ago entraron como 0.061 — ver la tabla del programa en `HOJA-DE-RUTA.md` §1).
 
 - **Aplica en:** la lista de precios (renglón por modelo) y la mesa de negociación. ⬜ **POR CONSTRUIR**
-  (versión 0.061). **Fecha:** 2026-08-29.
+  (versión **0.062**). **Fecha:** 2026-08-29.
 
 ---
 
@@ -9840,5 +9853,51 @@ hay que reabrirla a propósito, y eso deja rastro. Es el precio de que el númer
 `.default('cortado')` del Zod de entrada (`contrato/esquemas/costos.ts`), **puede reescribir órdenes ya
 costeadas** en un PUT que omita el campo (su propio TSDoc lo advierte, y el ETL «deja adrede el default»).
 **El cambio aplica a lo que se costee de aquí en adelante; lo ya costeado no se toca.** **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.155) — ⭐ EL **DROPEADO** Y EL PAPEL: una sola regla para los dos momentos (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Al medir el alcance de la 0.062 (§Post-F9.151) apareció un **defecto de diseño que
+habría entregado la versión rota**, y para resolverlo hubo que preguntarle a Daniel algo que ninguna
+decisión previa contestaba.
+
+🔴 **El defecto.** `exigirRenglonesAprobados` (`dominio/desarrollo/cotizaciones.ts`) exige que **TODOS**
+los renglones tengan `precioAprobado`, y lo consumen **los tres** caminos de papel: el **PDF**, el
+**Excel** y la **emisión de la cotización**. Un renglón «Dropeado» —que por definición **nunca se va a
+aprobar**— dejaría la lista **sin PDF, sin Excel y sin cotización para siempre**. Y es *exactamente* el
+escenario con el que Daniel pidió los estados: *«de una lista de 10 modelos, cierro 5 y los otros ya no
+los vendo»*. La única salida hoy sería **borrar** el renglón — justo lo que los estados vienen a evitar.
+
+**Lo que contestó Daniel**, y que reveló un matiz del negocio que el plan no tenía:
+
+> *«El dropeo se hace hasta la negociación. Hay un envío de cotización previa a la negociación. Ahí van
+> todos. Después de la negociación solo hay que mandar los que están vigentes. Quitar los dropeados»*
+
+### Lo que queda decidido
+
+1. ⭐ **UNA SOLA REGLA cubre los dos momentos: el papel muestra los renglones NO dropeados.** No hacen
+   falta dos impresos ni dos tipos de cotización, porque **el dropeo ocurre durante la negociación**:
+   - **Antes de negociar** no hay ninguno dropeado ⇒ **salen todos** — la *cotización previa* de Daniel.
+   - **Después de negociar** ⇒ salen **los vigentes**, sin los dropeados.
+
+   📌 Se prefirió esta forma sobre «dos impresos» precisamente porque el estado ya lleva el tiempo
+   dentro: preguntarle al renglón *"¿estás dropeado hoy?"* contesta las dos preguntas sin que nadie
+   tenga que elegir qué versión del papel bajar.
+
+2. 🔴 **El guard `exigirRenglonesAprobados` deja de mirar a los dropeados.** Exige aprobación **sólo de
+   los renglones vigentes**, en los **tres** consumidores (PDF, Excel y cotización) — no en uno, y no
+   sólo en el render. Un dropeado sin precio aprobado **no puede volver a bloquear la lista entera**.
+
+3. **«Dropeado» NO es definitivo: se puede revivir, y queda el rastro.** Si el cliente se arrepiente, el
+   renglón vuelve a «abierto» o «en negociación» **conservando toda su historia** de precios y
+   comentarios, y se registra **quién lo dropeó, cuándo, y quién lo revivió**. Daniel eligió esto sobre
+   la alternativa estricta (dar de alta un renglón nuevo y negociar desde cero).
+
+**Alcance.** Migración **sí** (la columna de estado del renglón, con valor inicial `abierto` para las
+filas existentes — *todo renglón nace ahí*, §Post-F9.151). **Permisos: NO** — `listas.negociar` ya
+gobierna el cambio de estado de la lista y es el candidato natural para el del renglón. **Seed: NO** si
+los cuatro estados son un **enum** cerrado, que es la lectura correcta de Daniel (*«en total son 4
+estados»*) y evita que alguien agregue un quinto sin pensarlo. **Fecha:** 2026-08-30.
 
 ---
