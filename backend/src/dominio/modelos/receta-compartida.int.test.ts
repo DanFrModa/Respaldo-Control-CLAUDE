@@ -20,8 +20,11 @@
  *
  * Corre en CI (NUNCA Docker local, regla §7 de CLAUDE.md).
  */
-// Credenciales R2 FALSAS, ANTES de importar el dominio: `listarModelos` y `listarFotosArte`
-// construyen el servicio de archivos aunque aquí ningún modelo tenga fotos.
+// Credenciales R2 FALSAS. ⚠️ Lo que las hace funcionar NO es que estén "antes de importar" —en ESM
+// los `import` se evalúan ANTES que cualquier sentencia de este archivo, así que esa explicación
+// sería falsa—: es que `listarModelos` y `listarFotosArte` CONSTRUYEN el servicio de archivos de
+// forma DIFERIDA, en su parámetro por defecto, o sea al ser llamadas. Para entonces estas variables
+// ya están puestas. (Aquí ningún modelo tiene fotos, pero el servicio se construye igual.)
 process.env.R2_ACCOUNT_ID ??= 'cuenta-fake';
 process.env.R2_ACCESS_KEY_ID ??= 'llave-fake';
 process.env.R2_SECRET_ACCESS_KEY ??= 'secreto-fake';
@@ -40,7 +43,7 @@ import {
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { calcularPreCosto, listaPrecios } from '../costos/pre-costo.js';
-import { copiarRecetaDelModelo } from '../produccion/receta-orden.js';
+import { copiarRecetaDelModelo, traerDelModelo } from '../produccion/receta-orden.js';
 
 import { listarFotosArte } from './arte-modelo.js';
 import { sugerirAviosFavoritos } from './avios-favoritos.js';
@@ -73,6 +76,10 @@ const PERM: ClavePermiso[] = [
   'precostos.consultar',
   'consultas.ver-importes',
   'costos.ver',
+  // `traerDelModelo` pasa por `enRecetaEditable`, que exige `desarrollo.administrar`.
+  'ordenes.ver',
+  'desarrollo.ver',
+  'desarrollo.administrar',
 ];
 const sesion = () => sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM });
 const bd = () => ({ cliente });
@@ -276,25 +283,30 @@ describe('🔴 listaPrecios — el injerto EN LOTE del precosto', () => {
 
 // ── 3. 🔴 LA ORDEN: por aquí pasa el 100 % de las órdenes ─────────────────────────────────────
 
-describe('🔴 copiarRecetaDelModelo — la orden de un hijo nace con la receta del padre', () => {
-  /** Crea una orden de 10 piezas del modelo dado y le copia la receta, como hace el alta real. */
-  async function ordenConReceta(folio: bigint, idModelo: number): Promise<number> {
-    const orden = await cliente.orden.create({
-      data: { folio, idEmpresa: empresa.id, idModelo, idCliente },
-      select: { id: true },
-    });
-    await enTransaccion(
-      (tx) =>
-        copiarRecetaDelModelo(tx, sesion(), {
-          id: orden.id,
-          idEmpresa: empresa.id,
-          idModelo,
-        }),
-      bd(),
-    );
-    return orden.id;
-  }
+/** Crea una orden del modelo dado y le copia la receta, como hace el alta real. */
+async function ordenConReceta(folio: bigint, idModelo: number): Promise<number> {
+  const orden = await cliente.orden.create({
+    data: { folio, idEmpresa: empresa.id, idModelo, idCliente },
+    select: { id: true },
+  });
+  await enTransaccion(
+    (tx) => copiarRecetaDelModelo(tx, sesion(), { id: orden.id, idEmpresa: empresa.id, idModelo }),
+    bd(),
+  );
+  return orden.id;
+}
 
+/** Las medidas por talla que quedaron en un renglón de avío de la receta de la orden. */
+async function medidasDeLaOrden(idOrden: number, idAvio: number): Promise<number[]> {
+  const filas = await cliente.ordenAvioTalla.findMany({
+    where: { ordenAvio: { idOrden, idAvio } },
+    select: { consumo: true },
+    orderBy: { idTalla: 'asc' },
+  });
+  return filas.map((f) => f.consumo.toNumber());
+}
+
+describe('🔴 copiarRecetaDelModelo — la orden de un hijo nace con la receta del padre', () => {
   it('copia telas, avíos y artes del padre', async () => {
     const idOrden = await ordenConReceta(1n, idHijoRojo);
     expect(await cliente.ordenTela.count({ where: { idOrden } })).toBe(2);
@@ -306,13 +318,13 @@ describe('🔴 copiarRecetaDelModelo — la orden de un hijo nace con la receta 
     // Sin el resolver aquí, la orden de un hijo nacería SIN medidas por talla **en silencio**, y
     // eso mueve el requerido del MRP. No hay error, no hay aviso: sólo se compra otra cantidad.
     const idOrden = await ordenConReceta(2n, idHijoRojo);
-    const medidas = await cliente.ordenAvioTalla.findMany({
+    expect(await medidasDeLaOrden(idOrden, avioEtiqueta.id)).toEqual([2, 4]);
+    const tallas = await cliente.ordenAvioTalla.findMany({
       where: { ordenAvio: { idOrden } },
-      select: { idTalla: true, consumo: true },
+      select: { idTalla: true },
       orderBy: { idTalla: 'asc' },
     });
-    expect(medidas.map((m) => m.consumo.toNumber())).toEqual([2, 4]);
-    expect(medidas.map((m) => m.idTalla)).toEqual([tallaCH.id, tallaG.id]);
+    expect(tallas.map((t) => t.idTalla)).toEqual([tallaCH.id, tallaG.id]);
   });
 
   it('congela el mismo PRECIO que el padre (la cascada única, §Post-F9.48)', async () => {
@@ -353,6 +365,82 @@ describe('🔴 copiarRecetaDelModelo — la orden de un hijo nace con la receta 
     const telas = await cliente.ordenTela.findMany({ where: { idOrden } });
     expect(telas).toHaveLength(1);
     expect(telas[0]?.idTela).toBe(telaRib.id);
+  });
+});
+
+// ── 3-bis. 🔴🔴 TRAER DEL MODELO: la mutación que sobrevivió a la primera revisión ───────────
+
+describe('🔴🔴 traerDelModelo — el avío que se trae llega CON sus medidas por talla', () => {
+  /**
+   * ⭐⭐ ESTA PRUEBA EXISTE POR UNA MUTACIÓN QUE SOBREVIVIÓ.
+   *
+   * En la revisión de la etapa, el reviewer revirtió a mano la resolución de las medidas por talla
+   * dentro de `traerDelModelo` y corrió la suite completa: **2,345 pruebas, todas verdes**. Ni el
+   * guardián la veía (trabaja por ARCHIVO, y ese archivo ya importaba el resolver) ni ninguna
+   * prueba de conducta la alcanzaba, porque **todas las órdenes de los demás tests son de modelos
+   * con linaje `NULL`** ⇒ el resolver es la identidad ⇒ la mutación es invisible.
+   *
+   * 🔴 **Lo que la mutación causaba en el negocio:** en la orden de un modelo hijo, darle a «traer
+   * del modelo» metía el avío **sin sus medidas por talla**. No truena ni avisa: **cambia el
+   * requerido del MRP** y se compra otra cantidad.
+   *
+   * El escenario es el real y el mismo que ya cubre V1-E3h: *el desarrollo siguió después de la
+   * OP*. La orden del hijo nace con su receta; DESPUÉS el padre agrega un avío con medidas por
+   * talla; traerlo tiene que arrastrarlas.
+   */
+  it('el avío que el PADRE agregó después llega a la orden del hijo con sus medidas (R18)', async () => {
+    const idOrden = await ordenConReceta(6n, idHijoRojo);
+
+    // El desarrollo sigue: el PADRE gana un avío nuevo, con medidas por talla PROPIAS (5 y 9,
+    // distintas de las del primer avío) para que no se puedan confundir con las de nadie más.
+    const cierre = await cliente.avio.create({
+      data: { clave: 'CIE-01', descripcion: 'Cierre', unidad: 'pza', precioReferencia: 3 },
+    });
+    await cliente.modeloAvio.create({
+      data: {
+        idModelo: idPadre,
+        idAvio: cierre.id,
+        consumoPorPrenda: 1,
+        consumoPorTalla: true,
+        tallas: {
+          create: [
+            { idTalla: tallaCH.id, consumo: 5 },
+            { idTalla: tallaG.id, consumo: 9 },
+          ],
+        },
+      },
+    });
+
+    const r = await traerDelModelo(sesion(), idOrden, {}, bd());
+
+    // Se trajo el avío del PADRE (la orden es de un HIJO que no tiene receta propia)…
+    expect(r.traidos).toEqual([{ tipo: 'avio', material: 'CIE-01 — Cierre' }]);
+    // …y con él SUS MEDIDAS. Ésta es la aserción que mata la mutación: sin resolver, la lectura de
+    // `ModeloAvioTalla` iría contra el hijo, traería CERO filas y el renglón nacería sin medidas —
+    // en silencio, moviendo el requerido del MRP.
+    expect(await medidasDeLaOrden(idOrden, cierre.id)).toEqual([5, 9]);
+    // Y el avío que ya estaba conserva las suyas (no se cruzan los juegos de medidas).
+    expect(await medidasDeLaOrden(idOrden, avioEtiqueta.id)).toEqual([2, 4]);
+  });
+
+  it('en un modelo SIN padre traer del modelo sigue arrastrando sus medidas (no-regresión)', async () => {
+    const idOrden = await ordenConReceta(7n, idSuelto);
+    const boton = await cliente.avio.create({
+      data: { clave: 'BOT-01', descripcion: 'Botón', unidad: 'pza', precioReferencia: 1 },
+    });
+    await cliente.modeloAvio.create({
+      data: {
+        idModelo: idSuelto,
+        idAvio: boton.id,
+        consumoPorPrenda: 1,
+        consumoPorTalla: true,
+        tallas: { create: [{ idTalla: tallaCH.id, consumo: 6 }] },
+      },
+    });
+
+    await traerDelModelo(sesion(), idOrden, {}, bd());
+
+    expect(await medidasDeLaOrden(idOrden, boton.id)).toEqual([6]);
   });
 });
 

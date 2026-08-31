@@ -193,6 +193,39 @@ describe('El guardián de las lecturas de receta (V1-E9b)', () => {
     }
   });
 
+  it('⭐⭐ NADIE lee `ModeloAvioTalla` directo fuera de los archivos que pueden', () => {
+    // 🔴 LA LECCIÓN DE LA REVISIÓN DE ESTA ETAPA. De las cinco tablas de la receta,
+    // `ModeloAvioTalla` es la ÚNICA que no tenía lectura canónica: las otras cuatro viven bajo el
+    // paraguas del embudo, y su resolución no puede perderse porque no está en el llamador. La de
+    // las medidas SÍ estaba en el llamador, repetida en CUATRO sitios de `receta-orden.ts`, y sólo
+    // uno tenía prueba. El reviewer revirtió uno a mano y **la suite entera siguió verde** — la
+    // regla de arriba tampoco lo veía, porque trabaja por ARCHIVO y ése ya importaba el resolver.
+    //
+    // Esta regla es la que cierra ese hueco: `leerMedidasAvioBom` es la CUARTA canónica, y aquí se
+    // exige que nadie más lea la tabla directo. Ya no es «acuérdate de resolver»: es «no puedes
+    // escribir la consulta».
+    const LEE_MEDIDAS = /\.modeloAvioTalla\.(?:findMany|findFirst|findUnique|count|aggregate)\s*\(/;
+    /** Los únicos que pueden, cada uno con su razón. */
+    const PUEDEN: Record<string, string> = {
+      'src/dominio/modelos/bom-modelo.ts':
+        'ALOJA la canónica `leerMedidasAvioBom` (y `copiarBom`, deuda declarada de la pieza B).',
+      'src/dominio/modelos/medidas-avio-talla.ts':
+        'Es el módulo DUEÑO de la tabla: la captura por talla se lee y se escribe aquí.',
+      'src/dominio/modelos/versiones.ts':
+        'Excepción ya declarada arriba (copia congelada a una versión; un hijo no se versiona).',
+    };
+    const leenMedidas = fuentes.filter((f) => LEE_MEDIDAS.test(codigo.get(f) ?? ''));
+    expect(leenMedidas.filter((f) => !(f in PUEDEN))).toEqual([]);
+    // Y la contraparte: `receta-orden.ts` —los cuatro sitios del incidente— ya NO la lee.
+    expect(leenMedidas).not.toContain('src/dominio/produccion/receta-orden.ts');
+    // La canónica existe y resuelve por dentro (si dejara de hacerlo, la regla sería un adorno).
+    const bom = codigo.get('src/dominio/modelos/bom-modelo.ts') ?? '';
+    expect(bom).toMatch(/export async function leerMedidasAvioBom\b/);
+    expect(bom.slice(bom.indexOf('export async function leerMedidasAvioBom'))).toMatch(
+      /resolverIdRecetaDeModelo\(tx, idModelo\)/,
+    );
+  });
+
   it('🔴 quien trae la receta por `include` TIENE que injertarla, no sólo importar el resolver', () => {
     // La regla de arriba se conforma con que el archivo importe algo del resolver. Para la forma 3
     // eso no basta: importar `resolverIdRecetaDeModelo` y seguir usando el `include` tal cual
