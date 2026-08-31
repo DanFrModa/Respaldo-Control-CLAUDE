@@ -10429,3 +10429,70 @@ vino a matar. Haría falta una segunda entrada: *«órdenes sin receta»*. **(3)
 - **Aplica en:** la **0.065** no se cierra sin (1). **Fecha:** 2026-08-31.
 
 ---
+
+#### (Post-F9.165) — 🔴 EL CANDADO DE COMPRA (0.067): **el dato que parece el candado NO lo es** (medido el 31-ago-2026)
+
+**Cómo salió.** Medición previa de la 0.067 —*«pongamos un candado que no se pueda comprar nada hasta que
+esté cerrado otra vez»* (§Post-F9.160(a))—. **No está construida**, pero está hecha por dentro en un ~40 %,
+y el plan **describe mal la pieza que falta** de una forma que habría entregado la versión rota.
+
+### 🔴 El hallazgo: el atajo que parece funcionar
+
+El plan sugiere que `Orden.recetaLiberadaEn` es el candado. **No lo es.** El propio código lo dice literal
+(`schema.prisma:3107-3108` y `receta-orden.ts:3540`): *«la PUERTA DE COMPRA ya NO se decide con esta
+columna»*. Y ese derivado **ya se cae solo a NULL** al desfirmar cualquier renglón
+(`sincronizarLiberacionOrden:3568-3574`).
+
+⇒ **Quien lea el plan, vea el derivado caerse solo y concluya «ya está», entrega esto:** la pantalla diría
+*«receta no liberada»* **y la orden de compra saldría igual**. Un candado que se ve puesto y no cierra.
+
+### 🔴 Y un choque de frente que el plan no menciona: §Post-F9.80
+
+Daniel **retiró la liberación en bloque** (*«no tiene sentido liberar las cosas sin ver»*), y `liberarReceta`
+exige **renglones nombrados por id**, rechazando la lista vacía (`receta-orden.ts:2700-2705`).
+⇒ **Reabrir es un acto en bloque cuyo inverso Daniel prohibió.** Si reabrir desfirmara todo, una receta de
+40 renglones costaría **40 clics para volver a cerrarla**. Es la decisión de diseño central de la versión,
+no un detalle.
+
+### Lo que YA está construido (el ~40 %)
+
+`revocarFirmaDeRenglones` (`:3463`) **existe** —la ficha lo nombra bien— pero **NO es la reapertura**: es un
+efecto automático dentro de `enRecetaEditable`, sin endpoint ni botón, que quita la firma **al renglón que
+se edita** (siete mutaciones lo disparan). Además ya están: el derivado que se recalcula solo
+(`sincronizarLiberacionOrden:3549`), **`exigirNoSacarLoComprado`** (`:3398`, en 7 puntos — ya impide sacar
+de la receta un material con OC comprometida), las dos puertas de compra (`:1387`, `:1435`) con sus **cinco
+bocas de gasto** ya cableadas, y la UI de estado (`PanelRecetaOrden.tsx:440-456`).
+
+### Diseño tomado (defaults del lead, derivados de decisiones YA tomadas por Daniel)
+
+1. ⭐ **Reabrir SÓLO MARCA; no desfirma.** Conserva las firmas ⇒ **cerrar es un clic, no cuarenta**. Es lo
+   único compatible con §Post-F9.80. *Si Daniel prefiere otra cosa, se ajusta — pero este default sale de
+   su propia decisión, no de una preferencia técnica.*
+2. **Al cerrar sólo hay que re-firmar lo que se tocó**, y **eso ya funciona solo** (`:1532`): editar un
+   renglón le quita su firma. Cerrar exige que no quede nada sin firmar.
+3. **Motivo obligatorio al abrir**, igual que ya lo pide `quitarRenglonReceta`.
+4. **No se puede abrir una receta que nunca se liberó** (409): sin firma no hay nada que reabrir.
+5. **Las OC ya autorizadas no se tocan** — se bloquean las nuevas. Des-autorizar sigue siendo manual y de
+   Dirección. *(Coherente con la REGLA 0-B: hacia adelante, nada retroactivo.)*
+6. **Bloquea el GASTO, no la lectura**: ver qué falta no cuesta dinero.
+7. 🔴 **La orden reabierta TIENE que verse en una bandeja.** Si reabrir sólo marca, la orden **no aparece
+   en «Recetas por liberar»** (esa bandeja lista por renglones sin firmar, y no habría ninguno) ⇒ quedaría
+   con la **compra congelada, invisible e indefinidamente**. Necesita distintivo propio.
+8. **Mensaje propio para el comprador.** Hoy daría un 409 con el texto *«todavía no la libera Desarrollo»*
+   (`:1405`), que **es falso** en este caso: sí la liberaron, está en corrección.
+
+### Alcance
+
+**Migración SÍ** —y el plan acierta en el «sí» pero **falla en el porqué**: no es que falte dónde guardar la
+fecha, es que **el dato que ya existe no gobierna la compra**. Campos aditivos en `Orden`
+(`receta_abierta_en` / `_por_id` / `_motivo`). **Permisos NO** (`desarrollo.administrar` ya es la llave de
+firmar y de toda mutación de receta; abrir y cerrar son actos del mismo dueño) ⇒ **sin `SEED_ON_START`**.
+**El contrato SÍ se mueve** (campos nuevos junto a `puedeComprar`).
+
+📌 **Solape:** con la 0.065 es **nulo** (otro archivo, otro dato, otro momento: aquélla es la compuerta del
+MODELO al promover). Con la 0.066, **ninguno** — pero conviene recordar que **la 0.066 ya resultó estar
+construida**.
+
+- **Aplica en:** versión **0.067**. **Fecha:** 2026-08-31.
+
+---
