@@ -9945,3 +9945,44 @@ Daniel no lo ha reportado como molestia**, así que se deja como está y no se t
 Si algún día le estorba, el cambio es chico. **Fecha:** 2026-08-30.
 
 ---
+
+#### (Post-F9.157) — 🔴 REGLA DE TRABAJO: **NO SE FRENA ESPERANDO RESPUESTAS** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** El lead cerró la versión 0.062, contestó una pregunta sobre qué decisiones faltaban… y
+**se quedó quieto, sin nada corriendo**, teniendo por delante la **0.063 completamente decidida** y lista
+para arrancar. Daniel lo detectó con dos preguntas seguidas: *«¿Estás trabajando?»* y *«¿Estás frenado
+esperando las respuestas, o estás trabajando?»*. 🔴 **No estaba bloqueado: estaba parado.** Su instrucción,
+textual:
+
+> *«mientras haya algo que hacer, no frenes por las respuestas. **No estoy pegado a Claude 24 horas.**
+> Necesito que avances mientras puedas hacer algo y después te doy mis respuestas.»*
+
+Y pidió explícitamente que quedara **donde toda sesión nueva lo lea**, no en el chat:
+
+> *«Por favor anota esto donde tengas que anotarlo para atrás, que nunca vuelva a suceder… déjalo como una
+> decisión, para que cuando abra nuevos chats la decisión sea la misma.»*
+
+### Lo que queda decidido
+
+1. ⭐ **Preguntar NO es parar.** Se deja la pregunta puesta —**con su default propuesto**— y **se sigue con
+   lo siguiente que no dependa de ella**. Cuando la respuesta llegue, se retoma donde se dejó.
+2. **Antes de decir «espero respuesta» hay que haber agotado lo que NO depende de ella.** Casi siempre hay
+   algo: otra versión entera del programa, la **medición** de la que sigue, una deuda del §4, o
+   documentación. **Una etapa bloqueada no bloquea el programa: se salta y se sigue.**
+   📌 **Precedente que lo prueba, del mismo día:** la **0.061** (el costo) se aparcó por decisión de Daniel
+   y se pasó **directo a la 0.062**, sin perder un minuto y sin discutir nada dos veces — porque sus
+   decisiones quedaron escritas (§Post-F9.154) antes de aparcarla.
+3. **Sólo se para de verdad** cuando *todo* lo pendiente depende de esa respuesta, o cuando avanzar sin
+   ella arriesgaría trabajo que habría que tirar. En ese caso **se dice con esas palabras** — *«estoy
+   detenido esperando esto»* — y se explica qué se intentó antes de detenerse. Una pausa sin esa frase
+   explícita **es un error, no una espera**.
+4. **Las preguntas se juntan** (refuerza §6 de `CLAUDE.md`): si hay tres decisiones abiertas de un bloque,
+   van **las tres de una vez** con su default, no de a gotas.
+5. **Corolario operativo:** el ritmo del proyecto **no puede depender de que Daniel esté frente a la
+   pantalla**. Él responde cuando puede; el trabajo no se detiene mientras tanto.
+
+- **Aplica en:** TODA sesión, siempre. Escrita como **REGLA 0** al inicio de `CLAUDE.md` §7 — el primer
+  archivo que lee cualquier chat nuevo — para que no dependa de que alguien recuerde esta decisión.
+  **Fecha:** 2026-08-30.
+
+---

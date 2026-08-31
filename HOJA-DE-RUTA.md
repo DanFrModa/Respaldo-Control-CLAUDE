@@ -1999,6 +1999,17 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
 
+### 🔴 REGLA 0 — no se frena esperando respuestas (Daniel, 30-ago-2026, §Post-F9.157)
+
+> *«mientras haya algo que hacer, no frenes por las respuestas. **No estoy pegado a Claude 24 horas.**
+> Necesito que avances mientras puedas hacer algo y después te doy mis respuestas.»*
+
+**Preguntar no es parar.** Se deja la pregunta con su default y **se sigue con lo que no dependa de ella**;
+una etapa bloqueada **no bloquea el programa** (precedente del mismo día: la 0.061 se aparcó y se pasó a la
+0.062 sin perder un minuto). Sólo se para cuando *todo* lo pendiente depende de esa respuesta — y entonces
+**se dice con esas palabras**: *«estoy detenido esperando esto»*. La regla completa vive en `CLAUDE.md` §7,
+como REGLA 0, porque es el primer archivo que lee cualquier sesión nueva.
+
 ### ⚙️ Reglas de MÉTODO nacidas en V1-E8j, V1-E8k y V1-E8l (aplican a toda etapa, no sólo a ésas)
 
 - 🟢 **Se puede correr INTEGRACIÓN en local sin Docker.** La regla del proyecto prohíbe **Docker y
