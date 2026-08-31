@@ -11225,3 +11225,93 @@ justo lo que él dice que no debe pasar.
   **Fecha:** 2026-08-31.
 
 ---
+
+#### (Post-F9.167) — 🔴🔴 EL BLOQUE 3 (modelos 1:N), MEDIDO: **el plan repitió para LECTURAS el error que ya estaba arreglado para ESCRITURAS** (31-ago-2026)
+
+**Cómo salió.** Medición previa del Bloque 3 —la pieza más grande del programa— contra el árbol. El plan
+dice mal **cinco** cosas, y una de ellas habría entregado un defecto **silencioso que llega al precio del
+cliente**.
+
+### 🔴🔴 (1) El hallazgo grave: el conteo de sitios omite **una clase entera** de lectores
+
+El plan dice *«~44 sitios en 10 archivos leen las tablas DIRECTO»*. **Medido: son 71 en 9** — 42 lecturas
+y **29 escrituras** (que el plan menciona sin dimensionar). Pero el problema no es el número: es **qué
+tipo de sitio se quedó fuera**.
+
+`costos/pre-costo.ts:280,370` usan `include: incluirReceta`, y `desarrollo/precostos.ts:737,813,1206` usan
+`include: incluirBomModelo`. **Esos `include` traen `telas`, `avios`, `avios.tallas` y `artes` por NOMBRE
+DE RELACIÓN, sin nombrar jamás la tabla** ⇒ son **invisibles** a la medición del plan, que buscó
+`.modeloTela.findMany` y hermanos.
+
+⭐ **Y esto ya había pasado, en el mismo repo, en la otra dirección.** El guardián `receta-embudo.test.ts:70-74`
+documenta exactamente este punto ciego **para las escrituras**: *«Prisma deja escribir anidado… el reviewer
+de V1-E7e demostró que ese camino era invisible»*. **El plan repitió para LECTURAS el error que el
+guardián ya arregló para ESCRITURAS.**
+
+🔴 **Lo que se habría entregado:** el precosto de un modelo hijo **con la receta vacía** — sólo maquila,
+corte y el empaque de $2.20. Y de ahí sale **el precio que se cotiza en la cara del cliente**. Es el
+escenario nativo del defecto que la **0.063** acaba de hotfixear (§Post-F9.162), reaparecido por otra
+puerta. **No lanza, no truena: entrega un número menor y se ve normal.**
+
+### (2) La razón que da el plan para no reusar `idModeloPadre` es **falsa** — la conclusión, correcta
+
+El plan dice que `esVersionDeModelo` haría que el hijo *«bloquee su propia promoción»*. **El hijo nunca se
+promueve**: nace ya en producción. Y aunque pasara, el guard de `origen` lanza **antes**. Peor: **la 0.065
+quita esa compuerta**, así que el mecanismo citado ni siquiera existirá.
+
+**El daño real es otro, y sí justifica la columna nueva:** `ModelosPagina.tsx:768` pinta el chip de
+revisión **sólo por el linaje, sin mirar `origen`** ⇒ cada hijo enseñaría *«Revisión pendiente… no puede
+mandarse a producir»* **sin ningún botón para arreglarlo**, sobre un modelo que ya está en producción. Es
+la cicatriz de §Post-F9.119 que V1-E7d vino a cerrar. *Conclusión correcta, mecanismo equivocado — y eso
+importa porque el mecanismo es lo que alguien va a ir a verificar.*
+
+### (3) E3 rompe algo en silencio, y no está en el plan
+
+`requisitos-orden.ts:290-293` busca las órdenes por `Orden.idModelo`. Hoy, apagar `llevaArte` en el modelo
+alcanza a sus 4 órdenes. Después de E3 cada orden apunta a **su propio hijo** ⇒ **tocar el padre no alcanza
+a ninguna**. Y `llevaArte` viaja en la ficha heredada, así que el hijo se lleva su copia.
+
+### (4) §Post-F9.166 **no cabe en las cuatro etapas: es una quinta pieza**
+
+La propagación de la liberación (*«al liberar el modelo se libera para las 4 órdenes»*) necesita la columna
+(E1) **y** que existan varios hijos (**E3**) **y** que liberar dispare la copia congelada (§Post-F9.158(a),
+que hoy **no** es así: la receta se copia al **crear** la orden). ⇒ **cuelga de E3, no de E2** — pese a que
+§Post-F9.166 la llamó *«el corazón de E2»*. **Hoy no tiene casilla en la tabla.**
+
+### (5) Los dígitos alternos: queda **UNO**, no seis
+
+`seed.ts:568-577` siembra 8 géneros con los dígitos 0,1,2,3,4,6,7,9. Libres: el **5** (ya tomado por
+Caballero como alterno) y el **8**, que el propio comentario declara *«no se usa»*. ⇒ la válvula de escape
+alcanza para **un** género más. Multiplicar el consumo ×4 contra una sola serie de repuesto es un techo más
+duro del que el plan pinta. *(No cambia nada hoy: §Post-F9.135 pregunta 10 ya decidió «decidirlo el día que
+pase».)*
+
+### ✅ Lo que el plan acierta
+
+`derivarModeloDeProduccion` e `idModeloDesarrollo` **no existen** (confirmado). `promoverAProduccionNucleo`
+**sí transforma una fila** (un solo `update`, `nomenclatura.ts:776-786`). Las tres lecturas canónicas son
+`leerTelasBom`, `leerAviosBom` y `leerArtesModelo`. **`ModeloAvioTalla` no la lee ninguna de las tres** — el
+plan tenía razón, y por eso su advertencia sobre las medidas por talla es correcta.
+
+### 📐 El troceado: 1→2→3 es obligado, pero **E2 está mal cortada**
+
+- **E2 son 71 sitios en un solo commit sin punto de verificación intermedio.** Se parte en dos:
+  **E2a** = el resolver + las cinco tablas + `copiarRecetaDelModelo` + **los 5 `include` anidados** (el
+  camino por el que pasa el 100 % de las órdenes y del precosto; verificable solo).
+  **E2b** = los escritores + `copiarBom` + el letrero de la ficha.
+- **E4 NO depende de E2** (trabaja sobre `Orden.idModelo`): se puede adelantar.
+- **Añadir la quinta pieza con nombre**: la propagación de la liberación, después de E3.
+- **Meter en E3 explícitamente**: invertir el orden de `salidaAProduccion` (hoy crea la orden **antes** de
+  promover) y arreglar `recalcularEstadoOrdenesDeModelo`.
+- **Añadir a E1, gratis**: excluir a los hijos en **las tres copias** de `esVersionDeModelo` (dominio TS,
+  SQL y frontend), para que el chip fantasma nunca llegue a existir.
+
+### Alcance de la 0.069 (E1)
+
+**Migración: UNA, aditiva** (`id_modelo_desarrollo` + FK `ON DELETE RESTRICT` + índice), **sin backfill**
+(REGLA 0-B; y `NULL` = *«la receta es la mía»*, la conducta de hoy). Conviene un CHECK
+`id_modelo_desarrollo <> id`. **Permisos: CERO. Seed: NO ⇒ no requiere `SEED_ON_START`.**
+
+- **Aplica en:** las versiones **0.069–0.072** y la quinta pieza. **Fecha:** 2026-08-31.
+
+---
