@@ -80,7 +80,11 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { exigirMaterialesLiberados, exigirRecetaLiberada } from '../produccion/receta-orden.js';
+import {
+  exigirComprasNoCongeladas,
+  exigirMaterialesLiberados,
+  exigirRecetaLiberada,
+} from '../produccion/receta-orden.js';
 
 /** Clave de la secuencia de folios de órdenes de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN_COMPRA = 'orden-compra';
@@ -600,6 +604,29 @@ async function validarLineas(
         throw new ErrorNoEncontrado('Orden', idOrden);
       }
     }
+    // ⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA VA **FUERA** DEL BUCLE, Y ÉSA ES LA CORRECCIÓN
+    // (hallazgo del reviewer de esta etapa).
+    //
+    // 🔴 EL DEFECTO QUE TENÍA: meter el candado DENTRO de `exigirRecetaLiberada` lo hacía heredar la
+    // exención de `agregaLineas` de abajo (*"corregir cantidad o precio conserva la identidad ⇒ no
+    // es gastar de nuevo"*). Esa exención se justificó para **la firma**, y su razón es *"un material
+    // que la receta firmada sí incluía"* — una razón que **NO transfiere al candado**, cuya premisa
+    // es exactamente que esa receta firmada **está bajo corrección**. Resultado medido: con la
+    // receta congelada, un `PATCH` que subía la cantidad de una línea YA existente de 100 a 5,000 kg
+    // no llegaba nunca a la guarda (`agregaLineas` contestaba `false` → `continue`) y **la OC
+    // comprometía 50 veces el dinero mientras la compra estaba "congelada"**.
+    //
+    // ⭐ POR QUÉ AQUÍ ES CORRECTO, y no sólo "más temprano": `idsOrdenLigada` se arma de las líneas
+    // **ENTRANTES**, así que esto bloquea **cualquier orden que la OC siga referenciando** —da igual
+    // si le cambia el material, la cantidad o el precio—, y **deja pasar quitarle TODAS sus líneas**
+    // a una orden congelada (su id ya no está en el conjunto). Esa asimetría no es un descuido: es
+    // la única vía de escape honesta para una OC que agrupa varias OP y una de ellas se congeló.
+    // Vale para `crearOC` y `actualizarOC` de una sola vez, y cuesta una consulta sólo si hay ligas.
+    //
+    // Va DESPUÉS del filtro por empresa, como todo lo de aquí: una orden ajena no se comprueba ni se
+    // nombra (A9).
+    await exigirComprasNoCongeladas(tx, idsOrdenLigada, idEmpresa);
+
     // ⭐ LA PUERTA, también por la puerta de atrás (V1-E3d, §Post-F9.43(c) — hallazgo del reviewer).
     // La decisión dice *"no se puede explotar el MRP **ni generar OC**"*, y una OC capturada A MANO
     // en *Compras › Nueva OC* y ligada a la orden gasta el mismo dinero contra la misma receta que
@@ -1140,6 +1167,24 @@ export async function autorizarOC(
       );
     }
     await exigirComplementosCapturados(tx, id);
+    // ⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a)): con la receta de una orden ligada ABIERTA
+    // para corregirse, su compra está congelada. Autorizar es EL momento en que el dinero se
+    // compromete —el borrador todavía no compra nada—, así que la guarda va aquí y no sólo al
+    // capturar las líneas.
+    //
+    // ⚠️ No contradice el punto 5 de §Post-F9.165 ("las OC ya autorizadas no se tocan"): eso protege
+    // a las que YA tienen firma, y esto frena una firma NUEVA. La OC no se pierde: se queda en
+    // borrador y se autoriza en cuanto Desarrollo cierre la receta.
+    const ligadas = await tx.ordenCompraLinea.findMany({
+      where: { idOrdenCompra: id, idOrden: { not: null } },
+      select: { idOrden: true },
+      distinct: ['idOrden'],
+    });
+    await exigirComprasNoCongeladas(
+      tx,
+      ligadas.flatMap((l) => (l.idOrden === null ? [] : [l.idOrden])),
+      sesion.idEmpresaActiva,
+    );
     await tx.ordenCompra.update({
       where: { id },
       data: {
@@ -1438,6 +1483,20 @@ export async function duplicarOC(
     if (motivo !== null) {
       throw new ErrorValidacion(motivo);
     }
+    // ⭐⭐ V1-E8z — EL CANDADO, también por aquí. Duplicar es capturar una OC nueva contra la misma
+    // orden de producción, sólo que copiando: si la receta de esa orden está abierta para
+    // corregirse, su compra está congelada y esta copia no puede nacer.
+    //
+    // 🔴 Y de paso queda dicho lo que se encontró al pasar (deuda PREVIA, no de esta etapa): esta
+    // función NO llama a `validarLineas`, así que se salta las DOS puertas de la firma
+    // (`exigirRecetaLiberada` / `exigirMaterialesLiberados`) que sí cobra la captura a mano. Aquí
+    // sólo se cierra el candado de V1-E8z; cerrar el hueco de la firma es una decisión aparte,
+    // anotada para el lead.
+    await exigirComprasNoCongeladas(
+      tx,
+      origen.lineas.flatMap((l) => (l.idOrden === null ? [] : [l.idOrden])),
+      sesion.idEmpresaActiva,
+    );
 
     const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_ORDEN_COMPRA);
 

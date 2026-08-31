@@ -35,6 +35,10 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
     liberadaPor: null,
     puedeComprar: false,
     todoLiberado: false,
+    // ⭐⭐ V1-E8z: la receta NO está reabierta (el candado de compra, §Post-F9.160(a)).
+    abiertaEn: null,
+    abiertaPor: null,
+    abiertaMotivo: null,
     resumen: {
       sinRevisar: 3,
       revisados: 0,

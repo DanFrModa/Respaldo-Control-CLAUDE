@@ -57,6 +57,9 @@ interface FilaBandeja {
   avios: bigint;
   artes: bigint;
   conOrdenCompra: boolean;
+  /** ⭐⭐ V1-E8z: la receta está ABIERTA para corregirse (la compra de la orden está congelada). */
+  abiertaEn: Date | null;
+  abiertaMotivo: string | null;
 }
 
 /**
@@ -91,11 +94,18 @@ function pendientesPorOrden(): Prisma.Sql {
 }
 
 /**
- * BANDEJA «Recetas por liberar» (`desarrollo.ver`, A9). Una fila por ORDEN VIVA con al menos un
- * renglón de receta sin firmar, ordenada por FECHA DE ENTREGA (las sin fecha, al final) y luego por
- * folio.
+ * BANDEJA «Recetas por liberar» (`desarrollo.ver`, A9). Una fila por ORDEN VIVA que tenga al menos
+ * un renglón de receta sin firmar **o la receta ABIERTA para corregirse** (V1-E8z), ordenada con las
+ * abiertas primero y luego por FECHA DE ENTREGA (las sin fecha, al final) y folio.
  *
- * Las órdenes CANCELADAS quedan fuera: su receta ya no se compra y firmarla no significa nada.
+ * ⭐⭐ V1-E8z (§Post-F9.165 punto 7) — **la orden reabierta TIENE que verse aquí.** Reabrir sólo
+ * marca (no desfirma), así que no deja renglones pendientes y sin esto no aparecería en ninguna
+ * lista: compra congelada, invisible e indefinidamente. Sale con `abiertaEn`/`abiertaMotivo` y su
+ * `porLiberar` puede ser 0 — no es un hueco: es «no falta firmar nada, falta CERRARLA».
+ *
+ * Las órdenes CANCELADAS quedan fuera: su receta ya no se compra y firmarla no significa nada. (Una
+ * cancelada con la receta abierta tampoco aparece; su candado se cierra desde la receta de la orden,
+ * que es la razón de que cerrar no exija la orden viva.)
  */
 export async function consultarRecetasPorLiberar(
   sesion: SesionUsuario,
@@ -125,13 +135,29 @@ export async function consultarRecetasPorLiberar(
     )`;
   const condSoloConOc = f.soloConOrdenCompra ? Prisma.sql`AND ${conOc}` : Prisma.empty;
 
+  /*
+   * 🔴 V1-E8z — POR QUÉ ESTE `FROM` SE DIO VUELTA, y es la mitad de la etapa (§Post-F9.165 punto 7).
+   *
+   * Hasta aquí la bandeja MANEJABA desde los renglones pendientes (`JOIN` contra la subconsulta) y
+   * por eso sólo veía órdenes con algo sin firmar. Pero **reabrir sólo marca: no desfirma**, así que
+   * una orden en corrección **no tiene ni un renglón pendiente** y esta bandeja no la vería jamás:
+   * quedaría con la compra congelada, invisible e indefinidamente — el silencio exacto que la
+   * bandeja vino a romper (§Post-F9.72). Ahora manda la ORDEN y los pendientes entran por `LEFT
+   * JOIN`; una fila sale si tiene pendientes **o** si su receta está abierta.
+   *
+   * El costo: se recorren las órdenes vivas de la empresa en vez de sólo las que tienen pendientes.
+   * Es un hash join contra una cartera de miles, no de millones, y el plan lo seguía dominando el
+   * `UNION ALL` de las tres tablas de renglones — que no cambió. Un índice sobre `receta_abierta_en`
+   * no ayudaría a este plan (la columna es casi toda NULL y no es la que dirige la consulta).
+   */
   const desde = Prisma.sql`
-    FROM (${pendientesPorOrden()}) AS "p"
-    JOIN "ordenes"  o ON o."id"  = "p"."id_orden"
+    FROM "ordenes"  o
     JOIN "modelos"  m ON m."id"  = o."id_modelo"
     JOIN "clientes" c ON c."id"  = o."id_cliente"
+    LEFT JOIN (${pendientesPorOrden()}) AS "p" ON "p"."id_orden" = o."id"
    WHERE o."id_empresa" = ${sesion.idEmpresaActiva}
      AND o."estado"::text <> 'cancelada'
+     AND ("p"."id_orden" IS NOT NULL OR o."receta_abierta_en" IS NOT NULL)
      ${condBusqueda}
      ${condSoloConOc}
   `;
@@ -145,12 +171,19 @@ export async function consultarRecetasPorLiberar(
              m."codigo"        AS "modelo",
              c."nombre"        AS "cliente",
              o."fecha_entrega" AS "fechaEntrega",
-             "p"."telas"       AS "telas",
-             "p"."avios"       AS "avios",
-             "p"."artes"       AS "artes",
-             ${conOc}          AS "conOrdenCompra"
+             COALESCE("p"."telas", 0) AS "telas",
+             COALESCE("p"."avios", 0) AS "avios",
+             COALESCE("p"."artes", 0) AS "artes",
+             ${conOc}          AS "conOrdenCompra",
+             o."receta_abierta_en"     AS "abiertaEn",
+             o."receta_abierta_motivo" AS "abiertaMotivo"
       ${desde}
-      ORDER BY o."fecha_entrega" ASC NULLS LAST, o."folio" ASC
+      -- ⭐ V1-E8z: las ABIERTAS van ARRIBA. La bandeja ordena por "lo que estorba primero", y una
+      -- receta abierta congela la compra de TODA la orden, no la de un renglón. Además muchas
+      -- órdenes no tienen fecha de entrega y caen al final: dejar ahí una compra congelada sería
+      -- volver a esconderla.
+      ORDER BY (o."receta_abierta_en" IS NOT NULL) DESC,
+               o."fecha_entrega" ASC NULLS LAST, o."folio" ASC
       LIMIT ${f.porPagina} OFFSET ${(f.pagina - 1) * f.porPagina}
     `),
   ]);
@@ -172,6 +205,8 @@ export async function consultarRecetasPorLiberar(
       artes,
       porLiberar: telas + avios + artes,
       conOrdenCompra: r.conOrdenCompra,
+      abiertaEn: r.abiertaEn === null ? null : r.abiertaEn.toISOString(),
+      abiertaMotivo: r.abiertaMotivo,
     };
   });
 

@@ -41,6 +41,9 @@ function fila(over: Partial<RecetaPorLiberar> = {}): RecetaPorLiberar {
     artes: 0,
     porLiberar: 3,
     conOrdenCompra: false,
+    // ⭐⭐ V1-E8z: por default la receta NO está reabierta (el candado de compra, §Post-F9.160(a)).
+    abiertaEn: null,
+    abiertaMotivo: null,
     ...over,
   };
 }
@@ -215,5 +218,53 @@ describe('textoFalta — el conteo por tipo, redactado', () => {
 
   it('si el servidor no desglosa, se enuncia el total (nunca una cadena vacía)', () => {
     expect(textoFalta({ telas: 0, avios: 0, artes: 0, porLiberar: 4 })).toBe('4 renglones');
+  });
+
+  it('⭐⭐ V1-E8z: con NADA pendiente no dice «0 renglones» — es una receta reabierta', () => {
+    // Desde el candado, una fila puede entrar a la bandeja sin ningún renglón por firmar: llegó por
+    // estar ABIERTA. «0 renglones» sería un número inútil justo donde el chip ya dice qué pasa.
+    expect(textoFalta({ telas: 0, avios: 0, artes: 0, porLiberar: 0 })).toBe(
+      'Nada por firmar: falta cerrarla',
+    );
+  });
+});
+
+/**
+ * ⭐⭐⭐ EL CANDADO EN LA BANDEJA (V1-E8z, §Post-F9.165 punto 7).
+ *
+ * 🔴 POR QUÉ ESTO ES LA MITAD DE LA ETAPA: reabrir **sólo marca, no desfirma**, así que una orden en
+ * corrección **no tiene ni un renglón pendiente**. Sin distintivo propio se leería como una fila más
+ * —o directamente no estaría—, y quedaría con la compra congelada, invisible e indefinidamente: el
+ * silencio exacto que esta bandeja vino a romper.
+ */
+describe('<RecetasPorLiberarPagina> · el candado de compra (V1-E8z)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('🔴 la receta ABIERTA se marca «En corrección», aunque no le falte firmar nada', () => {
+    render([
+      fila({
+        telas: 0,
+        avios: 0,
+        artes: 0,
+        porLiberar: 0,
+        abiertaEn: '2026-08-31T09:00:00.000Z',
+        abiertaMotivo: 'el cliente cambió el cierre',
+      }),
+    ]);
+
+    const chip = screen.getByTestId('rpl-en-correccion');
+    expect(chip).toHaveTextContent(/compra congelada/);
+    expect(chip).toHaveAttribute('title', 'Motivo: el cliente cambió el cierre');
+    // Y la celda no enseña un «0 renglones» que no dice nada.
+    expect(within(screen.getByTestId('rpl-fila')).getByText(/falta cerrarla/)).toBeInTheDocument();
+  });
+
+  it('una fila normal (sólo firmas pendientes) NO lleva la marca del candado', () => {
+    render([fila()]);
+
+    expect(screen.queryByTestId('rpl-en-correccion')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rpl-fila')).toHaveTextContent('1 tela, 2 avíos');
   });
 });

@@ -22,6 +22,11 @@ vi.mock('@/api/receta-orden', () => ({
   useEditarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
   useTraerDelModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useCorregirCapturaAvio: () => ({ mutate: vi.fn(), isPending: false }),
+  // ⭐⭐ V1-E8z — el candado de compra. `PanelRecetaOrden` los consume, así que el mock los tiene
+  // que exportar o el módulo entero revienta al montar (no es un detalle del mock: es la lista
+  // completa de lo que la pantalla necesita del API).
+  useAbrirReceta: () => ({ mutate: vi.fn(), isPending: false }),
+  useCerrarReceta: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/api/medidas-avio', () => ({
@@ -42,6 +47,10 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
     liberadaPor: null,
     puedeComprar: false,
     todoLiberado: false,
+    // ⭐⭐ V1-E8z: la receta NO está reabierta (el candado de compra, §Post-F9.160(a)).
+    abiertaEn: null,
+    abiertaPor: null,
+    abiertaMotivo: null,
     resumen: {
       sinRevisar: 1,
       revisados: 0,

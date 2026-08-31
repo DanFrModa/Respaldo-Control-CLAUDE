@@ -1002,6 +1002,14 @@ export type RecetaEditarCuerpo =
 export type LiberarRecetaCuerpo = NonNullable<
   paths['/api/ordenes/{id}/receta/liberar']['post']['requestBody']
 >['content']['application/json'];
+/**
+ * ⭐⭐ V1-E8z — Cuerpo de ABRIR la receta (§Post-F9.160(a)): reabrirla para corregirla **congela la
+ * compra de la orden** hasta que se cierre. El `motivo` es OBLIGATORIO — es lo que el comprador ve
+ * en el 409 cuando intenta comprar. Cerrar no lleva cuerpo.
+ */
+export type AbrirRecetaCuerpo = NonNullable<
+  paths['/api/ordenes/{id}/receta/abrir']['post']['requestBody']
+>['content']['application/json'];
 /** Cuerpo de TRAER DEL MODELO (sin `materiales` = todo lo que falte). */
 export type TraerDelModeloCuerpo = NonNullable<
   paths['/api/ordenes/{id}/receta/traer-del-modelo']['post']['requestBody']

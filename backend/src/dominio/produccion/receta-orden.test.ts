@@ -19,6 +19,7 @@ import { Prisma } from '../../datos/index.js';
 
 import {
   calcularDesalineacion,
+  exigirCompraNoCongelada,
   laCulpaEsDeLaNormalizacion,
   magnitudDelAvisoDeCaptura,
   medidasResultantes,
@@ -630,5 +631,68 @@ describe('magnitudDelAvisoDeCaptura (V1-E8h/H1 — sólo se afirma lo que la ord
   it('en una orden SIN matriz capturada (0 piezas) no se inventa un descuadre', () => {
     const sinMatriz = { total: 0, porTalla: new Map<number, number>() };
     expect(magnitudDelAvisoDeCaptura(renglon(), sinMatriz)).toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐⭐ EL CANDADO DE COMPRA, su parte PURA (V1-E8z, §Post-F9.160(a)) — DANIEL: *"pongamos un
+ * candado que **no se pueda comprar nada hasta que esté cerrado otra vez**"*.
+ *
+ * Lo que se fija aquí es **el mensaje**, y no es cosmética: es lo único que el comprador recibe
+ * cuando su orden de compra se rechaza. Si dijera *«todavía no la libera Desarrollo»* —el texto de
+ * la OTRA puerta— sería **falso** (sí la liberaron: está en corrección) y lo mandaría a pedir una
+ * firma que ya existe. §Post-F9.165 punto 8 lo nombra aparte por eso.
+ *
+ * El resto del candado —que las cinco bocas de gasto pasen de verdad por esta guarda— vive en
+ * `receta-orden.int.test.ts`, que es donde se puede intentar comprar.
+ */
+describe('exigirCompraNoCongelada — la puerta del candado (V1-E8z)', () => {
+  const abierta = {
+    folio: 1234n,
+    recetaAbiertaEn: new Date('2026-08-31T09:00:00.000Z'),
+    recetaAbiertaMotivo: 'el cliente cambió el cierre',
+  };
+
+  it('con la receta CERRADA no estorba (`recetaAbiertaEn` en null = todo como siempre)', () => {
+    expect(() =>
+      exigirCompraNoCongelada({ folio: 1234n, recetaAbiertaEn: null, recetaAbiertaMotivo: null }),
+    ).not.toThrow();
+  });
+
+  it('🔴 con la receta ABIERTA frena, nombra la ORDEN, la FECHA y el MOTIVO', () => {
+    const error = (() => {
+      try {
+        exigirCompraNoCongelada(abierta);
+        return null;
+      } catch (e) {
+        return e as Error;
+      }
+    })();
+
+    expect(error).not.toBeNull();
+    expect(error?.message).toContain('1234');
+    expect(error?.message).toContain('2026-08-31');
+    expect(error?.message).toContain('el cliente cambió el cierre');
+    expect(error?.message).toContain('CONGELADA');
+  });
+
+  it('⭐ y NO dice «todavía no la libera Desarrollo»: eso sería mentira y manda a pedir una firma que ya existe', () => {
+    expect(() => exigirCompraNoCongelada(abierta)).toThrow(/ABIERTA para corregirse/);
+    expect(() => exigirCompraNoCongelada(abierta)).not.toThrow(/todavía no la libera/);
+  });
+
+  it('dice las DOS cosas que el comprador necesita saber: quién la cierra y qué NO está frenado', () => {
+    // Sin el «dónde se cierra», el 409 es un muro. Sin el «cortar y producir no están bloqueados»,
+    // medio taller cree que la producción se paró (la misma aclaración que ya lleva la otra puerta).
+    expect(() => exigirCompraNoCongelada(abierta)).toThrow(/Desarrollo/);
+    expect(() => exigirCompraNoCongelada(abierta)).toThrow(/cortar y producir/);
+  });
+
+  it('sin motivo guardado (dato viejo) NO se rompe: frena igual y no inventa texto', () => {
+    // REGLA 0-B: la única pregunta es «¿funciona bien cuando el dato NO está?». Aquí sí: el candado
+    // frena, y sencillamente no hay motivo que citar.
+    const sinMotivo = { ...abierta, recetaAbiertaMotivo: null };
+    expect(() => exigirCompraNoCongelada(sinMotivo)).toThrow(/CONGELADA/);
+    expect(() => exigirCompraNoCongelada(sinMotivo)).not.toThrow(/Motivo/);
   });
 });

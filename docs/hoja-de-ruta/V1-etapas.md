@@ -1218,6 +1218,81 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8z · ⭐ EL CANDADO DE COMPRA: reabrir la receta congela el gasto (31-ago-2026, versión **0.067**) — ✅ HECHA
+
+**El encargo, en palabras de Daniel** (§Post-F9.160(a)): *«pongamos un candado que **no se pueda comprar
+nada hasta que esté cerrado otra vez**»*. Una receta de OP ya liberada **se puede volver a ABRIR** para
+corregirla, y **mientras está abierta la compra de esa orden queda bloqueada**.
+
+### 🔴 El hallazgo que definió la etapa: el atajo que parece funcionar
+
+El plan sugería que `Orden.recetaLiberadaEn` era el candado. **NO LO ES** — el propio código lo dice
+literal (`schema.prisma:3107-3108`, `receta-orden.ts:3540`): *«la PUERTA DE COMPRA ya NO se decide con esta
+columna»*, y ese derivado **ya se cae solo a NULL** al desfirmar cualquier renglón. ⇒ **quien se hubiera
+apoyado en él habría entregado esto: la pantalla dice «receta no liberada» y la orden de compra sale
+igual.** Un candado que se ve puesto y no cierra. Por eso van **tres columnas nuevas**.
+
+### ⭐ La decisión de diseño que salió bien: cerrar la puerta EN la puerta
+
+En vez de blindar las cinco bocas de gasto una por una, el guard `exigirCompraNoCongelada` vive **dentro**
+de `exigirRecetaLiberada` y `exigirMaterialesLiberados`, por las que ya pasan todas. **Cero consultas
+extra** (el `findFirst` que ya sacaba el folio trae las dos columnas) y ningún sitio que olvidar mañana.
+Va **antes** que la comprobación de firma **a propósito**: corregir un renglón le quita su firma, así que
+una receta abierta puede quedar sin nada firmado y el mensaje viejo —*«todavía no la libera Desarrollo»*—
+sería **falso**.
+
+⭐ **Y aparecieron DOS bocas más que nadie había contado:** `duplicarOC` y `autorizarOC`, que **no pasan por
+`validarLineas`**. ⚠️ *Autorizar es el momento en que sale el dinero.* Cerradas también ⇒ **siete, no cinco**.
+
+### 🔴 La revisión independiente: RECHAZADA con 2 bloqueantes, los dos corregidos
+
+- **H1 · 🔴 El candado HEREDÓ una exención que no le correspondía.** Meterlo dentro de
+  `exigirRecetaLiberada` lo hizo heredar la de `agregaLineas` —*«corregir cantidad/precio conserva la
+  identidad ⇒ exento»*—, que **se justificó para la FIRMA** (*«un material que la receta firmada sí
+  incluía»*) y **cuya razón no transfiere al candado**, cuya premisa es que esa receta firmada **está bajo
+  corrección**. Escenario medido: con la receta congelada, un `PATCH` subía una línea de **100 a 5,000 kg**
+  y la guarda **nunca corría** — 50× el dinero comprometido «con la compra congelada». Arreglado sacando la
+  comprobación **fuera del bucle**, sobre las órdenes que la OC **sigue referenciando**: bloquea cantidad,
+  precio y material, **y deja pasar quitarle todas sus líneas** — que es justo la vía de escape que H2
+  necesita. ⭐ *La elegancia de reusar una puerta trajo su equipaje: la exención de la otra regla.*
+- **H2 · 🔴 La salida del candado existía en el dominio y NO en la pantalla.** `permitirOrdenCancelada` se
+  construyó **exactamente** para que el candado no fuera una trampa… y la UI escondía el botón *Cerrar* en
+  una orden cancelada, y la bandeja no la listaba. Escenario: una OC agrupa la OP 500 y la 501; se abre la
+  receta de la 500 y el cliente la cancela ⇒ **`autorizarOC` responde 409 nombrando la 500 para siempre**,
+  sin botón y sin fila. **Código muerto que prometía una salida que nadie podía tomar.**
+
+### ⭐⭐ Y algo que el coder encontró EN SÍ MISMO, mutando
+
+Dos de sus mutaciones de H2 **sobrevivieron**, y eso destapó que sus propias guardas internas eran **código
+muerto demostrable**: sin permiso, `editable` ya era `false`, así que a esa rama **no se llegaba nunca**.
+Las quitó. 🔑 **La lección, que vale para todo el proyecto:** *un `&&` que ninguna prueba puede tumbar no
+es protección — es decoración.* De paso reforzó una prueba suya que era débil («cancelada sin abrir» no
+pintaba ningún botón, así que pasaba sin comprobar nada).
+
+### Cómo quedó
+
+**Reabrir sólo MARCA; no desfirma** (§Post-F9.165 punto 1) ⇒ **cerrar es un clic, no cuarenta**: es lo
+único compatible con §Post-F9.80, donde Daniel retiró la liberación en bloque. **Motivo obligatorio** al
+abrir. **Bloquea el gasto, no la lectura.** Las OC ya autorizadas **no se tocan**. Y **la orden reabierta se
+ve**: la bandeja cambió de plan para listarla, porque si sólo se marca no tendría renglones sin firmar y
+habría quedado **congelada e invisible**.
+
+⚠️ **PENDIENTE DE DANIEL (§Post-F9.168):** abrir exige la receta **liberada completa**, no «al menos una
+firma». Es más seguro —evita una orden imposible de cerrar— pero **deja fuera un caso real**: 39 de 40
+renglones firmados con OC emitidas y el 40 sin firmar; el único rodeo sería **firmar el 40 sin revisarlo**,
+justo lo que §Post-F9.80 prohíbe. La regla **no se tocó**; la pregunta está escrita.
+
+📌 **Deuda declarada (no de esta etapa):** `duplicarOC` y `autorizarOC` **se saltan las dos puertas de la
+FIRMA** (no llaman a `validarLineas`) — es previo; aquí sólo se les puso el candado nuevo. Y **reabrir no
+des-completa la orden**: el requisito `receta` sigue cumplido y la OP sigue `completa`, coherente con
+«bloquea el gasto» pero observable.
+
+⚠️ **Migración aditiva** `20260831180000_el_candado_de_compra` (3 columnas anulables, sin backfill),
+**verificada con `prisma migrate diff`, no a ojo**. **SIN permisos ⇒ NO requiere `SEED_ON_START`.** El
+contrato se movió ⇒ backend y frontend suben juntos.
+
+---
+
 ## V1-E8y · ⭐⭐ COTIZAR EN LA CITA UN MODELO QUE NO EXISTE (31-ago-2026, versión **0.064**) — ✅ HECHA
 
 **El encargo, en palabras de Daniel** (§Post-F9.152):

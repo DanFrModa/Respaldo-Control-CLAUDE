@@ -10,6 +10,7 @@ import { CLAVE_ORDENES } from './ordenes';
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
+  AbrirRecetaCuerpo,
   LiberarRecetaCuerpo,
   RecetaAgregarCuerpo,
   RecetaEditarCuerpo,
@@ -284,6 +285,66 @@ export function useLiberarReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, A
     onSuccess: (receta, { idOrden }) => {
       trasMutar(qc, idOrden, receta);
       // La bandeja de Desarrollo cuenta pendientes por orden: firmar cambia lo que muestra.
+      void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
+    },
+  });
+}
+
+// ── ⭐⭐ V1-E8z · EL CANDADO DE COMPRA (§Post-F9.160(a)) ──────────────────────────────────────
+
+/** Argumentos de ABRIR la receta: el motivo es obligatorio (lo exige el contrato). */
+export interface ArgsAbrirReceta {
+  idOrden: number;
+  cuerpo: AbrirRecetaCuerpo;
+}
+
+/**
+ * ⭐⭐⭐ **REABRE la receta para corregirla y CONGELA la compra de la orden.** DANIEL: *"pongamos un
+ * candado que no se pueda comprar nada hasta que esté cerrado otra vez"*.
+ *
+ * **Las firmas NO se pierden**: reabrir sólo marca, así que cerrar es un clic y sólo hay que
+ * re-firmar lo que se toque (§Post-F9.165 punto 1). Todas las reglas —que la receta esté liberada
+ * completa, que no esté ya abierta, que la orden esté viva— las decide el BACKEND (A1); aquí sólo
+ * se pide.
+ *
+ * Se invalida también la BANDEJA: la orden reabierta aparece ahí marcada «En corrección», que es lo
+ * único que impide que se quede congelada e invisible.
+ */
+export function useAbrirReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, ArgsAbrirReceta> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ idOrden, cuerpo }: ArgsAbrirReceta) => {
+      const { data, error } = await api.POST('/api/ordenes/{id}/receta/abrir', {
+        params: { path: { id: idOrden } },
+        body: cuerpo,
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: (receta, { idOrden }) => {
+      trasMutar(qc, idOrden, receta);
+      void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
+    },
+  });
+}
+
+/**
+ * **CIERRA la receta reabierta y descongela la compra.** El backend exige que no quede ningún
+ * renglón vivo sin firmar y nombra los que falten (A1: esa regla no se replica aquí). Sin cuerpo: la
+ * razón ya se dio al abrir.
+ */
+export function useCerrarReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, number> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (idOrden: number) => {
+      const { data, error } = await api.POST('/api/ordenes/{id}/receta/cerrar', {
+        params: { path: { id: idOrden } },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: (receta, idOrden) => {
+      trasMutar(qc, idOrden, receta);
       void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
     },
   });

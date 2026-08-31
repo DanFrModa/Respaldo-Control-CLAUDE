@@ -63,6 +63,7 @@
 import type {
   CambioReceta,
   ChoqueTraerDelModelo,
+  DatosAbrirReceta,
   DatosLiberarReceta,
   DatosRecetaAgregar,
   DatosTraerDelModelo,
@@ -79,6 +80,7 @@ import type {
   TipoRenglonRecetaClave,
 } from '../../contrato/index.js';
 import {
+  esquemaAbrirRecetaCuerpo,
   esquemaLiberarRecetaCuerpo,
   esquemaRecetaAgregarCuerpo,
   esquemaRecetaEditarCuerpo,
@@ -155,6 +157,13 @@ interface OrdenParaReceta {
   fechaCompletada: Date | null;
   recetaLiberadaEn: Date | null;
   recetaLiberadaPorId: string | null;
+  /**
+   * ⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a)). No null = la receta está ABIERTA para
+   * corregirse y **la compra de esta orden está congelada**. Ver {@link exigirCompraNoCongelada}.
+   */
+  recetaAbiertaEn: Date | null;
+  recetaAbiertaPorId: string | null;
+  recetaAbiertaMotivo: string | null;
   /** V1-E3r: la CURVA del modelo viaja aquí para poder avisar cuando difiere de la de la orden. */
   modelo: {
     codigo: string;
@@ -182,6 +191,9 @@ async function exigirOrdenDeLaEmpresa(
       fechaCompletada: true,
       recetaLiberadaEn: true,
       recetaLiberadaPorId: true,
+      recetaAbiertaEn: true,
+      recetaAbiertaPorId: true,
+      recetaAbiertaMotivo: true,
       modelo: {
         select: {
           codigo: true,
@@ -1246,8 +1258,19 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     // ⭐ V1-E3h: la puerta dejó de ser todo-o-nada. `puedeComprar` = **hay algo firmado**, que es
     // exactamente lo que el MRP necesita para tener qué explotar; `todoLiberado` es la bandera
     // DERIVADA de la orden ("no queda nada por firmar"), la que lee el semáforo de orden completa.
-    puedeComprar: resumen.liberados > 0,
+    //
+    // ⭐⭐ V1-E8z — Y CON LA RECETA ABIERTA, `puedeComprar` ES `false` AUNQUE TODO ESTÉ FIRMADO. El
+    // campo es una PROMESA de lo que el servidor va a contestar, y con el candado puesto contesta
+    // 409 en las cinco bocas de gasto. Dejarlo en `true` sería que la pantalla ofreciera comprar lo
+    // que el API va a rechazar — y peor: obligaría al frontend a deducir la puerta cruzando dos
+    // campos, que es justo lo que A1 prohíbe.
+    puedeComprar: resumen.liberados > 0 && orden.recetaAbiertaEn === null,
     todoLiberado: orden.recetaLiberadaEn !== null,
+    // ⭐⭐ V1-E8z — EL CANDADO, tal cual está guardado. `abiertaEn` no null = la compra de ESTA
+    // orden está congelada hasta que Desarrollo cierre la receta (§Post-F9.160(a)).
+    abiertaEn: orden.recetaAbiertaEn?.toISOString() ?? null,
+    abiertaPor: orden.recetaAbiertaPorId,
+    abiertaMotivo: orden.recetaAbiertaMotivo,
     // ⭐ V1-E3r: el aviso YA REDACTADO por el servidor (A1), o null si no hay nada que avisar. La
     // pantalla lo pinta tal cual — ni arma la frase, ni resuelve el plural, ni ordena las tallas.
     avisoCurva: aviso === null ? null : aviso.texto,
@@ -1285,6 +1308,85 @@ export async function desalineacionDeOrden(
 const DONDE_SE_LIBERA =
   'Se libera desde la receta de la orden (Centro de Órdenes → la orden → «Receta de la orden»), o ' +
   'de un jalón desde Desarrollo → «Recetas por liberar».';
+
+/** Dónde se CIERRA la receta reabierta, dicho una sola vez (misma pantalla que la firma). */
+const DONDE_SE_CIERRA =
+  'La cierra Desarrollo desde la receta de la orden (Centro de Órdenes → la orden → «Receta de la ' +
+  'orden»), o desde Desarrollo → «Recetas por liberar», donde sale marcada «En corrección».';
+
+/**
+ * ⭐⭐ EL CANDADO DE COMPRA (V1-E8z, §Post-F9.160(a)). DANIEL: *"pongamos un candado que **no se
+ * pueda comprar nada hasta que esté cerrado otra vez**"*.
+ *
+ * 🔴 **POR QUÉ ES UNA COLUMNA NUEVA Y NO `recetaLiberadaEn` PUESTO EN NULL.** Ése es el atajo que
+ * PARECE funcionar y entrega la versión rota: desde V1-E3h ese campo es un DERIVADO ("no queda
+ * ningún renglón vivo sin firmar") y **la puerta de compra dejó de consultarlo** — pregunta renglón
+ * por renglón (`exigirRecetaLiberada`, unas líneas más abajo, nunca lo lee). Apagarlo cambiaría el
+ * letrero de la pantalla a *«receta no liberada»* y **la orden de compra saldría igual**.
+ *
+ * 🔴 **Y ES POR ORDEN, NO POR RENGLÓN**, que es lo que lo distingue de la firma de §Post-F9.158(b).
+ * La firma dice *"este renglón ya se puede comprar"* (de a uno, hacia adelante); esto **reabre lo ya
+ * firmado** y congela la compra de TODA la orden mientras dura la corrección. Confundirlas sería el
+ * error caro que §Post-F9.160(a) señala.
+ *
+ * QUÉ FRENA Y QUÉ NO:
+ *  • **FRENA el GASTO**: explotar el MRP, la previa/generación de OC, la OC capturada a mano ligada
+ *    a la orden, duplicarla y autorizarla. Todas pasan por aquí.
+ *  • **NO frena la LECTURA** (§Post-F9.165 punto 6): ver qué falta no cuesta dinero, así que el
+ *    tablero «qué tengo / qué falta», la receta y el estatus de materiales se consultan igual.
+ *  • **NO toca las OC ya autorizadas** (punto 5): se bloquean las NUEVAS. Des-autorizar sigue
+ *    siendo un acto manual de Dirección (`compras.desautorizar`).
+ *  • **NO frena la producción**: cortar, enviar a maquila, recibir y entregar siguen sin bloquearse,
+ *    igual que con la puerta de la firma.
+ *
+ * El mensaje es PROPIO y no reusa el de «todavía no la libera Desarrollo» (§Post-F9.165 punto 8):
+ * ese texto sería FALSO aquí —sí la liberaron, está en corrección— y mandaría al comprador a pedir
+ * una firma que ya existe.
+ *
+ * Se EXPORTA porque es pura (mismo criterio que `resumirReceta` y `recetaCompletamenteLiberada`):
+ * la regla y su redacción se prueban sin base, y lo que las pruebas de integración verifican es lo
+ * otro — que las bocas de gasto de verdad pasen por aquí.
+ */
+export function exigirCompraNoCongelada(orden: {
+  folio: bigint;
+  recetaAbiertaEn: Date | null;
+  recetaAbiertaMotivo: string | null;
+}): void {
+  if (orden.recetaAbiertaEn === null) return;
+  const desde = orden.recetaAbiertaEn.toISOString().slice(0, 10);
+  const motivo =
+    orden.recetaAbiertaMotivo === null ? '' : ` Motivo: "${orden.recetaAbiertaMotivo}".`;
+  throw new ErrorConflicto(
+    `La receta de la orden ${String(orden.folio)} está ABIERTA para corregirse (desde el ${desde}): ` +
+      `la compra de esta orden está CONGELADA hasta que Desarrollo la cierre.${motivo} ` +
+      `${DONDE_SE_CIERRA} Las órdenes de compra ya autorizadas no se tocan, y cortar y producir ` +
+      'no están bloqueados.',
+  );
+}
+
+/**
+ * EL CANDADO, para quien NO carga la orden (duplicar y autorizar una OC): comprueba de una sola
+ * consulta que ninguna de las órdenes ligadas tenga la receta abierta.
+ *
+ * **A9**: filtra por empresa, así que una orden ajena sencillamente no se comprueba (y no se nombra:
+ * nada de confirmar su existencia desde otra empresa). Un `idOrden` que no exista tampoco lanza 404
+ * aquí — no es trabajo de esta guarda decidir eso, y quien la llama ya validó sus propias ligas.
+ */
+export async function exigirComprasNoCongeladas(
+  tx: Tx,
+  idsOrden: Iterable<number>,
+  idEmpresa: number,
+): Promise<void> {
+  const ids = [...new Set(idsOrden)];
+  if (ids.length === 0) return;
+  const ordenes = await tx.orden.findMany({
+    where: { id: { in: ids }, idEmpresa, recetaAbiertaEn: { not: null } },
+    select: { folio: true, recetaAbiertaEn: true, recetaAbiertaMotivo: true },
+    orderBy: { folio: 'asc' },
+  });
+  const primera = ordenes[0];
+  if (primera !== undefined) exigirCompraNoCongelada(primera);
+}
 
 /** Un renglón VIVO de la receta que Desarrollo todavía no firma (V1-E3h, §Post-F9.72). */
 export interface RenglonPorLiberar {
@@ -1391,11 +1493,19 @@ export async function exigirRecetaLiberada(
 ): Promise<RenglonPorLiberar[]> {
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
-    select: { folio: true },
+    select: { folio: true, recetaAbiertaEn: true, recetaAbiertaMotivo: true },
   });
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
+  // ⭐⭐ V1-E8z — EL CANDADO VA PRIMERO, y el orden importa. Con la receta abierta puede que no
+  // quede nada firmado (corregir un renglón le quita su firma), y entonces el mensaje de «todavía
+  // no la libera Desarrollo» sería el equivocado: sí la liberaron, está en corrección. El aviso
+  // tiene que describir la causa REAL, no la que se topó primero (§Post-F9.165 punto 8).
+  //
+  // Va aquí y no en las cinco bocas una por una: **cerrar la puerta en la puerta** es lo que hace
+  // que ninguna se quede fuera, hoy y el día que aparezca una sexta.
+  exigirCompraNoCongelada(orden);
   const [pendientes, liberados] = await Promise.all([
     leerPorLiberar(tx, idOrden),
     contarLiberados(tx, idOrden),
@@ -1440,11 +1550,16 @@ export async function exigirMaterialesLiberados(
 ): Promise<void> {
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
-    select: { folio: true },
+    select: { folio: true, recetaAbiertaEn: true, recetaAbiertaMotivo: true },
   });
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
+  // ⭐⭐ V1-E8z — la MISMA guarda, también aquí. Hoy los dos llamadores de esta función pasan antes
+  // por `exigirRecetaLiberada`, así que sería redundante… hasta que alguien la llame sola. Una
+  // puerta que sólo cierra "porque la otra ya cerró" es la que se queda abierta en la etapa que
+  // viene, y cuesta una comparación contra un campo que la consulta ya trajo.
+  exigirCompraNoCongelada(orden);
   const pendientes = await leerPorLiberar(tx, idOrden);
   if (pendientes.length === 0) return;
   const telasPendientes = new Map(
@@ -1491,12 +1606,28 @@ async function enRecetaEditable<T>(
   idOrden: number,
   bd: ContextoBd | undefined,
   accion: (tx: Tx, orden: OrdenParaReceta, ctx: ContextoMutacionReceta) => Promise<T>,
-  opciones: { cambiaElContenido?: boolean } = {},
+  opciones: {
+    cambiaElContenido?: boolean;
+    /**
+     * ⭐⭐ V1-E8z — LA ÚNICA MUTACIÓN QUE SE PERMITE SOBRE UNA ORDEN CANCELADA: **cerrar la receta**.
+     *
+     * 🔴 El caso es real y no tiene otra salida. Si una orden se cancela con la receta ABIERTA, la
+     * guarda de `exigirOrdenViva` dejaría el candado puesto **para siempre**: no habría forma de
+     * cerrarlo, la orden seguiría en la bandeja marcada «En corrección» y su compra congelada, sin
+     * ningún camino que ofrecerle a nadie. Un candado que sólo se puede abrir es una trampa.
+     *
+     * Y no afloja nada: cerrar **no toca ni un renglón** —limpia las tres columnas del candado y
+     * escribe su bitácora—, así que la receta de una orden cancelada sigue siendo tan inmutable
+     * como antes. ABRIR sí exige la orden viva: reabrir para corregir lo que ya no se va a producir
+     * no significa nada.
+     */
+    permitirOrdenCancelada?: boolean;
+  } = {},
 ): Promise<RecetaOrden> {
   verificarPermiso(sesion, 'desarrollo.administrar');
   return enTransaccion(async (tx) => {
     const orden = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
-    exigirOrdenViva(orden);
+    if (opciones.permitirOrdenCancelada !== true) exigirOrdenViva(orden);
     let sobreLapida = false;
     const tocados: { tipo: TipoRenglonRecetaClave; idRenglon: number }[] = [];
     await accion(tx, orden, {
@@ -2808,6 +2939,178 @@ export async function liberarReceta(
       seleccion,
     });
   });
+}
+
+// ── 4-bis. EL CANDADO DE COMPRA: ABRIR y CERRAR la receta (V1-E8z, §Post-F9.160(a)) ────────
+
+/**
+ * ⭐⭐⭐ **ABRE** la receta ya liberada de una orden para corregirla — y con eso **CONGELA LA COMPRA
+ * de esa orden** hasta que se cierre (`desarrollo.administrar`).
+ *
+ * DANIEL (§Post-F9.160(a)): *"pongamos un candado que **no se pueda comprar nada hasta que esté
+ * cerrado otra vez**"*.
+ *
+ * ⭐ **ABRIR SÓLO MARCA: NO DESFIRMA NADA**, y ésta es LA decisión de la etapa (§Post-F9.165 punto
+ * 1). Es lo único compatible con §Post-F9.80 —donde Daniel retiró la liberación en bloque y dejó
+ * que `liberarReceta` exija los renglones nombrados uno por uno—: si abrir desfirmara la receta
+ * entera, **cerrar una receta de 40 renglones costaría 40 clics**, y el candado que existe para
+ * proteger la compra se volvería el motivo para no abrirlo nunca. Conservando las firmas, cerrar es
+ * un clic y **sólo hay que re-firmar lo que se tocó** — que ya funciona solo: editar un renglón le
+ * quita su firma (`revocarFirmaDeRenglones`, disparado dentro de `enRecetaEditable`).
+ *
+ * LAS TRES CONDICIONES, y por qué cada una:
+ *  • **La orden tiene que estar VIVA.** Reabrir para corregir lo que ya no se va a producir no
+ *    significa nada (cerrar sí se permite cancelada: ver `permitirOrdenCancelada`).
+ *  • **La receta tiene que estar LIBERADA COMPLETA** (`recetaLiberadaEn` no nulo). Y es la condición
+ *    que hace que el candado no tenga trampa: como al abrir no quedaba nada sin firmar, todo lo que
+ *    quede sin firmar al cerrar es **algo que esta corrección tocó**, así que siempre hay alguien
+ *    que puede volver a firmarlo. Si se pudiera abrir una receta a medio firmar, un renglón que el
+ *    cliente todavía no autoriza dejaría la orden **imposible de cerrar** — congelada para siempre,
+ *    que es justo lo que este candado no debe producir.
+ *
+ *    🔴 **PERO OJO: esto se DESVÍA de la letra de §Post-F9.165 punto 4, y deja un caso real fuera.**
+ *    Aquel punto decía *"no se puede abrir una receta que **nunca se liberó**"*, que literalmente es
+ *    `liberados === 0` — o sea, permitiría reabrir una receta liberada A MEDIAS. Aquí se exige que
+ *    esté COMPLETA, que es más estricto, y el caso que queda fuera es éste: **39 de 40 renglones
+ *    firmados y con OC emitidas, el 40 sin firmar; Desarrollo descubre que la tela está mal y NO
+ *    puede congelar la compra de los otros 39.** El único rodeo sería firmar el renglón 40 sin
+ *    revisarlo — exactamente lo que §Post-F9.80 vino a impedir.
+ *    Se eligió así por ser lo más seguro (la alternativa produce órdenes imposibles de cerrar), pero
+ *    **es una decisión de producto que está pendiente de que Daniel la confirme**: quien lea esto
+ *    mañana tiene que saber que la restricción es deliberada y qué cuesta.
+ *  • **No puede estar ya abierta.** Se dice desde cuándo y por qué, en vez de pisar el motivo de
+ *    quien la abrió (D3: lo guardado no se sobrescribe en silencio).
+ *
+ * **MOTIVO OBLIGATORIO** (punto 3): congelar la compra de una orden entera sin decir por qué deja al
+ * comprador adivinando — y ese texto es LITERALMENTE lo que el 409 le enseña
+ * ({@link exigirCompraNoCongelada}).
+ *
+ * D3/A7: abrir y cerrar **se registran** en la bitácora, los dos; las tres columnas son el ESTADO
+ * ("¿está abierta ahora?"), no el historial.
+ */
+export async function abrirReceta(
+  sesion: SesionUsuario,
+  idOrden: number,
+  cuerpo: DatosAbrirReceta,
+  bd?: ContextoBd,
+): Promise<RecetaOrden> {
+  const datos = validarEntrada(esquemaAbrirRecetaCuerpo, cuerpo);
+  return enRecetaEditable(sesion, idOrden, bd, async (tx, orden) => {
+    if (orden.recetaAbiertaEn !== null) {
+      const desde = orden.recetaAbiertaEn.toISOString().slice(0, 10);
+      throw new ErrorConflicto(
+        `La receta de la orden ${String(orden.folio)} YA está abierta desde el ${desde}` +
+          (orden.recetaAbiertaMotivo === null ? '' : ` ("${orden.recetaAbiertaMotivo}")`) +
+          ': corrígela y ciérrala. La compra de esta orden ya está congelada.',
+      );
+    }
+    if (orden.recetaLiberadaEn === null) {
+      throw new ErrorConflicto(
+        `La receta de la orden ${String(orden.folio)} no está liberada completa: no hay nada que ` +
+          'reabrir. Lo que todavía no está firmado ya no se puede comprar, y corregirlo no ' +
+          `necesita candado. ${DONDE_SE_LIBERA}`,
+      );
+    }
+    const abiertaEn = new Date();
+    await tx.orden.update({
+      where: { id: orden.id },
+      data: {
+        recetaAbiertaEn: abiertaEn,
+        recetaAbiertaPorId: sesion.id,
+        recetaAbiertaMotivo: datos.motivo,
+        ...datosModificacion(sesion),
+      },
+    });
+    await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+      accion: 'abrir-receta',
+      motivo: datos.motivo,
+      abiertaEn: abiertaEn.toISOString(),
+      // Desde cuándo estaba liberada: es el dato que dice qué se está reabriendo.
+      liberadaEn: orden.recetaLiberadaEn.toISOString(),
+      // Se deja escrito que las firmas NO se tocaron: quien lea la bitácora dentro de un año no
+      // tiene por qué acordarse de cuál de las dos variantes se construyó.
+      firmasConservadas: true,
+      efecto: 'la compra de esta orden queda congelada hasta que se cierre la receta',
+    });
+  });
+}
+
+/**
+ * ⭐⭐⭐ **CIERRA** la receta reabierta y **descongela la compra** de la orden
+ * (`desarrollo.administrar`).
+ *
+ * **EXIGE QUE NO QUEDE NINGÚN RENGLÓN VIVO SIN FIRMAR** (§Post-F9.165 punto 2). No es una condición
+ * cara: al abrir estaba todo firmado, así que lo único que puede faltar es lo que ESTA corrección
+ * tocó —editar revoca la firma de ese renglón, y traer del modelo o agregar a mano nace sin ella—.
+ * Cerrar sin esa comprobación descongelaría la compra de material que nadie volvió a mirar, que es
+ * exactamente el agujero que la firma existe para tapar. El mensaje **nombra** lo que falta: mandar
+ * a alguien a buscar "algo sin firmar" en una receta de 40 renglones es no decirle nada.
+ *
+ * ⚠️ Una receta que quedó **sin renglones vivos** (todo excluido) SÍ se puede cerrar: no queda nada
+ * sin firmar. No abre ninguna puerta — la puerta vieja (`exigirRecetaLiberada`) sigue frenando la
+ * compra porque no hay nada liberado que comprar.
+ *
+ * 🔴 **NO exige la orden viva**, y es deliberado ({@link enRecetaEditable} `permitirOrdenCancelada`):
+ * si la orden se cancela con la receta abierta, ésta es la única salida del candado. Un candado que
+ * sólo se puede abrir es una trampa.
+ *
+ * **Sin cuerpo, sin motivo**: la razón ya se dio al abrir. Pedir un segundo texto por la misma
+ * corrección es la fricción que entrena a escribir "ok".
+ */
+export async function cerrarReceta(
+  sesion: SesionUsuario,
+  idOrden: number,
+  bd?: ContextoBd,
+): Promise<RecetaOrden> {
+  return enRecetaEditable(
+    sesion,
+    idOrden,
+    bd,
+    async (tx, orden) => {
+      const abiertaEn = orden.recetaAbiertaEn;
+      if (abiertaEn === null) {
+        throw new ErrorConflicto(
+          `La receta de la orden ${String(orden.folio)} no está abierta: no hay nada que cerrar. ` +
+            'Su compra se rige por la firma de cada renglón, como siempre.',
+        );
+      }
+      const pendientes = await leerPorLiberar(tx, orden.id);
+      if (pendientes.length > 0) {
+        // Se nombran hasta cinco: la lista completa de una receta grande convierte el aviso en un
+        // muro que nadie lee, y con cinco ya se sabe por dónde empezar.
+        const nombres = pendientes.slice(0, 5).map((p) => `"${p.material}"`);
+        const resto = pendientes.length - nombres.length;
+        throw new ErrorConflicto(
+          `Antes de cerrar la receta de la orden ${String(orden.folio)} hay que volver a firmar lo ` +
+            `que se corrigió: ${String(pendientes.length)} ` +
+            `${pendientes.length === 1 ? 'renglón sigue' : 'renglones siguen'} sin liberar ` +
+            `(${nombres.join(', ')}${resto > 0 ? ` y ${String(resto)} más` : ''}). Editar un ` +
+            'renglón le quita la firma a propósito: fírmalo en su fila y vuelve a cerrar.',
+        );
+      }
+      await tx.orden.update({
+        where: { id: orden.id },
+        data: {
+          recetaAbiertaEn: null,
+          recetaAbiertaPorId: null,
+          recetaAbiertaMotivo: null,
+          ...datosModificacion(sesion),
+        },
+      });
+      await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+        accion: 'cerrar-receta',
+        // Qué se está cerrando: la apertura que se limpia queda ÍNTEGRA aquí (D3), porque las tres
+        // columnas se vacían y en la orden ya no habrá rastro de ella.
+        abiertaEn: abiertaEn.toISOString(),
+        abiertaPorId: orden.recetaAbiertaPorId,
+        motivoDeApertura: orden.recetaAbiertaMotivo,
+        // Cerrar una orden CANCELADA es legal y raro: que quede dicho en la traza.
+        ordenCancelada: orden.estado === 'cancelada',
+        efecto: 'la compra de esta orden vuelve a regirse por la firma de cada renglón',
+      });
+    },
+    { permitirOrdenCancelada: true },
+  );
 }
 
 /**

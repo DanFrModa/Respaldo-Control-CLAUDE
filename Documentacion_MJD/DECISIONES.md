@@ -11315,3 +11315,45 @@ plan tenía razón, y por eso su advertencia sobre las medidas por talla es corr
 - **Aplica en:** las versiones **0.069–0.072** y la quinta pieza. **Fecha:** 2026-08-31.
 
 ---
+
+#### (Post-F9.168) — ⏳ PENDIENTE DE DANIEL: ¿se puede congelar la compra de una orden con la receta **a medio firmar**? (31-ago-2026)
+
+**Cómo salió.** Al construir el candado de compra (**0.067**, §Post-F9.165) hubo que fijar **cuándo se
+puede abrir** una receta. La decisión escrita decía *«no se puede abrir una receta que **nunca se
+liberó**»* — o sea, `liberados === 0`. **Se implementó más estricto: exige la receta liberada COMPLETA.**
+
+**Por qué se endureció** (razón del coder, ratificada por el reviewer): si se pudiera abrir una receta a
+medio firmar, un renglón que nadie autoriza dejaría la orden **imposible de cerrar** —congelada para
+siempre—, que es exactamente lo que el candado no debe poder producir. **Se prefirió la regla segura.**
+
+🔴 **Pero deja fuera un caso real, y hay que decirlo:** receta de 40 renglones, **39 firmados y con OC ya
+emitidas**, 1 sin firmar. Desarrollo descubre que la tela está mal. **No puede congelar.** El único rodeo
+sería **firmar el renglón 40 sin haberlo revisado**, sólo para poder abrir — justo lo que **§Post-F9.80**
+quiso evitar (*«no tiene sentido liberar las cosas sin ver»*).
+
+⚠️ Y el estado `en-parte` **no es raro**: desde V1-E3h es normal y soportado (*«se compra lo liberado»*).
+Ahí **sí hay compra que congelar** y el candado no se puede poner.
+
+### La pregunta, con sus tres salidas
+
+> **¿Quieres poder congelar la compra de una orden cuya receta está a medio firmar?**
+
+- **(a) NO — se queda como está** *(lo construido)*. Más seguro: ninguna orden puede quedar imposible de
+  cerrar. Precio: el caso de los 39 de 40 no tiene candado.
+- **(b) SÍ — se permite abrir en `en-parte`.** Para que no cree una orden inmortal habría que **aflojar la
+  regla de cerrar** (hoy: *cerrar exige que no quede nada sin firmar*). ⚠️ Esa regla **no la pidió ninguna
+  decisión**: la puso el coder. Si cerrar sólo limpiara la bandera y dejara que la puerta por renglón siga
+  haciendo su trabajo, se podría abrir en `en-parte` sin riesgo.
+- **(c) SÍ, pero sólo el dueño.** Congelar a medias como acto excepcional con permiso propio.
+
+**Default propuesto: (a)**, que es lo construido — pero **la pregunta se hace igual**, porque el caso de
+los 39 de 40 es el que Daniel se va a encontrar en la práctica.
+
+📌 **Corrección a §Post-F9.165 punto 3:** decía *«motivo obligatorio al abrir, igual que lo pide
+`quitarRenglonReceta`»*. **La analogía era FALSA** — el motivo de quitar es `.optional()`. Se implementó
+**obligatorio igual**, y con razón mejor: **ese texto ES el 409** que lee el comprador cuando su compra se
+frena; sin él, el mensaje no podría decir por qué.
+
+- **Aplica en:** la **0.067**, ya construida con (a). **Fecha:** 2026-08-31.
+
+---

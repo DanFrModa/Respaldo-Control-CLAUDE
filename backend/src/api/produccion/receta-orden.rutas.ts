@@ -18,6 +18,9 @@
  *    infla el requerido (el botón «Corregir», §Post-F9.130)
  *  • `POST   /ordenes/:id/receta/revisar`                      — marcar TODO revisado (un solo clic)
  *  • `POST   /ordenes/:id/receta/liberar`                      — firmar renglón por renglón (§Post-F9.80)
+ *  • `POST   /ordenes/:id/receta/abrir`                        — ⭐ REABRIR para corregir: CONGELA la
+ *    compra de la orden (V1-E8z, §Post-F9.160(a)). Motivo obligatorio.
+ *  • `POST   /ordenes/:id/receta/cerrar`                       — ⭐ cerrar y DESCONGELAR la compra
  *  • `POST   /ordenes/:id/receta/traer-del-modelo`             — traer lo que le falta (§Post-F9.73)
  *  • `GET    /recetas-por-liberar`                             — la BANDEJA de Desarrollo (§Post-F9.72)
  *
@@ -31,6 +34,7 @@ import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
+  esquemaAbrirRecetaCuerpo,
   esquemaErrorApi,
   esquemaLiberarRecetaCuerpo,
   esquemaRecetaAgregarCuerpo,
@@ -46,7 +50,9 @@ import {
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
+  abrirReceta,
   agregarRenglonReceta,
+  cerrarReceta,
   corregirCapturaAvio,
   editarRenglonReceta,
   liberarReceta,
@@ -282,6 +288,49 @@ export const rutasRecetaOrden: FastifyPluginCallbackZod = (app, _opciones, done)
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return liberarReceta(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐⭐ V1-E8z (§Post-F9.160(a)) — EL CANDADO DE COMPRA. Mismo permiso que firmar
+  // (`desarrollo.administrar`): abrir y cerrar son actos del MISMO dueño de la receta, así que no
+  // hay permiso nuevo y **este deploy no requiere `SEED_ON_START`**.
+  //
+  // Dos endpoints y no un `PATCH` con bandera: son dos actos distintos con reglas distintas (abrir
+  // exige motivo y la orden viva; cerrar exige que no quede nada sin firmar y SÍ se permite sobre
+  // una orden cancelada), y un solo endpoint con un booleano los escondería detrás del mismo verbo.
+  app.route({
+    method: 'POST',
+    url: '/ordenes/:id/receta/abrir',
+    preHandler: app.conPermiso('desarrollo.administrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary:
+        'Reabrir la receta para corregirla — CONGELA la compra de la orden (§Post-F9.160(a))',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamOrden,
+      body: esquemaAbrirRecetaCuerpo,
+      response: { 200: esquemaRecetaOrden, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return abrirReceta(sesion, request.params.id, request.body);
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/ordenes/:id/receta/cerrar',
+    preHandler: app.conPermiso('desarrollo.administrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Cerrar la receta reabierta y descongelar la compra de la orden',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamOrden,
+      response: { 200: esquemaRecetaOrden, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cerrarReceta(sesion, request.params.id);
     },
   });
 

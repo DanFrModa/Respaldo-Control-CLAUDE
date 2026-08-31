@@ -1,4 +1,4 @@
-import { AlertTriangle, Maximize2, Search } from 'lucide-react';
+import { AlertTriangle, Lock, Maximize2, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -86,7 +86,9 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
             <p className="text-[12.5px] text-muted-foreground">
               Órdenes cuya receta espera la firma de Desarrollo. Sin firmar, ese material no se
               compra. «Ver la receta» abre la orden completa: ahí se revisa y se firma renglón por
-              renglón, que es la única forma de liberar.
+              renglón, que es la única forma de liberar. Aquí salen también, arriba y marcadas{' '}
+              <strong>En corrección</strong>, las recetas que alguien reabrió: ésas tienen la compra
+              de toda su orden congelada hasta que se cierren.
             </p>
           </div>
         </div>
@@ -177,6 +179,23 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                     <TablaDensaCelda>
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="text-sm">{textoFalta(f)}</span>
+                        {/* ⭐⭐ V1-E8z (§Post-F9.165 punto 7) — EL DISTINTIVO SIN EL CUAL LA ETAPA NO
+                            SIRVE. Reabrir sólo marca (no desfirma), así que estas órdenes NO tienen
+                            renglones pendientes: sin este chip la fila se leería como una más, y
+                            sin la fila la orden quedaría con la compra congelada e invisible. */}
+                        {f.abiertaEn !== null ? (
+                          <ChipEstado
+                            tono="crit"
+                            data-testid="rpl-en-correccion"
+                            title={
+                              f.abiertaMotivo === null
+                                ? 'La compra de esta orden está congelada hasta que se cierre la receta'
+                                : `Motivo: ${f.abiertaMotivo}`
+                            }
+                          >
+                            <Lock className="size-3" aria-hidden /> En corrección · compra congelada
+                          </ChipEstado>
+                        ) : null}
                         {/* ⭐ La marca que Daniel pidió: aquí YA hay dinero esperando la firma. */}
                         {f.conOrdenCompra ? (
                           <ChipEstado tono="crit" data-testid="rpl-frena-dinero">
@@ -257,5 +276,9 @@ export function textoFalta(f: {
   if (f.telas > 0) partes.push(`${f.telas} ${f.telas === 1 ? 'tela' : 'telas'}`);
   if (f.avios > 0) partes.push(`${f.avios} ${f.avios === 1 ? 'avío' : 'avíos'}`);
   if (f.artes > 0) partes.push(`${f.artes} ${f.artes === 1 ? 'arte' : 'artes'}`);
-  return partes.length === 0 ? `${f.porLiberar} renglones` : partes.join(', ');
+  if (partes.length > 0) return partes.join(', ');
+  // ⭐⭐ V1-E8z: desde esta etapa una fila puede NO tener nada pendiente de firma — es una receta
+  // REABIERTA, que entra a la bandeja por el candado y no por los renglones. Decir «0 renglones»
+  // sería un número inútil justo donde el chip «En corrección» ya dice lo que pasa.
+  return f.porLiberar === 0 ? 'Nada por firmar: falta cerrarla' : `${f.porLiberar} renglones`;
 }

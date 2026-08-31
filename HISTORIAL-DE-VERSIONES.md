@@ -54,6 +54,53 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > del costo, avanza con lo demás»*—, pero **sus tres decisiones ya están tomadas y escritas**
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. El número queda reservado.
 
+## 0.067 · 31-ago-2026 · **en prueba** — Corregir una receta ya liberada **congela la compra de esa orden**
+
+> 📌 **Los números 0.065 y 0.066 se saltan a propósito.** La **0.065** (disolver la compuerta) está
+> **esperando una decisión tuya** — al quitarla, la firma de revisión del modelo quedaría sin poder
+> firmarse nunca y sin aparecer en ninguna cola (§Post-F9.164). Y la **0.066** (la OP incompleta)
+> **resultó estar YA CONSTRUIDA**: una orden sin receta ya sale en «Órdenes incompletas» con su motivo.
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Corregir una receta que ya habías liberado, sin miedo a que alguien compre mientras tanto.** Tus
+  palabras: *«pongamos un candado que no se pueda comprar nada hasta que esté cerrado otra vez»*. Ahora la
+  receta de una orden se puede **volver a abrir** —diciendo por qué— y **mientras está abierta nadie puede
+  comprar nada de esa orden**. Al cerrarla, la compra se reanuda.
+
+- **El candado alcanza a los SIETE lugares donde se gasta dinero**, no sólo a los que se ven: explotar
+  materiales, planear la compra, generar la orden de compra, crearla o editarla a mano, **duplicarla** y
+  —el más caro— **autorizarla**. Los dos últimos no estaban previstos y aparecieron al construirlo.
+
+- **Y el que compra se entera de por qué.** Antes le habría salido *«todavía no la libera Desarrollo»*, que
+  en este caso **es mentira**: sí la liberaron, está en corrección. Ahora lo dice con esas palabras.
+
+### Qué cambió y puede sorprender
+
+- **Abrir la receta NO borra las firmas.** Lo que ya estaba autorizado sigue autorizado; sólo se congela la
+  compra. Por eso **cerrar es un clic** y no volver a firmar renglón por renglón — que sería justo lo que
+  pediste evitar cuando dijiste *«no tiene sentido liberar las cosas sin ver»*.
+
+- **La orden con la receta abierta aparece en la bandeja de Desarrollo**, con su distintivo. Sin eso habría
+  quedado con la compra congelada **y sin que nadie supiera**, que es la peor combinación.
+
+- **Puedes cerrar la receta aunque la orden se haya cancelado.** Si no, una orden cancelada con la receta
+  abierta dejaría bloqueadas las órdenes de compra que la acompañan, **para siempre**.
+
+- ⚠️ **Reabrir no marca la orden como incompleta.** Sigue contando como completa: lo que se frena es **el
+  gasto**, no la producción. Es a propósito, pero conviene saberlo.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Una pregunta para ti:** hoy **sólo se puede congelar una receta liberada por completo**. Si tienes 40
+  renglones, 39 firmados con compras ya hechas y uno sin firmar, **no podrías congelar** — y el único
+  rodeo sería firmar ese último sin revisarlo. Se hizo así porque es más seguro (evita una orden que no se
+  pueda cerrar nunca), pero **¿quieres poder congelar una orden a medio firmar?**
+- **Duplicar y autorizar una orden de compra se saltan la revisión de las firmas.** Es un hueco **anterior**
+  a esta versión; aquí sólo se les puso el candado nuevo. Queda anotado como deuda.
+
+---
+
 ## 0.064 · 31-ago-2026 · **en prueba** — **Cotizar en la cita un modelo que no existe**
 
 ### Qué se puede hacer ahora que antes no

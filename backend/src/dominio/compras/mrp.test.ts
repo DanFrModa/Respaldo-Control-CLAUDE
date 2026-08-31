@@ -1082,7 +1082,12 @@ describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)',
         findFirst: (args?: never) => {
           const w = (args as unknown as { where: { id: number; idEmpresa: number } }).where;
           const casa = w.id === ID_ORDEN && w.idEmpresa === orden.idEmpresa;
-          return Promise.resolve(casa ? { folio: orden.folio } : null);
+          // ⭐⭐ V1-E8z: el `select` real de la puerta trae también las columnas del CANDADO DE
+          // COMPRA. El stub las devuelve en NULL (= receta no reabierta), que es el caso de esta
+          // batería; devolver menos de lo que el `select` pide sería mentirle a la función.
+          return Promise.resolve(
+            casa ? { folio: orden.folio, recetaAbiertaEn: null, recetaAbiertaMotivo: null } : null,
+          );
         },
       },
       // La receta: NADA pendiente de liberar y UN renglón de tela ya firmado (así la puerta de
@@ -1384,7 +1389,13 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
     const tablas: Record<string, Record<string, () => Promise<unknown>>> = {
       orden: {
         findMany: () => Promise.resolve([orden]),
-        findFirst: () => Promise.resolve({ folio: orden.folio }),
+        // ⭐⭐ V1-E8z: las columnas del candado de compra, en NULL (receta no reabierta).
+        findFirst: () =>
+          Promise.resolve({
+            folio: orden.folio,
+            recetaAbiertaEn: null,
+            recetaAbiertaMotivo: null,
+          }),
       },
       ordenTela: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(1) },
       ordenAvio: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
