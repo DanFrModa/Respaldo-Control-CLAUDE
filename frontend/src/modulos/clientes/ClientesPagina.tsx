@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Trash2,
   UserRound,
+  UsersRound,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -40,6 +41,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoCliente } from './DialogoCliente';
 import { EditorCamposCliente } from './EditorCamposCliente';
+import { EditorContactosCliente } from './EditorContactosCliente';
 import { EditorDepartamentosCliente } from './EditorDepartamentosCliente';
 import { EditorFactoresCliente } from './EditorFactoresCliente';
 import { leerDeepLinkFactores, puedeVerFactoresDePrecio } from './factores-precio';
@@ -532,6 +534,19 @@ function DetalleCliente({
         ) : (
           <CamposSoloLectura cliente={cliente} />
         )}
+      </SeccionDetalle>
+
+      {/* ⭐ V1-E8y (§Post-F9.152) — LAS PERSONAS del cliente. Va ANTES de los departamentos porque
+          es lo que se busca cuando se abre la ficha en una cita: con quién se habla.
+          ⚠️ Se llama «Personas del cliente» y NO «Contactos»: justo arriba está «Datos de contacto»
+          (los tres campos sueltos de la ficha, que la REGLA 0-B deja donde están), y dos secciones
+          seguidas con el mismo nombre y el mismo icono no se distinguen de un vistazo. El icono
+          también cambia, por lo mismo. */}
+      <SeccionDetalle titulo="Personas del cliente (la compradora)" icono={UsersRound}>
+        <EditorContactosCliente
+          idCliente={cliente.id}
+          deshabilitado={!puedeAdministrar || !cliente.activo}
+        />
       </SeccionDetalle>
 
       <SeccionDetalle titulo="Departamentos (D13/R16)" icono={Building2}>

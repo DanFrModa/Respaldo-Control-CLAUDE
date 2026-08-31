@@ -1218,6 +1218,123 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8y · ⭐⭐ COTIZAR EN LA CITA UN MODELO QUE NO EXISTE (31-ago-2026, versión **0.064**) — ✅ HECHA
+
+**El encargo, en palabras de Daniel** (§Post-F9.152):
+
+> *«a veces estando en la cita, me piden cotizar algún modelo que no tengamos en muestrario que llevamos.
+> Y tengo que darles ahí un precio. Necesito armarlo desde cero estimando cosas. O bien podría copiar
+> algún modelo de los que ya tenemos desarrollados y cambiarle cosas. Me puedes dejar espacio para meter
+> nuevos modelos y hacerlos ahí con datos estimados.»*
+
+Más tres respuestas suyas del 31-ago: los **contactos** cuelgan del **cliente con departamento OPCIONAL**
+(*«así "Laura, compradora de NIÑOS" se distingue, y "Carlos, crédito" no necesita departamento
+inventado»*); los **pendientes van POR MODELO, no por cita**; y **Aurora también puede crear el modelo**
+—ya podía: §Post-F9.123 bajó `modelos.administrar` hasta Gerencial, que es su rol—.
+
+### 🔴 Lo que la MEDICIÓN previa corrigió del plan (cuatro cosas, y una era el corazón)
+
+1. 🔴🔴 **«Copiar un modelo los trae todos: cero fricción» era FALSO en lo que más duele.** `copiarBom`
+   copia telas, avíos y arte — pero **`maquilaBase`, `corteBase`, `numOperaciones`, `composicion` e
+   `idCurvaTalla` son columnas de `Modelo`, NO del BOM**, y `generarPrecosto` toma la maquila y el corte
+   **de ahí**. Un modelo copiado sólo con el BOM **precostea con maquila $0 y corte $0, en silencio**, y
+   de ese precosto sale el precio que se le dice al cliente en la cara. ⇒ la copia arrastra **la FICHA
+   además de la receta** (`fichaHeredadaDeModelo`, función PURA con su prueba y su mutación).
+2. 🔴 **Copiar NO es versionar, aunque `crearVersionDeModelo` sí arrastre los costos.** Aquella función
+   cuelga al hijo de la **familia del padre** (`CYA-26-71-001` → `-01`), y ese código lleva dentro **la
+   abreviatura del cliente del padre**: copiar un modelo de C&A para cotizárselo a Liverpool le pondría
+   un código que dice «CYA». Además deja `revisionEstado: 'pendiente'` y exige `modelos.aprobar-receta`,
+   que es otro permiso. ⇒ aquí se **mintea un código nuevo del cliente de la mesa** y se reusa **sólo** la
+   pieza que sí aplica: `copiarRecetaAlHijo`, que se exportó como `copiarRecetaAModeloNuevo`.
+3. 🔴🔴 **LA PIEZA GRANDE QUE EL PLAN NO NOMBRABA: no existía forma de agregar un renglón a una lista ya
+   creada.** El ÚNICO escritor de `lista_precios_linea` era el `createMany` de `crearLista` ⇒ una lista
+   nacía con sus modelos y **no admitía ni uno más**; meter uno obligaba a **borrar la lista y rehacerla**,
+   perdiendo aprobaciones, rondas, acuerdos e historial. Sin esto, *«el modelo nace dentro de la lista que
+   está negociando»* era literalmente imposible.
+4. ⚠️ **Un cliente sin `abreviatura` —o un tipo/género sin dígito— ROMPE el alta.** En plena cita eso es
+   inaceptable, así que la abreviatura se **comprueba antes de teclear nada** (aviso arriba del formulario
+   y botón apagado) y el resto se rechaza con mensajes que dicen **qué falta y dónde capturarlo**.
+
+### Lo que entrega
+
+**Backend**
+
+- ⭐⭐ **`agregarLineasLista`** + `POST /listas-precios/:id/lineas`: agrega modelos ya cotizados a una lista
+  existente, con **las mismas reglas** que crear (misma función: `problemasDeCandidatura`, extraída de
+  `crearLista` y **compartida**, no copiada) y **el precio calculado con el SNAPSHOT de la lista**, no con
+  los factores vigentes del cliente — si no, un modelo agregado el martes saldría con otro margen que sus
+  doce hermanos y nadie lo vería.
+  🔑 **Toma LOS DOS advisory locks, en orden canónico EMPRESA → LISTA.** El de empresa
+  (`NAMESPACE_LOCK_CREAR_LISTA`) es el que `crearLista` usa para cerrar el TOCTOU del
+  `@@unique([idDesarrollo])`; sin él se reabría. El de lista hace race-free a `exigirListaNoCerrada`.
+  Ninguna otra función toma el de lista y luego el de empresa ⇒ no puede formarse un ciclo.
+- ⭐⭐ **`crearModeloEnLista`** + `POST /listas-precios/:id/modelo-nuevo`: en **UNA transacción** nacen el
+  **proyecto** (si se pide uno nuevo, por nombre — nunca dos llamadas sueltas desde la pantalla), el
+  **modelo** (desde cero o copiando ficha + receta), el **desarrollo** y su **precosto BORRADOR**.
+  ⚠️ **NO agrega el renglón**, y es a propósito: un renglón necesita precosto **congelado** y uno recién
+  nacido desde cero no tiene nada costeado (el candado de la 0.063). La mesa hace **dos actos visibles**
+  —«créalo» y «agrégalo»— en vez de uno que a veces funciona.
+- **`editarEncabezadoLista`** + `PATCH /listas-precios/:id/encabezado`: el **LUGAR de la cita** (columna
+  nueva) y las **NOTAS**, que existían desde F8-E4 y **sólo se podían escribir al crear la lista**.
+- **Pendientes por modelo** (`pendientes-linea.ts` + 4 rutas): la **LIBRETA** de la cita. Se corrige el
+  texto, se tacha y se borra (con su foto en la bitácora). 🔴 **NO es `NegociacionEvento.acuerdo`**, que es
+  el libro inmutable de lo pactado. **UNA sola regla de acceso: los pendientes no son el papel** ⇒ no los
+  frena el cierre de la lista ni el estado del renglón (tachar *«falta la muestra de color»* dos semanas
+  después de cerrar el modelo es justo para lo que sirven).
+- **`ClienteContacto`** (`cliente-contactos.ts` + 3 rutas): espejo de `ProveedorContacto` con el
+  **departamento OPCIONAL**. Un departamento que venga tiene que ser **de ese cliente** y estar activo.
+  Borrado suave (D3). 🔴 **La tabla nace VACÍA y así se queda**: los `Cliente.contacto` viejos **no se
+  migran** (REGLA 0-B).
+- **`digitosDeNomenclatura`** extraída a `modelos/nomenclatura.ts` y **compartida** con
+  `crearDesarrolloConModeloNuevo`: eran la misma comprobación palabra por palabra, y copiarla habría sido
+  la enésima copia reducida que después deriva (lección de R3-H1).
+- 🔴 **Las dos trampas de la CASCADA, cerradas:** `quitarLineaLista` y `eliminarLista` ahora **fotografían
+  los pendientes** antes de que se los lleve el borrado — exactamente la corrección que V1-E8w tuvo que
+  hacer con los `NegociacionEventoCosto`.
+- 🔴 **La FUSIÓN de departamentos repunta los contactos.** `ClienteContacto` cuelga de
+  `ClienteDepartamento`, y la prueba que **lee `schema.prisma`** exige que `REFERENCIAS_A_REPUNTAR` cubra
+  TODAS sus relaciones: sin agregar la quinta, el CI se pone rojo (**mutación confirmada**). Sin ella, la
+  compradora se habría quedado colgada de un departamento apagado.
+
+**Frontend**
+
+- **`DialogoAgregarModelos`** con sus dos pestañas —«Ya cotizados» (con los descartados y su motivo, mismo
+  criterio de §Post-F9.128) y «Modelo nuevo» (desde cero o copiando, con el proyecto existente o uno nuevo
+  por nombre)—, y el **aviso de la abreviatura faltante** antes de teclear nada.
+- **`ModeloNuevoEnMesa`**: la tira que aparece tras crear el modelo, con los dos actos que faltan —
+  **Costear** (abre el editor de precosto que ya existía, sin duplicar nada) y **Agregar a la lista**.
+- **`PendientesRenglon`** dentro del cajón del renglón (junto al desglose de costo) + **chip con el conteo
+  de pendientes SIN tachar** en la fila: un pendiente escondido detrás de un clic no cumple su función.
+- **`EditorContactosCliente`** en la ficha del cliente, y el **LUGAR de la cita** en el encabezado de la
+  lista con su diálogo de edición.
+
+### Pruebas y mutaciones (todas ejecutadas de verdad)
+
+| Prueba | Mutación | Resultado |
+|---|---|---|
+| `modelo-en-la-mesa.test.ts` (PURA) | quitar `maquilaBase` de la ficha heredada | 🔴 cae «se lleva LA MAQUILA y EL CORTE» |
+| `listas-precios-agregar.test.ts` (PURA) | `hayEntradaInvalida` siempre `false` | 🔴 caen 2 (400 vs 409) |
+| `listas-precios-agregar.test.ts` | recorrer el mapa en vez de los ids pedidos | 🔴 caen 3 (orden y faltantes) |
+| `cliente-departamentos-fusion-referencias.test.ts` | quitar `contactos` de la lista de repunte | 🔴 cae (lee el esquema) |
+| `PendientesRenglon.test.tsx` | `resuelto: true` fijo | 🔴 cae «destachar manda false» |
+| `PendientesRenglon.test.tsx` | quitar `line-through` | 🔴 cae «el tachado se ve tachado» |
+| `DialogoAgregarModelos.test.tsx` | el aviso de abreviatura deja de apagar el botón | 🔴 cae |
+| `DialogoAgregarModelos.test.tsx` | copiar deja de mandar `idModeloOrigen` | 🔴 cae |
+| `EditorContactosCliente.test.tsx` | el selector deja de filtrar departamentos apagados | 🔴 cae |
+| `EditorContactosCliente.test.tsx` | manda siempre el departamento | 🔴 cae «es OPCIONAL» |
+
+Integración (la juzga el CI): `mesa-abierta.int.test.ts` (24 casos — agregar renglones con el snapshot de
+la lista, los rechazos, la lista cerrada, A9, el alta desde cero y **copiando con sus costos**, el ciclo
+completo crear→congelar→agregar, copiar un migrado sin género, el encabezado y los pendientes con su
+regla propia) y `cliente-contactos.int.test.ts` (8 casos, incluido el **repunte de la fusión**).
+
+⚠️ **SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.** **Migración aditiva**
+`20260831120000_cotizar_en_la_cita_un_modelo_que_no_existe`: `cliente_contacto`,
+`lista_precios.lugar` y `lista_precios_linea_pendiente`. **El contrato SÍ se movió** (5 rutas nuevas +
+`lugar` en el detalle + `pendientes` en cada renglón) ⇒ backend y frontend suben juntos.
+
+---
+
 ## V1-E8x · ⭐ LOS CUATRO ESTADOS DEL MODELO DENTRO DE LA LISTA (30-ago-2026, versión **0.062**) — ✅ HECHA
 
 **El encargo, en palabras de Daniel:** *«seria bueno saber los modelos que ya cerre…. a veces de una lista

@@ -317,3 +317,120 @@ export const esquemaClientesPagina = z
 
 /** Forma de la respuesta paginada de clientes. */
 export type ClientesPagina = z.infer<typeof esquemaClientesPagina>;
+
+// ── ⭐ CONTACTOS del cliente (V1-E8y, §Post-F9.152) ───────────────────────────────────────────────
+//
+// Daniel, cotizando en la cita: la mesa se negocia CON ALGUIEN, y el cliente no guardaba a nadie —
+// sólo los tres campos sueltos de arriba (`contacto`/`telefono`/`email`), uno por cliente. Es el
+// ESPEJO de `ProveedorContacto` (V1-E3f) con **una diferencia que él decidió**: el DEPARTAMENTO es
+// OPCIONAL. Así «Laura, compradora, NIÑOS» se distingue de la compradora de DAMAS, y «Carlos,
+// crédito y cobranza» —que atiende a todo el cliente— no necesita que le inventen un departamento.
+//
+// El PUESTO es TEXTO LIBRE, igual que en el proveedor: *"deja el campo abierto qué rol tiene cada
+// persona"*. No hay catálogo que validar.
+
+/** Campos comunes del contacto de cliente (mismas reglas en alta y edición). */
+const camposContactoCliente = {
+  nombre: z
+    .string({ error: 'El nombre del contacto es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre del contacto es obligatorio' })
+    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+  /** Qué hace la persona, en TEXTO LIBRE (compradora, crédito y cobranza, tráfico…). */
+  puesto: z
+    .string()
+    .trim()
+    .max(100, { error: 'El puesto no puede tener más de 100 caracteres' })
+    .optional(),
+  telefono: z
+    .string()
+    .trim()
+    .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' })
+    .optional(),
+  email: z
+    .email({ error: 'El email del contacto no es válido' })
+    .max(200, { error: 'El email no puede tener más de 200 caracteres' })
+    .optional(),
+  notas: z
+    .string()
+    .trim()
+    .max(1000, { error: 'Las notas no pueden tener más de 1000 caracteres' })
+    .optional(),
+  /**
+   * Departamento al que atiende, **OPCIONAL** (decisión de Daniel). Omitir/`null` = atiende al
+   * cliente completo. El dominio exige que, si viene, sea un departamento DE ESE cliente.
+   */
+  idClienteDepartamento: z
+    .number({ error: 'El id del departamento debe ser un número' })
+    .int({ error: 'El id del departamento debe ser entero' })
+    .positive({ error: 'El id del departamento debe ser positivo' })
+    .optional(),
+} as const;
+
+/** Alta de un contacto del cliente (el cliente va en la URL, no en el cuerpo). */
+export const esquemaClienteContactoCrear = z
+  .object(camposContactoCliente)
+  .describe('Alta de un contacto del cliente (puesto en texto libre; departamento opcional).');
+
+/** Datos validados del alta de un contacto de cliente. */
+export type DatosClienteContactoCrear = z.infer<typeof esquemaClienteContactoCrear>;
+
+/**
+ * Edición PARCIAL de un contacto: omitir = no tocar; `null`/'' = borrar el dato. El `nombre` no es
+ * nullable (un contacto sin nombre no sirve), pero sí opcional. `idClienteDepartamento: null`
+ * DESLIGA a la persona del departamento (pasa a atender al cliente completo), que es un cambio
+ * legítimo y no un borrado.
+ */
+export const esquemaClienteContactoEditarCuerpo = z
+  .object({
+    nombre: camposContactoCliente.nombre.optional(),
+    puesto: camposContactoCliente.puesto.nullable(),
+    telefono: camposContactoCliente.telefono.nullable(),
+    email: camposContactoCliente.email.nullable(),
+    notas: camposContactoCliente.notas.nullable(),
+    idClienteDepartamento: camposContactoCliente.idClienteDepartamento.nullable(),
+    /** Borrado SUAVE (D3): `false` archiva el contacto, `true` lo revive. */
+    activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
+  })
+  .describe('Edición parcial de un contacto del cliente.');
+
+/** Datos validados de la edición de un contacto de cliente. */
+export type DatosClienteContactoEditarCuerpo = z.infer<typeof esquemaClienteContactoEditarCuerpo>;
+
+/** Forma de un contacto de cliente tal como lo devuelve la API. */
+export const esquemaClienteContactoSalida = z
+  .object({
+    id: z.number().int().describe('Id del contacto.'),
+    idCliente: z.number().int().describe('Id del cliente dueño del contacto.'),
+    idClienteDepartamento: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Departamento al que atiende, o null si atiende al cliente completo.'),
+    nombreDepartamento: z
+      .string()
+      .nullable()
+      .describe('Nombre del departamento al que atiende, o null.'),
+    nombre: z.string().describe('Nombre de la persona.'),
+    puesto: z.string().nullable().describe('Qué hace (texto libre), o null.'),
+    telefono: z.string().nullable().describe('Teléfono, o null.'),
+    email: z.string().nullable().describe('Email, o null.'),
+    notas: z.string().nullable().describe('Notas, o null.'),
+    activo: z.boolean().describe('Falso si está archivado (borrado suave).'),
+  })
+  .describe('Contacto de un cliente (la compradora, crédito y cobranza, tráfico…).');
+
+/** Contacto de cliente tal como sale de la API. */
+export type ClienteContactoSalida = z.infer<typeof esquemaClienteContactoSalida>;
+
+/** Respuesta del listado de contactos de un cliente. */
+export const esquemaClienteContactosLista = z
+  .object({ datos: z.array(esquemaClienteContactoSalida).describe('Contactos del cliente.') })
+  .describe('Contactos de un cliente.');
+
+/** Filtros del listado de contactos (por omisión, sólo los activos). */
+export const esquemaClienteContactosQuery = z
+  .object({
+    incluirInactivos: z.stringbool().default(false).describe('Incluye los archivados.'),
+  })
+  .describe('Filtros del listado de contactos del cliente.');

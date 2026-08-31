@@ -9294,6 +9294,444 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/clientes/{id}/contactos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar los contactos del cliente (la compradora; puesto en texto libre) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Incluye los archivados. */
+          incluirInactivos?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Id del cliente. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Contactos de un cliente. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Contactos del cliente. */
+              datos: {
+                /** @description Id del contacto. */
+                id: number;
+                /** @description Id del cliente dueño del contacto. */
+                idCliente: number;
+                /** @description Departamento al que atiende, o null si atiende al cliente completo. */
+                idClienteDepartamento: number | null;
+                /** @description Nombre del departamento al que atiende, o null. */
+                nombreDepartamento: string | null;
+                /** @description Nombre de la persona. */
+                nombre: string;
+                /** @description Qué hace (texto libre), o null. */
+                puesto: string | null;
+                /** @description Teléfono, o null. */
+                telefono: string | null;
+                /** @description Email, o null. */
+                email: string | null;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está archivado (borrado suave). */
+                activo: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Agregar un contacto al cliente (departamento OPCIONAL) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del cliente. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Alta de un contacto del cliente (puesto en texto libre; departamento opcional). */
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre: string;
+            puesto?: string;
+            telefono?: string;
+            /** Format: email */
+            email?: string;
+            notas?: string;
+            idClienteDepartamento?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Contacto de un cliente (la compradora, crédito y cobranza, tráfico…). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del contacto. */
+              id: number;
+              /** @description Id del cliente dueño del contacto. */
+              idCliente: number;
+              /** @description Departamento al que atiende, o null si atiende al cliente completo. */
+              idClienteDepartamento: number | null;
+              /** @description Nombre del departamento al que atiende, o null. */
+              nombreDepartamento: string | null;
+              /** @description Nombre de la persona. */
+              nombre: string;
+              /** @description Qué hace (texto libre), o null. */
+              puesto: string | null;
+              /** @description Teléfono, o null. */
+              telefono: string | null;
+              /** @description Email, o null. */
+              email: string | null;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está archivado (borrado suave). */
+              activo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/clientes/{id}/contactos/{idContacto}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Editar (o archivar con activo=false) un contacto del cliente */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del cliente. */
+          id: number;
+          /** @description Id del contacto del cliente. */
+          idContacto: number;
+        };
+        cookie?: never;
+      };
+      /** @description Edición parcial de un contacto del cliente. */
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre?: string;
+            puesto?: string | null;
+            telefono?: string | null;
+            email?: string | null;
+            notas?: string | null;
+            idClienteDepartamento?: number | null;
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Contacto de un cliente (la compradora, crédito y cobranza, tráfico…). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del contacto. */
+              id: number;
+              /** @description Id del cliente dueño del contacto. */
+              idCliente: number;
+              /** @description Departamento al que atiende, o null si atiende al cliente completo. */
+              idClienteDepartamento: number | null;
+              /** @description Nombre del departamento al que atiende, o null. */
+              nombreDepartamento: string | null;
+              /** @description Nombre de la persona. */
+              nombre: string;
+              /** @description Qué hace (texto libre), o null. */
+              puesto: string | null;
+              /** @description Teléfono, o null. */
+              telefono: string | null;
+              /** @description Email, o null. */
+              email: string | null;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está archivado (borrado suave). */
+              activo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
   '/api/telas-categorias': {
     parameters: {
       query?: never;
@@ -94044,6 +94482,8 @@ export interface paths {
             fecha?: string;
             /** @description Notas de la lista (opcional). */
             notas?: string | null;
+            /** @description Dónde fue la cita (opcional, texto libre). */
+            lugar?: string | null;
           };
         };
       };
@@ -94088,6 +94528,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -94133,6 +94575,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -94299,6 +94763,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -94344,6 +94810,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -94632,6 +95120,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -94677,6 +95167,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -94842,6 +95354,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -94887,6 +95401,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -95054,6 +95590,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -95099,6 +95637,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -95278,6 +95838,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -95323,6 +95885,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -95498,6 +96082,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -95543,6 +96129,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -95720,6 +96328,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -95765,6 +96375,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -96437,6 +97069,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -96482,6 +97116,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -96661,6 +97317,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -96706,6 +97364,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -96884,6 +97564,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -96929,6 +97611,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -97256,6 +97960,8 @@ export interface paths {
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
               /** @description Renglones (uno por desarrollo). */
               lineas: {
                 /** @description Id del renglón. */
@@ -97301,6 +98007,28 @@ export interface paths {
                 estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
               }[];
               /**
                * Format: date-time
@@ -97316,6 +98044,1204 @@ export interface paths {
               modificadoEn: string;
               /** @description Id del último usuario que la modificó. */
               modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/listas-precios/{id}/lineas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Agregar modelos (ya cotizados) a una lista de precios existente */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la lista de precios. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Agregar renglones a una lista de precios ya creada. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Desarrollos (cotizados) a agregar como renglones nuevos. */
+            idsDesarrollo: number[];
+          };
+        };
+      };
+      responses: {
+        /** @description Lista de precios por Cliente+Departamento, con sus renglones. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la lista. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Cliente de la lista. */
+              idCliente: number;
+              /** @description Nombre del cliente. */
+              nombreCliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento. */
+              nombreDepartamento: string;
+              /**
+               * Format: date
+               * @description Fecha de la lista (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description Estado de la lista. */
+              idEstadoLista: number;
+              /** @description Código del estado (ej. "abierta"). */
+              codigoEstado: string;
+              /** @description Nombre del estado. */
+              nombreEstado: string;
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
+              margenPct: number | null;
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
+              descuentosPct: number | null;
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
+              regaliasPct: number | null;
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
+              costoVentasPct: number | null;
+              /** @description Notas de la lista, o null. */
+              notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
+              /** @description Renglones (uno por desarrollo). */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Desarrollo del renglón. */
+                idDesarrollo: number;
+                /** @description Versión congelada del precosto usada. */
+                idPrecosto: number;
+                /** @description Nº de versión del precosto congelado. */
+                versionPrecosto: number;
+                /** @description Código del modelo (nuestro número). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para este modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Costo unitario snapshot (o null sin importes). */
+                costoUnit: number | null;
+                /** @description Precio propuesto por la fórmula (o null sin importes). */
+                precioCalculado: number | null;
+                /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
+                precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
+                /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
+                aprobado: boolean;
+                /** @description Quién aprobó el precio, o null. */
+                aprobadoPorId: string | null;
+                /** @description Cuándo se aprobó (ISO 8601), o null. */
+                aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/listas-precios/{id}/encabezado': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Editar el lugar de la cita y las notas de una lista de precios */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la lista de precios. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Editar el lugar de la cita y las notas de una lista de precios. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Dónde fue la cita (null para vaciarlo). */
+            lugar?: string | null;
+            /** @description Notas de la lista (null para vaciarlas). */
+            notas?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Lista de precios por Cliente+Departamento, con sus renglones. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la lista. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Cliente de la lista. */
+              idCliente: number;
+              /** @description Nombre del cliente. */
+              nombreCliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento. */
+              nombreDepartamento: string;
+              /**
+               * Format: date
+               * @description Fecha de la lista (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description Estado de la lista. */
+              idEstadoLista: number;
+              /** @description Código del estado (ej. "abierta"). */
+              codigoEstado: string;
+              /** @description Nombre del estado. */
+              nombreEstado: string;
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
+              margenPct: number | null;
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
+              descuentosPct: number | null;
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
+              regaliasPct: number | null;
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
+              costoVentasPct: number | null;
+              /** @description Notas de la lista, o null. */
+              notas: string | null;
+              /** @description Dónde fue la cita (texto libre), o null. */
+              lugar: string | null;
+              /** @description Renglones (uno por desarrollo). */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Desarrollo del renglón. */
+                idDesarrollo: number;
+                /** @description Versión congelada del precosto usada. */
+                idPrecosto: number;
+                /** @description Nº de versión del precosto congelado. */
+                versionPrecosto: number;
+                /** @description Código del modelo (nuestro número). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para este modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Costo unitario snapshot (o null sin importes). */
+                costoUnit: number | null;
+                /** @description Precio propuesto por la fórmula (o null sin importes). */
+                precioCalculado: number | null;
+                /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
+                precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
+                /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
+                aprobado: boolean;
+                /** @description Quién aprobó el precio, o null. */
+                aprobadoPorId: string | null;
+                /** @description Cuándo se aprobó (ISO 8601), o null. */
+                aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
+                /** @description Pendientes anotados de este modelo (los tachados incluidos). */
+                pendientes: {
+                  /** @description Id del pendiente. */
+                  id: number;
+                  /** @description Renglón (modelo) al que pertenece. */
+                  idListaLinea: number;
+                  /** @description Qué falta. */
+                  texto: string;
+                  /** @description ¿Ya se tachó? */
+                  resuelto: boolean;
+                  /** @description Cuándo se tachó (ISO 8601), o null. */
+                  resueltoEn: string | null;
+                  /** @description Quién lo tachó, o null. */
+                  resueltoPorId: string | null;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo se anotó (ISO 8601).
+                   */
+                  creadoEn: string;
+                  /** @description Quién lo anotó, o null. */
+                  creadoPorId: string | null;
+                }[];
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/listas-precios/{id}/modelo-nuevo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Dar de alta desde la mesa un modelo que no existe (desde cero o copiando otro) con su precosto borrador */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la lista de precios. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Alta de un modelo NUEVO (desde cero o copiando otro) desde la mesa de negociación. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Modelo del que se COPIA la ficha + la receta. Omitir = armarlo desde cero. */
+            idModeloOrigen?: number;
+            /** @description Año de ENTREGA (el que se congela en el código del modelo). */
+            anioEntrega: number;
+            /** @description Tipo de prenda (1er dígito). Obligatorio desde cero; al copiar se hereda. */
+            idTipoProducto?: number;
+            /** @description Género (2º dígito). Obligatorio desde cero; al copiar se hereda. */
+            idGenero?: number;
+            /** @description Descripción del modelo (al copiar, hereda la del origen si se omite). */
+            descripcion?: string;
+            /** @description Curva de tallas (al copiar, hereda la del origen si se omite). */
+            idCurvaTalla?: number;
+            /** @description Número que el cliente le da a este modelo (opcional). */
+            numeroCliente?: string;
+            /** @description Proyecto donde nace el desarrollo. O manda `nombreProyectoNuevo`. */
+            idProyecto?: number;
+            /** @description Nombre del proyecto NUEVO a crear (en la misma transacción). O manda `idProyecto`. */
+            nombreProyectoNuevo?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Modelo nuevo creado desde la mesa, con su precosto borrador. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Desarrollo recién creado. */
+              idDesarrollo: number;
+              /** @description Modelo recién creado. */
+              idModelo: number;
+              /** @description Código que le minteó el sistema (ej. CYA-26-71-004). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Proyecto donde quedó el desarrollo. */
+              idProyecto: number;
+              /** @description Folio del proyecto. */
+              folioProyecto: number;
+              /** @description Nombre del proyecto. */
+              nombreProyecto: string;
+              /** @description ¿El proyecto se creó en esta misma llamada? */
+              proyectoCreado: boolean;
+              /** @description Precosto BORRADOR generado, listo para estimar. */
+              idPrecosto: number;
+              /** @description Versión del precosto generado. */
+              versionPrecosto: number;
+              /** @description Modelo del que se copió, o null. */
+              copiadoDeIdModelo: number | null;
+              /** @description Código del modelo del que se copió, o null. */
+              copiadoDeCodigo: string | null;
+              /** @description Qué se copió de la receta (todo en cero si nació desde cero). */
+              receta: {
+                /** @description Renglones de tela copiados. */
+                telas: number;
+                /** @description Renglones de avío copiados. */
+                avios: number;
+                /** @description Medidas por talla copiadas. */
+                medidas: number;
+                /** @description Artes copiados. */
+                artes: number;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/listas-precios/lineas/{idLinea}/pendientes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar los pendientes anotados sobre un modelo de la lista */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Pendientes de un modelo dentro de la lista. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Pendientes del modelo. */
+              datos: {
+                /** @description Id del pendiente. */
+                id: number;
+                /** @description Renglón (modelo) al que pertenece. */
+                idListaLinea: number;
+                /** @description Qué falta. */
+                texto: string;
+                /** @description ¿Ya se tachó? */
+                resuelto: boolean;
+                /** @description Cuándo se tachó (ISO 8601), o null. */
+                resueltoEn: string | null;
+                /** @description Quién lo tachó, o null. */
+                resueltoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se anotó (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Quién lo anotó, o null. */
+                creadoPorId: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Anotar un pendiente sobre un modelo de la lista */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      /** @description Alta de un pendiente del modelo dentro de la lista. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Qué falta (texto libre). */
+            texto: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Un pendiente anotado sobre un modelo de la lista. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del pendiente. */
+              id: number;
+              /** @description Renglón (modelo) al que pertenece. */
+              idListaLinea: number;
+              /** @description Qué falta. */
+              texto: string;
+              /** @description ¿Ya se tachó? */
+              resuelto: boolean;
+              /** @description Cuándo se tachó (ISO 8601), o null. */
+              resueltoEn: string | null;
+              /** @description Quién lo tachó, o null. */
+              resueltoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Cuándo se anotó (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Quién lo anotó, o null. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/listas-precios/lineas/{idLinea}/pendientes/{idPendiente}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Borrar un pendiente de un modelo de la lista (queda en la bitácora) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+          /** @description Id del pendiente. */
+          idPendiente: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Corregir o tachar un pendiente de un modelo de la lista */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+          /** @description Id del pendiente. */
+          idPendiente: number;
+        };
+        cookie?: never;
+      };
+      /** @description Edición de un pendiente del modelo. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nuevo texto (omitir = no tocar). */
+            texto?: string;
+            /** @description true lo TACHA, false lo devuelve a pendiente (omitir = no tocar). */
+            resuelto?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Un pendiente anotado sobre un modelo de la lista. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del pendiente. */
+              id: number;
+              /** @description Renglón (modelo) al que pertenece. */
+              idListaLinea: number;
+              /** @description Qué falta. */
+              texto: string;
+              /** @description ¿Ya se tachó? */
+              resuelto: boolean;
+              /** @description Cuándo se tachó (ISO 8601), o null. */
+              resueltoEn: string | null;
+              /** @description Quién lo tachó, o null. */
+              resueltoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Cuándo se anotó (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Quién lo anotó, o null. */
+              creadoPorId: string | null;
             };
           };
         };

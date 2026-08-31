@@ -10355,8 +10355,54 @@ Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
    **porque necesita que la mesa ya sepa mostrar y mover costos renglón por renglón**: un modelo
    estimado sin eso no se puede cotizar.
 
-- **Aplica en:** la mesa de negociación, el alta de desarrollo/modelo y el precosteo. ⬜ **POR
-  CONSTRUIR** (versión **0.064**). **Fecha:** 2026-08-29.
+### Lo que se decidió el 31-ago al construirla (Daniel, tres respuestas)
+
+6. **CONTACTOS DEL CLIENTE: cuelgan del CLIENTE, con DEPARTAMENTO OPCIONAL.** Daniel: *«así "Laura,
+   compradora de NIÑOS" se distingue, y "Carlos, crédito" no necesita departamento inventado»*. ⇒
+   `ClienteContacto` es el espejo de `ProveedorContacto` con `idClienteDepartamento` **nullable** y fuera
+   de toda unicidad. Sale de medir la mesa: la lista se negocia CON ALGUIEN y **el cliente no guardaba a
+   nadie** (sólo los tres campos sueltos `contacto`/`telefono`/`email`, uno por cliente).
+7. **PENDIENTES: POR MODELO, NO POR CITA.** Se le ofreció una nota general de la junta y eligió lo otro:
+   *«falta muestra de color»*, *«pedir precio de jareta»* son **de un modelo concreto**, y una nota
+   general los revolvería. ⇒ cuelgan del RENGLÓN de la lista. 🔴 **Son LIBRETA, no bitácora**: el texto se
+   corrige, se tacha y se borra — a diferencia de `NegociacionEvento.acuerdo`, que es obligatorio e
+   INMUTABLE (D3) y **no se reusó** para esto. Y **no son el papel** (no salen en PDF/Excel/cotización),
+   así que **no los frena el cierre de la lista ni el estado del renglón**: tachar *«falta la muestra»*
+   dos semanas después de cerrar el modelo es justo para lo que sirven.
+8. **QUIÉN PUEDE CREAR EL MODELO: Aurora también** — y **ya podía**: §Post-F9.123 bajó
+   `modelos.administrar` hasta **Gerencial**, que es su rol. **Sin permisos nuevos.**
+
+### 🔴 Lo que la MEDICIÓN del 31-ago corrigió del punto 3 de arriba (y es la lección)
+
+El punto 3 decía *«el trabajo no es construir el motor: es abrir el camino»*. Es cierto a medias, y las
+dos mitades falsas son las que dolían:
+
+- 🔴🔴 **`copiarBom` NO trae los costos.** `maquilaBase`, `corteBase`, `numOperaciones`, `composicion` e
+  `idCurvaTalla` son columnas de **`Modelo`**, no del BOM — y `generarPrecosto` toma la maquila y el corte
+  **de ahí**. Un modelo copiado sólo con el BOM **precostea con maquila $0 y corte $0, en silencio**, y de
+  ese precosto sale **el precio que se le dice al cliente en la cara**. ⇒ la copia arrastra **la FICHA
+  además de la receta**. *La frase «copiar los trae todos: cero fricción» era exactamente al revés en lo
+  único que decide el precio.*
+- 🔴🔴 **NO existía forma de agregar un renglón a una lista ya creada.** El ÚNICO escritor de
+  `lista_precios_linea` era el `createMany` de `crearLista` ⇒ el punto 2 de esta decisión —*«el modelo
+  nace dentro de la lista que está negociando»*— era **literalmente imposible**: había que borrar la lista
+  y rehacerla, perdiendo aprobaciones, rondas, acuerdos e historial. **El plan no la nombraba**, y era la
+  pieza más grande de la etapa.
+- ⚖️ **Copiar NO es versionar.** `crearVersionDeModelo` sí arrastra los costos, pero cuelga al hijo de la
+  **familia del padre** (`CYA-26-71-001` → `-01`) y ese código lleva dentro **la abreviatura del cliente
+  del padre**: copiar un modelo de C&A para cotizárselo a Liverpool le pondría un código que dice «CYA».
+  Además deja `revisionEstado: 'pendiente'` y exige `modelos.aprobar-receta`. ⇒ se mintea **código nuevo
+  del cliente de la mesa** y se reusa **sólo** `copiarRecetaAModeloNuevo`.
+- ⚠️ **Y lo que el punto 4 dejaba abierto se resolvió sin preguntar de nuevo:** el alta desde la mesa
+  **NO agrega el renglón**. Un renglón necesita precosto **CONGELADO** y uno recién nacido desde cero no
+  tiene nada costeado (candado de la 0.063) ⇒ la mesa hace **dos actos visibles** —«créalo» y
+  «agrégalo»— en vez de uno que a veces funciona y no dice por qué. El modelo nace con su **precosto
+  borrador** ya generado, así que entre los dos actos sólo hay teclear los estimados.
+
+- **Aplica en:** la mesa de negociación, el alta de desarrollo/modelo, el precosteo y el catálogo de
+  clientes. ✅ **CONSTRUIDA** (V1-E8y, 31-ago-2026, versión **0.064**); **lleva migración de BD**
+  (`cliente_contacto`, `lista_precios.lugar`, `lista_precios_linea_pendiente`) y **SIN permisos nuevos ⇒
+  NO requiere `SEED_ON_START`**. **Fecha:** 2026-08-29 (construida el 2026-08-31).
 
 ---
 

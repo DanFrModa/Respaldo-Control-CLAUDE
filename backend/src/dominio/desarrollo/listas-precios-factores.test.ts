@@ -210,6 +210,10 @@ function filaLineaConJoins(l: FilaLinea): Record<string, unknown> {
       },
     },
     precosto: { version: 1, congeladoEn: new Date('2026-08-01T00:00:00.000Z') },
+    // ⭐ V1-E8y: el renglón trae ahora sus PENDIENTES (la libreta de la cita). Van vacíos: esta
+    // prueba no habla de ellos, pero la proyección los lee y sin la clave reventaría — que es lo
+    // que tiene que pasar si algún día alguien quita el `include`.
+    pendientes: [],
   };
 }
 

@@ -12,7 +12,7 @@
  * ⚠️ **AQUÍ LA FUSIÓN REPUNTA; NO BLOQUEA — y es lo contrario de la de COLORES.** `fusionarColores`
  * se NIEGA cuando el origen ya se usa (§Post-F9.129) porque `Color` tiene DOCE llaves entrantes y
  * varias son movimientos ya asentados (corte, kardex de PT) que no se pueden mover sin volverlos
- * incoherentes entre sí. `ClienteDepartamento` no se parece en nada a eso: sus CUATRO llaves
+ * incoherentes entre sí. `ClienteDepartamento` no se parece en nada a eso: sus CINCO llaves
  * entrantes son relaciones 1:N simples sobre documentos que **siguen vivos y editables**, y
  * justamente **lo que hay que arreglar es que apunten al departamento bueno**. Bloquear aquí dejaría
  * a Daniel exactamente igual de atorado que hoy: los departamentos revueltos son los que YA tienen
@@ -155,9 +155,15 @@ export async function colisionDeFactores(
 }
 
 /**
- * Las CUATRO referencias entrantes de `ClienteDepartamento`, TODAS repuntables. El orden es el del
- * peso que tienen para el usuario: primero lo que se ve en pantalla (proyectos, listas, cotizaciones)
- * y al final la configuración (factores), que es la única con colisión posible.
+ * Las referencias entrantes de `ClienteDepartamento`, TODAS repuntables. El orden es el del peso que
+ * tienen para el usuario: primero lo que se ve en pantalla (proyectos, listas, cotizaciones,
+ * contactos) y al final la configuración (factores), que es la única con colisión posible.
+ *
+ * ⭐ **V1-E8y sumó la quinta: `contactos`** (§Post-F9.152). Los contactos del cliente pueden colgar
+ * de un departamento —«Laura, compradora de NIÑOS»— y ahí la fusión importa de verdad: si dos
+ * departamentos revueltos son el mismo, sus compradoras son las del departamento bueno. Se repunta
+ * como las demás, y sin colisión posible: no hay unicidad sobre `(cliente, departamento, persona)`
+ * —dos personas pueden llamarse igual— así que un `updateMany` a secas es correcto.
  */
 export const REFERENCIAS_A_REPUNTAR: ReferenciaARepuntar[] = [
   {
@@ -192,6 +198,20 @@ export const REFERENCIAS_A_REPUNTAR: ReferenciaARepuntar[] = [
       // Se mueve la LLAVE, nunca `nombreDepartamento`: ese snapshot va congelado a propósito
       // (el papel que ya se imprimió no se reescribe). Ver la cabecera de este archivo.
       const { count } = await tx.cotizacion.updateMany({
+        where: { idClienteDepartamento: idOrigen },
+        data: { idClienteDepartamento: idDestino },
+      });
+      return { movidos: count };
+    },
+  },
+  {
+    relacion: 'contactos',
+    etiqueta: 'contactos del cliente en ese departamento',
+    contar: (tx, id) => tx.clienteContacto.count({ where: { idClienteDepartamento: id } }),
+    repuntar: async (tx, { idOrigen, idDestino }) => {
+      // Se mueven TODOS, archivados incluidos: un contacto que ya no está activo sigue siendo el
+      // rastro de quién atendía ese departamento, y dejarlo apuntando al absorbido lo escondería.
+      const { count } = await tx.clienteContacto.updateMany({
         where: { idClienteDepartamento: idOrigen },
         data: { idClienteDepartamento: idDestino },
       });

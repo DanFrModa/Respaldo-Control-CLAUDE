@@ -245,6 +245,15 @@ export {
   type DatosClienteCampoCrear,
   type DatosClienteCampoEditar,
   type ClienteCampoSalida,
+  // ⭐ V1-E8y (§Post-F9.152) — contactos del cliente (la compradora), con departamento OPCIONAL.
+  esquemaClienteContactoCrear,
+  esquemaClienteContactoEditarCuerpo,
+  esquemaClienteContactoSalida,
+  esquemaClienteContactosLista,
+  esquemaClienteContactosQuery,
+  type DatosClienteContactoCrear,
+  type DatosClienteContactoEditarCuerpo,
+  type ClienteContactoSalida,
 } from './esquemas/cliente.js';
 
 // ── Catálogos de materiales (F1-E3): globales con relaciones (ADR-0007/ADR-0009) ──

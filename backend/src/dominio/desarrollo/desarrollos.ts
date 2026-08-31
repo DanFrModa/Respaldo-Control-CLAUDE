@@ -26,7 +26,7 @@ import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
@@ -37,7 +37,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { crearModelo } from '../modelos/modelos.js';
-import { mintearCodigoDesarrollo } from '../modelos/nomenclatura.js';
+import { digitosDeNomenclatura, mintearCodigoDesarrollo } from '../modelos/nomenclatura.js';
 
 /** Alta: campos del esquema compartido. */
 export type EntradaCrearDesarrollo = z.input<typeof esquemaDesarrolloCrear>;
@@ -307,40 +307,17 @@ export async function crearDesarrolloConModeloNuevo(
 
     // Los dos dígitos salen del CATÁLOGO (tipo de prenda + género), que es de donde los toma
     // después el número de producción: así los dos códigos del modelo dicen lo mismo.
-    const [tipo, genero] = await Promise.all([
-      tx.tipoProducto.findUnique({
-        where: { id: datos.idTipoProducto },
-        select: { nombre: true, activo: true, digitoConcepto: true },
-      }),
-      tx.genero.findUnique({
-        where: { id: datos.idGenero },
-        select: { nombre: true, activo: true, digitoNomenclatura: true },
-      }),
-    ]);
-    if (tipo === null || !tipo.activo) {
-      throw new ErrorValidacion('El tipo de producto seleccionado no existe o está desactivado.');
-    }
-    if (genero === null || !genero.activo) {
-      throw new ErrorValidacion('El género seleccionado no existe o está desactivado.');
-    }
-    if (tipo.digitoConcepto === null) {
-      throw new ErrorValidacion(
-        `El tipo de producto "${tipo.nombre}" no tiene dígito de concepto capturado, y sin él no ` +
-          `se puede armar el código del modelo. Captúralo en su catálogo.`,
-      );
-    }
-    if (genero.digitoNomenclatura === null) {
-      throw new ErrorValidacion(
-        `El género "${genero.nombre}" no tiene dígito de nomenclatura capturado, y sin él no se ` +
-          `puede armar el código del modelo. Captúralo en su catálogo.`,
-      );
-    }
+    //
+    // ⭐ V1-E8y: el bloque que leía y validaba los dos dígitos vive ahora en
+    // `digitosDeNomenclatura` (`modelos/nomenclatura.ts`), COMPARTIDO con el alta desde la mesa de
+    // negociación (§Post-F9.152). Eran la misma comprobación palabra por palabra; copiarla habría
+    // sido la enésima copia reducida que después deriva.
+    const digitos = await digitosDeNomenclatura(tx, datos.idTipoProducto, datos.idGenero);
 
     const { codigo } = await mintearCodigoDesarrollo(tx, {
       idCliente: proyecto.idCliente,
       anioEntrega: datos.anioEntrega,
-      concepto: tipo.digitoConcepto,
-      genero: genero.digitoNomenclatura,
+      ...digitos,
     });
 
     const modelo = await crearModelo(

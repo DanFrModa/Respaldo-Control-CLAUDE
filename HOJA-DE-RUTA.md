@@ -154,8 +154,8 @@
 > | **0.060** ✅ *(en `prueba`, 30-ago)* | **La mesa con su forma real + el guardado.** Tela con **precio y consumo separados** y movibles · **avíos desglosados** y movibles · **foto** principal del modelo · **TARGET PRICE** del cliente (lo captura Aurora en el renglón de la lista; **informa, NO bloquea**) · **encabezado** (hoy se parte palabra por palabra) · **costo de EMPAQUE** como **tercera ancla fija** junto a maquila y corte (`CONCEPTOS_ANCLA`), con **default 2.20 en `ConfiguracionEmpresa`, NO hardcodeado** · y encima **los estimados SE GUARDAN** (último estado, desglose por concepto, al cerrar la negociación; **NO** autosave por tecla). **LLEVA MIGRACIÓN.** ⚠️ **Ya existe y NO se reconstruye:** el editor de renglones con `consumo`/`precioUnit`/`ajustado` (`DialogoPrecosto.tsx`); `desgloseCostoLinea` **aplasta por concepto** — el defecto es que agrupa, no que falte el dato | §Post-F9.149 · .150 · **.153** |
 > | **0.061** ⬜ | **La incompleta sale de Tránsito como merma · el divisor pasa a `recibido` · y ⭐ EL COSTO SE CONGELA AL CERRAR.** Las tres decididas por Daniel el 30-ago (**§Post-F9.154**), y la tercera **la levantó él**: *«¿en qué momento se define que ya se cerró el costo? ¿O va cambiando?»* — **va cambiando, medido**: se persiste el dinero y la base, pero la CANTIDAD se re-suma en cada lectura ⇒ con `recibido` el costo queda **vivo hasta el último recibo**. Adoptar el divisor sin el congelado habría dejado el costo bailando para siempre. 🔴 **Lo que el plan viejo decía MAL, ya medido:** el default **NO vive en dos sitios sino en CINCO** (+1 en SQL crudo), y el que el plan no nombraba —el `.default` del Zod— **puede reescribir órdenes ya costeadas** en un PUT que omita el campo ⇒ el cambio aplica **sólo hacia adelante**; y la **división entre cero YA está guardada en los seis divisores** ⇒ ahí no hay defecto, sólo falta **redactar** «aún no hay piezas recibidas». ⭐ **La merma está construida al ~70 %**: transacción, auditoría, almacén de tránsito y **la reversión al cancelar (que sale gratis: el motor ya revierte por origen)**; falta un código de catálogo y una rama. **NO es retroactiva al histórico** y no hay que programarlo: lo migrado no tiene el dato. **Seed ⇒ `SEED_ON_START=true`** · migración sólo por el `@default` · **sin permisos** | §Post-F9.154 |
 > | **0.062** ✅ | **Cuatro estados por MODELO** dentro de la lista: **Abierto → En negociación → Cerrado → Dropeado** («Dropeado» es palabra de Daniel, **no traducir**). 🔴 La medición previa evitó entregarla **rota**: el guard del papel exigía TODOS aprobados y lo consumen los **tres** impresos ⇒ un dropeado dejaba la lista **sin PDF, Excel ni cotización para siempre**. Regla de Daniel: **el papel muestra los NO dropeados** — una sola regla para sus dos momentos. **Se puede REVIVIR con rastro.** §Post-F9.156: **los factores son su calculadora, el precio cerrado es un compromiso** ⇒ mover un factor **no toca** a los terminales | §Post-F9.151 · .155 · **.156** |
-> | **0.063** ⬜ | 🔴 **HOTFIX · el candado del precosto que la 0.060 desdentó.** La guarda que impedía congelar un precosto en **cero** dejó de proteger cuando el **empaque** entró como tercera ancla: un modelo con **receta vacía** ya no suma $0.00 sino **$2.20**, así que **congela** — y de un precosto congelado (inmutable) sale **el precio que se cotiza al cliente**. ⚠️ **El defecto está VIVO en `prueba`.** La regla nueva: congela sólo si **algo que no es el empaque aporta importe** — receta valuada, o maquila o corte capturados. ⭐ **No rechaza nada que fuera congelable antes de la 0.060** (verificado por demostración: con todos los importes ≥ 0 por contrato, es literalmente la guarda vieja con el empaque descontado). **Entra antes que la 0.064 porque ésa —crear modelos desde cero en la cita— es el escenario NATIVO del defecto** | — |
-> | **0.064** ⬜ | **Cotizar en la cita un modelo que no existe** — desde cero o **copiando** uno ya desarrollado. ⚠️ El motor **ya existe** (`crearDesarrolloConModeloNuevo` mintea el código, `copiarBom`, `copiarArteDeOtroModelo`): el trabajo es **abrir el camino desde la mesa**. Obligatorios reales: `codigo` + `idGenero` + `idTipoProducto` (**tres**; el alta de desarrollo no pide `codigo` porque lo mintea) ⇒ **copiar un modelo los trae todos: cero fricción**. **+ la COMPRADORA**: contactos por cliente/departamento (patrón `ProveedorContacto`; hoy los clientes **no guardan a nadie**) **+ el LUGAR de la cita + un campo abierto de pendientes** | §Post-F9.152 |
+> | **0.063** ✅ *(en `prueba`)* | 🔴 **HOTFIX · el candado del precosto que la 0.060 desdentó.** La guarda que impedía congelar un precosto en **cero** dejó de proteger cuando el **empaque** entró como tercera ancla: un modelo con **receta vacía** ya no suma $0.00 sino **$2.20**, así que **congela** — y de un precosto congelado (inmutable) sale **el precio que se cotiza al cliente**. ⚠️ **El defecto está VIVO en `prueba`.** La regla nueva: congela sólo si **algo que no es el empaque aporta importe** — receta valuada, o maquila o corte capturados. ⭐ **No rechaza nada que fuera congelable antes de la 0.060** (verificado por demostración: con todos los importes ≥ 0 por contrato, es literalmente la guarda vieja con el empaque descontado). **Entra antes que la 0.064 porque ésa —crear modelos desde cero en la cita— es el escenario NATIVO del defecto** | — |
+> | **0.064** ✅ | **Cotizar en la cita un modelo que no existe** — desde cero o **copiando** uno ya desarrollado, **desde la mesa**. 🔴🔴 **La medición corrigió el plan en lo que más duele: «copiar los trae todos» era FALSO.** `copiarBom` **NO trae los costos** (`maquilaBase`/`corteBase`/`numOperaciones`/`composicion`/`idCurvaTalla` son columnas de `Modelo`, no del BOM) ⇒ un modelo copiado precosteaba con **maquila $0 y corte $0 en silencio**, y de ahí sale el precio que se dice en la cara del cliente: la copia arrastra **la ficha además de la receta**. Y **copiar NO es versionar**: `crearVersionDeModelo` sí trae los costos pero cuelga al hijo de la familia del padre, cuyo código lleva **la abreviatura de OTRO cliente** ⇒ aquí se mintea código nuevo. 🔴🔴 **La pieza grande que el plan no nombraba: NO existía forma de agregar un renglón a una lista ya creada** (el único escritor era el `createMany` del alta) ⇒ meter un modelo obligaba a **borrar la lista y rehacerla**, perdiendo aprobaciones e historial. Entrega además **la COMPRADORA** (contactos por cliente, **departamento OPCIONAL**), el **LUGAR de la cita**, los **pendientes POR MODELO** (libreta, no bitácora) y la corrección de las **notas**, que sólo se podían escribir al crear la lista | §Post-F9.152 |
 >
 > > ⚠️ **Los números CORRIERON UN LUGAR (30-ago):** entró el **hotfix del candado del precosto** como
 > **0.063**, así que lo que era 0.063–0.074 pasó a **0.064–0.075**. Es la tercera renumeración del
@@ -167,7 +167,7 @@
 > | Versión | Qué trae |
 > |---|---|
 > | **0.065** ⬜ | **Disolver la compuerta** (§Post-F9.144(c)): quitar `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo` ⇒ la OP entra con receta pendiente y **lo que se frena es COMPRAR**. **Medido: los renglones YA nacen `liberadoEn = NULL`** ⇒ la segunda pieza **es una prueba, no código**. Incluye la deuda del 26-ago: hoy `POST /api/ordenes` **crea una OP sin pasar por la compuerta** |
-> | **0.066** ⬜ | **La OP incompleta**, marcada hasta que se meta la receta y se libere. Daniel: *«La OP Queda como incompleta, hasta que se meta la receta y se libere»* |
+> | **0.066** ✅ *(YA ESTABA CONSTRUIDA — medido el 31-ago)* | **La OP incompleta**, marcada hasta que se meta la receta y se libere (§Post-F9.160(b)). 🔴 **La medición encontró que YA FUNCIONA:** `produccion/requisitos-orden.ts:11` define el requisito **`receta`** —*«Desarrollo liberó la receta de ESTA orden por completo»*— con la etiqueta **«liberar la receta»**, así que una OP sin receta **ya sale en «Órdenes incompletas» con su motivo**. ⇒ **no se construye: se VERIFICA.** Lo único abierto es de vocabulario (el enum es `capturada/completa/cancelada`; «incompleta» vive en la pantalla) y **se queda así**: un cuarto estado sería migración por una etiqueta |
 > | **0.067** ⬜ | **Abrir y cerrar la receta de la OP** + su **candado de compra**. Daniel: *«pongamos un candado que no se pueda comprar nada hasta que este cerrado otra vez»*. **Lleva migración** |
 > | **0.068** ⬜ | **El aviso del avío distinto** entre OP hermanas + que el aviso **lleve** a `desautorizarOC` (que **ya existe**) |
 >
@@ -219,6 +219,66 @@
 > está — pero **como precaución barata, NO porque el riesgo le importe a Daniel** (*«si quiere
 > despejarlo tampoco me preocupa tanto»*). **Pasa a importar el día que negocie alguien más que él**;
 > hoy sólo negocia Daniel. §Post-F9.148.
+>
+> ✅ **`V1-E8y` · COTIZAR EN LA CITA UN MODELO QUE NO EXISTE ⭐⭐** (31-ago, **0.064**) — §Post-F9.152.
+> Daniel: *«a veces estando en la cita, me piden cotizar algún modelo que no tengamos en muestrario…
+> Necesito armarlo desde cero estimando cosas. O bien podría copiar algún modelo de los que ya tenemos
+> desarrollados y cambiarle cosas»*. ⇒ Desde la **mesa de negociación** nacen, en UNA transacción, el
+> proyecto (si hace falta), el modelo —**desde cero o copiando**—, el desarrollo y su **precosto
+> borrador**; y la lista, por fin, **acepta modelos nuevos sin rehacerse**.
+> 🔴🔴 **Lo que la MEDICIÓN corrigió, y es la lección de la etapa: dos premisas del plan eran falsas en lo
+> que más duele.** (1) *«copiar un modelo los trae todos: cero fricción»* — **`copiarBom` NO trae los
+> costos**: `maquilaBase`, `corteBase`, `numOperaciones`, `composicion` e `idCurvaTalla` son columnas de
+> `Modelo`, no del BOM, y `generarPrecosto` las lee **de ahí** ⇒ un modelo copiado precosteaba con
+> **maquila $0 y corte $0 en silencio**, y de ese precosto sale el precio que se le dice al cliente en la
+> cara. (2) **No existía forma de agregar un renglón a una lista ya creada** —el único escritor era el
+> `createMany` del alta—, así que *«el modelo nace dentro de la lista que está negociando»* era imposible:
+> había que **borrar la lista y rehacerla**, perdiendo aprobaciones, rondas, acuerdos e historial. Ninguna
+> de las dos estaba en el plan.
+> ⚖️ **Y una tercera decisión medida: copiar NO es versionar.** `crearVersionDeModelo` sí arrastra los
+> costos —es el molde de la idea— pero cuelga al hijo de la **familia del padre**, y ese código lleva
+> dentro **la abreviatura del cliente del padre**: copiar un modelo de C&A para cotizárselo a Liverpool le
+> pondría un código que dice «CYA». Se reusó **sólo** la pieza que sí aplica (`copiarRecetaAModeloNuevo`)
+> y se mintea código nuevo del cliente de la mesa.
+> **Entrega además:** la **COMPRADORA** (`ClienteContacto`, con **departamento OPCIONAL** por decisión de
+> Daniel — *«así "Laura, compradora de NIÑOS" se distingue, y "Carlos, crédito" no necesita departamento
+> inventado»*), el **LUGAR de la cita**, los **pendientes POR MODELO** (libreta editable y tachable, que
+> **no** se confunde con `NegociacionEvento.acuerdo`, inmutable) y la corrección de las **notas de la
+> lista**, que existían desde F8-E4 y sólo se podían escribir al crearla.
+> ⚠️ **Migración aditiva** (`cliente_contacto`, `lista_precios.lugar`, `lista_precios_linea_pendiente`);
+> **SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`**; el contrato se movió ⇒ **backend y frontend suben
+> juntos**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8y.
+>
+> ✅ **`V1-E8y` · COTIZAR EN LA CITA UN MODELO QUE NO EXISTE ⭐** (31-ago, **0.064**) — §Post-F9.152 + las
+> tres respuestas de Daniel del 30-ago. Daniel: *«a veces estando en la cita, me piden cotizar algún modelo
+> que no tengamos en muestrario… necesito armarlo desde cero estimando cosas. O bien podría copiar algún
+> modelo de los que ya tenemos desarrollados»*. Entrega: **crear el modelo desde la mesa** (desde cero o
+> copiando), **los contactos del cliente** (la compradora, con departamento **opcional**), **los pendientes
+> POR MODELO** (Daniel eligió esto sobre una nota general de la cita) y el **lugar** de la cita.
+> 🔴 **Lo que la medición previa evitó:** el plan prometía *«copiar un modelo los trae todos: cero
+> fricción»* y **era falso** — `copiarBom` copia la receta pero **NO** la maquila ni el corte, que son
+> columnas de `Modelo`, así que **un modelo copiado habría precosteado con maquila $0 y corte $0, en
+> silencio**. Y al construirlo apareció **una tercera razón** que nadie había visto para no usar la vía de
+> «versión del modelo»: **cuelga al hijo de la familia del padre, y ese código lleva dentro la abreviatura
+> del CLIENTE del padre** ⇒ copiar un modelo de C&A para cotizárselo a Liverpool le habría puesto un código
+> que dice «CYA». 🔑 **Y la pieza más grande no estaba en el plan:** no existía forma de **agregar un
+> renglón a una lista ya creada**, sin la cual *«el modelo nace dentro de la lista que estás negociando»* es
+> imposible.
+> 🔴 **Revisión independiente: RECHAZADA con 4 hallazgos.** Los dos focos de riesgo **pasaron verificados**
+> (la copia **sí** arrastra los costos, comprobado hasta el precosto; y los dos advisory locks **no pueden
+> hacer ciclo** — barrió los 30+ del backend). Pero: **la prueba insignia de la etapa iba a tumbar el CI por
+> 20 centavos** (esperaba `107.75` y la suma es `107.95` — y el propio comentario, dos líneas arriba, lo
+> demostraba al revés); el API **aceptaba `lugar` y lo tiraba en silencio** con un 201; un mensaje mandaba
+> al usuario **a buscar en otras listas un modelo que estaba en la que tenía enfrente**; y el historial
+> —**la nota que lee Daniel**— prometía poder **corregir** un pendiente cuando la pantalla no lo permitía.
+> ⭐ Los cuatro corregidos, y dos **mejorados**: la prueba ganó la **aserción de la resta** (lo que aporta la
+> ficha copiada no puede ser cero, así falla por la razón correcta aunque cambien los precios del fixture),
+> y el mensaje distingue ahora **«ya está en ESTA lista»**. Además se **retiró `candidatosParaLista`**
+> (cero llamadores de producción, portando sus pruebas al camino vivo) y se hizo el **editar inline** de
+> pendientes, con lo que el `PATCH` dejó de estar muerto **y la frase del historial se volvió cierta**.
+> ⚠️ **Migración aditiva** (`cliente_contacto`, `lista_precios.lugar`, `lista_precios_linea_pendiente`),
+> **sin permisos ⇒ NO requiere `SEED_ON_START`**; el contrato se movió ⇒ backend y frontend suben juntos.
+> Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8y.
 >
 > ✅ **`V1-E8x` · LOS CUATRO ESTADOS DEL MODELO ⭐** (30-ago, **0.062**) — §Post-F9.151 · .155 · **.156**.
 > Daniel: *«a veces de una lista de 10 modelos, cierro 5 y los otros ya no los vendo»*. ⇒ Cada modelo

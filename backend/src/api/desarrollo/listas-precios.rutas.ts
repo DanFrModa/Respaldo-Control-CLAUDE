@@ -30,8 +30,16 @@ import {
   esquemaCandidatosQuery,
   esquemaDesgloseCostoLinea,
   esquemaListaFactoresEditar,
+  esquemaAgregarLineasLista,
+  esquemaListaEncabezadoEditar,
   esquemaListaPreciosCrear,
   esquemaListaPreciosDetalle,
+  esquemaModeloNuevoEnLista,
+  esquemaModeloNuevoEnListaSalida,
+  esquemaPendienteLineaCrear,
+  esquemaPendienteLineaEditar,
+  esquemaPendienteLineaSalida,
+  esquemaPendientesLineaLista,
   esquemaListasPreciosLista,
   esquemaListasPreciosQuery,
   esquemaPrecioTargetLinea,
@@ -50,9 +58,11 @@ import {
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
+  agregarLineasLista,
   ajustarPrecioLinea,
   aprobarLinea,
   crearLista,
+  editarEncabezadoLista,
   desgloseCostoLinea,
   diagnosticoCandidatosLista,
   editarFactoresLista,
@@ -72,6 +82,13 @@ import {
   simularMesa,
   simularNegociacion,
 } from '../../dominio/desarrollo/negociacion.js';
+import { crearModeloEnLista } from '../../dominio/desarrollo/modelo-en-la-mesa.js';
+import {
+  crearPendienteDeRenglon,
+  editarPendienteDeRenglon,
+  eliminarPendienteDeRenglon,
+  listarPendientesDeRenglon,
+} from '../../dominio/desarrollo/pendientes-linea.js';
 import { impresoListaPrecios } from '../../dominio/desarrollo/impresos/impreso-lista-precios.js';
 import { excelListaPrecios } from '../../dominio/desarrollo/impresos/excel-lista-precios.js';
 
@@ -91,6 +108,20 @@ const esquemaParamLinea = z.object({
     .int({ error: 'El id del renglón debe ser entero' })
     .positive({ error: 'El id del renglón debe ser positivo' })
     .describe('Id del renglón de la lista.'),
+});
+
+/** Parámetros `:idLinea` + `:idPendiente` (V1-E8y, pendientes por modelo). */
+const esquemaParamPendiente = z.object({
+  idLinea: z.coerce
+    .number({ error: 'El id del renglón debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del renglón de la lista.'),
+  idPendiente: z.coerce
+    .number({ error: 'El id del pendiente debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del pendiente.'),
 });
 
 /** Respuestas de error comunes a toda ruta protegida. */
@@ -522,6 +553,171 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
   });
 
   // Impreso PDF de la lista (R9). Binario; exige ver importes (el impreso ES precios).
+  // ── ⭐⭐ V1-E8y (§Post-F9.152) — LA MESA ABIERTA ────────────────────────────
+  //
+  // Tres puertas nuevas: agregar modelos ya cotizados a una lista que ya existe (lo que NO se
+  // podía), dar de alta ahí mismo un modelo que no existe (desde cero o copiando) y corregir los
+  // datos de la cita. SIN permisos nuevos.
+
+  // AGREGAR renglones a una lista ya creada. Hasta V1-E8y el único escritor de renglones era el
+  // alta de la lista: agregar un modelo obligaba a borrarla y rehacerla.
+  app.route({
+    method: 'POST',
+    url: '/listas-precios/:id/lineas',
+    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Agregar modelos (ya cotizados) a una lista de precios existente',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaAgregarLineasLista,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return agregarLineasLista(sesion, request.params.id, request.body);
+    },
+  });
+
+  // El ENCABEZADO de la cita: el LUGAR (nuevo) y las NOTAS (que sólo se podían escribir al crear).
+  app.route({
+    method: 'PATCH',
+    url: '/listas-precios/:id/encabezado',
+    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Editar el lugar de la cita y las notas de una lista de precios',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaListaEncabezadoEditar,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return editarEncabezadoLista(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐⭐ COTIZAR EN LA CITA UN MODELO QUE NO EXISTE: crea (proyecto si hace falta) + modelo (desde
+  // cero o copiando) + desarrollo + precosto BORRADOR, en UNA transacción. NO agrega el renglón:
+  // eso pide un precosto congelado, y primero hay que teclearle los estimados (ver el dominio).
+  //
+  // Los SEIS permisos van en el preHandler (AND) porque el dominio hace todas esas cosas —
+  // incluidas las LECTURAS con las que `crearProyecto` y `generarPrecosto` proyectan su salida. Si
+  // faltara uno, el 403 llegaría a mitad de la transacción — la lección de F8-E3.
+  app.route({
+    method: 'POST',
+    url: '/listas-precios/:id/modelo-nuevo',
+    preHandler: [
+      app.conPermiso('listas.administrar'),
+      app.conPermiso('listas.ver'),
+      app.conPermiso('desarrollo.administrar'),
+      app.conPermiso('desarrollo.ver'),
+      app.conPermiso('modelos.administrar'),
+      app.conPermiso('desarrollo.precostear'),
+    ],
+    schema: {
+      tags: ['listas'],
+      summary:
+        'Dar de alta desde la mesa un modelo que no existe (desde cero o copiando otro) con su precosto borrador',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaModeloNuevoEnLista,
+      response: { 201: esquemaModeloNuevoEnListaSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const creado = await crearModeloEnLista(sesion, request.params.id, request.body);
+      return reply.code(201).send(creado);
+    },
+  });
+
+  // ── ⭐ V1-E8y — PENDIENTES POR MODELO ───────────────────────────────────────
+  //
+  // La LIBRETA de la cita («falta muestra de color»). No es el papel: no sale en PDF/Excel/
+  // cotización, y por eso el dominio NO la frena con el cierre de la lista ni con el estado del
+  // renglón (ver el encabezado de `pendientes-linea.ts`). Se leen también embebidos en cada renglón
+  // del detalle de la lista; este GET existe para quien quiera sólo la libreta.
+  app.route({
+    method: 'GET',
+    url: '/listas-precios/lineas/:idLinea/pendientes',
+    preHandler: app.conPermiso('listas.ver'),
+    schema: {
+      tags: ['listas'],
+      summary: 'Listar los pendientes anotados sobre un modelo de la lista',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      response: { 200: esquemaPendientesLineaLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await listarPendientesDeRenglon(sesion, request.params.idLinea);
+      return { datos };
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/listas-precios/lineas/:idLinea/pendientes',
+    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Anotar un pendiente sobre un modelo de la lista',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      body: esquemaPendienteLineaCrear,
+      response: { 201: esquemaPendienteLineaSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const pendiente = await crearPendienteDeRenglon(sesion, request.params.idLinea, request.body);
+      return reply.code(201).send(pendiente);
+    },
+  });
+
+  // Corrige el texto y/o TACHA el pendiente (`resuelto`).
+  app.route({
+    method: 'PATCH',
+    url: '/listas-precios/lineas/:idLinea/pendientes/:idPendiente',
+    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Corregir o tachar un pendiente de un modelo de la lista',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamPendiente,
+      body: esquemaPendienteLineaEditar,
+      response: { 200: esquemaPendienteLineaSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return editarPendienteDeRenglon(
+        sesion,
+        request.params.idLinea,
+        request.params.idPendiente,
+        request.body,
+      );
+    },
+  });
+
+  // Borra el pendiente (queda íntegro en la bitácora). 204 sin cuerpo.
+  app.route({
+    method: 'DELETE',
+    url: '/listas-precios/lineas/:idLinea/pendientes/:idPendiente',
+    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Borrar un pendiente de un modelo de la lista (queda en la bitácora)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamPendiente,
+      response: { 204: z.null(), ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      await eliminarPendienteDeRenglon(sesion, request.params.idLinea, request.params.idPendiente);
+      return reply.code(204).send(null);
+    },
+  });
+
   app.route({
     method: 'GET',
     url: '/listas-precios/:id/pdf',

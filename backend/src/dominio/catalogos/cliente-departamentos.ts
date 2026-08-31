@@ -348,13 +348,14 @@ export async function reactivarDepartamentoCliente(
  * armar la lista de «Caballeros». Sin esto, Daniel **no puede armar una lista de precios**.
  *
  * **Qué hace:** repunta al canónico **TODO** lo que colgaba de cada absorbido —proyectos, listas de
- * precios, cotizaciones y factores— (`REFERENCIAS_A_REPUNTAR`, con su red contra el olvido), DESACTIVA
+ * precios, cotizaciones, contactos y factores— (`REFERENCIAS_A_REPUNTAR`, con su red contra el
+ * olvido), DESACTIVA
  * cada absorbido (borrado SUAVE: **nunca se borra físicamente un departamento**), REACTIVA el canónico
  * y deja bitácora por cada absorbido más una de resumen en el que se queda. Todo en UNA transacción
  * (A2): o se consolida entero o no se toca nada.
  *
  * ⚠️ **REPUNTA, NO BLOQUEA — al revés que `fusionarColores`.** El porqué, con la medición, está en la
- * cabecera de `cliente-departamentos-fusion-referencias.ts`: las cuatro llaves entrantes del
+ * cabecera de `cliente-departamentos-fusion-referencias.ts`: las llaves entrantes del
  * departamento son documentos vivos y editables, y arreglar a dónde apuntan **es** el trabajo.
  * Negarse aquí (como se hace con los colores, cuyos movimientos ya asentados no se pueden mover sin
  * volverlos incoherentes) dejaría a Daniel exactamente igual de atorado.
