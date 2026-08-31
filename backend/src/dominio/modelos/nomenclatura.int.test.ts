@@ -1529,8 +1529,11 @@ describe('derivarModeloDeProduccion — el linaje 1:N', () => {
       numeroProduccion: 71_001,
       numeroCapturado: false,
       idModeloDesarrollo: idDesarrollo,
-      codigoModeloDesarrollo: 'CYA-26-71-001',
-      numeroDeDesarrollo: 'CYA-26-71-001',
+      // ⚠️ Estos DOS tienen que ser el código con el que ESTA prueba creó el desarrollo (…-004), no el
+      // de la primera del archivo: son lo que el renglón de bitácora dice sobre el PADRE. El CI cazó
+      // aquí un copia-pega que las unitarias no podían ver — el doble no conoce el código real.
+      codigoModeloDesarrollo: 'CYA-26-71-004',
+      numeroDeDesarrollo: 'CYA-26-71-004',
     });
   });
 
