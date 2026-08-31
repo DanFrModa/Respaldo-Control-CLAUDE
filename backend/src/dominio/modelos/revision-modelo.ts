@@ -327,7 +327,7 @@ export interface DatosAprobarRevision {
  * quedó vivo cuando aquél se corrigió. Hoy la firma **no abre ni cierra ninguna puerta**: sólo
  * saca la versión de la cola de «Recetas por revisar» y deja constancia de quién revisó y
  * cuándo. Lo que gobierna el gasto es la liberación POR RENGLÓN de la receta de la orden
- * (`exigirRecetaLiberada`, en `../ordenes/receta-orden.ts`). Creer lo contrario es exactamente lo
+ * (`exigirRecetaLiberada`, en `../produccion/receta-orden.ts`). Creer lo contrario es exactamente lo
  * que llevaría a volver a cablear la compuerta que V1-E9c disolvió.
  *
  * Todo en UNA transacción (A2) con la bitácora dentro (A7). Aprobar dos veces es `ErrorConflicto`:

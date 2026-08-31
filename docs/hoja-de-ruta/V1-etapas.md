@@ -1303,8 +1303,32 @@ cola de revisión sigue igual), así que se sostiene **con la razón corregida**
 ### Cierre
 
 **Gates:** backend `typecheck` · `lint` · `format:check` · `test:unit` **2,344** · frontend `typecheck`
-(`tsc -b`) · `lint` · `format:check` · `test` **1,863**. **Mutaciones corridas: 4, todas muertas.**
-Revisión independiente: **APROBADA** tras dos rondas de rechazo.
+(`tsc -b`) · `lint` · `format:check` · `test` **1,863**.
+
+**Mutaciones: 11 corridas en la etapa, y UNA sobrevivió** —`origenAlFirmar` en el rechazo, con 48/48
+en verde— hasta que se arregló. **Ese es el dato que vale**, no el conteo final: decir «todas muertas»
+borra justamente la que enseñó algo.
+
+Revisión independiente: **tres rondas, dos rechazos**. El tercero encontró **la sexta gemela** —el
+docstring de la bandeja, 450 líneas debajo de dos que la ronda anterior acababa de arreglar en ese
+mismo archivo— y **tres defectos que introdujo la propia ronda de corrección**: una ruta a un
+directorio inventado en la frase cuya única misión era mandar al lector al mecanismo correcto, una
+cláusula del `schema.prisma` que **esta misma versión falsificó** al quitar los botones que la
+sostenían, y un comentario re-envuelto a medias.
+
+### ⭐ EL MÉTODO, no la anécdota
+
+La gemela apareció **cuatro veces**, la última en el archivo que la ronda anterior acababa de tocar.
+De ahí sale la regla, y conviene aplicarla tal cual:
+
+> **El barrido no se hace sobre lo que cambiaste: se hace sobre LA AFIRMACIÓN, en todo el repo, en
+> MULTILÍNEA, y con `.prisma` y `.sql` dentro.**
+
+Multilínea porque una frase partida en dos renglones no la caza un `grep` por línea — así se
+escaparon la cuarta y la quinta. Y `.prisma` dentro porque de ahí se generan archivos que nadie
+revisa. ⛔ **Excepción que NO se toca: las migraciones ya aplicadas.** `migration.sql` lleva checksum
+en `_prisma_migrations`; editarla aborta el siguiente `migrate deploy` con *«migration was modified
+after it was applied»* y **tumba el despliegue**. La frase muerta se queda ahí, a propósito.
 
 ---
 

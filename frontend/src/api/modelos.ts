@@ -406,10 +406,14 @@ export interface ArgsRevisionModelo {
 
 /**
  * APRUEBA la revisión de la receta de una versión: la firma de Desarrollo sobre ella
- * (§Post-F9.110). **NO habilita producción** — desde V1-E9c (§Post-F9.169) la firma no abre ni
- * cierra ninguna puerta: sólo saca la versión de «Recetas por revisar» y deja constancia. El
- * gasto lo gobierna la liberación por renglón de la receta de la orden. La pantalla NO decide nada — el backend valida que sea una versión, que no esté
- * ya aprobada y que quien firma tenga `modelos.aprobar-receta` (A1).
+ * (§Post-F9.110).
+ *
+ * ⚠️ **NO habilita producción.** Desde V1-E9c (§Post-F9.169) la firma no abre ni cierra ninguna
+ * puerta: sólo saca la versión de «Recetas por revisar» y deja constancia. El gasto lo gobierna
+ * la liberación **por renglón** de la receta de la orden.
+ *
+ * La pantalla NO decide nada — el backend valida que sea una versión, que no esté ya aprobada y
+ * que quien firma tenga `modelos.aprobar-receta` (A1).
  */
 export function useAprobarRevisionModelo(): UseMutationResult<
   RevisionModelo,
@@ -863,8 +867,11 @@ export interface FiltrosRecetasPorRevisar {
 }
 
 /**
- * BANDEJA «Recetas por revisar» (§Post-F9.140): las versiones negociadas a las que la revisión les
- * niega producción. La fecha comprometida, las piezas y la marca de "ya frena dinero" vienen
+ * BANDEJA «Recetas por revisar» (§Post-F9.140): las versiones negociadas cuya receta todavía no
+ * está firmada, **estén en desarrollo o ya en producción**. ⚠️ Decía *"a las que la revisión les
+ * niega producción"*: desde V1-E9c (§Post-F9.169) la revisión **no niega producción**, y la
+ * bandeja **ya no esconde** las que están produciendo — son justo las que urge revisar. La fecha
+ * comprometida, las piezas y la marca de "ya frena dinero" vienen
  * **agregadas del servidor** (A1: aquí no se suma nada). Sólo lectura: firmar es otro endpoint.
  */
 export function useRecetasPorRevisar(
