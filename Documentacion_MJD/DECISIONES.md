@@ -10132,7 +10132,7 @@ este archivo**: entraron al repo en un solo commit que tocó **únicamente `HOJA
 viviendo dentro de una celda de la tabla del programa. Dos de ellas **llevan esquema de base de datos
 detrás**. Se rescatan aquí, que es donde mandan.
 
-### (a) 🔴 EL CANDADO DE COMPRA: abrir y cerrar la receta de la OP → versión **0.066**
+### (a) 🔴 EL CANDADO DE COMPRA: abrir y cerrar la receta de la OP → versión **0.067**
 
 > *«pongamos un candado que **no se pueda comprar nada hasta que esté cerrado otra vez**»*
 
@@ -10144,12 +10144,19 @@ firma es *«este elemento ya se puede comprar»* (de a uno, hacia adelante); **e
 y congelar la compra **de toda la orden** mientras dure la corrección. Son dos mecanismos distintos sobre
 el mismo dato. **Lleva migración.**
 
-### (b) 🔴 LA OP INCOMPLETA → versión **0.065**
+### (b) 🔴 LA OP INCOMPLETA → versión **0.066** — ⚠️ **YA ESTÁ CONSTRUIDA, sólo hay que verificarla**
 
 > *«La OP queda como **incompleta**, hasta que se meta la receta y se libere»*
 
 **La regla:** una orden nace **marcada como incompleta** y deja de estarlo cuando su receta entra y se
-libera. ⭐ **Encaja exactamente con §Post-F9.158(a)** —la receta se copia **al liberarse**, no al crear la
+libera.
+
+🔴 **MEDIDO EL 31-ago: esto YA ESTÁ CONSTRUIDO.** `produccion/requisitos-orden.ts:11` define el requisito
+**`receta`** como *«Desarrollo liberó la receta de ESTA orden por completo»*, con la etiqueta **«liberar la
+receta»** (`:57`): una OP sin receta queda en estado `capturada` y **ya sale en «Órdenes incompletas» con
+`Falta: liberar la receta`**. ⇒ **La 0.066 no se construye: se VERIFICA.** Lo único abierto es de
+vocabulario — el enum del dato es `capturada | completa | cancelada` y la palabra «incompleta» vive sólo en
+la pantalla. **Default: se queda así**; agregar un cuarto estado sería una migración por una etiqueta. ⭐ **Encaja exactamente con §Post-F9.158(a)** —la receta se copia **al liberarse**, no al crear la
 orden—: sin ese estado, una OP recién creada se vería idéntica a una terminada, y **nadie sabría que le
 falta lo principal**. Es el letrero de esa decisión.
 
@@ -10365,5 +10372,60 @@ desde el primer día.*
 - **Aplica en:** TODA sesión, siempre. Escrita como **REGLA 0-B** en `CLAUDE.md` §7, junto a la REGLA 0,
   porque las dos atacan lo mismo: **el lead gastando el tiempo de Daniel y los recursos del proyecto en
   cosas que no avanzan**. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.164) — ⏳ PENDIENTE DE DANIEL: sin la compuerta, **¿para qué sirve la firma de revisión del modelo?** (medido el 31-ago-2026)
+
+**Cómo salió.** La medición de la **0.065** (*disolver la compuerta*) encontró que el plan, tal como está
+escrito, **entrega la versión rota** — y de una forma que nadie había visto porque el efecto es a
+distancia, no en el código que se toca.
+
+🔴 **La cadena, medida paso a paso:**
+1. Sin compuerta, generar la OP **promueve la versión igual**, con `revisionEstado = 'pendiente'`
+   (`produccion/salida-produccion.ts:142`).
+2. `exigirVersionRevisable` (`modelos/revision-modelo.ts:250-256`) dice: *«ya está en el catálogo de
+   producción: la revisión es ANTES de mandar a producir y **ya no se puede cambiar**»* ⇒ **aprobar la
+   revisión la rechaza para siempre**.
+3. `recetas-por-revisar.ts:40` filtra por `origen = 'desarrollo'` ⇒ **la versión desaparece de la bandeja**.
+
+⇒ **Toda versión que genere una OP queda `pendiente` de por vida: no se puede firmar y no aparece en
+ninguna cola.** El acto de revisión que Daniel pidió en §Post-F9.140 —*«tiene que haber una validación de
+la receta original»*— **se queda sin camino de ejecución**. Y de rebote, el subsistema de invalidación
+`tocarModeloPorCambioDeReceta` (**12 sitios de llamada**), que existe sólo para mantener honesta esa firma,
+queda como contabilidad sin consumidor.
+
+⚠️ **Esto no se decide sin Daniel: es su propia decisión de §Post-F9.140 la que se estaría deshaciendo.**
+
+### La pregunta, con su default propuesto
+
+> **Al quitar la compuerta, la firma de revisión del modelo se queda sin puerta que guardar. ¿Qué hacemos
+> con ella?**
+
+- **(a) Default propuesto — que deje de ser una PUERTA y pase a ser un REGISTRO.** Se permite firmarla
+  **también con el modelo ya en producción** (quitando el bloqueo de `revision-modelo.ts:250-256`) y la
+  bandeja **deja de filtrar por `origen = 'desarrollo'`**. 📌 Nota fina que lo respalda: esa regla 3 de la
+  bandeja **se justificaba explícitamente en que «el muro ya no la frena»** — al quitar el muro, la
+  justificación se invierte sola.
+- **(b) Retirar el mecanismo completo** —compuerta, firma y los 12 sitios de invalidación— y que la única
+  firma del sistema sea **la de renglón** (`liberadoEn`), que es la que de verdad gobierna la compra.
+- ⚠️ **Lo que NO es opción: dejarlo como quedaría.** Un acto de negocio que existe, nadie puede ejecutar y
+  nadie ve, es peor que no tenerlo.
+
+### Y una segunda, más chica
+
+> **¿`copiarRecetaDelModelo` se mueve dentro de la 0.065, o en versión propia?**
+
+**Default propuesto: versión propia.** Al medirlo aparecieron tres cosas que el plan no contemplaba:
+**(1)** *«copiar al liberarse»* es **circular** tal como suena — `liberarReceta` firma renglones **que ya
+existen, por id**: no se puede liberar lo que no está. La secuencia real es **traer → revisar → firmar**, y
+la palabra de Daniel ya la dice bien: *«hasta que **se meta** la receta y se libere»*. ⇒ no hay que *mover*
+la copia: hay que **dejar de llamarla al crear la orden** y que `traerDelModelo` (que ya existe) sea la
+entrada. **(2)** La bandeja «Recetas por liberar» se arma con renglones **existentes** sin firmar: una OP
+sin receta **no aparece**, así que nacería invisible para Desarrollo — justo el problema que esa bandeja
+vino a matar. Haría falta una segunda entrada: *«órdenes sin receta»*. **(3)** El impreso de la OP saldría
+**sin materiales** al piso, y eso pesa más ahora que Daniel autorizó **cortar sin firmar** (§Post-F9.158(b)).
+
+- **Aplica en:** la **0.065** no se cierra sin (1). **Fecha:** 2026-08-31.
 
 ---
