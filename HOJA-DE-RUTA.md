@@ -166,7 +166,7 @@
 >
 > | Versión | Qué trae |
 > |---|---|
-> | **0.065** ⬜ *(DESBLOQUEADA 31-ago)* | **Disolver la compuerta**: la OP entra con la receta pendiente y **lo que se frena es COMPRAR**. ✅ **Daniel la contestó (§Post-F9.169):** *«Todo lo que no está firmado simplemente no se puede comprar. Pero **no detiene ni la producción ni los demás renglones ya firmados**»* ⇒ el único control es **la firma POR RENGLÓN**, sin segunda puerta. 🔑 Y con eso se toma la opción (a) de §Post-F9.164: **la revisión del modelo deja de ser PUERTA y pasa a REGISTRO** —se podrá firmar con el modelo ya en producción y la bandeja deja de esconderlo—, porque su regla de filtrado **se justificaba en que «el muro ya no la frena»** y al quitar el muro **la justificación se invierte sola**. Medido: los renglones **ya nacen sin firmar** ⇒ la segunda pieza **es una prueba, no código** | §Post-F9.144(c) · .164 · **.169** |
+> | **0.065** ✅ *(salió como **0.071** — el plan numera la fila, la entrega numera la llegada; ver «Cómo se numeran» en `HISTORIAL-DE-VERSIONES.md`)* | **Disolver la compuerta**: la OP entra con la receta pendiente y **lo que se frena es COMPRAR**. ✅ **Daniel la contestó (§Post-F9.169):** *«Todo lo que no está firmado simplemente no se puede comprar. Pero **no detiene ni la producción ni los demás renglones ya firmados**»* ⇒ el único control es **la firma POR RENGLÓN**, sin segunda puerta. 🔑 Y con eso se toma la opción (a) de §Post-F9.164: **la revisión del modelo deja de ser PUERTA y pasa a REGISTRO** —se podrá firmar con el modelo ya en producción y la bandeja deja de esconderlo—, porque su regla de filtrado **se justificaba en que «el muro ya no la frena»** y al quitar el muro **la justificación se invierte sola**. Medido: los renglones **ya nacen sin firmar** ⇒ la segunda pieza **fue una prueba, no código** (confirmado). 🔴 **El plan decía «su único sitio de llamada» y ya era FALSO al leerlo:** la **0.069 —dos días antes— añadió el segundo llamador** (`derivarModeloDeProduccion`), justo el del camino 1:N que estrena la 0.071 ⇒ quitar sólo el que el plan nombraba habría dejado **el muro vivo en el camino nuevo**. *La medición de un plan caduca.* 🔴 Revisión **rechazada dos veces**: la copia que la persona lee **al decidir** seguía prometiendo el bloqueo (los toasts sí, la descripción no), y aparecieron **cinco afirmaciones gemelas más** —incluido el comentario del `schema.prisma`—. ⭐ **El patrón salió TRES veces en una etapa** ⇒ *la simetría del código tampoco se hereda a la prosa* | §Post-F9.144(c) · .164 · **.169** |
 > | **0.066** ✅ *(YA ESTABA CONSTRUIDA — medido el 31-ago)* | **La OP incompleta**, marcada hasta que se meta la receta y se libere (§Post-F9.160(b)). 🔴 **La medición encontró que YA FUNCIONA:** `produccion/requisitos-orden.ts:11` define el requisito **`receta`** —*«Desarrollo liberó la receta de ESTA orden por completo»*— con la etiqueta **«liberar la receta»**, así que una OP sin receta **ya sale en «Órdenes incompletas» con su motivo**. ⇒ **no se construye: se VERIFICA.** Lo único abierto es de vocabulario (el enum es `capturada/completa/cancelada`; «incompleta» vive en la pantalla) y **se queda así**: un cuarto estado sería migración por una etiqueta |
 > | **0.067** ✅ | **El candado de compra**: reabrir la receta de una OP **congela el gasto de esa orden** hasta cerrarla (§Post-F9.160(a) · .165). 🔴 **La medición evitó el atajo:** `recetaLiberadaEn` **no** es el candado —el código lo dice literal— así que apoyarse en él habría dado *«la pantalla dice receta no liberada y la OC sale igual»*. ⭐ **El guard vive DENTRO de las dos puertas** por las que ya pasan todas las bocas ⇒ cero consultas extra; y aparecieron **DOS bocas más** que nadie contaba (`duplicarOC` y **`autorizarOC`, donde sale el dinero**) ⇒ **siete, no cinco**. 🔴 Revisión **RECHAZADA con 2 bloqueantes**: el candado **heredó la exención** de editar cantidad/precio (con la receta congelada se subía una línea de 100 a **5,000 kg** sin que corriera), y **la salida en una orden cancelada existía en el dominio y no en la pantalla**. ⏳ **§Post-F9.168 pendiente de Daniel**: hoy sólo se congela una receta liberada **completa** | §Post-F9.160(a) · .165 · **.168** |
 > | **0.068** ⬜ | **El aviso del avío distinto** entre OP hermanas + que el aviso **lleve** a `desautorizarOC` (que **ya existe**) |
@@ -517,7 +517,8 @@
 > §Post-F9.140. Daniel: *"despues de una negociacion, tiene que haber una validadcion de la receta
 > original… de alguna manera deberia de pasar un filtro para ver lo que se negocio con el cliente. y
 > como se cerro"*. 🔴 **Se midió antes de codear, y la premisa del encargo se SOSTUVO a medias:** la
-> **compuerta ya existía** (`exigirRevisionAprobadaParaProducir`, V1-E7d — no se reconstruyó), pero
+> **compuerta ya existía** (`exigirRevisionAprobadaParaProducir`, V1-E7d — no se reconstruyó; ⚠️ **la
+> 0.071 la ELIMINÓ del repo**, §Post-F9.169: hoy la revisión es registro, no puerta), pero
 > **nadie podía listar la cola**, así que la revisión era un **muro al final del camino**: te topabas con
 > ella al querer producir. ⇒ Se construyó **la cola**, con la forma que Daniel ya aprobó (la bandeja
 > hermana «Recetas por liberar», de la que dijo *"está buenísima"*): `consultarRecetasPorRevisar` →
@@ -528,7 +529,9 @@
 > obvio— habría dejado **bloqueadas e invisibles** dos poblaciones que el muro SÍ frena: las versiones
 > con la columna en **NULL** (las anteriores a V1-E7d; su migración dice *"para ellas NULL se lee como
 > `pendiente`"*) y las **rechazadas**. Se resolvió con **guardas gemelas**: `revisionBloqueaProduccion`
-> (TS, lo que la compuerta pregunta antes de lanzar) + `SQL_REVISION_BLOQUEA_PRODUCCION` (SQL), vecinas
+> (TS, lo que la compuerta pregunta antes de lanzar) + `SQL_REVISION_BLOQUEA_PRODUCCION` (SQL) —⚠️ **la
+> 0.071 las renombró** a `revisionSinAprobar` / `SQL_REVISION_SIN_APROBAR`, porque el nombre viejo
+> afirma un bloqueo que ya no existe; **su trabajo no cambió**: siguen llenando la cola—, vecinas
 > en el mismo archivo y con una prueba que las corre sobre las **16 combinaciones** comparándolas fila
 > por fila. 📋 **Orden y marca, medidos, no copiados:** **por los caminos de la UI** una versión frenada
 > no llega a tener OP —generarla exige promover; queda el hueco **sólo por API** de `crearOrden`, deuda
@@ -2313,6 +2316,16 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > **Y dos huecos previos, declarados en la 0.067 y NO cerrados:** `duplicarOC` y `autorizarOC` **se saltan
 > las dos puertas de la FIRMA** (no llaman a `validarLineas`). Se les puso el candado de compra, pero la
 > revisión de firmas sigue abierta en los dos. ⚠️ **Autorizar es el momento en que sale el dinero.**
+>
+> 📌 **Revisados al disolver la compuerta (0.071) — y la gravedad NO subió.** Es tentador decir que
+> quitar el muro los empeora, y **es falso**: el muro cubría **sólo las VERSIONES**, y para los ~4,987
+> modelos migrados de Access la firma del renglón **siempre fue el único control**. Estos dos huecos
+> valen hoy lo que valían ayer. ⚠️ **Se dice así a propósito**, porque en el reporte a Daniel se dijo
+> primero que la gravedad subía y hubo que corregirlo.
+>
+> **Y una tercera, de V1-E7d (§Post-F9.34): `crearOrden` se salta la promoción entera.** La compuerta la
+> tapaba a medias; hoy no hay nada que tapar. **La 0.071 no la cierra** — se nombra para no descubrirla
+> por segunda vez.
 
 
 
@@ -2454,8 +2467,12 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 
   1. **Quitar `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo`**
      (`dominio/modelos/nomenclatura.ts` — su único sitio de llamada) ⇒ la OP entra con la receta pendiente.
+     ✅ **EJECUTADO en la 0.071**, y de más: la función **se eliminó del repo entero** (una compuerta
+     apagada es una que alguien vuelve a encender). 🔴 **«Su único sitio de llamada» era FALSO al
+     ejecutarse:** la 0.069 había añadido `derivarModeloDeProduccion` como segundo llamador.
   2. **Que los renglones de una versión sin revisar estén SIN FIRMAR**, para que el candado que ya existe
      haga el trabajo: `exigirMaterialesLiberados` bloquea **sólo el material sin firmar** (§Post-F9.142).
+     ✅ **Ya era así** ⇒ en la 0.071 esta pieza fue **una prueba, no código**.
 
   ⇒ ⭐ **No hay compuerta nueva que mantener.** La granularidad que Daniel necesita ya estaba construida;
   lo que sobraba era la puerta gruesa de más arriba.

@@ -657,9 +657,13 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
   const admin = () => sesion(['modelos.ver', 'modelos.administrar']);
 
   /**
-   * Deja lista una VERSIÓN con receta heredada y su revisión APROBADA, y comprueba de paso que en
-   * ese punto SÍ podría mandarse a producir (si no, la prueba de abajo no demostraría nada:
-   * pasaría por estar rota desde antes).
+   * Deja lista una VERSIÓN con receta heredada y su revisión APROBADA, y comprueba de paso que la
+   * firma quedó puesta —estado y firmante— para que la prueba de abajo, que la tira, no pase por
+   * estar rota desde antes.
+   *
+   * ⚠️ Decía *"comprueba que en ese punto SÍ podría mandarse a producir"*, y el cuerpo nunca lo
+   * comprobó: sólo lee `revisionEstado` e `idRevisadoPor`. Desde V1-E9c (§Post-F9.169) además
+   * sería falso — la firma no gobierna producir.
    */
   async function versionAprobadaConReceta(): Promise<{
     idVersion: number;

@@ -320,7 +320,15 @@ export interface DatosAprobarRevision {
 }
 
 /**
- * ⭐ APRUEBA la revisión de una versión: la firma que la habilita para producción.
+ * ⭐ APRUEBA la revisión de una versión: la firma de Desarrollo sobre su receta.
+ *
+ * ⚠️ **V1-E9c (§Post-F9.169) — esta firma NO habilita producción.** Aquí decía *"la firma que
+ * la habilita para producción"*, gemelo del docstring de {@link rechazarRevisionModelo}, y se
+ * quedó vivo cuando aquél se corrigió. Hoy la firma **no abre ni cierra ninguna puerta**: sólo
+ * saca la versión de la cola de «Recetas por revisar» y deja constancia de quién revisó y
+ * cuándo. Lo que gobierna el gasto es la liberación POR RENGLÓN de la receta de la orden
+ * (`exigirRecetaLiberada`, en `../ordenes/receta-orden.ts`). Creer lo contrario es exactamente lo
+ * que llevaría a volver a cablear la compuerta que V1-E9c disolvió.
  *
  * Todo en UNA transacción (A2) con la bitácora dentro (A7). Aprobar dos veces es `ErrorConflicto`:
  * la segunda firma no cambiaría nada y sí borraría de la fila a quien firmó primero.

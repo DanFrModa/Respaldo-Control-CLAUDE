@@ -405,8 +405,10 @@ export interface ArgsRevisionModelo {
 }
 
 /**
- * APRUEBA la revisión de la receta de una versión: la firma que la habilita para producción
- * (§Post-F9.110). La pantalla NO decide nada — el backend valida que sea una versión, que no esté
+ * APRUEBA la revisión de la receta de una versión: la firma de Desarrollo sobre ella
+ * (§Post-F9.110). **NO habilita producción** — desde V1-E9c (§Post-F9.169) la firma no abre ni
+ * cierra ninguna puerta: sólo saca la versión de «Recetas por revisar» y deja constancia. El
+ * gasto lo gobierna la liberación por renglón de la receta de la orden. La pantalla NO decide nada — el backend valida que sea una versión, que no esté
  * ya aprobada y que quien firma tenga `modelos.aprobar-receta` (A1).
  */
 export function useAprobarRevisionModelo(): UseMutationResult<
@@ -427,8 +429,10 @@ export function useAprobarRevisionModelo(): UseMutationResult<
 }
 
 /**
- * RECHAZA la revisión con motivo: la versión sigue existiendo y editándose, pero no puede mandarse
- * a producir. El motivo es obligatorio y el backend lo vuelve a exigir.
+ * RECHAZA la revisión con motivo: la versión sigue existiendo, sigue editándose y vuelve a la
+ * cola de «Recetas por revisar». **Rechazar NO detiene su producción** (V1-E9c, §Post-F9.169):
+ * aquí decía *"pero no puede mandarse a producir"* y era verdad sólo mientras existió la
+ * compuerta. El motivo es obligatorio y el backend lo vuelve a exigir.
  */
 export function useRechazarRevisionModelo(): UseMutationResult<
   RevisionModelo,

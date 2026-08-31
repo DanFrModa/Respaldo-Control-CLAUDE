@@ -20,6 +20,22 @@ opera el negocio. `0.001`, `0.002`, `0.003`…
 junta un lote. Cada merge a `prueba` = una entrada nueva aquí, aunque traiga una sola cosa. Así siempre se
 puede decir qué versión se está mirando.
 
+> ### 📌 El número del PROGRAMA no es el número de ENTREGA
+>
+> `HOJA-DE-RUTA.md` numera las versiones **planeadas** (0.060, 0.061, 0.062…). Ése es un **lugar en la
+> fila**, no una promesa: cuando una versión se aparca —esperando una decisión, o porque Daniel cambia la
+> prioridad— **las de atrás se adelantan y llegan antes**.
+>
+> **Manda la llegada.** El número se asigna **al entrar a `prueba`**, y por eso siempre sube: la 0.065 del
+> plan entró como **0.071**, después de la 0.070. Cuando eso pasa, la entrada lo dice en su primera línea
+> (*«se planeó como 0.065»*) y la fila del programa apunta a dónde salió.
+>
+> ⚠️ **Y no es una convención: es obligatorio.** `version.test.ts` exige que las entradas vayan en orden
+> **estrictamente descendente** y que la constante de la topbar sea **la primera**. Insertar una versión
+> que llega tarde en su hueco numérico dejaría la topbar mostrando la anterior — que es el fallo exacto
+> que ese candado existe para impedir. **Un hueco en la numeración no se rellena nunca**: 0.061, 0.065,
+> 0.066 y 0.068 se quedan vacíos para siempre, y eso está bien.
+
 **El número es UNO SOLO y VIAJA.** Se asigna al entrar a **`prueba`** y **esa misma versión** es la que
 después sube a producción — **no se re-numera**. Así se puede decir _"producción corre la 0.014, que es
 exactamente la que probé el 18 de agosto"_, en vez de tener dos numeraciones paralelas que en tres meses
@@ -52,7 +68,53 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > incompleta saliendo de tránsito como merma, el costo repartido entre las recibidas y el congelado al
 > cerrar la orden). Daniel decidió el 30-ago dejarlo para después —*«no es tan relevante ahorita el tema
 > del costo, avanza con lo demás»*—, pero **sus tres decisiones ya están tomadas y escritas**
-> (§Post-F9.154), así que se retoma sin volver a discutir nada. El número queda reservado.
+> (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
+> reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
+
+## 0.071 · 31-ago-2026 · **en prueba** — Una receta a medio firmar **ya no detiene la producción**: sólo frena la compra
+
+> 📌 **Se planeó como «0.065».** Salió con el número 0.071 porque esperó tu respuesta mientras las dos
+> anteriores se adelantaban. Es la misma que aparece en el programa como 0.065.
+
+### Qué se puede hacer ahora que antes no
+
+**Mandar a producir un modelo cuya receta todavía no está revisada.** Antes el sistema lo impedía: si la
+receta no llevaba la firma de revisión, la orden de producción **no salía**. Tú lo dijiste así:
+
+> *«Todo lo que no está firmado simplemente no se puede comprar. Pero **no detiene ni la producción ni los
+> demás renglones ya firmados**.»*
+
+Ahora es exactamente eso. **La orden entra con la receta pendiente**, se corta, se manda a maquila, se
+recibe y se entrega. **Lo único que se frena es el dinero**, y renglón por renglón: la tela que Desarrollo
+ya firmó se compra hoy; la que no, espera — **sin detener a las demás**.
+
+⇒ **Deja de haber dos candados.** Antes había un muro grueso al principio (el modelo entero aprobado o
+nada) y un candado fino después (renglón por renglón). El grueso llegaba **antes** que el fino, así que el
+fino casi nunca se estrenaba. **Se quitó el grueso. Queda el fino, que es el que tú pediste.**
+
+### Qué cambió y puede sorprender
+
+- **Rechazar una revisión ya no detiene nada.** Sigue sirviendo —devuelve el modelo con observaciones y lo
+  regresa a «Recetas por revisar»— pero **no impide producir**. El texto de la pantalla lo dice ahora con
+  todas sus letras, porque **prometía lo contrario justo en el momento de decidir**.
+- **La firma de revisión pasó de ser una puerta a ser un registro.** Deja constancia de quién revisó y
+  cuándo, y saca el modelo de la cola. **No abre ni cierra nada.**
+- **La bandeja de «Recetas por revisar» ya no esconde los modelos que están produciendo.** Antes tenía
+  sentido esconderlos, porque estar en producción significaba que ya habían pasado el muro. Sin muro, la
+  razón se invierte sola: **son justo los que urge revisar.**
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Hay dos caminos por los que todavía se puede comprar sin que corra el candado**: *duplicar* una
+  orden de compra y *autorizarla*. Se detectaron en la 0.067 y **siguen abiertos**. Conviene decir bien la
+  gravedad: **esto no empeoró con esta versión.** El muro que se quitó cubría **sólo las versiones nuevas**
+  — para los casi 5,000 modelos que vienen de Access, la firma del renglón **siempre fue el único control**.
+- **Crear una orden por una vía lateral se salta la promoción entera** (pendiente viejo, de cuando se
+  construyó la revisión). No cambia con esta versión; se anota para no volver a descubrirlo.
+- **Sin decidir:** si la bandeja de revisión debe **marcar** los modelos que ya están produciendo, para
+  distinguirlos de un vistazo. Hoy salen igual que los demás. **No estorba nada**; es cosmético y es tuyo.
+
+---
 
 ## 0.070 · 31-ago-2026 · **en prueba** — Los modelos de un mismo desarrollo **comparten una sola receta** (cambio interno)
 

@@ -2272,9 +2272,16 @@ model Modelo {
   /// (`CYA-26-71-001` → `-01`), que es otra cosa: una versión NACE EN DESARROLLO, hereda una COPIA
   /// congelada de la receta y **lleva su propia revisión**. Un hijo de producción nace **ya en
   /// producción**, **comparte** la receta del padre (no la copia) y **no lleva revisión propia**:
-  /// la firma que lo habilita es la del padre. Meterlos en la misma columna haría que cada hijo se
-  /// enseñara como *«Revisión pendiente · no puede mandarse a producir»* **sin ningún botón para
-  /// arreglarlo**, sobre un modelo que ya está en producción (§Post-F9.167 punto 2).
+  /// la revisión que le toca es la del padre, porque la receta es la del padre. Meterlos en la
+  /// misma columna llenaría la cola de «Recetas por revisar» con un renglón por cada hijo —y **sin
+  /// ningún botón para arreglarlo**, porque el hijo no tiene receta propia que firmar
+  /// (§Post-F9.167 punto 2).
+  ///
+  /// ⚠️ Aquí decía que la firma del padre *"lo habilita"* y que un hijo sin ella *"no puede
+  /// mandarse a producir"*. Eso se escribió en 0.069, con la compuerta viva; **V1-E9c la disolvió**
+  /// (§Post-F9.169) y hoy ninguna firma habilita ni bloquea producir. El argumento de separar las
+  /// columnas NO dependía de la compuerta —el ruido en la cola de revisión sigue igual—, por eso la
+  /// decisión se sostiene con la razón corregida.
   ///
   /// `NULL` = **«la receta es la mía»**, que es la conducta de siempre: es el caso de los ~4,987
   /// modelos migrados del Access, de los capturados a mano y de todo lo que existe hoy. La

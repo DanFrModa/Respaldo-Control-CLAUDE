@@ -70,7 +70,7 @@ describe('<DialogoRevisionModelo> — lo que le promete a quien firma', () => {
     // Lo que la persona necesita saber para no equivocarse de acto: esto NO es el freno.
     expect(texto).toContain('rechazarla NO detiene su producción');
     // Y a dónde ir de verdad si lo que quiere es frenar el dinero (la firma POR RENGLÓN).
-    expect(texto).toContain('liberar la receta renglón por renglón');
+    expect(texto).toContain('lo que Desarrollo no libera, no se compra');
     // Lo que sí hace: se conserva y vuelve a la cola.
     expect(texto).toContain('Recetas por revisar');
 
