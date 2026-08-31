@@ -57,6 +57,7 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
+import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
@@ -252,8 +253,13 @@ export async function leerTelasBom(
   idModelo: number,
   idEmpresa: number,
 ): Promise<ModeloTelaDetalle[]> {
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA: un modelo de producción derivado lee las telas de su modelo
+  // de DESARROLLO. Se resuelve AQUÍ DENTRO, no en cada llamador: ésta es una de las tres lecturas
+  // canónicas y por ella entra todo el sistema (ficha, precosto de la orden, MRP). Resolver es
+  // idempotente (no hay cadenas), así que no importa si quien llama ya resolvió.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
   const filas = await tx.modeloTela.findMany({
-    where: { idModelo },
+    where: { idModelo: idReceta },
     select: {
       idTela: true,
       consumoPorPrenda: true,
@@ -344,8 +350,11 @@ export async function leerAviosBom(
   idModelo: number,
   idEmpresa: number,
 ): Promise<ModeloAvioDetalle[]> {
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA (ver {@link leerTelasBom}): los avíos salen del modelo de
+  // desarrollo cuando éste es uno de sus hijos de producción.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
   const filas = await tx.modeloAvio.findMany({
-    where: { idModelo },
+    where: { idModelo: idReceta },
     select: {
       idAvio: true,
       consumoPorPrenda: true,

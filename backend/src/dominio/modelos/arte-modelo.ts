@@ -65,6 +65,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { exigirModelo } from './modelos.js';
 import { reordenarComoPrincipal } from './orden-principal.js';
+import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 
 /** Carpeta R2 de las fotos del arte (la key real se ordena por id, no por nombre, A5). */
@@ -237,8 +238,11 @@ function aDetalle(f: FilaArte): ModeloArteDetalle {
  * ficha del modelo (`leerBom`), el impreso de la orden y los listados.
  */
 export async function leerArtesModelo(tx: Tx, idModelo: number): Promise<ModeloArteDetalle[]> {
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA: el arte de un modelo de producción derivado es el de su
+  // modelo de DESARROLLO (tercera lectura canónica, misma razón que en `leerTelasBom`).
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
   const filas = await tx.modeloArte.findMany({
-    where: { idModelo },
+    where: { idModelo: idReceta },
     select: SELECT_ARTE,
     orderBy: [...ORDEN_ARTES],
   });
@@ -905,8 +909,12 @@ export async function listarFotosArte(
 ): Promise<FotoArteConUrl[]> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
+  // ⭐ V1-E9b — el arte que la ficha del hijo enseña es el del PADRE, así que la pertenencia (A9
+  // del sub-recurso) se comprueba contra el modelo de la RECETA. Sin esto, abrir las fotos de un
+  // arte heredado daría 404 sobre un renglón que la pantalla acaba de listar.
+  const idReceta = await resolverIdRecetaDeModelo(cliente, idModelo);
   const arte = await cliente.modeloArte.findFirst({
-    where: { id: idArte, idModelo },
+    where: { id: idArte, idModelo: idReceta },
     select: {
       id: true,
       fotos: {
