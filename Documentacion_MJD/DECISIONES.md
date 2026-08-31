@@ -11133,3 +11133,49 @@ construida**.
 - **Aplica en:** versión **0.067**. **Fecha:** 2026-08-31.
 
 ---
+
+#### (Post-F9.166) — ⭐⭐ LIBERAR EL MODELO LIBERA **SUS N ÓRDENES DE GOLPE**, no una por una (DANIEL, 31-ago-2026)
+
+**Cómo salió.** Daniel lo aclaró por su cuenta, al ver el trabajo del Bloque 2:
+
+> *«cuando hay 4 órdenes que dependen de un mismo modelo (4 colores diferentes del mismo modelo), **al
+> liberar el modelo se libera automáticamente para las 4 órdenes. No es una por una.**»*
+
+🔴 **Hoy NO funciona así, y es un cambio de fondo, no un ajuste.** `liberarReceta`
+(`backend/src/dominio/produccion/receta-orden.ts:2691`) recibe **`idOrden`**: firma los renglones **de esa
+orden**. Con cuatro colores del mismo modelo, hoy habría que **firmar cuatro veces lo mismo** — que es
+justo lo que él dice que no debe pasar.
+
+### Lo que queda decidido
+
+1. **La liberación es del MODELO y se propaga a todas sus órdenes vivas.** Un acto de Desarrollo, N órdenes
+   servidas. **No se repite por color.**
+2. ⚠️ **NO contradice §Post-F9.80** (*«no tiene sentido liberar las cosas sin ver»*), y conviene decirlo
+   para que nadie las cruce mal: aquella decisión es sobre **QUÉ se firma** —renglón por renglón, viéndolo,
+   nunca en bloque a ciegas—; ésta es sobre **A CUÁNTAS ÓRDENES ALCANZA** esa firma. **Se firma viendo, y
+   lo que se firmó vale para las cuatro.** Son ejes distintos: el *qué* y el *a quiénes*.
+3. **Encaja con §Post-F9.158(a)** (*la receta se copia a la OP al liberarse*): al liberar el modelo, **las
+   N órdenes reciben su copia congelada en el mismo acto**. Un disparador, N efectos.
+4. **Y con la excepción de §Post-F9.146 pieza 1** (su respuesta a la pregunta 4): *«normalmente todas las
+   OP deben ir iguales… puede pasar que a una OP del grupo se le cambie algún avío… se debe poder hacer,
+   pero advirtiendo de la diferencia»*. ⇒ **La liberación es en grupo; la excepción es por orden y avisada.**
+   El default es *todas juntas*, no *cada una por su lado*.
+
+### 🔴 Lo que esto MUEVE de lo ya medido (31-ago)
+
+- **0.065 / 0.067**: las mediciones asumen la liberación **por orden**. La propagación al grupo **es una
+  pieza propia** y no estaba en el plan. ⚠️ El **candado de compra** de la 0.067 hereda la pregunta: si se
+  reabre la receta del modelo, **¿se congela la compra de las cuatro órdenes?** *Default propuesto: sí* —
+  es la misma lógica («un acto, N efectos») y es lo coherente con lo que Daniel acaba de decir.
+- **Bloque 3 (modelos 1:N)**: esto **es** el corazón de su etapa E2 (*la receta compartida*). La aclaración
+  la ratifica desde el lado de la liberación, y **adelanta un requisito** que esa etapa tendrá que cumplir.
+- ⚠️ **Depende del grupo, que todavía no existe.** El vínculo entre las N órdenes del mismo modelo de
+  desarrollo (`idModeloDesarrollo`) **lo construye la 0.069**. Hoy las cuatro OP comparten `idModelo`
+  **sólo por el hueco** que la 0.071 viene a cerrar. ⇒ **La propagación se construye con la familia, no
+  antes** — anclarla hoy en `idModelo` funcionaría y **se quedaría muda** el día que cada color tenga su
+  modelo propio. Es la misma trampa que la medición de la 0.068 acaba de encontrar.
+
+- **Aplica en:** el Bloque 3 (la familia y la receta compartida) y, de rebote, el candado de la 0.067.
+  **Fecha:** 2026-08-31.
+
+---
