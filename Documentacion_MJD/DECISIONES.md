@@ -10229,6 +10229,27 @@ Escrito con precisión a propósito, porque mal leído esto haría daño. **Lo q
 - **No es permiso para romper lo que hoy funciona**, ni para saltarse pruebas. Es permiso para **no gastar
   en reparar el pasado**.
 
+### El matiz sobre ACCESS, que Daniel precisó aparte
+
+> *«si vamos a jalar los datos de Access… pero asumo que todo lo que se hizo en Access viene de una versión
+> con **muchas menos funcionalidades** y **la información va a venir incompleta. Eso lo tengo completamente
+> asumido.**»*
+
+⇒ **El histórico SÍ se importa** —esto no cancela el ETL ni F10— **y llega con huecos a propósito**. Un
+registro migrado al que le falten campos **NO es un defecto que reportar ni que arreglar**: es lo esperado,
+porque el sistema viejo no tenía ese concepto. Ejemplos que ya viven así en el repo y **están bien**:
+`cantidadIncompletas` es `NULL` en todo lo migrado (Access no tenía «prenda incompleta»), y los modelos
+migrados no tienen `codigoDesarrollo` (no había desarrollo).
+
+🔑 **La línea fina, y es la que hay que tener presente al construir: TOLERAR ≠ COMPENSAR.**
+- ✅ **Tolerar:** una función nueva **no se rompe** cuando el dato viejo falta.
+- ❌ **Compensar:** inventar valores, construir pantallas para «completar el histórico», hacer backfills, o
+  **bloquear una función porque el histórico no la puede alimentar**.
+
+📌 Y su corolario práctico: **si una capacidad nueva sólo aplica a lo que se capture de ahora en adelante,
+eso está bien y NO hay que avisarlo como carencia.** Decirlo en cada entrega es otra forma de gastar el
+tiempo de Daniel en algo que él ya dio por asumido.
+
 📌 **En una línea:** *lo viejo se tira, no se arregla; y lo nuevo se hace bien desde el primer día.*
 
 ### Lo que esta decisión RETIRA de inmediato (casos reales del mismo día)

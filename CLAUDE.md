@@ -177,6 +177,17 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 > - **No es permiso para romper cosas que hoy funcionan** ni para saltarse pruebas: es permiso para **no
 >   gastar en reparar el pasado**.
 >
+> **Y el matiz sobre ACCESS, que Daniel precisó aparte:** *«si vamos a jalar los datos de Access… pero
+> asumo que todo lo que se hizo en Access viene de una versión con muchas menos funcionalidades y **la
+> información va a venir incompleta. Eso lo tengo completamente asumido**»*.
+> ⇒ **El histórico SÍ se importa, y llega con huecos A PROPÓSITO.** Un registro migrado al que le falten
+> campos **NO es un defecto**: es lo esperado, porque el sistema viejo no tenía ese concepto.
+> 🔑 **La línea fina: TOLERAR ≠ COMPENSAR.** Una función nueva debe **no romperse** cuando el dato viejo
+> falta, pero **NO debe doblarse para rellenarlo**: nada de inventar valores, de pantallas para
+> «completar el histórico», ni de bloquear una función porque el histórico no la puede alimentar. Si una
+> capacidad nueva sólo aplica a lo que se capture de ahora en adelante, **eso está bien y no hay que
+> avisarlo como carencia**.
+>
 > 📌 **En una línea:** *lo viejo se tira, no se arregla; y lo nuevo se hace bien desde el primer día.*
 
 1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
