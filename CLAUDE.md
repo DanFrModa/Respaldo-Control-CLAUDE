@@ -146,6 +146,39 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 ## 7. Cómo se desarrolla CONTROL v2 (reglas vigentes)
 
+> ## 🔴 REGLA 0-B — LOS DATOS DE HOY SON BASURA: EL SISTEMA MIRA HACIA ADELANTE (DANIEL, 30-ago-2026, §Post-F9.163)
+>
+> **Textual de Daniel:**
+>
+> > *«Estamos trabajando en la versión de prueba… toda la información que haya ahí **no es importante, es
+> > basura. La vamos a limpiar.** Deja de preocuparte por información que ya tenga la receta, o en general
+> > información que ya esté. Todo lo que vamos haciendo nuevo está bien que aplique **sólo a los nuevos
+> > modelos** que vayamos a meter. Te veo muy preocupado por que los datos que ya tienen alguna cosa
+> > quieras hacer algo para poder revertir las cosas que tienen. Piensa que todo lo que vamos a usar de
+> > manera correcta es **información nueva**. No te preocupes incluso por la información que vamos a
+> > importar de Access. **Todo el sistema debe estar enfocado sólo en nueva información**, no en ver cómo
+> > arreglamos la que ya se hizo de una manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
+>
+> **Qué se DEJA de hacer, desde ya:**
+> 1. **No se auditan los datos existentes** de `prueba` buscando los que quedaron mal por un defecto. Se
+>    limpian, no se reparan. Nada de consultas de rescate ni de informes de daño sobre datos de prueba.
+> 2. **No se construyen backfills, reparaciones ni migraciones de datos** para dejar coherente lo ya
+>    cargado, salvo que Daniel lo pida por su nombre.
+> 3. **Una función nueva no tiene que ser retrocompatible con los datos viejos.** Si sólo funciona bien
+>    para lo que se capture de aquí en adelante, **está bien** y no hace falta declararlo como límite.
+> 4. **Lo migrado de Access no manda sobre el diseño.** Hay mucho que ya no aplica; no se dobla una
+>    función nueva para que le cuadre al histórico.
+>
+> ⚠️ **DÓNDE ESTÁ LA FRONTERA — esta regla habla de DATOS, no de REGLAS.** Lo que NO cambia ni un ápice:
+> - **D3 sigue intacto:** lo guardado es inmutable, cancelar es un movimiento inverso auditado, nunca se
+>   edita ni se borra para corregir. *Eso gobierna cómo el sistema trata los datos NUEVOS*, y es justo lo
+>   que hace que la información nueva sí valga.
+> - **Las guardas de entrada, la auditoría, las transacciones y el RBAC** siguen exactamente igual.
+> - **No es permiso para romper cosas que hoy funcionan** ni para saltarse pruebas: es permiso para **no
+>   gastar en reparar el pasado**.
+>
+> 📌 **En una línea:** *lo viejo se tira, no se arregla; y lo nuevo se hace bien desde el primer día.*
+
 1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
 2. **Flujo de ramas + AUTORIZACIÓN (innegociable):** rama de tarea → PR a **`prueba`** → **Gabriel verifica EN VIVO en Railway** (no en local) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.) La rama de tarea **NO debe trackear `prueba`** como upstream (riesgo de push accidental). **NADA de `git commit` ni `git push` sin autorización EXPRESA de Gabriel.** El flujo correcto al terminar una etapa:
    1. El lead y los agentes codean en el working tree (sin comitear nada).

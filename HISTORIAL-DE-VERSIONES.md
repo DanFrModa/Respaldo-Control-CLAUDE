@@ -38,6 +38,54 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > del costo, avanza con lo demás»*—, pero **sus tres decisiones ya están tomadas y escritas**
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. El número queda reservado.
 
+## 0.063 · 30-ago-2026 · **en prueba** — Ya no se puede **fijar un precio sobre un costo vacío**
+
+### Qué se puede hacer ahora que antes no
+
+- 🔴 **Nada nuevo: esto TAPA UN HUECO, y es de los que duelen.** Un precosto congelado es **inmutable**, y
+  de él sale **el precio que se le cotiza al cliente**. Por eso el sistema siempre impidió congelar uno
+  que sumara **$0.00**: sería fijar un precio sobre la nada.
+
+  **Esa protección dejó de servir con la versión anterior.** Al entrar el **empaque** como costo fijo, un
+  modelo **con la receta vacía** ya no suma cero: suma **$2.20** — el empaque que el sistema pone solo. Y
+  con eso **pasaba el candado y se congelaba**. El precio del cliente podía quedar amarrado a un costo
+  que nadie capturó.
+
+- **Ahora el sistema mira si hay algo REAL costeado**, no si el total es mayor que cero. Congela si tiene
+  receta con precios, o si le capturaste **maquila** o **corte**. El empaque solo **no basta**: lo pone el
+  sistema, no es una decisión de costeo tuya.
+
+- **Y si te frena, te dice exactamente por qué**, con el importe real de tu empresa: *«El precosto sólo
+  suma el costo de EMPAQUE ($2.20), que el sistema pone por su cuenta: no hay NADA costeado todavía…
+  Captura la receta del modelo o los costos de maquila y corte antes de congelar.»*
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Nada que antes congelaba deja de congelar.** Se verificó con una demostración, no con una opinión:
+  es exactamente el candado de siempre, con el empaque descontado. En particular **sigue funcionando el
+  costeo por proceso** — un modelo **sin receta** pero con maquila y corte capturados **congela igual**,
+  porque no todo lleva lista de materiales.
+
+- 🔴 **Lo que YA se congeló, sigue congelado.** Esto es un candado de **entrada**: impide de aquí en
+  adelante, y **no toca nada del pasado** (lo guardado no se reescribe, nunca). Si en estos días alguien
+  alcanzó a congelar un precosto de puro empaque, **ese sigue vivo**. Hay que buscarlo a mano; si aparece
+  y ya está en una lista aprobada, **es un precio mal cotizado** y se corrige generando una versión nueva.
+
+- **Los números del programa corrieron un lugar.** Este arreglo se metió como **0.063** por urgente, así
+  que «cotizar en la cita un modelo que no existe» pasó a ser la **0.064**, y todo lo que venía detrás
+  corrió con ella.
+
+### Qué sigue pendiente o roto
+
+- **Un avío sin precio sigue entrando en silencio.** Si un avío de la receta no tiene precio en ningún
+  lado, su renglón nace en **$0.00** y nadie se entera — el aviso existe pero sólo queda en la bitácora.
+  Con este candado ya no puede congelarse *solo*, pero **sí puede colarse dentro de un precosto que por
+  lo demás está bien**. Queda anotado para arreglarlo.
+- **La comprobación de lo ya congelado en `prueba` está pendiente** de correrse (es una consulta, no un
+  arreglo).
+
+---
+
 ## 0.062 · 30-ago-2026 · **en prueba** — Cada modelo de la lista dice **en qué punto va**: abierto, en negociación, cerrado o **dropeado**
 
 ### Qué se puede hacer ahora que antes no

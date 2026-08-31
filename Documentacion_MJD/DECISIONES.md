@@ -9711,7 +9711,7 @@ Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
    entra primero, la referencia apunta a algo que aún no existe — por eso la cita va **textual aquí**
    y basta por sí sola; el numeral es sólo el puntero para cuando las dos ramas estén juntas. Engancha con el
    pendiente ya abierto de **ratificar tipo de prenda y género obligatorios**.
-5. **PLANIFICACIÓN: versión 0.063** ⚠️ (decía 0.062; **corrió un lugar**, igual que §Post-F9.151 — ver
+5. **PLANIFICACIÓN: versión 0.064** ⚠️ (decía 0.062, luego 0.063; **ha corrido dos lugares** — la segunda vez por el hotfix del candado del precosto, que entró como 0.063 — ver
    la tabla del programa en `HOJA-DE-RUTA.md` §1). Va después de la **0.060** (la mesa con su forma real
    + estimados persistidos + target price) y de la **0.062** (los estados del modelo, que en la
    numeración vieja eran la 0.061). **Las dos ya están ✅ CONSTRUIDAS y en `prueba`.** Va después
@@ -9719,7 +9719,7 @@ Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
    estimado sin eso no se puede cotizar.
 
 - **Aplica en:** la mesa de negociación, el alta de desarrollo/modelo y el precosteo. ⬜ **POR
-  CONSTRUIR** (versión **0.063**). **Fecha:** 2026-08-29.
+  CONSTRUIR** (versión **0.064**). **Fecha:** 2026-08-29.
 
 ---
 
@@ -10137,5 +10137,111 @@ CLIENTE**, y las negociaciones se cuelgan de él — **no al revés**. Es lo que
 una pestaña más de la lista de precios.
 
 - **Aplica en:** nada de la primera versión. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.162) — 🔴 EL CANDADO DEL PRECOSTO QUE LA 0.060 DESDENTÓ, y la lección que deja (30-ago-2026)
+
+**Cómo salió.** No lo pidió Daniel: **lo encontró la medición previa de la 0.064** (cotizar en la cita un
+modelo que no existe). Al preguntarse qué pasaría con un modelo creado **desde cero**, apareció que el
+sistema **ya no lo protegía**.
+
+🔴 **El defecto.** `exigirCostoCongelable` existe porque un precosto congelado es **INMUTABLE** y de él
+sale **el precio que se cotiza al cliente**: congelar uno en **$0.00** sería fijar un precio sobre la nada.
+La versión **0.060** metió el **empaque como tercera ancla fija**, y `generarPrecosto` **siempre** agrega
+esa línea con su default (**2.20**). ⇒ Un modelo con la receta vacía **ya no suma cero: suma 2.20**, pasa
+la guarda y **se congela**. La protección seguía ahí, pero **ya no protegía de nada real**.
+
+⭐⭐ **La lección, y es la más importante de la jornada:** *una guarda no se rompe sólo cuando alguien la
+borra — se rompe cuando cambia el terreno que medía.* Nadie tocó `exigirCostoCongelable`; se le movió el
+suelo debajo. **Al agregar un valor que el sistema pone por su cuenta, hay que preguntarse qué umbrales
+dejan de significar lo que significaban.**
+
+### Lo que queda decidido
+
+1. **La regla:** un precosto congela sólo si **algo que NO es el ancla de empaque aporta importe** —
+   cualquier renglón de receta valuado, **o** maquila **o** corte capturados, **o** un renglón manual que
+   una persona haya agregado. **El empaque solo NO basta:** lo pone el sistema, no es una decisión de
+   costeo.
+2. ⭐ **No rechaza nada que fuera congelable antes de la 0.060 — verificado por DEMOSTRACIÓN, no por
+   opinión.** Como **todos los importes son ≥ 0 por contrato** (`precioUnit`, `consumo`, `maquilaBase` y
+   `costoEmpaqueBase` son todos `.nonnegative()`), *«existe un no-empaque > 0»* ≡ *«Σ no-empaque > 0»* ≡ la
+   guarda vieja. Es **literalmente** el candado de siempre con el empaque descontado.
+3. **El costeo por proceso NO se rompe:** un modelo **sin receta** con maquila y/o corte capturados **sí
+   congela** — no todo lleva BOM. Con prueba propia que lo vigila.
+4. **La guarda suma en vez de existir** (`Σ no-empaque > 0`): así no depende de que los importes sigan
+   siendo no-negativos para siempre. Con `∃` bastaba hoy, pero `tela 30 + descuento −30 + empaque 2.20`
+   habría congelado un precosto cuyo total real es la bolsa — **el mismo defecto que este arreglo cierra**.
+   *Una guarda no debe apoyarse en una invariante que otro archivo puede cambiar.*
+5. **Es un candado de ENTRADA (D3): no toca nada ya congelado.** ⚠️~~ **Pendiente operativo de Gabriel:**
+   correr la consulta que busca precostos congelados cuyo total sea sólo empaque. La ventana es corta (la
+   0.060 lleva ~1 día en `prueba`), pero **si aparece alguno y ya está en una lista aprobada, es un precio
+   mal cotizado** — y por D3 no se corrige editando: se genera una versión nueva y se renegocia.~~
+   🔴 **RETIRADO por §Post-F9.163 (mismo día):** los datos de `prueba` son basura y se van a limpiar.
+   **No se audita ni se rescata nada.** El candado de entrada impide que vuelva a pasar, y eso basta.
+
+📌 **Deuda anotada, hermana de este defecto:** `agregarLineaManual` deja nacer renglones en **$0.00 en
+silencio** cuando el avío ligado no tiene precio en ninguna parte de la cascada; la marca
+`sinPrecioCatalogo` va **sólo a la bitácora** y el usuario nunca se entera. Con este candado ya no puede
+congelarse *solo*, pero **sí puede colarse dentro de un precosto que por lo demás está bien**. Merece que
+el aviso llegue a la pantalla.
+
+- **Aplica en:** versión **0.063**. **Sin migración, sin permisos, sin seed** ⇒ no exige `SEED_ON_START`.
+  **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.163) — 🔴🔴 LOS DATOS DE HOY SON BASURA: **EL SISTEMA MIRA HACIA ADELANTE** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Daniel lo dijo tras ver, a lo largo de un día entero, que el lead **se frenaba una y otra
+vez cuidando datos que a él no le importan**:
+
+> *«Estamos trabajando en la versión de prueba… toda la información que haya ahí **no es importante, es
+> basura. La vamos a limpiar.** Deja de preocuparte por información que ya tenga la receta, o en general
+> información que ya esté. Todo lo que vamos haciendo nuevo está bien que aplique **sólo a los nuevos
+> modelos** que vayamos a meter. Te veo muy preocupado por que los datos que ya tienen alguna cosa quieras
+> hacer algo para poder revertir las cosas que tienen. Piensa que todo lo que vamos a usar de manera
+> correcta es **información nueva**. No te preocupes incluso por la información que vamos a importar de
+> Access. Hay muchas cosas que ya no van a aplicar a las nuevas cosas que estamos haciendo. **Todo el
+> sistema debe estar enfocado sólo en nueva información**, no en ver cómo arreglamos la que ya se hizo de
+> una manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
+
+### Lo que queda decidido
+
+1. **No se auditan los datos existentes** de `prueba` buscando los que quedaron mal por un defecto. **Se
+   limpian, no se reparan.** Nada de consultas de rescate ni de informes de daño sobre datos de prueba.
+2. **No se construyen backfills, reparaciones ni migraciones de datos** para dejar coherente lo ya cargado
+   — salvo que Daniel lo pida por su nombre.
+3. **Una función nueva NO tiene que ser retrocompatible con los datos viejos.** Si sólo funciona bien para
+   lo que se capture de aquí en adelante, **está bien**, y ni siquiera hace falta declararlo como límite.
+4. **Lo migrado de Access no manda sobre el diseño.** Hay mucho que ya no aplica; **no se dobla una función
+   nueva para que le cuadre al histórico**.
+
+### ⚠️ LA FRONTERA — habla de DATOS, no de REGLAS
+
+Escrito con precisión a propósito, porque mal leído esto haría daño. **Lo que NO cambia:**
+
+- **D3 sigue intacto:** lo guardado es **inmutable**; cancelar es un **movimiento inverso auditado**; nunca
+  se edita ni se borra para corregir. ⭐ Eso gobierna cómo el sistema trata **los datos NUEVOS** — y es
+  justamente lo que hace que la información nueva **sí valga**. Tirar los datos viejos y tratar bien los
+  nuevos son la misma idea, no ideas opuestas.
+- **Las guardas de entrada, la auditoría, las transacciones y el RBAC** siguen exactamente igual.
+- **No es permiso para romper lo que hoy funciona**, ni para saltarse pruebas. Es permiso para **no gastar
+  en reparar el pasado**.
+
+📌 **En una línea:** *lo viejo se tira, no se arregla; y lo nuevo se hace bien desde el primer día.*
+
+### Lo que esta decisión RETIRA de inmediato (casos reales del mismo día)
+
+| Lo que se había pedido/anotado | Qué pasa ahora |
+|---|---|
+| 🔴 **Buscar en `prueba` los precostos ya congelados de puro empaque** (§Post-F9.162 punto 5) — se le había pedido a Gabriel correr una consulta SQL | **RETIRADO.** Son datos basura. El candado de entrada ya impide que vuelva a pasar; lo que quedó mal se limpia con el resto |
+| **Qué hacer con las prendas incompletas que quedaron en tránsito** entre la 0.059 y la merma (§Post-F9.154) | **RETIRADO.** No se limpian a mano ni se barren con un proceso: se van con la limpieza general |
+| **La preocupación de que cambiar el default de `baseProrrateo` reescribiera órdenes ya costeadas** (§Post-F9.154) | La **cautela técnica se conserva** —no queremos una función que reescriba en silencio, y eso vale para datos nuevos— pero **deja de ser un riesgo que frene la decisión** |
+| **«No retroactiva al histórico migrado»** como requisito de la merma (§Post-F9.154) | Sigue siendo cierto por construcción, pero **ya no hay que diseñar para garantizarlo** |
+
+- **Aplica en:** TODA sesión, siempre. Escrita como **REGLA 0-B** en `CLAUDE.md` §7, junto a la REGLA 0,
+  porque las dos atacan lo mismo: **el lead gastando el tiempo de Daniel y los recursos del proyecto en
+  cosas que no avanzan**. **Fecha:** 2026-08-30.
 
 ---
