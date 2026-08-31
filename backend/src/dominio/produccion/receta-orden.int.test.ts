@@ -3633,6 +3633,72 @@ describe('⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a))', () => {
       expect(mensaje).toContain('ABIERTA para corregirse');
     });
 
+    /**
+     * 🔴🔴 **EL HALLAZGO DEL REVIEWER (H1) — el que el candado dejaba pasar.**
+     *
+     * `validarLineas` exime de la puerta de la FIRMA a la edición que *"conserva la identidad"*
+     * (`agregaLineas`): corregir cantidad o precio de una línea que ya existía no es gastar de
+     * nuevo… **para la firma**, cuya razón es *"un material que la receta firmada sí incluía"*. Esa
+     * razón **NO transfiere al candado**, cuya premisa es que esa receta firmada está BAJO
+     * CORRECCIÓN. Con el candado dentro de `exigirRecetaLiberada`, heredaba la exención y esto
+     * pasaba: 100 kg → 5,000 kg **con la compra "congelada"**, 50 veces el dinero.
+     */
+    it('🔴 boca 5-bis (H1) · SUBIR la cantidad de una línea YA existente de la orden congelada', async () => {
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        actualizarOC(
+          sesionCompra(),
+          oc.id,
+          {
+            // MISMO material, MISMA orden, MISMA cantidad de líneas: `agregaLineas` dice `false`.
+            // Lo único que cambia es la cantidad (100 → 5000) y el precio.
+            lineas: [
+              {
+                idTela: telaJersey.id,
+                cantidad: 5000,
+                precio: 90,
+                unidad: 'kg',
+                idOrden: ordenA,
+              },
+            ],
+          },
+          bd(),
+        ),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+
+      // Y NO se escribió: la cantidad sigue siendo la original.
+      const linea = await cliente.ordenCompraLinea.findFirstOrThrow({
+        where: { idOrdenCompra: oc.id },
+      });
+      expect(linea.cantidad.toNumber()).toBe(10);
+    });
+
+    /**
+     * ⭐ LA MITAD POSITIVA DE H1, y no es cosmética: es **la vía de escape**. `idsOrdenLigada` se
+     * arma de las líneas ENTRANTES, así que QUITARLE a la OC todas las líneas de la orden congelada
+     * sí se puede — que es lo que le queda a un comprador cuya OC agrupa varias OP y una se congeló.
+     * Sin esta mitad, el fix de H1 sería un bloqueo total disfrazado.
+     */
+    it('⭐ …pero QUITARLE a la OC las líneas de la orden congelada SÍ se puede (la vía de escape)', async () => {
+      // Una OC que agrupa la orden congelada Y otra línea suelta (el caso normal, §Post-F9.86).
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      // Se reemplaza el juego de líneas por una SIN liga: la orden congelada deja de estar en el
+      // conjunto entrante, así que el candado ya no tiene nada que proteger aquí.
+      const editada = await actualizarOC(
+        sesionCompra(),
+        oc.id,
+        { lineas: [{ idTela: telaJersey.id, cantidad: 10, precio: 50, unidad: 'kg' }] },
+        bd(),
+      );
+      expect(editada.lineas).toHaveLength(1);
+      expect(editada.lineas[0]?.idOrden ?? null).toBeNull();
+    });
+
     it('⭐ boca 6 (hallazgo) · DUPLICAR una OC ligada a la orden', async () => {
       const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
       await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());

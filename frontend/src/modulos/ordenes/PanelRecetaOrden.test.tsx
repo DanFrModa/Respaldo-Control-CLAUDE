@@ -1385,6 +1385,68 @@ describe('<PanelRecetaOrden> · el candado de compra (V1-E8z)', () => {
     });
   });
 
+  /**
+   * 🔴🔴 **H2 — LA SALIDA DEL CANDADO EN UNA ORDEN CANCELADA** (hallazgo del reviewer).
+   *
+   * El dominio permite cerrar una receta abierta aunque la OP esté cancelada
+   * (`permitirOrdenCancelada`) **exactamente para que el candado no sea una trampa**… y la pantalla
+   * escondía el botón, porque colgaba de `editable = puedeAdministrar && estado !== 'cancelada'`.
+   *
+   * Escenario del reviewer: una OC borrador agrupa la OP 500 y la 501 (§Post-F9.86). Desarrollo abre
+   * la receta de la 500 y el cliente cancela esa OP. `autorizarOC` contesta 409 nombrando la 500
+   * **para siempre**: no hay botón aquí, no hay fila en la bandeja (excluye canceladas) y ningún
+   * mensaje sugiere la única salida real. Sin esta prueba, `permitirOrdenCancelada` era código
+   * muerto.
+   */
+  it('🔴 H2: la orden CANCELADA con la receta abierta SIGUE ofreciendo «Cerrar»', () => {
+    render(
+      liberadaCompleta({
+        estado: 'cancelada',
+        abiertaEn: '2026-08-31T09:00:00.000Z',
+        abiertaMotivo: 'el cliente cambió el cierre',
+        puedeComprar: false,
+      }),
+    );
+
+    expect(screen.getByTestId('receta-cerrar')).toBeInTheDocument();
+    // …y el estado se sigue viendo: la compra de esa OP está congelada y hay que decirlo.
+    expect(screen.getByTestId('receta-en-correccion')).toBeInTheDocument();
+  });
+
+  it('…pero en esa MISMA cancelada abierta no se cuela «Abrir» ni «marcar revisado»', () => {
+    // ⚠️ El escenario tiene que ser el de ARRIBA (cancelada **y abierta**), no una cancelada a
+    // secas: en ésa no se pinta ningún botón y la prueba pasaría sin comprobar nada. Aquí el bloque
+    // SÍ se pinta —por el candado— y lo que se afirma es que sólo trae la salida, no el resto de
+    // la edición, que sobre una orden cancelada sigue prohibida.
+    render(
+      liberadaCompleta({
+        estado: 'cancelada',
+        abiertaEn: '2026-08-31T09:00:00.000Z',
+        puedeComprar: false,
+        resumen: {
+          sinRevisar: 1,
+          revisados: 2,
+          ajustados: 0,
+          excluidos: 0,
+          total: 3,
+          liberados: 3,
+          porLiberar: 0,
+        },
+      }),
+    );
+
+    expect(screen.getByTestId('receta-cerrar')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+    // `sinRevisar: 1` a propósito: sin el filtro por `editable`, este botón se habilitaría.
+    expect(screen.queryByTestId('receta-marcar-revisado')).not.toBeInTheDocument();
+  });
+
+  it('⚠️ y sin `desarrollo.administrar` la cancelada tampoco ofrece cerrar (el permiso manda)', () => {
+    render(liberadaCompleta({ estado: 'cancelada', abiertaEn: '2026-08-31T09:00:00.000Z' }), false);
+
+    expect(screen.queryByTestId('receta-cerrar')).not.toBeInTheDocument();
+  });
+
   it('cerrar no pide nada: la razón ya se dio al abrir', async () => {
     const usuario = userEvent.setup();
     render(liberadaCompleta({ abiertaEn: '2026-08-31T09:00:00.000Z', puedeComprar: false }));

@@ -289,6 +289,7 @@ export function PanelRecetaOrden({
       <CabeceraReceta
         receta={d}
         editable={editable}
+        puedeAdministrar={puedeAdministrar}
         ocupado={ocupado}
         alMarcarTodo={() => {
           marcar.mutate(idOrden, {
@@ -520,6 +521,7 @@ export function PanelRecetaOrden({
 function CabeceraReceta({
   receta,
   editable,
+  puedeAdministrar,
   ocupado,
   alMarcarTodo,
   alAbrir,
@@ -527,6 +529,15 @@ function CabeceraReceta({
 }: {
   receta: RecetaOrden;
   editable: boolean;
+  /**
+   * ⭐⭐ V1-E8z (H2) — el permiso CRUDO, **sin** el filtro de «orden cancelada» que lleva `editable`.
+   * Existe por una sola razón, y es la que impide que el candado sea una trampa: **cerrar la receta
+   * es la única mutación legal sobre una orden cancelada** (el dominio lo permite a propósito, ver
+   * `permitirOrdenCancelada`). Con `editable` a secas, una OP que se cancelaba con la receta
+   * abierta se quedaba con la compra congelada **para siempre**: sin botón aquí, sin fila en la
+   * bandeja —que excluye las canceladas— y sin ningún mensaje que insinuara la salida.
+   */
+  puedeAdministrar: boolean;
   ocupado: boolean;
   alMarcarTodo: () => void;
   /** ⭐⭐ V1-E8z: reabrir para corregir (pide motivo en un diálogo aparte). */
@@ -580,22 +591,37 @@ function CabeceraReceta({
         </p>
       )}
 
-      {editable ? (
+      {/* ⭐⭐ V1-E8z (H2) — CERRAR SOBREVIVE A LA CANCELACIÓN DE LA ORDEN, y por eso este bloque ya
+          NO cuelga de `editable` a secas. El dominio permite cerrar una receta abierta aunque la OP
+          esté cancelada (`permitirOrdenCancelada`) justamente para que el candado tenga salida; si
+          la pantalla lo escondiera, esa salida no existiría en ninguna parte —la bandeja tampoco
+          lista las canceladas— y `autorizarOC` seguiría contestando 409 por esa OP para siempre.
+          **ABRIR sí exige la orden viva**: reabrir para corregir lo que ya no se va a producir no
+          significa nada, y el servidor lo rechaza. */}
+      {editable || (enCorreccion && puedeAdministrar) ? (
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={ocupado || r.sinRevisar === 0}
-            onClick={alMarcarTodo}
-            data-testid="receta-marcar-revisado"
-          >
-            <CheckCircle2 aria-hidden /> Marcar todo revisado
-          </Button>
-          {/* ⭐⭐ V1-E8z — ABRIR y CERRAR, y **nunca los dos a la vez**: son los dos lados del mismo
+          {editable ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={ocupado || r.sinRevisar === 0}
+              onClick={alMarcarTodo}
+              data-testid="receta-marcar-revisado"
+            >
+              <CheckCircle2 aria-hidden /> Marcar todo revisado
+            </Button>
+          ) : null}
+          {/* ABRIR y CERRAR, y **nunca los dos a la vez**: son los dos lados del mismo
               interruptor. Abrir sólo se ofrece con la receta liberada COMPLETA, que es la única que
               el servidor deja reabrir (§Post-F9.165 punto 4) — ofrecerlo siempre sería un botón que
               contesta 409 la mitad de las veces. */}
+          {/* ⚠️ Aquí NO se vuelve a preguntar por `puedeAdministrar` ni por `editable`, y no es un
+              olvido: la condición de arriba ya los agotó. Sin el permiso, `editable` es false Y la
+              segunda rama también, así que a este punto **no se llega**; y a la rama de ABRIR sólo
+              se llega con `!enCorreccion`, donde la condición de arriba se reduce a `editable`. Un
+              `&&` que nunca puede ser falso es una guarda que ninguna prueba puede tumbar — y este
+              proyecto ya decidió que eso no vale como protección. */}
           {enCorreccion ? (
             <Button
               type="button"

@@ -2961,12 +2961,23 @@ export async function liberarReceta(
  * LAS TRES CONDICIONES, y por qué cada una:
  *  • **La orden tiene que estar VIVA.** Reabrir para corregir lo que ya no se va a producir no
  *    significa nada (cerrar sí se permite cancelada: ver `permitirOrdenCancelada`).
- *  • **La receta tiene que estar LIBERADA COMPLETA** (§Post-F9.165 punto 4: *"sin firma no hay nada
- *    que reabrir"*). Y es la condición que hace que el candado no tenga trampa: como al abrir no
- *    quedaba nada sin firmar, todo lo que quede sin firmar al cerrar es **algo que esta corrección
- *    tocó**, así que siempre hay alguien que puede volver a firmarlo. Si se pudiera abrir una receta
- *    a medio firmar, un renglón que el cliente todavía no autoriza dejaría la orden **imposible de
- *    cerrar** — congelada para siempre, que es justo lo que este candado no debe producir.
+ *  • **La receta tiene que estar LIBERADA COMPLETA** (`recetaLiberadaEn` no nulo). Y es la condición
+ *    que hace que el candado no tenga trampa: como al abrir no quedaba nada sin firmar, todo lo que
+ *    quede sin firmar al cerrar es **algo que esta corrección tocó**, así que siempre hay alguien
+ *    que puede volver a firmarlo. Si se pudiera abrir una receta a medio firmar, un renglón que el
+ *    cliente todavía no autoriza dejaría la orden **imposible de cerrar** — congelada para siempre,
+ *    que es justo lo que este candado no debe producir.
+ *
+ *    🔴 **PERO OJO: esto se DESVÍA de la letra de §Post-F9.165 punto 4, y deja un caso real fuera.**
+ *    Aquel punto decía *"no se puede abrir una receta que **nunca se liberó**"*, que literalmente es
+ *    `liberados === 0` — o sea, permitiría reabrir una receta liberada A MEDIAS. Aquí se exige que
+ *    esté COMPLETA, que es más estricto, y el caso que queda fuera es éste: **39 de 40 renglones
+ *    firmados y con OC emitidas, el 40 sin firmar; Desarrollo descubre que la tela está mal y NO
+ *    puede congelar la compra de los otros 39.** El único rodeo sería firmar el renglón 40 sin
+ *    revisarlo — exactamente lo que §Post-F9.80 vino a impedir.
+ *    Se eligió así por ser lo más seguro (la alternativa produce órdenes imposibles de cerrar), pero
+ *    **es una decisión de producto que está pendiente de que Daniel la confirme**: quien lea esto
+ *    mañana tiene que saber que la restricción es deliberada y qué cuesta.
  *  • **No puede estar ya abierta.** Se dice desde cuándo y por qué, en vez de pisar el motivo de
  *    quien la abrió (D3: lo guardado no se sobrescribe en silencio).
  *
