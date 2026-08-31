@@ -97,10 +97,13 @@ export function DialogoRevisionModelo({
             {modelo === null
               ? ''
               : esRechazo
-                ? `La versión ${modelo.codigo} se devuelve con observaciones: se conserva y se ` +
-                  `puede seguir corrigiendo, pero no podrá mandarse a producir.`
-                : `Con tu firma, la versión ${modelo.codigo} queda lista para mandarse a ` +
-                  `producir — por «Pasar a producción» o al generarle su orden.`}
+                ? `La versión ${modelo.codigo} se devuelve con observaciones: se conserva, se ` +
+                  `puede seguir corrigiendo y queda en «Recetas por revisar» hasta que se firme. ` +
+                  `Ojo: rechazarla NO detiene su producción — lo que frena el gasto es liberar la ` +
+                  `receta renglón por renglón, en la orden.`
+                : `Queda constancia de que revisaste la receta de ${modelo.codigo}, con tu nombre ` +
+                  `y la fecha. La firma no habilita ni bloquea nada por sí sola; si alguien le ` +
+                  `mueve la receta después, se cae y vuelve a «Recetas por revisar».`}
           </DialogDescription>
         </DialogHeader>
 
