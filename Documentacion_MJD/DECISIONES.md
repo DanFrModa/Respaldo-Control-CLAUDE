@@ -734,6 +734,7 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 5. *"Normalmente se descargan las telas al mismo tiempo cuando están relacionadas"* (la felpa y su cardigan al tono).
 6. Sobrantes: *"solo damos salida de lo que se corta, no lo que viene en la partida. Bajo esa manera de trabajar no veo la necesidad de volver a meterlo al almacén."* → **NO hay devoluciones de tela al almacén**; nunca sale más de lo que se consumió.
 7. Entradas: permitir **las dos** vías (con orden de compra y por factura/remisión sin OC), con **una cabecera por documento y N partidas** (cada una con su color y sus telas al tono).
+   🔴 **SUPERADO (§Post-F9.159, 30-ago-2026):** la vía «sin OC» **queda cerrada**. Daniel: *«es imposible. Sin OC no podemos recibir tela. ¿De quién recibiríamos sin OC? No puede suceder»*. Esta línea es anterior a que se construyera la cadena de compras; **prevalece §Post-F9.159**.
 
 **Lo que YA estaba y no había que construir:** el **lote** es una partida de UN color con **N telas dentro** (`Lote` + `LoteComponente`, decisión **D5**) — dos partidas de negro son dos lotes, cada uno con su cardigan al tono, y el inventario se lleva por **tela × lote × almacén**. También el **precio por color** (`TelaColor`) y el **precio por proveedor y por color** (`TelaProveedor`/`TelaProveedorColor`, F8-E1).
 
@@ -10000,5 +10001,62 @@ F4 existen; lo que falta es el documento que las amarre a la OP y que la explosi
 
 - **Aplica en:** (a) y (b) desbloquean el **Bloque 2** (0.064–0.067). (c) es requisito nuevo **fuera** del
   programa vigente. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.159) — 🔴 NO SE RECIBE TELA SIN OC (se IMPIDE), y **el defecto de fondo: las respuestas se usaban pero no se anclaban** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Se le presentaron a Daniel tres «decisiones que faltaban». Su respuesta:
+
+> *«Ya te había contestado todo lo que dices. Debe de estar en algún lado. Ya contesté esas 10 preguntas.
+> Ya contesté el dígito adicional, que cuando haga falta lo decidimos. Y lo de recibir la tela sin OC
+> también ya lo contesté… **es imposible. Porque sin OC no podemos recibir tela. ¿De quién recibiríamos
+> sin OC? No puede suceder.**»*
+
+**Tenía razón en las tres, y al verificarlas apareció el defecto de fondo — que NO era «falta la respuesta»:**
+
+### (a) 🔴 La decisión de la tela sin OC: se IMPIDE. Y el archivo se contradecía a sí mismo
+
+**Ésta es la causa real de que quedara listada como abierta:** `DECISIONES.md` tenía **las dos respuestas,
+opuestas**, y nadie había zanjado cuál manda:
+
+| Dónde | Qué decía |
+|---|---|
+| `DECISIONES.md:736` | *«Entradas: permitir **las dos** vías (con orden de compra y por factura/remisión **sin OC**)»* |
+| `DECISIONES.md:5252` | *«el color se define en la OC, y **no se recibe nada sin OC previa**»* |
+
+⇒ **DECIDIDO: se IMPIDE. Bloqueo, no aviso.** Y con un argumento que no admite vuelta: no es una
+preferencia operativa, es que **no puede ocurrir físicamente** — *«¿de quién recibiríamos sin OC?»*.
+⚠️ **La línea 736 queda SUPERADA** (venía de la propuesta original de Finanzas/proveedores, anterior a que
+la cadena de compras se construyera): **prevalece 5252 y esta decisión**. Al construir el letrero de
+`CapturaRenglonesTelaColor` (versión **0.072**), el camino «sin OC» **no se advierte: se cierra**.
+
+### (b) El dígito de continuación YA estaba decidido — el error fue presentarlo como pendiente
+
+`DECISIONES.md` §Post-F9.135 pregunta 10 ya dice, con sus palabras: **«Decidirlo el día que pase**, con el
+aviso encima y a la vista de qué dígitos están libres — **no ahora a ciegas»**. ⇒ **La decisión ESTÁ
+tomada: la decisión es diferirla.** Listarla como «decisión que falta» fue un error del lead: una decisión
+diferida a conciencia **no es una decisión pendiente**. No se le vuelve a preguntar.
+
+### (c) 🔴 EL DEFECTO DE FONDO — la tabla no distingue «propuesto» de «decidido»
+
+Las 10 preguntas de §Post-F9.135 **están contestadas** (`HOJA-DE-RUTA.md` §1 lo registra, y cita la
+respuesta a la 6b: *«No se prohibe, se puede hacer a mano (Solo yo)»*, que **elimina la etapa E5** del plan
+1:N). Pero en `DECISIONES.md` **la tabla sigue mostrando sólo la columna «default propuesto»**, sin marca
+de confirmación.
+
+⭐ **Ahí está el defecto que Daniel señaló, y es de FORMA, no de contenido:** quien lee esa tabla **no puede
+distinguir «esto es lo que proponemos» de «esto es lo que Daniel decidió»**. La respuesta se **usó** —el
+plan 1:N ya bajó de cinco etapas a cuatro por la 6b— pero **no se ancló** donde manda. Y el mismo patrón
+apareció hoy en §Post-F9.151 (afirmaba que los renglones no tenían estado, y era falso).
+
+**La regla que queda:** cuando Daniel confirma un default, **se marca como confirmado en la tabla, con la
+fecha**, aunque el texto de la columna no cambie ni una letra. *Un default confirmado y un default a secas
+se leen igual y significan cosas opuestas.* Es la hermana documental de la REGLA 0 (§Post-F9.157): lo que
+no queda escrito donde manda, se vuelve a preguntar — y hacerle repetir una decisión al dueño es el peor
+uso de su tiempo.
+
+- **Aplica en:** (a) la versión **0.072**; (b) y (c) son correcciones documentales, de aplicación
+  inmediata. **Fecha:** 2026-08-30.
 
 ---
