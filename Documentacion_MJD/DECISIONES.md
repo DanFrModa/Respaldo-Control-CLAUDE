@@ -11604,7 +11604,7 @@ sentido y no el otro **pasaría en verde** y fallaría justo en el caso que orig
 puede tener **más de un salto** (A→B→C), como ya contempla `colorCanonico` (`catalogos/colores.ts:481`) —
 que es el precedente a copiar, no a reinventar.
 
-### (b) 🔴 CONTRADICCIÓN ENTRE DOS RESPUESTAS SUYAS: al resurtir la misma OC, ¿el modelo estrena número o reusa el que ya nació?
+### (b) ✅ CERRADA (DANIEL, 31-ago-2026): **SE REUSA cuando sea el mismo modelo**
 
 **Hay que resolverla antes de construir E3**, porque las dos respuestas son suyas y dicen cosas distintas:
 
@@ -11613,9 +11613,41 @@ que es el precedente a copiar, no a reinventar.
 - **§Post-F9.170**: *«**cada OP lleva un número de modelo de producción diferente**»* — leído literal,
   daría **un modelo nuevo por cada resurtido**.
 
-⭐ **DEFAULT PROPUESTO: REUSAR** (su primera respuesta, que es la explícita sobre el resurtido). ⚠️ **Lo que
-hay que decirle al preguntarle:** si estrena número en cada resurtido, **la misma prenda queda partida en
-dos modelos de catálogo** y su existencia se reparte entre los dos renglones de inventario.
+> ### ✅ DANIEL, textual: *«**Se reúsa cuando sea el mismo modelo.**»*
+>
+> ⇒ **La contradicción se resuelve así: el número pertenece al MODELO, no a la OP.** Modelos distintos
+> (colores distintos) ⇒ números distintos — que es lo que quería decir *«cada OP lleva un número
+> diferente»* en su caso, cuatro OC de cuatro colores. **Mismo modelo ⇒ mismo número, siempre.**
+
+**Por qué importa:** si estrenara número en cada resurtido, **la misma prenda quedaría partida en dos
+modelos de catálogo** y su existencia repartida entre dos renglones de inventario.
+
+### ⏳ EL BORDE QUE FALTA FIJAR — no es una duda retórica: es una llave de base de datos
+
+**Medido el 31-ago:** el **modelo hijo NO guarda el color**. Sus campos propios son `numeroProduccion` e
+`idModeloDesarrollo` (`schema.prisma:2241` y `:2309`); **no hay columna de color**, porque Daniel decidió
+que ***«el color va en la OP»***. El color vive en `OrdenLinea`, con `@@unique([idOrden, idColor])`
+(`schema.prisma:3349`). ⇒ **el sistema no le puede preguntar a la fila del modelo «¿de qué color eres?»**,
+así que *«el mismo modelo»* hay que traducirlo a una llave, y hay dos candidatas:
+
+| | qué reusa | qué pasa con una **OC NUEVA del mismo color** |
+|---|---|---|
+| **(A)** llave = **renglón de pedido** | el resurtido de la MISMA OC | **estrena** número ⇒ 🔴 la misma prenda, **dos números de catálogo** |
+| **(B)** llave = **desarrollo + color** | el resurtido **y** cualquier OC posterior de ese color | reusa ⇒ **un número por prenda real** |
+
+⭐ **DEFAULT PROPUESTO: (B).** Su respuesta dice *«el mismo **modelo**»*, no *«la misma orden»* — y el daño
+que él mismo nombró (la prenda partida en dos renglones de inventario) **lo produce (A)** en cuanto llegue
+una segunda OC de ese color, que es lo normal en un resurtido de temporada. (A) es literalmente su
+respuesta anterior a la pregunta 2 (*«uno por renglón de pedido»*), pero **ésa se escribió antes de medir
+que el hijo no lleva color**.
+
+⚠️ **(B) cuesta un dato, y se puede tener sin contradecirlo:** para reusar por color hay que **poder saber
+de qué color nació un hijo**. Se guarda en el hijo **el color de catálogo del que nació** — dato de
+**identidad**, no de operación: la OP sigue mandando sobre lo que se produce, que es lo que él quiso decir
+con *«el color va en la OP»*. Es una columna con índice único `(idModeloDesarrollo, idColor)` que **de paso
+ES la llave de idempotencia** que hoy **no existe** y sin la cual **un doble clic genera dos modelos**.
+
+📌 **No bloquea nada salvo E3.** Si Daniel no precisa el borde, se construye **(B)**.
 
 📌 **Y esto no es sólo una etiqueta: hoy NO HAY LLAVE DE IDEMPOTENCIA.** Medido: el freno actual es un
 **efecto de borde** —la primera llamada deja el modelo en `origen:'produccion'`, así que la segunda entra
@@ -11624,7 +11656,8 @@ derivaría ⇒ **doble clic = 2 modelos**, y se queman números de una serie de 
 natural (`Orden.findFirst({ where: { idPedidoLinea } })` + `pg_advisory_xact_lock` sobre `idPedidoLinea`)
 **implementa a la vez la respuesta «reusar»**. ⇒ elegir «reusar» no cuesta trabajo extra: **lo ahorra**.
 
-- **Aplica en:** (a) ✅ **CERRADA** — etapa propia, sin número, **con migración**. (b) ⏳ **SIGUE
-  ABIERTA**: hay que resolverla antes de construir **E3**. **Fecha:** 2026-08-31.
+- **Aplica en:** (a) ✅ **CERRADA** — etapa propia, sin número, **con migración**. (b) ✅ **CERRADA**:
+  **se reusa**. Queda por precisar sólo **el borde (A) vs (B)**, con default **(B)**; se construye en
+  **E3**, que la necesita como llave. **Fecha:** 2026-08-31.
 
 ---
