@@ -51,6 +51,7 @@ import {
   promoverAProduccionNucleo,
   type ResultadoPromocion,
 } from './nomenclatura.js';
+import { repartirFilasDeReceta, repartoDeRecetas } from './receta-compartida.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearModelo = z.input<typeof esquemaModeloCrear>;
@@ -1164,15 +1165,27 @@ async function adjuntarAgregadosListado(
 
   // Tela principal: todas las telas del BOM de los modelos de la página, en el orden de la ficha
   // (nombre asc); al recorrer, la PRIMERA de cada modelo es su principal (igual que la foto).
+  //
+  // 🔴 V1-E9b — LA RECETA COMPARTIDA **EN LOTE** (§Post-F9.167). Ésta es la forma del resolver que
+  // se olvida: no basta con traducir cada modelo a su receta para el `in`, hay que saber
+  // DEVOLVERLE sus filas —un padre con cuatro hijos reparte las MISMAS telas a los cuatro—. Sin el
+  // camino de vuelta, el `Map` sólo tendría al padre y **cada hijo saldría sin tela principal en el
+  // listado, en silencio**. El linaje ya viene en `modelos` (`idModeloDesarrollo`), así que el
+  // reparto se arma sin volver a la base.
+  const reparto = repartoDeRecetas(modelos);
   const telas = await cliente.modeloTela.findMany({
-    where: { idModelo: { in: ids } },
+    where: { idModelo: { in: reparto.idsDeReceta } },
     select: { idModelo: true, tela: { select: { nombre: true } } },
     orderBy: [{ tela: { nombre: 'asc' } }, { idTela: 'asc' }],
   });
+  const telasPorModelo = repartirFilasDeReceta(reparto, ids, telas, (t) => t.idModelo);
   const telaPorModelo = new Map<number, string>();
-  for (const t of telas) {
-    if (!telaPorModelo.has(t.idModelo)) {
-      telaPorModelo.set(t.idModelo, t.tela.nombre);
+  for (const [idModelo, filas] of telasPorModelo) {
+    // El `orderBy` de arriba se conserva dentro de cada grupo ⇒ la PRIMERA sigue siendo la
+    // principal, igual que en la ficha (y que la foto).
+    const primera = filas[0];
+    if (primera !== undefined) {
+      telaPorModelo.set(idModelo, primera.tela.nombre);
     }
   }
 

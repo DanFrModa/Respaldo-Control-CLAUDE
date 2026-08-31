@@ -1218,6 +1218,92 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9b · ⭐⭐ LA RECETA COMPARTIDA, pieza A (31-ago-2026, versión **0.070**) — ✅ HECHA
+
+**La decisión, ratificada por Daniel el mismo día que se construyó:**
+
+> *«**Que los cuatro lean la del desarrollo. Ésta es la correcta.**»* (§Post-F9.170)
+
+Un modelo de producción **hijo lee la receta de su modelo de desarrollo**: `idModeloDeLaReceta(m) =
+m.idModeloDesarrollo ?? m.id`. No se copia, no se replica, no se sincroniza. ⭐ Y lo decide su propia
+pregunta de agosto — *«todos los modelos deben de llevar lo mismo, **¿cómo lo controlas?»*** —: con copias
+no se *controla*, se *vigila*, y vigilar depende de que alguien se acuerde.
+
+### Es la pieza A de dos. Qué entra y qué no
+
+**E2 completa son 71 sitios en 9 archivos** — se partió porque en un solo entregable **no hay punto de
+verificación intermedio** (§Post-F9.167 §5). **Aquí van las LECTURAS** (19 de 42): las tres canónicas, los
+cinco `include` anidados, `copiarRecetaDelModelo` y el resto. **E2b llevará los escritores.**
+
+### 🔴 Lo que esta pieza existía para evitar
+
+Los **cinco `include` anidados** (`pre-costo.ts` ×2, `precostos.ts` ×3) traen la receta **por nombre de
+relación, sin nombrar la tabla** — por eso el plan original **no los vio**. Sin ellos, **el precosto de un
+hijo sale con la receta VACÍA** —sólo maquila, corte y empaque— **y de ahí sale el precio al cliente**. No
+lanza: entrega un número más bajo y **se ve normal**.
+
+### ⭐⭐ El hallazgo de la revisión, y por qué cambió la forma del arreglo
+
+El reviewer buscó **lo contrario** de lo que se le pidió y encontró **una mutación que SOBREVIVE la suite
+entera**: revirtió la lectura de medidas por talla de `traerDelModelo` y **los 2,345 tests pasaron en
+verde**.
+
+🔑 **Y encontró la razón estructural, que es lo que vale:** de las cinco tablas de receta,
+**`ModeloAvioTalla` era la ÚNICA sin lectura canónica**. Las otras cuatro están bajo el paraguas del
+embudo —se puede romper el resolver de un llamador y no pasa nada, porque la canónica re-resuelve—. Las
+medidas no lo tenían, así que su resolución estaba **duplicada en 4 sitios y sólo 1 tenía prueba**.
+*Escenario post-E3:* «traer del modelo» sobre la orden de un hijo mete el avío **sin sus medidas por
+talla** ⇒ **cambia el requerido del MRP** y se compra otra cantidad. En silencio.
+
+⇒ **Se arregló por la vía estructural, no con una prueba:** nació **`leerMedidasAvioBom`**, la **cuarta
+lectura canónica**, y los 4 sitios pasan por ella. **Las 4 copias de la regla quedaron en 1**, y
+`receta-orden.ts` tiene hoy **cero** lecturas directas de esa tabla.
+
+⭐⭐ **La prueba de que valía la pena la dio el reviewer con una mutación que él mismo inventó:** hizo que
+**un archivo distinto** leyera la tabla directo — **y el guardián lo cazó**. *Un `it()` habría cubierto ese
+sitio; la regla nueva cubre a quien todavía no ha escrito el código.* Se pasó de *«acuérdate de resolver»*
+a **«no puedes escribir la consulta»**.
+
+### El guardián de las lecturas
+
+Gemelo de `receta-embudo.test.ts` (que hace lo mismo para las **escrituras**) y nació porque **el error que
+aquél ya había arreglado se repitió idéntico en la otra dirección**. Exige que todo archivo que lea una
+tabla de receta —directo **o por relación anidada**— pase por el resolver, con excepciones **declaradas y
+verificadas**. Su mutación discriminante es el **import de adorno**: importar el resolver y no usarlo.
+📌 Su detalle más fino: `pre-costo.ts` **no nombra ni una vez** las tablas de receta. Que aun así aparezca
+en la lista de lectores **es la demostración de que la detección anidada funciona**.
+
+### Dos sitios que la medición no traía, y los dos fallaban en la cara del usuario
+
+- **`listarFotosArte`**: la ficha del hijo **pinta** el arte heredado, y abrir sus fotos habría dado **404
+  sobre un renglón que la pantalla acaba de mostrar**.
+- **`modelos.ts` necesitaba mapa Y mapa inverso**: un padre con dos hijos reparte **las mismas filas** a los
+  dos; sin el camino de vuelta, cada hijo sale **sin tela principal en el listado**, en silencio.
+
+### ✅ Se despliega SOLA — verificado por tres puertas, no aceptado de palabra
+
+El troceado deja **tres costuras** abiertas hasta E2b (escribir la receta sobre un hijo crearía **filas
+fantasma** que ninguna lectura vuelve a ver). **No son alcanzables hoy**, y el reviewer lo comprobó:
+`derivarModeloDeProduccion` **no tiene llamador de producción** · `idModeloDesarrollo` vive **sólo en el
+esquema de respuesta** y los dos únicos `create` de modelo lo ponen en `null` · **cero SQL crudo y cero
+vistas** contra esas tablas. ⇒ **hoy no existe forma de crear un hijo.**
+
+### 📌 Dos deudas nombradas para E2b — que NO son escritores, y por eso pueden caerse entre las piezas
+
+- 🔴 **La LECTURA DEL ORIGEN de `copiarBom`.** Si el **origen** es un hijo, trae **vacío** y —con
+  `reemplazar: true`, que es el default— **borra la receta del destino y la sustituye por nada**; el arte
+  se borra **de verdad**. **Silencioso y destructivo.** El alcance de E2b dice *«los escritores»* y **esto
+  no es un escritor**: va nombrado literal en el docstring y aquí, para que no se pierda.
+- **La excepción de `versiones.ts` cierra hoy, pero cuelga de un `if` ajeno**: un hijo no se puede versionar
+  porque nace sin `codigoDesarrollo`. El día que se decida permitir versionar un modelo de producción, **la
+  versión de un hijo nacería con la receta vacía y el guardián seguiría verde**. En E2b hay que rechazar
+  explícitamente `padre.idModeloDesarrollo !== null`.
+
+⚠️ **Sin migración, sin permisos, sin seed ⇒ NO requiere `SEED_ON_START`.** El contrato **no se movió** ⇒
+frontend intacto.
+
+---
+
 ## V1-E9a · ⭐ EL LINAJE DE LOS MODELOS 1:N (31-ago-2026, versión **0.069**) — ✅ HECHA
 
 **Qué es:** la etapa **E1** del **Bloque 3**, la más grande del programa. Hoy, cuatro OC de un cliente para

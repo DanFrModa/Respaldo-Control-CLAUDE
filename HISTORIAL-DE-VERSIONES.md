@@ -54,6 +54,46 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > del costo, avanza con lo demás»*—, pero **sus tres decisiones ya están tomadas y escritas**
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. El número queda reservado.
 
+## 0.070 · 31-ago-2026 · **en prueba** — Los modelos de un mismo desarrollo **comparten una sola receta** (cambio interno)
+
+> 📌 **Como la 0.069, todavía no cambia nada que puedas ver.** Es el segundo ladrillo de la obra de cuatro,
+> y el más grande. Lo que hace es que **cuando existan los modelos por color, todos lean la receta del
+> desarrollo** en vez de llevar cada uno su copia.
+
+### Qué se está construyendo
+
+Tú lo cerraste con una frase: ***«Que los cuatro lean la del desarrollo. Ésta es la correcta.»***
+
+La razón es la pregunta que hiciste en agosto: *«todos los modelos deben de llevar lo mismo, **¿cómo lo
+controlas?»***. Con cuatro copias no se **controla**: se **vigila**, y vigilar depende de que alguien se
+acuerde de repetir cada cambio en las otras tres. **Con una sola receta, que lleven lo mismo deja de ser
+disciplina y pasa a ser estructura.**
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **El precosto de un color habría salido VACÍO.** El plan original contaba los lugares del código
+  buscándolos por su nombre, y **cinco se leen de otra forma** — sin nombrar la tabla. Justo los del
+  precosto. Sin ellos, un color habría costeado **sólo con maquila, corte y empaque**, sin telas ni avíos:
+  un precio más bajo, **sin ningún error a la vista**. Y de ese precio sale lo que le cotizas al cliente.
+- 🔴 **Las medidas por talla se habrían perdido al «traer del modelo».** La revisión encontró que ese punto
+  **no lo protegía ninguna prueba** — lo comprobó rompiéndolo, y las 2,345 pruebas siguieron en verde. El
+  efecto: el avío entra **sin sus medidas**, lo que **cambia la cantidad que el sistema dice que hay que
+  comprar**. Se arregló de raíz: ahora esa consulta **ya no se puede escribir mal**.
+- **Y dos cosas que habrían fallado en pantalla:** abrir las fotos de un arte heredado habría dado error
+  **sobre un renglón que la pantalla acababa de mostrar**, y en el listado cada color habría salido **sin
+  su tela principal**.
+
+### Qué sigue pendiente o roto
+
+- **La segunda mitad de esta etapa** (que se pueda *editar* la receta desde un color, no sólo leerla). Hasta
+  entonces, guardar la receta sobre un color no serviría de nada — **pero eso hoy no puede pasar**, porque
+  los modelos por color todavía no existen: los crea una versión posterior.
+- **Las fotos del arte por orden** (§Post-F9.171): pediste poder heredarlas del desarrollo pero también
+  **quitarlas y meter fotos propias en la OP**. La mitad existe —el arte de la OP ya es suyo, se puede
+  quitar y agregar a mano— pero **las fotos siguen siendo del modelo**. Queda como pieza pendiente.
+
+---
+
 ## 0.069 · 31-ago-2026 · **en prueba** — Cimiento para que **un modelo pueda tener varios colores** (cambio interno)
 
 > 📌 **Esta versión NO cambia nada que puedas ver o hacer distinto.** Es el **primer ladrillo** de una obra

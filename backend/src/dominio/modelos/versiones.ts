@@ -204,6 +204,21 @@ export async function mintearVersionDeModelo(
   // desarrollo, y un modelo que nunca lo tuvo —los 4,987 migrados del Access— no tiene de dónde
   // colgarlo. Se rechaza en vez de inventarle uno: versionar un modelo puramente de producción es
   // una decisión de negocio que Daniel todavía no ha tomado, y esta etapa NO la toma por él.
+  // 🔴 DEUDA DECLARADA DE V1-E9b — **ESTA GUARDA ESTÁ SOSTENIENDO UNA INVARIANTE QUE NO ES SUYA.**
+  //
+  // Hoy cierra, y por eso `versiones.ts` es excepción del guardián de lecturas de receta
+  // (`receta-compartida-guardian.test.ts`): un modelo HIJO del linaje 1:N nace con
+  // `codigoDesarrollo = null` (`marcaProduccionDerivada`, `nomenclatura.ts`) ⇒ rebota aquí ⇒
+  // `copiarRecetaAModeloNuevo` nunca lee la receta de un hijo, que si la leyera vendría VACÍA.
+  //
+  // ⚠️ Pero el comentario de arriba dice que versionar un modelo de producción *«es una decisión de
+  // negocio que Daniel todavía no ha tomado»*. **El día que la tome, esta guarda se afloja por una
+  // razón que no tiene nada que ver con el linaje 1:N — y la versión de un hijo nacería con la
+  // receta VACÍA, con el guardián en verde.** Dos invariantes distintas colgando del mismo `if`.
+  //
+  // ⇒ **En V1-E9b pieza B hay que rechazar EXPLÍCITAMENTE `padre.idModeloDesarrollo !== null`
+  // aquí**, con su propio mensaje, para que la excepción del guardián deje de depender de una
+  // guarda ajena que alguien puede mover sin verla.
   if (padre.codigoDesarrollo === null) {
     throw new ErrorValidacion(
       `El modelo "${padre.codigo}" no tiene número de DESARROLLO, y la versión con sufijo cuelga ` +

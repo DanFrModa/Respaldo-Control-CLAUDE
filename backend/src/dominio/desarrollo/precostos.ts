@@ -57,6 +57,7 @@ import {
   leerUltimosPreciosCompra,
   type UltimosPreciosCompra,
 } from '../costos/ultimo-precio-compra.js';
+import { conRecetaCompartidaDeUno } from '../modelos/receta-compartida.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
 export type EntradaLineaManual = z.input<typeof esquemaPrecostoLineaManualCrear>;
@@ -138,6 +139,30 @@ const incluirBomModelo = {
 } satisfies Prisma.ModeloInclude;
 
 type ModeloConBom = Prisma.ModeloGetPayload<{ include: typeof incluirBomModelo }>;
+
+/**
+ * 🔴 V1-E9b (§Post-F9.167) — Lee el modelo con su BOM **de quien de verdad es la receta**.
+ *
+ * Las TRES puertas del precosto (generar, recalcular y restaurar un renglón) leían el modelo con
+ * `include: incluirBomModelo`, que trae `telas`/`avios`/`avios.tallas`/`artes` **por nombre de
+ * relación, sin nombrar jamás la tabla**: la clase de lectura invisible que el conteo del plan
+ * omitió. Con un modelo de producción derivado (V1-E9a) eso habría precosteado con la receta
+ * VACÍA — sólo corte, maquila y empaque—, *sin lanzar*, y de ahí sale el precio del cliente.
+ *
+ * ⚠️ Hoy las tres entran por `Desarrollo.idModelo`, que apunta a un modelo de DESARROLLO ⇒ el
+ * resolver es la IDENTIDAD y no cambia nada. Va igual, y a propósito: la regla se cumple **por
+ * construcción**, no porque alguien recuerde que hoy ese modelo nunca es un hijo. El día que un
+ * desarrollo pueda colgar de un modelo de producción, esto ya está bien.
+ */
+async function leerModeloConBom(tx: Tx, idModelo: number): Promise<ModeloConBom | null> {
+  const propio = await tx.modelo.findUnique({ where: { id: idModelo }, include: incluirBomModelo });
+  if (propio === null) {
+    return null;
+  }
+  return conRecetaCompartidaDeUno(propio, (idPadre) =>
+    tx.modelo.findUnique({ where: { id: idPadre }, include: incluirBomModelo }),
+  );
+}
 
 /** Un renglón nuevo (sin `idPrecosto`, que se agrega al insertar en lote). */
 type LineaNueva = Omit<Prisma.PrecostoLineaCreateManyInput, 'idPrecosto'>;
@@ -732,10 +757,7 @@ export async function generarPrecosto(
     });
     const version = (ultima._max.version ?? 0) + 1;
 
-    const modelo = await tx.modelo.findUnique({
-      where: { id: desarrollo.idModelo },
-      include: incluirBomModelo,
-    });
+    const modelo = await leerModeloConBom(tx, desarrollo.idModelo);
     if (modelo === null) {
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }
@@ -808,10 +830,7 @@ export async function recalcularDesdeBom(
     if (desarrollo === null) {
       throw new ErrorNoEncontrado('Desarrollo', precosto.idDesarrollo);
     }
-    const modelo = await tx.modelo.findUnique({
-      where: { id: desarrollo.idModelo },
-      include: incluirBomModelo,
-    });
+    const modelo = await leerModeloConBom(tx, desarrollo.idModelo);
     if (modelo === null) {
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }
@@ -1201,10 +1220,7 @@ export async function restaurarLineaBom(
     if (desarrollo === null) {
       throw new ErrorNoEncontrado('Desarrollo', precosto.idDesarrollo);
     }
-    const modelo = await tx.modelo.findUnique({
-      where: { id: desarrollo.idModelo },
-      include: incluirBomModelo,
-    });
+    const modelo = await leerModeloConBom(tx, desarrollo.idModelo);
     if (modelo === null) {
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }

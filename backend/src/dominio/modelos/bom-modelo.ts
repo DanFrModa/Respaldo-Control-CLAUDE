@@ -57,6 +57,7 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
+import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
@@ -252,8 +253,13 @@ export async function leerTelasBom(
   idModelo: number,
   idEmpresa: number,
 ): Promise<ModeloTelaDetalle[]> {
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA: un modelo de producción derivado lee las telas de su modelo
+  // de DESARROLLO. Se resuelve AQUÍ DENTRO, no en cada llamador: ésta es una de las tres lecturas
+  // canónicas y por ella entra todo el sistema (ficha, precosto de la orden, MRP). Resolver es
+  // idempotente (no hay cadenas), así que no importa si quien llama ya resolvió.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
   const filas = await tx.modeloTela.findMany({
-    where: { idModelo },
+    where: { idModelo: idReceta },
     select: {
       idTela: true,
       consumoPorPrenda: true,
@@ -344,8 +350,11 @@ export async function leerAviosBom(
   idModelo: number,
   idEmpresa: number,
 ): Promise<ModeloAvioDetalle[]> {
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA (ver {@link leerTelasBom}): los avíos salen del modelo de
+  // desarrollo cuando éste es uno de sus hijos de producción.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
   const filas = await tx.modeloAvio.findMany({
-    where: { idModelo },
+    where: { idModelo: idReceta },
     select: {
       idAvio: true,
       consumoPorPrenda: true,
@@ -461,6 +470,56 @@ export async function leerAviosBom(
       precioReferencia:
         f.avio.precioReferencia === null ? null : f.avio.precioReferencia.toNumber(),
     };
+  });
+}
+
+/** Una medida por talla del BOM, tal como la copia quien la lee (R18). */
+export interface ModeloAvioTallaBom {
+  idAvio: number;
+  idTalla: number;
+  consumo: Prisma.Decimal;
+  idAvioMedida: number | null;
+}
+
+/**
+ * ⭐⭐ V1-E9b — **LA CUARTA LECTURA CANÓNICA**: las MEDIDAS POR TALLA del BOM (R18,
+ * `ModeloAvioTalla`), con la receta compartida ya resuelta.
+ *
+ * ### Por qué existe, que es lo importante
+ *
+ * De las CINCO tablas de la receta, `ModeloAvioTalla` era **la única sin lectura canónica**. Las
+ * otras cuatro viven bajo el paraguas del embudo —`leerTelasBom`, `leerAviosBom` y
+ * `leerArtesModelo` resuelven POR DENTRO—, así que quien las llama puede pasarles el id del hijo o
+ * el del padre y **da lo mismo**: la resolución no se puede perder porque no está en el llamador.
+ *
+ * Las medidas no tenían ese paraguas, y el precio se pagaba en duplicación: su resolución vivía
+ * **repetida en cuatro sitios** de `produccion/receta-orden.ts` (la copia al crear la orden,
+ * agregar un renglón, restaurarlo y «traer del modelo») y **sólo uno de los cuatro tenía prueba**.
+ * El reviewer de la etapa lo demostró revirtiendo uno a mano: la suite entera —2,345 pruebas—
+ * **siguió en verde**. Y el guardián de lecturas tampoco lo veía, porque trabaja por ARCHIVO y ese
+ * archivo ya importaba el resolver.
+ *
+ * 🔴 **Lo que esa mutación superviviente significaba en el negocio:** en la orden de un modelo hijo,
+ * darle a «traer del modelo» metía el avío **sin sus medidas por talla**. No truena ni avisa:
+ * **cambia el requerido del MRP** y se compra otra cantidad.
+ *
+ * ⇒ Con esta función las cuatro duplicaciones se vuelven UNA, y la resolución deja de ser algo que
+ * un llamador pueda olvidar. `receta-compartida-guardian.test.ts` vigila que nadie vuelva a leer la
+ * tabla directo desde producción.
+ *
+ * `idAvio` acota a un solo renglón (lo que piden tres de los cuatro sitios); sin él trae las
+ * medidas de TODO el BOM (lo que pide la copia al crear la orden).
+ */
+export async function leerMedidasAvioBom(
+  tx: Tx,
+  idModelo: number,
+  idAvio?: number,
+): Promise<ModeloAvioTallaBom[]> {
+  // Mismo embudo que las otras tres canónicas: se resuelve AQUÍ DENTRO, nunca en el llamador.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
+  return tx.modeloAvioTalla.findMany({
+    where: { idModelo: idReceta, ...(idAvio === undefined ? {} : { idAvio }) },
+    select: { idAvio: true, idTalla: true, consumo: true, idAvioMedida: true },
   });
 }
 
@@ -889,6 +948,28 @@ export async function listarAviosBom(
  * V1-E3d): antes de barrerlo se registra ÍNTEGRO en la bitácora —precio, proveedor y foto
  * incluidos— y sus `Archivo` sin dueño se limpian con la misma regla de foto compartida que usa
  * `arte-modelo.ts` (D3: nada se borra en silencio).
+ *
+ * ---
+ * ## 🔴 DEUDA DECLARADA DE V1-E9b — **LA LECTURA DEL ORIGEN NO RESUELVE LA RECETA COMPARTIDA**
+ *
+ * *(Nómbrala así, por su nombre: **«la lectura del origen de `copiarBom`»**. NO es «parte de
+ * copiarBom» ni «un escritor»: el alcance de la pieza B se definió como «los escritores», y este
+ * renglón **es una LECTURA** — puede caerse justo entre las dos piezas si nadie lo nombra.)*
+ *
+ * Las cuatro consultas de abajo leen `where: { idModelo: datos.idOrigen }` **en crudo**, sin pasar
+ * por el resolver de {@link ../modelos/receta-compartida.js}. El día que exista un modelo hijo del
+ * linaje 1:N (V1-E9a → V1-E9c), **copiar DESDE un hijo trae VACÍO** — porque su receta no es suya,
+ * es la de su padre.
+ *
+ * 🔴 **Y con `reemplazar: true`, que es el DEFAULT, eso no devuelve una lista vacía: BORRA la
+ * receta del destino y la sustituye por nada.** El arte se borra **de verdad** (ver el aviso de
+ * arriba) y sólo sobrevive en la bitácora. Es **silencioso y destructivo**: la operación “sale
+ * bien”, sin error y sin aviso.
+ *
+ * ⚠️ Hoy **no es alcanzable**: no existe ninguna puerta que cree un hijo (`derivarModeloDeProduccion`
+ * no tiene llamador de producción y `idModeloDesarrollo` no es campo de entrada de ningún alta), y
+ * por eso V1-E9b se despliega sola. Se arregla **antes o junto con** la etapa que estrene el alta de
+ * hijos, resolviendo `datos.idOrigen` igual que hacen las cuatro lecturas canónicas.
  *
  * @example
  * await copiarBom(sesion, idDestino, { idOrigen: idBase, reemplazar: true });

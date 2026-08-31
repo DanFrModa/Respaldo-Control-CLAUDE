@@ -119,7 +119,8 @@ import {
   type RequeridoContradictorio,
 } from '../catalogos/unidades-avio.js';
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
-import { leerAviosBom, leerTelasBom } from '../modelos/bom-modelo.js';
+import { leerAviosBom, leerMedidasAvioBom, leerTelasBom } from '../modelos/bom-modelo.js';
+import { resolverIdRecetaDeModelo } from '../modelos/receta-compartida.js';
 // ⭐ V1-E4c: la lista de estatus que ya COMPROMETIERON la compra vive en `compras/comprometido-en-oc.ts`,
 // junto a la otra lista de estatus de OC. La guarda de §Post-F9.79 (no sacar de la receta lo ya
 // comprado) y la de V1-E4c (no cambiarle el color a una tela ya comprada) leen la MISMA: dos copias
@@ -283,9 +284,16 @@ export async function copiarRecetaDelModelo(
   }
 
   const sinPrecios = opciones.sinPrecios ?? false;
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA, en el sitio MÁS CALIENTE del sistema: por aquí pasa el 100 %
+  // de las órdenes. Un modelo de producción derivado (V1-E9a) copia la receta de su modelo de
+  // DESARROLLO, y por eso el id se resuelve UNA vez y manda en las cuatro lecturas de abajo —
+  // incluidas las MEDIDAS POR TALLA (`ModeloAvioTalla`, R18), que ninguna de las tres lecturas
+  // canónicas trae: sin esto, cada orden de un hijo nacería SIN medidas por talla, en silencio, y
+  // eso mueve el requerido del MRP.
+  const idReceta = await resolverIdRecetaDeModelo(tx, orden.idModelo);
   const [telas, avios, artes, medidas] = await Promise.all([
     sinPrecios
-      ? tx.modeloTela.findMany({ where: { idModelo: orden.idModelo } }).then((filas) =>
+      ? tx.modeloTela.findMany({ where: { idModelo: idReceta } }).then((filas) =>
           filas.map((f) => ({
             idTela: f.idTela,
             consumoPorPrenda: f.consumoPorPrenda.toNumber(),
@@ -296,9 +304,9 @@ export async function copiarRecetaDelModelo(
             idTelaProveedor: f.idTelaProveedor,
           })),
         )
-      : leerTelasBom(tx, orden.idModelo, orden.idEmpresa),
+      : leerTelasBom(tx, idReceta, orden.idEmpresa),
     sinPrecios
-      ? tx.modeloAvio.findMany({ where: { idModelo: orden.idModelo } }).then((filas) =>
+      ? tx.modeloAvio.findMany({ where: { idModelo: idReceta } }).then((filas) =>
           filas.map((f) => ({
             idAvio: f.idAvio,
             consumoPorPrenda: f.consumoPorPrenda.toNumber(),
@@ -310,12 +318,9 @@ export async function copiarRecetaDelModelo(
             idAvioProveedor: f.idAvioProveedor,
           })),
         )
-      : leerAviosBom(tx, orden.idModelo, orden.idEmpresa),
-    leerArtesModelo(tx, orden.idModelo),
-    tx.modeloAvioTalla.findMany({
-      where: { idModelo: orden.idModelo },
-      select: { idAvio: true, idTalla: true, consumo: true, idAvioMedida: true },
-    }),
+      : leerAviosBom(tx, idReceta, orden.idEmpresa),
+    leerArtesModelo(tx, idReceta),
+    leerMedidasAvioBom(tx, idReceta),
   ]);
 
   const auditoria = sesion === null ? {} : datosCreacion(sesion);
@@ -1915,10 +1920,9 @@ export async function agregarRenglonReceta(
         } else if (previo === null && delModeloAvio !== undefined) {
           // Renglón NUEVO que sí está en el modelo: se trae también su juego de medidas por talla
           // (lo que antes se perdía y había que recuperar con un "Restaurar" que nadie anunciaba).
-          const medidas = await tx.modeloAvioTalla.findMany({
-            where: { idModelo: orden.idModelo, idAvio: datos.idAvio },
-            select: { idTalla: true, consumo: true, idAvioMedida: true },
-          });
+          // V1-E9b — por la CUARTA lectura canónica: las medidas salen del modelo de la RECETA
+          // y esa resolución no vive aquí, así que no se puede perder al editar esta línea.
+          const medidas = await leerMedidasAvioBom(tx, orden.idModelo, datos.idAvio);
           if (medidas.length > 0) {
             await reemplazarMedidasAvio(
               tx,
@@ -2623,10 +2627,8 @@ export async function restaurarRenglonReceta(
           : delModelo.consumoPorTalla;
         // Las medidas del MODELO se leen ANTES de escribir: son las que quedarán en el renglón
         // (`reemplazarMedidasAvio` más abajo) y por tanto las que deciden el requerido resultante.
-        const medidas = await tx.modeloAvioTalla.findMany({
-          where: { idModelo: orden.idModelo, idAvio: fila.idAvio },
-          select: { idTalla: true, consumo: true, idAvioMedida: true },
-        });
+        // V1-E9b — cuarta canónica: del modelo de la RECETA, el mismo del que salió `delModelo`.
+        const medidas = await leerMedidasAvioBom(tx, orden.idModelo, fila.idAvio);
         // ⭐ V1-E3y (§Post-F9.79): misma comprobación que en la tela, con las MEDIDAS del modelo
         // (R18) — restaurar puede vaciar el requerido tanto por el consumo como por las medidas.
         if (
@@ -3203,6 +3205,11 @@ export async function traerDelModelo(
         fila: { estado: EstadoRenglonReceta; agregadoAMano: boolean; excluido: boolean },
       ): boolean => loPidieronPorSuNombre(tipo, id) || desviadoAProposito(fila);
 
+      // ⭐ V1-E9b — las CUATRO lecturas de la receta que hace este bloque son canónicas, y las
+      // cuatro resuelven POR DENTRO. Aquí NO se resuelve nada a propósito: un `idReceta` local
+      // sería una copia de la regla que alguien puede revertir sin que ninguna prueba caiga —que
+      // es exactamente la mutación que sobrevivió en la revisión de la etapa—. Lo que no está
+      // escrito aquí, no se puede romper aquí.
       const [telasModelo, aviosModelo, artesModelo] = await Promise.all([
         leerTelasBom(tx, orden.idModelo, orden.idEmpresa),
         leerAviosBom(tx, orden.idModelo, orden.idEmpresa),
@@ -3315,10 +3322,7 @@ export async function traerDelModelo(
           },
           select: { id: true },
         });
-        const medidas = await tx.modeloAvioTalla.findMany({
-          where: { idModelo: orden.idModelo, idAvio: a.idAvio },
-          select: { idTalla: true, consumo: true, idAvioMedida: true },
-        });
+        const medidas = await leerMedidasAvioBom(tx, orden.idModelo, a.idAvio);
         if (medidas.length > 0) {
           await tx.ordenAvioTalla.createMany({
             data: medidas.map((m) => ({

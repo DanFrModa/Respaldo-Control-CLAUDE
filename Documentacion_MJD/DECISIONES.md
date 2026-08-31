@@ -11349,11 +11349,166 @@ Ahí **sí hay compra que congelar** y el candado no se puede poner.
 **Default propuesto: (a)**, que es lo construido — pero **la pregunta se hace igual**, porque el caso de
 los 39 de 40 es el que Daniel se va a encontrar en la práctica.
 
+✅ **CERRADA (Daniel, 31-ago-2026, §Post-F9.171(a)):** *«Está bien como dices»* ⇒ **se queda (a)**, con el
+precio aceptado a sabiendas. **Sin trabajo pendiente.**
+
 📌 **Corrección a §Post-F9.165 punto 3:** decía *«motivo obligatorio al abrir, igual que lo pide
 `quitarRenglonReceta`»*. **La analogía era FALSA** — el motivo de quitar es `.optional()`. Se implementó
 **obligatorio igual**, y con razón mejor: **ese texto ES el 409** que lee el comprador cuando su compra se
 frena; sin él, el mensaje no podría decir por qué.
 
 - **Aplica en:** la **0.067**, ya construida con (a). **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.169) — ✅ LA 0.065, CONTESTADA: **lo que no está firmado no se compra, y ya** (DANIEL, 31-ago-2026)
+
+**Cómo salió.** §Post-F9.164 dejó la 0.065 detenida con una pregunta: al quitar la compuerta, **la firma de
+revisión del modelo se quedaría sin poder firmarse nunca y sin aparecer en ninguna cola**. Daniel contestó
+sin rodeos:
+
+> *«**.065.** Todo lo que no está firmado simplemente **no se puede comprar**. Pero **no detiene ni la
+> producción ni los demás renglones ya firmados**.»*
+
+### Lo que queda decidido
+
+1. ⭐ **El único control es la firma POR RENGLÓN.** Un renglón sin firmar **no se compra** — y punto. No hay
+   segunda puerta, ni una condición de «receta completa» por encima.
+2. **No detiene la producción.** Confirma §Post-F9.158(b) y la regla vieja: *el piso no se detiene porque
+   Desarrollo no haya terminado*. **Cortar no lleva ninguna raya nueva.**
+3. ⭐ **No detiene a los demás renglones.** Que la tela esté sin firmar **no frena comprar los avíos que sí
+   lo están**. Es exactamente lo que ya hace `exigirMaterialesLiberados` (material por material) frente a
+   `exigirRecetaLiberada` (≥1 firmado): **la granularidad correcta es el renglón, no la orden**.
+
+### 🔑 La lectura que esto obliga sobre §Post-F9.164 — y por qué
+
+La pregunta abierta era **qué hacer con la firma de REVISIÓN DEL MODELO** (`revisionEstado`), que es otra
+cosa que la firma por renglón (`liberadoEn`). Daniel no la nombró; describió **el mecanismo que gobierna**.
+Y al decir que *«todo lo que no está firmado simplemente no se puede comprar»* **sin mencionar ninguna otra
+condición**, deja claro que el control vive **en el renglón**.
+
+⇒ **Se toma la opción (a) de §Post-F9.164: la revisión del modelo deja de ser una PUERTA y pasa a ser un
+REGISTRO.** Se podrá firmar **también con el modelo ya en producción** (quitando el bloqueo de
+`revision-modelo.ts:250-256`) y la bandeja **dejará de filtrar por `origen = 'desarrollo'`**.
+
+📌 **Lo que respalda esa lectura, y no es una interpretación libre:** esa regla 3 de la bandeja **se
+justificaba explícitamente en que «el muro ya no la frena»** — al quitar el muro, **la justificación se
+invierte sola**. Y el subsistema de invalidación `tocarModeloPorCambioDeReceta` (**12 sitios**) existe sólo
+para mantener honesta esa firma: convertirla en registro lo conserva útil, retirarla lo dejaría huérfano.
+
+⚠️ **Lo que NO se hace:** retirar el mecanismo de revisión (la opción (b)). Daniel lo pidió en §Post-F9.140
+(*«tiene que haber una validación de la receta original»*) y **nada en su respuesta lo revoca** — sólo dice
+que **no es lo que gobierna la compra**.
+
+⚠️ **Si esta lectura no es la suya, el punto a corregir es éste**, y es de una línea: *¿la revisión del
+modelo se conserva como registro (a), o se retira del todo (b)?* **Se construye con (a).**
+
+- **Aplica en:** la **0.065**, que queda **DESBLOQUEADA**. **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.170) — ⭐ LA ACLARACIÓN DE DANIEL SOBRE EL 1:N, Y UN ARGUMENTO DEL PLAN QUE YA ESTABA RESUELTO (31-ago-2026)
+
+**Cómo salió.** Daniel leyó el mapa del programa, vio el tamaño de la receta compartida y dijo:
+
+> *«La receta compartida: no sé si no me expliqué bien. **Me parece más fácil de lo que expones.** Lo que
+> hay que hacer es simplemente **relacionar el mismo modelo de desarrollo con más de una OP**. ¿Eso es
+> complicado?»*
+
+**Se midió antes de contestar** —podía tener razón y ahorrarnos tres etapas— y de la medición salieron tres
+cosas. Al aclararle la pregunta, él precisó:
+
+> *«No quiero que haya una confusión. Hay **modelos de desarrollo** y **modelos de producción**. Mi
+> comentario es que **cada OP puede compartir modelos de desarrollo. Y cada OP lleva un número de modelo de
+> producción diferente**.»*
+
+### Lo que queda asentado
+
+1. ✅ **Su aclaración CONFIRMA el plan de §Post-F9.135, no lo simplifica.** *«Cada OP lleva un número de
+   modelo de producción diferente»* ⇒ **sí nacen N modelos de producción**, uno por OP. Lo que él llamaba
+   *«simplemente relacionar»* **es el vínculo**, que es justo lo que la **0.069 ya construyó** (E1).
+2. ⭐ **Y por eso la receta compartida (0.070) SÍ hace falta.** Precisamente porque cada OP tiene su propio
+   modelo de producción, cada uno necesita receta: **copiarla a los N** obliga a mantenerlas iguales a
+   mano; **leerla del desarrollo** hace la igualdad estructural. Es su propia pregunta del 28-ago la que
+   lo decide — *«Todos los modelos deben de llevar lo mismo. **¿Cómo lo controlas?»*** — porque con copias
+   no se *controla*: se *vigila*, y vigilar depende de que alguien se acuerde.
+
+### 📌 Lo que la medición SÍ desmintió del plan
+
+🔴 **El argumento del inventario ya estaba resuelto, y el plan lo arrastraba como si no.** §Post-F9.135
+justifica los N modelos así: *«los modelos de producción son los que se van a inventariar»* — dando a
+entender que **sin** N modelos el inventario no distinguiría los colores. **Medido: sí los distingue.**
+`MovimientoDetPt` lleva **`idModelo` + `idColor` + `idTalla`** (`schema.prisma:4163-4168`), y el color vive
+en `OrdenLinea` con su pantone propio (`:3320-3324`). Además **nada impide hoy** que varias órdenes
+compartan modelo (no hay `@@unique` sobre `Orden.idModelo`).
+
+⇒ **El motivo real de los N modelos NO es el inventario: es el NÚMERO DE CATÁLOGO** — que cada color tenga
+su número de producción de 5 dígitos, como Daniel acaba de decir. La conclusión del plan era correcta; **su
+argumento, no**. Se corrige aquí para que nadie vuelva a apoyarse en él.
+
+### ✅ RATIFICADO POR DANIEL, sin ambigüedad (31-ago-2026)
+
+Puestas las dos formas enfrente —copiar la receta a los N modelos, o que los N lean la del desarrollo—
+contestó:
+
+> *«**Que los cuatro lean la del desarrollo. Ésta es la correcta.**»*
+
+⇒ **La receta es UNA, la del modelo de desarrollo, y los N modelos de producción la LEEN.** No se copia, no
+se replica, no se sincroniza. Es la decisión central del Bloque 3 y queda cerrada con sus palabras, no por
+inferencia. **La 0.070 se construye exactamente así.**
+
+- **Aplica en:** confirma el Bloque 3 tal como está planeado (0.069 ✅ · **0.070 ← se está construyendo** ·
+  0.071 · 0.072). **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.171) — ✅ EL CANDADO A MEDIO FIRMAR: se queda como está · y ⭐ LAS FOTOS SON DE LA OP, NO DEL DESARROLLO (DANIEL, 31-ago-2026)
+
+**Dos respuestas suyas del mismo mensaje.**
+
+### (a) ✅ §Post-F9.168 CERRADA — el candado exige la receta liberada COMPLETA
+
+> *«Lo del candado con receta a medio firmar. **Está bien como dices.**»*
+
+⇒ Se confirma el **default (a)**, que es lo que la **0.067** ya construyó: **sólo se puede congelar la compra
+de una orden cuya receta está liberada por completo**. Queda aceptado con conocimiento del precio —el caso
+de **39 renglones firmados de 40**, donde no se podrá congelar— porque la alternativa es peor: una orden
+**imposible de cerrar**. **No hay trabajo pendiente**: la versión ya está en `prueba`.
+
+### (b) ⭐ LAS FOTOS DEL ARTE SON DE LA ORDEN, con herencia opcional
+
+> *«La foto debería de ser **de la OP no del desarrollo**. Si el desarrollo tiene fotos está bien que
+> podamos **heredarlas**, pero también la opción de **quitarlas de la OP** y **meter fotos directo a la
+> OP**. Eso me parece que ya existe.»*
+
+🔴 **Medido: existe la MITAD, no la otra.** Su memoria acierta en el renglón y falla en la foto:
+
+| Lo que pide | ¿Existe? |
+|---|---|
+| Que la OP tenga su lista de artes, congelada | ✅ `OrdenArte`, congelada al crear la orden |
+| **Quitar** un arte de la OP sin tocar el modelo | ✅ ya se puede |
+| **Agregar** un arte a mano, sin vínculo al modelo | ✅ `idModeloArte` es `NULL` = agregado a mano |
+| Descripción y posición propias de esa orden | ✅ viven en `OrdenArte` |
+| 🔴 **Meter FOTOS directo a la OP** | ❌ **NO existe** |
+| 🔴 **Quitar una foto sólo en la OP** | ❌ **NO existe** |
+
+**Las fotos cuelgan de `ModeloArteFoto` → `ModeloArte`**, o sea **del modelo**. `OrdenArte` **no tiene fotos
+propias**: las toma del arte del modelo por su vínculo. ⇒ **Consecuencia hoy: un arte agregado a mano en la
+OP —sin vínculo— NO PUEDE TENER FOTO**, y no hay forma de subir una que valga sólo para esa orden.
+
+**Lo que queda decidido:** las fotos del arte pasan a ser **de la orden**, con **herencia del desarrollo**
+como valor inicial y la posibilidad de **quitarlas o sustituirlas sólo ahí**. Es el mismo patrón que ya
+gobierna la descripción y la posición del arte (§Post-F9.52): *lo del modelo es el punto de partida; lo de
+la orden es lo que manda*.
+
+📌 **Alcance: una tabla nueva de fotos por `OrdenArte` + su pantalla.** No es grande, pero **no está**, y no
+se cuenta como existente. **Sin número de versión todavía** — se contrasta y se ordena con el resto.
+
+⭐ **Y esto contesta, de paso, una duda que el reviewer levantó dos veces:** post-E3 los N modelos hijos
+saldrían **sin foto** en el catálogo porque `ModeloFoto` no se hereda. **La respuesta de Daniel apunta al
+otro lado**: la foto que importa operativamente es **la de la OP**, no la del modelo. La duda del catálogo
+sigue abierta, pero deja de ser urgente.
+
+- **Aplica en:** (a) nada, ya construido. (b) pieza nueva sin número. **Fecha:** 2026-08-31.
 
 ---
