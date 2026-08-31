@@ -11357,3 +11357,49 @@ frena; sin él, el mensaje no podría decir por qué.
 - **Aplica en:** la **0.067**, ya construida con (a). **Fecha:** 2026-08-31.
 
 ---
+
+#### (Post-F9.169) — ✅ LA 0.065, CONTESTADA: **lo que no está firmado no se compra, y ya** (DANIEL, 31-ago-2026)
+
+**Cómo salió.** §Post-F9.164 dejó la 0.065 detenida con una pregunta: al quitar la compuerta, **la firma de
+revisión del modelo se quedaría sin poder firmarse nunca y sin aparecer en ninguna cola**. Daniel contestó
+sin rodeos:
+
+> *«**.065.** Todo lo que no está firmado simplemente **no se puede comprar**. Pero **no detiene ni la
+> producción ni los demás renglones ya firmados**.»*
+
+### Lo que queda decidido
+
+1. ⭐ **El único control es la firma POR RENGLÓN.** Un renglón sin firmar **no se compra** — y punto. No hay
+   segunda puerta, ni una condición de «receta completa» por encima.
+2. **No detiene la producción.** Confirma §Post-F9.158(b) y la regla vieja: *el piso no se detiene porque
+   Desarrollo no haya terminado*. **Cortar no lleva ninguna raya nueva.**
+3. ⭐ **No detiene a los demás renglones.** Que la tela esté sin firmar **no frena comprar los avíos que sí
+   lo están**. Es exactamente lo que ya hace `exigirMaterialesLiberados` (material por material) frente a
+   `exigirRecetaLiberada` (≥1 firmado): **la granularidad correcta es el renglón, no la orden**.
+
+### 🔑 La lectura que esto obliga sobre §Post-F9.164 — y por qué
+
+La pregunta abierta era **qué hacer con la firma de REVISIÓN DEL MODELO** (`revisionEstado`), que es otra
+cosa que la firma por renglón (`liberadoEn`). Daniel no la nombró; describió **el mecanismo que gobierna**.
+Y al decir que *«todo lo que no está firmado simplemente no se puede comprar»* **sin mencionar ninguna otra
+condición**, deja claro que el control vive **en el renglón**.
+
+⇒ **Se toma la opción (a) de §Post-F9.164: la revisión del modelo deja de ser una PUERTA y pasa a ser un
+REGISTRO.** Se podrá firmar **también con el modelo ya en producción** (quitando el bloqueo de
+`revision-modelo.ts:250-256`) y la bandeja **dejará de filtrar por `origen = 'desarrollo'`**.
+
+📌 **Lo que respalda esa lectura, y no es una interpretación libre:** esa regla 3 de la bandeja **se
+justificaba explícitamente en que «el muro ya no la frena»** — al quitar el muro, **la justificación se
+invierte sola**. Y el subsistema de invalidación `tocarModeloPorCambioDeReceta` (**12 sitios**) existe sólo
+para mantener honesta esa firma: convertirla en registro lo conserva útil, retirarla lo dejaría huérfano.
+
+⚠️ **Lo que NO se hace:** retirar el mecanismo de revisión (la opción (b)). Daniel lo pidió en §Post-F9.140
+(*«tiene que haber una validación de la receta original»*) y **nada en su respuesta lo revoca** — sólo dice
+que **no es lo que gobierna la compra**.
+
+⚠️ **Si esta lectura no es la suya, el punto a corregir es éste**, y es de una línea: *¿la revisión del
+modelo se conserva como registro (a), o se retira del todo (b)?* **Se construye con (a).**
+
+- **Aplica en:** la **0.065**, que queda **DESBLOQUEADA**. **Fecha:** 2026-08-31.
+
+---
