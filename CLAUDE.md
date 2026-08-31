@@ -189,8 +189,12 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 > cliente. Ahí **no se puede tirar y volver a capturar**, y cada cambio de regla obliga a preguntarse qué
 > pasa con lo ya hecho — que es exactamente lo que hoy está prohibido gastar.
 >
-> ⚠️ **Si lees esto y la versión ya empieza con `1.`: PARA.** No apliques nada de lo de abajo. La política
-> de datos en producción **está por definir con Daniel** y es una decisión suya, no un default del lead.
+> ⚠️ **Si lees esto y la versión ya empieza con `1.`: PARA.** No apliques nada de lo de abajo, y **pregunta
+> a Daniel la política nueva** — él dijo que ese día *«revisamos esta regla desde el principio»*.
+>
+> ✅ **Y si la versión todavía empieza con `0.`: no hay nada que preparar.** *«Ahorita no te preocupes por
+> eso»* — la política de producción **no se diseña por adelantado**, ni se deja código «listo por si
+> acaso». Se decide el día que toque, con el sistema a la vista.
 >
 > **Textual de Daniel:**
 >

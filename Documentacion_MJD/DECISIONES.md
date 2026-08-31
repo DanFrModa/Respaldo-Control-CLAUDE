@@ -10252,10 +10252,18 @@ el aviso llegue a la pantalla.
 > capturar**, y cada cambio de regla obliga a preguntarse qué pasa con lo ya hecho. Es decir: **lo que hoy
 > está prohibido gastar, en producción será obligatorio pensarlo.**
 >
-> ⚠️ **PENDIENTE ABIERTO, de Daniel, sin fecha:** *la política de datos en producción*. Qué se hace cuando
-> una regla cambia y ya hay información capturada con la regla vieja — ¿se recalcula?, ¿se deja como
-> está?, ¿se marca?, ¿se corrige con un movimiento nuevo (D3)? **No se le pone default**: es decisión suya
-> y hay que agendarla **antes del go-live (F10)**, no después.
+> ✅ **Y NO ES UN PENDIENTE QUE ARRASTRAR — Daniel lo cerró así:** *«o sea, aplica a todo lo que se está
+> haciendo ahorita. Cuando entremos en producción, **revisamos esta regla desde el principio** para dejar
+> bien clara la nueva política. **Ahorita no te preocupes por eso.**»*
+>
+> ⇒ **La política de datos en producción NO se diseña por adelantado.** No hay que agendarla, ni
+> prepararla, ni dejar el código «listo por si acaso». Se revisa **el día del rebautizo a `1.000`**, con
+> el sistema ya construido a la vista — que es cuando se puede decidir bien.
+>
+> 📌 **Es el mismo patrón que ya usa el proyecto** con el dígito de continuación de la nomenclatura
+> (§Post-F9.135 pregunta 10): *«decidirlo el día que pase, con el aviso encima, no ahora a ciegas»*.
+> **Una decisión diferida a conciencia NO es una decisión pendiente**, y tratarla como tal es gastar dos
+> veces: hoy preparándola, y el día que llegue rehaciéndola.
 
 
 **Cómo salió.** Daniel lo dijo tras ver, a lo largo de un día entero, que el lead **se frenaba una y otra

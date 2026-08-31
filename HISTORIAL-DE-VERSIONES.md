@@ -39,9 +39,10 @@ cuál `0.xxx` viene (_"1.000 — antes 0.014"_). De ahí en adelante, `1.001`, `
 > producción **serán el negocio** — órdenes, compras y precios que ya se le cobraron a un cliente — y ahí
 > no se puede tirar y volver a capturar.
 >
-> ⚠️ **Antes de poner ese `1.000` hay que cerrar con Daniel la *política de datos en producción*:** qué se
-> hace cuando una regla cambia y ya hay información capturada con la vieja. **Es decisión suya y no tiene
-> default.**
+> 📌 **Qué hacer ese día — y sólo ese día:** revisar con Daniel la *política de datos en producción* (qué
+> pasa cuando una regla cambia y ya hay información capturada con la vieja). **No se prepara antes.** Él
+> lo dijo así: *«cuando entremos en producción, revisamos esta regla desde el principio para dejar bien
+> clara la nueva política. **Ahorita no te preocupes por eso.**»*
 
 Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en producción` cuando sube.
 

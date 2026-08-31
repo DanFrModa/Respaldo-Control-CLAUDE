@@ -2010,8 +2010,10 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 > ## ⏳ **CADUCA AL LLEGAR A PRODUCCIÓN.** Daniel: *«es válido mientras no hayamos ido a producción.
 > Después… habrá que medir qué hacemos con información que hayamos hecho dentro del sistema»*.
 > **El disparador: el día que la versión se rebautice `1.000`.** Mientras empiece con `0.`, aplica entera.
-> ⚠️ Deja un **pendiente abierto sin fecha**: *la política de datos en producción*, que hay que agendar
-> **antes del go-live (F10)**.
+> ✅ **No deja pendiente que arrastrar.** Daniel: *«cuando entremos en producción, revisamos esta regla
+> desde el principio… **ahorita no te preocupes por eso**»*. La política de datos en producción **no se
+> diseña por adelantado**: se revisa el día del rebautizo, con el sistema a la vista. Mismo patrón que el
+> dígito de continuación — *una decisión diferida a conciencia no es una decisión pendiente*.
 
 
 > *«toda la información que haya ahí **no es importante, es basura. La vamos a limpiar**… Todo el sistema
