@@ -57,14 +57,21 @@ ALTER TABLE "modelos" ADD CONSTRAINT "modelos_id_modelo_desarrollo_fkey"
 ALTER TABLE "modelos" ADD CONSTRAINT "modelos_linaje_desarrollo_no_es_si_mismo_check"
   CHECK ("id_modelo_desarrollo" IS DISTINCT FROM "id");
 
--- (b) Sólo un modelo de PRODUCCIÓN puede llevar el vínculo. Esto **no es adorno: es lo que hace
---     imposibles las CADENAS** (A → B → C), y por eso se prefiere a una comprobación en el dominio
---     que sólo valdría mientras nadie escriba la columna por otro lado. El razonamiento completo:
---     el único escritor (`derivarModeloDeProduccion`) exige que el PADRE sea de DESARROLLO; con
---     este CHECK, un modelo de desarrollo NUNCA puede llevar la columna; luego un hijo (que es de
---     producción, y por lo tanto lleva la columna) jamás puede ser padre de otro. La profundidad
---     máxima del linaje es 1, garantizada por la base y no por la memoria de quien programe después.
---     ⚠️ Un CHECK no puede mirar OTRA fila, así que "el padre es de desarrollo" no se puede exigir
---     aquí; lo exige el dominio, y este CHECK es lo que hace que esa exigencia baste.
+-- (b) Sólo un modelo de PRODUCCIÓN puede llevar el vínculo. Esto **no es adorno: es la mitad de lo
+--     que hace imposibles las CADENAS** (A → B → C). La otra mitad vive en el dominio, y hay que
+--     decirlo con precisión porque de esto depende que alguien no escriba la columna por otro
+--     camino creyéndose cubierto:
+--
+--      • el único escritor (`derivarModeloDeProduccion`) exige que el PADRE sea de DESARROLLO;
+--      • este CHECK garantiza que un modelo de desarrollo NUNCA lleve la columna;
+--      • luego un hijo —que es de producción, y por lo tanto lleva la columna— jamás puede ser padre
+--        de otro, y la profundidad máxima del linaje es 1.
+--
+--     🔴 **Esa profundidad la garantizan las DOS COSAS JUNTAS: este CHECK *más* la guarda del único
+--     escritor — NO la base ella sola.** Un CHECK no puede mirar OTRA fila, así que "el padre es de
+--     desarrollo" no se puede exigir aquí: la cadena A(desarrollo) → B(producción, hijo de A) →
+--     C(producción, hijo de B) **satisface los dos CHECK sin problema**. Quien escriba
+--     `id_modelo_desarrollo` por otra puerta (un ETL, SQL crudo, una función nueva) tiene que
+--     comprobar él mismo que el padre es de DESARROLLO: la base NO se lo va a atajar.
 ALTER TABLE "modelos" ADD CONSTRAINT "modelos_linaje_desarrollo_solo_produccion_check"
   CHECK ("id_modelo_desarrollo" IS NULL OR "origen" = 'produccion');

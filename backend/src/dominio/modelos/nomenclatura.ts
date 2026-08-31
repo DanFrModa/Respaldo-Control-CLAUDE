@@ -56,6 +56,7 @@ import { z } from 'zod';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { validarEntrada } from '../../comun/validacion.js';
 import { siguienteFolioGlobal } from '../../comun/secuencias.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
@@ -846,6 +847,10 @@ export interface DatosDerivarModelo {
    * {@link promoverAProduccionNucleo}: la congruencia con los dígitos **avisa, no bloquea**
    * (§Post-F9.34 punto 7 — *"si Daniel quiere una excepción, la excepción es suya"*), pero el
    * número REPETIDO sí bloquea.
+   *
+   * ⚠️ **Se valida DENTRO de la función** (`esquemaNumeroProduccion`: entero de 5 dígitos), porque
+   * a diferencia de la promoción **este camino no pasa por ninguna ruta REST**: ver el comentario
+   * de la validación.
    */
   numeroCapturado?: number | undefined;
 }
@@ -1007,7 +1012,18 @@ export async function derivarModeloDeProduccion(
     }
     numero = propuesta.numero;
   } else {
-    numero = datos.numeroCapturado;
+    // 🔴 **EL NÚMERO CAPTURADO SE VALIDA AQUÍ, Y NO ES DUPLICAR LA CAPA API: ES QUE NO HAY.**
+    // `promoverAProduccionNucleo` recibe el suyo ya pasado por `esquemaNumeroProduccion` en la
+    // ruta REST (`modelos.ts` → `pasarModeloAProduccion`). Esta función **no tiene endpoint**: su
+    // llamador es `salidaAProduccion` (V1-E9c), dominio→dominio, **sin frontera Zod por medio**.
+    // Sin esta línea, un `123456` o un `5` que venga de ahí pasa entero: `codigoDeNumeroProduccion`
+    // no recorta ni rellena hacia abajo, así que nacería un modelo de producción con código de 6
+    // dígitos (o de 1) que ya **no casa con `PATRON_CODIGO_PRODUCCION`** — no lo vería
+    // `numeroProduccionDeCodigo`, ni `consecutivosUsados`, ni el centinela de choque, ni ninguno de
+    // los dos CHECK de la base, que sólo miran el linaje. Un modelo fuera de la nomenclatura, en
+    // silencio. La clase entera se cierra **antes de que E3 exista**, que es lo que E1 puede hacer
+    // gratis.
+    numero = validarEntrada(esquemaNumeroProduccion, datos.numeroCapturado);
     avisos.push(...avisosDeCongruencia(numero, digitos));
   }
 

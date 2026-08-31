@@ -1218,6 +1218,88 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9a · ⭐ EL LINAJE DE LOS MODELOS 1:N (31-ago-2026, versión **0.069**) — ✅ HECHA
+
+**Qué es:** la etapa **E1** del **Bloque 3**, la más grande del programa. Hoy, cuatro OC de un cliente para
+**cuatro colores del mismo modelo** producen **4 órdenes pero UN SOLO modelo de producción**
+(§Post-F9.135). El bloque busca que nazcan **N modelos compartiendo la receta** del de desarrollo. **Esta
+etapa pone sólo el VÍNCULO** — el resolver de la receta (E2), la salida con N modelos (E3) y la corrección
+en bloque (E4) quedan fuera **a propósito**, y el reviewer verificó que **no se coló nada**.
+
+### 🔴 El descubrimiento del camino: `!== null` habría abierto la compuerta
+
+El coder escribió primero `idModeloDesarrollo !== null` y **siete pruebas se pusieron rojas**. Lo que
+destaparon es un mecanismo que **TypeScript no puede ver**: `promoverAProduccionNucleo` y `salidaAProduccion`
+arman la fila como `Record<string, unknown>`, **donde la clave falta** ⇒ `undefined !== null` es `true` ⇒ el
+modelo se lee como «hijo» ⇒ la exclusión **abre la compuerta de revisión**. ⭐ **Una versión sin revisar se
+habría ido a producción sin firma.** Quedó `typeof === 'number'`, con la regla escrita: **lo que no se sabe,
+no excluye**.
+
+⚠️ **Y un matiz honesto que hay que decir con estas palabras: el relato de las «siete rojas» YA NO ES
+REPRODUCIBLE.** Al añadir `idModeloDesarrollo: null` a los tres fakes —que era lo correcto, los volvió
+honestos— hoy `!== null` también pasaría. **La decisión la defiende UNA SOLA prueba**: *«una fila SIN la
+columna del linaje 1:N sigue siendo versión»*, comprobada por el reviewer. Se escribe así para que quien
+intente reproducir las siete **no concluya que la red no existe**.
+
+📌 **Verificado por el reviewer, y vale por lo que descarta:** `typeof === 'number'` cubre **todos** los
+caminos (`null`/`undefined`/clave ausente/`string` no excluyen), las otras dos columnas con `!== null`
+también **caen del lado conservador**, y **no hay ningún otro sitio en el repo con esa forma** — los únicos
+dos llamadores de producción salen de `select` tipados.
+
+### Lo que entrega
+
+- **`Modelo.idModeloDesarrollo`** con relación de **nombre propio** (`ModeloDerivadoDeDesarrollo`), **no**
+  reusando la de versiones: son **dos ejes distintos** — una versión nace en desarrollo, se lleva una
+  **copia congelada** y **lleva revisión propia**; un hijo 1:N nace **ya en producción**, **comparte** la
+  receta y **no lleva revisión** (la firma es la del padre).
+- **`derivarModeloDeProduccion`** en `nomenclatura.ts` —junto a su hermana, **no** en `versiones.ts`, que es
+  excepción del embudo y se la habría contagiado—. **No escribe ni una fila de receta**: el hijo **apunta**
+  a la del padre. Verificado por el reviewer: el padre **no recibe ni un `update`**.
+- **Las tres copias de `esVersionDeModelo`** excluyen a los hijos: dominio TS, **gemela SQL** y **frontend**.
+  Sin esto, cada hijo enseñaría *«Revisión pendiente · no puede mandarse a producir»* **sin ningún botón**,
+  sobre un modelo ya en producción — la cicatriz de §Post-F9.119.
+  ⚠️ Hoy es **una guarda contra el futuro**, no un defecto vivo: el hijo ya quedaría fuera por otros campos.
+  El caso que la ejercita es que una etapa posterior le ponga `idModeloPadre` «para guardar de dónde salió».
+- **Dos CHECK** (la medición pedía uno): `<> id` y **`IS NULL OR origen = 'produccion'`**, añadido por el
+  coder — es el que sostiene el argumento de las cadenas.
+
+### 🔴 La revisión: APROBADA con cuatro condiciones
+
+- **H1 · una guarda que faltaba, antes de que hiciera falta.** `derivarModeloDeProduccion` **no tiene capa
+  API** (su llamador será dominio→dominio, sin frontera Zod), así que un `numeroCapturado: 123456` habría
+  hecho nacer un modelo **con código de 6 dígitos**, fuera de `PATRON_CODIGO_PRODUCCION` **para siempre**:
+  invisible a `numeroProduccionDeCodigo`, a `consecutivosUsados` —su número **se volvería a repartir**—, al
+  centinela de choque y a los dos CHECK. **No era un defecto vivo** (no hay llamador): es cerrar la puerta
+  **antes de que exista el camino**, que es lo que E1 puede hacer gratis.
+- **H3 · una frase de la migración se acreditaba de más.** Decía que la profundidad 1 estaba *«garantizada
+  por la base»*. **Falso a solas**, y el coder lo **comprobó contra Postgres real**: sembró
+  `A(desarrollo) → B(hijo) → C(hijo de B)` y **la base aceptó las tres filas**. Lo que mata la cadena es el
+  CHECK **más** la guarda del dominio. Reescrito en la migración y en el esquema, con la cadena concreta y
+  el aviso a quien escriba la columna por otra puerta.
+- **H4 · una prueba que prometía una red que no tenía.** Su comentario decía que sin cierto centinela *«la
+  prueba quedaría en verde»* — **y quitarlo la dejaba en verde igual**, porque el doble devolvía lo mismo a
+  cualquier consulta, **ignorando el filtro**. Arreglado el **doble** (ahora mira el `where`), no el
+  comentario. ⭐ **Ésta es la mutación fina que engañó al propio coder:** él mutaba el bloque entero —que sí
+  moría, por otro mensaje— y no la condición sola.
+- **H2** · la documentación, que es ésta.
+
+⚠️ **`derivarModeloDeProduccion` queda SIN LLAMADOR de producción** (E3/0.071 la usará). No es código
+muerto sino **pre-cableado**: nace con su llamador nombrado, a una etapa, y la ejercitan 9 pruebas
+unitarias + 14 de integración. ⭐ **Y el reviewer añadió la razón que lo justifica mejor:** sin llamador,
+el estado intermedio *«hijo sin resolver de receta»* es **inalcanzable en producción** — que es justo lo
+que permite desplegar E1 sola **sin arriesgar el precosto vacío** de §Post-F9.167. **Queda como deuda con
+nombre en §4 desde ya**, no «si E3 se aplaza».
+
+⚠️ **Migración aditiva** `20260831190000_el_linaje_de_los_modelos`, **sin backfill** (REGLA 0-B), verificada
+levantando Postgres **binario (no Docker)** y con `prisma migrate diff` **vacío**. **SIN permisos ⇒ NO
+requiere `SEED_ON_START`.** El contrato ganó dos campos de salida.
+
+📌 **Borde conocido, anotado para E3:** un hijo que además llevara `idModeloPadre` recibiría de
+`aprobarRevisionModelo` un mensaje engañoso. **Inalcanzable hoy** (sin llamador y sin camino desde la UI);
+no se toca porque arreglarlo obligaría a mover aserciones literales de pruebas de integración.
+
+---
+
 ## V1-E8z · ⭐ EL CANDADO DE COMPRA: reabrir la receta congela el gasto (31-ago-2026, versión **0.067**) — ✅ HECHA
 
 **El encargo, en palabras de Daniel** (§Post-F9.160(a)): *«pongamos un candado que **no se pueda comprar

@@ -2287,9 +2287,12 @@ model Modelo {
   ///  • `modelos_linaje_desarrollo_no_es_si_mismo_check` — un modelo no puede ser su propio padre
   ///    de receta.
   ///  • `modelos_linaje_desarrollo_solo_produccion_check` — sólo un modelo de PRODUCCIÓN puede
-  ///    llevar esta columna. Con ella, **las cadenas son imposibles**: el único escritor
-  ///    (`derivarModeloDeProduccion`) exige que el padre sea de DESARROLLO, y un modelo de
-  ///    desarrollo nunca puede llevar la columna ⇒ un hijo jamás puede ser padre de otro.
+  ///    llevar esta columna. Con ella **más** la guarda del único escritor
+  ///    (`derivarModeloDeProduccion` exige que el padre sea de DESARROLLO) **las cadenas son
+  ///    imposibles**: un modelo de desarrollo nunca lleva la columna ⇒ un hijo jamás puede ser
+  ///    padre de otro. ⚠️ Hacen falta LAS DOS: un CHECK no puede mirar la fila del padre, así que
+  ///    quien escriba esta columna por otra puerta tiene que comprobar él mismo que el padre es de
+  ///    desarrollo.
   idModeloDesarrollo Int?     @map("id_modelo_desarrollo")
   modeloDesarrollo   Modelo?  @relation("ModeloDerivadoDeDesarrollo", fields: [idModeloDesarrollo], references: [id], onDelete: Restrict)
   /// La otra pata: los modelos de PRODUCCIÓN (uno por color/OC) que nacieron de ESTE desarrollo.

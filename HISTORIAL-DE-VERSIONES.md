@@ -54,6 +54,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > del costo, avanza con lo demás»*—, pero **sus tres decisiones ya están tomadas y escritas**
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. El número queda reservado.
 
+## 0.069 · 31-ago-2026 · **en prueba** — Cimiento para que **un modelo pueda tener varios colores** (cambio interno)
+
+> 📌 **Esta versión NO cambia nada que puedas ver o hacer distinto.** Es el **primer ladrillo** de una obra
+> de cuatro. Se escribe igual porque cada actualización de `prueba` lleva su entrada — y porque conviene
+> saber qué se está construyendo debajo.
+
+### Qué se está construyendo
+
+Hoy, cuando un cliente te manda **cuatro órdenes de compra del mismo modelo en cuatro colores**, el sistema
+crea **cuatro órdenes de producción pero UN SOLO modelo**. Eso te obliga a que los cuatro colores compartan
+todo, y a que el inventario de producto terminado no distinga entre ellos.
+
+Lo que viene es que nazcan **cuatro modelos —uno por color— que comparten UNA SOLA receta**: la del modelo
+de desarrollo. Cambias la receta en un lugar y vale para los cuatro; pero cada color tiene su código, su
+número y su inventario.
+
+**Esta versión pone sólo el vínculo** entre el modelo de desarrollo y sus modelos de producción. Todavía no
+hay nada que lo use: eso llega en las siguientes.
+
+### Qué cambió y puede sorprender
+
+- **Nada, a propósito.** El vínculo existe en la base de datos y hay una función que sabe crear un modelo
+  de producción a partir de uno de desarrollo, **pero nadie la llama todavía**. Es deliberado: así este
+  cimiento se puede subir y verificar **sin que nada del sistema cambie de conducta**.
+
+### Qué sigue pendiente o roto
+
+- **Las tres etapas que faltan del bloque**: que la receta se comparta de verdad, que la salida a producción
+  haga nacer los cuatro modelos, y poder corregir en bloque las órdenes de una familia.
+- **La 0.068** (avisar cuando una orden lleva un avío distinto a sus hermanas) **está detenida a propósito**
+  hasta que exista la familia: hoy se anclaría en un dato que va a dejar de servir justo cuando el aviso
+  empiece a hacer falta.
+
+---
+
 ## 0.067 · 31-ago-2026 · **en prueba** — Corregir una receta ya liberada **congela la compra de esa orden**
 
 > 📌 **Los números 0.065 y 0.066 se saltan a propósito.** La **0.065** (disolver la compuerta) está

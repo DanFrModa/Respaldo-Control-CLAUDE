@@ -9,7 +9,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
@@ -770,10 +770,16 @@ describe('promoverAProduccionNucleo — la compuerta de la REVISIÓN (V1-E7d)', 
 function txDerivacion(
   padre: Record<string, unknown> | null,
   /**
-   * Lo que devuelve `modelo.findFirst`, que sirve a DOS centinelas: el del número repetido (dentro
-   * de `derivarModeloDeProduccion`) y el del código libre (dentro de `crearModeloNucleo`). Que sean
-   * el mismo método es justamente por lo que hay que afirmar el MENSAJE y no sólo que reviente:
-   * los dos rebotan un `ErrorConflicto`, pero sólo uno dice de qué NÚMERO habla.
+   * La fila que "ocupa" el número, para el centinela del número repetido.
+   *
+   * 🔴 **Este doble SÍ mira el `where`, y es la diferencia entre una red y un adorno.** El método
+   * `modelo.findFirst` lo comparten DOS centinelas: el del NÚMERO repetido (dentro de
+   * `derivarModeloDeProduccion`) y el del CÓDIGO libre (dentro de `crearModeloNucleo`). Con un
+   * doble que devolviera lo mismo a los dos —como estaba escrito primero—, **quitarle al centinela
+   * del número su condición por `numeroProduccion` dejaba la prueba EN VERDE**: seguía habiendo
+   * "choque", seguía lanzando su mensaje, y la mutación sobrevivía sin que nadie se enterara. Lo
+   * midió el reviewer de esta etapa. Distinguirlos por su `OR` cuesta tres líneas y hace que la
+   * unitaria muerda de verdad.
    */
   choque: Record<string, unknown> | null = null,
 ): {
@@ -789,9 +795,13 @@ function txDerivacion(
   const tx = {
     modelo: {
       findUnique: (args: unknown) => reg('modelo.findUnique', args, padre),
-      // Sirve al centinela de choque de la serie Y al de código libre: los dos esperan `null`
-      // (= nada ocupado).
-      findFirst: (args: unknown) => reg('modelo.findFirst', args, choque),
+      // Sólo el centinela del NÚMERO pregunta por `numeroProduccion` en su `OR`; el del código
+      // libre mira `codigo`/`codigoDesarrollo` y nada más. Por ahí se distinguen (ver `choque`).
+      findFirst: (args: unknown) => {
+        const donde = (args as { where?: { OR?: Record<string, unknown>[] } }).where;
+        const preguntaPorElNumero = (donde?.OR ?? []).some((c) => 'numeroProduccion' in c);
+        return reg('modelo.findFirst', args, preguntaPorElNumero ? choque : null);
+      },
       create: (args: unknown) => reg('modelo.create', args, { id: 77, codigo: '71001' }),
       findUniqueOrThrow: (args: unknown) =>
         reg('modelo.findUniqueOrThrow', args, { id: 77, codigo: '71001' }),
@@ -930,6 +940,36 @@ describe('derivarModeloDeProduccion — qué escribe', () => {
     expect(salida.avisos.join(' ')).toContain('(71)');
   });
 
+  /**
+   * 🔴 H1 — LA FRONTERA QUE ESTA FUNCIÓN NO TIENE. `promoverAProduccionNucleo` recibe su número ya
+   * pasado por `esquemaNumeroProduccion` en la ruta REST; ésta **no tiene ruta**: la va a llamar
+   * `salidaAProduccion`, dominio→dominio, sin Zod por medio. Sin la validación de dentro, un
+   * `123456` nace como modelo de producción con código de SEIS dígitos —`codigoDeNumeroProduccion`
+   * no recorta— y queda fuera de `PATRON_CODIGO_PRODUCCION`: invisible para el generador de
+   * consecutivos, para el centinela de choque y para los dos CHECK de la base, que sólo miran el
+   * linaje. **Se afirman los dos extremos**, porque un `min` sin `max` (o al revés) dejaría medio
+   * agujero abierto y una sola aserción no lo enseñaría.
+   */
+  it('⭐ un número capturado FUERA de los 5 dígitos se rechaza (aquí no hay capa API que lo filtre)', async () => {
+    for (const fuera of [123_456, 5, 9_999, 100_000, 0, -71_001]) {
+      const { tx, llamadas } = txDerivacion(paraDerivar());
+      await expect(
+        derivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { numeroCapturado: fuera }),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+      // Y no nace nada a medias: el número se valida antes de escribir.
+      expect(llamadas.filter((l) => l.metodo === 'modelo.create')).toEqual([]);
+    }
+
+    // El control: el primero y el último número VÁLIDOS de la serie sí pasan. Sin esto, un
+    // validador que rechazara todo dejaría la prueba de arriba en verde.
+    for (const dentro of [10_000, 99_999]) {
+      const { tx } = txDerivacion(paraDerivar());
+      await expect(
+        derivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { numeroCapturado: dentro }),
+      ).resolves.toMatchObject({ numeroProduccion: dentro });
+    }
+  });
+
   it('el lock del par se toma ANTES de elegir el número (es lo que sustituye a A3)', async () => {
     const { tx, llamadas } = txDerivacion(paraDerivar());
     await derivarModeloDeProduccion(tx, SESION_PROMOCION, 42);
@@ -994,8 +1034,14 @@ describe('derivarModeloDeProduccion — las cuatro guardas', () => {
    * **`numeroProduccion`**, que puede estar ocupado por un modelo cuyo CÓDIGO es otro (el número es
    * editable a mano desde §Post-F9.46, y ahí las dos columnas se pueden desalinear). Sin él, ese
    * caso llegaría al `@unique` de la base y **abortaría la transacción entera** de la salida a
-   * producción, con las otras tres órdenes dentro. Se afirma el MENSAJE porque los dos centinelas
-   * lanzan el mismo tipo de error: sin eso, quitar éste dejaría la prueba en verde.
+   * producción, con las otras tres órdenes dentro.
+   *
+   * ⚠️ **Esta prueba muerde porque el doble mira el `where`** (ver `txDerivacion`): quitarle al
+   * centinela su condición por `numeroProduccion` hace que el doble devuelva `null` y el modelo
+   * nazca, y la aserción cae. Sin esa distinción —como estaba escrito primero— la mutación
+   * sobrevivía en verde. Y la prueba que cubre el caso **con datos reales** es la de integración
+   * *«⭐ rebota el número ocupado aunque el que lo ocupa tenga OTRO código»*, donde la fila existe
+   * de verdad y el `where` lo resuelve Postgres, no un doble.
    */
   it('⭐ el número REPETIDO se rebota diciendo de qué número habla (no lo tapa el código libre)', async () => {
     const { tx } = txDerivacion(paraDerivar(), { codigo: 'MODELO-VIEJO', activo: true });
