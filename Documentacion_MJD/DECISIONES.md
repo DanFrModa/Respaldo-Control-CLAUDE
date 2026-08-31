@@ -11071,7 +11071,16 @@ desde el primer día.*
 
 ---
 
-#### (Post-F9.164) — ⏳ PENDIENTE DE DANIEL: sin la compuerta, **¿para qué sirve la firma de revisión del modelo?** (medido el 31-ago-2026)
+#### (Post-F9.164) — ✅ CERRADA: sin la compuerta, **¿para qué sirve la firma de revisión del modelo?** (medido el 31-ago-2026)
+
+> ⚠️ **Este encabezado decía «PENDIENTE DE DANIEL» y ya estaba contestada** — en **§Post-F9.169** de este
+> mismo archivo, que **toma la opción (a)**: *la revisión del modelo deja de ser una PUERTA y pasa a ser
+> un REGISTRO*. Se construyó en la versión **0.071**, ya en `prueba`. **No hay nada que preguntar.**
+>
+> 🔑 Y la razón por la que se decidió sola vale releerla: la regla de filtrado de la bandeja **se
+> justificaba en que «el muro ya no la frena»**, así que al quitar el muro **la justificación se
+> invierte** — los modelos que ya están produciendo pasan de ser los que se esconden a ser **los que
+> urge revisar**. El desarrollo de abajo se conserva porque es la medición que lo demostró.
 
 **Cómo salió.** La medición de la **0.065** (*disolver la compuerta*) encontró que el plan, tal como está
 escrito, **entrega la versión rota** — y de una forma que nadie había visto porque el efecto es a
