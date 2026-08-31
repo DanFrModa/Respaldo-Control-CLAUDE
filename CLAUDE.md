@@ -171,6 +171,97 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 > Daniel lo detectó preguntando *«¿estás trabajando?»*. **No estaba bloqueado: estaba parado.** La regla
 > existe para que esa distinción nunca vuelva a confundirse.
 
+> ## 🔴 REGLA 0-B — LOS DATOS DE HOY SON BASURA: EL SISTEMA MIRA HACIA ADELANTE (DANIEL, 30-ago-2026, §Post-F9.163)
+>
+> ## ⏳⏳ ESTA REGLA CADUCA — SÓLO VALE ANTES DE PRODUCCIÓN
+>
+> **Daniel, textual:** *«cabe aclarar que todo esto que comenté de la información vieja **es válido
+> mientras no hayamos ido a producción**. Después de que estemos en producción, habrá que medir qué
+> hacemos con información que hayamos hecho dentro del sistema y si luego se cambia algo… habrá que ver
+> cómo manejarlo.»*
+>
+> 🔑 **EL DISPARADOR ES CONCRETO Y VERIFICABLE: el día que la versión se rebautice `1.000`** (el hito del
+> arranque, ver `HISTORIAL-DE-VERSIONES.md` §«Cómo se numeran»), **esta regla DEJA DE APLICAR**. Mientras
+> el número siga empezando con `0.`, aplica entera.
+>
+> **Por qué caduca:** hoy los datos de `prueba` son basura porque **nadie operó el negocio con ellos**. En
+> producción serán **el negocio**: órdenes reales, compras reales, precios que se le cobraron a un
+> cliente. Ahí **no se puede tirar y volver a capturar**, y cada cambio de regla obliga a preguntarse qué
+> pasa con lo ya hecho — que es exactamente lo que hoy está prohibido gastar.
+>
+> ⚠️ **Si lees esto y la versión ya empieza con `1.`: PARA.** No apliques nada de lo de abajo, y **pregunta
+> a Daniel la política nueva** — él dijo que ese día *«revisamos esta regla desde el principio»*.
+>
+> ✅ **Y si la versión todavía empieza con `0.`: no hay nada que preparar.** *«Ahorita no te preocupes por
+> eso»* — la política de producción **no se diseña por adelantado**, ni se deja código «listo por si
+> acaso». Se decide el día que toque, con el sistema a la vista.
+>
+> **Textual de Daniel:**
+>
+> > *«Estamos trabajando en la versión de prueba… toda la información que haya ahí **no es importante, es
+> > basura. La vamos a limpiar.** Deja de preocuparte por información que ya tenga la receta, o en general
+> > información que ya esté. Todo lo que vamos haciendo nuevo está bien que aplique **sólo a los nuevos
+> > modelos** que vayamos a meter. Te veo muy preocupado por que los datos que ya tienen alguna cosa
+> > quieras hacer algo para poder revertir las cosas que tienen. Piensa que todo lo que vamos a usar de
+> > manera correcta es **información nueva**. No te preocupes incluso por la información que vamos a
+> > importar de Access. **Todo el sistema debe estar enfocado sólo en nueva información**, no en ver cómo
+> > arreglamos la que ya se hizo de una manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
+>
+> **Qué se DEJA de hacer, desde ya:**
+> 1. **No se auditan los datos existentes** de `prueba` buscando los que quedaron mal por un defecto. Se
+>    limpian, no se reparan. Nada de consultas de rescate ni de informes de daño sobre datos de prueba.
+> 2. **No se construyen backfills, reparaciones ni migraciones de datos** para dejar coherente lo ya
+>    cargado, salvo que Daniel lo pida por su nombre.
+> 3. **Una función nueva no tiene que ser retrocompatible con los datos viejos.** Si sólo funciona bien
+>    para lo que se capture de aquí en adelante, **está bien** y no hace falta declararlo como límite.
+> 4. **Lo migrado de Access no manda sobre el diseño.** Hay mucho que ya no aplica; no se dobla una
+>    función nueva para que le cuadre al histórico.
+>
+> ⚠️ **DÓNDE ESTÁ LA FRONTERA — esta regla habla de DATOS, no de REGLAS.** Lo que NO cambia ni un ápice:
+> - **D3 sigue intacto:** lo guardado es inmutable, cancelar es un movimiento inverso auditado, nunca se
+>   edita ni se borra para corregir. *Eso gobierna cómo el sistema trata los datos NUEVOS*, y es justo lo
+>   que hace que la información nueva sí valga.
+> - **Las guardas de entrada, la auditoría, las transacciones y el RBAC** siguen exactamente igual.
+> - **No es permiso para romper cosas que hoy funcionan** ni para saltarse pruebas: es permiso para **no
+>   gastar en reparar el pasado**.
+>
+> **Y el matiz sobre ACCESS, que Daniel precisó aparte:** *«si vamos a jalar los datos de Access… pero
+> asumo que todo lo que se hizo en Access viene de una versión con muchas menos funcionalidades y **la
+> información va a venir incompleta. Eso lo tengo completamente asumido**»*.
+> ⇒ **El histórico SÍ se importa, y llega con huecos A PROPÓSITO.** Un registro migrado al que le falten
+> campos **NO es un defecto**: es lo esperado, porque el sistema viejo no tenía ese concepto.
+> 🔑 **La línea fina: TOLERAR ≠ COMPENSAR.** Una función nueva debe **no romperse** cuando el dato viejo
+> falta, pero **NO debe doblarse para rellenarlo**: nada de inventar valores, de pantallas para
+> «completar el histórico», ni de bloquear una función porque el histórico no la puede alimentar. Si una
+> capacidad nueva sólo aplica a lo que se capture de ahora en adelante, **eso está bien y no hay que
+> avisarlo como carencia**.
+>
+> ---
+> ### 🔑 CÓMO SE APLICA, SIN PENSARLO (Daniel, 30-ago: *«que en nuevos chats no se detenga a ver cómo resuelve el tema de los datos viejos»*)
+>
+> **La única pregunta que hay que hacerse es: «¿esto funciona bien cuando el dato NO está?»**
+> No *«¿cómo arreglo los que ya están mal?»*. Esa segunda pregunta **no se hace nunca**. Daniel:
+> *«sólo hay que ver cómo guardamos y hacemos compatible todo lo que no tenga datos. Y punto. Sin más.»*
+>
+> | Si te encuentras con… | Qué haces | Qué NO haces |
+> |---|---|---|
+> | Un campo nuevo y filas existentes sin él | `NULL` o un `DEFAULT` en la migración, y **sigues** | Backfill, script de relleno, «reparar» las filas |
+> | Un registro migrado de Access sin el dato que tu función necesita | Que la función **no truene**: vacío, `—`, o simplemente no aplica | Inventar el valor, pedirlo en pantalla, bloquear la función |
+> | Un defecto que ya dejó datos mal en `prueba` | Arreglas **la entrada** para que no se repita. **Punto final** | Auditar la BD, consultas de rescate, informes de daño, migración correctiva |
+> | Una función nueva que sólo tiene sentido para lo que se capture desde hoy | **Está bien.** La construyes así y **ni lo mencionas** | Advertirlo como carencia, diseñar una variante para el histórico |
+> | Una regla nueva que el histórico no cumple | La regla aplica **de hoy en adelante** | Validar el histórico contra ella, marcarlo como inconsistente |
+>
+> ⛔ **PROHIBIDO GASTAR EN:** backfills · scripts de reparación · auditorías de datos existentes · consultas
+> de rescate · pantallas para «completar» el histórico · variantes de una función «para los datos viejos» ·
+> advertencias de que algo «sólo aplica a lo nuevo».
+>
+> 🚫 **Y prohibido PREGUNTARLE a Daniel qué hacer con datos ya existentes.** Ya está contestado, para
+> siempre, aquí: **se limpian; no se arreglan.** Preguntarlo otra vez es exactamente lo que esta regla
+> vino a impedir.
+>
+> 📌 **En una línea:** *lo viejo se tira, no se arregla; lo que falta se tolera; y lo nuevo se hace bien
+> desde el primer día.*
+
 1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
 2. **Flujo de ramas + AUTORIZACIÓN (innegociable):** rama de tarea → PR a **`prueba`** → **Gabriel verifica EN VIVO en Railway** (no en local) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.) La rama de tarea **NO debe trackear `prueba`** como upstream (riesgo de push accidental). **NADA de `git commit` ni `git push` sin autorización EXPRESA de Gabriel.** El flujo correcto al terminar una etapa:
    1. El lead y los agentes codean en el working tree (sin comitear nada).

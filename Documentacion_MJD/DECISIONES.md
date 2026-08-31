@@ -734,6 +734,7 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 5. *"Normalmente se descargan las telas al mismo tiempo cuando están relacionadas"* (la felpa y su cardigan al tono).
 6. Sobrantes: *"solo damos salida de lo que se corta, no lo que viene en la partida. Bajo esa manera de trabajar no veo la necesidad de volver a meterlo al almacén."* → **NO hay devoluciones de tela al almacén**; nunca sale más de lo que se consumió.
 7. Entradas: permitir **las dos** vías (con orden de compra y por factura/remisión sin OC), con **una cabecera por documento y N partidas** (cada una con su color y sus telas al tono).
+   🔴 **SUPERADO (§Post-F9.159, 30-ago-2026):** la vía «sin OC» **queda cerrada**. Daniel: *«es imposible. Sin OC no podemos recibir tela. ¿De quién recibiríamos sin OC? No puede suceder»*. Esta línea es anterior a que se construyera la cadena de compras; **prevalece §Post-F9.159**.
 
 **Lo que YA estaba y no había que construir:** el **lote** es una partida de UN color con **N telas dentro** (`Lote` + `LoteComponente`, decisión **D5**) — dos partidas de negro son dos lotes, cada uno con su cardigan al tono, y el inventario se lleva por **tela × lote × almacén**. También el **precio por color** (`TelaColor`) y el **precio por proveedor y por color** (`TelaProveedor`/`TelaProveedorColor`, F8-E1).
 
@@ -4254,8 +4255,12 @@ La conclusión no cambia: catálogo nuevo + dimensión nueva de existencias + re
 del histórico = **otra etapa, del tamaño de ésta o más**. Por eso NO entró aquí (habría duplicado el
 alcance de la etapa que Daniel puso como prioridad).
 
-⬜ **Pendiente de Daniel:** ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
-justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
+✅ **CONTESTADO — ya no preguntar.** Daniel lo cerró el **22-ago-2026** en **§Post-F9.91**: *«Va.
+Entonces lo dejamos así y ponemos los avíos con color en la misma descripción del avío»*. ⇒ **basta la
+descripción; NO se hace catálogo por color.** Se conserva la pregunta original abajo sólo como historia:
+
+> ⬜ ~~Pendiente de Daniel:~~ ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
+> justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
 ⚠️ **Al preguntárselo, hay que poner sobre la mesa que en D13 (4-jul-2026) él ya había dicho** *"consumo
 por talla solo ciertos avíos (telas no; **tampoco por color**)"* — puede seguir vigente o la práctica
 puede haberlo rebasado, pero la pregunta se hace con esa decisión a la vista, no como terreno virgen.
@@ -7928,7 +7933,18 @@ partiera, Daniel creería haber cerrado la puerta y quedaría abierta la de a un
 
 #### 6. Las 10 preguntas para Daniel, cada una con su default
 
-⏳ **Ninguna está contestada.** El default es lo que se construiría si sólo dijera «adelante».
+✅ **CONFIRMADAS POR DANIEL (30-ago-2026).** Él mismo lo dijo: *«Ya contesté esas 10 preguntas»*. La
+columna de la derecha era el **default propuesto** y quedó **confirmada tal cual**. De dos hay cita
+textual suya: **6b** — *«No se prohibe, se puede hacer a mano (Solo yo)»* — y **6a** — *«Ok como
+propones»*.
+
+🔴 **Consecuencia dura de la 6b: ELIMINA la etapa E5 del troceado de §7.** El plan 1:N pasa de
+**cinco etapas a cuatro** — el candado de «ya cortada» **NO se construye**.
+
+⚠️ **Límite honesto de este anclaje, para que nadie lo lea de más:** sólo 6a y 6b están citadas
+textualmente en el repo; las otras ocho se dan por confirmadas **en bloque**, apoyadas en la frase de
+Daniel de arriba y en el registro de `HOJA-DE-RUTA.md` §1. **Si alguna vez una de ellas sorprende al
+construirla, ésta es la línea a releer** — y se le pregunta esa sola, no las diez.
 
 ⚠️ **Se le presentan en SU idioma, y eso obliga a dos cosas** que la primera redacción no cumplía:
 **(1)** nunca decirle *«el hijo»* ni *«el padre»* —jerga nuestra, jamás suya—, y **(2)** no gastarle
@@ -9695,13 +9711,15 @@ Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
    entra primero, la referencia apunta a algo que aún no existe — por eso la cita va **textual aquí**
    y basta por sí sola; el numeral es sólo el puntero para cuando las dos ramas estén juntas. Engancha con el
    pendiente ya abierto de **ratificar tipo de prenda y género obligatorios**.
-5. **PLANIFICACIÓN: versión 0.062**, después de la **0.060** (la mesa con su forma real + estimados
-   persistidos + target price) y la **0.061** (estados del modelo). Va después **porque necesita que la
-   mesa ya sepa mostrar y mover costos renglón por renglón**: un modelo estimado sin eso no se puede
-   cotizar.
+5. **PLANIFICACIÓN: versión 0.064** ⚠️ (decía 0.062, luego 0.063; **ha corrido dos lugares** — la segunda vez por el hotfix del candado del precosto, que entró como 0.063 — ver
+   la tabla del programa en `HOJA-DE-RUTA.md` §1). Va después de la **0.060** (la mesa con su forma real
+   + estimados persistidos + target price) y de la **0.062** (los estados del modelo, que en la
+   numeración vieja eran la 0.061). **Las dos ya están ✅ CONSTRUIDAS y en `prueba`.** Va después
+   **porque necesita que la mesa ya sepa mostrar y mover costos renglón por renglón**: un modelo
+   estimado sin eso no se puede cotizar.
 
 - **Aplica en:** la mesa de negociación, el alta de desarrollo/modelo y el precosteo. ⬜ **POR
-  CONSTRUIR** (versión 0.062). **Fecha:** 2026-08-29.
+  CONSTRUIR** (versión **0.064**). **Fecha:** 2026-08-29.
 
 ---
 
@@ -9894,6 +9912,8 @@ los vendo»*. La única salida hoy sería **borrar** el renglón — justo lo qu
    comentarios, y se registra **quién lo dropeó, cuándo, y quién lo revivió**. Daniel eligió esto sobre
    la alternativa estricta (dar de alta un renglón nuevo y negociar desde cero).
 
+✅ **CONSTRUIDA** (versión **0.062**, 30-ago-2026).
+
 **Alcance.** Migración **sí** (la columna de estado del renglón, con valor inicial `abierto` para las
 filas existentes — *todo renglón nace ahí*, §Post-F9.151). **Permisos: NO** — `listas.negociar` ya
 gobierna el cambio de estado de la lista y es el candidato natural para el del renglón. **Seed: NO** si
@@ -9936,6 +9956,9 @@ la frase que **explica la regla y vale más que la regla**:
 4. 📌 **La bitácora deja de mentir:** además del total registra `renglonesRecalculados` y
    `terminalesRespetados` (id, estado y precio de cada uno). Antes habría afirmado haber tocado renglones
    que no tocó.
+
+✅ **CONSTRUIDA** (versión **0.062**, 30-ago-2026): `editarFactoresLista` salta los renglones
+en estado terminal, y la bitácora registra `terminalesRespetados`.
 
 📌 **Anotado, NO cambiado (queda como pregunta abierta, sin fecha):** hoy cambiar factores **también**
 tumba la firma de los renglones **abiertos y en negociación**. Con la frase de Daniel eso admite dos
@@ -9984,5 +10007,363 @@ Y pidió explícitamente que quedara **donde toda sesión nueva lo lea**, no en 
 - **Aplica en:** TODA sesión, siempre. Escrita como **REGLA 0** al inicio de `CLAUDE.md` §7 — el primer
   archivo que lee cualquier chat nuevo — para que no dependa de que alguien recuerde esta decisión.
   **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.158) — ⭐⭐ LA RECETA SE COPIA A LA OP **AL LIBERARSE**, Y LA FIRMA GOBIERNA LA COMPRA (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Eran las **dos preguntas abiertas de §Post-F9.144(c)** que bloqueaban el Bloque 2 del
+programa (versiones 0.064–0.067), y que estaban registradas como *«Daniel no lo contestó»*. Las contestó
+de corrido, y de paso **dejó un pendiente nuevo**, explícitamente para después.
+
+### (a) ¿Qué pasa con la COPIA de la receta que la OP se lleva?
+
+**Contexto del problema:** `copiarRecetaDelModelo` congela el BOM **al crear la orden** (§Post-F9.34). Si
+la OP nace **antes** de que Desarrollo termine, se lleva la receta **vieja**. ¿Se re-copia? ¿Basta el
+detector de desalineación? ¿Se corrige a mano? Daniel, textual:
+
+> *«La principal función de la receta son las compras. Para poder hacer las compras se tienen que liberar
+> los elementos por parte de desarrollo. Entonces más bien yo copiaría la receta en la OP **hasta que se
+> libere** por parte de desarrollo. Me parece que es lo más sensato. **No tiene sentido cargarla antes.**»*
+
+⇒ **DECIDIDO: la receta NO se copia al crear la orden. Se copia cuando Desarrollo la libera.** Con eso la
+pregunta se disuelve en vez de resolverse: **no hay receta vieja que arrastrar**, porque no se copia nada
+hasta que hay algo firmado que copiar. ⭐ El razonamiento de Daniel es el que ordena todo: *la receta
+existe para comprar*, así que su momento natural es el de la liberación, no el del alta de la orden.
+
+⚠️ **Consecuencia a manejar al construir:** una OP recién creada **no tendrá receta** — es lo esperado, no
+un error. Es justo lo que la **0.065** («la OP incompleta, marcada hasta que se meta la receta y se
+libere») ya contemplaba. Y encaja con §Post-F9.144(c): *lo que se frena no es producir, es **comprar***.
+
+### (b) ¿Cortar puede hacerse con la receta sin firmar?
+
+> *«Pues se va firmando **por cada elemento**. Para poder comprar la tela, se debe de haber firmado antes
+> la receta **al menos en la tela**. **Sí se puede cortar** antes de firmar la demás parte de la receta.»*
+
+⇒ **DECIDIDO, y confirma el diseño ya construido en V1-E3h/E3k:** la firma es **por renglón**
+(`liberadoEn`), no todo-o-nada, y **lo que gobierna es la COMPRA de ESE elemento**: para comprar la tela,
+la tela tiene que estar firmada; los demás renglones no estorban. **Cortar NO pasa por esas puertas** — se
+mantiene la regla vieja (*«el piso no se detiene porque Desarrollo no haya terminado»*). **No se pone
+ninguna raya nueva en el corte.**
+
+### 📌 (c) PENDIENTE NUEVO que Daniel deja anotado, y pide NO tocar todavía
+
+> *«Acá nos podemos topar con algo que no hemos puesto anteriormente en ningún lugar. Pero **ahorita no
+> quiero moverle. Hasta que se termine todo.** Pero te lo dejo para irlo poniendo, pon un pendiente para
+> después: a veces hay órdenes que **no compramos la tela sino que se ocupa algún stock que tengamos en
+> almacén**. En ese caso ¿cómo va a funcionar? ¿**Se hace una requisición al almacén** para poder sacar la
+> tela del almacén? (Como si fuera una **OC interna**)»*
+
+⚠️ **NO SE CONSTRUYE AHORA. Queda como requisito nuevo, sin número de versión, por instrucción expresa.**
+Lo que plantea: hoy la cadena asume que **todo material se compra** (la explosión propone OC y el kardex
+entra por recepción). La tela que **ya está en el almacén** no tiene camino propio: no hay «requisición
+interna» que la reserve para una OP y la saque contra ella. Daniel mismo propone la forma —**una OC
+interna contra el almacén**—, que encaja con lo ya construido (el motor de kardex y las notas de salida de
+F4 existen; lo que falta es el documento que las amarre a la OP y que la explosión lo reconozca como
+«cubierto» en vez de proponer comprarlo). **Se retoma cuando el programa vigente esté cerrado.**
+
+- **Aplica en:** (a) y (b) desbloquean el **Bloque 2** (0.064–0.067). (c) es requisito nuevo **fuera** del
+  programa vigente. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.159) — 🔴 NO SE RECIBE TELA SIN OC (se IMPIDE), y **el defecto de fondo: las respuestas se usaban pero no se anclaban** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Se le presentaron a Daniel tres «decisiones que faltaban». Su respuesta:
+
+> *«Ya te había contestado todo lo que dices. Debe de estar en algún lado. Ya contesté esas 10 preguntas.
+> Ya contesté el dígito adicional, que cuando haga falta lo decidimos. Y lo de recibir la tela sin OC
+> también ya lo contesté… **es imposible. Porque sin OC no podemos recibir tela. ¿De quién recibiríamos
+> sin OC? No puede suceder.**»*
+
+**Tenía razón en las tres, y al verificarlas apareció el defecto de fondo — que NO era «falta la respuesta»:**
+
+### (a) 🔴 La decisión de la tela sin OC: se IMPIDE. Y el archivo se contradecía a sí mismo
+
+**Ésta es la causa real de que quedara listada como abierta:** `DECISIONES.md` tenía **las dos respuestas,
+opuestas**, y nadie había zanjado cuál manda:
+
+| Dónde | Qué decía |
+|---|---|
+| `DECISIONES.md:736` | *«Entradas: permitir **las dos** vías (con orden de compra y por factura/remisión **sin OC**)»* |
+| `DECISIONES.md:5252` | *«el color se define en la OC, y **no se recibe nada sin OC previa**»* |
+
+⇒ **DECIDIDO: se IMPIDE. Bloqueo, no aviso.** Y con un argumento que no admite vuelta: no es una
+preferencia operativa, es que **no puede ocurrir físicamente** — *«¿de quién recibiríamos sin OC?»*.
+⚠️ **La línea 736 queda SUPERADA** (venía de la propuesta original de Finanzas/proveedores, anterior a que
+la cadena de compras se construyera): **prevalece 5252 y esta decisión**. Al construir el letrero de
+`CapturaRenglonesTelaColor` (versión **0.072**), el camino «sin OC» **no se advierte: se cierra**.
+
+### (b) El dígito de continuación YA estaba decidido — el error fue presentarlo como pendiente
+
+`DECISIONES.md` §Post-F9.135 pregunta 10 ya dice, con sus palabras: **«Decidirlo el día que pase**, con el
+aviso encima y a la vista de qué dígitos están libres — **no ahora a ciegas»**. ⇒ **La decisión ESTÁ
+tomada: la decisión es diferirla.** Listarla como «decisión que falta» fue un error del lead: una decisión
+diferida a conciencia **no es una decisión pendiente**. No se le vuelve a preguntar.
+
+### (c) 🔴 EL DEFECTO DE FONDO — la tabla no distingue «propuesto» de «decidido»
+
+Las 10 preguntas de §Post-F9.135 **están contestadas** (`HOJA-DE-RUTA.md` §1 lo registra, y cita la
+respuesta a la 6b: *«No se prohibe, se puede hacer a mano (Solo yo)»*, que **elimina la etapa E5** del plan
+1:N). Pero en `DECISIONES.md` **la tabla sigue mostrando sólo la columna «default propuesto»**, sin marca
+de confirmación.
+
+⭐ **Ahí está el defecto que Daniel señaló, y es de FORMA, no de contenido:** quien lee esa tabla **no puede
+distinguir «esto es lo que proponemos» de «esto es lo que Daniel decidió»**. La respuesta se **usó** —el
+plan 1:N ya bajó de cinco etapas a cuatro por la 6b— pero **no se ancló** donde manda. Y el mismo patrón
+apareció hoy en §Post-F9.151 (afirmaba que los renglones no tenían estado, y era falso).
+
+**La regla que queda:** cuando Daniel confirma un default, **se marca como confirmado en la tabla, con la
+fecha**, aunque el texto de la columna no cambie ni una letra. *Un default confirmado y un default a secas
+se leen igual y significan cosas opuestas.* Es la hermana documental de la REGLA 0 (§Post-F9.157): lo que
+no queda escrito donde manda, se vuelve a preguntar — y hacerle repetir una decisión al dueño es el peor
+uso de su tiempo.
+
+- **Aplica en:** (a) la versión **0.072**; (b) y (c) son correcciones documentales, de aplicación
+  inmediata. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.160) — ⭐ TRES DECISIONES DE DANIEL QUE VIVÍAN **SÓLO EN UNA CELDA DE TABLA** (rescatadas 30-ago-2026)
+
+**Cómo salió.** El barrido que nació de la queja de Daniel (*«ya te había contestado todo… debe de estar
+en algún lado»*, §Post-F9.159) encontró **tres decisiones suyas, con cita textual, que nunca llegaron a
+este archivo**: entraron al repo en un solo commit que tocó **únicamente `HOJA-DE-RUTA.md`**, y quedaron
+viviendo dentro de una celda de la tabla del programa. Dos de ellas **llevan esquema de base de datos
+detrás**. Se rescatan aquí, que es donde mandan.
+
+### (a) 🔴 EL CANDADO DE COMPRA: abrir y cerrar la receta de la OP → versión **0.066**
+
+> *«pongamos un candado que **no se pueda comprar nada hasta que esté cerrado otra vez**»*
+
+**La regla:** una receta de OP **ya liberada se puede volver a ABRIR** para corregirla, y **mientras está
+abierta, la compra de esa orden queda bloqueada**; se desbloquea al **cerrarla** de nuevo.
+
+⚠️ **NO es lo mismo que la firma por renglón de §Post-F9.158(b)**, y confundirlas sería un error caro: la
+firma es *«este elemento ya se puede comprar»* (de a uno, hacia adelante); **esto es reabrir lo ya firmado**
+y congelar la compra **de toda la orden** mientras dure la corrección. Son dos mecanismos distintos sobre
+el mismo dato. **Lleva migración.**
+
+### (b) 🔴 LA OP INCOMPLETA → versión **0.065**
+
+> *«La OP queda como **incompleta**, hasta que se meta la receta y se libere»*
+
+**La regla:** una orden nace **marcada como incompleta** y deja de estarlo cuando su receta entra y se
+libera. ⭐ **Encaja exactamente con §Post-F9.158(a)** —la receta se copia **al liberarse**, no al crear la
+orden—: sin ese estado, una OP recién creada se vería idéntica a una terminada, y **nadie sabría que le
+falta lo principal**. Es el letrero de esa decisión.
+
+### (c) 🟡 EL KPI DEL MAQUILERO: por UMBRAL, no proporcional → **sin versión, fuera del programa**
+
+> *«**arriba de un cierto porcentaje sí va a pesar**»*
+
+**El principio está decidido** —un **umbral**, no un castigo proporcional— y **el número se fija cuando se
+vea la calificación de maquileros**, no antes. ⚠️ **Y hay un pendiente previo que lo condiciona: las
+segundas HOY NO SE MIDEN** (el KPI se arma con auditorías AQL), así que esa pieza **empieza por medirlas**,
+no por poner dos umbrales.
+
+---
+
+#### (Post-F9.161) — 📌 R22 / MÓDULO 16: SEGUIMIENTO DE ACUERDOS CON CLIENTES — **fuera de la primera versión** (DANIEL, 30-ago-2026)
+
+> *«sería buenísimo que la gente de ventas tenga **todos los pendientes que se tiene con cada cliente** y
+> ahí vamos colgando estas negociaciones… **Pero eso es para otro módulo. Y para una segunda etapa.**»*
+
+**Requisito nuevo (R22) y módulo nuevo (16), explícitamente FUERA del alcance de la primera versión.** Se
+registra aquí —y no sólo en la hoja de ruta— porque es a la vez **un requisito** y **una decisión de
+alcance**: sin este registro, o alguien lo construye por error dentro de la v1, o se pierde.
+
+⭐ **La frase que le da su forma, y que hay que respetar cuando se construya: el seguimiento cuelga DEL
+CLIENTE**, y las negociaciones se cuelgan de él — **no al revés**. Es lo que lo hace un módulo aparte y no
+una pestaña más de la lista de precios.
+
+- **Aplica en:** nada de la primera versión. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.162) — 🔴 EL CANDADO DEL PRECOSTO QUE LA 0.060 DESDENTÓ, y la lección que deja (30-ago-2026)
+
+**Cómo salió.** No lo pidió Daniel: **lo encontró la medición previa de la 0.064** (cotizar en la cita un
+modelo que no existe). Al preguntarse qué pasaría con un modelo creado **desde cero**, apareció que el
+sistema **ya no lo protegía**.
+
+🔴 **El defecto.** `exigirCostoCongelable` existe porque un precosto congelado es **INMUTABLE** y de él
+sale **el precio que se cotiza al cliente**: congelar uno en **$0.00** sería fijar un precio sobre la nada.
+La versión **0.060** metió el **empaque como tercera ancla fija**, y `generarPrecosto` **siempre** agrega
+esa línea con su default (**2.20**). ⇒ Un modelo con la receta vacía **ya no suma cero: suma 2.20**, pasa
+la guarda y **se congela**. La protección seguía ahí, pero **ya no protegía de nada real**.
+
+⭐⭐ **La lección, y es la más importante de la jornada:** *una guarda no se rompe sólo cuando alguien la
+borra — se rompe cuando cambia el terreno que medía.* Nadie tocó `exigirCostoCongelable`; se le movió el
+suelo debajo. **Al agregar un valor que el sistema pone por su cuenta, hay que preguntarse qué umbrales
+dejan de significar lo que significaban.**
+
+### Lo que queda decidido
+
+1. **La regla:** un precosto congela sólo si **algo que NO es el ancla de empaque aporta importe** —
+   cualquier renglón de receta valuado, **o** maquila **o** corte capturados, **o** un renglón manual que
+   una persona haya agregado. **El empaque solo NO basta:** lo pone el sistema, no es una decisión de
+   costeo.
+2. ⭐ **No rechaza nada que fuera congelable antes de la 0.060 — verificado por DEMOSTRACIÓN, no por
+   opinión.** Como **todos los importes son ≥ 0 por contrato** (`precioUnit`, `consumo`, `maquilaBase` y
+   `costoEmpaqueBase` son todos `.nonnegative()`), *«existe un no-empaque > 0»* ≡ *«Σ no-empaque > 0»* ≡ la
+   guarda vieja. Es **literalmente** el candado de siempre con el empaque descontado.
+3. **El costeo por proceso NO se rompe:** un modelo **sin receta** con maquila y/o corte capturados **sí
+   congela** — no todo lleva BOM. Con prueba propia que lo vigila.
+4. **La guarda suma en vez de existir** (`Σ no-empaque > 0`): así no depende de que los importes sigan
+   siendo no-negativos para siempre. Con `∃` bastaba hoy, pero `tela 30 + descuento −30 + empaque 2.20`
+   habría congelado un precosto cuyo total real es la bolsa — **el mismo defecto que este arreglo cierra**.
+   *Una guarda no debe apoyarse en una invariante que otro archivo puede cambiar.*
+5. **Es un candado de ENTRADA (D3): no toca nada ya congelado.** ⚠️~~ **Pendiente operativo de Gabriel:**
+   correr la consulta que busca precostos congelados cuyo total sea sólo empaque. La ventana es corta (la
+   0.060 lleva ~1 día en `prueba`), pero **si aparece alguno y ya está en una lista aprobada, es un precio
+   mal cotizado** — y por D3 no se corrige editando: se genera una versión nueva y se renegocia.~~
+   🔴 **RETIRADO por §Post-F9.163 (mismo día):** los datos de `prueba` son basura y se van a limpiar.
+   **No se audita ni se rescata nada.** El candado de entrada impide que vuelva a pasar, y eso basta.
+
+📌 **Deuda anotada, hermana de este defecto:** `agregarLineaManual` deja nacer renglones en **$0.00 en
+silencio** cuando el avío ligado no tiene precio en ninguna parte de la cascada; la marca
+`sinPrecioCatalogo` va **sólo a la bitácora** y el usuario nunca se entera. Con este candado ya no puede
+congelarse *solo*, pero **sí puede colarse dentro de un precosto que por lo demás está bien**. Merece que
+el aviso llegue a la pantalla.
+
+- **Aplica en:** versión **0.063**. **Sin migración, sin permisos, sin seed** ⇒ no exige `SEED_ON_START`.
+  **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.163) — 🔴🔴 LOS DATOS DE HOY SON BASURA: **EL SISTEMA MIRA HACIA ADELANTE** (DANIEL, 30-ago-2026)
+
+> ## ⏳⏳ ESTA DECISIÓN CADUCA — SÓLO VALE **ANTES DE PRODUCCIÓN**
+>
+> Daniel lo precisó él mismo, el mismo día:
+>
+> > *«cabe aclarar que todo esto que comenté de la información vieja **es válido mientras no hayamos ido a
+> > producción**. Después de que estemos en producción, habrá que **medir qué hacemos** con información que
+> > hayamos hecho dentro del sistema y si luego se cambia algo… habrá que ver cómo manejarlo.»*
+>
+> 🔑 **El disparador es concreto y verificable: el día que la versión se rebautice `1.000`** — el hito del
+> arranque, ya definido en `HISTORIAL-DE-VERSIONES.md` §«Cómo se numeran». **Mientras el número empiece
+> con `0.`, esta decisión aplica entera. En cuanto empiece con `1.`, deja de aplicar.**
+>
+> **Por qué caduca, y es la razón de fondo:** hoy los datos de `prueba` son basura porque **nadie operó el
+> negocio con ellos** — se capturaron para probar. En producción serán **el negocio**: órdenes reales,
+> compras reales, precios que ya se le cobraron a un cliente. Ahí **no se puede tirar y volver a
+> capturar**, y cada cambio de regla obliga a preguntarse qué pasa con lo ya hecho. Es decir: **lo que hoy
+> está prohibido gastar, en producción será obligatorio pensarlo.**
+>
+> ✅ **Y NO ES UN PENDIENTE QUE ARRASTRAR — Daniel lo cerró así:** *«o sea, aplica a todo lo que se está
+> haciendo ahorita. Cuando entremos en producción, **revisamos esta regla desde el principio** para dejar
+> bien clara la nueva política. **Ahorita no te preocupes por eso.**»*
+>
+> ⇒ **La política de datos en producción NO se diseña por adelantado.** No hay que agendarla, ni
+> prepararla, ni dejar el código «listo por si acaso». Se revisa **el día del rebautizo a `1.000`**, con
+> el sistema ya construido a la vista — que es cuando se puede decidir bien.
+>
+> 📌 **Es el mismo patrón que ya usa el proyecto** con el dígito de continuación de la nomenclatura
+> (§Post-F9.135 pregunta 10): *«decidirlo el día que pase, con el aviso encima, no ahora a ciegas»*.
+> **Una decisión diferida a conciencia NO es una decisión pendiente**, y tratarla como tal es gastar dos
+> veces: hoy preparándola, y el día que llegue rehaciéndola.
+
+
+**Cómo salió.** Daniel lo dijo tras ver, a lo largo de un día entero, que el lead **se frenaba una y otra
+vez cuidando datos que a él no le importan**:
+
+> *«Estamos trabajando en la versión de prueba… toda la información que haya ahí **no es importante, es
+> basura. La vamos a limpiar.** Deja de preocuparte por información que ya tenga la receta, o en general
+> información que ya esté. Todo lo que vamos haciendo nuevo está bien que aplique **sólo a los nuevos
+> modelos** que vayamos a meter. Te veo muy preocupado por que los datos que ya tienen alguna cosa quieras
+> hacer algo para poder revertir las cosas que tienen. Piensa que todo lo que vamos a usar de manera
+> correcta es **información nueva**. No te preocupes incluso por la información que vamos a importar de
+> Access. Hay muchas cosas que ya no van a aplicar a las nuevas cosas que estamos haciendo. **Todo el
+> sistema debe estar enfocado sólo en nueva información**, no en ver cómo arreglamos la que ya se hizo de
+> una manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
+
+### Lo que queda decidido
+
+1. **No se auditan los datos existentes** de `prueba` buscando los que quedaron mal por un defecto. **Se
+   limpian, no se reparan.** Nada de consultas de rescate ni de informes de daño sobre datos de prueba.
+2. **No se construyen backfills, reparaciones ni migraciones de datos** para dejar coherente lo ya cargado
+   — salvo que Daniel lo pida por su nombre.
+3. **Una función nueva NO tiene que ser retrocompatible con los datos viejos.** Si sólo funciona bien para
+   lo que se capture de aquí en adelante, **está bien**, y ni siquiera hace falta declararlo como límite.
+4. **Lo migrado de Access no manda sobre el diseño.** Hay mucho que ya no aplica; **no se dobla una función
+   nueva para que le cuadre al histórico**.
+
+### ⚠️ LA FRONTERA — habla de DATOS, no de REGLAS
+
+Escrito con precisión a propósito, porque mal leído esto haría daño. **Lo que NO cambia:**
+
+- **D3 sigue intacto:** lo guardado es **inmutable**; cancelar es un **movimiento inverso auditado**; nunca
+  se edita ni se borra para corregir. ⭐ Eso gobierna cómo el sistema trata **los datos NUEVOS** — y es
+  justamente lo que hace que la información nueva **sí valga**. Tirar los datos viejos y tratar bien los
+  nuevos son la misma idea, no ideas opuestas.
+- **Las guardas de entrada, la auditoría, las transacciones y el RBAC** siguen exactamente igual.
+- **No es permiso para romper lo que hoy funciona**, ni para saltarse pruebas. Es permiso para **no gastar
+  en reparar el pasado**.
+
+### El matiz sobre ACCESS, que Daniel precisó aparte
+
+> *«si vamos a jalar los datos de Access… pero asumo que todo lo que se hizo en Access viene de una versión
+> con **muchas menos funcionalidades** y **la información va a venir incompleta. Eso lo tengo completamente
+> asumido.**»*
+
+⇒ **El histórico SÍ se importa** —esto no cancela el ETL ni F10— **y llega con huecos a propósito**. Un
+registro migrado al que le falten campos **NO es un defecto que reportar ni que arreglar**: es lo esperado,
+porque el sistema viejo no tenía ese concepto. Ejemplos que ya viven así en el repo y **están bien**:
+`cantidadIncompletas` es `NULL` en todo lo migrado (Access no tenía «prenda incompleta»), y los modelos
+migrados no tienen `codigoDesarrollo` (no había desarrollo).
+
+🔑 **La línea fina, y es la que hay que tener presente al construir: TOLERAR ≠ COMPENSAR.**
+- ✅ **Tolerar:** una función nueva **no se rompe** cuando el dato viejo falta.
+- ❌ **Compensar:** inventar valores, construir pantallas para «completar el histórico», hacer backfills, o
+  **bloquear una función porque el histórico no la puede alimentar**.
+
+📌 Y su corolario práctico: **si una capacidad nueva sólo aplica a lo que se capture de ahora en adelante,
+eso está bien y NO hay que avisarlo como carencia.** Decirlo en cada entrega es otra forma de gastar el
+tiempo de Daniel en algo que él ya dio por asumido.
+
+### 🔑 Cómo se aplica, sin pensarlo — la reformulación que pidió Daniel
+
+Daniel volvió sobre ella para que **no se pierda tiempo ni siquiera en interpretarla**:
+
+> *«deja esto perfectamente bien documentado, para que **en nuevos chats no se detenga a ver cómo resuelve
+> el tema de los datos viejos**. Ni los que están ahorita en prueba ni los que vienen de Access. Más bien
+> sólo hay que ver **cómo guardamos y hacemos compatible todo lo que no tenga datos. Y punto. Sin más.**»*
+
+⭐ **La regla, dicha en positivo, es una sola pregunta:** *«¿esto funciona bien cuando el dato NO está?»*
+La otra pregunta —*«¿cómo arreglo los que ya están mal?»*— **no se hace nunca**.
+
+| Si aparece… | Qué se hace | Qué NO se hace |
+|---|---|---|
+| Un campo nuevo y filas existentes sin él | `NULL` o `DEFAULT` en la migración, y se sigue | Backfill, script de relleno, «reparar» filas |
+| Un registro migrado sin el dato que la función necesita | Que **no truene**: vacío, `—`, o no aplica | Inventar el valor, pedirlo en pantalla, bloquear la función |
+| Un defecto que ya dejó datos mal en `prueba` | Se arregla **la entrada** para que no se repita. **Punto final** | Auditar la BD, consultas de rescate, informes de daño |
+| Una función que sólo tiene sentido para lo capturado desde hoy | Se construye así **y ni se menciona** | Advertirlo como carencia, hacer una variante para el histórico |
+| Una regla nueva que el histórico no cumple | Aplica **de hoy en adelante** | Validar el histórico contra ella, marcarlo inconsistente |
+
+⛔ **PROHIBIDO GASTAR EN:** backfills · scripts de reparación · auditorías de datos existentes · consultas
+de rescate · pantallas para «completar» el histórico · variantes «para los datos viejos» · advertencias de
+que algo «sólo aplica a lo nuevo».
+
+🚫 **Y PROHIBIDO PREGUNTARLE A DANIEL qué hacer con datos ya existentes.** Está contestado para siempre
+aquí: **se limpian; no se arreglan.** Volver a preguntarlo es exactamente lo que esta decisión vino a
+impedir — y ya pasó cuatro veces en un solo día.
+
+📌 **En una línea:** *lo viejo se tira, no se arregla; lo que falta se tolera; y lo nuevo se hace bien
+desde el primer día.*
+
+### Lo que esta decisión RETIRA de inmediato (casos reales del mismo día)
+
+| Lo que se había pedido/anotado | Qué pasa ahora |
+|---|---|
+| 🔴 **Buscar en `prueba` los precostos ya congelados de puro empaque** (§Post-F9.162 punto 5) — se le había pedido a Gabriel correr una consulta SQL | **RETIRADO.** Son datos basura. El candado de entrada ya impide que vuelva a pasar; lo que quedó mal se limpia con el resto |
+| **Qué hacer con las prendas incompletas que quedaron en tránsito** entre la 0.059 y la merma (§Post-F9.154) | **RETIRADO.** No se limpian a mano ni se barren con un proceso: se van con la limpieza general |
+| **La preocupación de que cambiar el default de `baseProrrateo` reescribiera órdenes ya costeadas** (§Post-F9.154) | La **cautela técnica se conserva** —no queremos una función que reescriba en silencio, y eso vale para datos nuevos— pero **deja de ser un riesgo que frene la decisión** |
+| **«No retroactiva al histórico migrado»** como requisito de la merma (§Post-F9.154) | Sigue siendo cierto por construcción, pero **ya no hay que diseñar para garantizarlo** |
+
+- **Aplica en:** TODA sesión, siempre. Escrita como **REGLA 0-B** en `CLAUDE.md` §7, junto a la REGLA 0,
+  porque las dos atacan lo mismo: **el lead gastando el tiempo de Daniel y los recursos del proyecto en
+  cosas que no avanzan**. **Fecha:** 2026-08-30.
 
 ---

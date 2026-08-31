@@ -154,16 +154,22 @@
 > | **0.060** ✅ *(en `prueba`, 30-ago)* | **La mesa con su forma real + el guardado.** Tela con **precio y consumo separados** y movibles · **avíos desglosados** y movibles · **foto** principal del modelo · **TARGET PRICE** del cliente (lo captura Aurora en el renglón de la lista; **informa, NO bloquea**) · **encabezado** (hoy se parte palabra por palabra) · **costo de EMPAQUE** como **tercera ancla fija** junto a maquila y corte (`CONCEPTOS_ANCLA`), con **default 2.20 en `ConfiguracionEmpresa`, NO hardcodeado** · y encima **los estimados SE GUARDAN** (último estado, desglose por concepto, al cerrar la negociación; **NO** autosave por tecla). **LLEVA MIGRACIÓN.** ⚠️ **Ya existe y NO se reconstruye:** el editor de renglones con `consumo`/`precioUnit`/`ajustado` (`DialogoPrecosto.tsx`); `desgloseCostoLinea` **aplasta por concepto** — el defecto es que agrupa, no que falte el dato | §Post-F9.149 · .150 · **.153** |
 > | **0.061** ⬜ | **La incompleta sale de Tránsito como merma · el divisor pasa a `recibido` · y ⭐ EL COSTO SE CONGELA AL CERRAR.** Las tres decididas por Daniel el 30-ago (**§Post-F9.154**), y la tercera **la levantó él**: *«¿en qué momento se define que ya se cerró el costo? ¿O va cambiando?»* — **va cambiando, medido**: se persiste el dinero y la base, pero la CANTIDAD se re-suma en cada lectura ⇒ con `recibido` el costo queda **vivo hasta el último recibo**. Adoptar el divisor sin el congelado habría dejado el costo bailando para siempre. 🔴 **Lo que el plan viejo decía MAL, ya medido:** el default **NO vive en dos sitios sino en CINCO** (+1 en SQL crudo), y el que el plan no nombraba —el `.default` del Zod— **puede reescribir órdenes ya costeadas** en un PUT que omita el campo ⇒ el cambio aplica **sólo hacia adelante**; y la **división entre cero YA está guardada en los seis divisores** ⇒ ahí no hay defecto, sólo falta **redactar** «aún no hay piezas recibidas». ⭐ **La merma está construida al ~70 %**: transacción, auditoría, almacén de tránsito y **la reversión al cancelar (que sale gratis: el motor ya revierte por origen)**; falta un código de catálogo y una rama. **NO es retroactiva al histórico** y no hay que programarlo: lo migrado no tiene el dato. **Seed ⇒ `SEED_ON_START=true`** · migración sólo por el `@default` · **sin permisos** | §Post-F9.154 |
 > | **0.062** ✅ | **Cuatro estados por MODELO** dentro de la lista: **Abierto → En negociación → Cerrado → Dropeado** («Dropeado» es palabra de Daniel, **no traducir**). 🔴 La medición previa evitó entregarla **rota**: el guard del papel exigía TODOS aprobados y lo consumen los **tres** impresos ⇒ un dropeado dejaba la lista **sin PDF, Excel ni cotización para siempre**. Regla de Daniel: **el papel muestra los NO dropeados** — una sola regla para sus dos momentos. **Se puede REVIVIR con rastro.** §Post-F9.156: **los factores son su calculadora, el precio cerrado es un compromiso** ⇒ mover un factor **no toca** a los terminales | §Post-F9.151 · .155 · **.156** |
-> | **0.063** ⬜ | **Cotizar en la cita un modelo que no existe** — desde cero o **copiando** uno ya desarrollado. ⚠️ El motor **ya existe** (`crearDesarrolloConModeloNuevo` mintea el código, `copiarBom`, `copiarArteDeOtroModelo`): el trabajo es **abrir el camino desde la mesa**. Obligatorios reales: `codigo` + `idGenero` + `idTipoProducto` (**tres**; el alta de desarrollo no pide `codigo` porque lo mintea) ⇒ **copiar un modelo los trae todos: cero fricción**. **+ la COMPRADORA**: contactos por cliente/departamento (patrón `ProveedorContacto`; hoy los clientes **no guardan a nadie**) **+ el LUGAR de la cita + un campo abierto de pendientes** | §Post-F9.152 |
+> | **0.063** ⬜ | 🔴 **HOTFIX · el candado del precosto que la 0.060 desdentó.** La guarda que impedía congelar un precosto en **cero** dejó de proteger cuando el **empaque** entró como tercera ancla: un modelo con **receta vacía** ya no suma $0.00 sino **$2.20**, así que **congela** — y de un precosto congelado (inmutable) sale **el precio que se cotiza al cliente**. ⚠️ **El defecto está VIVO en `prueba`.** La regla nueva: congela sólo si **algo que no es el empaque aporta importe** — receta valuada, o maquila o corte capturados. ⭐ **No rechaza nada que fuera congelable antes de la 0.060** (verificado por demostración: con todos los importes ≥ 0 por contrato, es literalmente la guarda vieja con el empaque descontado). **Entra antes que la 0.064 porque ésa —crear modelos desde cero en la cita— es el escenario NATIVO del defecto** | — |
+> | **0.064** ⬜ | **Cotizar en la cita un modelo que no existe** — desde cero o **copiando** uno ya desarrollado. ⚠️ El motor **ya existe** (`crearDesarrolloConModeloNuevo` mintea el código, `copiarBom`, `copiarArteDeOtroModelo`): el trabajo es **abrir el camino desde la mesa**. Obligatorios reales: `codigo` + `idGenero` + `idTipoProducto` (**tres**; el alta de desarrollo no pide `codigo` porque lo mintea) ⇒ **copiar un modelo los trae todos: cero fricción**. **+ la COMPRADORA**: contactos por cliente/departamento (patrón `ProveedorContacto`; hoy los clientes **no guardan a nadie**) **+ el LUGAR de la cita + un campo abierto de pendientes** | §Post-F9.152 |
 >
-> #### Bloque 2 · La OP y su receta
+> > ⚠️ **Los números CORRIERON UN LUGAR (30-ago):** entró el **hotfix del candado del precosto** como
+> **0.063**, así que lo que era 0.063–0.074 pasó a **0.064–0.075**. Es la tercera renumeración del
+> programa (las dos anteriores están anotadas arriba). 📌 **La razón de fondo:** el número de versión se
+> asigna **al desplegar a `prueba`**, no al planear — así que un arreglo urgente siempre corre al plan.
+
+#### Bloque 2 · La OP y su receta
 >
 > | Versión | Qué trae |
 > |---|---|
-> | **0.064** ⬜ | **Disolver la compuerta** (§Post-F9.144(c)): quitar `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo` ⇒ la OP entra con receta pendiente y **lo que se frena es COMPRAR**. **Medido: los renglones YA nacen `liberadoEn = NULL`** ⇒ la segunda pieza **es una prueba, no código**. Incluye la deuda del 26-ago: hoy `POST /api/ordenes` **crea una OP sin pasar por la compuerta** |
-> | **0.065** ⬜ | **La OP incompleta**, marcada hasta que se meta la receta y se libere. Daniel: *«La OP Queda como incompleta, hasta que se meta la receta y se libere»* |
-> | **0.066** ⬜ | **Abrir y cerrar la receta de la OP** + su **candado de compra**. Daniel: *«pongamos un candado que no se pueda comprar nada hasta que este cerrado otra vez»*. **Lleva migración** |
-> | **0.067** ⬜ | **El aviso del avío distinto** entre OP hermanas + que el aviso **lleve** a `desautorizarOC` (que **ya existe**) |
+> | **0.065** ⬜ | **Disolver la compuerta** (§Post-F9.144(c)): quitar `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo` ⇒ la OP entra con receta pendiente y **lo que se frena es COMPRAR**. **Medido: los renglones YA nacen `liberadoEn = NULL`** ⇒ la segunda pieza **es una prueba, no código**. Incluye la deuda del 26-ago: hoy `POST /api/ordenes` **crea una OP sin pasar por la compuerta** |
+> | **0.066** ⬜ | **La OP incompleta**, marcada hasta que se meta la receta y se libere. Daniel: *«La OP Queda como incompleta, hasta que se meta la receta y se libere»* |
+> | **0.067** ⬜ | **Abrir y cerrar la receta de la OP** + su **candado de compra**. Daniel: *«pongamos un candado que no se pueda comprar nada hasta que este cerrado otra vez»*. **Lleva migración** |
+> | **0.068** ⬜ | **El aviso del avío distinto** entre OP hermanas + que el aviso **lleve** a `desautorizarOC` (que **ya existe**) |
 >
 > #### Bloque 3 · Modelos 1:N — la pieza grande (§Post-F9.135)
 >
@@ -173,18 +179,18 @@
 >
 > | Versión | Etapa del plan | Qué trae |
 > |---|---|---|
-> | **0.068** ⬜ | E1 | **El linaje**: `idModeloDesarrollo` + `derivarModeloDeProduccion`. ⚠️ `idModeloPadre` **NO se puede reusar** (`esVersionDeModelo` haría que el hijo bloquee su propia promoción) y `codigoDesarrollo` es `@unique` ⇒ los hijos van con `NULL`. **Única con migración** (aditiva) |
-> | **0.069** ⬜ | E2 | 🔴 **La receta compartida — la más grande de todo el programa.** El resolver en las tres lecturas canónicas **+ los ~44 sitios en 10 archivos que leen las tablas DIRECTO** + los escritores. ⚠️ **`ModeloAvioTalla` (las medidas por talla, R18) NO la lee ninguna de las tres**: con el resolver puesto sólo ahí, **cada orden de un hijo nacería SIN medidas por talla, en silencio** — y eso mueve el requerido del MRP. El sitio más caliente es `copiarRecetaDelModelo`, por donde pasa el 100 % de las órdenes |
-> | **0.070** ⬜ | E3 | **La salida a producción hace nacer N modelos.** Es el hueco que Daniel describió: hoy sus 4 OC producen **1** modelo y **1** renglón de inventario PT, porque `promoverAProduccionNucleo` **transforma una fila** en vez de crear otra |
-> | **0.071** ⬜ | E4 | **Corregir en bloque** las órdenes de la familia, **saltando la ya cortada y reportándola** (Daniel: *«Ok como propones»*). El precedente ya existe: `traerDelModelo` devuelve `traidos` + `respetados` |
+> | **0.069** ⬜ | E1 | **El linaje**: `idModeloDesarrollo` + `derivarModeloDeProduccion`. ⚠️ `idModeloPadre` **NO se puede reusar** (`esVersionDeModelo` haría que el hijo bloquee su propia promoción) y `codigoDesarrollo` es `@unique` ⇒ los hijos van con `NULL`. **Única con migración** (aditiva) |
+> | **0.070** ⬜ | E2 | 🔴 **La receta compartida — la más grande de todo el programa.** El resolver en las tres lecturas canónicas **+ los ~44 sitios en 10 archivos que leen las tablas DIRECTO** + los escritores. ⚠️ **`ModeloAvioTalla` (las medidas por talla, R18) NO la lee ninguna de las tres**: con el resolver puesto sólo ahí, **cada orden de un hijo nacería SIN medidas por talla, en silencio** — y eso mueve el requerido del MRP. El sitio más caliente es `copiarRecetaDelModelo`, por donde pasa el 100 % de las órdenes |
+> | **0.071** ⬜ | E3 | **La salida a producción hace nacer N modelos.** Es el hueco que Daniel describió: hoy sus 4 OC producen **1** modelo y **1** renglón de inventario PT, porque `promoverAProduccionNucleo` **transforma una fila** en vez de crear otra |
+> | **0.072** ⬜ | E4 | **Corregir en bloque** las órdenes de la familia, **saltando la ya cortada y reportándola** (Daniel: *«Ok como propones»*). El precedente ya existe: `traerDelModelo` devuelve `traidos` + `respetados` |
 >
 > #### Bloque 4 · Callejones sin letrero y cabos
 >
 > | Versión | Qué trae |
 > |---|---|
-> | **0.072** ⬜ | **Tres callejones del mismo tipo:** la tela **sin color** en el almacén (letrero de **diagnóstico**, §Post-F9.144(d): *«este color no viene de ninguna OC»*) · la **fusión de colores no se ve** en ninguna pantalla (sólo vive en la bitácora) · la **búsqueda por referencia** sigue partida después de fusionar departamentos |
-> | **0.073** ⬜ | **Cabos de pantalla:** 🔴 **un parpadeo de red saca al usuario a la pantalla de login** (`ProveedorSesion.tsx` con `retry: false` trata cualquier fallo como «no autenticado») · `PanelComentarios.tsx` pinta el **id crudo** donde va un nombre (la receta ya está escrita y probada: `nombresDeAutores`) · la **tarjeta de móvil de Modelos**, medida y no arreglada |
-> | **0.074** ⬜ | La **bandeja de cuadre** pregunta *«¿se logró lo prometido?»*, no *«¿ya capturaste?»* (§Post-F9.144(b): **los estimados son METAS**) |
+> | **0.073** ⬜ | **Tres callejones del mismo tipo:** la tela **sin color** en el almacén (letrero de **diagnóstico**, §Post-F9.144(d): *«este color no viene de ninguna OC»*) · la **fusión de colores no se ve** en ninguna pantalla (sólo vive en la bitácora) · la **búsqueda por referencia** sigue partida después de fusionar departamentos |
+> | **0.074** ⬜ | **Cabos de pantalla:** 🔴 **un parpadeo de red saca al usuario a la pantalla de login** (`ProveedorSesion.tsx` con `retry: false` trata cualquier fallo como «no autenticado») · `PanelComentarios.tsx` pinta el **id crudo** donde va un nombre (la receta ya está escrita y probada: `nombresDeAutores`) · la **tarjeta de móvil de Modelos**, medida y no arreglada |
+> | **0.075** ⬜ | La **bandeja de cuadre** pregunta *«¿se logró lo prometido?»*, no *«¿ya capturaste?»* (§Post-F9.144(b): **los estimados son METAS**) |
 >
 > #### Sin numerar todavía — se contrastan contra el repo antes de prometerlos
 >
@@ -553,7 +559,7 @@
 > `Genero.digitoAlterno` prueba que agotar una serie **ya pasó en el Access** (Caballero, `1 → 5`).
 > ⚠️ El aviso (`LIBRES_PARA_AVISAR = 50`) y el salto a la serie de continuación **ya están
 > construidos**: lo que falta decidir es **qué dígito se le abre a los otros seis géneros**, que hoy no
-> tienen ninguno. ⏳ **BLOQUEADO hasta que Daniel conteste las 10 preguntas** (§6, todas con default
+> tienen ninguno. ⏳ **✅ DESBLOQUEADO: Daniel confirmó las 10 el 30-ago-2026 (§Post-F9.135 §6)
 > propuesto). ⇒ **SIN migración · SIN permisos · SIN seed · SIN contrato · sin `SEED_ON_START`**.
 > Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8n.
 >
@@ -1998,6 +2004,28 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 3. Un **reviewer independiente** la revisa; **tiene la última palabra** y rige *"todo lo menor es mayor"* (cero pendientes diferidos).
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
+
+### 🔴 REGLA 0-B — los datos viejos no se arreglan: el sistema mira hacia adelante (Daniel, 30-ago-2026, §Post-F9.163)
+
+> ## ⏳ **CADUCA AL LLEGAR A PRODUCCIÓN.** Daniel: *«es válido mientras no hayamos ido a producción.
+> Después… habrá que medir qué hacemos con información que hayamos hecho dentro del sistema»*.
+> **El disparador: el día que la versión se rebautice `1.000`.** Mientras empiece con `0.`, aplica entera.
+> ✅ **No deja pendiente que arrastrar.** Daniel: *«cuando entremos en producción, revisamos esta regla
+> desde el principio… **ahorita no te preocupes por eso**»*. La política de datos en producción **no se
+> diseña por adelantado**: se revisa el día del rebautizo, con el sistema a la vista. Mismo patrón que el
+> dígito de continuación — *una decisión diferida a conciencia no es una decisión pendiente*.
+
+
+> *«toda la información que haya ahí **no es importante, es basura. La vamos a limpiar**… Todo el sistema
+> debe estar enfocado sólo en **nueva información**, no en ver cómo arreglamos la que ya se hizo de una
+> manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
+
+**La única pregunta al construir es: «¿esto funciona bien cuando el dato NO está?»**. La otra —*«¿cómo
+arreglo los que ya están mal?»*— **no se hace nunca**. El histórico de Access **sí se importa** y llega
+**incompleto a propósito**: un registro migrado con huecos **no es un defecto**. 🔑 **Tolerar ≠ compensar.**
+⛔ Nada de backfills, auditorías de datos, consultas de rescate ni pantallas para completar el histórico.
+🚫 **Y no se le vuelve a preguntar a Daniel qué hacer con datos existentes**: está contestado para siempre.
+La regla completa, con su **tabla de decisión**, está en `CLAUDE.md` §7 como REGLA 0-B.
 
 ### 🔴 REGLA 0 — no se frena esperando respuestas (Daniel, 30-ago-2026, §Post-F9.157)
 
@@ -3450,12 +3478,12 @@ estar vivo.
 | **A9** — qué catálogos son por empresa vs globales | en **F1-E1** (la firma Gabriel) |
 | **Nº interno de producción** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.36 punto 5):** *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón. Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP y OC también."* Aplica a **órdenes de producción Y órdenes de compra**. El número exacto se fija **en el ensayo**, cuando se conozca el máximo real migrado. Requiere que `migracion/reparar-secuencias.ts` acepte un **salto a escalón**, no solo `max+1`. ⚠️ **Irreversible una vez arrancado.** | construir antes del go-live; el número se elige en el **ensayo** |
 | **¿«Mejor siempre desde producción» quiso decir «siempre desde DESARROLLO»?** (§Post-F9.134) — la frase de Daniel del 28-ago, leída al pie de la letra, dice lo contrario del resto de su párrafo. La lectura del lead —que el modelo llegue a producción **sólo por la puerta de «pasar a producción»**— está escrita y **marcada como pendiente de confirmar**, no dada por buena. | **antes de construir** §Post-F9.134 (es una pregunta de una línea) |
-| **⭐ Las 10 preguntas de la relación 1:N** (§Post-F9.135) — un modelo de desarrollo del que nacen VARIOS de producción con **una sola receta**. Todas van **con default propuesto** y están en `DECISIONES.md` §Post-F9.135, sección «⭐ EL PLAN» §6. Las dos que más mueven el alcance: **la 6b** (¿se **prohíbe** además cambiar a mano una orden ya cortada? — sólo esa mitad dispara la etapa E5; la 6a, la del botón masivo, no) y **la 10** (se acaban los números de 5 dígitos: el aviso y el salto **ya existen**, lo que falta decidir es **qué dígito de continuación se le abre a Dama, Niño, Niña, Bebo y Beba**, que hoy no tienen ninguno). | **antes de construir** §Post-F9.135 — hoy es lo único que lo bloquea |
+| **✅ Las 10 preguntas de la relación 1:N** (§Post-F9.135) — **CONFIRMADAS por Daniel (30-ago-2026):** *«Ya contesté esas 10 preguntas»*; los defaults quedaron confirmados tal cual. 🔴 **La 6b** —*«No se prohibe, se puede hacer a mano (Solo yo)»*— **ELIMINA la etapa E5**: el plan pasa de cinco a cuatro. ⚠️ Sólo 6a y 6b tienen cita textual; las otras ocho se dan por confirmadas **en bloque** (límite declarado en §Post-F9.135 §6). **El dígito de continuación NO es un pendiente: la decisión es diferirlo** — *«decidirlo el día que pase, no ahora a ciegas»*. | — |
 | **¿La OP puede entrar con la RECETA PENDIENTE?** — ✅ **CERRADA A FAVOR (Daniel, 29-ago-2026, §Post-F9.144(c)):** *"si, mueve la compuerta al comprar… asi podemos ir comprando la tela en lo que se terinan de aprobar los demas elementos"*. ⚠️ **No se mueve: se DISUELVE** en la firma por renglón (`liberadoEn`), porque `Modelo.revisionEstado` es todo-o-nada y mudarlo bloquearía comprar TODO. ⬜ **Decidida, SIN CONSTRUIR** — detalle en §4. | — |
-| **🔴 ¿Qué pasa con la COPIA de la receta que la OP se lleva?** (§Post-F9.144(c), punto 1) — `copiarRecetaDelModelo` congela el BOM **al crear la orden** (§Post-F9.34). Si la OP nace **antes** de que Desarrollo reconfigure, se copia la receta **VIEJA**: ¿se re-copia?, ¿basta el detector de desalineación?, ¿se corrige a mano en la OP? **Daniel no lo contestó** y es lo que más mueve el alcance. | **antes de construir** el movimiento de la compuerta |
-| **¿Cortar puede hacerse con la receta sin firmar?** (§Post-F9.144(c), punto 2) — hoy cortar **no pasa** por las puertas de la firma, a propósito (*"el piso no se detiene porque Desarrollo no haya terminado"*). Con la OP entrando sin revisar, hay que confirmar si ahí sí hay una raya. **No se le pone default.** | misma etapa |
+| **✅ ¿Qué pasa con la COPIA de la receta que la OP se lleva?** — **CERRADA (Daniel, 30-ago-2026, §Post-F9.158(a)):** *«La principal función de la receta son las compras… yo copiaría la receta en la OP **hasta que se libere** por parte de desarrollo. **No tiene sentido cargarla antes.**»* ⭐ Su respuesta **no resuelve la pregunta: la DISUELVE** — si la receta se copia al liberarse, **no hay receta vieja que arrastrar**. | — |
+| **✅ ¿Cortar puede hacerse con la receta sin firmar?** — **CERRADA (Daniel, 30-ago-2026, §Post-F9.158(b)):** *«se va firmando **por cada elemento**. Para poder comprar la tela, se debe de haber firmado antes la receta al menos en la tela. **Sí se puede cortar** antes de firmar la demás parte.»* ⇒ la firma gobierna **la COMPRA de ESE elemento**; **el corte NO lleva raya nueva**. | — |
 | **⭐ Afinación de la bandeja «Recetas por revisar»** (§Post-F9.144(b)) — ¿la bandeja debe poder registrar que **NO se consiguió** la meta (*"no es seguro que se consiga"*), y enseñar la brecha? El lead propone **que sí**, con dos desenlaces en vez de uno. **No se construyó nada.** | antes de tocar `recetas-por-revisar.ts` |
-| **⬜ ¿Recibir tela sin OC ligada se IMPIDE o sólo se advierte?** (§Post-F9.144(d)) — Daniel dejó clarísimo que *"no puede recibir nada que no se haya comprado con una OC"*, pero **no dijo si el sistema debe bloquearlo**. **No se le pone default** a propósito. | antes de afinar el letrero de `CapturaRenglonesTelaColor` |
+| **✅ ¿Recibir tela sin OC se IMPIDE o sólo se advierte?** — **CERRADA (Daniel, 30-ago-2026, §Post-F9.159(a)): se IMPIDE.** *«es imposible. Sin OC no podemos recibir tela. **¿De quién recibiríamos sin OC?** No puede suceder.»* ⚠️ La pregunta seguía abierta porque **`DECISIONES.md` se contradecía**: la línea 736 permitía las dos vías y la 5252 lo prohibía. Prevalece la prohibición. | 0.072 |
 | **Historia de las 6 empresas viejas INACTIVAS** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.37 punto 7):** *"Con el archivo basta. Ya no operan ahorita. Solo activa FR Moda."* **NO existen como `Empresa` operativa en v2.** Sus ~1,528 órdenes ya viven en el archivo histórico (§Post-F9.29) con su empresa original en `empresaV1`. Efecto colateral útil: la deuda de **membresía usuario↔empresa** (§4) **queda dormida** — con una sola empresa activa no muerde. ⚠️ **Si algún día se activa una 2ª, esa deuda pasa a BLOQUEANTE.** | — |
 
 ### Cerradas el 13-ago-2026 (repaso del flujo completo — `docs/DIAGNOSTICO-FLUJO-COMPLETO.md`)

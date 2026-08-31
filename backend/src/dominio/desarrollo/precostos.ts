@@ -228,6 +228,14 @@ function precioAvioDeCatalogo(
 const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_arte'] as const;
 
 /**
+ * Código del concepto de EMPAQUE. Vive en su propia constante porque **dos** reglas distintas lo
+ * miran: la de ancla fija ({@link CONCEPTOS_ANCLA}) y la del contenido mínimo para congelar
+ * ({@link exigirCostoCongelable}) — y la segunda existe justamente porque el empaque es la única
+ * de las tres anclas que nace con un valor **puesto por el sistema**, no capturado por nadie.
+ */
+const CONCEPTO_EMPAQUE = 'empaque';
+
+/**
  * Códigos de los conceptos ANCLA fijos (rediseño R5 + V1-E8w): un renglón `manual` por prenda, ÚNICO,
  * que se EDITA pero NO se elimina ni se agrega dos veces — maquila/costura, corte y **empaque**.
  *
@@ -236,7 +244,7 @@ const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_arte'] as const;
  * simplemente un campo que casi siempre es el mismo costo"*. Su importe default NO está clavado
  * aquí: sale de `ConfiguracionEmpresa.costoEmpaqueBase` (ver {@link costoEmpaqueDeEmpresa}).
  */
-const CONCEPTOS_ANCLA = ['maquila', 'corte', 'empaque'] as const;
+const CONCEPTOS_ANCLA = ['maquila', 'corte', CONCEPTO_EMPAQUE] as const;
 
 /**
  * Costo de empaque por prenda de RESPALDO, para una empresa que todavía no tiene fila de
@@ -258,6 +266,20 @@ export const COSTO_EMPAQUE_DEFECTO = 2.2;
  */
 function esAnclaFija(origen: string, conceptoCodigo: string): boolean {
   return origen === 'manual' && (CONCEPTOS_ANCLA as readonly string[]).includes(conceptoCodigo);
+}
+
+/**
+ * ¿Es el renglón del ancla de EMPAQUE, la que el sistema pone SOLO? Hermana de {@link esAnclaFija},
+ * pero para una pregunta distinta: no *"¿se puede borrar?"* sino *"¿esto lo costeó una persona?"*.
+ *
+ * La respuesta es NO: `generarPrecosto` mete este renglón en TODO precosto nuevo con el default de
+ * la empresa (§Post-F9.153), sin que nadie capture nada. Por eso {@link exigirCostoCongelable} lo
+ * descuenta al medir si el precosto tiene contenido. Un `manual` bajo `empaque` agregado a mano en
+ * un borrador viejo (el camino de V1-E8w) cuenta igual: sigue siendo el costo del empaque, que por
+ * sí solo no es el costeo de una prenda.
+ */
+function esAnclaEmpaque(linea: { origen: string; conceptoCodigo: string }): boolean {
+  return linea.origen === 'manual' && linea.conceptoCodigo === CONCEPTO_EMPAQUE;
 }
 
 /** Clave de identidad de un renglón BOM (origen + insumo) para casar ajustes con la regeneración. */
@@ -1234,8 +1256,18 @@ export async function restaurarLineaBom(
   return obtenerPrecosto(sesion, idPrecosto, bd);
 }
 
+/** Renglón visto por el GUARD del congelado: sólo lo que decide si hay contenido costeado. */
+export interface RenglonCongelable {
+  /** `bom_tela` / `bom_avio` / `bom_arte` / `manual`. */
+  origen: string;
+  /** Código del concepto de costo (`tela`, `maquila`, `corte`, `empaque`, …). */
+  conceptoCodigo: string;
+  /** Importe del renglón, ya en número (la columna es `Decimal(12,2)`). */
+  importe: number;
+}
+
 /**
- * ⭐ V1-E4 (punto 2) — GUARD del congelado: un precosto NO se congela en CERO.
+ * ⭐ V1-E4 (punto 2) — GUARD del congelado: un precosto NO se congela SIN NADA COSTEADO.
  *
  * El caso real: se genera el precosto de un modelo cuya receta todavía está vacía (o cuyos insumos
  * no tienen precio), así que sus renglones nacen en $0.00 — incluidas las anclas de maquila y
@@ -1246,15 +1278,64 @@ export async function restaurarLineaBom(
  * Nadie lo nota probando a mano porque el congelado "funciona": la pantalla no truena, solo miente.
  * Es dominio PURO a propósito, para que la regresión se pueda cementar sin base de datos.
  *
+ * 🔴🔴 **Por qué mira los RENGLONES y no sólo el total (candado del 31-ago-2026).** La versión 0.060
+ * metió el EMPAQUE como tercera ancla fija, con un default de la empresa ($2.20) que `generarPrecosto`
+ * pone en **todo** precosto nuevo sin que nadie capture nada (§Post-F9.153). Desde entonces un modelo
+ * con la receta vacía ya no suma $0.00: suma $2.20 — **y pasaba esta guarda sin protestar**. La
+ * versión se congelaba INMUTABLE, y de ese precosto salía el precio al cliente: una prenda cotizada
+ * a su bolsa. El guard seguía en pie, pero ya no protegía de nada real, y el escenario nativo de lo
+ * que viene (cotizar en la cita un modelo que se crea en ese momento) es justamente ése.
+ *
+ * **La regla:** el total, DESCONTANDO el ancla de empaque, tiene que ser **> 0**. O sea, la SUMA de
+ * todo lo que no es el empaque automático tiene que aportar:
+ * - cualquier renglón de la receta (tela / avío / arte) valuado, **o**
+ * - el ancla de **maquila** o la de **corte** con costo capturado, **o**
+ * - cualquier renglón MANUAL que la persona haya agregado en la calculadora de negociación.
+ *
+ * Es EXACTAMENTE la guarda de antes de 0.060 con el empaque descontado: nada que fuera congelable
+ * entonces deja de serlo ahora. Y por eso la regla es sobre el CONTENIDO, no sobre el monto:
+ * - un precosto de sólo maquila y corte, con la receta vacía, SÍ congela (costeo por proceso: no
+ *   toda prenda lleva BOM);
+ * - un precosto con receta real cuyo total sea bajísimo ($0.01) SÍ congela;
+ * - un empaque subido a $50 a mano NO alcanza: sigue siendo el costo de la bolsa, no el de la prenda.
+ *
  * Negativo también se rechaza: un total bajo cero solo puede salir de renglones mal capturados, y
  * congelarlo dejaría un precio de venta por debajo del costo, igual de inmutable.
  */
-export function exigirCostoCongelable(costoTotal: number): void {
-  if (costoTotal > 0) return;
+export function exigirCostoCongelable(
+  costoTotal: number,
+  renglones: readonly RenglonCongelable[],
+): void {
+  if (costoTotal < 0) {
+    throw new ErrorConflicto(
+      `El precosto suma un total NEGATIVO ($${costoTotal.toFixed(2)}); revisa los renglones antes de congelar.`,
+    );
+  }
+  if (costoTotal === 0) {
+    throw new ErrorConflicto(
+      'El precosto suma $0.00; congelarlo dejaría una versión INMUTABLE en cero, y de ahí sale el precio al cliente. Captura la receta del modelo (telas/avíos) o los costos de maquila y corte antes de congelar.',
+    );
+  }
+  // ⭐ El candado que 0.060 dejó hacer falta: ¿hay algo costeado, o el total es puro empaque?
+  //
+  // Se SUMA lo que no es empaque, en vez de buscar "algún renglón > 0", para que esto sea LITERAL
+  // la guarda de antes de 0.060 con el empaque descontado. Hoy las dos formas dan lo mismo porque
+  // todo importe es ≥ 0 por contrato (`precioUnit` y `consumo` son `.nonnegative()` en el esquema,
+  // y `maquilaBase`/`costoEmpaqueBase` también), pero el día que entre un renglón NEGATIVO —un
+  // descuento en la mesa de negociación, un ETL de precostos— "alguno > 0" dejaría congelar
+  // `tela 30 + descuento −30 + empaque 2.20`: un precosto que vale su bolsa, justo el defecto que
+  // este candado vino a cerrar. La suma no depende de que esa suposición siga siendo cierta.
+  const sinEmpaque = redondear2(
+    renglones.reduce((suma, linea) => (esAnclaEmpaque(linea) ? suma : suma + linea.importe), 0),
+  );
+  if (sinEmpaque > 0) return;
+  // El importe del empaque se calcula de los RENGLONES (no restando del total), para que el mensaje
+  // diga el número real de la empresa —que es configurable— y no dependa del total que le pasaron.
+  const empaque = redondear2(
+    renglones.reduce((suma, linea) => (esAnclaEmpaque(linea) ? suma + linea.importe : suma), 0),
+  );
   throw new ErrorConflicto(
-    costoTotal === 0
-      ? 'El precosto suma $0.00; congelarlo dejaría una versión INMUTABLE en cero, y de ahí sale el precio al cliente. Captura la receta del modelo (telas/avíos) o los costos de maquila y corte antes de congelar.'
-      : `El precosto suma un total NEGATIVO ($${costoTotal.toFixed(2)}); revisa los renglones antes de congelar.`,
+    `Fuera del EMPAQUE ($${empaque.toFixed(2)}) —que el sistema pone por su cuenta— el precosto no suma NADA costeado. Congelarlo dejaría una versión INMUTABLE de la que sale el precio al cliente. Captura la receta del modelo (telas/avíos/arte) o los costos de maquila y corte antes de congelar.`,
   );
 }
 
@@ -1278,18 +1359,25 @@ export async function congelarVersion(
     const precosto = await exigirPrecosto(tx, idPrecosto, sesion.idEmpresaActiva);
     exigirBorrador(precosto);
 
+    // El `origen` + el código del concepto viajan junto al importe porque la guarda de abajo no
+    // mira sólo cuánto suma, sino QUÉ lo suma (el ancla automática de empaque no cuenta).
     const lineas = await tx.precostoLinea.findMany({
       where: { idPrecosto },
-      select: { importe: true },
+      select: { importe: true, origen: true, conceptoCosto: { select: { codigo: true } } },
     });
     if (lineas.length === 0) {
       throw new ErrorConflicto(
         'El precosto no tiene renglones; agrega al menos uno antes de congelar.',
       );
     }
-    const costoTotal = redondear2(lineas.reduce((suma, l) => suma + l.importe.toNumber(), 0));
+    const renglones: RenglonCongelable[] = lineas.map((l) => ({
+      origen: l.origen,
+      conceptoCodigo: l.conceptoCosto.codigo,
+      importe: l.importe.toNumber(),
+    }));
+    const costoTotal = redondear2(renglones.reduce((suma, l) => suma + l.importe, 0));
     // V1-E4 (punto 2): la versión que se congela es INMUTABLE y alimenta el precio al cliente.
-    exigirCostoCongelable(costoTotal);
+    exigirCostoCongelable(costoTotal, renglones);
 
     await tx.precosto.update({
       where: { id: idPrecosto },
