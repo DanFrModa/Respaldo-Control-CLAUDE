@@ -146,6 +146,31 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 ## 7. Cómo se desarrolla CONTROL v2 (reglas vigentes)
 
+> ## 🔴 REGLA 0 — NO TE FRENES ESPERANDO RESPUESTAS (DANIEL, 30-ago-2026, §Post-F9.157)
+>
+> **Mientras haya algo que hacer, se hace.** Textual de Daniel:
+>
+> > *«mientras haya algo que hacer, no frenes por las respuestas. **No estoy pegado a Claude 24 horas.**
+> > Necesito que avances mientras puedas hacer algo y después te doy mis respuestas.»*
+>
+> **Qué significa en la práctica, sin margen de interpretación:**
+> 1. **Preguntar NO es parar.** Se deja la pregunta puesta —con su default propuesto— **y se sigue con lo
+>    siguiente que no dependa de ella**. Cuando la respuesta llegue, se retoma.
+> 2. **Antes de decir «espero respuesta», hay que haber agotado lo que NO depende de ella.** Casi siempre
+>    hay: otra versión del programa entera, la medición de la que sigue, una deuda del §4, documentación.
+>    Una etapa bloqueada **no bloquea el programa**: se salta y se sigue (precedente: la **0.061** se
+>    aparcó y se pasó a la **0.062** sin perder un minuto).
+> 3. **Sólo se para de verdad** cuando *todo* lo pendiente depende de esa respuesta, o cuando avanzar sin
+>    ella arriesgaría trabajo que habría que tirar. En ese caso **se dice con esas palabras** —*«estoy
+>    detenido esperando esto»*— y se explica qué se intentó antes.
+> 4. **Las preguntas se juntan.** Si hay tres decisiones abiertas de un bloque, van **las tres de una vez**
+>    con su default (regla de §6), no de a gotas.
+>
+> ⚠️ **Cómo nació:** el 30-ago el lead terminó una versión, contestó una pregunta y **se quedó quieto**
+> sin nada corriendo, teniendo por delante una versión completamente decidida y lista para arrancar.
+> Daniel lo detectó preguntando *«¿estás trabajando?»*. **No estaba bloqueado: estaba parado.** La regla
+> existe para que esa distinción nunca vuelva a confundirse.
+
 1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
 2. **Flujo de ramas + AUTORIZACIÓN (innegociable):** rama de tarea → PR a **`prueba`** → **Gabriel verifica EN VIVO en Railway** (no en local) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.) La rama de tarea **NO debe trackear `prueba`** como upstream (riesgo de push accidental). **NADA de `git commit` ni `git push` sin autorización EXPRESA de Gabriel.** El flujo correcto al terminar una etapa:
    1. El lead y los agentes codean en el working tree (sin comitear nada).
