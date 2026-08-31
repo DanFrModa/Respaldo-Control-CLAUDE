@@ -11329,7 +11329,18 @@ plan tenía razón, y por eso su advertencia sobre las medidas por talla es corr
 
 ---
 
-#### (Post-F9.168) — ⏳ PENDIENTE DE DANIEL: ¿se puede congelar la compra de una orden con la receta **a medio firmar**? (31-ago-2026)
+#### (Post-F9.168) — ✅ CERRADA (Daniel, 31-ago-2026): ¿se puede congelar la compra de una orden con la receta **a medio firmar**?
+
+> ⚠️ **Este encabezado decía «PENDIENTE DE DANIEL» y él ya la había contestado**, en §Post-F9.169(a) de
+> este mismo archivo: *«Lo del candado con receta a medio firmar. **Está bien como dices.**»* ⇒ se
+> confirma el default (a), que la **0.067** ya construyó: sólo se congela la compra de una orden con la
+> receta liberada **por completo**. **No hay trabajo pendiente.**
+>
+> 🔴 **Por qué se corrige y no se borra:** un chat nuevo hace `grep "pendiente de Daniel"` y **le vuelve
+> a preguntar algo que ya contestó**. Es la rama gemela —se actualizó una copia y no la otra—, pero en
+> vez de mentirle a un programador, le hace perder el tiempo al dueño. **El desarrollo de abajo se
+> conserva entero**: el caso de los 39 renglones firmados de 40 es el precio aceptado con conocimiento,
+> y hay que poder releerlo.
 
 **Cómo salió.** Al construir el candado de compra (**0.067**, §Post-F9.165) hubo que fijar **cuándo se
 puede abrir** una receta. La decisión escrita decía *«no se puede abrir una receta que **nunca se
@@ -11523,5 +11534,60 @@ otro lado**: la foto que importa operativamente es **la de la OP**, no la del mo
 sigue abierta, pero deja de ser urgente.
 
 - **Aplica en:** (a) nada, ya construido. (b) pieza nueva sin número. **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.172) — ⏳ DOS PREGUNTAS ABIERTAS DE DANIEL, CON DEFAULT PROPUESTO (31-ago-2026)
+
+> **Ninguna de las dos frena nada** (REGLA 0): quedan aquí con su default y el programa sigue. Se anotan
+> **con su medición**, para que un chat nuevo no las re-descubra ni se las vuelva a preguntar mal.
+
+### (a) Al fusionar dos departamentos repetidos, ¿qué pasa con el texto de la División ya escrito en la orden?
+
+**Abierta desde la versión 0.053** (`HISTORIAL-DE-VERSIONES.md`: *«Es una decisión tuya y por eso no se
+tocó… Cuando decidas, se hace»*). **No consta respuesta.**
+
+🔑 **El defecto NO está en la búsqueda ni en la fusión — las dos están bien escritas.** Medido el 31-ago:
+el importador escribe la División **dos veces** (`dominio/pedidos/importacion-pdf.ts:1165-1174`): al
+catálogo **con FK** (`resolverOCrearDepartamento`) y como **texto crudo** en `OrdenReferencia.valor`, que
+es un `String` sin llave (`schema.prisma:3385-3397`). `fusionarDepartamentosCliente` repunta **las cinco**
+llaves entrantes —con una prueba que lee el `schema.prisma` y se pone roja si aparece una sexta— pero **el
+texto no es una llave**. Fusionar «2-HOMBRE» en «Caballeros» mueve el catálogo; la orden **sigue diciendo
+`2-HOMBRE`** y el `contains` de `armarBusqueda` (`produccion/ordenes.ts:1237-1250`) no lo alcanza.
+El propio código lo declara con nombre (`cliente-departamentos-fusion-referencias.ts:32-42`): *«no se
+arregla aquí porque tocar un valor capturado de un documento del cliente es una decisión de negocio»*.
+
+| camino | qué implica | tamaño |
+|---|---|---|
+| (i) dejarlo | la búsqueda sigue partida | 0 |
+| (ii) **reescribir** el texto de las órdenes al fusionar | ⚠️ toca **un valor capturado del documento del cliente** | ~40 líneas |
+| (iii) **búsqueda por sinónimos** | no toca el dato; resuelve al buscar | **una etapa entera** |
+
+⭐ **DEFAULT PROPUESTO: (iii).** Razón: (ii) reescribiría lo que el cliente puso en su papel — justo lo que
+`Cotizacion.nombreDepartamento` se congela **a propósito** para no hacer. Que Daniel busque por lo que
+tiene en la mano y no lo encuentre es una pérdida en silencio; que el sistema le cambie el texto de su
+documento es peor. **(iii) cuesta más y es el único que no falsea el original.**
+
+### (b) 🔴 CONTRADICCIÓN ENTRE DOS RESPUESTAS SUYAS: al resurtir la misma OC, ¿el modelo estrena número o reusa el que ya nació?
+
+**Hay que resolverla antes de construir E3**, porque las dos respuestas son suyas y dicen cosas distintas:
+
+- **§Post-F9.135 pregunta 2**, que contestó *«De acuerdo»*: **uno por renglón de pedido; si se re-surte la
+  misma OC, se REUSA el que ya nació.**
+- **§Post-F9.170**: *«**cada OP lleva un número de modelo de producción diferente**»* — leído literal,
+  daría **un modelo nuevo por cada resurtido**.
+
+⭐ **DEFAULT PROPUESTO: REUSAR** (su primera respuesta, que es la explícita sobre el resurtido). ⚠️ **Lo que
+hay que decirle al preguntarle:** si estrena número en cada resurtido, **la misma prenda queda partida en
+dos modelos de catálogo** y su existencia se reparte entre los dos renglones de inventario.
+
+📌 **Y esto no es sólo una etiqueta: hoy NO HAY LLAVE DE IDEMPOTENCIA.** Medido: el freno actual es un
+**efecto de borde** —la primera llamada deja el modelo en `origen:'produccion'`, así que la segunda entra
+por el `else` y hereda—. Con E3 el padre se queda en `desarrollo` **para siempre**, así que *cada* llamada
+derivaría ⇒ **doble clic = 2 modelos**, y se queman números de una serie de **999 por par**. La llave
+natural (`Orden.findFirst({ where: { idPedidoLinea } })` + `pg_advisory_xact_lock` sobre `idPedidoLinea`)
+**implementa a la vez la respuesta «reusar»**. ⇒ elegir «reusar» no cuesta trabajo extra: **lo ahorra**.
+
+- **Aplica en:** (a) una etapa propia, sin número. (b) **E3**, antes de construirla. **Fecha:** 2026-08-31.
 
 ---
