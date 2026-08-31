@@ -11349,6 +11349,9 @@ Ahí **sí hay compra que congelar** y el candado no se puede poner.
 **Default propuesto: (a)**, que es lo construido — pero **la pregunta se hace igual**, porque el caso de
 los 39 de 40 es el que Daniel se va a encontrar en la práctica.
 
+✅ **CERRADA (Daniel, 31-ago-2026, §Post-F9.171(a)):** *«Está bien como dices»* ⇒ **se queda (a)**, con el
+precio aceptado a sabiendas. **Sin trabajo pendiente.**
+
 📌 **Corrección a §Post-F9.165 punto 3:** decía *«motivo obligatorio al abrir, igual que lo pide
 `quitarRenglonReceta`»*. **La analogía era FALSA** — el motivo de quitar es `.optional()`. Se implementó
 **obligatorio igual**, y con razón mejor: **ese texto ES el 409** que lee el comprador cuando su compra se
@@ -11456,5 +11459,56 @@ inferencia. **La 0.070 se construye exactamente así.**
 
 - **Aplica en:** confirma el Bloque 3 tal como está planeado (0.069 ✅ · **0.070 ← se está construyendo** ·
   0.071 · 0.072). **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.171) — ✅ EL CANDADO A MEDIO FIRMAR: se queda como está · y ⭐ LAS FOTOS SON DE LA OP, NO DEL DESARROLLO (DANIEL, 31-ago-2026)
+
+**Dos respuestas suyas del mismo mensaje.**
+
+### (a) ✅ §Post-F9.168 CERRADA — el candado exige la receta liberada COMPLETA
+
+> *«Lo del candado con receta a medio firmar. **Está bien como dices.**»*
+
+⇒ Se confirma el **default (a)**, que es lo que la **0.067** ya construyó: **sólo se puede congelar la compra
+de una orden cuya receta está liberada por completo**. Queda aceptado con conocimiento del precio —el caso
+de **39 renglones firmados de 40**, donde no se podrá congelar— porque la alternativa es peor: una orden
+**imposible de cerrar**. **No hay trabajo pendiente**: la versión ya está en `prueba`.
+
+### (b) ⭐ LAS FOTOS DEL ARTE SON DE LA ORDEN, con herencia opcional
+
+> *«La foto debería de ser **de la OP no del desarrollo**. Si el desarrollo tiene fotos está bien que
+> podamos **heredarlas**, pero también la opción de **quitarlas de la OP** y **meter fotos directo a la
+> OP**. Eso me parece que ya existe.»*
+
+🔴 **Medido: existe la MITAD, no la otra.** Su memoria acierta en el renglón y falla en la foto:
+
+| Lo que pide | ¿Existe? |
+|---|---|
+| Que la OP tenga su lista de artes, congelada | ✅ `OrdenArte`, congelada al crear la orden |
+| **Quitar** un arte de la OP sin tocar el modelo | ✅ ya se puede |
+| **Agregar** un arte a mano, sin vínculo al modelo | ✅ `idModeloArte` es `NULL` = agregado a mano |
+| Descripción y posición propias de esa orden | ✅ viven en `OrdenArte` |
+| 🔴 **Meter FOTOS directo a la OP** | ❌ **NO existe** |
+| 🔴 **Quitar una foto sólo en la OP** | ❌ **NO existe** |
+
+**Las fotos cuelgan de `ModeloArteFoto` → `ModeloArte`**, o sea **del modelo**. `OrdenArte` **no tiene fotos
+propias**: las toma del arte del modelo por su vínculo. ⇒ **Consecuencia hoy: un arte agregado a mano en la
+OP —sin vínculo— NO PUEDE TENER FOTO**, y no hay forma de subir una que valga sólo para esa orden.
+
+**Lo que queda decidido:** las fotos del arte pasan a ser **de la orden**, con **herencia del desarrollo**
+como valor inicial y la posibilidad de **quitarlas o sustituirlas sólo ahí**. Es el mismo patrón que ya
+gobierna la descripción y la posición del arte (§Post-F9.52): *lo del modelo es el punto de partida; lo de
+la orden es lo que manda*.
+
+📌 **Alcance: una tabla nueva de fotos por `OrdenArte` + su pantalla.** No es grande, pero **no está**, y no
+se cuenta como existente. **Sin número de versión todavía** — se contrasta y se ordena con el resto.
+
+⭐ **Y esto contesta, de paso, una duda que el reviewer levantó dos veces:** post-E3 los N modelos hijos
+saldrían **sin foto** en el catálogo porque `ModeloFoto` no se hereda. **La respuesta de Daniel apunta al
+otro lado**: la foto que importa operativamente es **la de la OP**, no la del modelo. La duda del catálogo
+sigue abierta, pero deja de ser urgente.
+
+- **Aplica en:** (a) nada, ya construido. (b) pieza nueva sin número. **Fecha:** 2026-08-31.
 
 ---
