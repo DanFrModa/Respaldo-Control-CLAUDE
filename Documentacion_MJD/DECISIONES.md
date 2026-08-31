@@ -11403,3 +11403,47 @@ modelo se conserva como registro (a), o se retira del todo (b)?* **Se construye 
 - **Aplica en:** la **0.065**, que queda **DESBLOQUEADA**. **Fecha:** 2026-08-31.
 
 ---
+
+#### (Post-F9.170) — ⭐ LA ACLARACIÓN DE DANIEL SOBRE EL 1:N, Y UN ARGUMENTO DEL PLAN QUE YA ESTABA RESUELTO (31-ago-2026)
+
+**Cómo salió.** Daniel leyó el mapa del programa, vio el tamaño de la receta compartida y dijo:
+
+> *«La receta compartida: no sé si no me expliqué bien. **Me parece más fácil de lo que expones.** Lo que
+> hay que hacer es simplemente **relacionar el mismo modelo de desarrollo con más de una OP**. ¿Eso es
+> complicado?»*
+
+**Se midió antes de contestar** —podía tener razón y ahorrarnos tres etapas— y de la medición salieron tres
+cosas. Al aclararle la pregunta, él precisó:
+
+> *«No quiero que haya una confusión. Hay **modelos de desarrollo** y **modelos de producción**. Mi
+> comentario es que **cada OP puede compartir modelos de desarrollo. Y cada OP lleva un número de modelo de
+> producción diferente**.»*
+
+### Lo que queda asentado
+
+1. ✅ **Su aclaración CONFIRMA el plan de §Post-F9.135, no lo simplifica.** *«Cada OP lleva un número de
+   modelo de producción diferente»* ⇒ **sí nacen N modelos de producción**, uno por OP. Lo que él llamaba
+   *«simplemente relacionar»* **es el vínculo**, que es justo lo que la **0.069 ya construyó** (E1).
+2. ⭐ **Y por eso la receta compartida (0.070) SÍ hace falta.** Precisamente porque cada OP tiene su propio
+   modelo de producción, cada uno necesita receta: **copiarla a los N** obliga a mantenerlas iguales a
+   mano; **leerla del desarrollo** hace la igualdad estructural. Es su propia pregunta del 28-ago la que
+   lo decide — *«Todos los modelos deben de llevar lo mismo. **¿Cómo lo controlas?»*** — porque con copias
+   no se *controla*: se *vigila*, y vigilar depende de que alguien se acuerde.
+
+### 📌 Lo que la medición SÍ desmintió del plan
+
+🔴 **El argumento del inventario ya estaba resuelto, y el plan lo arrastraba como si no.** §Post-F9.135
+justifica los N modelos así: *«los modelos de producción son los que se van a inventariar»* — dando a
+entender que **sin** N modelos el inventario no distinguiría los colores. **Medido: sí los distingue.**
+`MovimientoDetPt` lleva **`idModelo` + `idColor` + `idTalla`** (`schema.prisma:4163-4168`), y el color vive
+en `OrdenLinea` con su pantone propio (`:3320-3324`). Además **nada impide hoy** que varias órdenes
+compartan modelo (no hay `@@unique` sobre `Orden.idModelo`).
+
+⇒ **El motivo real de los N modelos NO es el inventario: es el NÚMERO DE CATÁLOGO** — que cada color tenga
+su número de producción de 5 dígitos, como Daniel acaba de decir. La conclusión del plan era correcta; **su
+argumento, no**. Se corrige aquí para que nadie vuelva a apoyarse en él.
+
+- **Aplica en:** confirma el Bloque 3 tal como está planeado (0.069 ✅ · 0.070 · 0.071 · 0.072).
+  **Fecha:** 2026-08-31.
+
+---

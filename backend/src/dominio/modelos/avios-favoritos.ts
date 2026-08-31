@@ -47,6 +47,7 @@ import { clienteLectura, enTransaccion } from '../../comun/transaccion.js';
 import { leerAviosBom, type ModeloAvioDetalle } from './bom-modelo.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { exigirModelo } from './modelos.js';
+import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 
 /**
  * Cliente de LECTURA: la sugerencia es un GET y puede correr fuera de transacción, así que sus
@@ -121,9 +122,18 @@ function aFavorito(fila: FilaFavorita, cantidadSugerida: number): AvioFavorito {
   };
 }
 
-/** Ids de los avíos que la receta del modelo YA tiene. */
+/**
+ * Ids de los avíos que la receta del modelo YA tiene.
+ *
+ * ⭐ V1-E9b — «la receta del modelo» es la del modelo del que **se lee** la receta: con un hijo del
+ * linaje 1:N (V1-E9a) es la de su modelo de DESARROLLO. Sin esto, la sugerencia le ofrecería a un
+ * hijo avíos que su receta compartida ya trae.
+ */
 async function idsAviosDelBom(tx: Lector, idModelo: number): Promise<Set<number>> {
-  const filas = await tx.modeloAvio.findMany({ where: { idModelo }, select: { idAvio: true } });
+  const filas = await tx.modeloAvio.findMany({
+    where: { idModelo: await resolverIdRecetaDeModelo(tx, idModelo) },
+    select: { idAvio: true },
+  });
   return new Set(filas.map((f) => f.idAvio));
 }
 

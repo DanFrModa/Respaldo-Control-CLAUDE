@@ -66,6 +66,7 @@ import {
 
 import { avisosDeCurvaDelModelo } from './curva-desde-ordenes.js';
 import { exigirModelo, leerTallasCurvaModelo } from './modelos.js';
+import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 
 /** Cuerpo de guardar medidas tal como LLEGA al dominio (se re-valida con `validarEntrada`). */
@@ -206,11 +207,21 @@ async function leerMedidasAvio(
   idAvio: number,
   contexto: ContextoAvioTalla,
   idEmpresa: number,
+  /**
+   * ⭐ V1-E9b — de qué modelo salen las MEDIDAS (`ModeloAvioTalla`), que con un hijo del linaje 1:N
+   * no es el mismo del que sale la CURVA. Va como parámetro explícito, sin default, porque las dos
+   * puertas de este archivo quieren cosas distintas y ninguna debe heredarla por descuido: la
+   * LECTURA resuelve al modelo de la receta; el GUARDADO escribe donde escribe (V1-E9b pieza B).
+   *
+   * ⚠️ `idModelo` sigue mandando en la CURVA y en los avisos: la curva y las órdenes son del
+   * modelo que se está mirando, no de su padre de receta.
+   */
+  idModeloReceta: number,
 ): Promise<MedidasAvio> {
   const [curva, filas, avisosCurva] = await Promise.all([
     leerTallasCurvaModelo(tx, idModelo),
     tx.modeloAvioTalla.findMany({
-      where: { idModelo, idAvio },
+      where: { idModelo: idModeloReceta, idAvio },
       select: {
         idTalla: true,
         consumo: true,
@@ -487,8 +498,11 @@ export async function obtenerMedidasAvio(
 ): Promise<MedidasAvio> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
-  const contexto = await exigirRenglonAvio(cliente, idModelo, idAvio);
-  return leerMedidasAvio(cliente, idModelo, idAvio, contexto, sesion.idEmpresaActiva);
+  // V1-E9b — el renglón del BOM y sus medidas salen del modelo de la RECETA (con un hijo del
+  // linaje 1:N son del padre); la CURVA y los avisos siguen siendo del modelo que se mira.
+  const idReceta = await resolverIdRecetaDeModelo(cliente, idModelo);
+  const contexto = await exigirRenglonAvio(cliente, idReceta, idAvio);
+  return leerMedidasAvio(cliente, idModelo, idAvio, contexto, sesion.idEmpresaActiva, idReceta);
 }
 
 /**
@@ -561,6 +575,10 @@ export async function guardarMedidasAvio(
       idAvio,
       { ...contexto, consumoPorTalla: consumoPorTallaFinal },
       sesion.idEmpresaActiva,
+      // El GUARDADO acaba de escribir sobre `idModelo`: relee lo que él mismo dejó. Redirigir esto
+      // a la receta del padre es cosa de la pieza B (los escritores), no de ésta — hacerlo aquí
+      // enseñaría un resultado que no es el que se guardó.
+      idModelo,
     );
     if (forzado) {
       resultado.avisos.push(
