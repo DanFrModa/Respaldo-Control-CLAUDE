@@ -1329,12 +1329,40 @@ escaparon la cuarta y la quinta. Y `.prisma` dentro porque de ahí se generan ar
 revisa.
 
 🔴 **Y hubo una SÉPTIMA, que se nos escapó a los dos: estaba en el CONTRATO.** Un `.describe()` de
-`contrato/esquemas/modelo.ts` afirmaba *«su OP no puede nacer hasta que la receta se revise»* — la misma
-frase, en el único sitio que **viaja fuera del repo**: entra al OpenAPI y de ahí al cliente generado del
-frontend. La cazó, ya con la etapa aprobada, la medición de otra versión. ⇒ **la lista de sitios del
-barrido lleva `backend/src/contrato/` explícito**, y después del arreglo van `npm run openapi` y
-`npm run gen:api`, porque si no la frase vieja **sobrevive en los generados** aunque la fuente esté
-corregida. ⛔ **Excepción que NO se toca: las migraciones ya aplicadas.** `migration.sql` lleva checksum
+`contrato/esquemas/modelo.ts` afirmaba *«su OP **no puede nacer** hasta que la receta se revise»* — en el
+único sitio que **viaja fuera del repo**: entra al OpenAPI y de ahí al cliente generado del frontend. La
+cazó, ya con la etapa aprobada, la medición de otra versión.
+
+⚠️ **Y la primera lección que se escribió aquí ERA LA EQUIVOCADA.** Decía *«añadir `contrato/` a la lista
+de sitios del barrido»* — y **eso no habría evitado la séptima**: `contrato/` ya estaba dentro del
+`--include="*.ts"` sobre `backend/src`. **El barrido no falló por DÓNDE miró, sino por QUÉ buscó.** Se
+buscaron las **frases conocidas** (*mandarse a producir*, *habilita*, *niega*, *impide*, *bloquea*), y
+*«no puede nacer hasta que la receta se revise»* **no contiene ninguna**: es la misma afirmación con otras
+palabras. Sumar carpetas no arregla eso — un sinónimo en `dominio/` se escaparía igual.
+
+> ### ⭐⭐ LA LECCIÓN QUE SÍ GENERALIZA
+>
+> **Una afirmación de negocio no se busca por su REDACCIÓN: se busca ENUMERANDO SU SUPERFICIE Y
+> LEYÉNDOLA.** El `grep` sirve para **confirmar que algo se fue**; **no sirve para descubrir que sigue ahí
+> con otras palabras**.
+>
+> En el contrato eso es mecánico y barato, y ya está medido: extraer los `.describe()` (multilínea,
+> concatenaciones incluidas) da **5,476**; filtrar los que llevan un modal deja **82**; leerlos son
+> **minutos, una sola pasada**. Así se comprobó que el único contaminado era el nuestro.
+
+📌 **Y lo específico de este sitio se queda, porque es cierto:** tras corregir el contrato van
+`npm run openapi` y `npm run gen:api`, o **la frase vieja sobrevive en los tres generados** aunque la
+fuente esté corregida. Es el único lugar del repo donde eso pasa.
+
+🔴 **La octava fue la corrección de la séptima.** El primer reemplazo decía que la receta sin firmar
+*«detiene COMPRARLE el material»* — **también falso, y en el mismo renglón del contrato público**. Medido:
+`revisionEstado` aparece **cero veces** en `produccion/receta-orden.ts`, `compras/ordenes-compra.ts` y
+`compras/mrp.ts`; los renglones nacen `liberadoEn: null` **siempre**, aprobada la revisión o no, y sólo
+`liberarReceta` los libera. Son **dos firmas causalmente independientes sobre dos entidades distintas**.
+⇒ **Retirar una afirmación falsa y poner otra en su lugar es el modo de fallo de esta clase de arreglo**:
+al corregir, la pregunta no es *«¿suena bien?»* sino *«¿qué campo es éste, y qué dice el código que
+hace?»*. `conPedido` no afirma qué está bloqueado — es una **señal de prioridad**: hay piezas
+comprometidas detrás de esa receta sin revisar. ⛔ **Excepción que NO se toca: las migraciones ya aplicadas.** `migration.sql` lleva checksum
 en `_prisma_migrations`; editarla aborta el siguiente `migrate deploy` con *«migration was modified
 after it was applied»* y **tumba el despliegue**. La frase muerta se queda ahí, a propósito.
 
