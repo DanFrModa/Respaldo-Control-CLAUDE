@@ -188,7 +188,31 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 > capacidad nueva sólo aplica a lo que se capture de ahora en adelante, **eso está bien y no hay que
 > avisarlo como carencia**.
 >
-> 📌 **En una línea:** *lo viejo se tira, no se arregla; y lo nuevo se hace bien desde el primer día.*
+> ---
+> ### 🔑 CÓMO SE APLICA, SIN PENSARLO (Daniel, 30-ago: *«que en nuevos chats no se detenga a ver cómo resuelve el tema de los datos viejos»*)
+>
+> **La única pregunta que hay que hacerse es: «¿esto funciona bien cuando el dato NO está?»**
+> No *«¿cómo arreglo los que ya están mal?»*. Esa segunda pregunta **no se hace nunca**. Daniel:
+> *«sólo hay que ver cómo guardamos y hacemos compatible todo lo que no tenga datos. Y punto. Sin más.»*
+>
+> | Si te encuentras con… | Qué haces | Qué NO haces |
+> |---|---|---|
+> | Un campo nuevo y filas existentes sin él | `NULL` o un `DEFAULT` en la migración, y **sigues** | Backfill, script de relleno, «reparar» las filas |
+> | Un registro migrado de Access sin el dato que tu función necesita | Que la función **no truene**: vacío, `—`, o simplemente no aplica | Inventar el valor, pedirlo en pantalla, bloquear la función |
+> | Un defecto que ya dejó datos mal en `prueba` | Arreglas **la entrada** para que no se repita. **Punto final** | Auditar la BD, consultas de rescate, informes de daño, migración correctiva |
+> | Una función nueva que sólo tiene sentido para lo que se capture desde hoy | **Está bien.** La construyes así y **ni lo mencionas** | Advertirlo como carencia, diseñar una variante para el histórico |
+> | Una regla nueva que el histórico no cumple | La regla aplica **de hoy en adelante** | Validar el histórico contra ella, marcarlo como inconsistente |
+>
+> ⛔ **PROHIBIDO GASTAR EN:** backfills · scripts de reparación · auditorías de datos existentes · consultas
+> de rescate · pantallas para «completar» el histórico · variantes de una función «para los datos viejos» ·
+> advertencias de que algo «sólo aplica a lo nuevo».
+>
+> 🚫 **Y prohibido PREGUNTARLE a Daniel qué hacer con datos ya existentes.** Ya está contestado, para
+> siempre, aquí: **se limpian; no se arreglan.** Preguntarlo otra vez es exactamente lo que esta regla
+> vino a impedir.
+>
+> 📌 **En una línea:** *lo viejo se tira, no se arregla; lo que falta se tolera; y lo nuevo se hace bien
+> desde el primer día.*
 
 1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
 2. **Flujo de ramas + AUTORIZACIÓN (innegociable):** rama de tarea → PR a **`prueba`** → **Gabriel verifica EN VIVO en Railway** (no en local) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.) La rama de tarea **NO debe trackear `prueba`** como upstream (riesgo de push accidental). **NADA de `git commit` ni `git push` sin autorización EXPRESA de Gabriel.** El flujo correcto al terminar una etapa:

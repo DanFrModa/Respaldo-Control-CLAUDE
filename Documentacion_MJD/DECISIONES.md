@@ -10250,7 +10250,35 @@ migrados no tienen `codigoDesarrollo` (no había desarrollo).
 eso está bien y NO hay que avisarlo como carencia.** Decirlo en cada entrega es otra forma de gastar el
 tiempo de Daniel en algo que él ya dio por asumido.
 
-📌 **En una línea:** *lo viejo se tira, no se arregla; y lo nuevo se hace bien desde el primer día.*
+### 🔑 Cómo se aplica, sin pensarlo — la reformulación que pidió Daniel
+
+Daniel volvió sobre ella para que **no se pierda tiempo ni siquiera en interpretarla**:
+
+> *«deja esto perfectamente bien documentado, para que **en nuevos chats no se detenga a ver cómo resuelve
+> el tema de los datos viejos**. Ni los que están ahorita en prueba ni los que vienen de Access. Más bien
+> sólo hay que ver **cómo guardamos y hacemos compatible todo lo que no tenga datos. Y punto. Sin más.**»*
+
+⭐ **La regla, dicha en positivo, es una sola pregunta:** *«¿esto funciona bien cuando el dato NO está?»*
+La otra pregunta —*«¿cómo arreglo los que ya están mal?»*— **no se hace nunca**.
+
+| Si aparece… | Qué se hace | Qué NO se hace |
+|---|---|---|
+| Un campo nuevo y filas existentes sin él | `NULL` o `DEFAULT` en la migración, y se sigue | Backfill, script de relleno, «reparar» filas |
+| Un registro migrado sin el dato que la función necesita | Que **no truene**: vacío, `—`, o no aplica | Inventar el valor, pedirlo en pantalla, bloquear la función |
+| Un defecto que ya dejó datos mal en `prueba` | Se arregla **la entrada** para que no se repita. **Punto final** | Auditar la BD, consultas de rescate, informes de daño |
+| Una función que sólo tiene sentido para lo capturado desde hoy | Se construye así **y ni se menciona** | Advertirlo como carencia, hacer una variante para el histórico |
+| Una regla nueva que el histórico no cumple | Aplica **de hoy en adelante** | Validar el histórico contra ella, marcarlo inconsistente |
+
+⛔ **PROHIBIDO GASTAR EN:** backfills · scripts de reparación · auditorías de datos existentes · consultas
+de rescate · pantallas para «completar» el histórico · variantes «para los datos viejos» · advertencias de
+que algo «sólo aplica a lo nuevo».
+
+🚫 **Y PROHIBIDO PREGUNTARLE A DANIEL qué hacer con datos ya existentes.** Está contestado para siempre
+aquí: **se limpian; no se arreglan.** Volver a preguntarlo es exactamente lo que esta decisión vino a
+impedir — y ya pasó cuatro veces en un solo día.
+
+📌 **En una línea:** *lo viejo se tira, no se arregla; lo que falta se tolera; y lo nuevo se hace bien
+desde el primer día.*
 
 ### Lo que esta decisión RETIRA de inmediato (casos reales del mismo día)
 
