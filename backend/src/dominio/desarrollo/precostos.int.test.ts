@@ -1000,6 +1000,64 @@ describe('congelado inmutable + estado del desarrollo', () => {
     expect(enBd.congeladoEn).toBeNull();
   });
 
+  /**
+   * ⭐⭐ EL DEFECTO DE LA 0.060, de punta a punta (candado del 31-ago-2026). Al entrar el EMPAQUE
+   * como tercera ancla, `generarPrecosto` empezó a poner su default ($2.20) en TODO precosto nuevo:
+   * el de un modelo sin receta y sin costos capturados dejó de sumar $0.00 y **la guarda del total
+   * lo dejaba pasar**. Se congelaba INMUTABLE (D3) y de ahí salía el precio al cliente: la prenda
+   * cotizada al costo de su bolsa. Ojo al test de arriba — para reproducir el cero tuvo que poner
+   * el empaque en 0 A MANO; esa gimnasia era justamente la señal de que el caso REAL (el empaque en
+   * su valor de fábrica) se había quedado sin candado.
+   */
+  it('⭐ NO congela un precosto cuyo ÚNICO importe es el ancla AUTOMÁTICA de empaque', async () => {
+    const modelo = await cliente.modelo.create({
+      data: { codigo: 'SOLO-EMPAQUE', maquilaBase: 0, corteBase: 0 },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    // NO suma cero —el empaque lo sostiene solito—, así que la guarda del total no lo ataja: el
+    // precosto entero vale lo que su bolsa.
+    const empaque = borrador.lineas.find((l) => l.conceptoCodigo === 'empaque');
+    const importeEmpaque = empaque?.importe ?? 0;
+    expect(importeEmpaque).toBeGreaterThan(0);
+    expect(borrador.costoTotal).toBe(importeEmpaque);
+    expect(borrador.lineas.every((l) => l.conceptoCodigo === 'empaque' || l.importe === 0)).toBe(
+      true,
+    );
+
+    await expect(congelarVersion(sesion(), borrador.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+
+    // Sigue siendo BORRADOR: no quedó nada sellado a medias.
+    const enBd = await cliente.precosto.findUniqueOrThrow({ where: { id: borrador.id } });
+    expect(enBd.estado).toBe('borrador');
+    expect(enBd.congeladoEn).toBeNull();
+  });
+
+  /**
+   * ⚠️ LO QUE NO SE PUEDE ROMPER: hay modelos que se costean POR PROCESO (maquila + corte) y cuya
+   * receta está vacía a propósito — no toda prenda lleva BOM. Ése congela normal: el candado pide
+   * CONTENIDO capturado, no un BOM.
+   */
+  it('maquila y corte capturados SIN receta: el precosto sí congela (costeo por proceso)', async () => {
+    const modelo = await cliente.modelo.create({
+      data: { codigo: 'SIN-BOM', maquilaBase: 18, corteBase: 3.5 },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const importeEmpaque =
+      borrador.lineas.find((l) => l.conceptoCodigo === 'empaque')?.importe ?? 0;
+
+    const congelado = await congelarVersion(sesion(), borrador.id, bd());
+
+    expect(congelado.estado).toBe('congelado');
+    expect(congelado.costoTotal).toBe(redondear2(18 + 3.5 + importeEmpaque));
+  });
+
   it('con el costo capturado (aunque sea un centavo), el mismo precosto SÍ congela', async () => {
     const modelo = await cliente.modelo.create({ data: { codigo: 'CON-MAQUILA', maquilaBase: 0 } });
     const idProyecto = await proyectoNuevo();
