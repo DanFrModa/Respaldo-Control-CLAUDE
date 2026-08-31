@@ -2005,6 +2005,30 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
 
+### 🔴 REGLA 0-B — los datos viejos no se arreglan: el sistema mira hacia adelante (Daniel, 30-ago-2026, §Post-F9.163)
+
+> *«toda la información que haya ahí **no es importante, es basura. La vamos a limpiar**… Todo el sistema
+> debe estar enfocado sólo en **nueva información**, no en ver cómo arreglamos la que ya se hizo de una
+> manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
+
+**La única pregunta al construir es: «¿esto funciona bien cuando el dato NO está?»**. La otra —*«¿cómo
+arreglo los que ya están mal?»*— **no se hace nunca**. El histórico de Access **sí se importa** y llega
+**incompleto a propósito**: un registro migrado con huecos **no es un defecto**. 🔑 **Tolerar ≠ compensar.**
+⛔ Nada de backfills, auditorías de datos, consultas de rescate ni pantallas para completar el histórico.
+🚫 **Y no se le vuelve a preguntar a Daniel qué hacer con datos existentes**: está contestado para siempre.
+La regla completa, con su **tabla de decisión**, está en `CLAUDE.md` §7 como REGLA 0-B.
+
+### 🔴 REGLA 0 — no se frena esperando respuestas (Daniel, 30-ago-2026, §Post-F9.157)
+
+> *«mientras haya algo que hacer, no frenes por las respuestas. **No estoy pegado a Claude 24 horas.**
+> Necesito que avances mientras puedas hacer algo y después te doy mis respuestas.»*
+
+**Preguntar no es parar.** Se deja la pregunta con su default y **se sigue con lo que no dependa de ella**;
+una etapa bloqueada **no bloquea el programa** (precedente del mismo día: la 0.061 se aparcó y se pasó a la
+0.062 sin perder un minuto). Sólo se para cuando *todo* lo pendiente depende de esa respuesta — y entonces
+**se dice con esas palabras**: *«estoy detenido esperando esto»*. La regla completa vive en `CLAUDE.md` §7,
+como REGLA 0, porque es el primer archivo que lee cualquier sesión nueva.
+
 ### ⚙️ Reglas de MÉTODO nacidas en V1-E8j, V1-E8k y V1-E8l (aplican a toda etapa, no sólo a ésas)
 
 - 🟢 **Se puede correr INTEGRACIÓN en local sin Docker.** La regla del proyecto prohíbe **Docker y
