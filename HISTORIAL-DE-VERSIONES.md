@@ -28,6 +28,21 @@ nadie sabe emparejar.
 **El día del arranque:** la versión que salga a producción se **rebautiza `1.000`**, dejando escrito de
 cuál `0.xxx` viene (_"1.000 — antes 0.014"_). De ahí en adelante, `1.001`, `1.002`… con la misma regla.
 
+> ## ⏳⏳ Y ESE DÍA CADUCA UNA REGLA — no se puede pasar de largo
+>
+> **El rebautizo a `1.000` es el disparador de la REGLA 0-B** (`CLAUDE.md` §7, §Post-F9.163). Hasta ese
+> día vale que *«los datos viejos son basura: se limpian, no se arreglan»*; **a partir de ese día, no.**
+> Daniel: *«es válido mientras no hayamos ido a producción. Después… **habrá que medir qué hacemos con
+> información que hayamos hecho dentro del sistema** y si luego se cambia algo»*.
+>
+> **La razón:** hoy los datos de `prueba` son basura porque nadie operó el negocio con ellos. En
+> producción **serán el negocio** — órdenes, compras y precios que ya se le cobraron a un cliente — y ahí
+> no se puede tirar y volver a capturar.
+>
+> ⚠️ **Antes de poner ese `1.000` hay que cerrar con Daniel la *política de datos en producción*:** qué se
+> hace cuando una regla cambia y ya hay información capturada con la vieja. **Es decisión suya y no tiene
+> default.**
+
 Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en producción` cuando sube.
 
 ---

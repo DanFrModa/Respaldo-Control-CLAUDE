@@ -173,6 +173,25 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 > ## 🔴 REGLA 0-B — LOS DATOS DE HOY SON BASURA: EL SISTEMA MIRA HACIA ADELANTE (DANIEL, 30-ago-2026, §Post-F9.163)
 >
+> ## ⏳⏳ ESTA REGLA CADUCA — SÓLO VALE ANTES DE PRODUCCIÓN
+>
+> **Daniel, textual:** *«cabe aclarar que todo esto que comenté de la información vieja **es válido
+> mientras no hayamos ido a producción**. Después de que estemos en producción, habrá que medir qué
+> hacemos con información que hayamos hecho dentro del sistema y si luego se cambia algo… habrá que ver
+> cómo manejarlo.»*
+>
+> 🔑 **EL DISPARADOR ES CONCRETO Y VERIFICABLE: el día que la versión se rebautice `1.000`** (el hito del
+> arranque, ver `HISTORIAL-DE-VERSIONES.md` §«Cómo se numeran»), **esta regla DEJA DE APLICAR**. Mientras
+> el número siga empezando con `0.`, aplica entera.
+>
+> **Por qué caduca:** hoy los datos de `prueba` son basura porque **nadie operó el negocio con ellos**. En
+> producción serán **el negocio**: órdenes reales, compras reales, precios que se le cobraron a un
+> cliente. Ahí **no se puede tirar y volver a capturar**, y cada cambio de regla obliga a preguntarse qué
+> pasa con lo ya hecho — que es exactamente lo que hoy está prohibido gastar.
+>
+> ⚠️ **Si lees esto y la versión ya empieza con `1.`: PARA.** No apliques nada de lo de abajo. La política
+> de datos en producción **está por definir con Daniel** y es una decisión suya, no un default del lead.
+>
 > **Textual de Daniel:**
 >
 > > *«Estamos trabajando en la versión de prueba… toda la información que haya ahí **no es importante, es

@@ -10234,6 +10234,30 @@ el aviso llegue a la pantalla.
 
 #### (Post-F9.163) — 🔴🔴 LOS DATOS DE HOY SON BASURA: **EL SISTEMA MIRA HACIA ADELANTE** (DANIEL, 30-ago-2026)
 
+> ## ⏳⏳ ESTA DECISIÓN CADUCA — SÓLO VALE **ANTES DE PRODUCCIÓN**
+>
+> Daniel lo precisó él mismo, el mismo día:
+>
+> > *«cabe aclarar que todo esto que comenté de la información vieja **es válido mientras no hayamos ido a
+> > producción**. Después de que estemos en producción, habrá que **medir qué hacemos** con información que
+> > hayamos hecho dentro del sistema y si luego se cambia algo… habrá que ver cómo manejarlo.»*
+>
+> 🔑 **El disparador es concreto y verificable: el día que la versión se rebautice `1.000`** — el hito del
+> arranque, ya definido en `HISTORIAL-DE-VERSIONES.md` §«Cómo se numeran». **Mientras el número empiece
+> con `0.`, esta decisión aplica entera. En cuanto empiece con `1.`, deja de aplicar.**
+>
+> **Por qué caduca, y es la razón de fondo:** hoy los datos de `prueba` son basura porque **nadie operó el
+> negocio con ellos** — se capturaron para probar. En producción serán **el negocio**: órdenes reales,
+> compras reales, precios que ya se le cobraron a un cliente. Ahí **no se puede tirar y volver a
+> capturar**, y cada cambio de regla obliga a preguntarse qué pasa con lo ya hecho. Es decir: **lo que hoy
+> está prohibido gastar, en producción será obligatorio pensarlo.**
+>
+> ⚠️ **PENDIENTE ABIERTO, de Daniel, sin fecha:** *la política de datos en producción*. Qué se hace cuando
+> una regla cambia y ya hay información capturada con la regla vieja — ¿se recalcula?, ¿se deja como
+> está?, ¿se marca?, ¿se corrige con un movimiento nuevo (D3)? **No se le pone default**: es decisión suya
+> y hay que agendarla **antes del go-live (F10)**, no después.
+
+
 **Cómo salió.** Daniel lo dijo tras ver, a lo largo de un día entero, que el lead **se frenaba una y otra
 vez cuidando datos que a él no le importan**:
 

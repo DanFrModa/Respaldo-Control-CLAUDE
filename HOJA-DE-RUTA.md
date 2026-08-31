@@ -2007,6 +2007,13 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 
 ### 🔴 REGLA 0-B — los datos viejos no se arreglan: el sistema mira hacia adelante (Daniel, 30-ago-2026, §Post-F9.163)
 
+> ## ⏳ **CADUCA AL LLEGAR A PRODUCCIÓN.** Daniel: *«es válido mientras no hayamos ido a producción.
+> Después… habrá que medir qué hacemos con información que hayamos hecho dentro del sistema»*.
+> **El disparador: el día que la versión se rebautice `1.000`.** Mientras empiece con `0.`, aplica entera.
+> ⚠️ Deja un **pendiente abierto sin fecha**: *la política de datos en producción*, que hay que agendar
+> **antes del go-live (F10)**.
+
+
 > *«toda la información que haya ahí **no es importante, es basura. La vamos a limpiar**… Todo el sistema
 > debe estar enfocado sólo en **nueva información**, no en ver cómo arreglamos la que ya se hizo de una
 > manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
