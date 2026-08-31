@@ -66945,11 +66945,44 @@
                     },
                     "puedeComprar": {
                       "type": "boolean",
-                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                     },
                     "todoLiberado": {
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                     },
                     "avisoCurva": {
                       "anyOf": [
@@ -67913,6 +67946,9 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
                     "avisoCurva",
                     "resumen",
                     "telas",
@@ -68455,11 +68491,44 @@
                     },
                     "puedeComprar": {
                       "type": "boolean",
-                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                     },
                     "todoLiberado": {
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                     },
                     "avisoCurva": {
                       "anyOf": [
@@ -69423,6 +69492,9 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
                     "avisoCurva",
                     "resumen",
                     "telas",
@@ -69872,11 +69944,44 @@
                     },
                     "puedeComprar": {
                       "type": "boolean",
-                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                     },
                     "todoLiberado": {
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                     },
                     "avisoCurva": {
                       "anyOf": [
@@ -70840,6 +70945,9 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
                     "avisoCurva",
                     "resumen",
                     "telas",
@@ -71148,11 +71256,44 @@
                     },
                     "puedeComprar": {
                       "type": "boolean",
-                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                     },
                     "todoLiberado": {
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                     },
                     "avisoCurva": {
                       "anyOf": [
@@ -72116,6 +72257,9 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
                     "avisoCurva",
                     "resumen",
                     "telas",
@@ -72408,11 +72552,44 @@
                     },
                     "puedeComprar": {
                       "type": "boolean",
-                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                     },
                     "todoLiberado": {
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                     },
                     "avisoCurva": {
                       "anyOf": [
@@ -73376,6 +73553,9 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
                     "avisoCurva",
                     "resumen",
                     "telas",
@@ -73655,11 +73835,44 @@
                     },
                     "puedeComprar": {
                       "type": "boolean",
-                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                     },
                     "todoLiberado": {
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                     },
                     "avisoCurva": {
                       "anyOf": [
@@ -74623,6 +74836,9 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
                     "avisoCurva",
                     "resumen",
                     "telas",
@@ -74890,11 +75106,44 @@
                     },
                     "puedeComprar": {
                       "type": "boolean",
-                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                     },
                     "todoLiberado": {
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                     },
                     "avisoCurva": {
                       "anyOf": [
@@ -75858,6 +76107,9 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
                     "avisoCurva",
                     "resumen",
                     "telas",
@@ -76171,11 +76423,44 @@
                     },
                     "puedeComprar": {
                       "type": "boolean",
-                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                     },
                     "todoLiberado": {
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                     },
                     "avisoCurva": {
                       "anyOf": [
@@ -77139,6 +77424,2574 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
+                    "avisoCurva",
+                    "resumen",
+                    "telas",
+                    "avios",
+                    "artes",
+                    "desalineacion"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/{id}/receta/abrir": {
+      "post": {
+        "summary": "Reabrir la receta para corregirla — CONGELA la compra de la orden (§Post-F9.160(a))",
+        "tags": [
+          "ordenes"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "description": "Por qué se reabre la receta. Obligatorio: es lo que ve el comprador en el 409."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "description": "Reabre la receta de la orden y CONGELA su compra hasta que se cierre (§Post-F9.160(a))."
+              }
+            }
+          },
+          "description": "Reabre la receta de la orden y CONGELA su compra hasta que se cierre (§Post-F9.160(a))."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "codigoModelo": {
+                      "type": "string"
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente de la orden (encabezado de la pantalla)."
+                    },
+                    "fechaEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de entrega comprometida de la orden, o null."
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "capturada",
+                        "completa",
+                        "cancelada"
+                      ],
+                      "description": "Estado de la orden (una CANCELADA no se toca)."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de prendas de la orden (Σ de su matriz color×talla)."
+                    },
+                    "liberadaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72)."
+                    },
+                    "liberadaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la dejó completa. null con fecha presente = la liberó la migración."
+                    },
+                    "puedeComprar": {
+                      "type": "boolean",
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
+                    },
+                    "todoLiberado": {
+                      "type": "boolean",
+                      "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
+                    },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
+                    "resumen": {
+                      "type": "object",
+                      "properties": {
+                        "sinRevisar": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "revisados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "ajustados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "excluidos": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Renglones vivos (los excluidos NO cuentan)."
+                        },
+                        "liberados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Renglones vivos ya liberados (se pueden comprar)."
+                        },
+                        "porLiberar": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Renglones vivos SIN liberar (no se compran todavía)."
+                        }
+                      },
+                      "required": [
+                        "sinRevisar",
+                        "revisados",
+                        "ajustados",
+                        "excluidos",
+                        "total",
+                        "liberados",
+                        "porLiberar"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Conteo de renglones de la receta por estado y por firma."
+                    },
+                    "telas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de la receta de ESTA orden."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio",
+                              "arte"
+                            ],
+                            "description": "Sección de la receta a la que pertenece el renglón."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "sin_revisar",
+                              "revisado",
+                              "ajustado"
+                            ],
+                            "description": "Estado de revisión del renglón: sin revisar | revisado | ajustado a mano."
+                          },
+                          "agregadoAMano": {
+                            "type": "boolean",
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
+                          },
+                          "excluido": {
+                            "type": "boolean",
+                            "description": "El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué se ajustó/excluyó, si se escribió."
+                          },
+                          "enElModelo": {
+                            "type": "boolean",
+                            "description": "¿El insumo sigue en el BOM del modelo hoy?"
+                          },
+                          "cambios": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "agregado",
+                                "quitado",
+                                "consumo",
+                                "precio",
+                                "precio-mercado"
+                              ],
+                              "description": "Qué cambió respecto de la receta congelada de la orden."
+                            },
+                            "description": "Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar)."
+                          },
+                          "liberadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra."
+                          },
+                          "liberadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién firmó este renglón, o null."
+                          },
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la tela."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la tela."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de medida de la tela."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo por prenda CONGELADO en esta orden."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean"
+                          },
+                          "paraCosto": {
+                            "type": "boolean"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre proveedor–tela heredado del BOM (R17): a quién se le compra."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "consumoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo que trae HOY el BOM del modelo (null si ya no está)."
+                          },
+                          "precioModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio que costea HOY la receta del modelo (la cascada única), o null."
+                          },
+                          "precioModeloDeCompra": {
+                            "type": "boolean",
+                            "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "tipo",
+                          "estado",
+                          "agregadoAMano",
+                          "excluido",
+                          "notas",
+                          "enElModelo",
+                          "cambios",
+                          "liberadoEn",
+                          "liberadoPor",
+                          "idTela",
+                          "nombre",
+                          "unidad",
+                          "consumoPorPrenda",
+                          "precio",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "consumoModelo",
+                          "precioModelo",
+                          "precioModeloDeCompra"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de tela de la receta congelada de una orden."
+                      }
+                    },
+                    "avios": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de la receta de ESTA orden."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio",
+                              "arte"
+                            ],
+                            "description": "Sección de la receta a la que pertenece el renglón."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "sin_revisar",
+                              "revisado",
+                              "ajustado"
+                            ],
+                            "description": "Estado de revisión del renglón: sin revisar | revisado | ajustado a mano."
+                          },
+                          "agregadoAMano": {
+                            "type": "boolean",
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
+                          },
+                          "excluido": {
+                            "type": "boolean",
+                            "description": "El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué se ajustó/excluyó, si se escribió."
+                          },
+                          "enElModelo": {
+                            "type": "boolean",
+                            "description": "¿El insumo sigue en el BOM del modelo hoy?"
+                          },
+                          "cambios": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "agregado",
+                                "quitado",
+                                "consumo",
+                                "precio",
+                                "precio-mercado"
+                              ],
+                              "description": "Qué cambió respecto de la receta congelada de la orden."
+                            },
+                            "description": "Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar)."
+                          },
+                          "liberadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra."
+                          },
+                          "liberadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién firmó este renglón, o null."
+                          },
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "esGenerico": {
+                            "type": "boolean",
+                            "description": "¿Es un avío genérico (se netea contra el stock)?"
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo por prenda CONGELADO (`CantHabOrd` del viejo)."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean"
+                          },
+                          "paraCosto": {
+                            "type": "boolean"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo se captura por TALLA (R18)?"
+                          },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
+                          "capturaReparable": {
+                            "type": "boolean",
+                            "description": "⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón."
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del par `AvioProveedor` amarrado, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tallas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idTalla": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta de la talla (CH, M, G…)."
+                                },
+                                "consumo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
+                                },
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
+                                }
+                              },
+                              "required": [
+                                "idTalla",
+                                "etiqueta",
+                                "consumo",
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Medida por talla de un avío de la receta de la orden."
+                            },
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
+                          },
+                          "consumoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "precioModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "precioModeloDeCompra": {
+                            "type": "boolean",
+                            "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "tipo",
+                          "estado",
+                          "agregadoAMano",
+                          "excluido",
+                          "notas",
+                          "enElModelo",
+                          "cambios",
+                          "liberadoEn",
+                          "liberadoPor",
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "unidad",
+                          "esGenerico",
+                          "consumoPorPrenda",
+                          "precio",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
+                          "capturaReparable",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "tallas",
+                          "tieneTallas",
+                          "consumoModelo",
+                          "precioModelo",
+                          "precioModeloDeCompra"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de avío de la receta congelada de una orden."
+                      }
+                    },
+                    "artes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de la receta de ESTA orden."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio",
+                              "arte"
+                            ],
+                            "description": "Sección de la receta a la que pertenece el renglón."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "sin_revisar",
+                              "revisado",
+                              "ajustado"
+                            ],
+                            "description": "Estado de revisión del renglón: sin revisar | revisado | ajustado a mano."
+                          },
+                          "agregadoAMano": {
+                            "type": "boolean",
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
+                          },
+                          "excluido": {
+                            "type": "boolean",
+                            "description": "El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué se ajustó/excluyó, si se escribió."
+                          },
+                          "enElModelo": {
+                            "type": "boolean",
+                            "description": "¿El insumo sigue en el BOM del modelo hoy?"
+                          },
+                          "cambios": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "agregado",
+                                "quitado",
+                                "consumo",
+                                "precio",
+                                "precio-mercado"
+                              ],
+                              "description": "Qué cambió respecto de la receta congelada de la orden."
+                            },
+                            "description": "Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar)."
+                          },
+                          "liberadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra."
+                          },
+                          "liberadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién firmó este renglón, o null."
+                          },
+                          "idModeloArte": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
+                          },
+                          "puntadas": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
+                            "type": "string",
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad."
+                          },
+                          "idProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "proveedor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor que hace el arte, o null."
+                          },
+                          "precioModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio que trae HOY el arte del modelo, o null."
+                          },
+                          "precioModeloDeCompra": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "tipo",
+                          "estado",
+                          "agregadoAMano",
+                          "excluido",
+                          "notas",
+                          "enElModelo",
+                          "cambios",
+                          "liberadoEn",
+                          "liberadoPor",
+                          "idModeloArte",
+                          "descripcion",
+                          "posicion",
+                          "puntadas",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
+                          "precio",
+                          "idProveedor",
+                          "proveedor",
+                          "precioModelo",
+                          "precioModeloDeCompra"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Arte congelado de una orden."
+                      }
+                    },
+                    "desalineacion": {
+                      "type": "object",
+                      "properties": {
+                        "hayCambios": {
+                          "type": "boolean",
+                          "description": "¿Algo se movió respecto de esta receta congelada?"
+                        },
+                        "conOrdenCompra": {
+                          "type": "boolean",
+                          "description": "¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso."
+                        },
+                        "critico": {
+                          "type": "boolean",
+                          "description": "Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta."
+                        },
+                        "cambios": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "idRenglon": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el insumo, para nombrarlo en el aviso."
+                              },
+                              "idMaterialModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Id del material en el BOM del modelo (solo en `agregado`), o null."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "agregado",
+                                  "quitado",
+                                  "consumo",
+                                  "precio",
+                                  "precio-mercado"
+                                ],
+                                "description": "Qué cambió respecto de la receta congelada de la orden."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "El aviso ya redactado (\"la cantidad pasó de 1 a 2\")."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "idRenglon",
+                              "material",
+                              "idMaterialModelo",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un cambio del BOM del modelo respecto de la receta congelada de la orden."
+                          }
+                        }
+                      },
+                      "required": [
+                        "hayCambios",
+                        "conOrdenCompra",
+                        "critico",
+                        "cambios"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folio",
+                    "idModelo",
+                    "codigoModelo",
+                    "cliente",
+                    "fechaEntrega",
+                    "estado",
+                    "totalPiezas",
+                    "liberadaEn",
+                    "liberadaPor",
+                    "puedeComprar",
+                    "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
+                    "avisoCurva",
+                    "resumen",
+                    "telas",
+                    "avios",
+                    "artes",
+                    "desalineacion"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/{id}/receta/cerrar": {
+      "post": {
+        "summary": "Cerrar la receta reabierta y descongelar la compra de la orden",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "codigoModelo": {
+                      "type": "string"
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente de la orden (encabezado de la pantalla)."
+                    },
+                    "fechaEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de entrega comprometida de la orden, o null."
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "capturada",
+                        "completa",
+                        "cancelada"
+                      ],
+                      "description": "Estado de la orden (una CANCELADA no se toca)."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de prendas de la orden (Σ de su matriz color×talla)."
+                    },
+                    "liberadaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72)."
+                    },
+                    "liberadaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la dejó completa. null con fecha presente = la liberó la migración."
+                    },
+                    "puedeComprar": {
+                      "type": "boolean",
+                      "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
+                    },
+                    "todoLiberado": {
+                      "type": "boolean",
+                      "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                    },
+                    "abiertaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                    },
+                    "abiertaPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién la reabrió (id de usuario), o null."
+                    },
+                    "abiertaMotivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
+                    },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
+                    "resumen": {
+                      "type": "object",
+                      "properties": {
+                        "sinRevisar": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "revisados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "ajustados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "excluidos": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Renglones vivos (los excluidos NO cuentan)."
+                        },
+                        "liberados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Renglones vivos ya liberados (se pueden comprar)."
+                        },
+                        "porLiberar": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Renglones vivos SIN liberar (no se compran todavía)."
+                        }
+                      },
+                      "required": [
+                        "sinRevisar",
+                        "revisados",
+                        "ajustados",
+                        "excluidos",
+                        "total",
+                        "liberados",
+                        "porLiberar"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Conteo de renglones de la receta por estado y por firma."
+                    },
+                    "telas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de la receta de ESTA orden."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio",
+                              "arte"
+                            ],
+                            "description": "Sección de la receta a la que pertenece el renglón."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "sin_revisar",
+                              "revisado",
+                              "ajustado"
+                            ],
+                            "description": "Estado de revisión del renglón: sin revisar | revisado | ajustado a mano."
+                          },
+                          "agregadoAMano": {
+                            "type": "boolean",
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
+                          },
+                          "excluido": {
+                            "type": "boolean",
+                            "description": "El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué se ajustó/excluyó, si se escribió."
+                          },
+                          "enElModelo": {
+                            "type": "boolean",
+                            "description": "¿El insumo sigue en el BOM del modelo hoy?"
+                          },
+                          "cambios": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "agregado",
+                                "quitado",
+                                "consumo",
+                                "precio",
+                                "precio-mercado"
+                              ],
+                              "description": "Qué cambió respecto de la receta congelada de la orden."
+                            },
+                            "description": "Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar)."
+                          },
+                          "liberadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra."
+                          },
+                          "liberadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién firmó este renglón, o null."
+                          },
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la tela."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la tela."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de medida de la tela."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo por prenda CONGELADO en esta orden."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean"
+                          },
+                          "paraCosto": {
+                            "type": "boolean"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre proveedor–tela heredado del BOM (R17): a quién se le compra."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "consumoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo que trae HOY el BOM del modelo (null si ya no está)."
+                          },
+                          "precioModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio que costea HOY la receta del modelo (la cascada única), o null."
+                          },
+                          "precioModeloDeCompra": {
+                            "type": "boolean",
+                            "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "tipo",
+                          "estado",
+                          "agregadoAMano",
+                          "excluido",
+                          "notas",
+                          "enElModelo",
+                          "cambios",
+                          "liberadoEn",
+                          "liberadoPor",
+                          "idTela",
+                          "nombre",
+                          "unidad",
+                          "consumoPorPrenda",
+                          "precio",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "consumoModelo",
+                          "precioModelo",
+                          "precioModeloDeCompra"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de tela de la receta congelada de una orden."
+                      }
+                    },
+                    "avios": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de la receta de ESTA orden."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio",
+                              "arte"
+                            ],
+                            "description": "Sección de la receta a la que pertenece el renglón."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "sin_revisar",
+                              "revisado",
+                              "ajustado"
+                            ],
+                            "description": "Estado de revisión del renglón: sin revisar | revisado | ajustado a mano."
+                          },
+                          "agregadoAMano": {
+                            "type": "boolean",
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
+                          },
+                          "excluido": {
+                            "type": "boolean",
+                            "description": "El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué se ajustó/excluyó, si se escribió."
+                          },
+                          "enElModelo": {
+                            "type": "boolean",
+                            "description": "¿El insumo sigue en el BOM del modelo hoy?"
+                          },
+                          "cambios": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "agregado",
+                                "quitado",
+                                "consumo",
+                                "precio",
+                                "precio-mercado"
+                              ],
+                              "description": "Qué cambió respecto de la receta congelada de la orden."
+                            },
+                            "description": "Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar)."
+                          },
+                          "liberadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra."
+                          },
+                          "liberadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién firmó este renglón, o null."
+                          },
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "esGenerico": {
+                            "type": "boolean",
+                            "description": "¿Es un avío genérico (se netea contra el stock)?"
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo por prenda CONGELADO (`CantHabOrd` del viejo)."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean"
+                          },
+                          "paraCosto": {
+                            "type": "boolean"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo se captura por TALLA (R18)?"
+                          },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
+                          "capturaReparable": {
+                            "type": "boolean",
+                            "description": "⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón."
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del par `AvioProveedor` amarrado, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tallas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idTalla": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta de la talla (CH, M, G…)."
+                                },
+                                "consumo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
+                                },
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
+                                }
+                              },
+                              "required": [
+                                "idTalla",
+                                "etiqueta",
+                                "consumo",
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Medida por talla de un avío de la receta de la orden."
+                            },
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
+                          },
+                          "consumoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "precioModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "precioModeloDeCompra": {
+                            "type": "boolean",
+                            "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "tipo",
+                          "estado",
+                          "agregadoAMano",
+                          "excluido",
+                          "notas",
+                          "enElModelo",
+                          "cambios",
+                          "liberadoEn",
+                          "liberadoPor",
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "unidad",
+                          "esGenerico",
+                          "consumoPorPrenda",
+                          "precio",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
+                          "capturaReparable",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "tallas",
+                          "tieneTallas",
+                          "consumoModelo",
+                          "precioModelo",
+                          "precioModeloDeCompra"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de avío de la receta congelada de una orden."
+                      }
+                    },
+                    "artes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de la receta de ESTA orden."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio",
+                              "arte"
+                            ],
+                            "description": "Sección de la receta a la que pertenece el renglón."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "sin_revisar",
+                              "revisado",
+                              "ajustado"
+                            ],
+                            "description": "Estado de revisión del renglón: sin revisar | revisado | ajustado a mano."
+                          },
+                          "agregadoAMano": {
+                            "type": "boolean",
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
+                          },
+                          "excluido": {
+                            "type": "boolean",
+                            "description": "El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué se ajustó/excluyó, si se escribió."
+                          },
+                          "enElModelo": {
+                            "type": "boolean",
+                            "description": "¿El insumo sigue en el BOM del modelo hoy?"
+                          },
+                          "cambios": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "agregado",
+                                "quitado",
+                                "consumo",
+                                "precio",
+                                "precio-mercado"
+                              ],
+                              "description": "Qué cambió respecto de la receta congelada de la orden."
+                            },
+                            "description": "Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar)."
+                          },
+                          "liberadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra."
+                          },
+                          "liberadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién firmó este renglón, o null."
+                          },
+                          "idModeloArte": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
+                          },
+                          "puntadas": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
+                            "type": "string",
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad."
+                          },
+                          "idProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "proveedor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor que hace el arte, o null."
+                          },
+                          "precioModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio que trae HOY el arte del modelo, o null."
+                          },
+                          "precioModeloDeCompra": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "tipo",
+                          "estado",
+                          "agregadoAMano",
+                          "excluido",
+                          "notas",
+                          "enElModelo",
+                          "cambios",
+                          "liberadoEn",
+                          "liberadoPor",
+                          "idModeloArte",
+                          "descripcion",
+                          "posicion",
+                          "puntadas",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
+                          "precio",
+                          "idProveedor",
+                          "proveedor",
+                          "precioModelo",
+                          "precioModeloDeCompra"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Arte congelado de una orden."
+                      }
+                    },
+                    "desalineacion": {
+                      "type": "object",
+                      "properties": {
+                        "hayCambios": {
+                          "type": "boolean",
+                          "description": "¿Algo se movió respecto de esta receta congelada?"
+                        },
+                        "conOrdenCompra": {
+                          "type": "boolean",
+                          "description": "¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso."
+                        },
+                        "critico": {
+                          "type": "boolean",
+                          "description": "Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta."
+                        },
+                        "cambios": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "idRenglon": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el insumo, para nombrarlo en el aviso."
+                              },
+                              "idMaterialModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Id del material en el BOM del modelo (solo en `agregado`), o null."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "agregado",
+                                  "quitado",
+                                  "consumo",
+                                  "precio",
+                                  "precio-mercado"
+                                ],
+                                "description": "Qué cambió respecto de la receta congelada de la orden."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "El aviso ya redactado (\"la cantidad pasó de 1 a 2\")."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "idRenglon",
+                              "material",
+                              "idMaterialModelo",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un cambio del BOM del modelo respecto de la receta congelada de la orden."
+                          }
+                        }
+                      },
+                      "required": [
+                        "hayCambios",
+                        "conOrdenCompra",
+                        "critico",
+                        "cambios"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folio",
+                    "idModelo",
+                    "codigoModelo",
+                    "cliente",
+                    "fechaEntrega",
+                    "estado",
+                    "totalPiezas",
+                    "liberadaEn",
+                    "liberadaPor",
+                    "puedeComprar",
+                    "todoLiberado",
+                    "abiertaEn",
+                    "abiertaPor",
+                    "abiertaMotivo",
                     "avisoCurva",
                     "resumen",
                     "telas",
@@ -77492,11 +80345,44 @@
                         },
                         "puedeComprar": {
                           "type": "boolean",
-                          "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar."
+                          "description": "⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce)."
                         },
                         "todoLiberado": {
                           "type": "boolean",
                           "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                        },
+                        "abiertaEn": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca."
+                        },
+                        "abiertaPor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Quién la reabrió (id de usuario), o null."
+                        },
+                        "abiertaMotivo": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando intenta comprar: sin él, la compra se congela sin explicación."
                         },
                         "avisoCurva": {
                           "anyOf": [
@@ -78460,6 +81346,9 @@
                         "liberadaPor",
                         "puedeComprar",
                         "todoLiberado",
+                        "abiertaEn",
+                        "abiertaPor",
+                        "abiertaMotivo",
                         "avisoCurva",
                         "resumen",
                         "telas",
@@ -78819,6 +81708,28 @@
                           "conOrdenCompra": {
                             "type": "boolean",
                             "description": "⭐ YA ESTÁ FRENANDO DINERO: la orden ya tiene OC (no cancelada) por OTRA parte de su receta, así que alguien está comprando y esperando el resto. No es lo mismo que una orden recién nacida a la que todavía nadie le pide nada."
+                          },
+                          "abiertaEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E8z: la receta está ABIERTA para corregirse desde esta fecha (ISO) y la compra de la orden está congelada. null = no está abierta (la fila salió por renglones pendientes)."
+                          },
+                          "abiertaMotivo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué se reabrió, o null."
                           }
                         },
                         "required": [
@@ -78832,10 +81743,12 @@
                           "avios",
                           "artes",
                           "porLiberar",
-                          "conOrdenCompra"
+                          "conOrdenCompra",
+                          "abiertaEn",
+                          "abiertaMotivo"
                         ],
                         "additionalProperties": false,
-                        "description": "Una orden con renglones de receta pendientes de liberar (§Post-F9.72)."
+                        "description": "Una orden con receta pendiente de liberar o ABIERTA para corregirse (§Post-F9.72/165)."
                       }
                     },
                     "total": {

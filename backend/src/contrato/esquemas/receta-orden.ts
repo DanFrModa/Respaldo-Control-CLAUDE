@@ -412,11 +412,41 @@ export const esquemaRecetaOrden = z
       .describe(
         '⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se ' +
           'compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado ' +
-          'nada de esta receta y no hay qué comprar.',
+          'nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la ' +
+          'receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es ' +
+          'una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce).',
       ),
     todoLiberado: z
       .boolean()
       .describe('¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null).'),
+    /*
+     * ⭐⭐ V1-E8z (0.067) — EL CANDADO DE COMPRA (§Post-F9.160(a), §Post-F9.165).
+     *
+     * DANIEL: *"pongamos un candado que **no se pueda comprar nada hasta que esté cerrado otra
+     * vez**"*. La receta ya liberada se REABRE para corregirla y la compra de la orden se congela
+     * hasta que se cierre. Reabrir **sólo marca: NO desfirma** — así cerrar es un clic y no
+     * cuarenta (§Post-F9.80 retiró la liberación en bloque).
+     *
+     * ⚠️ **No es `liberadaEn` puesto en null.** Ese derivado ya NO gobierna la compra (la puerta
+     * pregunta renglón por renglón), así que apagarlo cambiaría el letrero de la pantalla y dejaría
+     * salir la orden de compra igual.
+     */
+    abiertaEn: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de ' +
+          'esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. ' +
+          'Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca.',
+      ),
+    abiertaPor: z.string().nullable().describe('Quién la reabrió (id de usuario), o null.'),
+    abiertaMotivo: z
+      .string()
+      .nullable()
+      .describe(
+        'POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando ' +
+          'intenta comprar: sin él, la compra se congela sin explicación.',
+      ),
     avisoCurva: z
       .string()
       .nullable()
@@ -610,6 +640,33 @@ export const esquemaLiberarRecetaCuerpo = z
 /** Datos de una liberación. */
 export type DatosLiberarReceta = z.input<typeof esquemaLiberarRecetaCuerpo>;
 
+// ── V1-E8z · EL CANDADO DE COMPRA: ABRIR y CERRAR la receta (§Post-F9.160(a)) ──
+
+/**
+ * Cuerpo de ABRIR la receta. **El motivo es OBLIGATORIO**, y no es simetría con «quitar» (donde es
+ * opcional): abrir CONGELA LA COMPRA DE UNA ORDEN ENTERA, y el comprador que se topa con el 409 sólo
+ * tiene este texto para saber qué está esperando. Un candado anónimo se vuelve un misterio a las dos
+ * horas.
+ *
+ * CERRAR **no lleva cuerpo**: no se pide motivo para terminar de corregir — la razón ya se dio al
+ * abrir, y pedir dos textos por una sola corrección es la fricción que entrena a escribir «ok».
+ */
+export const esquemaAbrirRecetaCuerpo = z
+  .object({
+    motivo: z
+      .string({ error: 'El motivo es obligatorio' })
+      .trim()
+      .min(1, { error: 'Di por qué se reabre: congela la compra de toda la orden' })
+      .max(2000)
+      .describe('Por qué se reabre la receta. Obligatorio: es lo que ve el comprador en el 409.'),
+  })
+  .describe(
+    'Reabre la receta de la orden y CONGELA su compra hasta que se cierre (§Post-F9.160(a)).',
+  );
+
+/** Datos al abrir la receta. */
+export type DatosAbrirReceta = z.input<typeof esquemaAbrirRecetaCuerpo>;
+
 // ── V1-E3h · TRAER DEL MODELO lo que le falta a la receta (§Post-F9.73) ────────
 
 /**
@@ -713,8 +770,27 @@ export const esquemaRecetaPorLiberar = z
           'receta, así que alguien está comprando y esperando el resto. No es lo mismo que una ' +
           'orden recién nacida a la que todavía nadie le pide nada.',
       ),
+    /*
+     * 🔴 V1-E8z — POR QUÉ LA BANDEJA TUVO QUE CRECER (§Post-F9.165 punto 7).
+     *
+     * Reabrir **sólo marca, no desfirma**, así que una orden en corrección **no tiene ni un renglón
+     * sin firmar** y esta bandeja —que lista por renglones pendientes— no la vería jamás. Quedaría
+     * con la compra congelada, invisible e indefinidamente: exactamente el silencio que la bandeja
+     * vino a romper. Por eso la consulta también trae las reabiertas, y por eso van ARRIBA: una
+     * receta abierta congela la compra de TODA la orden, no de un renglón.
+     */
+    abiertaEn: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ V1-E8z: la receta está ABIERTA para corregirse desde esta fecha (ISO) y la compra de ' +
+          'la orden está congelada. null = no está abierta (la fila salió por renglones pendientes).',
+      ),
+    abiertaMotivo: z.string().nullable().describe('Por qué se reabrió, o null.'),
   })
-  .describe('Una orden con renglones de receta pendientes de liberar (§Post-F9.72).');
+  .describe(
+    'Una orden con receta pendiente de liberar o ABIERTA para corregirse (§Post-F9.72/165).',
+  );
 
 /** Fila de la bandeja «Recetas por liberar». */
 export type RecetaPorLiberar = z.infer<typeof esquemaRecetaPorLiberar>;

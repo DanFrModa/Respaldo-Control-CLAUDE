@@ -16,13 +16,18 @@ import {
   limpiarBaseDatos,
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { explosionarOrden, previoCompraDesdeExplosion } from '../compras/mrp.js';
+import {
+  explosionarOrden,
+  generarOCDesdeExplosion,
+  previoCompraDesdeExplosion,
+} from '../compras/mrp.js';
 import {
   actualizarOC,
   autorizarOC,
   cancelarOC,
   crearOC,
   desautorizarOC,
+  duplicarOC,
 } from '../compras/ordenes-compra.js';
 import { obtenerCostoOrden } from '../costos/costo-orden.js';
 import { enTransaccion } from '../../comun/transaccion.js';
@@ -30,7 +35,9 @@ import { enTransaccion } from '../../comun/transaccion.js';
 import { habilitacionOrden } from './habilitacion-orden.js';
 import { consultarRecetasPorLiberar } from './recetas-por-liberar.js';
 import {
+  abrirReceta,
   agregarRenglonReceta,
+  cerrarReceta,
   copiarRecetaDelModelo,
   corregirCapturaAvio,
   editarRenglonReceta,
@@ -3349,5 +3356,435 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
       bd(),
     );
     expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(true);
+  });
+});
+
+// ── ⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a) + §Post-F9.165) ────────────────────────
+
+/**
+ * DANIEL: *"pongamos un candado que **no se pueda comprar nada hasta que esté cerrado otra vez**"*.
+ *
+ * 🔴 **EL DEFECTO QUE ESTE BLOQUE EXISTE PARA IMPEDIR, y que el plan de la etapa casi entrega.** El
+ * campo que PARECE el candado (`Orden.recetaLiberadaEn`) **no lo es**: desde V1-E3h es un derivado y
+ * la puerta de compra dejó de consultarlo — pregunta renglón por renglón. Quien "reabra" apagando
+ * ese derivado entrega esto: la pantalla dice *«receta no liberada»* y **la orden de compra sale
+ * igual**. Por eso la prueba central de aquí abajo no mira banderas: **intenta comprar por las
+ * cinco bocas** y exige que las cinco contesten 409.
+ *
+ * Las otras dos reglas que se fijan, y que son decisiones de negocio, no detalles:
+ *  • **Reabrir NO desfirma** (§Post-F9.165 punto 1): las firmas se conservan para que cerrar sea un
+ *    clic y no cuarenta — lo único compatible con §Post-F9.80.
+ *  • **Cerrar exige que no quede nada sin firmar**: lo que se tocó durante la corrección perdió su
+ *    firma solo, y sin esta condición se descongelaría la compra de material que nadie re-miró.
+ */
+describe('⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a))', () => {
+  /** Sesión de compras (capturar/generar OC). `extra` agrega la llave de autorizar. */
+  function sesionCompra(extra: ClavePermiso[] = []): SesionUsuario {
+    return sesionDePrueba({
+      idEmpresaActiva: empresa.id,
+      permisos: ['compras.ver', 'compras.administrar', 'compras.cancelar', ...extra],
+    });
+  }
+
+  /**
+   * Proveedor para tela y avíos: sin él el plan de compra no arma ninguna OC.
+   *
+   * ⚠️ Deja a `telaJersey` con DUEÑO, y eso manda en las pruebas de OC: `validarLineas` rechaza
+   * comprarle una tela a un proveedor que no es su dueño (§Post-F9.15). Por eso devuelve su id y las
+   * OC de aquí abajo se le capturan a ÉL — si no, el error que saldría sería el del dueño y estas
+   * pruebas «pasarían» sin haber tocado nunca el candado.
+   */
+  async function conProveedor(): Promise<number> {
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Insumos del Norte' } });
+    await cliente.tela.update({ where: { id: telaJersey.id }, data: { idProveedor: prov.id } });
+    await cliente.avioProveedor.createMany({
+      data: [
+        { idAvio: avioBoton.id, idProveedor: prov.id, precio: 2, habitual: true },
+        { idAvio: avioJareta.id, idProveedor: prov.id, precio: 8, habitual: true },
+      ],
+    });
+    return prov.id;
+  }
+
+  /** Cuerpo de una OC de la tela AL PROVEEDOR QUE LA POSEE, con o sin liga a la orden. */
+  async function cuerpoOcPropio(
+    idProveedor: number,
+    idOrden?: number,
+  ): Promise<Parameters<typeof crearOC>[1]> {
+    const direccion =
+      (await cliente.direccionEntrega.findFirst({ where: { nombre: 'Naucalpan' } })) ??
+      (await cliente.direccionEntrega.create({
+        data: { nombre: 'Naucalpan', direccion: 'Calle 1' },
+      }));
+    return {
+      idProveedor,
+      idDireccionEntrega: direccion.id,
+      fechaEntrega: '2026-09-30',
+      lineas: [
+        {
+          idTela: telaJersey.id,
+          cantidad: 10,
+          precio: 50,
+          unidad: 'kg',
+          ...(idOrden === undefined ? {} : { idOrden }),
+        },
+      ],
+    };
+  }
+
+  /** Deja la receta de `ordenA` LIBERADA COMPLETA: el único estado desde el que se puede reabrir. */
+  async function liberadaCompleta(): Promise<void> {
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    const r = await liberarTodo(ordenA);
+    expect(r.todoLiberado).toBe(true);
+  }
+
+  /** El texto del 409 del candado (para poder afirmar que es EL suyo y no el de la firma). */
+  async function mensajeDe(promesa: Promise<unknown>): Promise<string> {
+    const error = await promesa.then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    return (error as ErrorConflicto).message;
+  }
+
+  describe('ABRIR', () => {
+    it('⭐ abre, CONGELA la compra y CONSERVA todas las firmas (no desfirma nada)', async () => {
+      await liberadaCompleta();
+
+      const r = await abrirReceta(
+        sesion(),
+        ordenA,
+        { motivo: 'el cliente cambió el cierre' },
+        bd(),
+      );
+
+      expect(r.abiertaEn).not.toBeNull();
+      expect(r.abiertaPor).not.toBeNull();
+      expect(r.abiertaMotivo).toBe('el cliente cambió el cierre');
+      // 🔴 LA DECISIÓN DE LA ETAPA: las firmas siguen ahí. Si reabrir desfirmara, cerrar una receta
+      // de 40 renglones costaría 40 clics (§Post-F9.80 prohíbe la firma en bloque).
+      expect(r.resumen).toMatchObject({ liberados: 3, porLiberar: 0 });
+      expect(r.telas.every((t) => t.liberadoEn !== null)).toBe(true);
+      expect(r.avios.every((a) => a.liberadoEn !== null)).toBe(true);
+      expect(r.todoLiberado).toBe(true);
+      // …y aun así NO se puede comprar: el campo es una promesa de lo que el servidor contestará.
+      expect(r.puedeComprar).toBe(false);
+    });
+
+    it('el MOTIVO es obligatorio (un candado anónimo es un misterio a las dos horas)', async () => {
+      await liberadaCompleta();
+      await expect(abrirReceta(sesion(), ordenA, { motivo: '   ' }, bd())).rejects.toBeInstanceOf(
+        ErrorValidacion,
+      );
+      const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      expect(r.abiertaEn).toBeNull();
+    });
+
+    it('no se puede abrir DOS veces: se dice desde cuándo y por qué, sin pisar el motivo', async () => {
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'primera razón' }, bd());
+
+      const mensaje = await mensajeDe(
+        abrirReceta(sesion(), ordenA, { motivo: 'segunda razón' }, bd()),
+      );
+      expect(mensaje).toContain('YA está abierta');
+      expect(mensaje).toContain('primera razón');
+
+      const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      expect(r.abiertaMotivo).toBe('primera razón');
+    });
+
+    it('⚠️ no se puede abrir una receta que NO está liberada completa (nada que reabrir)', async () => {
+      // Sin firmar nada: lo que no está firmado ya no se compra, así que no necesita candado — y
+      // permitirlo dejaría órdenes imposibles de cerrar (un renglón que el cliente no autoriza).
+      const mensaje = await mensajeDe(abrirReceta(sesion(), ordenA, { motivo: 'x' }, bd()));
+      expect(mensaje).toContain('no está liberada completa');
+    });
+
+    it('exige `desarrollo.administrar` (es el mismo dueño que firma)', async () => {
+      await liberadaCompleta();
+      await expect(
+        abrirReceta(
+          sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['ordenes.ver'] }),
+          ordenA,
+          { motivo: 'x' },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorPermiso);
+    });
+
+    it('una orden de OTRA empresa es 404, no 409 (A9: ni se confirma que existe)', async () => {
+      await liberadaCompleta();
+      const otra = await crearEmpresaPrueba(cliente, 'Empresa ajena al candado');
+      await expect(
+        abrirReceta(sesion(PERM, otra.id), ordenA, { motivo: 'x' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    });
+
+    it('A7/D3: abrir y cerrar quedan los DOS en la bitácora', async () => {
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'el cliente cambió el cierre' }, bd());
+      await cerrarReceta(sesion(), ordenA, bd());
+
+      const rastro = await cliente.bitacora.findMany({
+        where: { entidad: 'RecetaOrden', idEntidad: String(ordenA) },
+        orderBy: { id: 'asc' },
+      });
+      const acciones = rastro.map((b) => (b.datos as { accion?: string }).accion);
+      expect(acciones).toContain('abrir-receta');
+      expect(acciones).toContain('cerrar-receta');
+      // El motivo NO se pierde al cerrar (las tres columnas se vacían: si no quedara aquí, se iría).
+      const cierre = rastro.find(
+        (b) => (b.datos as { accion?: string }).accion === 'cerrar-receta',
+      );
+      expect((cierre?.datos as { motivoDeApertura?: string }).motivoDeApertura).toBe(
+        'el cliente cambió el cierre',
+      );
+    });
+  });
+
+  /**
+   * 🔴🔴 **LA PRUEBA CENTRAL DE LA ETAPA.** No mira banderas: intenta **gastar dinero** por cada una
+   * de las bocas y exige el 409 del candado. Es lo único que distingue un candado de un letrero.
+   *
+   * Y cada caso comprueba las dos mitades: **cerrado se puede** / **abierto no**. Sin la primera
+   * mitad, una guarda que rechazara SIEMPRE pasaría igual de verde.
+   */
+  describe('🔴 LAS BOCAS DE GASTO: con la receta abierta, NINGUNA compra', () => {
+    /** El proveedor DUEÑO de la tela: es el único al que se le puede comprar (§Post-F9.15). */
+    let idProveedor: number;
+
+    beforeEach(async () => {
+      idProveedor = await conProveedor();
+      await liberadaCompleta();
+    });
+
+    it('boca 1 · EXPLOTAR el MRP', async () => {
+      await expect(explosionarOrden(sesion(), ordenA, bd())).resolves.toBeDefined();
+
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo la tela' }, bd());
+      const mensaje = await mensajeDe(explosionarOrden(sesion(), ordenA, bd()));
+
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      expect(mensaje).toContain('CONGELADA');
+      expect(mensaje).toContain('corrigiendo la tela');
+      // ⚠️ Y NO el mensaje de la firma, que aquí sería FALSO: sí la liberaron (§Post-F9.165 punto 8).
+      expect(mensaje).not.toContain('todavía no la libera Desarrollo');
+      // Lo que el candado NO frena: cortar y producir.
+      expect(mensaje).toContain('cortar y producir');
+    });
+
+    it('boca 2 · la REVISIÓN PREVIA de la compra', async () => {
+      await explosionarOrden(sesion(), ordenA, bd());
+      const cuerpo = { fechaEntrega: '2026-09-30', idsOrden: [ordenA], idsRequerimiento: [] };
+      await expect(previoCompraDesdeExplosion(sesionCompra(), cuerpo, bd())).resolves.toBeDefined();
+
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+      const mensaje = await mensajeDe(previoCompraDesdeExplosion(sesionCompra(), cuerpo, bd()));
+      expect(mensaje).toContain('ABIERTA para corregirse');
+    });
+
+    it('boca 3 · GENERAR las órdenes de compra desde la explosión', async () => {
+      // El snapshot se hace ANTES de abrir: es exactamente el caso que obliga a re-verificar aquí y
+      // no sólo al explotar — el dinero sale en este clic, no en el anterior.
+      await explosionarOrden(sesion(), ordenA, bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        generarOCDesdeExplosion(
+          sesionCompra(),
+          { fechaEntrega: '2026-09-30', idsOrden: [ordenA], idsRequerimiento: [] },
+          bd(),
+        ),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      expect(await cliente.ordenCompra.count()).toBe(0);
+    });
+
+    it('boca 4 · CAPTURAR a mano una OC ligada a la orden', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd()),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      expect(await cliente.ordenCompra.count()).toBe(0);
+    });
+
+    it('boca 5 · EDITAR una OC para meterle una línea de esta orden', async () => {
+      // La OC nace SIN liga (no toca la orden congelada); el intento es agregarle la línea después.
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        actualizarOC(
+          sesionCompra(),
+          oc.id,
+          {
+            lineas: [
+              { idTela: telaJersey.id, cantidad: 10, precio: 50, unidad: 'kg', idOrden: ordenA },
+            ],
+          },
+          bd(),
+        ),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+    });
+
+    it('⭐ boca 6 (hallazgo) · DUPLICAR una OC ligada a la orden', async () => {
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(duplicarOC(sesionCompra(), oc.id, bd()));
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      expect(await cliente.ordenCompra.count()).toBe(1);
+    });
+
+    it('⭐ boca 7 (hallazgo) · AUTORIZAR una OC ligada — el momento en que sale el dinero', async () => {
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        autorizarOC(sesionCompra(['compras.autorizar']), oc.id, bd()),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      const guardada = await cliente.ordenCompra.findUniqueOrThrow({ where: { id: oc.id } });
+      expect(guardada.estatus).toBe('borrador');
+    });
+
+    it('⭐ una OC YA AUTORIZADA no se toca: se bloquean las NUEVAS (§Post-F9.165 punto 5)', async () => {
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await autorizarOC(sesionCompra(['compras.autorizar']), oc.id, bd());
+
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const guardada = await cliente.ordenCompra.findUniqueOrThrow({ where: { id: oc.id } });
+      expect(guardada.estatus).toBe('autorizada');
+    });
+
+    it('⚠️ BLOQUEA EL GASTO, NO LA LECTURA: la receta y la habilitación se consultan igual', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      await expect(obtenerRecetaOrden(sesion(), ordenA, bd())).resolves.toBeDefined();
+      // Cortar y producir NO se bloquean: la habilitación es lo que el piso mira para surtir.
+      const h = await habilitacionOrden(sesion(), ordenA, bd());
+      expect(h.avios).toHaveLength(2);
+    });
+
+    it('⭐ y la orden VECINA del mismo modelo no se entera: el candado es POR ORDEN', async () => {
+      await marcarRecetaRevisada(sesion(), ordenB, bd());
+      await liberarTodo(ordenB);
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      await expect(explosionarOrden(sesion(), ordenB, bd())).resolves.toBeDefined();
+    });
+  });
+
+  describe('CERRAR', () => {
+    beforeEach(async () => {
+      await conProveedor();
+      await liberadaCompleta();
+    });
+
+    it('cerrar lo que no está abierto se dice, no se traga', async () => {
+      const mensaje = await mensajeDe(cerrarReceta(sesion(), ordenA, bd()));
+      expect(mensaje).toContain('no está abierta');
+    });
+
+    it('🔴 NO cierra mientras quede algo sin firmar, y NOMBRA lo que falta', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo la tela' }, bd());
+      const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      const tela = r0.telas[0]!;
+      // Editar el renglón le quita su firma (y SÓLO la suya): eso es lo que hay que re-firmar.
+      await editarRenglonReceta(sesion(), ordenA, 'tela', tela.id, { consumoPorPrenda: 2 }, bd());
+
+      const mensaje = await mensajeDe(cerrarReceta(sesion(), ordenA, bd()));
+      expect(mensaje).toContain('Jersey');
+      expect(mensaje).toContain('volver a firmar');
+
+      // Y sigue congelada: no se "cerró a medias".
+      const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      expect(r.abiertaEn).not.toBeNull();
+      await expect(explosionarOrden(sesion(), ordenA, bd())).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('⭐⭐ re-firmar SÓLO lo tocado y cerrar DESCONGELA la compra (el ciclo completo)', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo la tela' }, bd());
+      const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      const tela = r0.telas[0]!;
+      await editarRenglonReceta(sesion(), ordenA, 'tela', tela.id, { consumoPorPrenda: 2 }, bd());
+
+      // UN solo renglón que re-firmar: los otros dos conservaron su firma (ésa es la decisión).
+      const pendientes = (await obtenerRecetaOrden(sesion(), ordenA, bd())).resumen.porLiberar;
+      expect(pendientes).toBe(1);
+      await liberarReceta(sesion(), ordenA, { renglones: [{ tipo: 'tela', id: tela.id }] }, bd());
+
+      const cerrada = await cerrarReceta(sesion(), ordenA, bd());
+      expect(cerrada.abiertaEn).toBeNull();
+      expect(cerrada.abiertaPor).toBeNull();
+      expect(cerrada.abiertaMotivo).toBeNull();
+      expect(cerrada.puedeComprar).toBe(true);
+
+      // 🔴 Y LA COMPRA VUELVE DE VERDAD (no basta con que la bandera cambie).
+      const explosion = await explosionarOrden(sesion(), ordenA, bd());
+      expect(explosion.grupos.flatMap((g) => g.renglones)).toHaveLength(3);
+    });
+
+    it('🔴 la orden CANCELADA con la receta abierta SÍ se puede cerrar (si no, sería una trampa)', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+      await cliente.orden.update({ where: { id: ordenA }, data: { estado: 'cancelada' } });
+
+      const cerrada = await cerrarReceta(sesion(), ordenA, bd());
+      expect(cerrada.abiertaEn).toBeNull();
+    });
+
+    it('…pero ABRIR una orden cancelada no: no hay nada que corregir de lo que no se va a producir', async () => {
+      await cliente.orden.update({ where: { id: ordenA }, data: { estado: 'cancelada' } });
+      await expect(abrirReceta(sesion(), ordenA, { motivo: 'x' }, bd())).rejects.toBeInstanceOf(
+        ErrorConflicto,
+      );
+    });
+  });
+
+  /**
+   * 🔴 SIN ESTO, EL CANDADO SE VUELVE UNA TRAMPA SILENCIOSA (§Post-F9.165 punto 7). Como reabrir no
+   * desfirma, la orden en corrección **no tiene renglones pendientes** y la bandeja —que lista por
+   * renglones sin firmar— no la vería nunca: compra congelada, invisible e indefinidamente.
+   */
+  describe('LA BANDEJA la tiene que ver', () => {
+    it('⭐ la orden REABIERTA sale en la bandeja aunque no le falte firmar nada, y va PRIMERO', async () => {
+      // `ordenB` entra por lo de siempre (renglones sin firmar) y con la entrega MÁS CERCANA, así
+      // que sin la regla "las abiertas primero" iría arriba. `ordenA` no tiene fecha: sin esa regla
+      // caería al final (NULLS LAST), que es justo donde una compra congelada se vuelve invisible.
+      await cliente.orden.update({
+        where: { id: ordenB },
+        data: { fechaEntrega: new Date('2026-01-01T00:00:00.000Z') },
+      });
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'el cliente cambió el cierre' }, bd());
+
+      const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
+
+      expect(pagina.datos.map((d) => d.idOrden)).toEqual([ordenA, ordenB]);
+      const reabierta = pagina.datos[0]!;
+      expect(reabierta.abiertaEn).not.toBeNull();
+      expect(reabierta.abiertaMotivo).toBe('el cliente cambió el cierre');
+      // No le falta firmar NADA: entró por el candado, no por los renglones.
+      expect(reabierta.porLiberar).toBe(0);
+      // Y la que entró por lo de siempre no queda marcada.
+      expect(pagina.datos[1]?.abiertaEn).toBeNull();
+      expect(pagina.datos[1]?.porLiberar).toBe(3);
+    });
+
+    it('al CERRARLA desaparece de la bandeja (ya no falta firmar ni cerrar nada)', async () => {
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'x' }, bd());
+      await cerrarReceta(sesion(), ordenA, bd());
+
+      const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
+      expect(pagina.datos.map((d) => d.idOrden)).not.toContain(ordenA);
+    });
   });
 });

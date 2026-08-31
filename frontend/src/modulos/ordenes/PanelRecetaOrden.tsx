@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Download,
   Loader2Icon,
+  Lock,
   LockOpen,
   Pencil,
   RotateCcw,
@@ -14,7 +15,9 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
+  useAbrirReceta,
   useAgregarRenglonReceta,
+  useCerrarReceta,
   useCorregirCapturaAvio,
   useEditarRenglonReceta,
   useLiberarReceta,
@@ -137,12 +140,17 @@ export function PanelRecetaOrden({
   const restaurar = useRestaurarRenglonReceta();
   const agregar = useAgregarRenglonReceta();
   const traer = useTraerDelModelo();
+  // ⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a)).
+  const abrir = useAbrirReceta();
+  const cerrar = useCerrarReceta();
   const [aQuitar, setAQuitar] = useState<{
     tipo: TipoRenglonReceta;
     id: number;
     nombre: string;
   } | null>(null);
   const [motivo, setMotivo] = useState('');
+  const [abriendo, setAbriendo] = useState(false);
+  const [motivoApertura, setMotivoApertura] = useState('');
 
   if (receta.isPending) {
     return <p className="text-sm text-muted-foreground">Cargando la receta de la orden…</p>;
@@ -162,7 +170,9 @@ export function PanelRecetaOrden({
     quitar.isPending ||
     restaurar.isPending ||
     agregar.isPending ||
-    traer.isPending;
+    traer.isPending ||
+    abrir.isPending ||
+    cerrar.isPending;
 
   /**
    * ⭐ V1-E3k (§Post-F9.80) — FIRMA **UN** RENGLÓN. No hay otra forma de liberar desde aquí, y ésa
@@ -220,6 +230,27 @@ export function PanelRecetaOrden({
    */
   const conLlamado = editable && faltantesDelModelo(d).length > 0;
 
+  /**
+   * ⭐⭐ REABRE la receta. El motivo viaja tal cual: es lo que el comprador leerá en el 409 cuando
+   * intente comprar, así que aquí no se recorta ni se rellena con un default.
+   */
+  function alAbrirConfirmado(): void {
+    abrir.mutate(
+      { idOrden, cuerpo: { motivo: motivoApertura.trim() } },
+      {
+        onSuccess: () => {
+          toast.success(
+            'Receta abierta para corregir: la compra de esta orden queda congelada hasta que la ' +
+              'cierres. Las firmas se conservan.',
+          );
+          setAbriendo(false);
+          setMotivoApertura('');
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
   function alQuitarConfirmado(): void {
     if (aQuitar === null) return;
     const objetivo = aQuitar;
@@ -262,6 +293,17 @@ export function PanelRecetaOrden({
         alMarcarTodo={() => {
           marcar.mutate(idOrden, {
             onSuccess: () => toast.success('Receta marcada como revisada.'),
+            onError: (error) => toast.error(error.message),
+          });
+        }}
+        alAbrir={() => {
+          setMotivoApertura('');
+          setAbriendo(true);
+        }}
+        alCerrar={() => {
+          cerrar.mutate(idOrden, {
+            onSuccess: () =>
+              toast.success('Receta cerrada: la compra de esta orden vuelve a estar abierta.'),
             onError: (error) => toast.error(error.message),
           });
         }}
@@ -349,6 +391,63 @@ export function PanelRecetaOrden({
         }}
       />
 
+      {/* ⭐⭐ V1-E8z — EL MOTIVO NO ES OPCIONAL, y por eso tiene diálogo propio en vez de un botón
+          seco. Abrir congela la compra de TODA la orden: quien la abre tiene que decir por qué,
+          porque ese texto es literalmente lo que el comprador va a leer cuando su orden de compra
+          sea rechazada. El botón queda deshabilitado mientras el campo esté vacío — y el servidor
+          lo vuelve a exigir (§Post-F9.68: esconder *y* bloquear). */}
+      <Dialog
+        open={abriendo}
+        onOpenChange={(sigueAbierto) => {
+          if (!sigueAbierto) {
+            setAbriendo(false);
+            setMotivoApertura('');
+          }
+        }}
+      >
+        <DialogContent data-testid="dialogo-abrir-receta">
+          <DialogHeader>
+            <DialogTitle>Abrir la receta para corregirla</DialogTitle>
+            <DialogDescription>
+              Mientras esté abierta <strong>no se podrá comprar nada de esta orden</strong>: ni
+              explotar el MRP, ni generar, capturar, duplicar o autorizar órdenes de compra. Las
+              firmas de Desarrollo <strong>se conservan</strong>, así que al terminar sólo hay que
+              volver a firmar los renglones que hayas tocado. Las órdenes de compra ya autorizadas
+              no se tocan, y cortar y producir siguen sin bloquearse.
+            </DialogDescription>
+          </DialogHeader>
+          <Field>
+            <FieldLabel htmlFor="motivo-abrir-receta">Motivo (obligatorio)</FieldLabel>
+            <Input
+              id="motivo-abrir-receta"
+              value={motivoApertura}
+              onChange={(e) => setMotivoApertura(e.target.value)}
+              placeholder="Ej. el cliente cambió el cierre"
+              data-testid="motivo-abrir-receta"
+            />
+          </Field>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAbriendo(false);
+                setMotivoApertura('');
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={abrir.isPending || motivoApertura.trim() === ''}
+              onClick={alAbrirConfirmado}
+              data-testid="confirmar-abrir-receta"
+            >
+              {abrir.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+              Abrir y congelar la compra
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={aQuitar !== null}
         onOpenChange={(abierto) => {
@@ -423,17 +522,27 @@ function CabeceraReceta({
   editable,
   ocupado,
   alMarcarTodo,
+  alAbrir,
+  alCerrar,
 }: {
   receta: RecetaOrden;
   editable: boolean;
   ocupado: boolean;
   alMarcarTodo: () => void;
+  /** ⭐⭐ V1-E8z: reabrir para corregir (pide motivo en un diálogo aparte). */
+  alAbrir: () => void;
+  /** ⭐⭐ V1-E8z: cerrar y descongelar la compra. Sin diálogo: la razón ya se dio al abrir. */
+  alCerrar: () => void;
 }): React.JSX.Element {
   const r = receta.resumen;
   // ⭐ V1-E3h: TRES estados, no dos. Los decide el SERVIDOR y los lee `estadoFirmaReceta` — UNA sola
   // copia, compartida con el resumen del detalle de la OP (hallazgo del reviewer de V1-E3j: estaban
   // escritos dos veces y coincidían por casualidad).
-  const enParte = estadoFirmaReceta(receta) === 'en-parte';
+  const estadoFirma = estadoFirmaReceta(receta);
+  const enParte = estadoFirma === 'en-parte';
+  // ⭐⭐ V1-E8z: la receta está ABIERTA para corregirse ⇒ la compra de la orden está CONGELADA. Lo
+  // decide el SERVIDOR (`abiertaEn`); aquí sólo se lee, igual que los otros tres estados.
+  const enCorreccion = estadoFirma === 'en-correccion';
   // V1-E3j: receta SIN renglones vivos. `total` lo cuenta el servidor (los excluidos no cuentan).
   const vacia = r.total === 0;
   return (
@@ -446,15 +555,30 @@ function CabeceraReceta({
         </span>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {vacia
-          ? 'Esta orden todavía no tiene ningún material en su receta.'
-          : receta.todoLiberado
-            ? `Desarrollo liberó esta receta completa${receta.liberadaPor === null && receta.liberadaEn !== null ? ' (migración)' : ''}: ya se puede explotar el MRP y generar órdenes de compra.`
-            : enParte
-              ? `Se puede comprar lo ya liberado (${r.liberados} de ${r.total}). Los ${r.porLiberar} renglones sin firmar NO entran a la explosión de materiales, y el comprador los ve como pendientes.`
-              : 'Hasta que Desarrollo libere algo de la receta no se puede explotar el MRP ni generar órdenes de compra. Cortar y producir NO están bloqueados.'}
-      </p>
+      {/* ⭐⭐ V1-E8z — EL CANDADO manda sobre el resto del letrero: mientras la receta está abierta,
+          lo único que importa saber es que NO SE PUEDE COMPRAR y quién tiene que cerrarla. Decir
+          debajo "la receta está liberada completa" (que sigue siendo cierto) sería el mensaje que
+          se lleva la atención mientras el comprador se topa con un 409 que no entiende. */}
+      {enCorreccion ? (
+        <p className="text-xs text-crit" data-testid="receta-aviso-en-correccion">
+          Esta receta está ABIERTA para corregirse: la compra de esta orden está{' '}
+          <strong>congelada</strong> (no se puede explotar el MRP, ni generar o autorizar órdenes de
+          compra) hasta que Desarrollo la cierre. Las firmas se conservaron: sólo hay que volver a
+          firmar lo que se toque. Las órdenes de compra ya autorizadas no se tocan, y cortar y
+          producir NO están bloqueados.
+          {receta.abiertaMotivo === null ? null : <> Motivo: &quot;{receta.abiertaMotivo}&quot;.</>}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {vacia
+            ? 'Esta orden todavía no tiene ningún material en su receta.'
+            : receta.todoLiberado
+              ? `Desarrollo liberó esta receta completa${receta.liberadaPor === null && receta.liberadaEn !== null ? ' (migración)' : ''}: ya se puede explotar el MRP y generar órdenes de compra.`
+              : enParte
+                ? `Se puede comprar lo ya liberado (${r.liberados} de ${r.total}). Los ${r.porLiberar} renglones sin firmar NO entran a la explosión de materiales, y el comprador los ve como pendientes.`
+                : 'Hasta que Desarrollo libere algo de la receta no se puede explotar el MRP ni generar órdenes de compra. Cortar y producir NO están bloqueados.'}
+        </p>
+      )}
 
       {editable ? (
         <div className="flex flex-wrap gap-2">
@@ -468,6 +592,38 @@ function CabeceraReceta({
           >
             <CheckCircle2 aria-hidden /> Marcar todo revisado
           </Button>
+          {/* ⭐⭐ V1-E8z — ABRIR y CERRAR, y **nunca los dos a la vez**: son los dos lados del mismo
+              interruptor. Abrir sólo se ofrece con la receta liberada COMPLETA, que es la única que
+              el servidor deja reabrir (§Post-F9.165 punto 4) — ofrecerlo siempre sería un botón que
+              contesta 409 la mitad de las veces. */}
+          {enCorreccion ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={ocupado}
+              onClick={alCerrar}
+              data-testid="receta-cerrar"
+            >
+              {ocupado ? (
+                <Loader2Icon className="animate-spin" aria-hidden />
+              ) : (
+                <Lock aria-hidden />
+              )}{' '}
+              Cerrar la receta (descongela la compra)
+            </Button>
+          ) : receta.todoLiberado ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={ocupado}
+              onClick={alAbrir}
+              title="Reabrir para corregir. Mientras esté abierta no se puede comprar nada de esta orden."
+              data-testid="receta-abrir"
+            >
+              <LockOpen aria-hidden /> Abrir para corregir
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -15,6 +15,9 @@ const restaurarMutateMock = vi.fn();
 const editarMutateMock = vi.fn();
 const traerMutateMock = vi.fn();
 const corregirMutateMock = vi.fn();
+/** ⭐⭐ V1-E8z — el candado de compra: abrir (con motivo) y cerrar. */
+const abrirMutateMock = vi.fn();
+const cerrarMutateMock = vi.fn();
 
 /**
  * El catálogo de medidas del avío (para el amarre por talla). Por defecto VACÍO: sólo las pruebas
@@ -48,6 +51,8 @@ vi.mock('@/api/receta-orden', () => ({
   useEditarRenglonReceta: () => ({ mutate: editarMutateMock, isPending: false }),
   useTraerDelModelo: () => ({ mutate: traerMutateMock, isPending: false }),
   useCorregirCapturaAvio: () => ({ mutate: corregirMutateMock, isPending: false }),
+  useAbrirReceta: () => ({ mutate: abrirMutateMock, isPending: false }),
+  useCerrarReceta: () => ({ mutate: cerrarMutateMock, isPending: false }),
 }));
 
 /** Receta base: una tela y dos avíos (uno de ellos, la jareta), sin revisar y sin liberar. */
@@ -65,6 +70,10 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
     liberadaPor: null,
     puedeComprar: false,
     todoLiberado: false,
+    // ⭐⭐ V1-E8z: la receta NO está reabierta (el candado de compra, §Post-F9.160(a)).
+    abiertaEn: null,
+    abiertaPor: null,
+    abiertaMotivo: null,
     resumen: {
       sinRevisar: 3,
       revisados: 0,
@@ -1264,5 +1273,125 @@ describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)',
     // una"*. El nombre accesible es lo que hace visible la acción.
     expect(screen.getByTestId('liberar-receta-avio-2')).toHaveAccessibleName(/liberar/i);
     expect(screen.getByTestId('liberar-receta-avio-2')).toHaveTextContent('Liberar');
+  });
+});
+
+/**
+ * ⭐⭐⭐ EL CANDADO DE COMPRA EN PANTALLA (V1-E8z, §Post-F9.160(a)) — DANIEL: *"pongamos un candado
+ * que no se pueda comprar nada hasta que esté cerrado otra vez"*.
+ *
+ * 🔴 LO QUE ESTAS PRUEBAS EXISTEN PARA IMPEDIR, y es el defecto natural de esta etapa: como reabrir
+ * **sólo marca y no desfirma**, `todoLiberado` sigue en `true` mientras la receta está abierta. Una
+ * pantalla que lea sólo esa bandera enseña **«Receta liberada · ya se puede comprar»** mientras el
+ * servidor rechaza toda compra con un 409. El letrero mintiendo justo sobre lo único que importa.
+ */
+describe('<PanelRecetaOrden> · el candado de compra (V1-E8z)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /** Receta liberada COMPLETA — el único estado desde el que el servidor deja reabrir. */
+  function liberadaCompleta(over: Partial<RecetaOrden> = {}): RecetaOrden {
+    return recetaDePrueba({
+      liberadaEn: '2026-08-30T10:00:00.000Z',
+      liberadaPor: 'usuario-1',
+      puedeComprar: true,
+      todoLiberado: true,
+      resumen: {
+        sinRevisar: 0,
+        revisados: 3,
+        ajustados: 0,
+        excluidos: 0,
+        total: 3,
+        liberados: 3,
+        porLiberar: 0,
+      },
+      ...over,
+    });
+  }
+
+  it('🔴 con la receta ABIERTA no dice «liberada»: dice que la compra está CONGELADA', () => {
+    render(
+      liberadaCompleta({
+        // Reabrir NO desfirma: `todoLiberado` sigue en true y ésa es toda la trampa.
+        abiertaEn: '2026-08-31T09:00:00.000Z',
+        abiertaPor: 'usuario-1',
+        abiertaMotivo: 'el cliente cambió el cierre',
+        puedeComprar: false,
+      }),
+    );
+
+    expect(screen.getByTestId('receta-en-correccion')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-liberada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('receta-aviso-en-correccion')).toHaveTextContent(/congelada/);
+    // El motivo se ENSEÑA: es lo que el comprador va a leer en su 409, y quien mira la orden tiene
+    // que poder saber qué está esperando sin ir a preguntar.
+    expect(screen.getByText(/el cliente cambió el cierre/)).toBeInTheDocument();
+    // Y NO se repite el letrero viejo, que aquí sería falso de facto.
+    expect(screen.queryByText(/ya se puede explotar el MRP/)).not.toBeInTheDocument();
+  });
+
+  it('abierta: se ofrece CERRAR y desaparece «Abrir» (son los dos lados del mismo interruptor)', () => {
+    render(liberadaCompleta({ abiertaEn: '2026-08-31T09:00:00.000Z', puedeComprar: false }));
+
+    expect(screen.getByTestId('receta-cerrar')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+  });
+
+  it('cerrada y liberada completa: se ofrece ABRIR y no CERRAR', () => {
+    render(liberadaCompleta());
+
+    expect(screen.getByTestId('receta-abrir')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-cerrar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('receta-en-correccion')).not.toBeInTheDocument();
+  });
+
+  it('⚠️ sin liberar NO se ofrece abrir: el servidor lo rechazaría (no hay nada que reabrir)', () => {
+    render(recetaDePrueba());
+
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('receta-cerrar')).not.toBeInTheDocument();
+  });
+
+  it('sin `desarrollo.administrar` la receta es de solo lectura: ni abrir ni cerrar', () => {
+    render(liberadaCompleta({ abiertaEn: '2026-08-31T09:00:00.000Z' }), false);
+
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('receta-cerrar')).not.toBeInTheDocument();
+    // Pero el estado SÍ se ve: la compra congelada le importa a quien sólo mira.
+    expect(screen.getByTestId('receta-en-correccion')).toBeInTheDocument();
+  });
+
+  it('⭐ abrir EXIGE motivo: el botón no se habilita vacío, y el motivo viaja tal cual', async () => {
+    const usuario = userEvent.setup();
+    render(liberadaCompleta());
+
+    await usuario.click(screen.getByTestId('receta-abrir'));
+    const confirmar = screen.getByTestId('confirmar-abrir-receta');
+    expect(confirmar).toBeDisabled();
+    expect(abrirMutateMock).not.toHaveBeenCalled();
+
+    await usuario.type(
+      screen.getByTestId('motivo-abrir-receta'),
+      '  el cliente cambió el cierre  ',
+    );
+    expect(confirmar).toBeEnabled();
+    await usuario.click(confirmar);
+
+    expect(abrirMutateMock).toHaveBeenCalledTimes(1);
+    expect(abrirMutateMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      cuerpo: { motivo: 'el cliente cambió el cierre' },
+    });
+  });
+
+  it('cerrar no pide nada: la razón ya se dio al abrir', async () => {
+    const usuario = userEvent.setup();
+    render(liberadaCompleta({ abiertaEn: '2026-08-31T09:00:00.000Z', puedeComprar: false }));
+
+    await usuario.click(screen.getByTestId('receta-cerrar'));
+
+    expect(cerrarMutateMock).toHaveBeenCalledTimes(1);
+    expect(cerrarMutateMock.mock.calls[0]?.[0]).toBe(50);
   });
 });

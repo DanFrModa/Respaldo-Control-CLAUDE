@@ -3111,6 +3111,35 @@ model Orden {
   /// la MIGRACIÓN (backfill de V1-E3d).
   recetaLiberadaPorId String?   @map("receta_liberada_por_id")
 
+  // ── ⭐ EL CANDADO DE COMPRA (V1-E8z, 0.067 · §Post-F9.160(a)/§Post-F9.165) ─────────────────
+  //    DANIEL: *"pongamos un candado que NO SE PUEDA COMPRAR NADA hasta que esté cerrado otra
+  //    vez"*. Una receta ya liberada se puede volver a ABRIR para corregirla, y mientras está
+  //    abierta la COMPRA de esa orden queda congelada; se descongela al CERRARLA.
+  //
+  //    🔴 POR QUÉ HACEN FALTA COLUMNAS NUEVAS, y no basta con `receta_liberada_en`: esa columna es
+  //    un DERIVADO ("no queda ningún renglón vivo sin firmar") y **la puerta de compra ya no la
+  //    consulta** (lo dice la nota de arriba y lo hace `exigirRecetaLiberada`, que pregunta renglón
+  //    por renglón). Ponerla en NULL para "reabrir" apagaría el letrero de la pantalla y **la orden
+  //    de compra saldría igual**: un candado que se ve puesto y no cierra.
+  //
+  //    ⭐ REABRIR **SÓLO MARCA; NO DESFIRMA** (§Post-F9.165 punto 1). Las firmas por renglón se
+  //    conservan, así que CERRAR es un clic y no cuarenta — lo único compatible con §Post-F9.80,
+  //    donde Daniel retiró la liberación en bloque. Lo que se toque durante la corrección pierde su
+  //    firma solo (`revocarFirmaDeRenglones`), y cerrar exige que no quede nada sin firmar.
+
+  /// ⭐ CUÁNDO se reabrió la receta de esta orden para corregirla. **NO NULL = la compra de esta
+  /// orden está CONGELADA** (explotar el MRP, planear, generar OC, capturar/duplicar/autorizar una
+  /// OC ligada). NULL = cerrada, la compra se rige por la firma de cada renglón, como siempre.
+  /// Cortar, enviar a maquila, recibir y entregar **NO se bloquean nunca**.
+  recetaAbiertaEn     DateTime? @map("receta_abierta_en")
+  /// Quién la reabrió (`desarrollo.administrar`). Se limpia al cerrar; la traza completa —quién,
+  /// cuándo y por qué, en los dos actos— queda en la `bitacora` (D3: esto es el ESTADO, no el
+  /// historial).
+  recetaAbiertaPorId  String?   @map("receta_abierta_por_id")
+  /// POR QUÉ se reabrió. **Obligatorio al abrir**: congelar la compra de una orden entera sin decir
+  /// la razón deja al comprador adivinando, y es lo que el 409 le enseña.
+  recetaAbiertaMotivo String?   @map("receta_abierta_motivo")
+
   /// Renglones de TELA de la receta congelada de esta orden. Cascade.
   recetaTelas OrdenTela[]
   /// Renglones de AVÍO de la receta congelada de esta orden. Cascade.
