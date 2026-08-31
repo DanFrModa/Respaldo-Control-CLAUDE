@@ -246,16 +246,17 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           },
           // ⭐⭐ V1-E8r (§Post-F9.140) — LA OTRA BANDEJA, la de la RECETA NEGOCIADA. Daniel:
           // *"despues de una negociacion, tiene que haber una validadcion de la receta original…
-          // de alguna manera deberia de pasar un filtro"*. La compuerta existía desde V1-E7d pero
-          // era un MURO al final: se topaba uno con ella al querer producir y nadie podía LISTAR
-          // lo que esperaba revisión. Entra al RIEL (no sólo a ⌘K) por la misma razón que su
+          // de alguna manera deberia de pasar un filtro"*. La firma existía desde V1-E7d pero
+          // nadie podía LISTAR lo que esperaba revisión — y desde que V1-E9c disolvió el muro que
+          // había detrás (§Post-F9.169), esta lista es lo ÚNICO que hace que la revisión se
+          // levante. Entra al RIEL (no sólo a ⌘K) por la misma razón que su
           // hermana: una bandeja que hay que buscar no se abre. Gate `modelos.ver` — el mismo que
           // abre la ficha a la que lleva; firmar exige `modelos.aprobar-receta` y no se hace aquí.
           {
             clave: 'recetas-por-revisar',
             titulo: 'Recetas por revisar',
             descripcion:
-              'Versiones negociadas que no pueden producirse hasta que se revise su receta — y cuáles ya frenan un pedido',
+              'Versiones negociadas cuya receta todavía no se revisa — y cuáles ya tienen un pedido esperando',
             ruta: '/modelos/recetas-por-revisar',
             icono: 'lista-tareas',
             permisos: ['modelos.ver'],

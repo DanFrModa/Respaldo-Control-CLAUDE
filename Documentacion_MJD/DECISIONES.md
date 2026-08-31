@@ -8467,6 +8467,14 @@ bandeja ya conocida** y (b) que **no todas** las negociaciones pasan por ella.
 
 ### ⭐ MEDIDO CONTRA EL CÓDIGO (29-ago-2026) — la COMPUERTA ya existe; lo que falta es la BANDEJA
 
+> ⚠️⚠️ **CADUCÓ CON LA 0.071 (31-ago-2026, §Post-F9.169).** Todo lo que sigue describe **la compuerta
+> viva**, y era exacto cuando se escribió. **Ya no existe:** `exigirRevisionAprobadaParaProducir` se
+> eliminó del repo y la revisión pasó de **puerta** a **registro**. Se conserva porque su medición —los
+> eslabones, quién llama a quién— es el mapa que hizo posible disolverla; **léelo como historia, no
+> como el sistema de hoy.** Y **un dato de esa medición ya era falso al ejecutarse**: la 0.069 añadió un
+> **segundo** llamador (`derivarModeloDeProduccion`) donde aquí dice *«único sitio de llamada»*.
+
+
 ⚠️ **Corrección importante para quien construya:** la revisión que §Post-F9.110 pidió **ya se construyó**
 en `V1-E7d`, y hay que no volver a construirla:
 
@@ -8972,8 +8980,8 @@ muestre el desenlace no la convierte en una segunda autoridad.
 |---|---|---|---|
 | 1 | **`salidaAProduccion`** | `backend/src/dominio/produccion/salida-produccion.ts` | Genera la OP de un renglón de pedido. En su **paso 4**, si el modelo tiene `origen === 'desarrollo'`, llama a `promoverAProduccionNucleo`. |
 | 2 | **`promoverAProduccionNucleo`** | `backend/src/dominio/modelos/nomenclatura.ts` | Núcleo compartido por el endpoint «pasar a producción» **y** por la salida a producción. Antes de tomar el lock del par, llama a `exigirRevisionAprobadaParaProducir`. |
-| 3 | **`exigirRevisionAprobadaParaProducir`** | `backend/src/dominio/modelos/revision-modelo.ts` | ⭐ **LA COMPUERTA.** `nomenclatura.ts` es su **único sitio de llamada** en todo el repo fuera de pruebas. **Lanza** `ErrorConflicto` si el modelo es una versión sin firma. |
-| 4 | **`revisionBloqueaProduccion`** | `backend/src/dominio/modelos/revision-modelo.ts` | El predicado que decide: `esVersionDeModelo(modelo) && modelo.revisionEstado !== 'aprobada'` — o sea **es versión Y no está aprobada** (el `null` y el `rechazada` también bloquean). |
+| 3 | **`exigirRevisionAprobadaParaProducir`** | `backend/src/dominio/modelos/revision-modelo.ts` | ⭐ **LA COMPUERTA.** `nomenclatura.ts` es su **único sitio de llamada** en todo el repo fuera de pruebas. **Lanza** `ErrorConflicto` si el modelo es una versión sin firma. ⚠️ **YA NO EXISTE (0.071).** Y «único sitio de llamada» **caducó antes**: la 0.069 añadió `derivarModeloDeProduccion`. |
+| 4 | **`revisionBloqueaProduccion`** | `backend/src/dominio/modelos/revision-modelo.ts` | El predicado que decide: `esVersionDeModelo(modelo) && modelo.revisionEstado !== 'aprobada'` — o sea **es versión Y no está aprobada** (el `null` y el `rechazada` también bloquean). ⚠️ **Vive, renombrado a `revisionSinAprobar` (0.071)**: el nombre viejo afirmaba un bloqueo que ya no existe. **Su trabajo no cambió** — llena la cola de «Recetas por revisar». |
 
 Y el eslabón que cierra el círculo: **la versión nacida de la negociación entra por la puerta 1**. En
 `crearVersionDeModelo` (`backend/src/dominio/modelos/versiones.ts`) la hija se crea con
@@ -8987,6 +8995,11 @@ NACE PENDIENTE DE REVISIÓN"*.
 3. ⇒ `revisionBloqueaProduccion` = **true**.
 4. Es `origen: 'desarrollo'` ⇒ `salidaAProduccion` **sí** entra a promoverla.
 5. ⇒ `exigirRevisionAprobadaParaProducir` **lanza** ⇒ **la OP se rechaza**.
+
+> ⚠️ **El paso 5 dejó de ser cierto el 31-ago (0.071).** Los pasos 1–4 siguen exactos; **el 5 se cayó**
+> con la compuerta. Hoy la OP **sale**, y lo que se frena es **comprar**, renglón por renglón. El
+> silogismo se conserva porque es el que demuestra por qué el orden estaba invertido — que es
+> precisamente lo que la 0.071 corrigió.
 
 **El sistema obliga a cuadrar ANTES de la OP. Daniel necesita cuadrar DESPUÉS de la OP y ANTES de
 comprar.** No es un matiz de secuencia: es **el orden invertido**.

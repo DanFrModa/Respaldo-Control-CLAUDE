@@ -1,19 +1,25 @@
 /**
- * ⭐ V1-E7d — LA REVISIÓN ANTES DE MANDAR A PRODUCIR (§Post-F9.110).
+ * ⭐ LA REVISIÓN DE LA RECETA DE UNA VERSIÓN — V1-E7d (§Post-F9.110), **hoy un REGISTRO y ya no una
+ * compuerta** (V1-E9c, §Post-F9.169).
  *
  * Dos bloques, y la diferencia importa:
  *
- *  1. **LA COMPUERTA**, que es una función PURA: sin base, sin dobles, sin nada que pueda mentir.
- *     Aquí vive la regla entera —a quién alcanza, a quién NO, y qué dice cuando niega—.
+ *  1. **EL PREDICADO** `revisionSinAprobar`, que es una función PURA: sin base, sin dobles, sin
+ *     nada que pueda mentir. Es lo que la BANDEJA «Recetas por revisar» y el chip de la ficha
+ *     preguntan, y aquí vive su regla entera —a quién alcanza y a quién NO—.
  *  2. **Las dos FIRMAS** (aprobar / rechazar), contra un `tx` que es un **REGISTRADOR DE
  *     LLAMADAS**, no una imitación de Prisma. Sólo se afirma sobre lo que el registrador ve de
  *     verdad: QUÉ se llamó, con QUÉ argumentos y qué NO se llamó nunca. Nada que dependa de que el
  *     doble filtre un `where` (eso probaría la suposición del doble, no el sistema).
  *
- * Que la compuerta gobierne los dos caminos que PROMUEVEN se prueba aparte, donde de verdad se
- * puede romper: `nomenclatura.test.ts` (endpoint «pasar a producción») y
- * `../produccion/salida-produccion.test.ts` (**la puerta lateral**: generar la OP promueve el
- * modelo sola).
+ * 🔴 **Lo que estas pruebas YA NO afirman, y por qué.** Hasta V1-E9c había un tercer bloque sobre
+ * `exigirRevisionAprobadaParaProducir` —la compuerta que le negaba producción a la versión sin
+ * firma— con sus mensajes de rechazo. Daniel la disolvió (*"no detiene ni la producción ni los
+ * demás renglones ya firmados"*) y la función se retiró entera, así que sus pruebas se fueron con
+ * ella. Que producir NO se detenga se afirma ahora en positivo, donde se rompería:
+ * `nomenclatura.test.ts` (promover y derivar) y `../produccion/salida-produccion.test.ts` (generar
+ * la OP). Lo que sí frena el gasto —la liberación por renglón— vive en
+ * `../produccion/receta-orden*.test.ts` y no se tocó.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -29,140 +35,73 @@ import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   aprobarRevisionModelo,
   esVersionDeModelo,
-  exigirRevisionAprobadaParaProducir,
   invalidarRevisionSiAprobada,
   rechazarRevisionModelo,
-  revisionBloqueaProduccion,
+  revisionSinAprobar,
   textoDelCambioDeReceta,
   tocarModeloPorCambioDeReceta,
   type CambioDeReceta,
   type RevisionDeModelo,
 } from './revision-modelo.js';
 
-// ── 1. LA COMPUERTA (pura) ────────────────────────────────────────────────────
+// ── 1. EL PREDICADO (puro) ────────────────────────────────────────────────────
 
 /** Un modelo cualquiera; `extra` dice qué lo distingue en cada caso. */
 function modelo(extra: Partial<RevisionDeModelo> = {}): RevisionDeModelo {
   return {
-    codigo: 'CYA-26-71-001-01',
     idModeloPadre: 7,
     versionDesarrollo: 1,
     idModeloDesarrollo: null,
     revisionEstado: null,
-    revisadoEn: null,
-    revisionNota: null,
     ...extra,
   };
 }
 
-describe('exigirRevisionAprobadaParaProducir — a quién NO alcanza', () => {
-  it('⭐ un modelo que NO es versión pasa igual que siempre (los ~4,987 migrados del Access)', () => {
-    // LA aserción que impide que esta etapa se ensanche sola: la revisión es de lo que nació de
-    // una negociación. Si la compuerta dejara de mirar el linaje, TODO el catálogo dejaría de
-    // poder pasar a producción — 4,987 modelos y todo desarrollo normal.
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(
-        modelo({ codigo: '71001', idModeloPadre: null, versionDesarrollo: null }),
-      ),
-    ).not.toThrow();
+describe('revisionSinAprobar — a quién NO alcanza', () => {
+  it('⭐ un modelo que NO es versión no lleva revisión (los ~4,987 migrados del Access)', () => {
+    // LA aserción que impide que esto se ensanche solo: la revisión es de lo que nació de una
+    // negociación. Si el predicado dejara de mirar el linaje, el catálogo entero aparecería en la
+    // bandeja pidiendo una firma que Daniel nunca pidió.
+    expect(revisionSinAprobar(modelo({ idModeloPadre: null, versionDesarrollo: null }))).toBe(
+      false,
+    );
   });
 
-  it('un modelo que no es versión pasa AUNQUE traiga un estado de revisión colgando', () => {
-    // Defensa contra el orden de las condiciones: si alguien invirtiera "¿es versión?" y "¿está
-    // aprobada?", un dato residual bloquearía un modelo normal.
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(
-        modelo({
-          codigo: '71001',
-          idModeloPadre: null,
-          versionDesarrollo: null,
-          revisionEstado: 'pendiente',
-        }),
+  it('un modelo que no es versión queda fuera AUNQUE traiga un estado de revisión colgando', () => {
+    // El linaje manda sobre el estado: un `revisionEstado` puesto a mano en un modelo normal no lo
+    // convierte en algo que espera firma.
+    expect(
+      revisionSinAprobar(
+        modelo({ idModeloPadre: null, versionDesarrollo: null, revisionEstado: 'pendiente' }),
       ),
-    ).not.toThrow();
+    ).toBe(false);
+  });
+
+  it('⭐ una versión APROBADA ya no espera nada (la firma es lo que la saca de la cola)', () => {
+    expect(revisionSinAprobar(modelo({ revisionEstado: 'aprobada' }))).toBe(false);
   });
 });
 
-describe('exigirRevisionAprobadaParaProducir — a quién SÍ', () => {
-  it('⭐ una versión PENDIENTE no puede mandarse a producir', () => {
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(modelo({ revisionEstado: 'pendiente' })),
-    ).toThrow(ErrorConflicto);
+describe('revisionSinAprobar — a quién SÍ', () => {
+  it('⭐ una versión PENDIENTE espera firma', () => {
+    expect(revisionSinAprobar(modelo({ revisionEstado: 'pendiente' }))).toBe(true);
   });
 
-  it('⭐ una versión SIN estado (nacida antes de esta etapa) tampoco: null se lee como pendiente', () => {
-    // Las versiones que ya existían cuando esto se desplegó tienen la columna en NULL. La lectura
-    // conservadora es "nadie la firmó", nunca "se da por buena".
-    expect(() => exigirRevisionAprobadaParaProducir(modelo({ revisionEstado: null }))).toThrow(
-      ErrorConflicto,
-    );
+  it('⭐ una versión SIN estado (nacida antes de V1-E7d) también: null se lee como pendiente', () => {
+    // Las versiones que ya existían al desplegarse V1-E7d tienen la columna en NULL. Si el
+    // predicado preguntara `=== 'pendiente'`, quedarían sin firmar Y invisibles a la vez.
+    expect(revisionSinAprobar(modelo({ revisionEstado: null }))).toBe(true);
   });
 
-  it('una versión RECHAZADA tampoco, y el mensaje trae el motivo y la fecha', () => {
-    let mensaje = '';
-    try {
-      exigirRevisionAprobadaParaProducir(
-        modelo({
-          revisionEstado: 'rechazada',
-          revisadoEn: new Date('2026-08-25T18:30:00.000Z'),
-          revisionNota: 'le quitaron el cierre sin bajar el precio',
-        }),
-      );
-    } catch (error) {
-      mensaje = (error as Error).message;
-    }
-    expect(mensaje).toContain('RECHAZADA');
-    expect(mensaje).toContain('le quitaron el cierre sin bajar el precio');
-    expect(mensaje).toContain('25/8/2026');
+  it('una versión RECHAZADA también: un rechazo es lo contrario de una firma', () => {
+    expect(revisionSinAprobar(modelo({ revisionEstado: 'rechazada' }))).toBe(true);
   });
 
-  it('⭐ la fecha del mensaje es la de MÉXICO, no la del servidor (que corre en UTC)', () => {
-    // Un rechazo firmado a las 20:00 de Ciudad de México cae ya en el día 26 en UTC. Con
-    // `toISOString()` el mensaje decía "26/8" y la ficha del modelo —que lo pinta con
-    // `toLocaleDateString('es-MX')` en el navegador— decía "25/8": dos fechas para el mismo acto,
-    // y quien tiene que corregir buscando el rechazo en la bitácora se va al día equivocado.
-    let mensaje = '';
-    try {
-      exigirRevisionAprobadaParaProducir(
-        modelo({
-          revisionEstado: 'rechazada',
-          revisadoEn: new Date('2026-08-26T02:00:00.000Z'),
-          revisionNota: 'firmado tarde',
-        }),
-      );
-    } catch (error) {
-      mensaje = (error as Error).message;
-    }
-    expect(mensaje).toContain('25/8/2026');
-    expect(mensaje).not.toContain('26/8/2026');
-  });
-
-  it('⭐ una versión APROBADA pasa (la firma es lo que abre la puerta)', () => {
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(modelo({ revisionEstado: 'aprobada' })),
-    ).not.toThrow();
-  });
-
-  it('basta CUALQUIERA de las dos columnas del linaje para caer bajo la revisión', () => {
+  it('basta CUALQUIERA de las dos columnas del linaje para llevar revisión', () => {
     // Una versión cuyo código se capturó a mano puede no tener `versionDesarrollo`; una importada
-    // puede no tener padre. Exigir las dos dejaría un hueco por el que se cuela sin firma.
-    expect(() => exigirRevisionAprobadaParaProducir(modelo({ versionDesarrollo: null }))).toThrow(
-      ErrorConflicto,
-    );
-    expect(() => exigirRevisionAprobadaParaProducir(modelo({ idModeloPadre: null }))).toThrow(
-      ErrorConflicto,
-    );
-  });
-
-  it('el mensaje dice QUIÉN puede desatorarlo, no sólo que no se pudo', () => {
-    let mensaje = '';
-    try {
-      exigirRevisionAprobadaParaProducir(modelo({ revisionEstado: 'pendiente' }));
-    } catch (error) {
-      mensaje = (error as Error).message;
-    }
-    expect(mensaje).toContain('Aprobar receta');
-    expect(mensaje).toContain('CYA-26-71-001-01');
+    // puede no tener padre. Exigir las dos dejaría versiones fuera de la bandeja.
+    expect(revisionSinAprobar(modelo({ versionDesarrollo: null }))).toBe(true);
+    expect(revisionSinAprobar(modelo({ idModeloPadre: null }))).toBe(true);
   });
 });
 
@@ -183,10 +122,9 @@ describe('esVersionDeModelo', () => {
    * Un HIJO del linaje 1:N (`idModeloDesarrollo` puesto) **no es una versión**, pase lo que pase con
    * las otras dos columnas. La aserción que importa es la de la PRIMERA línea: un hijo al que
    * alguna etapa futura le ponga además `idModeloPadre` —para "guardar de dónde salió"— seguiría
-   * sin ser versión. Sin esa exclusión, la ficha le pintaría *«Revisión pendiente · no puede
-   * mandarse a producir»* **sin ningún botón para arreglarlo**, sobre un modelo que YA está en
-   * producción (`exigirVersionRevisable` rechaza firmar cualquier cosa de producción): la cicatriz
-   * de §Post-F9.119 otra vez.
+   * sin ser versión. Sin esa exclusión, la ficha le pintaría *«Revisión pendiente»* y la bandeja lo
+   * listaría pidiendo una firma que no le toca: su receta es la del padre, y firmarla en el hijo
+   * sería firmar dos veces lo mismo.
    *
    * ⚠️ Hoy `derivarModeloDeProduccion` hace nacer al hijo con las DOS columnas de versión en
    * `null`, así que las tres primeras aserciones describen combinaciones que el dominio todavía no
@@ -210,13 +148,8 @@ describe('esVersionDeModelo', () => {
   });
 
   /**
-   * La compuerta ENTERA sobre un hijo: no basta con que el predicado diga `false` — lo que hay que
-   * demostrar es que un hijo con la revisión SIN FIRMAR (el estado en que nacen todos, `null`)
-   * **no queda bloqueado** ni por `revisionBloqueaProduccion` ni por la compuerta que lanza.
-   */
-  /**
    * 🔴 EL MODO DE FALLO QUE IMPORTA, PINCHADO. La exclusión de los hijos es lo único de este
-   * predicado que puede ABRIR la compuerta, así que tiene que fallar del lado seguro: una fila a la
+   * predicado que puede DEJAR FUERA a un modelo, así que tiene que fallar del lado seguro: una fila a la
    * que le FALTE la columna (`undefined`, no `null`) **no** cuenta como hijo, y la versión sigue
    * necesitando su firma. Con un `!== null` en vez del `typeof`, esta prueba se pone roja — y con
    * ella se pusieron rojas, de verdad, siete pruebas de `promoverAProduccionNucleo` y
@@ -229,23 +162,25 @@ describe('esVersionDeModelo', () => {
       idModeloDesarrollo: number | null;
     };
     expect(esVersionDeModelo(sinLaColumna)).toBe(true);
-    expect(revisionBloqueaProduccion({ ...sinLaColumna, revisionEstado: null })).toBe(true);
+    expect(revisionSinAprobar({ ...sinLaColumna, revisionEstado: null })).toBe(true);
   });
 
-  it('⭐ a un HIJO del linaje 1:N la revisión no le bloquea nada (su firma es la del padre)', () => {
+  /**
+   * El predicado ENTERO sobre un hijo: no basta con que `esVersionDeModelo` diga `false` — lo que
+   * hay que demostrar es que un hijo con la revisión SIN FIRMAR (el estado en que nacen todos,
+   * `null`) **no aparece como pendiente de firma**, que es lo que decide la bandeja y el chip.
+   */
+  it('⭐ a un HIJO del linaje 1:N la revisión no le pide nada (su firma es la del padre)', () => {
     const hijo = {
       idModeloPadre: 7,
       versionDesarrollo: 1,
       idModeloDesarrollo: 9,
       revisionEstado: null,
     };
-    expect(revisionBloqueaProduccion(hijo)).toBe(false);
-    // Y la versión equivalente SIN el vínculo sí queda bloqueada: si las dos dieran lo mismo, este
+    expect(revisionSinAprobar(hijo)).toBe(false);
+    // Y la versión equivalente SIN el vínculo sí espera firma: si las dos dieran lo mismo, este
     // par de aserciones pasaría con el predicado roto.
-    expect(revisionBloqueaProduccion({ ...hijo, idModeloDesarrollo: null })).toBe(true);
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(modelo({ idModeloDesarrollo: 9, revisionEstado: null })),
-    ).not.toThrow();
+    expect(revisionSinAprobar({ ...hijo, idModeloDesarrollo: null })).toBe(true);
   });
 });
 
@@ -388,9 +323,32 @@ describe('aprobarRevisionModelo', () => {
     await expect(aprobarRevisionModelo(SESION, 42, {}, { tx })).rejects.toThrow(ErrorValidacion);
   });
 
-  it('un modelo YA en producción no se firma (la revisión es ANTES de mandar a producir)', async () => {
-    const { tx } = txRegistrador(filaFalsa({ origen: 'produccion' }));
-    await expect(aprobarRevisionModelo(SESION, 42, {}, { tx })).rejects.toThrow(ErrorConflicto);
+  it('⭐⭐ un modelo YA en producción SÍ se firma, y la bitácora dice desde dónde (V1-E9c)', async () => {
+    // 🔴 LA PRUEBA DE LA DECISIÓN (a) DE §Post-F9.169. Hasta aquí esto era `ErrorConflicto`
+    // —"la revisión es ANTES de mandar a producir"—, y tenía sentido mientras la firma abriera una
+    // compuerta. Sin compuerta, generar la OP promueve la versión con la revisión en `pendiente`:
+    // si firmarla siguiera prohibida, quedaría un acto de negocio que existe y que NADIE puede
+    // ejecutar nunca. Si alguien reinstala aquel guard, esta prueba muere.
+    const { tx, llamadas } = txRegistrador(filaFalsa({ origen: 'produccion', codigo: '71001' }));
+
+    const salida = await aprobarRevisionModelo(
+      SESION,
+      42,
+      { nota: 'revisada con la OP corriendo' },
+      { tx },
+    );
+
+    expect(salida.revisionEstado).toBe('aprobada');
+    expect(llamadas.map((l) => l.metodo)).toContain('modelo.update');
+    // Y el acto queda distinguible del que se firma antes de promover: la fila sólo guarda el
+    // ÚLTIMO acto (D3), así que el "desde dónde" sólo puede vivir en la bitácora.
+    expect(datosDeLaBitacora(llamadas).origenAlFirmar).toBe('produccion');
+  });
+
+  it('y el que se firma ANTES de promover queda marcado como tal (si no, el dato no distingue nada)', async () => {
+    const { tx, llamadas } = txRegistrador(filaFalsa({ origen: 'desarrollo' }));
+    await aprobarRevisionModelo(SESION, 42, {}, { tx });
+    expect(datosDeLaBitacora(llamadas).origenAlFirmar).toBe('desarrollo');
   });
 
   it('un modelo que no existe es `ErrorNoEncontrado`, no un crash', async () => {
@@ -464,15 +422,26 @@ describe('rechazarRevisionModelo', () => {
     );
   });
 
-  it('un modelo YA en producción tampoco se rechaza (gemela de la de aprobar)', async () => {
-    // El guard vive en `exigirVersionRevisable`, que las dos firmas comparten, así que hoy la
-    // conducta ya está. La prueba existe para que siga estándolo el día que alguna de las dos se
-    // salga del helper: un rechazo firmado DESPUÉS de producir no gobierna nada y sólo dejaría un
-    // dato mentiroso colgando de un modelo que ya se está fabricando.
-    const { tx } = txRegistrador(filaFalsa({ origen: 'produccion' }));
-    await expect(rechazarRevisionModelo(SESION, 42, { motivo: 'x' }, { tx })).rejects.toThrow(
-      ErrorConflicto,
+  it('⭐ un modelo YA en producción también se RECHAZA (gemela de la de aprobar, V1-E9c)', async () => {
+    // Las dos firmas comparten `exigirVersionRevisable`, así que la conducta viene de ahí. La
+    // prueba existe para que las dos se muevan juntas: si alguna volviera a prohibirlo, revisar una
+    // versión con su OP ya corriendo sólo se podría hacer a medias — aprobar sí, observar no—, que
+    // es peor que las dos cerradas.
+    const { tx, llamadas } = txRegistrador(filaFalsa({ origen: 'produccion', codigo: '71001' }));
+    const salida = await rechazarRevisionModelo(
+      SESION,
+      42,
+      { motivo: 'la tela que se acordó no la surte nadie' },
+      { tx },
     );
+    expect(salida.revisionEstado).toBe('rechazada');
+
+    // 🔴 Y el rechazo deja el MISMO rastro que la aprobación: desde dónde se firmó. Sin esta línea
+    // el campo quedaba SIN NINGUNA aserción en esta rama —comprobado: borrarlo dejaba las 48
+    // pruebas en verde—, que es exactamente el hueco que esta etapa encontró en la ficha del
+    // modelo. La fila sólo guarda el ÚLTIMO acto (D3): si el dato no está aquí, después no hay
+    // forma de distinguir el rechazo puesto antes de promover del puesto con la OP corriendo.
+    expect(datosDeLaBitacora(llamadas).origenAlFirmar).toBe('produccion');
   });
 
   it('la firma NUNCA borra ni edita otra cosa del modelo: sólo un update', async () => {
@@ -606,16 +575,13 @@ const QUIEN_CAMBIA = sesionDePrueba({
   permisos: ['modelos.ver', 'modelos.administrar'],
 });
 
-/** La fila viva, leída como la lee la compuerta pura. */
-function comoLaVeLaCompuerta(fila: Record<string, unknown>): RevisionDeModelo {
+/** La fila viva, leída como la lee el predicado puro. */
+function comoLaVeElPredicado(fila: Record<string, unknown>): RevisionDeModelo {
   return {
-    codigo: fila.codigo as string,
     idModeloPadre: fila.idModeloPadre as number | null,
     versionDesarrollo: fila.versionDesarrollo as number | null,
     idModeloDesarrollo: (fila.idModeloDesarrollo ?? null) as number | null,
     revisionEstado: fila.revisionEstado as RevisionDeModelo['revisionEstado'],
-    revisadoEn: fila.revisadoEn as Date | null,
-    revisionNota: fila.revisionNota as string | null,
   };
 }
 
@@ -827,18 +793,25 @@ describe('textoDelCambioDeReceta — el catálogo de textos es UNO', () => {
   });
 });
 
-// ── ⭐ EL CICLO COMPLETO: firmar → mover la receta → ya no se puede producir ────
+// ── ⭐ EL CICLO COMPLETO: firmar → mover la receta → la firma se cae y vuelve a la cola ────
 
 /**
- * La prueba que decide la etapa, una por cada tipo de cambio de receta. Encadena las TRES piezas
- * reales sobre la MISMA fila viva —la firma de V1-E7d, el embudo de V1-E7e y la compuerta de
- * V1-E7d— porque el agujero que Daniel mandó cerrar sólo aparece al recorrerlas en ese orden: la
- * firma sola está bien, el cambio de receta solo está bien, y juntos mandaban a producir una
- * receta que nadie miró.
+ * La prueba que decide la etapa de V1-E7e, una por cada tipo de cambio de receta. Encadena las
+ * piezas reales sobre la MISMA fila viva —la firma de V1-E7d y el embudo de V1-E7e— porque el
+ * agujero que Daniel mandó cerrar sólo aparece al recorrerlas en ese orden: la firma sola está
+ * bien, el cambio de receta solo está bien, y juntos dejaban una versión marcada como *revisada*
+ * con una receta que nadie miró.
+ *
+ * 🔴 **V1-E9c cambió lo que se afirma al final, y no es un aflojamiento.** Antes se cerraba con
+ * *"la compuerta vuelve a morder"* (la promoción rebotaba); esa compuerta ya no existe
+ * (§Post-F9.169). Lo que sigue en pie —y es lo único que la invalidación de verdad prometía— es
+ * que **la firma se cae**: el registro deja de decir "revisada" y la versión **vuelve a la cola**
+ * que la bandeja lista, preguntada con el MISMO predicado que la bandeja usa. Sin la invalidación,
+ * el paso 4 falla igual que antes.
  *
  * Que cada PUERTA real (el PUT de telas, el de avíos, las medidas, el arte, el copiado) pase de
  * verdad por el embudo se demuestra contra Postgres en `versiones.int.test.ts`; aquí se demuestra
- * que el embudo hace lo que tiene que hacer y que la compuerta vuelve a morder.
+ * que el embudo hace lo que tiene que hacer.
  */
 describe.each<[CambioDeReceta, string]>([
   ['telas', 'le cambian el consumo de una TELA'],
@@ -847,7 +820,7 @@ describe.each<[CambioDeReceta, string]>([
   ['arte', 'le mueven el ARTE'],
   ['copia-de-otro-modelo', 'le COPIAN la receta de otro modelo'],
 ])('⭐ EL CICLO — aprobada y luego %s', (cambio, relato) => {
-  it(`ya NO puede mandarse a producir cuando ${relato}`, async () => {
+  it(`la firma se cae y vuelve a la cola cuando ${relato}`, async () => {
     const { tx, fila } = baseFalsa([
       filaFalsa({ id: ID_VERSION, revisionEstado: 'pendiente' }),
       modeloMigrado(),
@@ -857,27 +830,24 @@ describe.each<[CambioDeReceta, string]>([
     await aprobarRevisionModelo(SESION, ID_VERSION, { nota: 'la revisé con Daniel' }, { tx });
     expect(fila(ID_VERSION).revisionEstado).toBe('aprobada');
 
-    // 2. Con la firma puesta, la compuerta la deja pasar a producción.
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(comoLaVeLaCompuerta(fila(ID_VERSION))),
-    ).not.toThrow();
+    // 2. Con la firma puesta sale de la cola: la bandeja ya no la lista.
+    expect(revisionSinAprobar(comoLaVeElPredicado(fila(ID_VERSION)))).toBe(false);
 
     // 3. Alguien MÁS le mueve la receta (no el que firmó).
     await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_VERSION, cambio);
 
-    // 4. ⭐ LA AFIRMACIÓN DE LA ETAPA: la compuerta vuelve a morder. Sin la invalidación, esta
-    //    línea pasa —y la OP sale sobre una receta que Aurora nunca vio—.
-    expect(() => exigirRevisionAprobadaParaProducir(comoLaVeLaCompuerta(fila(ID_VERSION)))).toThrow(
-      ErrorConflicto,
-    );
+    // 4. ⭐ LA AFIRMACIÓN DE LA ETAPA: la firma se cayó y la versión VOLVIÓ a la cola. Sin la
+    //    invalidación, esta línea pasa —y el sistema seguiría presentándola como revisada—.
+    expect(fila(ID_VERSION).revisionEstado).toBe('pendiente');
+    expect(revisionSinAprobar(comoLaVeElPredicado(fila(ID_VERSION)))).toBe(true);
+    // Y nadie firmó la receta que hay AHORA: el firmante se soltó de la fila.
+    expect(fila(ID_VERSION).idRevisadoPor).toBeNull();
 
     // 5. (d) No es un callejón sin salida: se vuelve a firmar con el MISMO permiso y vuelve a
-    //    pasar. Un estado muerto sería tan defecto como el agujero.
+    //    salir de la cola. Un estado muerto sería tan defecto como el agujero.
     await aprobarRevisionModelo(SESION, ID_VERSION, {}, { tx });
     expect(fila(ID_VERSION).revisionEstado).toBe('aprobada');
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(comoLaVeLaCompuerta(fila(ID_VERSION))),
-    ).not.toThrow();
+    expect(revisionSinAprobar(comoLaVeElPredicado(fila(ID_VERSION)))).toBe(false);
 
     // El testigo migrado no se movió en todo el ciclo.
     expect(fila(ID_MIGRADO).revisionEstado).toBeNull();

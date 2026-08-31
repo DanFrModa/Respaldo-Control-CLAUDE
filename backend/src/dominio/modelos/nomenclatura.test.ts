@@ -611,15 +611,22 @@ describe('mintearCodigoDesarrollo — el centinela, última red DETRÁS del piso
   });
 });
 
-// ── ⭐ V1-E7d: LA COMPUERTA de la revisión, dentro del NÚCLEO de la promoción ──────
+// ── ⭐⭐ V1-E9c: LA REVISIÓN **NO** DETIENE LA PROMOCIÓN (§Post-F9.169) ──────
 
 /**
- * §Post-F9.110 — *"después de la negociación con el cliente debe de haber una revisión antes de
- * mandar a producir"*.
+ * 🔴 **Este bloque afirmaba lo contrario hasta V1-E9c, y se invirtió a propósito.** V1-E7d había
+ * puesto aquí una COMPUERTA: una VERSIÓN sin revisar no pasaba a producción. Daniel la disolvió
+ * (31-ago-2026, §Post-F9.169): *«**Todo lo que no está firmado simplemente no se puede comprar.
+ * Pero no detiene ni la producción ni los demás renglones ya firmados.**»*
  *
- * Estas pruebas fijan **el camino del endpoint** «pasar a producción». El OTRO camino —generar la
- * OP, que promueve el modelo sola— se prueba en `../produccion/salida-produccion.test.ts`, y es la
- * razón por la que la compuerta vive AQUÍ, en el núcleo compartido, y no en el endpoint.
+ * Las pruebas no se borraron: se **dieron vuelta**. Siguen recorriendo exactamente las mismas
+ * poblaciones —versión pendiente, sin estado, rechazada, aprobada y modelo normal— pero ahora
+ * exigen que **TODAS promuevan**. Así, si alguien vuelve a poner una guarda de revisión en este
+ * camino, este bloque muere en vez de quedarse callado. Lo que sí frena el gasto —la liberación por
+ * renglón— vive en `../produccion/receta-orden*.test.ts` y no se tocó.
+ *
+ * El OTRO camino que comparte este núcleo —generar la OP, que promueve el modelo sola— se prueba en
+ * `../produccion/salida-produccion.test.ts`.
  *
  * La transacción de mentiras emula lo mínimo que `promoverAProduccionNucleo` toca: el modelo, los
  * dígitos del par (tipo/género), el lock, la ocupación de la serie (`$queryRaw`, vacía = todo
@@ -696,57 +703,51 @@ function version(extra: Record<string, unknown> = {}): Record<string, unknown> {
 
 const SESION_PROMOCION = sesionDePrueba({ permisos: ['modelos.administrar'] });
 
-describe('promoverAProduccionNucleo — la compuerta de la REVISIÓN (V1-E7d)', () => {
-  it('⭐ una VERSIÓN sin revisar NO pasa a producción', async () => {
-    const { tx } = txPromocion(version());
-    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow(
-      ErrorConflicto,
-    );
+describe('promoverAProduccionNucleo — la REVISIÓN ya NO detiene producir (V1-E9c)', () => {
+  /** Promueve y comprueba que de verdad se escribió el número, no sólo que no lanzó. */
+  async function promueveYEscribe(fila: Record<string, unknown>): Promise<void> {
+    const { tx, llamadas } = txPromocion(fila);
+    const resultado = await promoverAProduccionNucleo(tx, SESION_PROMOCION, 42);
+
+    expect(resultado.numeroProduccion).toBe(71_001);
+    expect(resultado.codigo).toBe('71001');
+    expect(llamadas.find((l) => l.metodo === 'modelo.update')?.args).toMatchObject({
+      data: { origen: 'produccion', numeroProduccion: 71_001 },
+    });
+  }
+
+  it('⭐⭐ una VERSIÓN sin revisar SÍ pasa a producción (la compuerta se retiró)', async () => {
+    // 🔴 LA PRUEBA DE LA ETAPA. Antes esto era `rejects.toThrow(ErrorConflicto)`.
+    await promueveYEscribe(version());
   });
 
-  it('⭐ y no deja NADA a medias: ni pide el lock ni escribe el modelo', async () => {
-    // La compuerta va antes del `pg_advisory_xact_lock` a propósito: no se serializa el par de una
-    // promoción que va a rebotar, y no se consume ningún hueco de la serie.
-    const { tx, llamadas } = txPromocion(version());
-    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow();
-    expect(llamadas.map((l) => l.metodo)).toEqual(['modelo.findUnique']);
+  it('⭐ una versión SIN estado de revisión (null) también pasa', async () => {
+    await promueveYEscribe(version({ revisionEstado: null }));
   });
 
-  it('una versión RECHAZADA tampoco pasa, y el motivo llega al mensaje', async () => {
-    const { tx } = txPromocion(
+  it('⭐⭐ una versión RECHAZADA también pasa: el rechazo no detiene producir, sólo comprar', async () => {
+    // El caso más fuerte de §Post-F9.169: ni siquiera un rechazo explícito frena la producción.
+    // Lo que no se puede es COMPRARLE material al renglón sin liberar (`receta-orden.ts`).
+    await promueveYEscribe(
       version({
         revisionEstado: 'rechazada',
         revisadoEn: new Date('2026-08-25T00:00:00.000Z'),
         revisionNota: 'el cierre que se quitó sí costaba',
       }),
     );
-    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow(
-      /el cierre que se quitó sí costaba/,
-    );
   });
 
-  it('⭐ una versión APROBADA pasa y se le escribe su número de 5 dígitos', async () => {
-    const { tx, llamadas } = txPromocion(version({ revisionEstado: 'aprobada' }));
-    const resultado = await promoverAProduccionNucleo(tx, SESION_PROMOCION, 42);
-
-    expect(resultado.numeroProduccion).toBe(71_001);
-    expect(resultado.codigo).toBe('71001');
-    const update = llamadas.find((l) => l.metodo === 'modelo.update');
-    expect(update?.args).toMatchObject({
-      data: { origen: 'produccion', numeroProduccion: 71_001 },
-    });
+  it('una versión APROBADA pasa, como siempre', async () => {
+    await promueveYEscribe(version({ revisionEstado: 'aprobada' }));
   });
 
-  it('⭐ un modelo que NO es versión pasa igual que siempre, sin firma alguna', async () => {
-    // LA aserción que impide que esta etapa se ensanche sola: los ~4,987 migrados del Access y
-    // todo desarrollo normal siguen promoviéndose sin revisión. Si la compuerta dejara de mirar el
-    // linaje, el catálogo entero se quedaría sin poder pasar a producción.
-    const { tx } = txPromocion(paraPromover());
-    const resultado = await promoverAProduccionNucleo(tx, SESION_PROMOCION, 42);
-    expect(resultado.numeroProduccion).toBe(71_001);
+  it('⭐ un modelo que NO es versión pasa igual que siempre (los ~4,987 migrados del Access)', async () => {
+    await promueveYEscribe(paraPromover());
   });
 
-  it('el modelo YA en producción sigue rebotando por su propio motivo (no por la revisión)', async () => {
+  it('el modelo YA en producción sigue rebotando por su propio motivo', async () => {
+    // Control negativo: la promoción NO se quedó sin guardas — la suya, la de "ya está promovido",
+    // sigue entera. Si esta prueba cayera, lo que se rompió no es la revisión.
     const { tx } = txPromocion(
       version({ origen: 'produccion', numeroProduccion: 71_001, revisionEstado: 'pendiente' }),
     );
@@ -760,7 +761,7 @@ describe('promoverAProduccionNucleo — la compuerta de la REVISIÓN (V1-E7d)', 
 
 /**
  * §Post-F9.135 — de un desarrollo nacen N modelos de producción (uno por color de la OC) que
- * COMPARTEN su receta. Aquí se fijan, sin base de datos, las cuatro guardas y **qué se escribe**;
+ * COMPARTEN su receta. Aquí se fijan, sin base de datos, las guardas y **qué se escribe**;
  * lo que sólo Postgres puede demostrar (los N números distintos bajo el lock, los CHECK y que la
  * receta de verdad no se copia) vive en `nomenclatura.int.test.ts`.
  *
@@ -987,7 +988,7 @@ describe('derivarModeloDeProduccion — qué escribe', () => {
   });
 });
 
-describe('derivarModeloDeProduccion — las cuatro guardas', () => {
+describe('derivarModeloDeProduccion — las guardas', () => {
   /** Nada se escribió y el par NO se serializó: la guarda rebotó antes de tocar nada. */
   function nadaPaso(llamadas: { metodo: string }[]): string[] {
     return llamadas.map((l) => l.metodo).filter((m) => m !== 'modelo.findUnique');
@@ -1019,13 +1020,16 @@ describe('derivarModeloDeProduccion — las cuatro guardas', () => {
     expect(nadaPaso(llamadas)).toEqual([]);
   });
 
-  it('⭐ una VERSIÓN sin revisar no deriva hijos: la compuerta se evalúa contra el PADRE', async () => {
-    const { tx, llamadas } = txDerivacion(
+  it('⭐⭐ una VERSIÓN sin revisar SÍ deriva hijos (V1-E9c: la guarda 4 se retiró)', async () => {
+    // 🔴 Antes esto era `rejects.toThrow(/REVISIÓN/)`. **Este llamador no estaba en la medición**
+    // de §Post-F9.164 —que contó UN solo llamador de la compuerta— porque V1-E9a lo añadió después.
+    // Dejarlo habría devuelto el muro entero por la puerta más nueva: justo la que V1-E3 va a usar
+    // para hacer nacer un modelo de producción por cada color de la OC.
+    const { tx } = txDerivacion(
       paraDerivar({ idModeloPadre: 7, versionDesarrollo: 1, revisionEstado: 'pendiente' }),
     );
-    await expect(derivarModeloDeProduccion(tx, SESION_PROMOCION, 42)).rejects.toThrow(/REVISIÓN/);
-    // Ni lock ni escritura: la compuerta va ANTES de serializar el par.
-    expect(nadaPaso(llamadas)).toEqual([]);
+    const hijo = await derivarModeloDeProduccion(tx, SESION_PROMOCION, 42);
+    expect(hijo.numeroProduccion).toBe(71_001);
   });
 
   /**

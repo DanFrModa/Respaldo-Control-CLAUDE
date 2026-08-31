@@ -1218,12 +1218,12 @@ export type DatosModeloFotoEditar = z.infer<typeof esquemaModeloFotoEditarCuerpo
 
 // ══ ⭐⭐ V1-E8r — BANDEJA «Recetas por revisar» (§Post-F9.140, DANIEL) ════════════════════════════
 //
-// La COLA de la compuerta de V1-E7d. Daniel: *"despues de una negociacion, tiene que haber una
+// La COLA de la revisión de V1-E7d. Daniel: *"despues de una negociacion, tiene que haber una
 // validadcion de la receta original… de alguna manera deberia de pasar un filtro para ver lo que se
 // negocio con el cliente. y como se cerro"*. Es de SOLO LECTURA: la bandeja NO firma, LLEVA a la
 // ficha del modelo, donde se revisa viéndola (§Post-F9.80).
 
-/** Una versión a la que la revisión le está negando producción (§Post-F9.140). */
+/** Una versión cuya revisión todavía no está firmada (§Post-F9.140). */
 export const esquemaRecetaPorRevisar = z
   .object({
     idModelo: z.number().int().describe('Id de la VERSIÓN que espera revisión.'),
@@ -1241,7 +1241,7 @@ export const esquemaRecetaPorRevisar = z
       .nullable()
       .describe('Nº del sufijo de versión (`-01` → 1), o null si el linaje sólo viene del padre.'),
     estado: esquemaEstadoRevisionModelo.describe(
-      'Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (misma lectura que la compuerta). Nunca llega `aprobada`: eso ya no espera nada.',
+      'Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (la misma lectura que la ficha del modelo). Nunca llega `aprobada`: eso ya no espera nada.',
     ),
     revisionNota: z
       .string()
@@ -1274,7 +1274,7 @@ export const esquemaRecetaPorRevisar = z
     conPedido: z
       .boolean()
       .describe(
-        '⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión y su OP no puede nacer hasta que la receta se revise. No es lo mismo que una versión recién negociada a la que nadie le pide nada.',
+        '⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión, así que hay piezas comprometidas esperando detrás de esta receta sin revisar — por eso esta fila va primero en la cola. No es lo mismo que una versión recién negociada a la que nadie le pide nada. ⚠️ Decía «su OP no puede nacer hasta que la receta se revise»: fue verdad hasta V1-E9c (§Post-F9.169), que disolvió la compuerta. La OP nace igual, y esta revisión no condiciona ni producir ni comprar: lo que gobierna la compra es OTRA firma, la liberación POR RENGLÓN de la receta de la ORDEN.',
       ),
   })
   .describe('Una versión que espera revisión de receta (§Post-F9.140).');

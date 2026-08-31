@@ -673,9 +673,12 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
 
   // ── ⭐ V1-E7d: LA REVISIÓN antes de mandar a producir (§Post-F9.110) ──────────
   //
-  // ⚠️ Estas dos rutas ENSEÑAN y firman; NO son la compuerta. La compuerta que impide producir sin
-  // revisión vive en `promoverAProduccionNucleo` (dominio), porque desde ahí cubre también la
-  // puerta lateral de GENERAR LA OP. Un botón escondido no protege nada con la URL a mano.
+  // ⚠️ **V1-E9c (§Post-F9.169) — estas dos rutas firman un REGISTRO, no abren una puerta.** Hasta
+  // aquí, la firma levantaba la compuerta que `promoverAProduccionNucleo` le ponía a la versión sin
+  // revisar; Daniel la disolvió (*"no detiene ni la producción ni los demás renglones ya
+  // firmados"*) y lo único que frena el gasto es la firma POR RENGLÓN de la receta de la orden. La
+  // revisión sigue existiendo porque dice que alguien miró lo que se negoció — y por eso ahora
+  // también se puede firmar con el modelo YA en producción.
   //
   // El permiso es el MISMO de «crear versión» (`modelos.aprobar-receta`, hasta Gerencial: *"Aurora
   // podría hacerlo aparte de mí"*) y NO `listas.aprobar`, que es el PRECIO y es sólo del dueño.
@@ -687,9 +690,11 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
       tags: ['modelos'],
       summary: 'Aprobar la revisión de la receta de una versión de modelo',
       description:
-        'Firma la revisión (quién y cuándo) y habilita a la versión para pasar a producción — ' +
-        'por el endpoint «pasar a producción» o al generarle su OP. Sólo aplica a VERSIONES ' +
-        '(modelos con sufijo); aprobar dos veces es conflicto.',
+        'Firma la revisión (quién y cuándo): deja constancia de que alguien miró la receta que se ' +
+        'acordó en la negociación. NO es una compuerta — no condiciona producir ni comprar (eso ' +
+        'lo gobierna la liberación por renglón de la receta de la orden). Sólo aplica a VERSIONES ' +
+        '(modelos con sufijo), se puede firmar aunque el modelo ya esté en producción, y aprobar ' +
+        'dos veces es conflicto.',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       body: esquemaRevisionAprobarCuerpo,
@@ -709,9 +714,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
       tags: ['modelos'],
       summary: 'Rechazar la revisión de la receta de una versión de modelo (con motivo)',
       description:
-        'Devuelve la versión con observaciones: sigue existiendo y editándose, pero no puede ' +
-        'mandarse a producir. El motivo es obligatorio; el rechazo anterior no se pierde (queda ' +
-        'en la bitácora).',
+        'Devuelve la versión con observaciones: sigue existiendo y editándose, y queda en la ' +
+        'bandeja «Recetas por revisar» hasta que se corrija y se firme. El motivo es obligatorio; ' +
+        'el rechazo anterior no se pierde (queda en la bitácora).',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       body: esquemaRevisionRechazarCuerpo,
@@ -723,12 +728,12 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
   });
 
-  // ⭐⭐ V1-E8r (§Post-F9.140, DANIEL) — LA BANDEJA «Recetas por revisar»: la COLA de la compuerta.
+  // ⭐⭐ V1-E8r (§Post-F9.140, DANIEL) — LA BANDEJA «Recetas por revisar».
   //
   // Daniel: *"despues de una negociacion, tiene que haber una validadcion de la receta original…
-  // de alguna manera deberia de pasar un filtro"*. La compuerta ya existía (V1-E7d) pero era un
-  // MURO al final del camino: te topabas con ella al querer producir, y nadie podía LISTAR lo que
-  // esperaba revisión. Esto es esa lista.
+  // de alguna manera deberia de pasar un filtro"*. La firma ya existía (V1-E7d) pero nadie podía
+  // LISTAR lo que esperaba revisión. Esto es esa lista — y desde V1-E9c, que disolvió el muro que
+  // había detrás (§Post-F9.169), es lo ÚNICO que hace que la revisión se levante.
   //
   // 🔴 De SOLO LECTURA: la bandeja NO firma, LLEVA (§Post-F9.80, la regla que Daniel fijó al
   // quitarle el botón de bloque a la bandeja hermana). Firmar sigue siendo `POST
@@ -743,11 +748,12 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     preHandler: app.conPermiso('modelos.ver'),
     schema: {
       tags: ['modelos'],
-      summary: 'Bandeja «Recetas por revisar»: versiones negociadas que no pueden producirse',
+      summary: 'Bandeja «Recetas por revisar»: versiones negociadas sin firmar',
       description:
-        'Las VERSIONES a las que la revisión de V1-E7d les niega producción (pendientes, sin ' +
-        'firma y rechazadas), ordenadas por la fecha comprometida del pedido que está esperando. ' +
-        'Sólo lectura: lleva a la ficha del modelo, donde se firma viendo la receta.',
+        'Las VERSIONES cuya revisión no está firmada (pendientes, sin firma y rechazadas), estén ' +
+        'todavía en desarrollo o ya en producción, ordenadas por la fecha comprometida del pedido ' +
+        'que está esperando. Sólo lectura: lleva a la ficha del modelo, donde se firma viendo la ' +
+        'receta.',
       security: SEGURIDAD_SESION,
       querystring: esquemaRecetasPorRevisarQuery,
       response: { 200: esquemaRecetasPorRevisarPagina, ...respuestasError },
