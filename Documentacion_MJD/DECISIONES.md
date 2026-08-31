@@ -9945,3 +9945,60 @@ Daniel no lo ha reportado como molestia**, así que se deja como está y no se t
 Si algún día le estorba, el cambio es chico. **Fecha:** 2026-08-30.
 
 ---
+
+#### (Post-F9.158) — ⭐⭐ LA RECETA SE COPIA A LA OP **AL LIBERARSE**, Y LA FIRMA GOBIERNA LA COMPRA (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Eran las **dos preguntas abiertas de §Post-F9.144(c)** que bloqueaban el Bloque 2 del
+programa (versiones 0.064–0.067), y que estaban registradas como *«Daniel no lo contestó»*. Las contestó
+de corrido, y de paso **dejó un pendiente nuevo**, explícitamente para después.
+
+### (a) ¿Qué pasa con la COPIA de la receta que la OP se lleva?
+
+**Contexto del problema:** `copiarRecetaDelModelo` congela el BOM **al crear la orden** (§Post-F9.34). Si
+la OP nace **antes** de que Desarrollo termine, se lleva la receta **vieja**. ¿Se re-copia? ¿Basta el
+detector de desalineación? ¿Se corrige a mano? Daniel, textual:
+
+> *«La principal función de la receta son las compras. Para poder hacer las compras se tienen que liberar
+> los elementos por parte de desarrollo. Entonces más bien yo copiaría la receta en la OP **hasta que se
+> libere** por parte de desarrollo. Me parece que es lo más sensato. **No tiene sentido cargarla antes.**»*
+
+⇒ **DECIDIDO: la receta NO se copia al crear la orden. Se copia cuando Desarrollo la libera.** Con eso la
+pregunta se disuelve en vez de resolverse: **no hay receta vieja que arrastrar**, porque no se copia nada
+hasta que hay algo firmado que copiar. ⭐ El razonamiento de Daniel es el que ordena todo: *la receta
+existe para comprar*, así que su momento natural es el de la liberación, no el del alta de la orden.
+
+⚠️ **Consecuencia a manejar al construir:** una OP recién creada **no tendrá receta** — es lo esperado, no
+un error. Es justo lo que la **0.065** («la OP incompleta, marcada hasta que se meta la receta y se
+libere») ya contemplaba. Y encaja con §Post-F9.144(c): *lo que se frena no es producir, es **comprar***.
+
+### (b) ¿Cortar puede hacerse con la receta sin firmar?
+
+> *«Pues se va firmando **por cada elemento**. Para poder comprar la tela, se debe de haber firmado antes
+> la receta **al menos en la tela**. **Sí se puede cortar** antes de firmar la demás parte de la receta.»*
+
+⇒ **DECIDIDO, y confirma el diseño ya construido en V1-E3h/E3k:** la firma es **por renglón**
+(`liberadoEn`), no todo-o-nada, y **lo que gobierna es la COMPRA de ESE elemento**: para comprar la tela,
+la tela tiene que estar firmada; los demás renglones no estorban. **Cortar NO pasa por esas puertas** — se
+mantiene la regla vieja (*«el piso no se detiene porque Desarrollo no haya terminado»*). **No se pone
+ninguna raya nueva en el corte.**
+
+### 📌 (c) PENDIENTE NUEVO que Daniel deja anotado, y pide NO tocar todavía
+
+> *«Acá nos podemos topar con algo que no hemos puesto anteriormente en ningún lugar. Pero **ahorita no
+> quiero moverle. Hasta que se termine todo.** Pero te lo dejo para irlo poniendo, pon un pendiente para
+> después: a veces hay órdenes que **no compramos la tela sino que se ocupa algún stock que tengamos en
+> almacén**. En ese caso ¿cómo va a funcionar? ¿**Se hace una requisición al almacén** para poder sacar la
+> tela del almacén? (Como si fuera una **OC interna**)»*
+
+⚠️ **NO SE CONSTRUYE AHORA. Queda como requisito nuevo, sin número de versión, por instrucción expresa.**
+Lo que plantea: hoy la cadena asume que **todo material se compra** (la explosión propone OC y el kardex
+entra por recepción). La tela que **ya está en el almacén** no tiene camino propio: no hay «requisición
+interna» que la reserve para una OP y la saque contra ella. Daniel mismo propone la forma —**una OC
+interna contra el almacén**—, que encaja con lo ya construido (el motor de kardex y las notas de salida de
+F4 existen; lo que falta es el documento que las amarre a la OP y que la explosión lo reconozca como
+«cubierto» en vez de proponer comprarlo). **Se retoma cuando el programa vigente esté cerrado.**
+
+- **Aplica en:** (a) y (b) desbloquean el **Bloque 2** (0.064–0.067). (c) es requisito nuevo **fuera** del
+  programa vigente. **Fecha:** 2026-08-30.
+
+---
