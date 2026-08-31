@@ -427,7 +427,7 @@ describe('rechazarRevisionModelo', () => {
     // prueba existe para que las dos se muevan juntas: si alguna volviera a prohibirlo, revisar una
     // versión con su OP ya corriendo sólo se podría hacer a medias — aprobar sí, observar no—, que
     // es peor que las dos cerradas.
-    const { tx } = txRegistrador(filaFalsa({ origen: 'produccion', codigo: '71001' }));
+    const { tx, llamadas } = txRegistrador(filaFalsa({ origen: 'produccion', codigo: '71001' }));
     const salida = await rechazarRevisionModelo(
       SESION,
       42,
@@ -435,6 +435,13 @@ describe('rechazarRevisionModelo', () => {
       { tx },
     );
     expect(salida.revisionEstado).toBe('rechazada');
+
+    // 🔴 Y el rechazo deja el MISMO rastro que la aprobación: desde dónde se firmó. Sin esta línea
+    // el campo quedaba SIN NINGUNA aserción en esta rama —comprobado: borrarlo dejaba las 48
+    // pruebas en verde—, que es exactamente el hueco que esta etapa encontró en la ficha del
+    // modelo. La fila sólo guarda el ÚLTIMO acto (D3): si el dato no está aquí, después no hay
+    // forma de distinguir el rechazo puesto antes de promover del puesto con la OP corriendo.
+    expect(datosDeLaBitacora(llamadas).origenAlFirmar).toBe('produccion');
   });
 
   it('la firma NUNCA borra ni edita otra cosa del modelo: sólo un update', async () => {

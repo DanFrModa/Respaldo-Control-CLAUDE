@@ -387,7 +387,13 @@ export interface DatosRechazarRevision {
 
 /**
  * ⭐ RECHAZA la revisión de una versión, con motivo. La versión sigue existiendo (D3: nada se
- * borra) y sigue editándose; lo que no puede es mandarse a producir.
+ * borra), sigue editándose y **vuelve a la cola** de «Recetas por revisar» hasta que se firme.
+ *
+ * ⚠️ **V1-E9c (§Post-F9.169) — rechazar NO detiene producir.** Aquí decía *"lo que no puede es
+ * mandarse a producir"*, y era verdad mientras existiera la compuerta. Hoy una versión rechazada
+ * genera su OP igual (`../produccion/salida-produccion.test.ts` lo asevera); lo que frena el gasto
+ * es la firma POR RENGLÓN de la receta de la orden. El texto del diálogo que lee quien rechaza dice
+ * esto mismo, y está aseverado en `DialogoRevisionModelo.test.tsx`.
  *
  * ⚠️ **Asimetría deliberada con la aprobación:** aprobar dos veces se rechaza (no cambia nada y
  * borra quién firmó primero), pero rechazar otra vez SÍ se permite — un segundo vistazo con una

@@ -15,17 +15,31 @@ import {
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 
 /**
- * ⭐ V1-E7d — LA REVISIÓN DE LA RECETA ANTES DE MANDAR A PRODUCIR (§Post-F9.110).
+ * ⭐ V1-E7d — LA REVISIÓN DE LA RECETA NEGOCIADA (§Post-F9.110). Este diálogo es donde alguien con
+ * «Aprobar receta» firma esa revisión —o la devuelve con observaciones—.
  *
  * Daniel: *"después de la negociación con el cliente, debe de haber una revisión antes de mandar a
  * producir. Porque luego en la negociación enfrente del cliente puede ser que se cometa una
- * imprudencia o un error"*. Este diálogo es donde alguien con «Aprobar receta» firma esa revisión
- * —o la devuelve con observaciones—.
+ * imprudencia o un error"*.
  *
- * ⚠️ **Esta pantalla no protege nada, y no pretende hacerlo.** Quien impide producir una versión
- * sin revisar es el BACKEND, dentro de `promoverAProduccionNucleo`: desde ahí cierra las DOS
- * puertas —«pasar a producción» y **generar la OP**— y no sólo el botón que se ve. Aquí sólo se
- * captura la firma y se enseña cómo quedó (A1).
+ * 🔴🔴 **V1-E9c (§Post-F9.169) — LO QUE ESTE DIÁLOGO DICE ES PARTE DE LA REGLA, NO ADORNO.** Daniel
+ * disolvió la compuerta: *«Todo lo que no está firmado simplemente no se puede comprar. **Pero no
+ * detiene ni la producción** ni los demás renglones ya firmados.»* Hasta esa decisión, el texto de
+ * abajo prometía —con todas sus letras— que rechazar impedía producir y que aprobar *"deja la
+ * versión lista para mandarse a producir"*. **Las dos frases ya son falsas**, y son las que la
+ * persona lee **en el segundo en que decide**.
+ *
+ * 🔑 **Por qué esto es un defecto y no una imprecisión.** Quien revisa rechaza *confiando* en que
+ * eso frena algo; la OP se genera igual esa misma tarde (lo prueba
+ * `produccion/salida-produccion.test.ts`: *"una versión RECHAZADA también genera su OP"*). Un texto
+ * que promete un freno que no existe es peor que no decir nada: sustituye una decisión real —ir a
+ * frenar el gasto en la receta de la ORDEN, renglón por renglón— por una falsa sensación de haberla
+ * tomado. Es la misma mentira que obligó a renombrar `revisionBloqueaProduccion`, sólo que aquí la
+ * lee un usuario y no un programador.
+ *
+ * ⚠️ **Esta copia está aseverada palabra por palabra en `DialogoRevisionModelo.test.tsx`.** No es
+ * celo: no había NINGUNA prueba sobre ella, y por eso pudo quedarse mintiendo veinte líneas debajo
+ * de los toasts que sí se actualizaron.
  *
  * `aprobar` lleva nota OPCIONAL; `rechazar` exige MOTIVO (el backend lo vuelve a exigir).
  */
