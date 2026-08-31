@@ -9635,8 +9635,8 @@ Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
 4. **PLANIFICACIÓN: versión 0.062** (era 0.061; corrió un lugar cuando las decisiones del
    30-ago entraron como 0.061 — ver la tabla del programa en `HOJA-DE-RUTA.md` §1).
 
-- **Aplica en:** la lista de precios (renglón por modelo) y la mesa de negociación. ⬜ **POR CONSTRUIR**
-  (versión **0.062**). **Fecha:** 2026-08-29.
+- **Aplica en:** la lista de precios (renglón por modelo) y la mesa de negociación. ✅ **CONSTRUIDA**
+  (versión **0.062**, 30-ago-2026). **Fecha:** 2026-08-29.
 
 ---
 
@@ -9899,5 +9899,49 @@ filas existentes — *todo renglón nace ahí*, §Post-F9.151). **Permisos: NO**
 gobierna el cambio de estado de la lista y es el candidato natural para el del renglón. **Seed: NO** si
 los cuatro estados son un **enum** cerrado, que es la lectura correcta de Daniel (*«en total son 4
 estados»*) y evita que alguien agregue un quinto sin pensarlo. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.156) — ⭐ LOS FACTORES SON UNA CALCULADORA; EL PRECIO **CERRADO** ES UN COMPROMISO (DANIEL, 30-ago-2026)
+
+**Cómo salió.** El reviewer de la 0.062 encontró un **callejón sin salida** que la etapa creaba sin querer,
+y que nadie había previsto — lo **ejecutó**, no lo dedujo:
+
+> Lista de 10 modelos, Daniel cierra 5 (los cinco aprobados). Cambia el margen de 30 % a 32 %.
+> ⇒ `editarFactoresLista` tumbaba `precioAprobado` de **los diez**. Pero un renglón `cerrado` ya **no
+> acepta** que se le apruebe precio (candado nuevo de esta versión) ⇒ los 5 quedaban **sin firma y sin
+> forma de volver a firmarla**; y como `cerrado` **sí es vigente**, el guard del papel los nombraba como
+> faltantes ⇒ **la lista entera se quedaba sin PDF, sin Excel y sin cotización**. Única salida: revivir →
+> aprobar → volver a cerrar, ×5 = 15 interacciones y 3 eventos inmutables de ruido por modelo.
+
+**Lo que contestó Daniel:** *«No se tocan: lo cerrado es un compromiso»*. Y al preguntársele por qué, dio
+la frase que **explica la regla y vale más que la regla**:
+
+> *«Los factores son elementos que me ayudan a saber mi margen a la hora de negociar. **Es solo para hacer
+> mis cálculos**.»*
+
+### Lo que queda decidido
+
+1. ⭐ **Son cosas de distinta naturaleza, y por eso mover una no mueve la otra.** Los factores (margen,
+   descuentos, regalías, costo de ventas) son **la calculadora privada de Daniel** — de hecho **sólo él
+   los ve**, §Post-F9.125/.137/.138. El **precio cerrado** es un **acuerdo con el cliente**. Cambiar el
+   margen de 30 % a 32 % cambia *lo que la herramienta sugiere de aquí en adelante*; **no** cambia lo que
+   ya se pactó.
+2. **`editarFactoresLista` SALTA los renglones en estado terminal** (`cerrado` y `dropeado`): ni recálculo,
+   ni firma tumbada, ni evento de invalidación. Los `abierto` y `en_negociacion` siguen recalculándose
+   igual que siempre.
+3. **Para cambiar un precio ya cerrado hay que REVIVIR el renglón** — y eso deja rastro, que es
+   exactamente lo que se quiere: mover un compromiso debe ser un acto deliberado y visible, no el efecto
+   colateral de tocar un porcentaje interno.
+4. 📌 **La bitácora deja de mentir:** además del total registra `renglonesRecalculados` y
+   `terminalesRespetados` (id, estado y precio de cada uno). Antes habría afirmado haber tocado renglones
+   que no tocó.
+
+📌 **Anotado, NO cambiado (queda como pregunta abierta, sin fecha):** hoy cambiar factores **también**
+tumba la firma de los renglones **abiertos y en negociación**. Con la frase de Daniel eso admite dos
+lecturas —se cae porque el precio ya no corresponde al cálculo nuevo, o no debería caerse porque aprobar
+fue una decisión suya y no un resultado automático—. **Ese comportamiento es anterior a esta versión y
+Daniel no lo ha reportado como molestia**, así que se deja como está y no se toca por iniciativa propia.
+Si algún día le estorba, el cambio es chico. **Fecha:** 2026-08-30.
 
 ---

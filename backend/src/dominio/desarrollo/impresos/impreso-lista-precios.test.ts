@@ -17,7 +17,7 @@ import { sesionDePrueba } from '../../../pruebas/sesiones.js';
 import { ErrorConflicto } from '../../../comun/errores.js';
 import { cerrarPoolPdf } from '../../../comun/pdf-worker.js';
 
-import { impresoListaPrecios } from './impreso-lista-precios.js';
+import { armarDatosImpresoListaPrecios, impresoListaPrecios } from './impreso-lista-precios.js';
 import { excelListaPrecios } from './excel-lista-precios.js';
 
 /** Una lista de ejemplo COMPLETAMENTE aprobada (137 y 155): la única de la que sale papel. */
@@ -59,6 +59,12 @@ function listaEjemplo(): ListaPreciosDetalle {
         aprobadoPorId: 'u1',
         aprobadoEn: '2026-07-06T00:00:00.000Z',
         avisoCostoViejo: null,
+        // ⭐ V1-E8x: los dos renglones de la lista base van VIGENTES (`abierto`). El caso dropeado
+        // tiene sus propias pruebas más abajo.
+        estado: 'abierto' as const,
+        nombreEstado: 'Abierto',
+        estadoPorId: null,
+        estadoEn: null,
       },
       {
         id: 11,
@@ -77,6 +83,10 @@ function listaEjemplo(): ListaPreciosDetalle {
         aprobadoPorId: 'u1',
         aprobadoEn: '2026-07-06T00:00:00.000Z',
         avisoCostoViejo: null,
+        estado: 'abierto' as const,
+        nombreEstado: 'Abierto',
+        estadoPorId: null,
+        estadoEn: null,
       },
     ],
     creadoEn: '2026-07-06T00:00:00.000Z',
@@ -97,9 +107,40 @@ function listaAMedioFirmar(): ListaPreciosDetalle {
   return lista;
 }
 
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.155) — la MISMA lista con `MOD-B` **DROPEADO y SIN FIRMAR**: el caso que
+ * antes dejaba a la lista sin PDF, sin Excel y sin cotización PARA SIEMPRE (un dropeado nunca se va
+ * a aprobar). Que vaya sin firmar es el punto entero de la prueba.
+ */
+function listaConDropeado(): ListaPreciosDetalle {
+  const lista = listaEjemplo();
+  const segunda = lista.lineas[1]!;
+  segunda.estado = 'dropeado';
+  segunda.nombreEstado = 'Dropeado';
+  segunda.estadoPorId = 'u1';
+  segunda.estadoEn = '2026-07-07T00:00:00.000Z';
+  segunda.precioAprobado = null;
+  segunda.aprobado = false;
+  segunda.aprobadoPorId = null;
+  segunda.aprobadoEn = null;
+  return lista;
+}
+
+/** La lista con TODOS los renglones dropeados: el caso límite (no queda oferta que mandar). */
+function listaTodaDropeada(): ListaPreciosDetalle {
+  const lista = listaEjemplo();
+  for (const linea of lista.lineas) {
+    linea.estado = 'dropeado';
+    linea.nombreEstado = 'Dropeado';
+  }
+  return lista;
+}
+
 const sesion = sesionDePrueba({ permisos: ['listas.ver', 'consultas.ver-importes'] });
 const fakeObtener = () => Promise.resolve(listaEjemplo());
 const fakeObtenerAMedias = () => Promise.resolve(listaAMedioFirmar());
+const fakeObtenerConDropeado = () => Promise.resolve(listaConDropeado());
+const fakeObtenerTodaDropeada = () => Promise.resolve(listaTodaDropeada());
 
 afterAll(async () => {
   await cerrarPoolPdf();
@@ -190,6 +231,101 @@ describe('🔴 Sin aprobación no sale documento, ni borrador (§Post-F9.125(c))
     const vacia = () => Promise.resolve({ ...listaEjemplo(), lineas: [] });
     await expect(
       excelListaPrecios(sesion, 1, undefined, { obtenerLista: vacia }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+});
+
+// ── ⭐⭐ V1-E8x (§Post-F9.155): EL DROPEADO Y EL PAPEL ────────────────────────────────
+//
+// Daniel: *«El dropeo se hace hasta la negociación. Hay un envío de cotización previa a la
+// negociación. Ahí van todos. Después de la negociación solo hay que mandar los que están vigentes.
+// Quitar los dropeados»*. UNA regla cubre los dos momentos: **el papel muestra los NO dropeados**.
+//
+// Lo que se blinda: (a) un dropeado SIN FIRMAR ya no bloquea el papel —era el defecto que habría
+// entregado la versión rota—, (b) tampoco se cuela AL papel, y (c) la lista toda-dropeada da un
+// error que se entiende, no una hoja en blanco ni un crash.
+
+describe('⭐⭐ V1-E8x — el papel lleva los renglones NO dropeados (§Post-F9.155)', () => {
+  it('🔴 un DROPEADO sin firmar YA NO bloquea el papel (era el defecto que rompía la versión)', async () => {
+    const datos = await armarDatosImpresoListaPrecios(sesion, 1, undefined, {
+      obtenerLista: fakeObtenerConDropeado,
+    });
+    // Antes de §Post-F9.155 esto tiraba ErrorConflicto por MOD-B y la lista se quedaba sin PDF
+    // para siempre: un dropeado nunca se aprueba.
+    expect(datos.renglones.map((r) => r.codigoModelo)).toEqual(['MOD-A']);
+  });
+
+  it('🔴 y el dropeado NO SE CUELA al PDF: sale sólo el vigente', async () => {
+    const datos = await armarDatosImpresoListaPrecios(sesion, 1, undefined, {
+      obtenerLista: fakeObtenerConDropeado,
+    });
+    expect(datos.renglones).toHaveLength(1);
+    expect(datos.renglones.map((r) => r.codigoModelo)).not.toContain('MOD-B');
+    // Y el PDF de verdad se genera (el guard ya no lo detiene).
+    const { buffer } = await impresoListaPrecios(sesion, 1, undefined, {
+      obtenerLista: fakeObtenerConDropeado,
+    });
+    expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+
+  it('🔴 tampoco se cuela al EXCEL: una sola fila de datos, y es MOD-A', async () => {
+    const { buffer } = await excelListaPrecios(sesion, 1, undefined, {
+      obtenerLista: fakeObtenerConDropeado,
+    });
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(buffer as unknown as ArrayBuffer);
+    const hoja = libro.worksheets[0]!;
+    // Fila 1 = encabezado; de datos, UNA sola: MOD-A. MOD-B se dropeó y no está.
+    const modelos: unknown[] = [];
+    hoja.eachRow((fila, numero) => {
+      if (numero > 1) {
+        modelos.push(fila.getCell('A').value);
+      }
+    });
+    expect(modelos).toEqual(['MOD-A']);
+    expect(hoja.getCell('A2').value).toBe('MOD-A');
+  });
+
+  it('un dropeado que SÍ estaba firmado tampoco sale (no es el precio: es el estado)', async () => {
+    const firmadoYDropeado = (): Promise<ListaPreciosDetalle> => {
+      const lista = listaEjemplo(); // los dos vienen aprobados
+      lista.lineas[1]!.estado = 'dropeado';
+      lista.lineas[1]!.nombreEstado = 'Dropeado';
+      return Promise.resolve(lista);
+    };
+    const datos = await armarDatosImpresoListaPrecios(sesion, 1, undefined, {
+      obtenerLista: firmadoYDropeado,
+    });
+    expect(datos.renglones.map((r) => r.codigoModelo)).toEqual(['MOD-A']);
+  });
+
+  it('⚠️ CASO LÍMITE — con TODOS dropeados no sale hoja en blanco: se rechaza y se dice cómo salir', async () => {
+    await expect(
+      impresoListaPrecios(sesion, 1, undefined, { obtenerLista: fakeObtenerTodaDropeada }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    let mensaje = '';
+    try {
+      await excelListaPrecios(sesion, 1, undefined, { obtenerLista: fakeObtenerTodaDropeada });
+    } catch (error) {
+      mensaje = error instanceof Error ? error.message : '';
+    }
+    expect(mensaje).toMatch(/DROPEADOS/i);
+    expect(mensaje).toContain('bajar el Excel de la lista');
+    // Y dice el remedio, no sólo el problema (§Post-F9.96).
+    expect(mensaje).toMatch(/[Rr]evive al menos uno/);
+  });
+
+  it('un renglón NO dropeado sin firmar sigue bloqueando (el candado del dueño no se aflojó)', async () => {
+    // MOD-B en `en_negociacion` y sin precio: no es dropeado ⇒ el guard de §Post-F9.125(c) manda.
+    const enNegociacionSinFirmar = (): Promise<ListaPreciosDetalle> => {
+      const lista = listaAMedioFirmar();
+      lista.lineas[1]!.estado = 'en_negociacion';
+      lista.lineas[1]!.nombreEstado = 'En negociación';
+      return Promise.resolve(lista);
+    };
+    await expect(
+      impresoListaPrecios(sesion, 1, undefined, { obtenerLista: enNegociacionSinFirmar }),
     ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 });

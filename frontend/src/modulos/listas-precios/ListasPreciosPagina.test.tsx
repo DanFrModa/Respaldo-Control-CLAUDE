@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type * as ReactRouterDom from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ListaLinea } from '@/api/listas-precios';
 import type { ClavePermiso } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
@@ -25,6 +26,7 @@ vi.mock('react-router-dom', async (importarOriginal) => {
 });
 
 const quitarMutate = vi.fn();
+const estadoRenglonMutate = vi.fn();
 const targetMutate = vi.fn();
 const eliminarMutate = vi.fn();
 const useListaPreciosMock = vi.fn();
@@ -70,6 +72,8 @@ vi.mock('@/api/negociacion', () => ({
   useRegistrarAcuerdo: () => ({ mutate: vi.fn(), isPending: false }),
   useSimularNegociacion: () => ({ data: undefined, isPending: false }),
   useCambiarEstadoLista: () => ({ mutate: vi.fn(), isPending: false }),
+  // ⭐ V1-E8x (§Post-F9.151): el estado del MODELO dentro de la lista.
+  useCambiarEstadoRenglon: () => ({ mutate: estadoRenglonMutate, isPending: false }),
 }));
 vi.mock('@/api/desarrollos', () => ({
   useDesarrollo: () => ({ data: undefined, isPending: false }),
@@ -114,10 +118,12 @@ const LISTA = {
       numeroCliente: 'CA-KM-114',
       costoUnit: 40,
       precioCalculado: 100,
-      precioAprobado: null,
+      // ⭐ V1-E8x: anotado (como `avisoCostoViejo`) para que las variantes puedan encender la
+      // aprobación; sin la anotación TypeScript infiere el literal `null` y no compilan.
+      precioAprobado: null as number | null,
       aprobado: false,
-      aprobadoPorId: null,
-      aprobadoEn: null,
+      aprobadoPorId: null as string | null,
+      aprobadoEn: null as string | null,
       // V1-E8d: `as string | null` para que el fixture admita encenderlo (`listaConAviso`); sin la
       // anotación TypeScript infiere el literal `null` y la variante no compila.
       avisoCostoViejo: null as string | null,
@@ -125,6 +131,12 @@ const LISTA = {
       // que `listaConTarget` pueda encenderlo. Por defecto NO lo dio ("si es que nos lo dio").
       precioTarget: null as number | null,
       tieneTarget: false,
+      // ⭐ V1-E8x (§Post-F9.151): el estado del MODELO. `as` para que las variantes puedan moverlo
+      // (si no, TypeScript infiere el literal y `listaConEstado` no compila).
+      estado: 'abierto' as ListaLinea['estado'],
+      nombreEstado: 'Abierto',
+      estadoPorId: null as string | null,
+      estadoEn: null as string | null,
     },
   ],
   creadoEn: '2026-08-10T10:00:00.000Z',
@@ -157,6 +169,7 @@ async function abrirDetalle(
         codigoEstado: 'abierta',
         nombreEstado: 'Abierta',
         totalRenglones: 1,
+        renglonesDropeados: 0,
         renglonesAprobados: 0,
         creadoEn: LISTA.creadoEn,
       },
@@ -547,5 +560,208 @@ describe('⭐ V1-E8w — el TARGET del cliente: columna, candados y captura', ()
     await usuario.click(screen.getByTestId('capturar-target'));
     await screen.findByTestId('input-target');
     expect(screen.queryByTestId('borrar-target')).not.toBeInTheDocument();
+  });
+});
+
+// ── ⭐⭐ V1-E8x (§Post-F9.151 / §Post-F9.155): LOS CUATRO ESTADOS DEL MODELO ──────────
+//
+// Daniel: *«seria bueno saber los modelos que ya cerre…. a veces de una lista de 10 modelos, cierro
+// 5 y los otros ya no los vendo»* · *«Que empiece todo en "Abierto", y luego estan los otros 3
+// estados. En negociacion, cerrado, dropeado. en total son 4 estados»*.
+//
+// Lo que se blinda en la PANTALLA (las reglas son del servidor y se prueban allá):
+//  • 🔴 el chip del MODELO no se confunde con el de la LISTA («En negociación» es el mismo string);
+//  • 🔴 un dropeado ya NO bloquea el PDF/Excel — era el defecto que rompía la versión;
+//  • 🔴 y se DICE que no sale en el papel, en vez de que el usuario cuente modelos y no cuadre.
+
+/**
+ * Un detalle con DOS renglones: uno dropeado y SIN firmar (el que antes bloqueaba el papel para
+ * siempre) y uno vigente ya aprobado. Es el escenario de Daniel en pequeño.
+ */
+function listaConVigenteYDropeado(): typeof LISTA {
+  const base = LISTA.lineas[0];
+  if (base === undefined) {
+    throw new Error('El fixture LISTA perdió su renglón: la prueba ya no prueba lo que dice.');
+  }
+  return {
+    ...LISTA,
+    lineas: [
+      { ...base, estado: 'dropeado', nombreEstado: 'Dropeado' },
+      { ...base, id: 92, codigoModelo: 'KM-200', precioAprobado: 180, aprobado: true },
+    ],
+  };
+}
+
+/** El mismo detalle, con el renglón en el estado dado. */
+function listaConEstado(
+  estado: ListaLinea['estado'],
+  extra: Partial<(typeof LISTA)['lineas'][number]> = {},
+): typeof LISTA {
+  return {
+    ...LISTA,
+    lineas: LISTA.lineas.map((ln) => ({
+      ...ln,
+      estado,
+      nombreEstado:
+        estado === 'dropeado'
+          ? 'Dropeado'
+          : estado === 'cerrado'
+            ? 'Cerrado'
+            : estado === 'en_negociacion'
+              ? 'En negociación'
+              : 'Abierto',
+      ...extra,
+    })),
+  };
+}
+
+describe('⭐⭐ V1-E8x — el estado del MODELO dentro de la lista', () => {
+  beforeEach(() => {
+    estadoRenglonMutate.mockReset();
+    useListaPreciosMock.mockReset();
+    useListasPreciosMock.mockReset();
+  });
+
+  it('el renglón enseña su estado con el nombre que manda el servidor', async () => {
+    await abrirDetalle(PERM, listaConEstado('en_negociacion'));
+    const chip = screen.getByTestId('chip-estado-renglon');
+    expect(chip).toHaveTextContent('En negociación');
+    expect(chip).toHaveAttribute('data-estado', 'en_negociacion');
+  });
+
+  /**
+   * 🔴 EL CHOQUE VISUAL. «En negociación» es el MISMO string en los dos ejes y los dos chips
+   * conviven en esta pantalla. Se separan por tres cosas a la vez: el chip del renglón va con
+   * CONTORNO (no relleno), la columna se llama «Estado del modelo», y cada chip dice en su `title`
+   * de qué eje es. Si alguien igualara los dos, esto se pone rojo.
+   */
+  it('🔴 el chip del MODELO no se confunde con el de la LISTA: contorno, columna y title propios', async () => {
+    // La lista está «Abierta»; el renglón, «En negociación» — los dos chips a la vez en pantalla.
+    await abrirDetalle(PERM, listaConEstado('en_negociacion'));
+
+    const chipRenglon = screen.getByTestId('chip-estado-renglon');
+    expect(chipRenglon).toHaveAttribute(
+      'title',
+      'Estado del MODELO dentro de la lista: En negociación',
+    );
+    // Y con firma, el title dice DESDE CUÁNDO (la firma vigente del estado).
+    expect(chipRenglon).not.toHaveAttribute('title', expect.stringContaining('desde'));
+    // Contorno + fondo transparente: el de la lista va relleno.
+    expect(chipRenglon.className).toContain('border');
+    expect(chipRenglon.className).toContain('bg-transparent');
+    // El encabezado de la columna NOMBRA el eje.
+    expect(screen.getByText('Estado del modelo')).toBeInTheDocument();
+    // Y el de la lista se identifica como el del documento.
+    const chipLista = screen.getByTitle('Estado de la LISTA (el documento): Abierta');
+    expect(chipLista).toBeInTheDocument();
+    expect(chipLista.className).not.toContain('bg-transparent');
+  });
+
+  it('el chip dice DESDE CUÁNDO está en ese estado cuando hay firma', async () => {
+    await abrirDetalle(
+      PERM,
+      listaConEstado('cerrado', { estadoEn: '2026-08-30T18:00:00.000Z', estadoPorId: 'daniel' }),
+    );
+    expect(screen.getByTestId('chip-estado-renglon').getAttribute('title')).toMatch(
+      /Estado del MODELO dentro de la lista: Cerrado · desde .+/,
+    );
+  });
+
+  it('con `listas.negociar` se puede mover el estado desde la fila, y manda el destino elegido', async () => {
+    const usuario = userEvent.setup();
+    await abrirDetalle([...PERM, 'listas.negociar'] as ClavePermiso[], listaConEstado('abierto'));
+
+    await usuario.selectOptions(screen.getByTestId('estado-renglon'), 'dropeado');
+
+    expect(estadoRenglonMutate).toHaveBeenCalledWith(
+      { idLinea: 91, cuerpo: { estado: 'dropeado' } },
+      expect.anything(),
+    );
+  });
+
+  it('🔴 desde un modelo DROPEADO el selector sólo ofrece REVIVIR (espejo del servidor)', async () => {
+    await abrirDetalle([...PERM, 'listas.negociar'] as ClavePermiso[], listaConEstado('dropeado'));
+
+    const opciones = [...screen.getByTestId('estado-renglon').querySelectorAll('option')].map(
+      (o) => o.value,
+    );
+    expect(opciones).toEqual(['', 'abierto', 'en_negociacion']);
+    expect(opciones).not.toContain('cerrado');
+  });
+
+  it('sin `listas.negociar` el selector ni se pinta (no se ofrece lo que el servidor va a negar)', async () => {
+    await abrirDetalle(PERM, listaConEstado('abierto'));
+    expect(screen.queryByTestId('estado-renglon')).not.toBeInTheDocument();
+    // Pero el chip sí: saber en qué va cada modelo no pide permiso de negociar.
+    expect(screen.getByTestId('chip-estado-renglon')).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴🔴 EL DEFECTO QUE ROMPÍA LA VERSIÓN. Un dropeado nunca se va a aprobar; con el criterio viejo
+   * («todos los renglones firmados») la lista se quedaba sin PDF, sin Excel y sin cotización PARA
+   * SIEMPRE — justo el escenario con el que Daniel pidió los estados.
+   */
+  it('🔴 un DROPEADO sin firmar ya NO bloquea el PDF ni el Excel', async () => {
+    // El renglón del fixture NO tiene precio aprobado (`precioAprobado: null`) y está dropeado ⇒
+    // el papel sí puede salir… salvo que aquí no queda NINGÚN vigente. Se prueban los dos casos:
+    // primero uno dropeado + uno vigente firmado.
+    const dosRenglones = listaConVigenteYDropeado();
+    await abrirDetalle(PERM, dosRenglones);
+
+    expect(screen.getByTestId('descargar-lista-pdf')).toBeEnabled();
+    expect(screen.getByTestId('descargar-lista-excel')).toBeEnabled();
+  });
+
+  it('🔴 y se DICE que el dropeado no sale en el papel (nombrándolo)', async () => {
+    const dosRenglones = listaConVigenteYDropeado();
+    await abrirDetalle(PERM, dosRenglones);
+
+    const aviso = screen.getByTestId('aviso-dropeados');
+    expect(aviso).toHaveTextContent('KM-114');
+    expect(aviso).toHaveTextContent(/no sale/i);
+    expect(aviso).toHaveTextContent(/PDF/);
+    // Y dice el remedio, no sólo el hecho.
+    expect(aviso).toHaveTextContent(/[Rr]evívelos/);
+  });
+
+  it('⚠️ CASO LÍMITE — con TODOS dropeados el papel se apaga y se explica por qué', async () => {
+    await abrirDetalle(PERM, listaConEstado('dropeado', { precioAprobado: 150, aprobado: true }));
+
+    expect(screen.getByTestId('descargar-lista-pdf')).toBeDisabled();
+    const aviso = screen.getByTestId('aviso-sin-aprobar');
+    expect(aviso).toHaveTextContent(/todos los modelos de la lista están dropeados/i);
+    expect(aviso).toHaveTextContent(/[Rr]evive al menos uno/);
+  });
+
+  it('sin dropeados NO se inventa el aviso (la pantalla no habla de más)', async () => {
+    await abrirDetalle(PERM, listaConEstado('abierto'));
+    expect(screen.queryByTestId('aviso-dropeados')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ V1-E8x (ronda de corrección) — el RESUMEN de costo viejo cuenta sobre los VIGENTES, igual que
+   * el diálogo de emitir cotización. Un dropeado con la receta movida levanta un aviso sin
+   * consecuencia (no va en ningún papel), y tener a las dos pantallas diciendo cosas distintas del
+   * mismo hecho es peor que no avisar.
+   */
+  it('🔴 el resumen de COSTO VIEJO no cuenta a los dropeados (un solo criterio con la cotización)', async () => {
+    await abrirDetalle(PERM, listaConEstado('dropeado', { avisoCostoViejo: AVISO }));
+    expect(screen.queryByTestId('aviso-costo-viejo-resumen')).not.toBeInTheDocument();
+    // Pero el aviso PEGADO a su renglón sí sigue: ahí es información local del modelo, y al
+    // revivirlo vuelve a importar.
+    expect(screen.getByTestId('aviso-costo-viejo')).toBeInTheDocument();
+  });
+
+  it('y sobre un renglón VIGENTE el resumen sí aparece (no se apagó de más)', async () => {
+    await abrirDetalle(PERM, listaConEstado('en_negociacion', { avisoCostoViejo: AVISO }));
+    expect(screen.getByTestId('aviso-costo-viejo-resumen')).toHaveTextContent('KM-114');
+  });
+
+  it('un modelo dropeado se APAGA en la fila (pero sigue ahí: se puede revivir)', async () => {
+    await abrirDetalle(PERM, listaConEstado('dropeado'));
+    const fila = screen.getByTestId('fila-renglon-lista');
+    expect(fila).toHaveAttribute('data-estado', 'dropeado');
+    expect(fila.className).toContain('opacity-60');
+    expect(fila).toHaveTextContent('Playera Cherry');
   });
 });

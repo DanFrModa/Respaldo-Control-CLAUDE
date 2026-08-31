@@ -341,5 +341,69 @@ test.describe('Listas de precios (F8-E4)', () => {
 
     // 5. Es un AVISO, no un candado: el renglón se sigue pudiendo aprobar (§Post-F9.127).
     await expect(renglon.getByTestId('aprobar-renglon')).toBeEnabled();
+
+    // ── ⭐⭐ V1-E8x (§Post-F9.151 / §Post-F9.155): LOS ESTADOS DEL MODELO Y EL PAPEL ──
+    //
+    // Daniel: *«a veces de una lista de 10 modelos, cierro 5 y los otros ya no los vendo»*. Va al
+    // FINAL del recorrido a propósito: dropea el ÚNICO renglón de esta lista, así que después de
+    // aquí no queda nada que negociar (se revive al cerrar, para dejar la lista utilizable).
+
+    // Se re-aprueba (la ronda de arriba tumbó la firma) para que el papel dependa SÓLO del estado.
+    await renglon.getByTestId('aprobar-renglon').click();
+    await expect(page.getByText(`Renglón "${codigoModelo}" aprobado.`)).toBeVisible();
+    await expect(detalleLista.getByTestId('descargar-lista-pdf')).toBeEnabled();
+
+    // El chip del MODELO existe y arranca en «Abierto» (todo renglón nace ahí).
+    await expect(renglon.getByTestId('chip-estado-renglon')).toHaveText('Abierto');
+
+    // DROPEARLO: el estado se mueve desde la fila, en un toque.
+    await renglon.getByTestId('estado-renglon').selectOption('dropeado');
+    await expect(page.getByText(`"${codigoModelo}" quedó en «Dropeado».`)).toBeVisible();
+    await expect(renglon.getByTestId('chip-estado-renglon')).toHaveText('Dropeado');
+    await expect(renglon).toHaveAttribute('data-estado', 'dropeado');
+
+    // Como era el ÚNICO renglón, la lista se queda sin nada vigente: el papel se apaga y DICE por
+    // qué (el caso límite de §Post-F9.155), y el servidor contesta lo mismo con un 409.
+    await expect(detalleLista.getByTestId('descargar-lista-pdf')).toBeDisabled();
+    await expect(detalleLista.getByTestId('aviso-dropeados')).toContainText(codigoModelo);
+    const pdfTodoDropeado = await page.request.get(`/api/listas-precios/${String(listaId)}/pdf`);
+    expect(pdfTodoDropeado.status()).toBe(409);
+    expect((await pdfTodoDropeado.text()).toUpperCase()).toContain('DROPEADOS');
+
+    // Un modelo dropeado ya no admite movimiento, y eso se ve en las DOS capas.
+    //
+    // ⚠️ En la PANTALLA no se llena un formulario que falla: los botones de ronda/acuerdo y la mesa
+    // **no existen** en el DOM para un renglón terminal (`movible` en `DialogoNegociacionRenglon`),
+    // así que lo que se afirma es su AUSENCIA más el aviso que explica por qué. Intentar pulsarlos
+    // aquí colgaría el job hasta el timeout — el guard los quitó de la pantalla.
+    await renglon.getByTestId('abrir-negociacion').click();
+    const panelCongelado = page.getByTestId('panel-negociacion');
+    await expect(panelCongelado.getByTestId('renglon-congelado')).toContainText('Dropeado');
+    await expect(panelCongelado.getByTestId('renglon-congelado')).toContainText(/revívelo/i);
+    await expect(panelCongelado.getByTestId('abrir-acuerdo')).toHaveCount(0);
+    await expect(panelCongelado.getByTestId('abrir-nueva-ronda')).toHaveCount(0);
+    // El historial NO se esconde: lo negociado sigue consultable, sólo se congela.
+    await expect(panelCongelado.getByTestId('fila-evento-negociacion').first()).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('panel-negociacion')).toHaveCount(0);
+
+    // Y el SERVIDOR lo niega por su cuenta —que es la puerta de verdad (A1)—: se le pide el acuerdo
+    // directo al API, como ya se hace arriba con el PDF, y contesta 409 nombrando lo que no admite.
+    const detalleApi = await page.request.get(`/api/listas-precios/${String(listaId)}`);
+    expect(detalleApi.ok()).toBeTruthy();
+    const idLinea = ((await detalleApi.json()) as { lineas: { id: number }[] }).lineas[0]!.id;
+    const acuerdoSobreDropeado = await page.request.post(
+      `/api/listas-precios/lineas/${String(idLinea)}/acuerdos`,
+      { data: { acuerdo: 'Intento sobre un modelo dropeado' } },
+    );
+    expect(acuerdoSobreDropeado.status()).toBe(409);
+    expect(await acuerdoSobreDropeado.text()).toContain('acuerdos nuevos');
+
+    // REVIVIRLO: vuelve al papel CON su precio aprobado intacto — revivir no pierde nada.
+    await renglon.getByTestId('estado-renglon').selectOption('en_negociacion');
+    await expect(page.getByText(`"${codigoModelo}" quedó en «En negociación».`)).toBeVisible();
+    await expect(renglon).toHaveAttribute('data-aprobado', 'true');
+    await expect(detalleLista.getByTestId('descargar-lista-pdf')).toBeEnabled();
+    await expect(detalleLista.getByTestId('aviso-dropeados')).toHaveCount(0);
   });
 });

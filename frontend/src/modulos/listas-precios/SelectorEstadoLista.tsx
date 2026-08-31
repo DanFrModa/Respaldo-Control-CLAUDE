@@ -49,7 +49,10 @@ export function SelectorEstadoLista({ lista }: { lista: ListaDetalle }): React.J
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="selector-estado-lista">
-      <span className="text-sm text-muted-foreground">Estado actual:</span>
+      {/* ⭐ V1-E8x: se dice «de la LISTA». Desde esta versión cada MODELO tiene su propio estado
+          en la tabla de abajo, y tres de los cuatro nombres se parecen (uno, «En negociación», es
+          idéntico): sin el rótulo, este control parecería mover el renglón seleccionado. */}
+      <span className="text-sm text-muted-foreground">Estado de la lista:</span>
       <Badge variant="outline">{lista.nombreEstado}</Badge>
       <SelectNativo
         aria-label="Nuevo estado de la lista"

@@ -28,17 +28,19 @@
  *    mismo `NegociacionEvento` inmutable. **Un solo criterio para el mismo hecho** — cambiar aquello
  *    sobre lo que se firmó tumba la firma, venga del costo o del margen.
  */
-import type { Prisma } from '../../datos/index.js';
+import type { EstadoRenglonLista, Prisma } from '../../datos/index.js';
 
 import {
   esquemaAcuerdoRegistrar,
   esquemaCambiarEstadoLista,
+  esquemaCambiarEstadoRenglon,
   esquemaGuardarMesa,
   esquemaRondaRegistrar,
   esquemaSimularMesaCuerpo,
   esquemaSimularNegociacionQuery,
   type DatosAcuerdoRegistrar,
   type DatosCambiarEstadoLista,
+  type DatosCambiarEstadoRenglon,
   type DatosGuardarMesa,
   type DatosRondaRegistrar,
   type DatosSimularMesa,
@@ -50,6 +52,7 @@ import {
   type SimulacionNegociacion,
 } from '../../contrato/index.js';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { fechaDelActo } from '../../comun/fecha-negocio.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
@@ -69,8 +72,10 @@ import { factoresANumeros, puedeVerFactoresDePrecio } from './cliente-factores.j
 import {
   exigirLineaBloqueandoLista,
   exigirListaNoCerrada,
+  exigirRenglonMovible,
   obtenerLista,
   NAMESPACE_LOCK_LISTA,
+  NOMBRE_ESTADO_RENGLON,
 } from './listas-precios.js';
 
 // ── Include + proyección de eventos ───────────────────────────────────────────────────
@@ -183,6 +188,8 @@ export async function registrarRonda(
   const idLista = await enTransaccion(async (tx) => {
     const linea = await exigirLineaBloqueandoLista(tx, idLinea, idEmpresa);
     exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x (§Post-F9.151): un modelo cerrado/dropeado ya no se re-costea.
+    exigirRenglonMovible(linea.estado, 'rondas de re-costeo');
 
     // El precosto NUEVO debe existir (A9), ser CONGELADO, del MISMO desarrollo y DISTINTO del actual.
     const nuevo = await tx.precosto.findFirst({
@@ -281,6 +288,8 @@ export async function registrarAcuerdo(
   const idLista = await enTransaccion(async (tx) => {
     const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x (§Post-F9.151): un modelo cerrado/dropeado ya no admite acuerdos nuevos.
+    exigirRenglonMovible(linea.estado, 'acuerdos nuevos');
 
     const precioAnterior = numOrNull(linea.precioAprobado) ?? num(linea.precioCalculado);
 
@@ -361,6 +370,143 @@ export async function cambiarEstadoLista(
       accion: 'MODIFICAR',
       datos: { operacion: 'cambiar-estado', de: lista.estadoLista.codigo, a: destino.codigo },
     });
+  }, bd);
+
+  return obtenerLista(sesion, idLista, bd);
+}
+
+// ── ⭐⭐ Cambio de estado del RENGLÓN (V1-E8x, §Post-F9.151 / .155) ─────────────────────
+
+/**
+ * Frase del `NegociacionEvento` que deja constancia de UNA transición. Se redacta aquí (criterio
+ * único del servidor) y no en la pantalla: es el texto que va a leer quien abra el historial dentro
+ * de un año, y el rastro tiene que decir de dónde a dónde se movió, no sólo dónde quedó.
+ */
+function textoDeTransicion(
+  desde: EstadoRenglonLista,
+  hacia: EstadoRenglonLista,
+  cuando: Date,
+): string {
+  const de = NOMBRE_ESTADO_RENGLON[desde];
+  const a = NOMBRE_ESTADO_RENGLON[hacia];
+  const fecha = fechaDelActo(cuando);
+  if (desde === 'dropeado') {
+    return (
+      `Se REVIVIÓ el modelo el ${fecha}: estaba DROPEADO y vuelve a «${a}». ` +
+      'Conserva toda su historia de precios y comentarios, y vuelve a salir en el PDF, el Excel y la cotización.'
+    );
+  }
+  if (desde === 'cerrado') {
+    return `Se REABRIÓ el modelo el ${fecha}: estaba CERRADO y vuelve a «${a}». Conserva toda su historia.`;
+  }
+  if (hacia === 'dropeado') {
+    return (
+      `Se DROPEÓ el modelo el ${fecha} (venía de «${de}»): el cliente al final no lo compró. ` +
+      'Deja de salir en el PDF, el Excel y la cotización, y ya no admite rondas ni acuerdos. ' +
+      'Se puede revivir sin perder nada de lo negociado.'
+    );
+  }
+  if (hacia === 'cerrado') {
+    return (
+      `Se CERRÓ el modelo el ${fecha} (venía de «${de}»): queda pactado y ya no admite más ` +
+      'movimiento. Sigue saliendo en el papel. Para volver a moverlo hay que revivirlo.'
+    );
+  }
+  return `Cambió de «${de}» a «${a}» el ${fecha}.`;
+}
+
+/**
+ * ⭐⭐ **CAMBIA EL ESTADO DE UN RENGLÓN** (§Post-F9.151): abierto → en negociación → cerrado →
+ * dropeado, y la vuelta (REVIVIR). Daniel:
+ *
+ * > *«seria bueno saber los modelos que ya cerre…. a veces de una lista de 10 modelos, cierro 5 y
+ * > los otros ya no los vendo»*
+ *
+ * Las reglas, todas suyas:
+ *  • **Un modelo `cerrado` o `dropeado` no acepta más movimiento** — ni rondas, ni acuerdos, ni
+ *    mesa, ni target, ni re-aprobación (eso lo impone `exigirRenglonMovible` en las seis
+ *    mutaciones). Desde aquí, el ÚNICO destino permitido es **revivir**: `abierto` o
+ *    `en_negociacion`. Pasar de `cerrado` a `dropeado` directo también es movimiento, así que
+ *    también se rechaza: primero se revive.
+ *  • **Revivir conserva TODA la historia** (§Post-F9.155 punto 3): no se borra ni un evento, ni el
+ *    precio aprobado, ni el target. Por eso el estado es una columna aparte y no un borrado.
+ *  • **El rastro** (quién lo dropeó, cuándo, y quién lo revivió) queda por partida doble y siguiendo
+ *    D3 —se AGREGA, nunca se edita—: un `NegociacionEvento` INMUTABLE por transición (con autor,
+ *    fecha y la frase de arriba, visible en el historial del renglón) + la `Bitacora` (A7). Las
+ *    columnas `estadoPorId`/`estadoEn` son sólo la FIRMA vigente, para que la fila lo diga sin
+ *    abrir nada.
+ *
+ * 🔴 El evento va **sin precios** (`precioAnterior`/`precioNuevo` en null) a propósito: aquí no se
+ * movió ningún precio, y ponerle uno haría que el historial contara una negociación que no pasó.
+ *
+ * Permiso: **`listas.negociar`** — el mismo que ya gobierna el estado de la LISTA; SIN permiso
+ * nuevo. Bajo el advisory lock por lista (guard `esCierre` race-free), en UNA transacción (A2).
+ */
+export async function cambiarEstadoRenglon(
+  sesion: SesionUsuario,
+  idLinea: number,
+  entrada: DatosCambiarEstadoRenglon,
+  bd?: ContextoBd,
+): Promise<ListaPreciosDetalle> {
+  verificarPermiso(sesion, 'listas.negociar');
+  const datos = validarEntrada(esquemaCambiarEstadoRenglon, entrada);
+
+  const idLista = await enTransaccion(async (tx) => {
+    const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
+    // Una lista en estado de CIERRE es historia: para tocar sus renglones se reabre (auditado).
+    exigirListaNoCerrada(linea.esCierre);
+
+    const desde = linea.estado;
+    const hacia = datos.estado;
+    if (desde === hacia) {
+      throw new ErrorConflicto(
+        `El modelo ya está en «${NOMBRE_ESTADO_RENGLON[hacia]}»; no hay nada que cambiar.`,
+      );
+    }
+    // Desde un estado TERMINAL sólo se puede revivir (§Post-F9.155 punto 3).
+    if (
+      (desde === 'cerrado' || desde === 'dropeado') &&
+      hacia !== 'abierto' &&
+      hacia !== 'en_negociacion'
+    ) {
+      throw new ErrorConflicto(
+        `El modelo está ${NOMBRE_ESTADO_RENGLON[desde].toLowerCase()} y desde ahí sólo se puede ` +
+          'REVIVIR (dejarlo en Abierto o En negociación). Revívelo primero y vuelve a moverlo; su historial se conserva.',
+      );
+    }
+
+    const cuando = new Date();
+    await tx.listaPreciosLinea.update({
+      where: { id: idLinea },
+      data: {
+        estado: hacia,
+        estadoPorId: sesion.id,
+        estadoEn: cuando,
+        ...datosModificacion(sesion),
+      },
+    });
+
+    // D3: el rastro se AGREGA (evento inmutable), jamás se edita el anterior.
+    await tx.negociacionEvento.create({
+      data: {
+        idListaLinea: idLinea,
+        idPrecostoAnterior: null,
+        idPrecostoNuevo: null,
+        precioAnterior: null,
+        precioNuevo: null,
+        acuerdo: textoDeTransicion(desde, hacia, cuando),
+        registradoPorId: sesion.id,
+      },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ListaPrecios',
+      idEntidad: linea.idLista,
+      accion: 'MODIFICAR',
+      datos: { operacion: 'cambiar-estado-renglon', idLinea, de: desde, a: hacia },
+    });
+
+    return linea.idLista;
   }, bd);
 
   return obtenerLista(sesion, idLista, bd);
@@ -711,6 +857,8 @@ export async function guardarMesa(
   const idLista = await enTransaccion(async (tx) => {
     const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x (§Post-F9.151): la mesa de un modelo cerrado/dropeado ya no se guarda.
+    exigirRenglonMovible(linea.estado, 'guardar la mesa');
 
     // MISMA aritmética que el simulador: lo guardado tiene que sumar lo que la pantalla enseñó.
     const { renglones, total } = resolverRenglonesMesa(datos.renglones);

@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { Prisma } from '../../datos/index.js';
+import { Prisma, type EstadoRenglonLista } from '../../datos/index.js';
 import { ErrorPermiso } from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -74,6 +74,14 @@ interface FilaLinea {
   precioAprobado: Prisma.Decimal | null;
   aprobadoPorId: string | null;
   aprobadoEn: Date | null;
+  /**
+   * ⭐ V1-E8x: el SEGUNDO eje del renglón. Vive en el fixture porque una de las pruebas de abajo
+   * exige que mover los factores NO lo toque: es una decisión de negocio de Daniel, no un derivado
+   * del cálculo, y perderla al recalcular sería un defecto.
+   */
+  estado: EstadoRenglonLista;
+  estadoPorId: string | null;
+  estadoEn: Date | null;
 }
 
 interface EstadoFake {
@@ -93,10 +101,20 @@ interface EstadoFake {
   bitacora: Record<string, unknown>[];
 }
 
-function linea(id: number, precioAprobado: number | null, aprobadoPorId: string | null): FilaLinea {
+function linea(
+  id: number,
+  precioAprobado: number | null,
+  aprobadoPorId: string | null,
+  estado: EstadoRenglonLista = 'en_negociacion',
+): FilaLinea {
   return {
     id,
     idLista: 7,
+    // ⭐ V1-E8x: NO `abierto` a propósito — con el default del enum, una mutación que borrara el
+    // estado al recalcular pasaría desapercibida (el valor escrito coincidiría con el esperado).
+    estado,
+    estadoPorId: 'aurora',
+    estadoEn: new Date('2026-08-12T18:00:00.000Z'),
     idDesarrollo: 100 + id,
     idPrecosto: 1000 + id,
     costoUnit: D(40),
@@ -256,6 +274,17 @@ function txFake(estado: EstadoFake): Tx {
         Promise.resolve(
           estado.lineas.map((l) => aplicarSelect(l as unknown as Record<string, unknown>, select)),
         ),
+      /**
+       * 🔴 El doble APLICA de verdad lo que el dominio escribe, campo por campo — no una versión
+       * "de lo que esperamos que escriba".
+       *
+       * Por qué importa (cicatriz de la ronda de corrección de V1-E8x): antes sólo aplicaba
+       * `precioCalculado` y forzaba a `null` la firma en cuanto veía `precioAprobado` en el `data`.
+       * Con eso, la aserción «el estado del renglón sigue siendo cerrado» **no probaba nada**: el
+       * doble jamás tocaba `estado`, así que habría pasado igual si el dominio escribiera
+       * `estado: 'abierto'`. Un doble que ignora un campo vuelve inalcanzable cualquier mutación
+       * sobre ese campo.
+       */
       update: ({ where, data }: { where: { id: number }; data: Record<string, unknown> }) => {
         estado.updatesLinea.push({ id: where.id, data });
         const fila = estado.lineas.find((l) => l.id === where.id);
@@ -264,9 +293,24 @@ function txFake(estado: EstadoFake): Tx {
             fila.precioCalculado = D(data.precioCalculado);
           }
           if ('precioAprobado' in data) {
-            fila.precioAprobado = null;
-            fila.aprobadoPorId = null;
-            fila.aprobadoEn = null;
+            fila.precioAprobado =
+              typeof data.precioAprobado === 'number' ? D(data.precioAprobado) : null;
+          }
+          if ('aprobadoPorId' in data) {
+            fila.aprobadoPorId = data.aprobadoPorId as string | null;
+          }
+          if ('aprobadoEn' in data) {
+            fila.aprobadoEn = data.aprobadoEn as Date | null;
+          }
+          // ⭐ V1-E8x: los tres campos del estado del renglón, aplicados igual que los demás.
+          if ('estado' in data) {
+            fila.estado = data.estado as EstadoRenglonLista;
+          }
+          if ('estadoPorId' in data) {
+            fila.estadoPorId = data.estadoPorId as string | null;
+          }
+          if ('estadoEn' in data) {
+            fila.estadoEn = data.estadoEn as Date | null;
           }
         }
         return Promise.resolve({ id: where.id });
@@ -413,6 +457,101 @@ describe('🔴 (d) Mover los factores TUMBA la aprobación (§Post-F9.125)', () 
       precioAprobadoAnterior: 137,
       aprobadoPorId: 'daniel',
     });
+  });
+
+  /**
+   * ⭐⭐ V1-E8x — **MOVER LOS FACTORES NO TOCA EL ESTADO DEL MODELO.** Tumbar la firma del precio es
+   * correcto (el precio se calculó con otros porcentajes, §Post-F9.125(d)); tumbar el ESTADO no lo
+   * sería: que Daniel haya cerrado o dropeado un modelo es una decisión suya sobre el negocio, no
+   * un derivado del cálculo. Perderla al recalcular sería un defecto silencioso —el renglón
+   * volvería «abierto» y reaparecería en el papel—, así que se blinda aquí.
+   */
+  it('⭐ NO toca el ESTADO del renglón: la firma es del cálculo, el estado es de Daniel', async () => {
+    const estado = estadoInicial();
+    estado.lineas[0]!.estado = 'cerrado';
+    estado.lineas[1]!.estado = 'dropeado';
+
+    const lista = await editarConFake(estado);
+
+    // Ni un solo UPDATE menciona las columnas del estado del renglón…
+    for (const update of estado.updatesLinea) {
+      expect(update.data).not.toHaveProperty('estado');
+      expect(update.data).not.toHaveProperty('estadoPorId');
+      expect(update.data).not.toHaveProperty('estadoEn');
+    }
+    // …y la lista que vuelve los conserva tal cual (el dropeado sigue fuera del papel).
+    // 🔴 Esta mitad MUERDE porque el doble de `listaPreciosLinea.update` aplica `estado` de verdad:
+    // si el dominio escribiera `estado: 'abierto'`, la fila en memoria cambiaría y esto saldría
+    // rojo. Con el doble anterior —que ignoraba el campo— la aserción era decorativa.
+    expect(lista.lineas.find((l) => l.id === 10)?.estado).toBe('cerrado');
+    expect(lista.lineas.find((l) => l.id === 11)?.estado).toBe('dropeado');
+  });
+
+  /**
+   * 🔴🔴 **V1-E8x — LO CERRADO NO SE TOCA, Y ÉSTE ES EL CALLEJÓN QUE EVITA.** Daniel, textual: *«No
+   * se tocan: lo cerrado es un compromiso»*.
+   *
+   * El defecto que cierra no era una incoherencia estética: tumbarle la firma a un renglón
+   * `cerrado` lo dejaba sin precio aprobado **y sin forma de volver a firmarlo** (`aprobarLinea` y
+   * `ajustarPrecioLinea` rechazan un terminal). Y como `cerrado` **sí es vigente**, el guard del
+   * papel lo nombraba como faltante ⇒ **la lista entera se quedaba sin PDF, sin Excel y sin
+   * cotización**. Es el mismo agujero de §Post-F9.155, abierto por el otro lado.
+   */
+  it('🔴 un renglón CERRADO conserva su firma y su precio: mover un factor NO lo toca', async () => {
+    const estado = estadoInicial();
+    estado.lineas[0]!.estado = 'cerrado'; // el 10, firmado por Daniel en 137
+    estado.lineas[1]!.estado = 'dropeado'; // el 11, sin firma
+    // el 12 queda vivo y firmado: control positivo de que el salto no bloquea de más.
+
+    const lista = await editarConFake(estado);
+
+    // 1. Al cerrado NO se le escribió NADA (ni el precio calculado nuevo).
+    expect(estado.updatesLinea.map((u) => u.id)).toEqual([12]);
+
+    // 2. Su firma sigue en pie — y con ella el papel puede salir.
+    const cerrado = lista.lineas.find((l) => l.id === 10);
+    expect(cerrado?.aprobado).toBe(true);
+    expect(cerrado?.precioAprobado).toBe(137);
+    expect(cerrado?.aprobadoPorId).toBe('daniel');
+    // Y su precio calculado se quedó en el viejo (100), no en el nuevo (125).
+    expect(cerrado?.precioCalculado).toBe(100);
+
+    // 3. NO se le escribió el evento de invalidación — que además termina diciendo "Hay que volver
+    //    a aprobarlo", una instrucción imposible sobre un cerrado (y absurda sobre un dropeado).
+    expect(estado.eventos.map((e) => e.idListaLinea)).toEqual([12]);
+
+    // 4. El renglón VIVO sí se recalculó y sí perdió la firma (§Post-F9.125(d) intacto).
+    const vivo = lista.lineas.find((l) => l.id === 12);
+    expect(vivo?.aprobado).toBe(false);
+    expect(vivo?.precioCalculado).toBe(125);
+
+    // 5. La bitácora no miente sobre cuántos tocó, y NOMBRA a los que respetó.
+    const registro = estado.bitacora[0]!.datos as Record<string, unknown>;
+    expect(registro.renglonesRecalculados).toBe(1);
+    expect(registro.terminalesRespetados).toEqual([
+      { idLinea: 10, estado: 'cerrado', precioAprobado: 137 },
+      { idLinea: 11, estado: 'dropeado', precioAprobado: null },
+    ]);
+    // Y la firma del cerrado NO aparece entre las invalidadas (porque no se invalidó).
+    expect(registro.firmasInvalidadas).toEqual([
+      expect.objectContaining({ idLinea: 12, aprobadoPorId: 'daniel' }),
+    ]);
+  });
+
+  it('🔴 el aviso «hay que volver a aprobarlo» ya NO alcanza a un DROPEADO', async () => {
+    const estado = estadoInicial();
+    estado.lineas[0]!.estado = 'dropeado'; // el 10 viene firmado en 137
+
+    await editarConFake(estado);
+
+    // A un dropeado no se le va a aprobar nada nunca: pedírselo por escrito era ruido con
+    // instrucción imposible en el historial que Daniel lee.
+    const paraElDropeado = estado.eventos.filter((e) => e.idListaLinea === 10);
+    expect(paraElDropeado).toHaveLength(0);
+    // El resto de la lista sí recibió el suyo (el criterio no se aflojó para todos).
+    expect(
+      estado.eventos.some((e) => String(e.acuerdo).includes('Hay que volver a aprobarlo')),
+    ).toBe(true);
   });
 
   it('NO hay estado muerto: el renglón queda como uno nuevo, listo para re-aprobar', async () => {

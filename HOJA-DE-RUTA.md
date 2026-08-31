@@ -153,7 +153,7 @@
 > | **0.059** ✅ | La incompleta sale del tránsito | §Post-F9.147 |
 > | **0.060** ✅ *(en `prueba`, 30-ago)* | **La mesa con su forma real + el guardado.** Tela con **precio y consumo separados** y movibles · **avíos desglosados** y movibles · **foto** principal del modelo · **TARGET PRICE** del cliente (lo captura Aurora en el renglón de la lista; **informa, NO bloquea**) · **encabezado** (hoy se parte palabra por palabra) · **costo de EMPAQUE** como **tercera ancla fija** junto a maquila y corte (`CONCEPTOS_ANCLA`), con **default 2.20 en `ConfiguracionEmpresa`, NO hardcodeado** · y encima **los estimados SE GUARDAN** (último estado, desglose por concepto, al cerrar la negociación; **NO** autosave por tecla). **LLEVA MIGRACIÓN.** ⚠️ **Ya existe y NO se reconstruye:** el editor de renglones con `consumo`/`precioUnit`/`ajustado` (`DialogoPrecosto.tsx`); `desgloseCostoLinea` **aplasta por concepto** — el defecto es que agrupa, no que falte el dato | §Post-F9.149 · .150 · **.153** |
 > | **0.061** ⬜ | **La incompleta sale de Tránsito como merma · el divisor pasa a `recibido` · y ⭐ EL COSTO SE CONGELA AL CERRAR.** Las tres decididas por Daniel el 30-ago (**§Post-F9.154**), y la tercera **la levantó él**: *«¿en qué momento se define que ya se cerró el costo? ¿O va cambiando?»* — **va cambiando, medido**: se persiste el dinero y la base, pero la CANTIDAD se re-suma en cada lectura ⇒ con `recibido` el costo queda **vivo hasta el último recibo**. Adoptar el divisor sin el congelado habría dejado el costo bailando para siempre. 🔴 **Lo que el plan viejo decía MAL, ya medido:** el default **NO vive en dos sitios sino en CINCO** (+1 en SQL crudo), y el que el plan no nombraba —el `.default` del Zod— **puede reescribir órdenes ya costeadas** en un PUT que omita el campo ⇒ el cambio aplica **sólo hacia adelante**; y la **división entre cero YA está guardada en los seis divisores** ⇒ ahí no hay defecto, sólo falta **redactar** «aún no hay piezas recibidas». ⭐ **La merma está construida al ~70 %**: transacción, auditoría, almacén de tránsito y **la reversión al cancelar (que sale gratis: el motor ya revierte por origen)**; falta un código de catálogo y una rama. **NO es retroactiva al histórico** y no hay que programarlo: lo migrado no tiene el dato. **Seed ⇒ `SEED_ON_START=true`** · migración sólo por el `@default` · **sin permisos** | §Post-F9.154 |
-> | **0.062** ⬜ | **Cuatro estados por MODELO** dentro de la lista: **Abierto → En negociación → Cerrado → Dropeado**. «Dropeado» es palabra de Daniel, **no traducir**. Son del **RENGLÓN**, distintos de los de la LISTA. 🔴 **Lo que la medición corrigió del plan (§Post-F9.155):** (1) el guard `exigirRenglonesAprobados` exige **TODOS** aprobados y lo consumen **los tres** papeles (PDF, Excel, cotización) ⇒ un dropeado —que nunca se aprueba— dejaría la lista **sin papel para siempre**, que es *el escenario exacto* con el que Daniel los pidió; (2) §Post-F9.151 decía que *«los renglones no tienen ninguno»* y **es falso**: ya hay **Aprobado/Pendiente** ocupando una columna «Estado»; (3) **«En negociación» no se parece al de la lista, ES EL MISMO STRING**; (4) `EstadoLista` **no es enum sino tabla-catálogo con CRUD** ⇒ existe el atajo equivocado de teclear ahí «Dropeado». ⭐ **La regla que Daniel cerró: el papel muestra los NO dropeados** — una sola regla cubre la cotización previa (*«ahí van todos»*, aún sin dropeos) y la posterior (*«sólo los vigentes»*). **Dropeado se puede REVIVIR con rastro.** **Migración** (columna con `abierto` inicial) · **sin permisos** (`listas.negociar`) · **sin seed** (enum cerrado) | §Post-F9.151 · **.155** |
+> | **0.062** ✅ | **Cuatro estados por MODELO** dentro de la lista: **Abierto → En negociación → Cerrado → Dropeado** («Dropeado» es palabra de Daniel, **no traducir**). 🔴 La medición previa evitó entregarla **rota**: el guard del papel exigía TODOS aprobados y lo consumen los **tres** impresos ⇒ un dropeado dejaba la lista **sin PDF, Excel ni cotización para siempre**. Regla de Daniel: **el papel muestra los NO dropeados** — una sola regla para sus dos momentos. **Se puede REVIVIR con rastro.** §Post-F9.156: **los factores son su calculadora, el precio cerrado es un compromiso** ⇒ mover un factor **no toca** a los terminales | §Post-F9.151 · .155 · **.156** |
 > | **0.063** ⬜ | **Cotizar en la cita un modelo que no existe** — desde cero o **copiando** uno ya desarrollado. ⚠️ El motor **ya existe** (`crearDesarrolloConModeloNuevo` mintea el código, `copiarBom`, `copiarArteDeOtroModelo`): el trabajo es **abrir el camino desde la mesa**. Obligatorios reales: `codigo` + `idGenero` + `idTipoProducto` (**tres**; el alta de desarrollo no pide `codigo` porque lo mintea) ⇒ **copiar un modelo los trae todos: cero fricción**. **+ la COMPRADORA**: contactos por cliente/departamento (patrón `ProveedorContacto`; hoy los clientes **no guardan a nadie**) **+ el LUGAR de la cita + un campo abierto de pendientes** | §Post-F9.152 |
 >
 > #### Bloque 2 · La OP y su receta
@@ -213,6 +213,40 @@
 > está — pero **como precaución barata, NO porque el riesgo le importe a Daniel** (*«si quiere
 > despejarlo tampoco me preocupa tanto»*). **Pasa a importar el día que negocie alguien más que él**;
 > hoy sólo negocia Daniel. §Post-F9.148.
+>
+> ✅ **`V1-E8x` · LOS CUATRO ESTADOS DEL MODELO ⭐** (30-ago, **0.062**) — §Post-F9.151 · .155 · **.156**.
+> Daniel: *«a veces de una lista de 10 modelos, cierro 5 y los otros ya no los vendo»*. ⇒ Cada modelo
+> dentro de la lista lleva su estado: **Abierto → En negociación → Cerrado → Dropeado**, con el candado de
+> que un terminal ya no admite rondas, acuerdos, target ni re-aprobación **hasta que se revive** — y
+> revivir **conserva toda la historia**, con rastro de quién y cuándo.
+> 🔴 **Lo que la MEDICIÓN previa evitó, y es la lección de la etapa:** el plan decía mal **cuatro** cosas,
+> y la primera habría entregado **la versión rota en el escenario exacto que la originó** —
+> `exigirRenglonesAprobados` exige TODOS aprobados y lo consumen **los tres** papeles, así que un
+> **dropeado —que nunca se aprueba— dejaba la lista sin PDF, sin Excel y sin cotización para siempre**, y
+> la única salida era **borrar** el renglón: justo lo que los estados vienen a evitar. Las otras tres: la
+> decisión afirmaba que *«los renglones no tienen ningún estado»* (**falso**, ya tenían Aprobado/Pendiente
+> con columna propia); *«tres nombres se parecen»* cuando uno **es el mismo string**; y `EstadoLista`
+> resultó ser **tabla-catálogo con CRUD**, no un enum ⇒ existía el **atajo equivocado** de teclear
+> «Dropeado» ahí, sin migración y en dos minutos. 🔑 **La pieza de diseño que lo cierra:** el guard pasó a
+> **devolver** los vigentes (`<T>(renglones): T[]`), así el llamador imprime lo que la función validó —
+> *validar una lista e imprimir otra* deja de ser posible (mutación: **8 pruebas en rojo**).
+> 🔴 **Revisión independiente: RECHAZADA con 5 hallazgos, los cinco arreglados.** El foco principal aguantó
+> (el reviewer corrió cinco mutaciones propias y las cinco cayeron), pero encontró **un e2e que iba a
+> tumbar el CI con certeza** —hacía clic en un botón que el guard nuevo ya había quitado del DOM, y la
+> prueba de componente del **mismo commit** afirmaba lo contrario— y ⭐ **un callejón sin salida que nadie
+> había previsto**, hallado **ejecutando** y no leyendo: mover un factor tumbaba la firma de los
+> **cerrados**, que ya no admiten re-aprobación ⇒ quedaban trabados **bloqueando el papel de toda la
+> lista**. Lo resolvió **Daniel** con la frase que explica la regla mejor que la regla: *«Los factores son
+> elementos que me ayudan a saber mi margen a la hora de negociar. **Es solo para hacer mis cálculos**»* ⇒
+> son cosas de distinta naturaleza (§Post-F9.156): la calculadora no mueve un compromiso pactado, y para
+> cambiar un precio cerrado **hay que revivir el renglón**, que deja rastro. Los otros tres: un aviso que
+> discrepaba entre dos pantallas, **tres docstrings que mentían** desde el propio commit (uno apareció al
+> barrer, nadie lo había señalado) y ⚪ **media aserción que no probaba nada** porque el doble de Prisma
+> ignoraba el campo — se arregló **el doble**, no la aserción.
+> ⭐⭐ **La lección de la jornada, tercera vez en el día:** *el código estaba bien y lo que fallaba era lo
+> que decía cuidarlo*. ⚠️ **SIN permisos ⇒ sin `SEED_ON_START`**; **migración aditiva**; el contrato se
+> movió (`renglonesAprobados` **cambió de significado**: sólo vigentes) ⇒ **backend y frontend suben
+> juntos**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8x.
 >
 > ✅ **`V1-E8w` · LA MESA CON SU FORMA REAL + EL GUARDADO ⭐⭐** (30-ago, **0.060**) — §Post-F9.149 ·
 > .150 · **.153**. Daniel probó la mesa de la 0.058 y pidió **cinco cosas de forma y una de costeo**;

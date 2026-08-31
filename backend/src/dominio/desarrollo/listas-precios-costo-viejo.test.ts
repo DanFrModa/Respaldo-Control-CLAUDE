@@ -48,6 +48,10 @@ function filaLinea(caso: CasoRenglon): Record<string, unknown> {
     precioAprobado: caso.precioAprobado === null ? null : D(caso.precioAprobado),
     aprobadoPorId: caso.precioAprobado === null ? null : 'daniel',
     aprobadoEn: caso.precioAprobado === null ? null : new Date('2026-08-21T00:00:00.000Z'),
+    // ⭐ V1-E8x: el segundo eje del renglón (aquí siempre vigente: lo que se prueba es el aviso).
+    estado: 'abierto',
+    estadoPorId: null,
+    estadoEn: null,
     desarrollo: {
       numeroCliente: `CA-${String(caso.id)}`,
       modelo: {

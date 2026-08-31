@@ -1,5 +1,6 @@
 import {
   AlertTriangleIcon,
+  BanIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeft,
@@ -36,7 +37,15 @@ import {
   type ListaLinea,
   type ListasQuery,
 } from '@/api/listas-precios';
+import { useCambiarEstadoRenglon } from '@/api/negociacion';
 import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
+import {
+  destinosDesde,
+  diagnosticarPapel,
+  ETIQUETA_ESTADO_RENGLON,
+  TONO_ESTADO_RENGLON,
+  type EstadoRenglon,
+} from './estados-renglon';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -100,8 +109,45 @@ function BadgeEstadoLista({
   className?: string;
 }): React.JSX.Element {
   return (
-    <ChipEstado tono={TONO_ESTADO_LISTA[codigo] ?? 'neutro'} {...(className ? { className } : {})}>
+    <ChipEstado
+      tono={TONO_ESTADO_LISTA[codigo] ?? 'neutro'}
+      // ⭐ V1-E8x: «En negociación» es el MISMO string en los dos ejes y los dos chips conviven en
+      // esta pantalla. Aquí se dice de cuál es —y el del renglón, además, se pinta con contorno.
+      title={`Estado de la LISTA (el documento): ${nombre}`}
+      {...(className ? { className } : {})}
+    >
       {nombre}
+    </ChipEstado>
+  );
+}
+
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151) — CHIP del estado de un **MODELO** dentro de la lista.
+ *
+ * 🔴 Se ve DISTINTO del de la lista a propósito: **contorno, no relleno**. Los dos chips comparten
+ * pantalla y uno de los cuatro nombres —«En negociación»— es idéntico carácter por carácter en los
+ * dos ejes; el color solo no basta para separarlos (y ni siquiera es fiable: el mismo tono aparece
+ * en los dos catálogos). El rótulo de la columna dice «Estado del modelo» y el `title` lo repite
+ * para quien llegue por lector de pantalla.
+ */
+function BadgeEstadoRenglon({ linea }: { linea: ListaLinea }): React.JSX.Element {
+  return (
+    <ChipEstado
+      tono={TONO_ESTADO_RENGLON[linea.estado]}
+      sinPunto
+      className="border border-current/40 bg-transparent"
+      // El `title` dice de qué eje es Y desde cuándo: `estadoEn` es la FIRMA vigente (quién lo dejó
+      // así y cuándo) — el rastro completo del dropeo y del revivir vive en el historial del
+      // renglón, que es donde se lee con autor y texto (§Post-F9.155 punto 3).
+      title={
+        linea.estadoEn === null
+          ? `Estado del MODELO dentro de la lista: ${linea.nombreEstado}`
+          : `Estado del MODELO dentro de la lista: ${linea.nombreEstado} · desde ${formatearFecha(linea.estadoEn)}`
+      }
+      data-testid="chip-estado-renglon"
+      data-estado={linea.estado}
+    >
+      {linea.nombreEstado}
     </ChipEstado>
   );
 }
@@ -337,10 +383,23 @@ export function ListasPreciosPagina(): React.JSX.Element {
                     </TablaDensaCelda>
                     <TablaDensaCelda numerica>
                       {l.totalRenglones.toLocaleString('es-MX')}
+                      {/* ⭐ V1-E8x: cuántos se cayeron, ahí mismo — si no, «10 modelos / 8
+                          aprobados» parece una lista a medias cuando en realidad ya está lista. */}
+                      {l.renglonesDropeados > 0 ? (
+                        <span
+                          className="ml-1 text-[11px] text-crit"
+                          data-testid="dropeados-listado"
+                        >
+                          (−{l.renglonesDropeados.toLocaleString('es-MX')})
+                        </span>
+                      ) : null}
                     </TablaDensaCelda>
                     <TablaDensaCelda numerica>
+                      {/* ⭐ V1-E8x (§Post-F9.155): aprobados sobre VIGENTES — el mismo par que el
+                          guard del papel evalúa. Contra el total, un dropeado sin firmar dejaba
+                          este conteo clavado en «8/10» aunque el PDF ya pudiera bajarse. */}
                       {l.renglonesAprobados.toLocaleString('es-MX')}/
-                      {l.totalRenglones.toLocaleString('es-MX')}
+                      {(l.totalRenglones - l.renglonesDropeados).toLocaleString('es-MX')}
                     </TablaDensaCelda>
                     <TablaDensaCelda>
                       <BadgeEstadoLista codigo={l.codigoEstado} nombre={l.nombreEstado} />
@@ -445,23 +504,32 @@ function PaginaLista({
 
   // §Post-F9.125(c): de una lista sin aprobar no sale papel. `aprobado` es un hecho del renglón
   // (no depende de ver importes), así que el aviso dice lo mismo para todos los que llegan aquí.
-  const sinAprobar = lista.lineas.filter((ln) => !ln.aprobado);
-  const listaCompletamenteAprobada = lista.lineas.length > 0 && sinAprobar.length === 0;
-  const sinAprobarTexto =
-    lista.lineas.length === 0
-      ? 'la lista no tiene renglones'
-      : sinAprobar.length === 1
-        ? `falta ${sinAprobar[0]?.codigoModelo ?? ''}`
-        : `faltan ${sinAprobar.map((ln) => ln.codigoModelo).join(', ')}`;
+  //
+  // ⭐⭐ V1-E8x (§Post-F9.155): el criterio ya no es «todos los renglones», es «todos los VIGENTES»
+  // — un modelo dropeado nunca se va a aprobar, y exigirle firma dejaba la lista sin papel para
+  // siempre. El diagnóstico entero (quiénes van, quiénes se cayeron, a quién le falta firma) lo
+  // arma `diagnosticarPapel`, que espeja el guard del servidor renglón por renglón.
+  const papel = diagnosticarPapel(lista.lineas);
+  const listaCompletamenteAprobada = papel.puedeSalir;
+  const sinAprobarTexto = papel.motivo ?? '';
 
   // ⭐ V1-E8d (§Post-F9.127): los renglones cuyo costo congelado quedó VIEJO porque la receta del
   // modelo se movió después. La FRASE la arma el servidor (`costo-viejo.ts`), aquí sólo se cuentan
   // para el resumen de arriba — el detalle de cada uno va pegado a SU renglón, que es donde sirve.
-  const conCostoViejo = lista.lineas.filter((ln) => ln.avisoCostoViejo !== null);
+  //
+  // ⭐ V1-E8x: se cuenta sobre los **VIGENTES**, igual que en el diálogo de emitir cotización. Un
+  // dropeado con la receta movida levantaba un aviso sin consecuencia —no va en ningún papel— y,
+  // peor, las dos pantallas decían cosas distintas del mismo hecho. Un solo criterio.
+  //
+  // ⚠️ El aviso PEGADO a su renglón sí se sigue pintando en un dropeado, y es a propósito: ahí es
+  // información local del modelo, y al revivirlo vuelve a importar. Lo que se acota es el RESUMEN,
+  // que habla de lo que afecta al papel.
+  const conCostoViejo = papel.vigentes.filter((ln) => ln.avisoCostoViejo !== null);
 
-  // Σ del pie del card (sobre los renglones ya cargados; el cálculo de precios es del backend).
-  const sumaCosto = lista.lineas.reduce((a, ln) => a + (ln.costoUnit ?? 0), 0);
-  const sumaPrecio = lista.lineas.reduce(
+  // Σ del pie del card. ⭐ V1-E8x: sobre los VIGENTES — sumar un modelo dropeado inflaría el total
+  // de la oferta con algo que el cliente no va a ver en ningún papel.
+  const sumaCosto = papel.vigentes.reduce((a, ln) => a + (ln.costoUnit ?? 0), 0);
+  const sumaPrecio = papel.vigentes.reduce(
     (a, ln) => a + (ln.precioAprobado ?? ln.precioCalculado ?? 0),
     0,
   );
@@ -497,7 +565,11 @@ function PaginaLista({
             />
           </h1>
           <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-            {lista.lineas.length} modelos · {formatearFecha(lista.fecha)}
+            {lista.lineas.length} modelos
+            {papel.dropeados.length > 0
+              ? ` (${String(papel.vigentes.length)} vigentes · ${String(papel.dropeados.length)} dropeados)`
+              : ''}{' '}
+            · {formatearFecha(lista.fecha)}
           </p>
           {lista.notas === null || lista.notas === '' ? null : (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -560,11 +632,31 @@ function PaginaLista({
               >
                 <LockIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                 <span>
-                  No se puede bajar el PDF ni el Excel: {sinAprobarTexto} sin precio aprobado por el
-                  dueño. Un papel con precios que nadie autorizó confunde al cliente.
+                  No se puede bajar el PDF ni el Excel: {sinAprobarTexto}
+                  {papel.sinAprobar.length > 0
+                    ? ' sin precio aprobado por el dueño. Un papel con precios que nadie autorizó confunde al cliente.'
+                    : '.'}
                 </span>
               </p>
             )}
+            {/* ⭐⭐ V1-E8x (§Post-F9.155): los dropeados NO salen en el papel, y eso se DICE — si
+                no, quien baja el PDF cuenta 8 modelos donde la lista enseña 10 y no sabe por qué. */}
+            {papel.dropeados.length > 0 ? (
+              <p
+                className="flex w-full items-start gap-1.5 text-[11.5px] text-muted-foreground"
+                data-testid="aviso-dropeados"
+              >
+                <BanIcon className="mt-0.5 size-3.5 shrink-0 text-crit" aria-hidden />
+                <span>
+                  {papel.dropeados.length === 1
+                    ? 'Un modelo está DROPEADO y no sale'
+                    : `${String(papel.dropeados.length)} modelos están DROPEADOS y no salen`}{' '}
+                  en el PDF, el Excel ni la cotización:{' '}
+                  {papel.dropeados.map((ln) => ln.codigoModelo).join(', ')}. Revívelos si el cliente
+                  se arrepiente — su historial se conserva.
+                </span>
+              </p>
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -672,7 +764,9 @@ function PaginaLista({
                 <TablaDensaHead numerica>Target cliente</TablaDensaHead>
                 <TablaDensaHead numerica>Precio calculado</TablaDensaHead>
                 <TablaDensaHead numerica>Precio aprobado</TablaDensaHead>
-                <TablaDensaHead>Estado</TablaDensaHead>
+                {/* ⭐ V1-E8x: la columna se NOMBRA («del modelo») porque arriba, en el encabezado
+                    del detalle, vive el chip de la LISTA con nombres que se repiten. */}
+                <TablaDensaHead>Estado del modelo</TablaDensaHead>
                 <TablaDensaHead className="text-right" />
               </TablaDensaFila>
             </TablaDensaEncabezado>
@@ -801,7 +895,14 @@ function FilaRenglon({
 
   return (
     <>
-      <TablaDensaFila data-testid="fila-renglon-lista" data-aprobado={linea.aprobado}>
+      <TablaDensaFila
+        data-testid="fila-renglon-lista"
+        data-aprobado={linea.aprobado}
+        data-estado={linea.estado}
+        // ⭐ V1-E8x: un modelo dropeado se APAGA. No se esconde (sigue siendo parte de la
+        // negociación y se puede revivir), pero tiene que leerse como lo que es: fuera del papel.
+        className={linea.estado === 'dropeado' ? 'opacity-60' : undefined}
+      >
         <TablaDensaCelda>
           <div className="flex items-center gap-2">
             {/* lp-exp del proto: botoncito con chevron para el desglose de costo. */}
@@ -820,7 +921,13 @@ function FilaRenglon({
               )}
             </button>
             <div className="min-w-0">
-              <div className="truncate font-semibold">
+              <div
+                className={
+                  linea.estado === 'dropeado'
+                    ? 'truncate font-semibold line-through decoration-crit/60'
+                    : 'truncate font-semibold'
+                }
+              >
                 {linea.descripcionModelo ?? linea.codigoModelo}
               </div>
               <div className="num truncate text-xs text-muted-foreground">
@@ -871,6 +978,11 @@ function FilaRenglon({
         </TablaDensaCelda>
         <TablaDensaCelda>
           <div className="flex flex-wrap items-center gap-1">
+            {/* ⭐⭐ V1-E8x: PRIMERO el estado del modelo (el eje nuevo, el que Daniel pidió para
+                *«saber los modelos que ya cerre»*), y luego la firma del precio. Son DOS ejes que
+                conviven: un modelo cerrado puede seguir sin firmar, y un dropeado conserva su firma
+                vieja intacta — por eso revivirlo no pierde nada. */}
+            <BadgeEstadoRenglon linea={linea} />
             {linea.aprobado ? (
               <ChipEstado tono="ok">Aprobado</ChipEstado>
             ) : (
@@ -884,6 +996,10 @@ function FilaRenglon({
               </ChipEstado>
             )}
           </div>
+          {/* El selector sólo para quien negocia (el servidor re-verifica, A1). Va PEGADO al chip:
+              Daniel cierra cinco modelos de diez de corrido, y mandarlo a un diálogo por renglón
+              convertiría eso en quince clics. */}
+          {puedeNegociar ? <SelectorEstadoRenglon linea={linea} /> : null}
         </TablaDensaCelda>
         <TablaDensaCelda className="text-right whitespace-nowrap">
           <div className="flex justify-end gap-1">
@@ -1005,6 +1121,72 @@ function FilaRenglon({
         </TablaDensaFila>
       ) : null}
     </>
+  );
+}
+
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151) — SELECTOR del estado de UN MODELO dentro de la lista. Daniel:
+ *
+ * > *«seria bueno saber los modelos que ya cerre…. a veces de una lista de 10 modelos, cierro 5 y
+ * > los otros ya no los vendo»*
+ *
+ * 🔴 **Va en la fila y dispara al elegir, sin diálogo de confirmación.** Es deliberado: el caso de
+ * uso es cerrar cinco modelos de diez de corrido, y un diálogo por renglón lo volvería quince
+ * clics. Se puede hacer así porque **nada se pierde**: el cambio es REVERSIBLE (revivir conserva
+ * toda la historia, §Post-F9.155) y queda AUDITADO con quién y cuándo, así que un clic de más se
+ * deshace con otro clic y deja constancia de los dos.
+ *
+ * 🔴 Las opciones que ofrece ESPEJAN al servidor: desde un modelo cerrado o dropeado el único
+ * camino es REVIVIR (Abierto / En negociación). El backend lo re-valida; esto sólo evita ofrecer
+ * un movimiento que va a volver como 409.
+ */
+function SelectorEstadoRenglon({ linea }: { linea: ListaLinea }): React.JSX.Element {
+  const cambiar = useCambiarEstadoRenglon();
+  // El destino elegido se guarda en estado (y se limpia al terminar) en vez de dejar el select
+  // clavado en «Mover a…»: un `value` constante hace que la opción elegida NUNCA quede marcada, y
+  // eso confunde a quien lo usa —y a los navegadores automatizados— mientras la mutación viaja.
+  const [destino, setDestino] = useState('');
+  const destinos = destinosDesde(linea.estado);
+
+  function alElegir(elegido: string): void {
+    setDestino(elegido);
+    if (elegido === '') {
+      return;
+    }
+    cambiar.mutate(
+      { idLinea: linea.id, cuerpo: { estado: elegido as EstadoRenglon } },
+      {
+        onSuccess: () => {
+          toast.success(
+            `"${linea.codigoModelo}" quedó en «${ETIQUETA_ESTADO_RENGLON[elegido as EstadoRenglon]}».`,
+          );
+          setDestino('');
+        },
+        onError: (error) => {
+          toast.error(error.message);
+          setDestino('');
+        },
+      },
+    );
+  }
+
+  return (
+    <SelectNativo
+      aria-label={`Estado del modelo ${linea.codigoModelo}`}
+      title="Mover este modelo: abierto · en negociación · cerrado · dropeado"
+      className="mt-1 h-7 w-auto text-[11.5px]"
+      value={destino}
+      disabled={cambiar.isPending}
+      onChange={(e) => alElegir(e.target.value)}
+      data-testid="estado-renglon"
+    >
+      <option value="">Mover a…</option>
+      {destinos.map((destino) => (
+        <option key={destino} value={destino}>
+          {ETIQUETA_ESTADO_RENGLON[destino]}
+        </option>
+      ))}
+    </SelectNativo>
   );
 }
 

@@ -1,4 +1,4 @@
-import { GitCompareIcon, HandshakeIcon, Loader2Icon, PlusIcon } from 'lucide-react';
+import { GitCompareIcon, HandshakeIcon, Loader2Icon, LockIcon, PlusIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -37,6 +37,7 @@ import { DialogoPrecosto } from '@/modulos/desarrollo/DialogoPrecosto';
 
 import { CalculadoraNegociacion } from './CalculadoraNegociacion';
 import { ComparadorVersiones } from './ComparadorVersiones';
+import { esEstadoTerminal } from './estados-renglon';
 import { MesaNegociacion } from './MesaNegociacion';
 
 /** Clases del textarea (mismo estilo que el resto de formularios). */
@@ -65,6 +66,11 @@ export function DialogoNegociacionRenglon({
   const eventos = useEventosLinea(abierto ? linea.id : null);
   const [nuevaRondaAbierta, setNuevaRondaAbierta] = useState(false);
   const [acuerdoAbierto, setAcuerdoAbierto] = useState(false);
+  // ⭐⭐ V1-E8x (§Post-F9.151): un modelo CERRADO o DROPEADO no admite movimiento — ni rondas, ni
+  // acuerdos, ni mesa— hasta que se reviva. El servidor los rechaza con 409; aquí se apagan los
+  // controles y se DICE por qué, en vez de dejar botones que fallan al pulsarlos. El historial y
+  // el comparador siguen abiertos: lo negociado no se esconde, sólo se congela.
+  const movible = puedeNegociar && !esEstadoTerminal(linea.estado);
 
   return (
     <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
@@ -82,13 +88,33 @@ export function DialogoNegociacionRenglon({
           className="max-h-[70vh] space-y-4 overflow-y-auto pr-1"
           data-testid="panel-negociacion"
         >
+          {/* ⭐ V1-E8x: el estado del modelo, arriba de todo — es lo que explica que los botones de
+              abajo estén apagados. */}
+          {esEstadoTerminal(linea.estado) ? (
+            <p
+              className="flex items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] text-muted-foreground"
+              data-testid="renglon-congelado"
+            >
+              <LockIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>
+                Este modelo está <b>{linea.nombreEstado}</b> y ya no admite rondas, acuerdos ni
+                mesa.
+                {linea.estado === 'dropeado'
+                  ? ' Tampoco sale en el PDF, el Excel ni la cotización.'
+                  : ''}{' '}
+                Para volver a moverlo, <b>revívelo</b> desde la lista (déjalo en Abierto o En
+                negociación): su historial se conserva completo.
+              </span>
+            </p>
+          ) : null}
+
           {/*
             ⭐⭐ LA MESA (§Post-F9.138): lo PRIMERO que se ve, porque es lo que se usa con el cliente
             enfrente. El historial de abajo cuenta lo que ya pasó; esto es lo que está pasando. Pide
             los dos permisos del endpoint (`listas.negociar` + `consultas.ver-importes`): sin ellos no
             hay nada que jugar aquí.
           */}
-          {puedeNegociar && verImportes ? (
+          {movible && verImportes ? (
             <MesaNegociacion
               idLinea={linea.id}
               precioInicial={linea.precioAprobado ?? linea.precioCalculado}
@@ -110,7 +136,7 @@ export function DialogoNegociacionRenglon({
             <HistorialEventos eventos={eventos.data ?? []} verImportes={verImportes} />
           )}
 
-          {puedeNegociar ? (
+          {movible ? (
             <div className="flex flex-wrap gap-2 border-t pt-3">
               <Button
                 type="button"

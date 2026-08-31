@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { Prisma } from '../../datos/index.js';
+import { Prisma, type EstadoRenglonLista } from '../../datos/index.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -30,6 +30,7 @@ import {
   exigirRenglonesAprobados,
   listarCotizaciones,
   obtenerCotizacion,
+  renglonesVigentesDelPapel,
   type RenglonListaParaCongelar,
 } from './cotizaciones.js';
 
@@ -56,6 +57,8 @@ interface FilaLineaLista {
   idLista: number;
   idPrecosto: number;
   precioAprobado: Prisma.Decimal | null;
+  /** ⭐ V1-E8x: el estado del MODELO. `dropeado` = no entra al papel (§Post-F9.155). */
+  estado: EstadoRenglonLista;
   precosto: { version: number };
   desarrollo: {
     numeroCliente: string | null;
@@ -130,12 +133,14 @@ function linea(
   numeroCliente: string | null,
   version: number,
   precioAprobado: number | null,
+  estado: EstadoRenglonLista = 'abierto',
 ): FilaLineaLista {
   return {
     id,
     idLista: 7,
     idPrecosto: 1000 + id,
     precioAprobado: precioAprobado === null ? null : D(precioAprobado),
+    estado,
     precosto: { version },
     desarrollo: { numeroCliente, modelo: { codigo, descripcion } },
   };
@@ -600,12 +605,15 @@ describe('🔴 No se emite una cotización con un precio SIN APROBAR', () => {
     expect(estado.lineasCreadas).toHaveLength(0);
   });
 
-  it('`exigirRenglonesAprobados` deja pasar sólo cuando TODOS tienen precio', () => {
-    const ok = [{ codigoModelo: 'A', aprobado: true }];
+  it('`exigirRenglonesAprobados` deja pasar sólo cuando TODOS los VIGENTES tienen precio', () => {
+    const ok = [{ codigoModelo: 'A', aprobado: true, estado: 'abierto' as const }];
     expect(() => exigirRenglonesAprobados(ok, 'emitir la cotización')).not.toThrow();
     expect(() => exigirRenglonesAprobados([], 'emitir la cotización')).toThrow(ErrorConflicto);
     expect(() =>
-      exigirRenglonesAprobados([{ codigoModelo: 'A', aprobado: false }], 'emitir la cotización'),
+      exigirRenglonesAprobados(
+        [{ codigoModelo: 'A', aprobado: false, estado: 'abierto' as const }],
+        'emitir la cotización',
+      ),
     ).toThrow(ErrorConflicto);
   });
 
@@ -615,8 +623,8 @@ describe('🔴 No se emite una cotización con un precio SIN APROBAR', () => {
   // que nadie autorizó e idéntico al bueno.
   it('el mensaje nombra el PAPEL que se intentó sacar, no siempre "la cotización"', () => {
     const sinFirmar = [
-      { codigoModelo: 'MOD-A', aprobado: true },
-      { codigoModelo: 'MOD-B', aprobado: false },
+      { codigoModelo: 'MOD-A', aprobado: true, estado: 'abierto' as const },
+      { codigoModelo: 'MOD-B', aprobado: false, estado: 'abierto' as const },
     ];
     for (const accion of [
       'emitir la cotización',
@@ -643,6 +651,111 @@ function estadoConFaltantes(): EstadoFake {
   estado.lineasLista[3]!.precioAprobado = null;
   return estado;
 }
+
+// ── ⭐⭐ V1-E8x (§Post-F9.155): EL DROPEADO Y LA COTIZACIÓN ──────────────────────────
+//
+// Daniel: *«El dropeo se hace hasta la negociación. Hay un envío de cotización previa a la
+// negociación. Ahí van todos. Después de la negociación solo hay que mandar los que están vigentes.
+// Quitar los dropeados»*.
+//
+// El defecto que esto cierra: `exigirRenglonesAprobados` exigía la firma de TODOS, y un dropeado
+// —que nunca se va a aprobar— dejaba la lista sin cotización PARA SIEMPRE. La única salida habría
+// sido borrar el renglón, justo lo que los estados vienen a evitar.
+
+describe('⭐⭐ V1-E8x — la cotización lleva los modelos VIGENTES (§Post-F9.155)', () => {
+  it('🔴 un DROPEADO sin firmar ya NO bloquea la emisión (el defecto que rompía la versión)', async () => {
+    const estado = estadoInicial();
+    estado.lineasLista[1]!.estado = 'dropeado';
+    estado.lineasLista[1]!.precioAprobado = null; // un dropeado NUNCA se va a aprobar
+
+    const cotizacion = await emitirConFake(estado);
+
+    expect(cotizacion.lineas.map((l) => l.codigoModelo)).toEqual([
+      'MOD-A',
+      'MOD-C',
+      'MOD-D',
+      'MOD-E',
+    ]);
+  });
+
+  it('🔴 el dropeado no se CONGELA en el documento (no basta con no bloquear: no debe salir)', async () => {
+    const estado = estadoInicial();
+    estado.lineasLista[1]!.estado = 'dropeado';
+
+    await emitirConFake(estado);
+
+    expect(estado.lineasCreadas).toHaveLength(4);
+    expect(estado.lineasCreadas.map((l) => l.codigoModelo)).not.toContain('MOD-B');
+  });
+
+  it('un dropeado que SÍ estaba firmado tampoco sale (manda el estado, no el precio)', async () => {
+    const estado = estadoInicial(); // los cinco vienen aprobados
+    estado.lineasLista[4]!.estado = 'dropeado'; // MOD-E, con su precio firmado intacto
+
+    const cotizacion = await emitirConFake(estado);
+
+    expect(cotizacion.lineas.map((l) => l.codigoModelo)).not.toContain('MOD-E');
+    expect(cotizacion.lineas).toHaveLength(4);
+  });
+
+  it('la BITÁCORA registra lo que SALIÓ, no lo que había en la lista', async () => {
+    const estado = estadoInicial();
+    estado.lineasLista[1]!.estado = 'dropeado';
+
+    await emitirConFake(estado);
+
+    const registro = estado.bitacora.at(-1)!;
+    const datos = registro.datos as { renglones: { codigoModelo: string }[] };
+    expect(datos.renglones.map((r) => r.codigoModelo)).not.toContain('MOD-B');
+    expect(datos.renglones).toHaveLength(4);
+  });
+
+  it('⚠️ CASO LÍMITE — con TODOS dropeados se rechaza con un mensaje que se entiende', async () => {
+    const estado = estadoInicial();
+    for (const l of estado.lineasLista) {
+      l.estado = 'dropeado';
+    }
+
+    await expect(emitirConFake(estado)).rejects.toBeInstanceOf(ErrorConflicto);
+    // Y NO quema folio ni escribe nada (el guard va antes de la secuencia, A3).
+    expect(estado.cabecera).toBeNull();
+    expect(estado.lineasCreadas).toHaveLength(0);
+
+    let mensaje = '';
+    try {
+      await emitirConFake(estado);
+    } catch (error) {
+      mensaje = error instanceof Error ? error.message : '';
+    }
+    expect(mensaje).toMatch(/DROPEADOS/i);
+    expect(mensaje).toContain('emitir la cotización');
+    expect(mensaje).toMatch(/[Rr]evive al menos uno/);
+  });
+
+  it('un renglón NO dropeado sin firmar sigue bloqueando (el candado del dueño no se aflojó)', async () => {
+    const estado = estadoInicial();
+    estado.lineasLista[1]!.estado = 'en_negociacion';
+    estado.lineasLista[1]!.precioAprobado = null;
+
+    await expect(emitirConFake(estado)).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('`renglonesVigentesDelPapel` es el criterio ÚNICO: filtra dropeados y NADA más', () => {
+    const renglones = [
+      { codigoModelo: 'A', estado: 'abierto' as const },
+      { codigoModelo: 'B', estado: 'en_negociacion' as const },
+      { codigoModelo: 'C', estado: 'cerrado' as const },
+      { codigoModelo: 'D', estado: 'dropeado' as const },
+    ];
+    // 🔴 CERRADO SÍ SALE: es un modelo vendido, no uno caído. Confundirlos habría dejado fuera del
+    // papel justo los que Daniel cerró (*"de una lista de 10 modelos, cierro 5"*).
+    expect(renglonesVigentesDelPapel(renglones).map((r) => r.codigoModelo)).toEqual([
+      'A',
+      'B',
+      'C',
+    ]);
+  });
+});
 
 // ── 🔴 Folio por secuencia atómica (A3) ─────────────────────────────────────────────
 

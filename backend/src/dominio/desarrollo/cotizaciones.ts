@@ -13,8 +13,17 @@
  * 🔴 **Su regla, la que es fácil equivocar:** si en la segunda vuelta sólo cambian **3 de los 5**
  * modelos, **la cotización nueva lleva LOS CINCO**. El cliente la lee sola, sin la anterior al lado;
  * mandarle sólo el delta lo obligaría a reconstruir el paquete de memoria. *Una cotización dice lo
- * que se ofrece AHORA, completo.* Por eso `emitirCotizacion` NO recibe una selección de renglones:
- * toma los de la lista, todos.
+ * que se ofrece AHORA, completo.* Por eso `emitirCotizacion` **NO recibe una selección de
+ * renglones**: el llamador no elige qué mandar.
+ *
+ * ⭐⭐ **V1-E8x (§Post-F9.155) — «todos» quiere decir TODOS LOS VIGENTES, y el matiz es de Daniel,
+ * no una excepción técnica.** Sus palabras: *«El dropeo se hace hasta la negociación. Hay un envío
+ * de cotización previa a la negociación. Ahí van todos. Después de la negociación solo hay que
+ * mandar los que están vigentes. Quitar los dropeados»*. Una sola regla cubre los dos momentos —
+ * **el papel muestra los renglones NO dropeados**— porque el estado ya lleva el tiempo dentro:
+ * antes de negociar no hay ninguno dropeado (salen todos, la *cotización previa*) y después salen
+ * los vigentes. La regla de arriba sigue intacta donde importa: **de los vigentes van TODOS**,
+ * hayan cambiado o no en esta vuelta; lo que nunca hubo, ni hay, es una casilla para escoger.
  *
  * Decisiones de diseño del lead (marcadas para que Daniel pueda objetarlas):
  *  1. **La cotización es INMUTABLE** — nace ya `emitida` (es la foto de un momento) y no se edita
@@ -27,7 +36,10 @@
  *     receta modelo→OP (§Post-F9.34).
  *  3. 🔴 **No se emite con un precio SIN APROBAR.** Mandarle al cliente un precio que el dueño no
  *     aprobó es exactamente el compromiso que nadie firmó (*"el precio lo apruebo solo yo"*). Si
- *     algún renglón no tiene `precioAprobado`, se rechaza NOMBRANDO cuáles.
+ *     algún renglón **vigente** no tiene `precioAprobado`, se rechaza NOMBRANDO cuáles.
+ *     ⭐ V1-E8x: la firma se le exige a los vigentes y **no a los dropeados** — a uno dropeado no se
+ *     le va a aprobar nada nunca, así que exigírsela dejaba la lista sin cotización PARA SIEMPRE
+ *     (§Post-F9.155). Si TODOS están dropeados no queda oferta que mandar y se rechaza diciéndolo.
  *
  * Innegociables aplicados:
  *  • A1 — toda la lógica vive aquí; las rutas sólo validan permiso + Zod y delegan.
@@ -41,7 +53,7 @@
  * Permisos (SIN inventar ninguno nuevo): **emitir/cancelar = `listas.negociar`** (dueño + gerente
  * comercial, que es quien está en la mesa) y **ver = `listas.ver`**.
  */
-import type { Prisma } from '../../datos/index.js';
+import type { EstadoRenglonLista, Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import {
@@ -102,6 +114,14 @@ export interface RenglonListaParaCongelar {
 }
 
 /**
+ * Un renglón de la lista listo para EMITIR: lo que se congela ({@link RenglonListaParaCongelar}) más
+ * los dos hechos que deciden si entra al papel ({@link RenglonAprobable}). Es un solo objeto a
+ * propósito: el guard filtra y devuelve **estos mismos objetos**, así que no hay forma de validar
+ * una lista y congelar otra.
+ */
+export type RenglonListaParaEmitir = RenglonListaParaCongelar & RenglonAprobable;
+
+/**
  * Lo MÍNIMO que hay que saber de un renglón para decidir si su precio puede salir en un papel: cómo
  * se llama el modelo (para nombrarlo en el rechazo) y si el dueño ya le firmó un precio.
  *
@@ -114,6 +134,35 @@ export interface RenglonAprobable {
   codigoModelo: string;
   /** `true` = el dueño ya le firmó un precio a este renglón. */
   aprobado: boolean;
+  /**
+   * ⭐⭐ V1-E8x (§Post-F9.155) — el estado del MODELO dentro de la lista. Sólo interesa una cosa de
+   * él aquí: si vale `'dropeado'`, **este renglón no existe para el papel**.
+   *
+   * Se pide el estado ENTERO y no un `dropeado: boolean` derivado a propósito: el criterio de qué
+   * es un renglón vigente vive en UN solo sitio ({@link renglonesVigentesDelPapel}) y no en cada
+   * llamador, que es justo el reparto que se torció con el `precioAprobado ?? precioCalculado` de
+   * los impresos.
+   */
+  estado: EstadoRenglonLista;
+}
+
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.155) — **LOS RENGLONES QUE SALEN EN EL PAPEL: los NO dropeados.**
+ *
+ * Es UNA regla que cubre los DOS momentos del negocio, y por eso no hay dos impresos. Daniel:
+ *
+ * > *«El dropeo se hace hasta la negociación. Hay un envío de cotización previa a la negociación.
+ * > Ahí van todos. Después de la negociación solo hay que mandar los que están vigentes. Quitar los
+ * > dropeados»*
+ *
+ * Antes de negociar no hay ninguno dropeado ⇒ salen todos (la *cotización previa*). Después ⇒ salen
+ * los vigentes. Preguntarle al renglón *"¿estás dropeado hoy?"* contesta las dos preguntas sin que
+ * nadie tenga que elegir qué versión del papel bajar.
+ */
+export function renglonesVigentesDelPapel<T extends { estado: EstadoRenglonLista }>(
+  renglones: readonly T[],
+): T[] {
+  return renglones.filter((r) => r.estado !== 'dropeado');
 }
 
 /**
@@ -133,22 +182,45 @@ export interface RenglonAprobable {
  *
  * También rechaza la lista VACÍA: un documento sin modelos no es una oferta, es una hoja en blanco.
  *
+ * ⭐⭐ **V1-E8x (§Post-F9.155) — Y AHORA SÓLO MIRA A LOS VIGENTES.** Exigía la firma de **TODOS** los
+ * renglones, dropeados incluidos. Un modelo dropeado —que por definición NUNCA se va a aprobar—
+ * dejaba la lista **sin PDF, sin Excel y sin cotización para siempre**, que es *exactamente* el
+ * escenario con el que Daniel pidió los estados (*«de una lista de 10 modelos, cierro 5 y los otros
+ * ya no los vendo»*); la única salida habría sido BORRAR el renglón, justo lo que los estados vienen
+ * a evitar. Hoy exige aprobación **sólo de los vigentes** y **devuelve esos vigentes**, para que el
+ * llamador imprima lo mismo que se validó: la regla no se puede aplicar a medias (validar aquí y
+ * volcar todo allá) porque el contenido del papel sale de este mismo retorno.
+ *
  * @param accion Lo que se intentó, en infinitivo y en el idioma del usuario: `'emitir la cotización'`,
  *   `'bajar el impreso de la lista'`, `'bajar el Excel de la lista'`.
+ * @returns Los renglones VIGENTES (no dropeados) — lo que de verdad va en el papel.
  */
-export function exigirRenglonesAprobados(renglones: RenglonAprobable[], accion: string): void {
+export function exigirRenglonesAprobados<T extends RenglonAprobable>(
+  renglones: readonly T[],
+  accion: string,
+): T[] {
   if (renglones.length === 0) {
     throw new ErrorConflicto(
       `La lista no tiene renglones: no hay nada que ${accion}. Agrega modelos a la lista primero.`,
     );
   }
-  const sinAprobar = renglones.filter((r) => !r.aprobado).map((r) => r.codigoModelo);
+  const vigentes = renglonesVigentesDelPapel(renglones);
+  if (vigentes.length === 0) {
+    // Caso límite REAL (§Post-F9.155): si se dropearon TODOS, no hay oferta que mandar — pero
+    // tampoco es un error críptico ni una hoja en blanco: se dice qué pasó y cómo se sale.
+    throw new ErrorConflicto(
+      `Todos los modelos de la lista están DROPEADOS: no queda ninguno vigente que ${accion}. ` +
+        'Revive al menos uno (déjalo en Abierto o En negociación) y vuelve a intentar.',
+    );
+  }
+  const sinAprobar = vigentes.filter((r) => !r.aprobado).map((r) => r.codigoModelo);
   if (sinAprobar.length > 0) {
     throw new ErrorConflicto(
       `No se puede ${accion}: estos modelos aún no tienen precio APROBADO por el dueño: ${sinAprobar.join(', ')}. ` +
         'Apruébalos (o teclea su precio) en la lista y vuelve a intentar.',
     );
   }
+  return vigentes;
 }
 
 /**
@@ -268,9 +340,14 @@ export function aCotizacionSalida(
 /**
  * ⭐ EMITE la cotización de una lista (A2/A3): el papel que sale de la mesa.
  *
- * Toma **TODOS** los renglones de la lista (regla de Daniel: aunque sólo hayan cambiado 3 de 5, la
- * cotización nueva lleva los cinco), exige que TODOS tengan precio aprobado, congela sus valores y
- * sella el documento con folio propio.
+ * Toma **TODOS los renglones VIGENTES** de la lista —los NO dropeados (§Post-F9.155)—, exige que
+ * TODOS ELLOS tengan precio aprobado, congela sus valores y sella el documento con folio propio.
+ * La regla de Daniel sigue en pie donde importa: aunque en esta vuelta sólo hayan cambiado 3 de 5,
+ * la cotización nueva lleva los cinco; lo que se queda fuera es lo que él ya dropeó, que es
+ * justamente lo que pidió *«quitar»* del papel después de negociar.
+ *
+ * 🔴 El guard {@link exigirRenglonesAprobados} **devuelve los vigentes**, y de ahí sale lo que se
+ * congela: no hay forma de validar una lista y congelar otra.
  *
  * Se serializa con el MISMO advisory lock por lista que usa toda mutación de la lista
  * (`NAMESPACE_LOCK_LISTA`): así la foto que se congela es COHERENTE — nadie aprueba, recalcula
@@ -311,7 +388,9 @@ export async function emitirCotizacion(
       throw new ErrorNoEncontrado('Lista de precios', datos.idLista);
     }
 
-    // TODOS los renglones de la lista, en su orden (la cotización va completa, siempre).
+    // TODOS los renglones de la lista, en su orden. Se leen todos —incluidos los dropeados— porque
+    // quien decide cuáles entran al papel es el guard de abajo, en UN solo sitio; filtrar aquí, en
+    // el `where`, escondería la regla en una consulta y dejaría el guard sin nada que rechazar.
     const lineas = await tx.listaPreciosLinea.findMany({
       where: { idLista: datos.idLista },
       orderBy: { id: 'asc' },
@@ -319,6 +398,9 @@ export async function emitirCotizacion(
         id: true,
         idPrecosto: true,
         precioAprobado: true,
+        // ⭐ V1-E8x (§Post-F9.155): decide si el renglón entra al papel. Sin él, un modelo dropeado
+        // se colaría a la cotización que se le manda al cliente.
+        estado: true,
         precosto: { select: { version: true } },
         desarrollo: {
           select: {
@@ -329,7 +411,7 @@ export async function emitirCotizacion(
       },
     });
 
-    const renglones: RenglonListaParaCongelar[] = lineas.map((l) => ({
+    const renglones: RenglonListaParaEmitir[] = lineas.map((l) => ({
       id: l.id,
       idPrecosto: l.idPrecosto,
       versionPrecosto: l.precosto.version,
@@ -337,13 +419,15 @@ export async function emitirCotizacion(
       descripcionModelo: l.desarrollo.modelo.descripcion,
       numeroCliente: l.desarrollo.numeroCliente,
       precioAprobado: l.precioAprobado === null ? null : num(l.precioAprobado),
+      aprobado: l.precioAprobado !== null,
+      estado: l.estado,
     }));
 
     // 🔴 El guard va ANTES del folio: si falta una aprobación no se quema un consecutivo.
-    exigirRenglonesAprobados(
-      renglones.map((r) => ({ codigoModelo: r.codigoModelo, aprobado: r.precioAprobado !== null })),
-      'emitir la cotización',
-    );
+    // ⭐ V1-E8x: y devuelve LOS VIGENTES — lo que se congela es exactamente lo que se validó, sin
+    // los dropeados (§Post-F9.155: *«Después de la negociación solo hay que mandar los que están
+    // vigentes. Quitar los dropeados»*).
+    const vigentes = exigirRenglonesAprobados(renglones, 'emitir la cotización');
 
     const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA);
     const fecha = datos.fecha === undefined ? new Date() : new Date(datos.fecha);
@@ -370,7 +454,7 @@ export async function emitirCotizacion(
       select: { id: true },
     });
 
-    const congelados = congelarRenglones(renglones, cotizacion.id, datosCreacion(sesion));
+    const congelados = congelarRenglones(vigentes, cotizacion.id, datosCreacion(sesion));
     await tx.cotizacionLinea.createMany({ data: congelados });
 
     await registrarBitacora(tx, sesion, {
@@ -382,8 +466,9 @@ export async function emitirCotizacion(
         folio: Number(folio),
         idLista: datos.idLista,
         // Qué se le ofreció, congelado, en la bitácora también: la respuesta a "¿qué le mandé?"
-        // no debe depender de que nadie toque la tabla del documento.
-        renglones: renglones.map((r) => ({
+        // no debe depender de que nadie toque la tabla del documento. Son los VIGENTES: la bitácora
+        // registra lo que SALIÓ, no lo que había en la lista.
+        renglones: vigentes.map((r) => ({
           codigoModelo: r.codigoModelo,
           versionPrecosto: r.versionPrecosto,
           precioUnit: r.precioAprobado ?? 0,

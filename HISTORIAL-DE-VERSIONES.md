@@ -32,6 +32,67 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+> 📌 **La 0.061 no se perdió: está aparcada a propósito.** Era el paquete del **costo** (la prenda
+> incompleta saliendo de tránsito como merma, el costo repartido entre las recibidas y el congelado al
+> cerrar la orden). Daniel decidió el 30-ago dejarlo para después —*«no es tan relevante ahorita el tema
+> del costo, avanza con lo demás»*—, pero **sus tres decisiones ya están tomadas y escritas**
+> (§Post-F9.154), así que se retoma sin volver a discutir nada. El número queda reservado.
+
+## 0.062 · 30-ago-2026 · **en prueba** — Cada modelo de la lista dice **en qué punto va**: abierto, en negociación, cerrado o **dropeado**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Saber qué modelos ya cerraste, de un vistazo.** Tus palabras: *«a veces de una lista de 10 modelos,
+  cierro 5 y los otros ya no los vendo»*. Ahora cada modelo dentro de la lista lleva su propio estado —
+  **Abierto → En negociación → Cerrado → Dropeado** — y se cambia desde la misma fila, sin abrir nada.
+
+- ⭐ **Un modelo «dropeado» ya no estorba.** Antes, para sacar de una lista un modelo que el cliente no
+  compró, **había que borrar el renglón** y con él toda su negociación. Ahora se marca como dropeado: se
+  apaga en la pantalla, deja de salir en el papel, y **conserva completa su historia** de precios y
+  comentarios.
+
+- **Y si el cliente se arrepiente, se revive.** Vuelve a «abierto» o «en negociación» con todo lo que
+  tenía. Queda registrado quién lo dropeó, cuándo, y quién lo revivió.
+
+- **El modelo cerrado queda protegido.** Una vez cerrado ya no admite rondas nuevas, ni acuerdos, ni que
+  se le mueva el precio — hasta que lo revivas a propósito. Es para que un precio pactado no se mueva por
+  accidente.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **El papel se ajusta solo a los dos momentos de tu negociación.** La regla es una sola: **sale lo que
+  no está dropeado**. Antes de negociar no hay ningún dropeado, así que **tu cotización previa sigue
+  llevando todos los modelos**; después de negociar, el PDF, el Excel y la cotización formal llevan
+  **sólo los vigentes**. No tienes que elegir qué versión bajar: el sistema ya sabe en qué punto estás.
+
+- 🔴 **Mover tus factores ya NO toca los modelos cerrados.** Tu frase lo explica: *«los factores son
+  elementos que me ayudan a saber mi margen… es solo para hacer mis cálculos»*. Cambiar el margen de 30 %
+  a 32 % recalcula los abiertos y en negociación, y **deja intactos los que ya cerraste** — porque ésos
+  son un compromiso con el cliente, no un resultado de tu calculadora. Si quieres cambiar un precio ya
+  cerrado, **revive el modelo primero**; así queda claro que fue a propósito.
+  ⚠️ **Esto arregló algo que estaba a punto de romperse:** tal como iba, cambiar un factor dejaba los
+  modelos cerrados trabados y **bloqueaba el PDF de toda la lista**.
+
+- **Dos etiquetas parecidas, dos cosas distintas.** La **lista** completa tiene su estado (arriba) y ahora
+  cada **modelo** tiene el suyo (en su fila). Los dos pueden decir «En negociación» al mismo tiempo y
+  significan cosas distintas: uno habla del documento, el otro de ese modelo. Se distinguen por la forma
+  del recuadro y por el rótulo de la columna, que ahora dice **«Estado del modelo»**.
+
+- **El contador de la lista cambió de cuenta.** Donde decía «8 de 10 aprobados» ahora descuenta los
+  dropeados, y te dice cuántos son. Antes un dropeado sin firmar dejaba el contador clavado aunque el PDF
+  ya se pudiera bajar.
+
+### Qué sigue pendiente o roto
+
+- **No hay campo para escribir POR QUÉ se dropeó un modelo.** Queda registrado quién y cuándo, pero no el
+  motivo. No se construyó porque no lo pediste; si lo quieres, se agrega sin tocar nada de lo demás.
+- **Cambiar factores sigue tumbando la firma de los modelos abiertos y en negociación** (sólo los cerrados
+  quedaron protegidos). Eso funcionaba así desde antes; se deja igual mientras no estorbe.
+- **Los cuatro estados todavía no se ven dentro de la mesa de negociación**, sólo en la lista y en el panel
+  del renglón.
+
+---
+
 ## 0.060 · 30-ago-2026 · **en prueba** — La mesa de negociación con su forma real, y **los estimados se quedan**
 
 > 📌 **Esta versión se construyó en una sesión y se revisó en otra.** Se cambió de sesión a media

@@ -42,8 +42,11 @@ import {
   aprobarLinea,
   crearLista,
   eliminarLista,
+  listarListas,
+  obtenerLista,
   quitarLineaLista,
 } from './listas-precios.js';
+import { cambiarEstadoRenglon } from './negociacion.js';
 import { congelarVersion, generarPrecosto } from './precostos.js';
 import { crearProyecto } from './proyectos.js';
 
@@ -284,6 +287,72 @@ describe('emitirCotizacion — el papel que sale de la mesa', () => {
     await expect(emitirCotizacion(otra, { idLista }, bd())).rejects.toBeInstanceOf(
       ErrorNoEncontrado,
     );
+  });
+});
+
+// ── ⭐⭐ V1-E8x (§Post-F9.155): EL DROPEADO Y EL PAPEL, CONTRA POSTGRES ──────────────
+
+describe('⭐⭐ V1-E8x — la cotización lleva los VIGENTES (§Post-F9.155)', () => {
+  it('todo renglón NACE «abierto» (el default de la columna, sobre la base de verdad)', async () => {
+    const { idLista } = await listaConModelos(['MOD-NACE'], false);
+    const lista = await obtenerLista(sesion(), idLista, bd());
+    expect(lista.lineas[0]!.estado).toBe('abierto');
+    expect(lista.lineas[0]!.nombreEstado).toBe('Abierto');
+  });
+
+  it('🔴 un DROPEADO sin aprobar ya no bloquea la emisión, y NO se congela en el papel', async () => {
+    // Cuatro modelos: se aprueban tres y el cuarto se DROPEA sin firmar (un dropeado nunca se
+    // aprueba). Antes de §Post-F9.155 esta lista se quedaba sin cotización para siempre.
+    const { idLista, idsLinea } = await listaConModelos(['MOD-A', 'MOD-B', 'MOD-C'], false);
+    await aprobarLinea(sesion(), idsLinea[0]!, bd());
+    await aprobarLinea(sesion(), idsLinea[1]!, bd());
+    await cambiarEstadoRenglon(sesion(), idsLinea[2]!, { estado: 'dropeado' }, bd());
+
+    const cotizacion = await emitirCotizacion(sesion(), { idLista }, bd());
+
+    expect(cotizacion.lineas.map((l) => l.codigoModelo).sort()).toEqual(['MOD-A', 'MOD-B']);
+    // Y en la base quedaron DOS renglones congelados, no tres.
+    const guardadas = await cliente.cotizacionLinea.count({
+      where: { idCotizacion: cotizacion.id },
+    });
+    expect(guardadas).toBe(2);
+  });
+
+  it('⚠️ CASO LÍMITE — con TODOS dropeados se rechaza (y no quema folio)', async () => {
+    const { idLista, idsLinea } = await listaConModelos(['MOD-X', 'MOD-Y']);
+    for (const id of idsLinea) {
+      await cambiarEstadoRenglon(sesion(), id, { estado: 'dropeado' }, bd());
+    }
+
+    await expect(emitirCotizacion(sesion(), { idLista }, bd())).rejects.toThrow(ErrorConflicto);
+    expect(await cliente.cotizacion.count()).toBe(0);
+  });
+
+  it('REVIVIR un dropeado lo devuelve al papel con su precio aprobado intacto', async () => {
+    const { idLista, idsLinea } = await listaConModelos(['MOD-REV', 'MOD-FIJO']);
+    await cambiarEstadoRenglon(sesion(), idsLinea[0]!, { estado: 'dropeado' }, bd());
+
+    const soloUno = await emitirCotizacion(sesion(), { idLista }, bd());
+    expect(soloUno.lineas).toHaveLength(1);
+
+    await cambiarEstadoRenglon(sesion(), idsLinea[0]!, { estado: 'en_negociacion' }, bd());
+    const conLosDos = await emitirCotizacion(sesion(), { idLista }, bd());
+    // Vuelve SIN tener que re-aprobar: revivir conserva toda la historia (§Post-F9.155 punto 3).
+    expect(conLosDos.lineas.map((l) => l.codigoModelo).sort()).toEqual(['MOD-FIJO', 'MOD-REV']);
+  });
+
+  it('el conteo del LISTADO se lee contra los vigentes (aprobados sobre no dropeados)', async () => {
+    const { idsLinea } = await listaConModelos(['MOD-L1', 'MOD-L2', 'MOD-L3'], false);
+    await aprobarLinea(sesion(), idsLinea[0]!, bd());
+    await cambiarEstadoRenglon(sesion(), idsLinea[1]!, { estado: 'dropeado' }, bd());
+    await aprobarLinea(sesion(), idsLinea[2]!, bd());
+
+    const listado = await listarListas(sesion(), {}, bd());
+    const resumen = listado[0]!;
+    expect(resumen.totalRenglones).toBe(3);
+    expect(resumen.renglonesDropeados).toBe(1);
+    // 2 aprobados de 2 vigentes ⇒ de esta lista YA sale papel, y el listado lo dice.
+    expect(resumen.renglonesAprobados).toBe(2);
   });
 });
 

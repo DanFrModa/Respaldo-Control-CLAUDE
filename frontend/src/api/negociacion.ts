@@ -34,9 +34,15 @@ export type RondaCuerpo =
 /** Cuerpo de un acuerdo. */
 export type AcuerdoCuerpo =
   paths['/api/listas-precios/lineas/{idLinea}/acuerdos']['post']['requestBody']['content']['application/json'];
-/** Cuerpo del cambio de estado. */
+/** Cuerpo del cambio de estado de la LISTA (el documento). */
 export type CambiarEstadoCuerpo =
   paths['/api/listas-precios/{id}/estado']['patch']['requestBody']['content']['application/json'];
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151): cuerpo del cambio de estado de un RENGLÓN (el modelo dentro de la
+ * lista). Es OTRO eje, no el de arriba: aquél mueve el documento entero.
+ */
+export type CambiarEstadoRenglonCuerpo =
+  paths['/api/listas-precios/lineas/{idLinea}/estado']['patch']['requestBody']['content']['application/json'];
 /** Resultado de la calculadora de negociación (costo/neto/margen). */
 export type SimulacionNegociacion =
   paths['/api/listas-precios/lineas/{idLinea}/simular']['get']['responses']['200']['content']['application/json'];
@@ -100,6 +106,18 @@ async function registrarAcuerdo(idLinea: number, cuerpo: AcuerdoCuerpo): Promise
 async function cambiarEstado(id: number, cuerpo: CambiarEstadoCuerpo): Promise<ListaDetalle> {
   const { data, error } = await api.PATCH('/api/listas-precios/{id}/estado', {
     params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function cambiarEstadoDeRenglon(
+  idLinea: number,
+  cuerpo: CambiarEstadoRenglonCuerpo,
+): Promise<ListaDetalle> {
+  const { data, error } = await api.PATCH('/api/listas-precios/lineas/{idLinea}/estado', {
+    params: { path: { idLinea } },
     body: cuerpo,
   });
   if (!data) throw new ErrorDeApi(error);
@@ -290,6 +308,33 @@ export function useCambiarEstadoLista(): UseMutationResult<
   const invalidar = useInvalidar();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCambiarEstado) => cambiarEstado(id, cuerpo),
+    onSuccess: invalidar,
+  });
+}
+
+/** Argumentos del cambio de estado de un RENGLÓN. */
+export interface ArgsCambiarEstadoRenglon {
+  idLinea: number;
+  cuerpo: CambiarEstadoRenglonCuerpo;
+}
+
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151) — mueve el estado de UN MODELO dentro de la lista: abierto → en
+ * negociación → cerrado → dropeado, y la vuelta (REVIVIR, §Post-F9.155). Permiso `listas.negociar`,
+ * el mismo que mueve el estado de la lista; SIN permiso nuevo.
+ *
+ * Invalida lo mismo que una ronda: el detalle de la lista (el chip y los botones del papel cambian)
+ * **y el hilo de EVENTOS del renglón**, porque cada transición agrega ahí su constancia inmutable.
+ */
+export function useCambiarEstadoRenglon(): UseMutationResult<
+  ListaDetalle,
+  ErrorDeApi,
+  ArgsCambiarEstadoRenglon
+> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ idLinea, cuerpo }: ArgsCambiarEstadoRenglon) =>
+      cambiarEstadoDeRenglon(idLinea, cuerpo),
     onSuccess: invalidar,
   });
 }

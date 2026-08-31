@@ -20,8 +20,18 @@ vi.mock('@/api/cotizaciones', () => ({
   useEmitirCotizacion: () => ({ mutate: emitirMutate, isPending: false }),
 }));
 
-function renglon(id: number, codigo: string, precioAprobado: number | null): ListaLinea {
+function renglon(
+  id: number,
+  codigo: string,
+  precioAprobado: number | null,
+  estado: ListaLinea['estado'] = 'abierto',
+): ListaLinea {
   return {
+    // ⭐ V1-E8x (§Post-F9.155): el estado decide si el renglón entra al papel.
+    estado,
+    nombreEstado: estado === 'dropeado' ? 'Dropeado' : 'Abierto',
+    estadoPorId: null,
+    estadoEn: null,
     id,
     idDesarrollo: id * 10,
     idPrecosto: id * 100,
@@ -195,5 +205,86 @@ describe('⭐ V1-E8d — costo viejo al emitir la cotización', () => {
       { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver']) },
     );
     expect(screen.queryByTestId('aviso-costo-viejo-cotizacion')).not.toBeInTheDocument();
+  });
+});
+
+// ── ⭐⭐ V1-E8x (§Post-F9.155): EL DROPEADO Y LA COTIZACIÓN ──────────────────────────
+//
+// Daniel: *«El dropeo se hace hasta la negociación. Hay un envío de cotización previa a la
+// negociación. Ahí van todos. Después de la negociación solo hay que mandar los que están
+// vigentes. Quitar los dropeados»*.
+
+describe('⭐⭐ V1-E8x — la cotización lleva los VIGENTES (§Post-F9.155)', () => {
+  beforeEach(() => {
+    emitirMutate.mockReset();
+  });
+
+  /** Los cinco de siempre, con MOD-C DROPEADO y sin firmar (un dropeado nunca se aprueba). */
+  const CON_DROPEADO = [
+    renglon(1, 'MOD-A', 137),
+    renglon(2, 'MOD-B', 210),
+    renglon(3, 'MOD-C', null, 'dropeado'),
+    renglon(4, 'MOD-D', 60),
+    renglon(5, 'MOD-E', 180),
+  ];
+
+  function abrir(lineas: ListaLinea[]): void {
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista(lineas)} />,
+      { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver', 'consultas.ver-importes']) },
+    );
+  }
+
+  it('🔴 el DROPEADO sin firmar ya NO bloquea la emisión (el defecto que rompía la versión)', () => {
+    abrir(CON_DROPEADO);
+    expect(screen.getByTestId('confirmar-emitir-cotizacion')).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('🔴 y NO aparece en la lista de lo que se le manda al cliente', () => {
+    abrir(CON_DROPEADO);
+    const renglones = screen.getByTestId('renglones-cotizacion');
+    expect(renglones.children).toHaveLength(4);
+    expect(renglones).not.toHaveTextContent('MOD-C');
+    expect(screen.getByText(/los 4 modelos vigentes/i)).toBeInTheDocument();
+  });
+
+  it('se DICE cuál se cayó (no desaparece en silencio) y cómo recuperarlo', () => {
+    abrir(CON_DROPEADO);
+    const aviso = screen.getByTestId('dropeados-fuera-cotizacion');
+    expect(aviso).toHaveTextContent('MOD-C');
+    expect(aviso).toHaveTextContent(/revívelos en la lista/i);
+  });
+
+  it('la SUMA no cuenta al dropeado (sería una oferta inflada con algo que no va)', () => {
+    // 137 + 210 + 60 + 180 = 587 (sin los 95 de MOD-C, que además va sin firmar).
+    abrir([
+      renglon(1, 'MOD-A', 137),
+      renglon(2, 'MOD-B', 210),
+      renglon(3, 'MOD-C', 500, 'dropeado'),
+      renglon(4, 'MOD-D', 60),
+      renglon(5, 'MOD-E', 180),
+    ]);
+    const resumen = screen.getByText(/Suma de precios/);
+    expect(resumen).toHaveTextContent('587');
+  });
+
+  it('⚠️ CASO LÍMITE — con TODOS dropeados no se emite, y se dice por qué', () => {
+    abrir(CINCO.map((l) => ({ ...l, estado: 'dropeado' as const, nombreEstado: 'Dropeado' })));
+    expect(screen.getByTestId('confirmar-emitir-cotizacion')).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/todos los modelos.*dropeados/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/[Rr]evive al menos uno/);
+  });
+
+  it('sin dropeados, el aviso NO se pinta y van los cinco (la «cotización previa»)', () => {
+    abrir(CINCO);
+    expect(screen.queryByTestId('dropeados-fuera-cotizacion')).not.toBeInTheDocument();
+    expect(screen.getByTestId('renglones-cotizacion').children).toHaveLength(5);
+  });
+
+  it('un modelo CERRADO sí va (es uno vendido, no uno caído)', () => {
+    abrir(CINCO.map((l) => ({ ...l, estado: 'cerrado' as const, nombreEstado: 'Cerrado' })));
+    expect(screen.getByTestId('renglones-cotizacion').children).toHaveLength(5);
+    expect(screen.getByTestId('confirmar-emitir-cotizacion')).toBeEnabled();
   });
 });

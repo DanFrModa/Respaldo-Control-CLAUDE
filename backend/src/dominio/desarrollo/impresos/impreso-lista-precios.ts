@@ -10,6 +10,10 @@
  * por el dominio). La ruta EXIGE `consultas.ver-importes`, así que en este camino los precios siempre
  * llegan (el impreso ES la exportación de precios).
  *
+ * ⭐⭐ **V1-E8x (§Post-F9.155) — LOS DROPEADOS NO SALEN.** El papel muestra los renglones NO
+ * dropeados, y esa única regla cubre los dos momentos: antes de negociar no hay ninguno dropeado
+ * (sale la lista completa, la *cotización previa* de Daniel) y después salen sólo los vigentes.
+ *
  * 🔴 **V1-E8b (§Post-F9.125(c)) — SIN APROBACIÓN NO SALE ESTA HOJA.** Imprimía
  * `precioAprobado ?? precioCalculado`, o sea que de una lista sin firmar salía un papel con precios
  * que nadie autorizó y con la MISMA pinta que el bueno. Daniel: *"si no está aprobado no debería de
@@ -76,8 +80,8 @@ export interface DepsImpresoListaPrecios {
 
 /**
  * Resuelve los datos del impreso de la lista (A9). Reusa `obtenerLista` (renglones con sus precios ya
- * resueltos), EXIGE que todos los renglones estén aprobados (§Post-F9.125(c)) y proyecta el precio a
- * imprimir.
+ * resueltos), EXIGE que los renglones **VIGENTES** estén aprobados (§Post-F9.125(c) + §Post-F9.155) y
+ * proyecta a imprimir **sólo esos**: los dropeados no salen en la hoja que ve el cliente.
  */
 export async function armarDatosImpresoListaPrecios(
   sesion: SesionUsuario,
@@ -90,7 +94,11 @@ export async function armarDatosImpresoListaPrecios(
 
   // §Post-F9.125(c): ni un borrador de una lista sin aprobar. Va ANTES de armar nada — si no puede
   // salir, no se gasta un worker de PDF en construirlo.
-  exigirRenglonesAprobados(lista.lineas, 'bajar el impreso de la lista');
+  //
+  // ⭐⭐ V1-E8x (§Post-F9.155): el guard exige la firma **sólo de los vigentes** y DEVUELVE esos
+  // vigentes, que son los que se imprimen. Los dropeados no salen en la hoja que ve el cliente —y
+  // tampoco se mencionan: que un modelo se haya caído es asunto NUESTRO, no suyo.
+  const vigentes = exigirRenglonesAprobados(lista.lineas, 'bajar el impreso de la lista');
 
   return {
     empresa: sesion.nombreEmpresaActiva,
@@ -100,7 +108,7 @@ export async function armarDatosImpresoListaPrecios(
     fecha: lista.fecha,
     estado: lista.nombreEstado,
     notas: lista.notas,
-    renglones: lista.lineas.map((l) => ({
+    renglones: vigentes.map((l) => ({
       codigoModelo: l.codigoModelo,
       descripcionModelo: l.descripcionModelo,
       numeroCliente: l.numeroCliente,
