@@ -1218,12 +1218,12 @@ export type DatosModeloFotoEditar = z.infer<typeof esquemaModeloFotoEditarCuerpo
 
 // ══ ⭐⭐ V1-E8r — BANDEJA «Recetas por revisar» (§Post-F9.140, DANIEL) ════════════════════════════
 //
-// La COLA de la compuerta de V1-E7d. Daniel: *"despues de una negociacion, tiene que haber una
+// La COLA de la revisión de V1-E7d. Daniel: *"despues de una negociacion, tiene que haber una
 // validadcion de la receta original… de alguna manera deberia de pasar un filtro para ver lo que se
 // negocio con el cliente. y como se cerro"*. Es de SOLO LECTURA: la bandeja NO firma, LLEVA a la
 // ficha del modelo, donde se revisa viéndola (§Post-F9.80).
 
-/** Una versión a la que la revisión le está negando producción (§Post-F9.140). */
+/** Una versión cuya revisión todavía no está firmada (§Post-F9.140). */
 export const esquemaRecetaPorRevisar = z
   .object({
     idModelo: z.number().int().describe('Id de la VERSIÓN que espera revisión.'),
@@ -1241,7 +1241,7 @@ export const esquemaRecetaPorRevisar = z
       .nullable()
       .describe('Nº del sufijo de versión (`-01` → 1), o null si el linaje sólo viene del padre.'),
     estado: esquemaEstadoRevisionModelo.describe(
-      'Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (misma lectura que la compuerta). Nunca llega `aprobada`: eso ya no espera nada.',
+      'Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (la misma lectura que la ficha del modelo). Nunca llega `aprobada`: eso ya no espera nada.',
     ),
     revisionNota: z
       .string()

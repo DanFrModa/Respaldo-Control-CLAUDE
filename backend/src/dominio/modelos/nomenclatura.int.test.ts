@@ -1537,7 +1537,7 @@ describe('derivarModeloDeProduccion — el linaje 1:N', () => {
     });
   });
 
-  // ── Las cuatro guardas ──────────────────────────────────────────────────────────
+  // ── Las guardas ─────────────────────────────────────────────────────────────────
 
   it('el desarrollo tiene que existir', async () => {
     await expect(
@@ -1579,12 +1579,17 @@ describe('derivarModeloDeProduccion — el linaje 1:N', () => {
   });
 
   /**
-   * LA COMPUERTA de V1-E7d (§Post-F9.110), evaluada contra el PADRE — que es lo correcto: el hijo
-   * no existe todavía cuando hay que decidir, y no lleva revisión propia porque su receta es la del
-   * padre. Sin esto, derivar sería la TERCERA puerta lateral por la que una versión sin revisar
-   * llegaría a producción.
+   * ⭐⭐ V1-E9c (§Post-F9.169) — **DERIVAR TAMPOCO PREGUNTA POR LA REVISIÓN.** Esta prueba afirmaba
+   * lo contrario: V1-E9a había puesto aquí la compuerta de V1-E7d evaluada contra el PADRE. Daniel
+   * la disolvió (*"no detiene ni la producción ni los demás renglones ya firmados"*), y derivar es
+   * precisamente el acto de producir: es lo que V1-E3 va a llamar para hacer nacer un modelo de
+   * producción por cada color de la OC del cliente.
+   *
+   * 🔴 Se prueba contra Postgres y no sólo con un doble porque lo que importa es que el hijo NAZCA
+   * de verdad —fila, número y vínculo— cuando la receta del padre está sin revisar: un `not.toThrow`
+   * pasaría igual con la derivación rota.
    */
-  it('⭐ una VERSIÓN sin revisar no puede derivar hijos (la compuerta se evalúa contra el padre)', async () => {
+  it('⭐⭐ una VERSIÓN sin revisar SÍ deriva hijos (la compuerta se retiró, V1-E9c)', async () => {
     const idRaiz = await crearDesarrolloConFicha('CYA-26-71-007');
     const version = await cliente.modelo.create({
       data: {
@@ -1600,17 +1605,17 @@ describe('derivarModeloDeProduccion — el linaje 1:N', () => {
       select: { id: true },
     });
 
-    await expect(enTx((tx) => derivarModeloDeProduccion(tx, sesion(), version.id))).rejects.toThrow(
-      /REVISIÓN/,
-    );
-
-    // Aprobada, sí deriva — si no, la prueba pasaría igual con la derivación rota del todo.
-    await cliente.modelo.update({
-      where: { id: version.id },
-      data: { revisionEstado: 'aprobada' },
-    });
     const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), version.id));
     expect(hijo.numeroProduccion).toBe(71_001);
+
+    const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: hijo.idModelo } });
+    expect(fila.origen).toBe('produccion');
+    expect(fila.idModeloDesarrollo).toBe(version.id);
+
+    // Y la revisión del PADRE no se tocó al derivar: sigue pendiente, y sigue siendo verdad.
+    expect(
+      (await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } })).revisionEstado,
+    ).toBe('pendiente');
   });
 
   // ── El número: mismas reglas que la promoción ───────────────────────────────────

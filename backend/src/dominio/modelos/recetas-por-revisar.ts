@@ -7,13 +7,18 @@
  * receta, pero otros que habra que cambiar en vivo (a estimado) y despues buscar proveedor y
  * cambiar la receta para produccion"*.
  *
- * 🔴 **EL PROBLEMA QUE RESUELVE — y lo que NO se vuelve a construir.** La compuerta que Daniel pidió
- * en §Post-F9.110 **ya existe** desde V1-E7d: `exigirRevisionAprobadaParaProducir`
- * (`revision-modelo.ts`) le niega producción a toda versión sin firma, y lo hace dentro de
- * `promoverAProduccionNucleo`, así que cubre también la puerta lateral de generar la OP. Lo que
- * **no existía** es la COLA: ninguna consulta listaba lo que espera revisión, así que **la
- * compuerta era un muro al final del camino, no un filtro** — te topabas con ella cuando ya
- * querías producir. Esto es la cola. La firma sigue donde estaba.
+ * 🔴 **EL PROBLEMA QUE RESUELVE.** V1-E7d había construido la FIRMA (§Post-F9.110) y, con ella, un
+ * muro que le negaba producción a la versión sin revisar. Lo que **no existía** era la COLA:
+ * ninguna consulta listaba lo que espera revisión, así que el muro estaba al final del camino y no
+ * al principio — te topabas con él cuando ya querías producir. Esto es la cola.
+ *
+ * 🔴🔴 **V1-E9c (§Post-F9.169) — EL MURO YA NO ESTÁ, Y ESTA BANDEJA SE VOLVIÓ LO ÚNICO QUE HAY.**
+ * Daniel disolvió la compuerta (*"no detiene ni la producción ni los demás renglones ya
+ * firmados"*): lo único que frena el gasto es la firma POR RENGLÓN de la receta de la orden. La
+ * revisión del modelo sobrevive como **REGISTRO** —dice que alguien miró lo que se negoció—, y sin
+ * muro detrás, **esta lista es la única forma de que ese registro se levante**: si nadie ve lo que
+ * falta por revisar, nadie lo revisa. Por eso aquí abajo la regla 3 se invirtió: ya NO se filtra
+ * por `origen = 'desarrollo'`.
  *
  * 🔴 **LA BANDEJA NO FIRMA: LLEVA.** Regla que Daniel fijó sobre la bandeja hermana «Recetas por
  * liberar» al quitarle su botón de aprobar en bloque: *"siempre se debe liberar uno por uno… no
@@ -23,46 +28,47 @@
  *
  * ── QUÉ CAE AQUÍ, y por qué exactamente eso ────────────────────────────────────────────────────
  *
- *  1. ⭐ **Lo que la COMPUERTA bloquea — preguntado con SU MISMA función**, no con un predicado
- *     parecido: {@link revisionBloqueaProduccion} y su gemela en SQL
- *     {@link SQL_REVISION_BLOQUEA_PRODUCCION}, ambas en `revision-modelo.ts` y probadas juntas
- *     sobre las 16 combinaciones. Escribir aquí `revision_estado = 'pendiente'` —lo obvio— habría
- *     dejado fuera dos poblaciones que el muro SÍ frena: las versiones con la columna en **NULL**
+ *  1. ⭐ **Lo que le FALTA la firma — preguntado con la MISMA función que la pinta en la ficha**,
+ *     no con un predicado parecido: {@link revisionSinAprobar} y su gemela en SQL
+ *     {@link SQL_REVISION_SIN_APROBAR}, ambas en `revision-modelo.ts` y probadas juntas
+ *     sobre las 32 combinaciones. Escribir aquí `revision_estado = 'pendiente'` —lo obvio— habría
+ *     dejado fuera dos poblaciones que tampoco están firmadas: las versiones con la columna en **NULL**
  *     (las que ya existían al desplegarse V1-E7d; su migración dice *"para ellas NULL se lee como
- *     `pendiente`"*) y las **rechazadas**, que tampoco pueden producirse. Bloqueadas e invisibles
- *     es justo el estado que esta etapa viene a matar.
+ *     `pendiente`"*) y las **rechazadas**, que son lo contrario de una firma. Sin firmar e
+ *     invisibles es justo el estado que esta etapa vino a matar.
  *  2. ⭐ **Sólo VERSIONES**, que es lo que nació de una negociación (`idModeloPadre` o
  *     `versionDesarrollo`). Va dentro del predicado de arriba, y por eso los **~4,987 modelos
  *     migrados del Access** —`revisionEstado` en NULL a propósito, *"no cambian de conducta"*— no
  *     se cuelan: no son versiones de nadie. Es lo que mantiene la bandeja CORTA, que es lo que
  *     Daniel pidió al decir *"hay muchos modelos que si se aceptan tal cual"*: los que se aceptan
  *     tal cual nunca generaron una versión, así que aquí no aparecen.
- *  3. **Sólo las de `origen = 'desarrollo'`.** Medido: `promoverAProduccionNucleo` rechaza un
- *     modelo ya de producción ANTES de llamar a la compuerta, y `salidaAProduccion` sólo promueve
- *     si `origen === 'desarrollo'` — o sea, a una versión ya promovida el muro no la frena y no hay
- *     nada que desatorar. (Y firmarla es imposible: `exigirVersionRevisable` la rechaza por estar
- *     en producción.) Listarla sería un renglón sobre el que nadie puede hacer nada.
+ *  3. ⭐⭐ **TAMBIÉN las que YA están en producción** (V1-E9c). Hasta aquí se filtraba
+ *     `origen = 'desarrollo'`, y la razón escrita era literalmente *"a una versión ya promovida el
+ *     muro no la frena y no hay nada que desatorar; y firmarla es imposible"*. **Las dos mitades de
+ *     esa razón se cayeron el mismo día**: al disolverse el muro, generar la OP promueve la versión
+ *     con la revisión en `pendiente` (antes no podía llegar ahí), y `exigirVersionRevisable` dejó
+ *     de rechazar el modelo de producción justamente para que se pueda firmar. Filtrarlas hoy
+ *     dejaría **fuera de la vista precisamente a las que ya están corriendo sin que nadie las
+ *     revisara** — que son las que urgen, no las que menos.
  *  4. **NO se filtra por `activo`**, a propósito: `promoverAProduccionNucleo` no mira esa bandera,
- *     así que una versión dada de baja sigue pudiendo intentar producirse y toparse con el muro.
- *     Esconderla aquí volvería a fabricar el "bloqueada e invisible".
+ *     así que una versión dada de baja sigue pudiendo producirse. Esconderla aquí volvería a
+ *     fabricar el "sin firmar e invisible".
  *
  * ── CÓMO SE RECORRE — las tres decisiones que Daniel fijó en la bandeja hermana, adaptadas ──────
  *
  *  1. **Una fila por VERSIÓN**, que es lo que una persona resuelve de una sentada (allá era una
  *     ORDEN). Se revisa la receta de un modelo completa: telas, avíos y arte de ESE modelo.
- *  2. **Ordenada por lo que ESTORBA PRIMERO.** Allá era la fecha de entrega de la orden; aquí se
- *     midió que **por los caminos de la UI una versión frenada no llega a tener OP** —generarla
- *     exige promover, y el muro lo impide—, así que "el modelo con OP ya generada" no sirve como
- *     criterio: casi siempre sería falso. ⚠️ **No es un absoluto**: existe la TERCERA PUERTA que
- *     documenta `revision-modelo.ts` —`POST /api/ordenes` → `crearOrden` crea una OP **sin
- *     promover**, así que no pasa por la compuerta—, un hueco **sólo por API**, **pre-existente**
- *     (viene de F2) y anotado como deuda con nombre en `V1-etapas.md` §V1-E7d. No cambia este
- *     orden ni esconde nada: el modelo sigue en `desarrollo` y bloqueado, así que **sigue en esta
- *     bandeja**. Lo que sí existe y sí urge es el **PEDIDO** que ya está detrás: el cliente ya lo
- *     ordenó y la OP no puede nacer por donde se trabaja. Por eso el orden es la **fecha
- *     comprometida más próxima de los pedidos vivos** que dependen de esta versión (las sin fecha,
- *     al final, como allá), luego las que tienen pedido, luego la MÁS VIEJA (la que lleva más
- *     tiempo detenida en silencio).
+ *  2. **Ordenada por lo que ESTORBA PRIMERO: el DINERO que ya está esperando.** Allá era la fecha
+ *     de entrega de la orden; aquí es la **fecha comprometida más próxima de los pedidos vivos**
+ *     que dependen de esta versión (las sin fecha, al final, como allá), luego las que tienen
+ *     pedido, luego la MÁS VIEJA (la que lleva más tiempo esperando en silencio).
+ *
+ *     ⚠️ **V1-E9c corrigió el porqué, no el criterio.** Se justificaba diciendo que *"una versión
+ *     frenada no llega a tener OP"* y que por eso "el modelo con OP ya generada" no servía de
+ *     criterio. Sin muro, eso dejó de ser cierto: hoy una versión sin revisar SÍ puede tener OP.
+ *     El orden sigue igual porque el pedido es la señal más temprana y más cara —el cliente ya lo
+ *     ordenó— y porque la OP no dice nada del gasto: lo que frena el gasto es el renglón sin
+ *     liberar, no la orden.
  *  3. **La marca de «ya está frenando dinero»** (`conPedido`, con sus `piezasPedidas`): allá era
  *     `conOrdenCompra`. Aquí es que ya hay un pedido vivo del cliente esperando esta receta — no es
  *     lo mismo que una versión recién negociada a la que todavía nadie le pide nada.
@@ -94,7 +100,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import {
   estadoRevisionEfectivo,
-  SQL_REVISION_BLOQUEA_PRODUCCION,
+  SQL_REVISION_SIN_APROBAR,
   type EstadoRevision,
 } from './revision-modelo.js';
 
@@ -168,8 +174,8 @@ function negociacionDeLaVersion(idEmpresa: number): Prisma.Sql {
 }
 
 /**
- * BANDEJA «Recetas por revisar» (`modelos.ver`). Una fila por VERSIÓN a la que la revisión le está
- * negando producción, ordenada por lo que estorba primero.
+ * BANDEJA «Recetas por revisar» (`modelos.ver`). Una fila por VERSIÓN cuya revisión no está
+ * firmada —esté en desarrollo o ya en producción—, ordenada por lo que estorba primero.
  */
 export async function consultarRecetasPorRevisar(
   sesion: SesionUsuario,
@@ -199,8 +205,7 @@ export async function consultarRecetasPorRevisar(
     LEFT JOIN "modelos" padre ON padre."id" = m."id_modelo_padre"
     ${negociacionDeLaVersion(idEmpresa)}
     ${dineroEsperando(idEmpresa)}
-   WHERE m."origen"::text = 'desarrollo'
-     AND ${SQL_REVISION_BLOQUEA_PRODUCCION}
+   WHERE ${SQL_REVISION_SIN_APROBAR}
      ${condBusqueda}
      ${condSoloConPedido}
   `;
@@ -236,7 +241,7 @@ export async function consultarRecetasPorRevisar(
     descripcion: r.descripcion,
     codigoPadre: r.codigoPadre,
     versionDesarrollo: r.versionDesarrollo,
-    // El `null` se pliega a `pendiente` AQUÍ, con la misma función que la compuerta: la pantalla
+    // El `null` se pliega a `pendiente` AQUÍ, con la misma función que la ficha del modelo: la pantalla
     // recibe la palabra ya resuelta y no puede inventarse otra lectura del mismo hecho.
     estado: estadoRevisionEfectivo(r.revisionEstado),
     revisionNota: r.revisionNota,

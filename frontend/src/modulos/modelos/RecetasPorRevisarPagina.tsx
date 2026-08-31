@@ -23,9 +23,14 @@ import { useDebounce } from '@/lib/useDebounce';
  * sea, de alguna manera deberia de pasar un filtro para ver lo que se negocio con el cliente. y como
  * se cerro."*
  *
- * EL PROBLEMA QUE RESUELVE. La revisión que impide producir una versión sin firmar **ya existía**
- * (V1-E7d), pero era un **MURO al final del camino**: te topabas con ella cuando ya querías generar
- * la OP, y no había forma de *ver* la cola. Esto es la cola.
+ * EL PROBLEMA QUE RESUELVE. La FIRMA de la receta negociada **ya existía** (V1-E7d), pero no había
+ * forma de *ver* la cola: sólo te topabas con ella cuando ya querías generar la OP. Esto es la cola.
+ *
+ * 🔴 **V1-E9c (§Post-F9.169) — Y AHORA ES LO ÚNICO QUE HAY.** Daniel disolvió el muro que había
+ * detrás: *"todo lo que no está firmado simplemente no se puede comprar, **pero no detiene ni la
+ * producción** ni los demás renglones ya firmados"*. La revisión pasó a ser un REGISTRO, así que
+ * esta lista es lo único que hace que se levante — y por eso **también salen las versiones que ya
+ * están en producción**: son las que están corriendo sin que nadie las haya revisado.
  *
  * 🔴 **LA BANDEJA NO FIRMA: LLEVA.** Es la regla que Daniel fijó sobre la bandeja hermana «Recetas
  * por liberar» cuando le quitó el botón de aprobar en bloque: *"siempre se debe liberar uno por
@@ -37,8 +42,8 @@ import { useDebounce } from '@/lib/useDebounce';
  *  • **Una fila por VERSIÓN** — lo que una persona resuelve de una sentada.
  *  • **Ordenada por lo que ESTORBA PRIMERO**: la fecha comprometida del pedido que está detenido
  *    detrás de esta receta; las que nadie ha pedido, al final, y entre ellas la más vieja arriba.
- *  • **«Ya frena un pedido»** marca las versiones que el cliente YA ordenó: ahí la OP no puede
- *    nacer hasta que esto se revise. No es lo mismo que una versión recién negociada.
+ *  • **«Ya frena un pedido»** marca las versiones que el cliente YA ordenó: ahí hay dinero
+ *    comprometido esperando esta receta. No es lo mismo que una versión recién negociada.
  *  • **«De»** es el modelo padre — *"la receta original"* contra la que Daniel quiere cotejar.
  *
  * A1: la fecha comprometida, las piezas y la marca las AGREGA EL SERVIDOR (misma regla que la
@@ -82,9 +87,8 @@ export function RecetasPorRevisarPagina(): React.JSX.Element {
               Recetas por revisar
             </h1>
             <p className="text-[12.5px] text-muted-foreground">
-              Versiones que nacieron de una negociación y todavía no pasan la revisión de receta:
-              hasta que se firmen no pueden mandarse a producir. «Ver la receta» abre la ficha del
-              modelo, que es donde se revisa y se firma viéndola.
+              Versiones que nacieron de una negociación y cuya receta todavía no se revisa. «Ver la
+              receta» abre la ficha del modelo, que es donde se revisa y se firma viéndola.
             </p>
           </div>
         </div>

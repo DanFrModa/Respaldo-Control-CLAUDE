@@ -368,7 +368,7 @@ export {
   esquemaRevisionAprobarCuerpo,
   esquemaRevisionRechazarCuerpo,
   esquemaRevisionModeloSalida,
-  // ⭐ V1-E8r (§Post-F9.140) — la BANDEJA «Recetas por revisar»: la cola de la compuerta de V1-E7d.
+  // ⭐ V1-E8r (§Post-F9.140) — la BANDEJA «Recetas por revisar»: la cola de la revisión de V1-E7d.
   esquemaRecetaPorRevisar,
   esquemaRecetasPorRevisarQuery,
   esquemaRecetasPorRevisarDominio,

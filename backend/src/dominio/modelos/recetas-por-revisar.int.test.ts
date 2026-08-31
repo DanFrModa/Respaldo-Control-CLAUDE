@@ -6,16 +6,18 @@
  *  (a) 🔴 **LO QUE EL USUARIO PIDIÓ VER, SE VE.** Daniel pidió *"un filtro para ver lo que se
  *      negocio con el cliente"*: una versión que espera revisión aparece en la lista, con su código,
  *      el de su padre y el cliente con el que se negoció.
- *  (b) 🔴 **LAS TRES POBLACIONES QUE EL MURO FRENA salen las tres**: `pendiente`, el **NULL** de las
+ *  (b) 🔴 **LAS TRES POBLACIONES SIN FIRMA salen las tres**: `pendiente`, el **NULL** de las
  *      versiones anteriores a V1-E7d y la **rechazada**. Una bandeja escrita con
- *      `revision_estado = 'pendiente'` dejaría las otras dos bloqueadas e invisibles.
+ *      `revision_estado = 'pendiente'` dejaría las otras dos sin firmar e invisibles.
  *  (c) 🔴 **LO QUE NO ESPERA NADA NO SE CUELA**: los modelos migrados del Access (NULL pero sin
- *      linaje), las versiones ya APROBADAS y las que ya están en producción.
+ *      linaje) y las versiones ya APROBADAS. ⭐ **V1-E9c: las que YA están en producción SÍ salen**
+ *      (§Post-F9.169, decisión (b)) — sin muro detrás, una versión promovida sin revisar es la que
+ *      más urge ver, no la que menos.
  *  (d) El ORDEN elegido (fecha comprometida del pedido → con pedido → la más vieja) y que sea el
  *      SERVIDOR quien agrega el dinero que espera.
  *  (e) A9: un pedido de OTRA empresa no marca «ya frena dinero».
- *  (f) 🔴 **GUARDAS GEMELAS**: el predicado en TS de la compuerta y su gemelo en SQL contestan lo
- *      MISMO sobre las 16 combinaciones posibles de (padre × versión × estado).
+ *  (f) 🔴 **GUARDAS GEMELAS**: el predicado en TS (`revisionSinAprobar`) y su gemelo en SQL
+ *      contestan lo MISMO sobre las 32 combinaciones de (padre × versión × hijo 1:N × estado).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -28,8 +30,8 @@ import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
 import { consultarRecetasPorRevisar } from './recetas-por-revisar.js';
 import {
-  revisionBloqueaProduccion,
-  SQL_REVISION_BLOQUEA_PRODUCCION,
+  revisionSinAprobar,
+  SQL_REVISION_SIN_APROBAR,
   type EstadoRevision,
 } from './revision-modelo.js';
 
@@ -205,14 +207,14 @@ describe('bandeja «Recetas por revisar» (§Post-F9.140)', () => {
     });
   });
 
-  it('⭐ (b) la versión anterior a V1-E7d (revisionEstado en NULL) SÍ sale: el muro la frena igual', async () => {
+  it('⭐ (b) la versión anterior a V1-E7d (revisionEstado en NULL) SÍ sale: tampoco está firmada', async () => {
     const raiz = await crearRaiz('CYA-26-71-002');
     const v = await crearVersion('CYA-26-71-002-01', raiz.id, 1, { revisionEstado: null });
 
     const pagina = await consultarRecetasPorRevisar(sesion(), {}, bd());
 
     expect(pagina.datos.map((d) => d.idModelo)).toEqual([v.id]);
-    // El null se pliega a `pendiente` EN EL SERVIDOR, con la misma lectura que la compuerta.
+    // El null se pliega a `pendiente` EN EL SERVIDOR, con la misma lectura que la ficha del modelo.
     expect(pagina.datos[0]?.estado).toBe('pendiente');
   });
 
@@ -249,7 +251,13 @@ describe('bandeja «Recetas por revisar» (§Post-F9.140)', () => {
     expect(pagina.total).toBe(0);
   });
 
-  it('(c) la versión YA PROMOVIDA a producción no sale: el muro ya no la frena y firmarla es imposible', async () => {
+  it('⭐⭐ (c) la versión YA PROMOVIDA a producción SÍ sale: es la que más urge (V1-E9c)', async () => {
+    // 🔴 LA PRUEBA DE LA DECISIÓN (b) DE §Post-F9.169. Esta prueba afirmaba lo CONTRARIO, y su
+    // razón escrita era *"el muro ya no la frena y firmarla es imposible"*. Al disolverse la
+    // compuerta las dos mitades se cayeron: generar la OP promueve la versión con la revisión en
+    // `pendiente` —antes ni siquiera podía llegar ahí— y firmarla ya es posible. Filtrarla hoy
+    // escondería justo a la que está corriendo sin que nadie la revisara. Si alguien devuelve el
+    // `WHERE m."origen" = 'desarrollo'`, esta prueba muere.
     const raiz = await crearRaiz('CYA-26-71-005');
     await crearVersion('71005', raiz.id, 1, {
       revisionEstado: 'pendiente',
@@ -258,7 +266,9 @@ describe('bandeja «Recetas por revisar» (§Post-F9.140)', () => {
 
     const pagina = await consultarRecetasPorRevisar(sesion(), {}, bd());
 
-    expect(pagina.total).toBe(0);
+    expect(pagina.total).toBe(1);
+    expect(pagina.datos[0]?.codigo).toBe('71005');
+    expect(pagina.datos[0]?.estado).toBe('pendiente');
   });
 
   it('⭐ (d) ORDEN: primero la de fecha comprometida más próxima; las sin pedido, al final por antigüedad', async () => {
@@ -390,13 +400,13 @@ describe('bandeja «Recetas por revisar» (§Post-F9.140)', () => {
 });
 
 /**
- * 🔴 GUARDAS GEMELAS. El predicado de la COMPUERTA vive en TS (`revisionBloqueaProduccion`, que es
- * literalmente lo que `exigirRevisionAprobadaParaProducir` pregunta antes de lanzar) y la BANDEJA lo
- * necesita en SQL (`SQL_REVISION_BLOQUEA_PRODUCCION`). Dos formas del mismo hecho se desincronizan
+ * 🔴 GUARDAS GEMELAS. El predicado *¿le falta la firma?* vive en TS (`revisionSinAprobar`, que es
+ * lo que la ficha del modelo pinta como chip) y la BANDEJA lo necesita en SQL
+ * (`SQL_REVISION_SIN_APROBAR`). Dos formas del mismo hecho se desincronizan
  * solas, así que aquí se corren LAS DOS sobre las 16 combinaciones posibles y se comparan fila por
  * fila. Si alguien mueve una y no la otra, esta prueba muere.
  */
-describe('guardas gemelas: la compuerta (TS) y la bandeja (SQL) contestan lo mismo', () => {
+describe('guardas gemelas: el predicado (TS) y la bandeja (SQL) contestan lo mismo', () => {
   /**
    * ⭐ V1-E9a — el barrido pasó de 16 a **32** combinaciones: se le sumó el eje del linaje 1:N
    * (`id_modelo_desarrollo`), que las tres copias del predicado tienen que excluir igual.
@@ -432,7 +442,7 @@ describe('guardas gemelas: la compuerta (TS) y la bandeja (SQL) contestan lo mis
             });
             casos.push({
               id: modelo.id,
-              esperado: revisionBloqueaProduccion({
+              esperado: revisionSinAprobar({
                 idModeloPadre: conPadre ? raiz.id : null,
                 versionDesarrollo: conVersion ? 1 : null,
                 idModeloDesarrollo,
@@ -446,7 +456,7 @@ describe('guardas gemelas: la compuerta (TS) y la bandeja (SQL) contestan lo mis
     }
 
     const bloqueadosSql = await cliente.$queryRaw<{ id: number }[]>(Prisma.sql`
-      SELECT m."id" AS "id" FROM "modelos" m WHERE ${SQL_REVISION_BLOQUEA_PRODUCCION}
+      SELECT m."id" AS "id" FROM "modelos" m WHERE ${SQL_REVISION_SIN_APROBAR}
     `);
     const idsSql = new Set(bloqueadosSql.map((f) => f.id));
 

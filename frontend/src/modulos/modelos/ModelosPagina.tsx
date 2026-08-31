@@ -87,11 +87,11 @@ const TONO_REVISION = {
 
 /**
  * ⭐ V1-E7d — ¿Este modelo nació de una NEGOCIACIÓN, o sea, es una VERSIÓN? Es el MISMO predicado
- * que usa el dominio para decidir a quién alcanza la compuerta (`esVersionDeModelo`, en
+ * que usa el dominio para decidir a quién alcanza la revisión (`esVersionDeModelo`, en
  * `backend/src/dominio/modelos/revision-modelo.ts`): el LINAJE, no el estado de la firma.
  *
  * ⭐ **V1-E9a — y los HIJOS del linaje 1:N quedan fuera:** ver el comentario de dentro. Las tres
- * copias del predicado (aquí, `esVersionDeModelo` y su gemela SQL `SQL_REVISION_BLOQUEA_PRODUCCION`)
+ * copias del predicado (aquí, `esVersionDeModelo` y su gemela SQL `SQL_REVISION_SIN_APROBAR`)
  * excluyen a los hijos, y las tres se movieron JUNTAS: mover una sola las desincroniza.
  *
  * ⚠️ **Por qué no se pregunta por `revisionEstado !== null`,** que es lo que esta pantalla hacía:
@@ -111,10 +111,9 @@ function esVersionDeModelo(
   // su desarrollo y NO lleva revisión propia: la firma que lo habilitó es la del padre.
   //
   // 🔴 Sin esta línea, el chip de abajo se pinta SÓLO por el linaje —sin mirar `origen`— y cada
-  // hijo se enseñaría a sí mismo como «Revisión pendiente · no puede mandarse a producir», SIN
-  // ningún botón para arreglarlo, sobre un modelo que ya está en producción (el backend rechaza
-  // firmar cualquier cosa que ya sea de producción). Es la cicatriz de §Post-F9.119 que V1-E7d vino
-  // a cerrar, y aquí se cierra ANTES de que exista.
+  // hijo se enseñaría a sí mismo como «Revisión pendiente» y pediría una firma que no le toca: su
+  // receta es la del padre, y firmarla en el hijo sería firmar dos veces lo mismo. Aquí se cierra
+  // ANTES de que exista.
   //
   // ⚠️ `typeof === 'number'` y no `!== null`, EXACTAMENTE como el dominio: esta exclusión es lo
   // único que puede apagar el chip, y su modo de fallo tiene que caer del lado seguro — lo que no
@@ -127,7 +126,7 @@ function esVersionDeModelo(
 
 /**
  * Con qué estado se PINTA la revisión de una versión. El null se lee como `pendiente`, igual que
- * en la compuerta del backend: nadie la firmó, y una versión sin firma no puede producirse.
+ * en el backend (`estadoRevisionEfectivo`): nadie la firmó.
  */
 function estadoRevision(modelo: Modelo): keyof typeof ETIQUETA_REVISION {
   return modelo.revisionEstado ?? 'pendiente';
@@ -782,11 +781,12 @@ export function ModelosPagina(): React.JSX.Element {
                     </button>
                   </span>
                 ) : null}
-                {/* ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110). Sólo aparece
-                    en las VERSIONES —se pregunta por el linaje, ver `esVersionDeModelo`—, porque
-                    es a ellas a quienes la compuerta del backend les exige la firma. Dice en qué
-                    quedó, quién firmó y cuándo; el rechazo enseña además el motivo, porque es lo
-                    único que le sirve a quien tiene que corregir. */}
+                {/* ⭐ V1-E7d — LA REVISIÓN de la receta negociada (§Post-F9.110). Sólo aparece en
+                    las VERSIONES —se pregunta por el linaje, ver `esVersionDeModelo`—, porque son
+                    las únicas que la llevan. Dice en qué quedó, quién firmó y cuándo; el rechazo
+                    enseña además el motivo, porque es lo único que le sirve a quien corrige.
+                    ⚠️ V1-E9c (§Post-F9.169): la revisión ya NO impide producir, así que el chip
+                    tampoco lo dice — es un REGISTRO de que alguien miró lo que se negoció. */}
                 {esVersionDeModelo(seleccion) ? (
                   <span
                     className="flex flex-wrap items-center gap-2 text-xs font-normal text-muted-foreground"
@@ -803,7 +803,7 @@ export function ModelosPagina(): React.JSX.Element {
                           : ''}
                       </span>
                     ) : seleccion.revisionNota === null ? (
-                      <span>Nadie la ha revisado todavía; no puede mandarse a producir.</span>
+                      <span>Nadie la ha revisado todavía.</span>
                     ) : null}
                     {estadoRevision(seleccion) !== 'aprobada' && seleccion.revisionNota !== null ? (
                       <span className="text-crit">«{seleccion.revisionNota}»</span>
@@ -839,15 +839,18 @@ export function ModelosPagina(): React.JSX.Element {
                 </Button>
               ) : null}
               {/* ⭐ V1-E7d — Firmar la REVISIÓN. Va bajo el MISMO permiso que crear la versión
-                  (`modelos.aprobar-receta`, hasta Gerencial) y sólo se pinta en las versiones
-                  —por el LINAJE, nunca por el estado de la firma: una versión SIN firmar es justo
-                  la que más necesita el botón— y mientras no estén ya en producción, porque
-                  después la revisión ya no gobierna nada. Ocultarlo es cortesía: quien de verdad
-                  niega producir sin revisión es el backend, dentro del núcleo de la promoción (por
-                  eso también cubre «generar la OP»). */}
-              {puedeVersionar &&
-              esVersionDeModelo(seleccion) &&
-              seleccion.origen === 'desarrollo' ? (
+                  (`modelos.aprobar-receta`, hasta Gerencial) y sólo se pinta en las versiones —por
+                  el LINAJE, nunca por el estado de la firma: una versión SIN firmar es justo la que
+                  más necesita el botón—.
+
+                  ⭐⭐ V1-E9c (§Post-F9.169) — **y TAMBIÉN con el modelo ya en producción.** Aquí
+                  había un `seleccion.origen === 'desarrollo'` que tenía sentido mientras la firma
+                  abriera una compuerta: promovido el modelo, ya no había nada que abrir. Sin
+                  compuerta, generar la OP promueve la versión con la revisión en `pendiente`, así
+                  que ese filtro dejaba un chip *«Revisión pendiente»* SIN ningún botón para
+                  resolverlo, para siempre — exactamente la cicatriz de §Post-F9.119. El backend
+                  también levantó su guard (`exigirVersionRevisable`); las dos se movieron juntas. */}
+              {puedeVersionar && esVersionDeModelo(seleccion) ? (
                 <>
                   {estadoRevision(seleccion) === 'aprobada' ? null : (
                     <Button

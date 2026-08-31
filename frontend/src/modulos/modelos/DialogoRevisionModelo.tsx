@@ -64,8 +64,8 @@ export function DialogoRevisionModelo({
         onSuccess: () => {
           toast.success(
             esRechazo
-              ? `Revisión de ${modelo.codigo} rechazada. No puede mandarse a producir.`
-              : `Revisión de ${modelo.codigo} aprobada. Ya puede mandarse a producir.`,
+              ? `Revisión de ${modelo.codigo} rechazada. Queda en «Recetas por revisar».`
+              : `Revisión de ${modelo.codigo} aprobada.`,
           );
           alCambiarAbierto(false);
         },

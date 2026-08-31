@@ -65,7 +65,6 @@ import {
   crearModeloNucleo,
   type MarcaNomenclaturaModelo,
 } from './modelos.js';
-import { exigirRevisionAprobadaParaProducir } from './revision-modelo.js';
 
 /** Tope del consecutivo de un par concepto+género (Daniel: los otros 3 dígitos). */
 export const CONSECUTIVO_MAX = 999;
@@ -697,14 +696,10 @@ export async function promoverAProduccionNucleo(
       numeroProduccion: true,
       idTipoProducto: true,
       idGenero: true,
-      // ⭐ V1-E7d — lo que mira LA COMPUERTA de la revisión (ver abajo).
-      idModeloPadre: true,
-      versionDesarrollo: true,
-      // ⭐ V1-E9a — el linaje 1:N: `esVersionDeModelo` lo mira para dejar fuera a los hijos.
-      idModeloDesarrollo: true,
-      revisionEstado: true,
-      revisadoEn: true,
-      revisionNota: true,
+      // ⚠️ V1-E9c — aquí venían `idModeloPadre` / `versionDesarrollo` / `idModeloDesarrollo` /
+      // `revisionEstado` / `revisadoEn` / `revisionNota`: los leía LA COMPUERTA de la revisión, que
+      // §Post-F9.169 disolvió (ver abajo). Sin ella nadie los pregunta, y un `select` que arrastra
+      // columnas que no se usan hace creer que alguna regla las mira.
     },
   });
   if (modelo === null) {
@@ -719,19 +714,19 @@ export async function promoverAProduccionNucleo(
     );
   }
 
-  // ⭐ V1-E7d (§Post-F9.110) — LA REVISIÓN ANTES DE MANDAR A PRODUCIR.
+  // 🔴🔴 V1-E9c (§Post-F9.169) — AQUÍ ESTABA LA COMPUERTA DE LA REVISIÓN, Y SE QUITÓ.
   //
-  // ⚠️ **Va AQUÍ, en el núcleo, y no en el endpoint «pasar a producción».** Este núcleo tiene DOS
-  // llamadores: ese endpoint y `produccion/salida-produccion.ts` paso 4 — es decir, **generar una
-  // OP promueve el modelo sola**. Con la compuerta en el endpoint, una versión sin revisar llegaría
-  // a producción por la PUERTA LATERAL de generar su OP, que es exactamente lo que la decisión de
-  // Daniel viene a impedir: *"enfrente del cliente puede ser que se cometa una imprudencia o un
-  // error"*. Esconder un botón es cortesía; negar la operación es la regla.
+  // `exigirRevisionAprobadaParaProducir(modelo)` frenaba aquí a toda VERSIÓN sin firma, y como este
+  // núcleo lo comparten el endpoint «pasar a producción» y `salida-produccion.ts` paso 4 (generar
+  // la OP promueve el modelo sola), frenaba las dos. Daniel: *«Todo lo que no está firmado
+  // simplemente no se puede comprar. **Pero no detiene ni la producción** ni los demás renglones ya
+  // firmados.»* Promover es el acto de producir, así que aquí no queda ninguna raya: la orden nace
+  // con la receta pendiente de revisar y lo que se frena, renglón por renglón, es COMPRARLE
+  // material (`produccion/receta-orden.ts`).
   //
-  // Y alcanza SÓLO a las versiones: un modelo que no nació de una negociación pasa igual que
-  // siempre (el porqué, en `revision-modelo.ts`). Va antes del lock a propósito — no se serializa
-  // el par de una promoción que va a rebotar.
-  exigirRevisionAprobadaParaProducir(modelo);
+  // ⚠️ **No volver a poner una guarda de revisión en este camino.** La revisión sobrevive como
+  // REGISTRO —se firma desde la ficha del modelo y se lista en «Recetas por revisar»—, pero ya no
+  // gobierna ninguna operación.
 
   const digitos = await digitosDelModelo(tx, modelo);
 
@@ -912,7 +907,7 @@ function marcaProduccionDerivada(
  * *«¿cómo controlas que los cuatro lleven lo mismo?»*. Con cuatro copias no se controla, se vigila;
  * con una sola receta compartida **la igualdad es estructural**.
  *
- * ### Las cuatro guardas, y por qué cada una
+ * ### Las tres guardas, y por qué cada una
  *
  *  1. **El padre existe** → `ErrorNoEncontrado`.
  *  2. **El padre es de DESARROLLO.** Es la semántica de la columna (*«nació del desarrollo N»*) y,
@@ -923,11 +918,11 @@ function marcaProduccionDerivada(
  *     *"Hay que activarlo para poder usarlo nuevamente"*): descontinuar es reversible y cuesta un
  *     clic, pero que un modelo dado de baja vuelva a producirse **como efecto lateral** de generar
  *     una OP no se paga con nada.
- *  4. **La REVISIÓN del padre está aprobada** ({@link exigirRevisionAprobadaParaProducir}) — y se
- *     evalúa **contra el padre, no contra el hijo**, que es lo correcto por partida doble: el hijo
- *     no existe todavía cuando hay que decidir, y aunque existiera no llevaría revisión propia (su
- *     receta es la del padre; firmarla dos veces sería firmar lo mismo). Es la MISMA compuerta que
- *     protege la promoción, así que la puerta lateral de §Post-F9.110 sigue cerrada por este camino.
+ *
+ * ⚠️ **Hubo una cuarta guarda y V1-E9c la retiró:** la REVISIÓN del padre aprobada. La revisión ya
+ * no detiene producir (§Post-F9.169), así que derivar tampoco la pregunta. Un hijo puede nacer de
+ * un desarrollo cuya receta nadie ha revisado; lo que no se le puede comprar es el renglón que no
+ * esté liberado.
  *
  * ⚠️ **Corre dentro de la transacción del llamador** (A2) — recibe `tx`, no abre la suya: hacer
  * nacer los N hijos de una salida a producción es **un solo hecho**, y el advisory lock del par sólo
@@ -953,13 +948,8 @@ export async function derivarModeloDeProduccion(
       codigoDesarrollo: true,
       origen: true,
       activo: true,
-      // Lo que mira LA COMPUERTA de la revisión (V1-E7d), contra el PADRE.
-      idModeloPadre: true,
-      versionDesarrollo: true,
-      idModeloDesarrollo: true,
-      revisionEstado: true,
-      revisadoEn: true,
-      revisionNota: true,
+      // ⚠️ V1-E9c — aquí venían las seis columnas de la revisión, que leía la compuerta retirada
+      // (ver la guarda 4, borrada más abajo).
       // La FICHA que el hijo hereda tal cual.
       ...CAMPOS_FICHA_HEREDADOS,
     },
@@ -985,9 +975,12 @@ export async function derivarModeloDeProduccion(
     );
   }
 
-  // Guarda 4 — LA COMPUERTA (V1-E7d, §Post-F9.110), contra el PADRE. Va antes del lock a
-  // propósito: no se serializa el par de una derivación que va a rebotar.
-  exigirRevisionAprobadaParaProducir(padre);
+  // 🔴 V1-E9c (§Post-F9.169) — AQUÍ ESTABA LA GUARDA 4: la compuerta de la revisión evaluada
+  // contra el PADRE. Se fue por lo mismo que la de `promoverAProduccionNucleo`: derivar es el acto
+  // de producir, y la revisión ya no lo detiene. **Ojo con la medición vieja**: §Post-F9.164 contó
+  // UN solo llamador de la compuerta porque se midió antes de que V1-E9a añadiera éste; dejarlo
+  // habría devuelto el muro entero por la puerta más nueva —justo la que V1-E3 va a usar para
+  // hacer nacer un modelo por color—.
 
   const digitos = await digitosDelModelo(tx, padre);
 
