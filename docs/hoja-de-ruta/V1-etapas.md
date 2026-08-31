@@ -1326,7 +1326,15 @@ De ahí sale la regla, y conviene aplicarla tal cual:
 
 Multilínea porque una frase partida en dos renglones no la caza un `grep` por línea — así se
 escaparon la cuarta y la quinta. Y `.prisma` dentro porque de ahí se generan archivos que nadie
-revisa. ⛔ **Excepción que NO se toca: las migraciones ya aplicadas.** `migration.sql` lleva checksum
+revisa.
+
+🔴 **Y hubo una SÉPTIMA, que se nos escapó a los dos: estaba en el CONTRATO.** Un `.describe()` de
+`contrato/esquemas/modelo.ts` afirmaba *«su OP no puede nacer hasta que la receta se revise»* — la misma
+frase, en el único sitio que **viaja fuera del repo**: entra al OpenAPI y de ahí al cliente generado del
+frontend. La cazó, ya con la etapa aprobada, la medición de otra versión. ⇒ **la lista de sitios del
+barrido lleva `backend/src/contrato/` explícito**, y después del arreglo van `npm run openapi` y
+`npm run gen:api`, porque si no la frase vieja **sobrevive en los generados** aunque la fuente esté
+corregida. ⛔ **Excepción que NO se toca: las migraciones ya aplicadas.** `migration.sql` lleva checksum
 en `_prisma_migrations`; editarla aborta el siguiente `migrate deploy` con *«migration was modified
 after it was applied»* y **tumba el despliegue**. La frase muerta se queda ahí, a propósito.
 

@@ -1274,7 +1274,7 @@ export const esquemaRecetaPorRevisar = z
     conPedido: z
       .boolean()
       .describe(
-        '⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión y su OP no puede nacer hasta que la receta se revise. No es lo mismo que una versión recién negociada a la que nadie le pide nada.',
+        '⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión, así que lo que la receta sin firmar detiene es COMPRARLE el material, renglón por renglón. No es lo mismo que una versión recién negociada a la que nadie le pide nada. ⚠️ Decía «su OP no puede nacer hasta que la receta se revise»: eso fue verdad hasta V1-E9c (§Post-F9.169), que disolvió la compuerta — la OP nace igual.',
       ),
   })
   .describe('Una versión que espera revisión de receta (§Post-F9.140).');
