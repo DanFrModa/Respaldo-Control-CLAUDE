@@ -11443,7 +11443,18 @@ compartan modelo (no hay `@@unique` sobre `Orden.idModelo`).
 su número de producción de 5 dígitos, como Daniel acaba de decir. La conclusión del plan era correcta; **su
 argumento, no**. Se corrige aquí para que nadie vuelva a apoyarse en él.
 
-- **Aplica en:** confirma el Bloque 3 tal como está planeado (0.069 ✅ · 0.070 · 0.071 · 0.072).
-  **Fecha:** 2026-08-31.
+### ✅ RATIFICADO POR DANIEL, sin ambigüedad (31-ago-2026)
+
+Puestas las dos formas enfrente —copiar la receta a los N modelos, o que los N lean la del desarrollo—
+contestó:
+
+> *«**Que los cuatro lean la del desarrollo. Ésta es la correcta.**»*
+
+⇒ **La receta es UNA, la del modelo de desarrollo, y los N modelos de producción la LEEN.** No se copia, no
+se replica, no se sincroniza. Es la decisión central del Bloque 3 y queda cerrada con sus palabras, no por
+inferencia. **La 0.070 se construye exactamente así.**
+
+- **Aplica en:** confirma el Bloque 3 tal como está planeado (0.069 ✅ · **0.070 ← se está construyendo** ·
+  0.071 · 0.072). **Fecha:** 2026-08-31.
 
 ---
