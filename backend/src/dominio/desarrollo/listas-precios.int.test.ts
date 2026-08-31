@@ -405,7 +405,10 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
         },
         bd(),
       ),
-    ).rejects.toThrow(/ya está en otra lista/);
+      // ⚠️ El mensaje pasó a NEUTRO en la 0.064: `problemasDeCandidatura` lo comparte entre crear una
+      // lista y agregarle renglones, y en el segundo caso «otra» era FALSO — el modelo estaba en la
+      // lista que el usuario tenía enfrente. Aquí (alta) siempre es otra, pero el texto es el mismo.
+    ).rejects.toThrow(/ya está en una lista de precios/);
   });
 
   it('rechaza un desarrollo que no es del cliente/departamento indicado', async () => {
