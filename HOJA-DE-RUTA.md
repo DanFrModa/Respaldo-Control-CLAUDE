@@ -179,7 +179,7 @@
 >
 > | Versión | Etapa del plan | Qué trae |
 > |---|---|---|
-> | **0.069** ⬜ | E1 | **El linaje**: `idModeloDesarrollo` + `derivarModeloDeProduccion`. ⚠️ `idModeloPadre` **NO se puede reusar** (`esVersionDeModelo` haría que el hijo bloquee su propia promoción) y `codigoDesarrollo` es `@unique` ⇒ los hijos van con `NULL`. **Única con migración** (aditiva) |
+> | **0.069** ✅ | **E1 · El linaje**: `idModeloDesarrollo` + `derivarModeloDeProduccion` + la exclusión de los hijos en **las TRES copias** de `esVersionDeModelo`. 🔴 **El descubrimiento del camino:** escribir `!== null` en vez de `typeof === 'number'` **abría la compuerta de revisión** —las filas se arman como `Record<string, unknown>` donde la clave FALTA, y TypeScript no llega ahí— ⇒ *una versión sin revisar se iría a producción sin firma*. Regla: **lo que no se sabe, no excluye**. 🔴 Revisión **APROBADA con 4 condiciones**: faltaba validar el número **antes de que exista su llamador** (habría nacido un código de 6 dígitos, invisible a todo **para siempre**), la migración **se acreditaba** una garantía que la base no da sola (comprobado: acepta la cadena A→B→C), y una prueba **prometía una red que no tenía**. **Sin llamador a propósito** ⇒ el estado intermedio es **inalcanzable en producción**, que es lo que deja desplegar E1 sola | §Post-F9.135 · **.167** |
 > | **0.070** ⬜ | E2 | 🔴 **La receta compartida — la más grande de todo el programa.** El resolver en las tres lecturas canónicas **+ los ~44 sitios en 10 archivos que leen las tablas DIRECTO** + los escritores. ⚠️ **`ModeloAvioTalla` (las medidas por talla, R18) NO la lee ninguna de las tres**: con el resolver puesto sólo ahí, **cada orden de un hijo nacería SIN medidas por talla, en silencio** — y eso mueve el requerido del MRP. El sitio más caliente es `copiarRecetaDelModelo`, por donde pasa el 100 % de las órdenes |
 > | **0.071** ⬜ | E3 | **La salida a producción hace nacer N modelos.** Es el hueco que Daniel describió: hoy sus 4 OC producen **1** modelo y **1** renglón de inventario PT, porque `promoverAProduccionNucleo` **transforma una fila** en vez de crear otra |
 > | **0.072** ⬜ | E4 | **Corregir en bloque** las órdenes de la familia, **saltando la ya cortada y reportándola** (Daniel: *«Ok como propones»*). El precedente ya existe: `traerDelModelo` devuelve `traidos` + `respetados` |
@@ -2298,6 +2298,22 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 ---
 
 ## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
+
+> ### 📌 Deuda con nombre, anotada el 31-ago-2026 (V1-E9a / 0.069)
+>
+> **`derivarModeloDeProduccion` está construida y SIN LLAMADOR de producción.** Su llamador es
+> `salidaAProduccion` en **E3 / 0.071**. **No es código muerto sino pre-cableado**: nace con su llamador
+> nombrado a una etapa de distancia y la ejercitan 9 pruebas unitarias + 14 de integración — a diferencia
+> de `candidatosParaLista`, que **perdió** el suyo y por eso se retiró.
+> ⭐ **Y sin llamador el estado intermedio «hijo sin resolver de receta» es INALCANZABLE en producción**,
+> que es justamente lo que permitió desplegar E1 sola **sin arriesgar el precosto vacío** de §Post-F9.167.
+> ⚠️ **Se anota YA, no «si E3 se aplaza»**: cuesta una línea y el aplazamiento siempre se descubre tarde.
+> Si E3 se mueve de sitio, esta deuda pasa a revisión.
+>
+> **Y dos huecos previos, declarados en la 0.067 y NO cerrados:** `duplicarOC` y `autorizarOC` **se saltan
+> las dos puertas de la FIRMA** (no llaman a `validarLineas`). Se les puso el candado de compra, pero la
+> revisión de firmas sigue abierta en los dos. ⚠️ **Autorizar es el momento en que sale el dinero.**
+
 
 
 > 🔴 **La suite de backend tarda 25 min, y eso es deuda (25-ago-2026).** El `timeout-minutes` del job

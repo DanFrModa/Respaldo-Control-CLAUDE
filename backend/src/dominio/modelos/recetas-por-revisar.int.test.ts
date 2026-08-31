@@ -397,7 +397,16 @@ describe('bandeja «Recetas por revisar» (§Post-F9.140)', () => {
  * fila. Si alguien mueve una y no la otra, esta prueba muere.
  */
 describe('guardas gemelas: la compuerta (TS) y la bandeja (SQL) contestan lo mismo', () => {
-  it('coinciden en las 16 combinaciones de (padre × versión × estado de revisión)', async () => {
+  /**
+   * ⭐ V1-E9a — el barrido pasó de 16 a **32** combinaciones: se le sumó el eje del linaje 1:N
+   * (`id_modelo_desarrollo`), que las tres copias del predicado tienen que excluir igual.
+   *
+   * ⚠️ Un modelo con el vínculo 1:N **tiene que ser de PRODUCCIÓN** — lo exige el CHECK
+   * `modelos_linaje_desarrollo_solo_produccion_check` de la base, y es justamente lo que hace
+   * imposibles las cadenas. Por eso la mitad "con hijo" del barrido nace `produccion`: no es un
+   * detalle del arreglo, es la invariante bajo prueba.
+   */
+  it('coinciden en las 32 combinaciones de (padre × versión × hijo 1:N × estado de revisión)', async () => {
     const raiz = await crearRaiz('CYA-26-71-900');
     const estados: (EstadoRevision | null)[] = [null, 'pendiente', 'aprobada', 'rechazada'];
 
@@ -405,27 +414,33 @@ describe('guardas gemelas: la compuerta (TS) y la bandeja (SQL) contestan lo mis
     let n = 0;
     for (const conPadre of [false, true]) {
       for (const conVersion of [false, true]) {
-        for (const estado of estados) {
-          n += 1;
-          const modelo = await cliente.modelo.create({
-            data: {
-              codigo: `CYA-26-71-9${String(n).padStart(2, '0')}`,
-              origen: 'desarrollo',
-              idModeloPadre: conPadre ? raiz.id : null,
-              versionDesarrollo: conVersion ? 1 : null,
-              revisionEstado: estado,
-            },
-            select: { id: true },
-          });
-          casos.push({
-            id: modelo.id,
-            esperado: revisionBloqueaProduccion({
-              idModeloPadre: conPadre ? raiz.id : null,
-              versionDesarrollo: conVersion ? 1 : null,
-              revisionEstado: estado,
-            }),
-            etiqueta: `padre=${String(conPadre)} version=${String(conVersion)} estado=${String(estado)}`,
-          });
+        for (const conHijo of [false, true]) {
+          for (const estado of estados) {
+            n += 1;
+            const idModeloDesarrollo = conHijo ? raiz.id : null;
+            const modelo = await cliente.modelo.create({
+              data: {
+                codigo: `CYA-26-71-9${String(n).padStart(2, '0')}`,
+                // El CHECK de la base sólo deja llevar el vínculo 1:N a un modelo de producción.
+                origen: conHijo ? 'produccion' : 'desarrollo',
+                idModeloPadre: conPadre ? raiz.id : null,
+                versionDesarrollo: conVersion ? 1 : null,
+                idModeloDesarrollo,
+                revisionEstado: estado,
+              },
+              select: { id: true },
+            });
+            casos.push({
+              id: modelo.id,
+              esperado: revisionBloqueaProduccion({
+                idModeloPadre: conPadre ? raiz.id : null,
+                versionDesarrollo: conVersion ? 1 : null,
+                idModeloDesarrollo,
+                revisionEstado: estado,
+              }),
+              etiqueta: `padre=${String(conPadre)} version=${String(conVersion)} hijo=${String(conHijo)} estado=${String(estado)}`,
+            });
+          }
         }
       }
     }
@@ -442,8 +457,11 @@ describe('guardas gemelas: la compuerta (TS) y la bandeja (SQL) contestan lo mis
       );
     }
     // Y que de verdad haya de las dos: si el predicado devolviera siempre lo mismo, el bucle de
-    // arriba pasaría igual.
+    // arriba pasaría igual. 9 de los 16 sin vínculo 1:N bloquean; NINGUNO de los 16 con vínculo lo
+    // hace — ése es el número que muere si alguien quita la exclusión de los hijos en cualquiera de
+    // las dos formas del predicado.
     expect(casos.filter((c) => c.esperado).length).toBe(9);
-    expect(casos.filter((c) => !c.esperado).length).toBe(7);
+    expect(casos.filter((c) => !c.esperado).length).toBe(23);
+    expect(casos.filter((c) => c.etiqueta.includes('hijo=true') && c.esperado)).toEqual([]);
   });
 });

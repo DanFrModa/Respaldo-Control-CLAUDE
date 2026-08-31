@@ -56,9 +56,15 @@ import { z } from 'zod';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { validarEntrada } from '../../comun/validacion.js';
 import { siguienteFolioGlobal } from '../../comun/secuencias.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
+import {
+  CAMPOS_FICHA_HEREDADOS,
+  crearModeloNucleo,
+  type MarcaNomenclaturaModelo,
+} from './modelos.js';
 import { exigirRevisionAprobadaParaProducir } from './revision-modelo.js';
 
 /** Tope del consecutivo de un par concepto+género (Daniel: los otros 3 dígitos). */
@@ -694,6 +700,8 @@ export async function promoverAProduccionNucleo(
       // ⭐ V1-E7d — lo que mira LA COMPUERTA de la revisión (ver abajo).
       idModeloPadre: true,
       versionDesarrollo: true,
+      // ⭐ V1-E9a — el linaje 1:N: `esVersionDeModelo` lo mira para dejar fuera a los hijos.
+      idModeloDesarrollo: true,
       revisionEstado: true,
       revisadoEn: true,
       revisionNota: true,
@@ -808,6 +816,317 @@ export async function promoverAProduccionNucleo(
     numeroCapturado: numeroCapturado !== undefined,
     avisos,
   };
+}
+
+// ── ⭐⭐ V1-E9a · EL LINAJE 1:N — HACER NACER UN MODELO DE PRODUCCIÓN DE UN DESARROLLO ──────────
+//
+// §Post-F9.135 (DANIEL): cuatro órdenes de compra del cliente para **cuatro colores del mismo
+// modelo** producen hoy 4 órdenes y **UN SOLO modelo de producción**. Lo que tiene que pasar es que
+// nazcan **N modelos de producción** —uno por color, cada uno con SU número de 5 dígitos— y que los
+// N **compartan la receta** de su modelo de desarrollo. Esta etapa (V1-E9a) construye **el
+// vínculo**; el resolver que lee la receta por él es la siguiente (V1-E9b), y quien llama a esto
+// desde la salida a producción es la de después (V1-E9c).
+//
+// ⚠️ **La diferencia con `promoverAProduccionNucleo`, en una línea:** promover **transforma la fila**
+// del desarrollo (un `update`: le cambia el código, le pone el número y lo muda de catálogo);
+// derivar **crea una fila NUEVA** y deja el desarrollo **intacto y en su catálogo**, que es lo único
+// que permite que de un mismo desarrollo salgan cuatro. Las dos comparten TODO lo que decide el
+// número —los dígitos, el advisory lock del par, la propuesta del hueco libre, los avisos de
+// congruencia y la comprobación de choque—, porque son la misma regla de nomenclatura aplicada dos
+// veces, y por eso viven en el mismo archivo.
+
+/** Lo que se puede ajustar al derivar (el resto se HEREDA del modelo de desarrollo). */
+export interface DatosDerivarModelo {
+  /**
+   * Descripción del modelo hijo; si se omite, hereda la del padre. Existe para que quien llame
+   * (V1-E9c) pueda decir de qué COLOR es este hijo sin tener que editarlo después.
+   */
+  descripcion?: string | undefined;
+  /**
+   * Nº de producción capturado a mano, en vez del que propone el sistema. Misma semántica que en
+   * {@link promoverAProduccionNucleo}: la congruencia con los dígitos **avisa, no bloquea**
+   * (§Post-F9.34 punto 7 — *"si Daniel quiere una excepción, la excepción es suya"*), pero el
+   * número REPETIDO sí bloquea.
+   *
+   * ⚠️ **Se valida DENTRO de la función** (`esquemaNumeroProduccion`: entero de 5 dígitos), porque
+   * a diferencia de la promoción **este camino no pasa por ninguna ruta REST**: ver el comentario
+   * de la validación.
+   */
+  numeroCapturado?: number | undefined;
+}
+
+/** Resultado de derivar: el hijo que nació, con su número y los avisos de la serie. */
+export interface ResultadoDerivacion {
+  /** Id del modelo de PRODUCCIÓN recién nacido. */
+  idModelo: number;
+  /** Id del modelo de DESARROLLO del que nació (y de quien es la receta). */
+  idModeloDesarrollo: number;
+  /** Nº de producción asignado. */
+  numeroProduccion: number;
+  /** Código del hijo (= el número de 5 dígitos). */
+  codigo: string;
+  /** `true` si el número lo capturó el usuario en vez de aceptar la propuesta. */
+  numeroCapturado: boolean;
+  avisos: string[];
+}
+
+/**
+ * La marca con la que entra al catálogo un HIJO del linaje 1:N: producción, con su número, **sin
+ * código de desarrollo** y apuntando al desarrollo del que nació.
+ *
+ * ⚠️ **`codigoDesarrollo` va en `null`, y no es un olvido.** Esa columna es `@unique` global: si los
+ * cuatro hijos se llevaran el `CYA-26-71-001` del padre, el segundo reventaría contra el índice. Y
+ * tampoco sería verdad — ese código es del padre, que sigue vivo, en su catálogo y con él puesto,
+ * así que el número de desarrollo **no se pierde** (D3): se llega a él por `idModeloDesarrollo`,
+ * que es una liga de verdad y no un texto repetido.
+ *
+ * ⚠️ **`idModeloPadre` NO se toca** (queda en `null`): un hijo de producción **no es una versión**.
+ * Ver `esVersionDeModelo` en `revision-modelo.ts` para lo que pasaría si lo fuera.
+ */
+function marcaProduccionDerivada(
+  numeroProduccion: number,
+  idModeloDesarrollo: number,
+): MarcaNomenclaturaModelo {
+  return {
+    origen: 'produccion',
+    codigoDesarrollo: null,
+    numeroProduccion,
+    idModeloDesarrollo,
+  };
+}
+
+/**
+ * ⭐⭐ **HACE NACER UN MODELO DE PRODUCCIÓN A PARTIR DE UNO DE DESARROLLO** (§Post-F9.135, V1-E9a).
+ *
+ * El hijo nace **ya en producción**, con su propio código y número de 5 dígitos minteados con las
+ * MISMAS reglas que la promoción (hueco libre más bajo del par, bajo el advisory lock de la serie),
+ * hereda la **ficha** del padre ({@link CAMPOS_FICHA_HEREDADOS}) y **apunta a su receta en vez de
+ * copiarla**. Se puede llamar N veces sobre el mismo desarrollo: cada llamada da un hijo más, y el
+ * padre no recibe ni un `update`.
+ *
+ * 🔑 **QUE NO COPIE RECETA ES LO QUE LA HACE INOFENSIVA.** Es la diferencia entera con
+ * `mintearVersionDeModelo`, que sí copia: por eso aquélla vive en `versiones.ts`, declarado
+ * **excepción del embudo de receta** (`receta-embudo.test.ts`), y ésta no necesita serlo. Esta
+ * función **no escribe ni una fila de `ModeloTela`/`ModeloAvio`/`ModeloAvioTalla`/`ModeloArte`**, y
+ * eso no es una casualidad que haya que recordar: es lo que contesta la pregunta de Daniel
+ * *«¿cómo controlas que los cuatro lleven lo mismo?»*. Con cuatro copias no se controla, se vigila;
+ * con una sola receta compartida **la igualdad es estructural**.
+ *
+ * ### Las cuatro guardas, y por qué cada una
+ *
+ *  1. **El padre existe** → `ErrorNoEncontrado`.
+ *  2. **El padre es de DESARROLLO.** Es la semántica de la columna (*«nació del desarrollo N»*) y,
+ *     junto con el CHECK `modelos_linaje_desarrollo_solo_produccion_check` de la base, es **lo que
+ *     hace imposibles las CADENAS**: un hijo es de producción ⇒ nunca puede ser padre de otro. Un
+ *     modelo de producción tampoco necesita derivar: su receta ya es suya y su orden ya lo apunta.
+ *  3. **El padre está ACTIVO.** Mismo criterio que `mintearVersionDeModelo` (§Post-F9.119, DANIEL:
+ *     *"Hay que activarlo para poder usarlo nuevamente"*): descontinuar es reversible y cuesta un
+ *     clic, pero que un modelo dado de baja vuelva a producirse **como efecto lateral** de generar
+ *     una OP no se paga con nada.
+ *  4. **La REVISIÓN del padre está aprobada** ({@link exigirRevisionAprobadaParaProducir}) — y se
+ *     evalúa **contra el padre, no contra el hijo**, que es lo correcto por partida doble: el hijo
+ *     no existe todavía cuando hay que decidir, y aunque existiera no llevaría revisión propia (su
+ *     receta es la del padre; firmarla dos veces sería firmar lo mismo). Es la MISMA compuerta que
+ *     protege la promoción, así que la puerta lateral de §Post-F9.110 sigue cerrada por este camino.
+ *
+ * ⚠️ **Corre dentro de la transacción del llamador** (A2) — recibe `tx`, no abre la suya: hacer
+ * nacer los N hijos de una salida a producción es **un solo hecho**, y el advisory lock del par sólo
+ * vale mientras esa transacción viva.
+ *
+ * ⚠️ **Deja DOS renglones de bitácora para el mismo nacimiento**, y es a propósito: el `CREAR`
+ * genérico que escribe {@link crearModeloNucleo} (el alta, igual que cualquier otro modelo) y éste,
+ * que cuenta **el acto de derivar** — de qué padre, con qué número, propuesto o capturado, y con qué
+ * avisos. Sin el segundo, la bitácora no podría contestar *"¿de dónde salió el 71004?"* una vez que
+ * alguien mire la fila y sólo vea una columna con un id.
+ */
+export async function derivarModeloDeProduccion(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idModeloDesarrollo: number,
+  datos: DatosDerivarModelo = {},
+): Promise<ResultadoDerivacion> {
+  const padre = await tx.modelo.findUnique({
+    where: { id: idModeloDesarrollo },
+    select: {
+      id: true,
+      codigo: true,
+      codigoDesarrollo: true,
+      origen: true,
+      activo: true,
+      // Lo que mira LA COMPUERTA de la revisión (V1-E7d), contra el PADRE.
+      idModeloPadre: true,
+      versionDesarrollo: true,
+      idModeloDesarrollo: true,
+      revisionEstado: true,
+      revisadoEn: true,
+      revisionNota: true,
+      // La FICHA que el hijo hereda tal cual.
+      ...CAMPOS_FICHA_HEREDADOS,
+    },
+  });
+  if (padre === null) {
+    throw new ErrorNoEncontrado('Modelo', idModeloDesarrollo);
+  }
+
+  // Guarda 2 — ver el encabezado: la semántica de la columna, y la raíz de que no haya cadenas.
+  if (padre.origen !== 'desarrollo') {
+    throw new ErrorConflicto(
+      `El modelo "${padre.codigo}" YA está en el catálogo de producción, así que no se le pueden ` +
+        `derivar modelos de producción: los que nacen por color salen de un modelo de DESARROLLO, ` +
+        `que es de donde sale la receta que todos van a compartir.`,
+    );
+  }
+
+  // Guarda 3 — descontinuado: se reactiva a mano, nunca como efecto lateral (§Post-F9.119).
+  if (!padre.activo) {
+    throw new ErrorConflicto(
+      `El modelo "${padre.codigo}" está descontinuado; reactívalo primero si vas a producirlo. Se ` +
+        `hace desde la ficha del modelo, marcándolo como activo.`,
+    );
+  }
+
+  // Guarda 4 — LA COMPUERTA (V1-E7d, §Post-F9.110), contra el PADRE. Va antes del lock a
+  // propósito: no se serializa el par de una derivación que va a rebotar.
+  exigirRevisionAprobadaParaProducir(padre);
+
+  const digitos = await digitosDelModelo(tx, padre);
+
+  // El lock ANTES de mirar la ocupación: dentro de él, "elegir el hueco" y "escribirlo" son un solo
+  // hecho (ver el encabezado del módulo). Es el MISMO namespace y la MISMA clave que usa la
+  // promoción — tiene que serlo, porque las dos se reparten la misma serie de números.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_NUMERO_PRODUCCION}::int, ${parDe(
+    digitos.concepto,
+    digitos.genero,
+  )}::int)`;
+
+  const propuesta = await proponerNumeroProduccion(tx, digitos);
+  const avisos = [...propuesta.avisos];
+
+  let numero: number;
+  if (datos.numeroCapturado === undefined) {
+    if (propuesta.numero === null) {
+      throw new ErrorValidacion(
+        `No queda ningún número libre en la serie ${propuesta.serie.par}: captura el número de ` +
+          `producción a mano.`,
+      );
+    }
+    numero = propuesta.numero;
+  } else {
+    // 🔴 **EL NÚMERO CAPTURADO SE VALIDA AQUÍ, Y NO ES DUPLICAR LA CAPA API: ES QUE NO HAY.**
+    // `promoverAProduccionNucleo` recibe el suyo ya pasado por `esquemaNumeroProduccion` en la
+    // ruta REST (`modelos.ts` → `pasarModeloAProduccion`). Esta función **no tiene endpoint**: su
+    // llamador es `salidaAProduccion` (V1-E9c), dominio→dominio, **sin frontera Zod por medio**.
+    // Sin esta línea, un `123456` o un `5` que venga de ahí pasa entero: `codigoDeNumeroProduccion`
+    // no recorta ni rellena hacia abajo, así que nacería un modelo de producción con código de 6
+    // dígitos (o de 1) que ya **no casa con `PATRON_CODIGO_PRODUCCION`** — no lo vería
+    // `numeroProduccionDeCodigo`, ni `consecutivosUsados`, ni el centinela de choque, ni ninguno de
+    // los dos CHECK de la base, que sólo miran el linaje. Un modelo fuera de la nomenclatura, en
+    // silencio. La clase entera se cierra **antes de que E3 exista**, que es lo que E1 puede hacer
+    // gratis.
+    numero = validarEntrada(esquemaNumeroProduccion, datos.numeroCapturado);
+    avisos.push(...avisosDeCongruencia(numero, digitos));
+  }
+
+  const codigo = codigoDeNumeroProduccion(numero);
+
+  // Repetido = BLOQUEA (lo único que §Post-F9.34 pide impedir; el resto sólo avisa). Se comprueban
+  // las TRES columnas que pueden llevar el número, igual que la promoción. Aquí NO hay un `id` que
+  // excluir: el hijo todavía no existe.
+  const chocan = await tx.modelo.findFirst({
+    where: {
+      OR: [
+        { codigo: { equals: codigo, mode: 'insensitive' } },
+        { numeroProduccion: numero },
+        { codigoDesarrollo: { equals: codigo, mode: 'insensitive' } },
+      ],
+    },
+    select: { codigo: true, activo: true },
+  });
+  if (chocan !== null) {
+    throw new ErrorConflicto(
+      `El número de producción ${codigo} ya está ocupado por el modelo "${chocan.codigo}"` +
+        (chocan.activo ? '.' : ' (descontinuado).'),
+    );
+  }
+
+  // El alta pasa por el NÚCLEO compartido (`crearModeloNucleo`) y no por un `create` propio: así el
+  // hijo recibe las mismas comprobaciones de código libre y de FKs vivas, y la misma auditoría y
+  // bitácora de alta, que cualquier otro modelo del catálogo. Lo único suyo es la MARCA.
+  const hijo = await crearModeloNucleo(
+    tx,
+    sesion,
+    {
+      codigo,
+      // La ficha del padre, tal cual. `null` se pasa como `undefined` para que el núcleo
+      // simplemente no escriba la columna y la base ponga su default (`llevaArte`,
+      // `secuenciaEstampado`), en vez de estrellarse contra un NOT NULL.
+      ...sinNulos({
+        descripcion: datos.descripcion ?? padre.descripcion,
+        composicion: padre.composicion,
+        maquilaBase: padre.maquilaBase === null ? null : padre.maquilaBase.toNumber(),
+        corteBase: padre.corteBase === null ? null : padre.corteBase.toNumber(),
+        idTemporada: padre.idTemporada,
+        idCurvaTalla: padre.idCurvaTalla,
+        idGenero: padre.idGenero,
+        idTipoProducto: padre.idTipoProducto,
+        idMaquileroCotizado: padre.idMaquileroCotizado,
+        numOperaciones: padre.numOperaciones,
+        secuenciaEstampado: padre.secuenciaEstampado,
+        llevaArte: padre.llevaArte,
+      }),
+    },
+    marcaProduccionDerivada(numero, padre.id),
+  );
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'Modelo',
+    idEntidad: hijo.id,
+    accion: 'CREAR',
+    datos: {
+      operacion: 'derivar-modelo-de-produccion',
+      codigo,
+      numeroProduccion: numero,
+      numeroCapturado: datos.numeroCapturado !== undefined,
+      propuesto: propuesta.numero,
+      // De qué desarrollo salió — y de quién es, por lo tanto, la receta que va a leer (A7). Se
+      // guardan los DOS textos del padre: su código VIGENTE y su nº de desarrollo, que casi siempre
+      // valen lo mismo pero no tienen por qué (un código de desarrollo capturado a mano).
+      idModeloDesarrollo: padre.id,
+      codigoModeloDesarrollo: padre.codigo,
+      numeroDeDesarrollo: padre.codigoDesarrollo,
+      avisos,
+    },
+  });
+
+  return {
+    idModelo: hijo.id,
+    idModeloDesarrollo: padre.id,
+    numeroProduccion: numero,
+    codigo,
+    numeroCapturado: datos.numeroCapturado !== undefined,
+    avisos,
+  };
+}
+
+/**
+ * Quita del objeto las claves cuyo valor es `null`, dejándolas `undefined`.
+ *
+ * La ficha del padre se lee de Prisma, donde "no capturado" es `null`; el alta la recibe como
+ * `DatosModeloCrearMigracion`, donde "no capturado" es que la clave **no venga** — `crearModeloNucleo`
+ * decide con `!== undefined` qué columnas escribe. Sin esta traducción, un `secuenciaEstampado: null`
+ * o un `llevaArte: null` viajarían al `create` y reventarían contra el NOT NULL de la base, y un
+ * `idTemporada: null` pediría validar una temporada que nadie eligió.
+ */
+function sinNulos<T extends Record<string, unknown>>(
+  objeto: T,
+): { [K in keyof T]?: Exclude<T[K], null> } {
+  const salida: Record<string, unknown> = {};
+  for (const [clave, valor] of Object.entries(objeto)) {
+    if (valor !== null) {
+      salida[clave] = valor;
+    }
+  }
+  return salida as { [K in keyof T]?: Exclude<T[K], null> };
 }
 
 /**

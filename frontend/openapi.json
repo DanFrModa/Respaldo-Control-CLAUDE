@@ -31413,6 +31413,30 @@
                             ],
                             "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                           },
+                          "idModeloDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya."
+                          },
+                          "codigoModeloDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código del modelo de desarrollo del que nació (para enseñar el linaje), o null."
+                          },
                           "revisionEstado": {
                             "anyOf": [
                               {
@@ -31764,6 +31788,8 @@
                           "idModeloPadre",
                           "codigoPadre",
                           "versionDesarrollo",
+                          "idModeloDesarrollo",
+                          "codigoModeloDesarrollo",
                           "revisionEstado",
                           "idRevisadoPor",
                           "revisadoPor",
@@ -32165,6 +32191,30 @@
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo de desarrollo del que nació (para enseñar el linaje), o null."
+                    },
                     "revisionEstado": {
                       "anyOf": [
                         {
@@ -32516,6 +32566,8 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "revisionEstado",
                     "idRevisadoPor",
                     "revisadoPor",
@@ -32813,6 +32865,30 @@
                         }
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                    },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo de desarrollo del que nació (para enseñar el linaje), o null."
                     },
                     "revisionEstado": {
                       "anyOf": [
@@ -33665,6 +33741,8 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "revisionEstado",
                     "idRevisadoPor",
                     "revisadoPor",
@@ -34115,6 +34193,30 @@
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo de desarrollo del que nació (para enseñar el linaje), o null."
+                    },
                     "revisionEstado": {
                       "anyOf": [
                         {
@@ -34466,6 +34568,8 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "revisionEstado",
                     "idRevisadoPor",
                     "revisadoPor",
@@ -34762,6 +34866,30 @@
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo de desarrollo del que nació (para enseñar el linaje), o null."
+                    },
                     "revisionEstado": {
                       "anyOf": [
                         {
@@ -35113,6 +35241,8 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "revisionEstado",
                     "idRevisadoPor",
                     "revisadoPor",
@@ -36223,6 +36353,30 @@
                           ],
                           "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                         },
+                        "idModeloDesarrollo": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya."
+                        },
+                        "codigoModeloDesarrollo": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Código del modelo de desarrollo del que nació (para enseñar el linaje), o null."
+                        },
                         "revisionEstado": {
                           "anyOf": [
                             {
@@ -36574,6 +36728,8 @@
                         "idModeloPadre",
                         "codigoPadre",
                         "versionDesarrollo",
+                        "idModeloDesarrollo",
+                        "codigoModeloDesarrollo",
                         "revisionEstado",
                         "idRevisadoPor",
                         "revisadoPor",
@@ -36918,6 +37074,30 @@
                         }
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                    },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo de desarrollo del que nació (para enseñar el linaje), o null."
                     },
                     "revisionEstado": {
                       "anyOf": [
@@ -37270,6 +37450,8 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "revisionEstado",
                     "idRevisadoPor",
                     "revisadoPor",

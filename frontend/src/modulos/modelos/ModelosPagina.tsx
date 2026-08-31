@@ -90,6 +90,10 @@ const TONO_REVISION = {
  * que usa el dominio para decidir a quién alcanza la compuerta (`esVersionDeModelo`, en
  * `backend/src/dominio/modelos/revision-modelo.ts`): el LINAJE, no el estado de la firma.
  *
+ * ⭐ **V1-E9a — y los HIJOS del linaje 1:N quedan fuera:** ver el comentario de dentro. Las tres
+ * copias del predicado (aquí, `esVersionDeModelo` y su gemela SQL `SQL_REVISION_BLOQUEA_PRODUCCION`)
+ * excluyen a los hijos, y las tres se movieron JUNTAS: mover una sola las desincroniza.
+ *
  * ⚠️ **Por qué no se pregunta por `revisionEstado !== null`,** que es lo que esta pantalla hacía:
  * era un PROXY que sólo acierta porque «crear versión» siempre escribe `'pendiente'`. Las
  * versiones que nacieron ANTES de que esta etapa se desplegara —las que estrenó V1-E7b en
@@ -99,7 +103,25 @@ const TONO_REVISION = {
  * distintas para el mismo hecho (§Post-F9.119); ahora las dos preguntan el linaje. Las dos
  * columnas ya viajan en `ModeloSalida`, así que no hizo falta tocar el contrato.
  */
-function esVersionDeModelo(modelo: Pick<Modelo, 'idModeloPadre' | 'versionDesarrollo'>): boolean {
+function esVersionDeModelo(
+  modelo: Pick<Modelo, 'idModeloPadre' | 'versionDesarrollo' | 'idModeloDesarrollo'>,
+): boolean {
+  // ⭐⭐ V1-E9a (§Post-F9.167 punto 2) — LOS HIJOS DEL LINAJE 1:N QUEDAN FUERA, SIEMPRE. Un modelo
+  // con `idModeloDesarrollo` nació YA EN PRODUCCIÓN (uno por color de la OC), comparte la receta de
+  // su desarrollo y NO lleva revisión propia: la firma que lo habilitó es la del padre.
+  //
+  // 🔴 Sin esta línea, el chip de abajo se pinta SÓLO por el linaje —sin mirar `origen`— y cada
+  // hijo se enseñaría a sí mismo como «Revisión pendiente · no puede mandarse a producir», SIN
+  // ningún botón para arreglarlo, sobre un modelo que ya está en producción (el backend rechaza
+  // firmar cualquier cosa que ya sea de producción). Es la cicatriz de §Post-F9.119 que V1-E7d vino
+  // a cerrar, y aquí se cierra ANTES de que exista.
+  //
+  // ⚠️ `typeof === 'number'` y no `!== null`, EXACTAMENTE como el dominio: esta exclusión es lo
+  // único que puede apagar el chip, y su modo de fallo tiene que caer del lado seguro — lo que no
+  // se sabe, no excluye. Las tres copias del predicado se mueven juntas o se desincronizan.
+  if (typeof modelo.idModeloDesarrollo === 'number') {
+    return false;
+  }
   return modelo.idModeloPadre !== null || modelo.versionDesarrollo !== null;
 }
 

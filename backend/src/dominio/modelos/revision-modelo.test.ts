@@ -32,6 +32,7 @@ import {
   exigirRevisionAprobadaParaProducir,
   invalidarRevisionSiAprobada,
   rechazarRevisionModelo,
+  revisionBloqueaProduccion,
   textoDelCambioDeReceta,
   tocarModeloPorCambioDeReceta,
   type CambioDeReceta,
@@ -46,6 +47,7 @@ function modelo(extra: Partial<RevisionDeModelo> = {}): RevisionDeModelo {
     codigo: 'CYA-26-71-001-01',
     idModeloPadre: 7,
     versionDesarrollo: 1,
+    idModeloDesarrollo: null,
     revisionEstado: null,
     revisadoEn: null,
     revisionNota: null,
@@ -166,10 +168,84 @@ describe('exigirRevisionAprobadaParaProducir — a quién SÍ', () => {
 
 describe('esVersionDeModelo', () => {
   it('es versión si tiene padre O número de versión; si no, no', () => {
-    expect(esVersionDeModelo({ idModeloPadre: 7, versionDesarrollo: 1 })).toBe(true);
-    expect(esVersionDeModelo({ idModeloPadre: 7, versionDesarrollo: null })).toBe(true);
-    expect(esVersionDeModelo({ idModeloPadre: null, versionDesarrollo: 2 })).toBe(true);
-    expect(esVersionDeModelo({ idModeloPadre: null, versionDesarrollo: null })).toBe(false);
+    const sinHijo = { idModeloDesarrollo: null };
+    expect(esVersionDeModelo({ idModeloPadre: 7, versionDesarrollo: 1, ...sinHijo })).toBe(true);
+    expect(esVersionDeModelo({ idModeloPadre: 7, versionDesarrollo: null, ...sinHijo })).toBe(true);
+    expect(esVersionDeModelo({ idModeloPadre: null, versionDesarrollo: 2, ...sinHijo })).toBe(true);
+    expect(esVersionDeModelo({ idModeloPadre: null, versionDesarrollo: null, ...sinHijo })).toBe(
+      false,
+    );
+  });
+
+  /**
+   * ⭐⭐ V1-E9a (§Post-F9.167 punto 2) — EL CHIP FANTASMA QUE NUNCA VA A EXISTIR.
+   *
+   * Un HIJO del linaje 1:N (`idModeloDesarrollo` puesto) **no es una versión**, pase lo que pase con
+   * las otras dos columnas. La aserción que importa es la de la PRIMERA línea: un hijo al que
+   * alguna etapa futura le ponga además `idModeloPadre` —para "guardar de dónde salió"— seguiría
+   * sin ser versión. Sin esa exclusión, la ficha le pintaría *«Revisión pendiente · no puede
+   * mandarse a producir»* **sin ningún botón para arreglarlo**, sobre un modelo que YA está en
+   * producción (`exigirVersionRevisable` rechaza firmar cualquier cosa de producción): la cicatriz
+   * de §Post-F9.119 otra vez.
+   *
+   * ⚠️ Hoy `derivarModeloDeProduccion` hace nacer al hijo con las DOS columnas de versión en
+   * `null`, así que las tres primeras aserciones describen combinaciones que el dominio todavía no
+   * produce: son **la guarda escrita**, no el retrato del dato de hoy. La última sí es el hijo tal
+   * como nace.
+   */
+  it('⭐ un HIJO del linaje 1:N NO es versión, aunque lleve las columnas de versión puestas', () => {
+    expect(
+      esVersionDeModelo({ idModeloPadre: 7, versionDesarrollo: 1, idModeloDesarrollo: 9 }),
+    ).toBe(false);
+    expect(
+      esVersionDeModelo({ idModeloPadre: 7, versionDesarrollo: null, idModeloDesarrollo: 9 }),
+    ).toBe(false);
+    expect(
+      esVersionDeModelo({ idModeloPadre: null, versionDesarrollo: 2, idModeloDesarrollo: 9 }),
+    ).toBe(false);
+    // Y así es como nace de verdad hoy: sin padre, sin sufijo, con el vínculo de receta.
+    expect(
+      esVersionDeModelo({ idModeloPadre: null, versionDesarrollo: null, idModeloDesarrollo: 9 }),
+    ).toBe(false);
+  });
+
+  /**
+   * La compuerta ENTERA sobre un hijo: no basta con que el predicado diga `false` — lo que hay que
+   * demostrar es que un hijo con la revisión SIN FIRMAR (el estado en que nacen todos, `null`)
+   * **no queda bloqueado** ni por `revisionBloqueaProduccion` ni por la compuerta que lanza.
+   */
+  /**
+   * 🔴 EL MODO DE FALLO QUE IMPORTA, PINCHADO. La exclusión de los hijos es lo único de este
+   * predicado que puede ABRIR la compuerta, así que tiene que fallar del lado seguro: una fila a la
+   * que le FALTE la columna (`undefined`, no `null`) **no** cuenta como hijo, y la versión sigue
+   * necesitando su firma. Con un `!== null` en vez del `typeof`, esta prueba se pone roja — y con
+   * ella se pusieron rojas, de verdad, siete pruebas de `promoverAProduccionNucleo` y
+   * `salidaAProduccion` que arman la fila como `Record<string, unknown>`, donde TypeScript no llega.
+   */
+  it('⭐ una fila SIN la columna del linaje 1:N sigue siendo versión (lo que no se sabe, no excluye)', () => {
+    const sinLaColumna = { idModeloPadre: 7, versionDesarrollo: 1 } as unknown as {
+      idModeloPadre: number | null;
+      versionDesarrollo: number | null;
+      idModeloDesarrollo: number | null;
+    };
+    expect(esVersionDeModelo(sinLaColumna)).toBe(true);
+    expect(revisionBloqueaProduccion({ ...sinLaColumna, revisionEstado: null })).toBe(true);
+  });
+
+  it('⭐ a un HIJO del linaje 1:N la revisión no le bloquea nada (su firma es la del padre)', () => {
+    const hijo = {
+      idModeloPadre: 7,
+      versionDesarrollo: 1,
+      idModeloDesarrollo: 9,
+      revisionEstado: null,
+    };
+    expect(revisionBloqueaProduccion(hijo)).toBe(false);
+    // Y la versión equivalente SIN el vínculo sí queda bloqueada: si las dos dieran lo mismo, este
+    // par de aserciones pasaría con el predicado roto.
+    expect(revisionBloqueaProduccion({ ...hijo, idModeloDesarrollo: null })).toBe(true);
+    expect(() =>
+      exigirRevisionAprobadaParaProducir(modelo({ idModeloDesarrollo: 9, revisionEstado: null })),
+    ).not.toThrow();
   });
 });
 
@@ -190,6 +266,7 @@ function filaFalsa(extra: Record<string, unknown> = {}): Record<string, unknown>
     origen: 'desarrollo',
     idModeloPadre: 7,
     versionDesarrollo: 1,
+    idModeloDesarrollo: null,
     revisionEstado: 'pendiente',
     idRevisadoPor: null,
     revisadoEn: null,
@@ -535,6 +612,7 @@ function comoLaVeLaCompuerta(fila: Record<string, unknown>): RevisionDeModelo {
     codigo: fila.codigo as string,
     idModeloPadre: fila.idModeloPadre as number | null,
     versionDesarrollo: fila.versionDesarrollo as number | null,
+    idModeloDesarrollo: (fila.idModeloDesarrollo ?? null) as number | null,
     revisionEstado: fila.revisionEstado as RevisionDeModelo['revisionEstado'],
     revisadoEn: fila.revisadoEn as Date | null,
     revisionNota: fila.revisionNota as string | null,

@@ -9,7 +9,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { ErrorConflicto } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
@@ -17,6 +17,7 @@ import {
   avisosDeCongruencia,
   codigoDeNumeroProduccion,
   consecutivoDeCodigoDesarrollo,
+  derivarModeloDeProduccion,
   digitosDeCodigoDesarrollo,
   MAX_INTENTOS_CODIGO_DESARROLLO,
   mintearCodigoDesarrollo,
@@ -673,6 +674,7 @@ function paraPromover(extra: Record<string, unknown> = {}): Record<string, unkno
     idGenero: 4,
     idModeloPadre: null,
     versionDesarrollo: null,
+    idModeloDesarrollo: null,
     revisionEstado: null,
     revisadoEn: null,
     revisionNota: null,
@@ -751,5 +753,311 @@ describe('promoverAProduccionNucleo — la compuerta de la REVISIÓN (V1-E7d)', 
     await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow(
       /ya está en el catálogo de producción/,
     );
+  });
+});
+
+// ── ⭐⭐ V1-E9a · derivarModeloDeProduccion: LAS GUARDAS y LA MARCA ───────────────────────────
+
+/**
+ * §Post-F9.135 — de un desarrollo nacen N modelos de producción (uno por color de la OC) que
+ * COMPARTEN su receta. Aquí se fijan, sin base de datos, las cuatro guardas y **qué se escribe**;
+ * lo que sólo Postgres puede demostrar (los N números distintos bajo el lock, los CHECK y que la
+ * receta de verdad no se copia) vive en `nomenclatura.int.test.ts`.
+ *
+ * La `tx` de mentiras emula además lo que recorre el ALTA (`crearModeloNucleo`): el centinela de
+ * código libre, las FKs y el `create` + `findUniqueOrThrow` del final.
+ */
+function txDerivacion(
+  padre: Record<string, unknown> | null,
+  /**
+   * La fila que "ocupa" el número, para el centinela del número repetido.
+   *
+   * 🔴 **Este doble SÍ mira el `where`, y es la diferencia entre una red y un adorno.** El método
+   * `modelo.findFirst` lo comparten DOS centinelas: el del NÚMERO repetido (dentro de
+   * `derivarModeloDeProduccion`) y el del CÓDIGO libre (dentro de `crearModeloNucleo`). Con un
+   * doble que devolviera lo mismo a los dos —como estaba escrito primero—, **quitarle al centinela
+   * del número su condición por `numeroProduccion` dejaba la prueba EN VERDE**: seguía habiendo
+   * "choque", seguía lanzando su mensaje, y la mutación sobrevivía sin que nadie se enterara. Lo
+   * midió el reviewer de esta etapa. Distinguirlos por su `OR` cuesta tres líneas y hace que la
+   * unitaria muerda de verdad.
+   */
+  choque: Record<string, unknown> | null = null,
+): {
+  tx: Tx;
+  llamadas: { metodo: string; args: unknown }[];
+} {
+  const llamadas: { metodo: string; args: unknown }[] = [];
+  const reg = <T>(metodo: string, args: unknown, resultado: T): Promise<T> => {
+    llamadas.push({ metodo, args });
+    return Promise.resolve(resultado);
+  };
+  const activo = { nombre: 'X', activo: true };
+  const tx = {
+    modelo: {
+      findUnique: (args: unknown) => reg('modelo.findUnique', args, padre),
+      // Sólo el centinela del NÚMERO pregunta por `numeroProduccion` en su `OR`; el del código
+      // libre mira `codigo`/`codigoDesarrollo` y nada más. Por ahí se distinguen (ver `choque`).
+      findFirst: (args: unknown) => {
+        const donde = (args as { where?: { OR?: Record<string, unknown>[] } }).where;
+        const preguntaPorElNumero = (donde?.OR ?? []).some((c) => 'numeroProduccion' in c);
+        return reg('modelo.findFirst', args, preguntaPorElNumero ? choque : null);
+      },
+      create: (args: unknown) => reg('modelo.create', args, { id: 77, codigo: '71001' }),
+      findUniqueOrThrow: (args: unknown) =>
+        reg('modelo.findUniqueOrThrow', args, { id: 77, codigo: '71001' }),
+      update: (args: unknown) => reg('modelo.update', args, {}),
+    },
+    tipoProducto: {
+      findUnique: (args: unknown) =>
+        reg('tipoProducto.findUnique', args, {
+          nombre: 'Pantalón',
+          digitoConcepto: 7,
+          activo: true,
+        }),
+    },
+    genero: {
+      findUnique: (args: unknown) =>
+        reg('genero.findUnique', args, {
+          nombre: 'Caballero',
+          digitoNomenclatura: 1,
+          digitoAlterno: 5,
+          activo: true,
+        }),
+    },
+    temporada: { findUnique: (args: unknown) => reg('temporada.findUnique', args, activo) },
+    curvaTalla: { findUnique: (args: unknown) => reg('curvaTalla.findUnique', args, activo) },
+    proveedor: { findFirst: (args: unknown) => reg('proveedor.findFirst', args, activo) },
+    $executeRaw: (plantilla: TemplateStringsArray, ...valores: unknown[]) =>
+      reg('$executeRaw', { sql: plantilla.join('?'), valores }, 1),
+    $queryRaw: (plantilla: TemplateStringsArray, ...valores: unknown[]) =>
+      reg('$queryRaw', { sql: plantilla.join('?'), valores }, []),
+    bitacora: { create: (args: unknown) => reg('bitacora.create', args, {}) },
+  };
+  return { tx: tx as unknown as Tx, llamadas };
+}
+
+/** Un modelo de DESARROLLO listo para derivar hijos; `extra` dice qué lo distingue. */
+function paraDerivar(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 42,
+    codigo: 'CYA-26-71-001',
+    codigoDesarrollo: 'CYA-26-71-001',
+    origen: 'desarrollo',
+    activo: true,
+    idTipoProducto: 5,
+    idGenero: 4,
+    idModeloPadre: null,
+    versionDesarrollo: null,
+    idModeloDesarrollo: null,
+    revisionEstado: null,
+    revisadoEn: null,
+    revisionNota: null,
+    descripcion: 'Sudadera con cierre',
+    composicion: null,
+    maquilaBase: null,
+    corteBase: null,
+    idTemporada: null,
+    idCurvaTalla: null,
+    idMaquileroCotizado: null,
+    numOperaciones: null,
+    secuenciaEstampado: 'antes',
+    llevaArte: true,
+    ...extra,
+  };
+}
+
+describe('derivarModeloDeProduccion — qué escribe', () => {
+  it('⭐ el hijo nace en PRODUCCIÓN, con su número, apuntando al desarrollo y SIN receta', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar());
+
+    const salida = await derivarModeloDeProduccion(tx, SESION_PROMOCION, 42, {
+      descripcion: 'Sudadera con cierre — Negro',
+    });
+
+    expect(salida).toMatchObject({
+      idModelo: 77,
+      idModeloDesarrollo: 42,
+      numeroProduccion: 71_001,
+      codigo: '71001',
+      numeroCapturado: false,
+    });
+
+    const create = llamadas.find((l) => l.metodo === 'modelo.create')?.args as {
+      data: Record<string, unknown>;
+    };
+    // La MARCA completa, campo por campo — es lo que define el linaje:
+    expect(create.data).toMatchObject({
+      codigo: '71001',
+      origen: 'produccion',
+      numeroProduccion: 71_001,
+      // @unique: los cuatro hermanos no pueden llevarse el código del padre (y sigue en él, D3).
+      codigoDesarrollo: null,
+      idModeloDesarrollo: 42,
+      descripcion: 'Sudadera con cierre — Negro',
+    });
+    // Un hijo NO es una versión: nada del otro linaje se escribe.
+    expect(create.data.idModeloPadre).toBeUndefined();
+    expect(create.data.versionDesarrollo).toBeUndefined();
+    expect(create.data.revisionEstado).toBeUndefined();
+    // 🔑 Y NO COPIA RECETA: ninguna relación de receta viaja en el `create` anidado. Si alguien
+    // "mejorara" esto copiándola —que es lo que hace `mintearVersionDeModelo`— las cuatro se
+    // desincronizarían a la semana, que es justo lo que la decisión de Daniel vino a impedir.
+    for (const relacion of ['telas', 'avios', 'artes', 'fotos']) {
+      expect(create.data[relacion]).toBeUndefined();
+    }
+    // Y el PADRE no recibe ni un `update`: leerlo es lo único que se hace con él.
+    expect(llamadas.filter((l) => l.metodo === 'modelo.update')).toEqual([]);
+
+    // A7 — el renglón que cuenta EL ACTO de derivar (el `CREAR` genérico del núcleo no dice de qué
+    // padre salió, y sin esto la bitácora no podría contestar "¿de dónde salió el 71001?").
+    const renglones = llamadas
+      .filter((l) => l.metodo === 'bitacora.create')
+      .map((l) => (l.args as { data: { datos: Record<string, unknown> } }).data.datos);
+    expect(renglones).toContainEqual(
+      expect.objectContaining({
+        operacion: 'derivar-modelo-de-produccion',
+        idModeloDesarrollo: 42,
+        codigoModeloDesarrollo: 'CYA-26-71-001',
+        numeroProduccion: 71_001,
+        numeroCapturado: false,
+      }),
+    );
+  });
+
+  it('⭐ el número capturado a mano se guarda con su AVISO de congruencia (avisa, no bloquea)', async () => {
+    // §Post-F9.34 punto 7, vigente tras §Post-F9.46: *"si Daniel quiere una excepción, la excepción
+    // es suya"*. Se afirma el CONTENIDO del aviso, no que la lista no esté vacía: sin eso, perder
+    // los avisos de congruencia —que es lo único que le dice al usuario que se salió del par— no
+    // rompería nada, y el número se guardaría igual sin que nadie se enterara.
+    const { tx } = txDerivacion(paraDerivar());
+    const salida = await derivarModeloDeProduccion(tx, SESION_PROMOCION, 42, {
+      numeroCapturado: 39_500,
+    });
+
+    expect(salida.numeroProduccion).toBe(39_500);
+    expect(salida.numeroCapturado).toBe(true);
+    expect(salida.avisos.join(' ')).toContain('(39)');
+    expect(salida.avisos.join(' ')).toContain('(71)');
+  });
+
+  /**
+   * 🔴 H1 — LA FRONTERA QUE ESTA FUNCIÓN NO TIENE. `promoverAProduccionNucleo` recibe su número ya
+   * pasado por `esquemaNumeroProduccion` en la ruta REST; ésta **no tiene ruta**: la va a llamar
+   * `salidaAProduccion`, dominio→dominio, sin Zod por medio. Sin la validación de dentro, un
+   * `123456` nace como modelo de producción con código de SEIS dígitos —`codigoDeNumeroProduccion`
+   * no recorta— y queda fuera de `PATRON_CODIGO_PRODUCCION`: invisible para el generador de
+   * consecutivos, para el centinela de choque y para los dos CHECK de la base, que sólo miran el
+   * linaje. **Se afirman los dos extremos**, porque un `min` sin `max` (o al revés) dejaría medio
+   * agujero abierto y una sola aserción no lo enseñaría.
+   */
+  it('⭐ un número capturado FUERA de los 5 dígitos se rechaza (aquí no hay capa API que lo filtre)', async () => {
+    for (const fuera of [123_456, 5, 9_999, 100_000, 0, -71_001]) {
+      const { tx, llamadas } = txDerivacion(paraDerivar());
+      await expect(
+        derivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { numeroCapturado: fuera }),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+      // Y no nace nada a medias: el número se valida antes de escribir.
+      expect(llamadas.filter((l) => l.metodo === 'modelo.create')).toEqual([]);
+    }
+
+    // El control: el primero y el último número VÁLIDOS de la serie sí pasan. Sin esto, un
+    // validador que rechazara todo dejaría la prueba de arriba en verde.
+    for (const dentro of [10_000, 99_999]) {
+      const { tx } = txDerivacion(paraDerivar());
+      await expect(
+        derivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { numeroCapturado: dentro }),
+      ).resolves.toMatchObject({ numeroProduccion: dentro });
+    }
+  });
+
+  it('el lock del par se toma ANTES de elegir el número (es lo que sustituye a A3)', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar());
+    await derivarModeloDeProduccion(tx, SESION_PROMOCION, 42);
+
+    const orden = llamadas.map((l) => l.metodo);
+    const lock = orden.indexOf('$executeRaw');
+    const ocupacion = orden.indexOf('$queryRaw');
+    const create = orden.indexOf('modelo.create');
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(lock).toBeLessThan(ocupacion);
+    expect(ocupacion).toBeLessThan(create);
+    // Y es el lock del par 71 (Pantalón 7 + Caballero 1), no otro.
+    const args = llamadas[lock]?.args as { valores: unknown[] };
+    expect(args.valores).toEqual([20_546, 71]);
+  });
+});
+
+describe('derivarModeloDeProduccion — las cuatro guardas', () => {
+  /** Nada se escribió y el par NO se serializó: la guarda rebotó antes de tocar nada. */
+  function nadaPaso(llamadas: { metodo: string }[]): string[] {
+    return llamadas.map((l) => l.metodo).filter((m) => m !== 'modelo.findUnique');
+  }
+
+  it('el desarrollo tiene que existir', async () => {
+    const { tx, llamadas } = txDerivacion(null);
+    await expect(derivarModeloDeProduccion(tx, SESION_PROMOCION, 42)).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+    expect(nadaPaso(llamadas)).toEqual([]);
+  });
+
+  it('⭐ un modelo que YA es de producción no deriva hijos (así no hay cadenas)', async () => {
+    const { tx, llamadas } = txDerivacion(
+      paraDerivar({ origen: 'produccion', codigo: '71001', idModeloDesarrollo: 9 }),
+    );
+    await expect(derivarModeloDeProduccion(tx, SESION_PROMOCION, 42)).rejects.toThrow(
+      /YA está en el catálogo de producción/,
+    );
+    expect(nadaPaso(llamadas)).toEqual([]);
+  });
+
+  it('un desarrollo DESCONTINUADO no deriva hijos (§Post-F9.119)', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar({ activo: false }));
+    await expect(derivarModeloDeProduccion(tx, SESION_PROMOCION, 42)).rejects.toThrow(
+      /descontinuado/,
+    );
+    expect(nadaPaso(llamadas)).toEqual([]);
+  });
+
+  it('⭐ una VERSIÓN sin revisar no deriva hijos: la compuerta se evalúa contra el PADRE', async () => {
+    const { tx, llamadas } = txDerivacion(
+      paraDerivar({ idModeloPadre: 7, versionDesarrollo: 1, revisionEstado: 'pendiente' }),
+    );
+    await expect(derivarModeloDeProduccion(tx, SESION_PROMOCION, 42)).rejects.toThrow(/REVISIÓN/);
+    // Ni lock ni escritura: la compuerta va ANTES de serializar el par.
+    expect(nadaPaso(llamadas)).toEqual([]);
+  });
+
+  /**
+   * 🔴 EL CENTINELA DEL NÚMERO REPETIDO, y por qué NO es redundante con el del código libre que ya
+   * trae `crearModeloNucleo`. Los dos miran `codigo` y `codigoDesarrollo`; sólo éste mira además
+   * **`numeroProduccion`**, que puede estar ocupado por un modelo cuyo CÓDIGO es otro (el número es
+   * editable a mano desde §Post-F9.46, y ahí las dos columnas se pueden desalinear). Sin él, ese
+   * caso llegaría al `@unique` de la base y **abortaría la transacción entera** de la salida a
+   * producción, con las otras tres órdenes dentro.
+   *
+   * ⚠️ **Esta prueba muerde porque el doble mira el `where`** (ver `txDerivacion`): quitarle al
+   * centinela su condición por `numeroProduccion` hace que el doble devuelva `null` y el modelo
+   * nazca, y la aserción cae. Sin esa distinción —como estaba escrito primero— la mutación
+   * sobrevivía en verde. Y la prueba que cubre el caso **con datos reales** es la de integración
+   * *«⭐ rebota el número ocupado aunque el que lo ocupa tenga OTRO código»*, donde la fila existe
+   * de verdad y el `where` lo resuelve Postgres, no un doble.
+   */
+  it('⭐ el número REPETIDO se rebota diciendo de qué número habla (no lo tapa el código libre)', async () => {
+    const { tx } = txDerivacion(paraDerivar(), { codigo: 'MODELO-VIEJO', activo: true });
+    await expect(
+      derivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { numeroCapturado: 71_003 }),
+    ).rejects.toThrow(
+      'El número de producción 71003 ya está ocupado por el modelo "MODELO-VIEJO".',
+    );
+  });
+
+  it('la versión APROBADA sí deriva (si no, la prueba de arriba pasaría con todo roto)', async () => {
+    const { tx } = txDerivacion(
+      paraDerivar({ idModeloPadre: 7, versionDesarrollo: 1, revisionEstado: 'aprobada' }),
+    );
+    await expect(derivarModeloDeProduccion(tx, SESION_PROMOCION, 42)).resolves.toMatchObject({
+      numeroProduccion: 71_001,
+    });
   });
 });

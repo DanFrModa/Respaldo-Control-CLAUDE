@@ -152,6 +152,10 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     idModeloPadre: modelo.idModeloPadre,
     codigoPadre: modelo.modeloPadre?.codigo ?? null,
     versionDesarrollo: modelo.versionDesarrollo,
+    // ⭐ V1-E9a — linaje 1:N: de qué DESARROLLO nació este modelo de producción (y de quién es, por
+    // lo tanto, la receta que la ficha va a enseñar). Null en todo lo demás = la receta es la suya.
+    idModeloDesarrollo: modelo.idModeloDesarrollo,
+    codigoModeloDesarrollo: modelo.modeloDesarrollo?.codigo ?? null,
     // ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110). Viajan los cuatro campos
     // del acto (estado + quién + cuándo + observación) para que la ficha pueda enseñar la firma
     // completa. En un modelo que no es versión vienen todos en null: no lleva revisión.

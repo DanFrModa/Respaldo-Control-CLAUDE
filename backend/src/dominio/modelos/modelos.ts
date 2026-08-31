@@ -68,6 +68,11 @@ export type ModeloConRelaciones = Modelo & {
   maquileroCotizado: { nombre: string } | null;
   /** Modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
   modeloPadre: { codigo: string } | null;
+  /**
+   * ⭐ V1-E9a — Modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N,
+   * §Post-F9.135) y de quien es su receta, o null = la receta es la suya.
+   */
+  modeloDesarrollo: { codigo: string } | null;
   /** ⭐ V1-E7d — quien FIRMÓ la revisión de esta versión (§Post-F9.110), o null. */
   revisadoPor: { nombre: string } | null;
   _count: { fotos: number };
@@ -106,11 +111,43 @@ export const incluirRelacionesModelo = {
   // Linaje de versiones (V1-E7b): el código del padre, para que la ficha pueda decir "Versión 2
   // de CYA-26-71-001" con liga. Un `select` de una columna por un índice: no es un N+1.
   modeloPadre: { select: { codigo: true } },
+  // ⭐ V1-E9a — el código del modelo de DESARROLLO del que nació este modelo de producción (linaje
+  // 1:N), para que la ficha pueda decir de quién es la receta que enseña. Un `select` de una
+  // columna por la PK: no es un N+1.
+  modeloDesarrollo: { select: { codigo: true } },
   // ⭐ V1-E7d — quién firmó la REVISIÓN de esta versión, por NOMBRE: la ficha dice "aprobada por
   // Aurora", no un cuid. Un `select` de una columna por la PK de usuarios: no es un N+1.
   revisadoPor: { select: { nombre: true } },
   _count: { select: { fotos: true } },
 } satisfies Prisma.ModeloInclude;
+
+/**
+ * Campos de FICHA que un modelo hereda de aquel del que NACE (la receta va aparte, y de otra
+ * manera en cada caso).
+ *
+ * Lo comparten las DOS formas de nacer de otro modelo, y por eso vive aquí y no en una de las dos:
+ *
+ *  • la **VERSIÓN** (`versiones.ts`, V1-E7b), que se lleva una COPIA CONGELADA de la receta, y
+ *  • el **HIJO 1:N de producción** (`nomenclatura.ts` → `derivarModeloDeProduccion`, V1-E9a), que
+ *    **comparte** la receta del padre en vez de copiarla.
+ *
+ * ⚠️ Si cada una llevara su propia lista, la primera columna de ficha que alguien agregue caería en
+ * una y no en la otra, **en silencio**. Una sola lista es lo que hace que eso no pueda pasar.
+ */
+export const CAMPOS_FICHA_HEREDADOS = {
+  descripcion: true,
+  composicion: true,
+  maquilaBase: true,
+  corteBase: true,
+  idTemporada: true,
+  idCurvaTalla: true,
+  idGenero: true,
+  idTipoProducto: true,
+  idMaquileroCotizado: true,
+  numOperaciones: true,
+  secuenciaEstampado: true,
+  llevaArte: true,
+} as const;
 
 /** Parámetros del listado (los reutiliza la ruta REST en su entrada; tipos nativos). */
 const esquemaListarModelosDominio = esquemaPaginacion.extend({
@@ -471,6 +508,16 @@ export interface MarcaNomenclaturaModelo {
   origen: 'desarrollo' | 'produccion';
   codigoDesarrollo: string | null;
   numeroProduccion: number | null;
+  /**
+   * ⭐ V1-E9a (§Post-F9.135) — LINAJE 1:N: de qué modelo de DESARROLLO nació este modelo de
+   * PRODUCCIÓN, y por lo tanto de quién es su receta. `null` en todas las altas que no derivan
+   * (= «la receta es la mía»).
+   *
+   * ⚠️ Va en la marca, y no como parámetro suelto del núcleo, **porque es obligatorio**: así una
+   * puerta de alta nueva **no compila** hasta declarar de qué linaje nace lo que crea. Es el mismo
+   * razonamiento por el que `origen` y los dos números viajan juntos aquí en vez de como banderas.
+   */
+  idModeloDesarrollo: number | null;
 }
 
 /** La marca del alta normal (V1-E8j): nace en DESARROLLO, sin nº de producción (§Post-F9.134). */
@@ -483,6 +530,10 @@ export function marcaDesarrollo(codigo: string): MarcaNomenclaturaModelo {
     codigoDesarrollo: codigo,
     // El nº lo estrena la promoción, que es la única que toma el lock de la serie.
     numeroProduccion: null,
+    // Un alta normal no deriva de nadie: su receta es la suya. Y no podría ser de otro modo — el
+    // CHECK `modelos_linaje_desarrollo_solo_produccion_check` prohíbe que un modelo de DESARROLLO
+    // lleve el vínculo, que es lo que hace imposibles las cadenas (V1-E9a).
+    idModeloDesarrollo: null,
   };
 }
 
