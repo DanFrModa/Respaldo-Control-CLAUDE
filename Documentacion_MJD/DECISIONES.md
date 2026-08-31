@@ -11542,7 +11542,7 @@ sigue abierta, pero deja de ser urgente.
 > **Ninguna de las dos frena nada** (REGLA 0): quedan aquí con su default y el programa sigue. Se anotan
 > **con su medición**, para que un chat nuevo no las re-descubra ni se las vuelva a preguntar mal.
 
-### (a) Al fusionar dos departamentos repetidos, ¿qué pasa con el texto de la División ya escrito en la orden?
+### (a) ✅ CERRADA (DANIEL, 31-ago-2026): la búsqueda entiende los DOS nombres — el papel del cliente NO se toca
 
 **Abierta desde la versión 0.053** (`HISTORIAL-DE-VERSIONES.md`: *«Es una decisión tuya y por eso no se
 tocó… Cuando decidas, se hace»*). **No consta respuesta.**
@@ -11563,10 +11563,37 @@ arregla aquí porque tocar un valor capturado de un documento del cliente es una
 | (ii) **reescribir** el texto de las órdenes al fusionar | ⚠️ toca **un valor capturado del documento del cliente** | ~40 líneas |
 | (iii) **búsqueda por sinónimos** | no toca el dato; resuelve al buscar | **una etapa entera** |
 
-⭐ **DEFAULT PROPUESTO: (iii).** Razón: (ii) reescribiría lo que el cliente puso en su papel — justo lo que
-`Cotizacion.nombreDepartamento` se congela **a propósito** para no hacer. Que Daniel busque por lo que
-tiene en la mano y no lo encuentre es una pérdida en silencio; que el sistema le cambie el texto de su
-documento es peor. **(iii) cuesta más y es el único que no falsea el original.**
+> ### ✅ DANIEL, textual: *«Está bien la 3. Lo que propones.»*
+>
+> ⇒ **CAMINO (iii): BÚSQUEDA POR SINÓNIMOS.** El texto capturado del documento del cliente **NO se
+> reescribe nunca**. Buscar «Caballeros» encuentra también las órdenes que dicen «2-HOMBRE» porque el
+> sistema **sabe** que uno se fusionó en el otro — **no porque le haya cambiado el papel**.
+
+**Por qué es el correcto y no sólo el propuesto:** (ii) reescribiría lo que el cliente puso en su papel —
+justo lo que `Cotizacion.nombreDepartamento` se congela **a propósito** para no hacer. Que Daniel busque
+por lo que tiene en la mano y no lo encuentre es una pérdida en silencio; que el sistema le cambie el
+texto de su documento es **peor**: rompería la única prueba de qué pidió el cliente.
+
+### 🔨 Qué hay que construir (medido el 31-ago, para que no se re-descubra)
+
+**Dónde se aplica, y por qué es barato:** `armarBusqueda` (`dominio/produccion/ordenes.ts:1237-1250`) hace
+hoy un `contains` sobre `referencias.some.valor`, y **la comparten tres consumidores** — el buscador
+global, las consultas ligeras (`consultas.ts:18`) y el Centro de Órdenes (`centro-comando.ts:83`). ⇒ **se
+arregla en un solo sitio y los tres quedan cubiertos**: es el patrón «embudo» del proyecto.
+
+⚠️ **LLEVA MIGRACIÓN, y conviene saber por qué:** a diferencia de los colores, la fusión de departamentos
+**no deja rastro en columna**. `Color` tiene `idFusionadoEn` con FK reflexiva e índice
+(`schema.prisma:1015`), pero `ClienteDepartamento` **sólo tiene `activo`** (`schema.prisma:7286-7310`): su
+fusión (`dominio/catalogos/cliente-departamentos.ts:375-454`) repunta bien **las cinco** llaves entrantes y
+deja **bitácora**, y ahí se acaba el rastro. ⇒ hay que darle **la misma columna que los colores ya tienen**,
+para resolver el sinónimo sin leer la bitácora.
+
+🔴 **LA TRAMPA, dicha con nombre: el sinónimo se resuelve en LOS DOS SENTIDOS.** Buscar el **destino**
+(«Caballeros») debe encontrar las órdenes que dicen el **origen** («2-HOMBRE») — y **también al revés**,
+porque quien tiene el papel viejo en la mano busca por el nombre viejo. **Es una rama gemela**: cubrir un
+sentido y no el otro **pasaría en verde** y fallaría justo en el caso que originó la decisión. Y la cadena
+puede tener **más de un salto** (A→B→C), como ya contempla `colorCanonico` (`catalogos/colores.ts:481`) —
+que es el precedente a copiar, no a reinventar.
 
 ### (b) 🔴 CONTRADICCIÓN ENTRE DOS RESPUESTAS SUYAS: al resurtir la misma OC, ¿el modelo estrena número o reusa el que ya nació?
 
@@ -11588,6 +11615,7 @@ derivaría ⇒ **doble clic = 2 modelos**, y se queman números de una serie de 
 natural (`Orden.findFirst({ where: { idPedidoLinea } })` + `pg_advisory_xact_lock` sobre `idPedidoLinea`)
 **implementa a la vez la respuesta «reusar»**. ⇒ elegir «reusar» no cuesta trabajo extra: **lo ahorra**.
 
-- **Aplica en:** (a) una etapa propia, sin número. (b) **E3**, antes de construirla. **Fecha:** 2026-08-31.
+- **Aplica en:** (a) ✅ **CERRADA** — etapa propia, sin número, **con migración**. (b) ⏳ **SIGUE
+  ABIERTA**: hay que resolverla antes de construir **E3**. **Fecha:** 2026-08-31.
 
 ---
