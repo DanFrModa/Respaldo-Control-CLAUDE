@@ -4255,8 +4255,12 @@ La conclusión no cambia: catálogo nuevo + dimensión nueva de existencias + re
 del histórico = **otra etapa, del tamaño de ésta o más**. Por eso NO entró aquí (habría duplicado el
 alcance de la etapa que Daniel puso como prioridad).
 
-⬜ **Pendiente de Daniel:** ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
-justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
+✅ **CONTESTADO — ya no preguntar.** Daniel lo cerró el **22-ago-2026** en **§Post-F9.91**: *«Va.
+Entonces lo dejamos así y ponemos los avíos con color en la misma descripción del avío»*. ⇒ **basta la
+descripción; NO se hace catálogo por color.** Se conserva la pregunta original abajo sólo como historia:
+
+> ⬜ ~~Pendiente de Daniel:~~ ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
+> justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
 ⚠️ **Al preguntárselo, hay que poner sobre la mesa que en D13 (4-jul-2026) él ya había dicho** *"consumo
 por talla solo ciertos avíos (telas no; **tampoco por color**)"* — puede seguir vigente o la práctica
 puede haberlo rebasado, pero la pregunta se hace con esa decisión a la vista, no como terreno virgen.
@@ -7929,7 +7933,18 @@ partiera, Daniel creería haber cerrado la puerta y quedaría abierta la de a un
 
 #### 6. Las 10 preguntas para Daniel, cada una con su default
 
-⏳ **Ninguna está contestada.** El default es lo que se construiría si sólo dijera «adelante».
+✅ **CONFIRMADAS POR DANIEL (30-ago-2026).** Él mismo lo dijo: *«Ya contesté esas 10 preguntas»*. La
+columna de la derecha era el **default propuesto** y quedó **confirmada tal cual**. De dos hay cita
+textual suya: **6b** — *«No se prohibe, se puede hacer a mano (Solo yo)»* — y **6a** — *«Ok como
+propones»*.
+
+🔴 **Consecuencia dura de la 6b: ELIMINA la etapa E5 del troceado de §7.** El plan 1:N pasa de
+**cinco etapas a cuatro** — el candado de «ya cortada» **NO se construye**.
+
+⚠️ **Límite honesto de este anclaje, para que nadie lo lea de más:** sólo 6a y 6b están citadas
+textualmente en el repo; las otras ocho se dan por confirmadas **en bloque**, apoyadas en la frase de
+Daniel de arriba y en el registro de `HOJA-DE-RUTA.md` §1. **Si alguna vez una de ellas sorprende al
+construirla, ésta es la línea a releer** — y se le pregunta esa sola, no las diez.
 
 ⚠️ **Se le presentan en SU idioma, y eso obliga a dos cosas** que la primera redacción no cumplía:
 **(1)** nunca decirle *«el hijo»* ni *«el padre»* —jerga nuestra, jamás suya—, y **(2)** no gastarle
@@ -9696,13 +9711,15 @@ Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
    entra primero, la referencia apunta a algo que aún no existe — por eso la cita va **textual aquí**
    y basta por sí sola; el numeral es sólo el puntero para cuando las dos ramas estén juntas. Engancha con el
    pendiente ya abierto de **ratificar tipo de prenda y género obligatorios**.
-5. **PLANIFICACIÓN: versión 0.062**, después de la **0.060** (la mesa con su forma real + estimados
-   persistidos + target price) y la **0.061** (estados del modelo). Va después **porque necesita que la
-   mesa ya sepa mostrar y mover costos renglón por renglón**: un modelo estimado sin eso no se puede
-   cotizar.
+5. **PLANIFICACIÓN: versión 0.063** ⚠️ (decía 0.062; **corrió un lugar**, igual que §Post-F9.151 — ver
+   la tabla del programa en `HOJA-DE-RUTA.md` §1). Va después de la **0.060** (la mesa con su forma real
+   + estimados persistidos + target price) y de la **0.062** (los estados del modelo, que en la
+   numeración vieja eran la 0.061). **Las dos ya están ✅ CONSTRUIDAS y en `prueba`.** Va después
+   **porque necesita que la mesa ya sepa mostrar y mover costos renglón por renglón**: un modelo
+   estimado sin eso no se puede cotizar.
 
 - **Aplica en:** la mesa de negociación, el alta de desarrollo/modelo y el precosteo. ⬜ **POR
-  CONSTRUIR** (versión 0.062). **Fecha:** 2026-08-29.
+  CONSTRUIR** (versión **0.063**). **Fecha:** 2026-08-29.
 
 ---
 
@@ -9895,6 +9912,8 @@ los vendo»*. La única salida hoy sería **borrar** el renglón — justo lo qu
    comentarios, y se registra **quién lo dropeó, cuándo, y quién lo revivió**. Daniel eligió esto sobre
    la alternativa estricta (dar de alta un renglón nuevo y negociar desde cero).
 
+✅ **CONSTRUIDA** (versión **0.062**, 30-ago-2026).
+
 **Alcance.** Migración **sí** (la columna de estado del renglón, con valor inicial `abierto` para las
 filas existentes — *todo renglón nace ahí*, §Post-F9.151). **Permisos: NO** — `listas.negociar` ya
 gobierna el cambio de estado de la lista y es el candidato natural para el del renglón. **Seed: NO** si
@@ -9937,6 +9956,9 @@ la frase que **explica la regla y vale más que la regla**:
 4. 📌 **La bitácora deja de mentir:** además del total registra `renglonesRecalculados` y
    `terminalesRespetados` (id, estado y precio de cada uno). Antes habría afirmado haber tocado renglones
    que no tocó.
+
+✅ **CONSTRUIDA** (versión **0.062**, 30-ago-2026): `editarFactoresLista` salta los renglones
+en estado terminal, y la bitácora registra `terminalesRespetados`.
 
 📌 **Anotado, NO cambiado (queda como pregunta abierta, sin fecha):** hoy cambiar factores **también**
 tumba la firma de los renglones **abiertos y en negociación**. Con la frase de Daniel eso admite dos
@@ -10058,5 +10080,62 @@ uso de su tiempo.
 
 - **Aplica en:** (a) la versión **0.072**; (b) y (c) son correcciones documentales, de aplicación
   inmediata. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.160) — ⭐ TRES DECISIONES DE DANIEL QUE VIVÍAN **SÓLO EN UNA CELDA DE TABLA** (rescatadas 30-ago-2026)
+
+**Cómo salió.** El barrido que nació de la queja de Daniel (*«ya te había contestado todo… debe de estar
+en algún lado»*, §Post-F9.159) encontró **tres decisiones suyas, con cita textual, que nunca llegaron a
+este archivo**: entraron al repo en un solo commit que tocó **únicamente `HOJA-DE-RUTA.md`**, y quedaron
+viviendo dentro de una celda de la tabla del programa. Dos de ellas **llevan esquema de base de datos
+detrás**. Se rescatan aquí, que es donde mandan.
+
+### (a) 🔴 EL CANDADO DE COMPRA: abrir y cerrar la receta de la OP → versión **0.066**
+
+> *«pongamos un candado que **no se pueda comprar nada hasta que esté cerrado otra vez**»*
+
+**La regla:** una receta de OP **ya liberada se puede volver a ABRIR** para corregirla, y **mientras está
+abierta, la compra de esa orden queda bloqueada**; se desbloquea al **cerrarla** de nuevo.
+
+⚠️ **NO es lo mismo que la firma por renglón de §Post-F9.158(b)**, y confundirlas sería un error caro: la
+firma es *«este elemento ya se puede comprar»* (de a uno, hacia adelante); **esto es reabrir lo ya firmado**
+y congelar la compra **de toda la orden** mientras dure la corrección. Son dos mecanismos distintos sobre
+el mismo dato. **Lleva migración.**
+
+### (b) 🔴 LA OP INCOMPLETA → versión **0.065**
+
+> *«La OP queda como **incompleta**, hasta que se meta la receta y se libere»*
+
+**La regla:** una orden nace **marcada como incompleta** y deja de estarlo cuando su receta entra y se
+libera. ⭐ **Encaja exactamente con §Post-F9.158(a)** —la receta se copia **al liberarse**, no al crear la
+orden—: sin ese estado, una OP recién creada se vería idéntica a una terminada, y **nadie sabría que le
+falta lo principal**. Es el letrero de esa decisión.
+
+### (c) 🟡 EL KPI DEL MAQUILERO: por UMBRAL, no proporcional → **sin versión, fuera del programa**
+
+> *«**arriba de un cierto porcentaje sí va a pesar**»*
+
+**El principio está decidido** —un **umbral**, no un castigo proporcional— y **el número se fija cuando se
+vea la calificación de maquileros**, no antes. ⚠️ **Y hay un pendiente previo que lo condiciona: las
+segundas HOY NO SE MIDEN** (el KPI se arma con auditorías AQL), así que esa pieza **empieza por medirlas**,
+no por poner dos umbrales.
+
+---
+
+#### (Post-F9.161) — 📌 R22 / MÓDULO 16: SEGUIMIENTO DE ACUERDOS CON CLIENTES — **fuera de la primera versión** (DANIEL, 30-ago-2026)
+
+> *«sería buenísimo que la gente de ventas tenga **todos los pendientes que se tiene con cada cliente** y
+> ahí vamos colgando estas negociaciones… **Pero eso es para otro módulo. Y para una segunda etapa.**»*
+
+**Requisito nuevo (R22) y módulo nuevo (16), explícitamente FUERA del alcance de la primera versión.** Se
+registra aquí —y no sólo en la hoja de ruta— porque es a la vez **un requisito** y **una decisión de
+alcance**: sin este registro, o alguien lo construye por error dentro de la v1, o se pierde.
+
+⭐ **La frase que le da su forma, y que hay que respetar cuando se construya: el seguimiento cuelga DEL
+CLIENTE**, y las negociaciones se cuelgan de él — **no al revés**. Es lo que lo hace un módulo aparte y no
+una pestaña más de la lista de precios.
+
+- **Aplica en:** nada de la primera versión. **Fecha:** 2026-08-30.
 
 ---
