@@ -98,10 +98,7 @@ export function idModeloDeLaReceta(modelo: LinajeDeReceta): number {
  * lecturas que hoy devuelven una lista vacía con toda razón (un modelo recién borrado, un id
  * inventado en un GET). Quien necesite existencia usa `exigirModelo`.
  */
-export async function resolverIdRecetaDeModelo(
-  lector: Lector,
-  idModelo: number,
-): Promise<number> {
+export async function resolverIdRecetaDeModelo(lector: Lector, idModelo: number): Promise<number> {
   const modelo = await lector.modelo.findUnique({
     where: { id: idModelo },
     select: SELECT_LINAJE_RECETA,
@@ -251,11 +248,7 @@ export async function conRecetaCompartida<M extends ModeloConRecetaAnidada>(
   leerPadres: (idsPadre: number[]) => Promise<M[]>,
 ): Promise<M[]> {
   const idsPadre = [
-    ...new Set(
-      modelos
-        .map((m) => m.idModeloDesarrollo)
-        .filter((id): id is number => id !== null),
-    ),
+    ...new Set(modelos.map((m) => m.idModeloDesarrollo).filter((id): id is number => id !== null)),
   ];
   if (idsPadre.length === 0) {
     return [...modelos];

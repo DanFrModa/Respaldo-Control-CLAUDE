@@ -25,9 +25,9 @@ import {
 /** Lector de mentira: sólo tiene lo que el resolver usa (`modelo.findUnique` / `findMany`). */
 function lectorDeMentira(filas: LinajeDeReceta[]) {
   const porId = new Map(filas.map((f) => [f.id, f]));
-  const findUnique = vi.fn(
-    ({ where }: { where: { id: number } }) => Promise.resolve(porId.get(where.id) ?? null),
-    );
+  const findUnique = vi.fn(({ where }: { where: { id: number } }) =>
+    Promise.resolve(porId.get(where.id) ?? null),
+  );
   const findMany = vi.fn(({ where }: { where: { id: { in: number[] } } }) =>
     Promise.resolve(where.id.in.map((id) => porId.get(id)).filter((f) => f !== undefined)),
   );

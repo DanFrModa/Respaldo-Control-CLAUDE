@@ -41,10 +41,7 @@ import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import {
-  conRecetaCompartida,
-  conRecetaCompartidaDeUno,
-} from '../modelos/receta-compartida.js';
+import { conRecetaCompartida, conRecetaCompartidaDeUno } from '../modelos/receta-compartida.js';
 
 import { num, numOrNull, promedioSimple, redondear2, redondear4 } from './decimales.js';
 import { calcularPrecioSugerido, type ParametrosPrecioSugerido } from './precio-sugerido.js';

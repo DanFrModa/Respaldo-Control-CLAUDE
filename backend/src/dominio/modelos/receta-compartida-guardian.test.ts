@@ -1,0 +1,211 @@
+/**
+ * ⭐ V1-E9b — **EL GUARDIÁN DE LAS LECTURAS DE RECETA** (§Post-F9.167 punto 1).
+ *
+ * Es el gemelo de `receta-embudo.test.ts`, que hace lo mismo para las ESCRITURAS. Existe porque el
+ * error que aquél ya había arreglado **se repitió idéntico en la otra dirección**: el conteo de
+ * sitios del plan buscó `.modeloTela.findMany` y hermanos, y por eso **no vio una clase entera de
+ * lectores** — los que traen la receta por `include` anidado (`telas`, `avios`, `avios.tallas`,
+ * `artes`) **sin nombrar jamás la tabla**.
+ *
+ * 🔴 **Lo que se habría entregado sin esto:** el precosto de un modelo hijo con la RECETA VACÍA
+ * —sólo maquila, corte y el empaque— *sin lanzar y sin verse raro*, y de ese número sale el precio
+ * que se cotiza en la cara del cliente.
+ *
+ * Esta prueba **lee el código fuente** y exige que todo archivo de producción del backend que LEA
+ * una tabla de la receta —directo o por relación— importe el resolver
+ * (`receta-compartida.ts`). Si alguien abre una lectura nueva y se olvida de preguntar de quién es
+ * la receta, esto se pone rojo antes de que un hijo salga vacío en producción.
+ *
+ * ⚠️ **Lo que SÍ y NO garantiza.** Igual que el guardián del embudo: trabaja por ARCHIVO, no por
+ * función. Garantiza que ningún archivo lea la receta sin conocer el resolver, y obliga a que toda
+ * excepción sea **DECLARADA aquí abajo con su razón** en vez de colarse callada. NO garantiza que
+ * dentro de un archivo que ya lo importa, una lectura nueva lo llame — eso lo cubren las pruebas de
+ * conducta (`receta-compartida.int.test.ts`). Es una red, no un teorema.
+ */
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
+/** La raíz del BACKEND (no de `src/`): el barrido tiene que alcanzar también `migracion/`. */
+const RAIZ_BACKEND = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+/** Las dos raíces de código del backend que pueden leer la receta. */
+const RAICES = ['src', 'migracion'];
+
+/** Las tablas que SON la receta de un modelo (las mismas cinco del embudo). */
+const TABLAS_DE_RECETA = [
+  'modeloTela',
+  'modeloAvio',
+  'modeloAvioTalla',
+  'modeloArte',
+  'modeloArteFoto',
+];
+
+/** Los métodos de Prisma que LEEN (los de escritura los vigila `receta-embudo.test.ts`). */
+const LECTURAS = [
+  'findMany',
+  'findFirst',
+  'findFirstOrThrow',
+  'findUnique',
+  'findUniqueOrThrow',
+  'count',
+  'aggregate',
+  'groupBy',
+];
+
+/**
+ * Los nombres de RELACIÓN por los que se llega a la receta desde el modelo. `avios` arrastra sus
+ * `tallas` (= `ModeloAvioTalla`, las medidas por talla R18) dentro de la misma fila, así que
+ * vigilar `avios` las cubre sin nombrarlas.
+ */
+const RELACIONES_DE_RECETA = ['telas', 'avios', 'artes'];
+
+/** Las palabras con las que Prisma abre los argumentos de una relación anidada. */
+const ARGUMENTOS_PRISMA = ['where', 'select', 'include', 'orderBy', 'take', 'skip', 'cursor'];
+
+/** La lectura DIRECTA: `tx.modeloTela.findMany(...)`. */
+const LEE_DIRECTO = new RegExp(
+  `\\.(?:${TABLAS_DE_RECETA.join('|')})\\.(?:${LECTURAS.join('|')})\\s*\\(`,
+);
+
+/**
+ * La lectura ANIDADA: `telas: { where: … }` colgando del modelo. Se pide un argumento de Prisma
+ * justo después para no confundirla con una DECLARACIÓN de tipo (`telas: { idTela: number }[]`),
+ * que abunda en los mismos archivos.
+ */
+const LEE_ANIDADO = new RegExp(
+  `\\b(?:${RELACIONES_DE_RECETA.join('|')})\\s*:\\s*\\{\\s*(?:${ARGUMENTOS_PRISMA.join('|')})\\s*:`,
+);
+
+const LEE_RECETA = (codigo: string): boolean =>
+  LEE_DIRECTO.test(codigo) || LEE_ANIDADO.test(codigo);
+
+/** ¿El archivo IMPORTA el resolver de la receta compartida? */
+const CONOCE_EL_RESOLVER = /from '(?:\.{1,2}\/)+(?:modelos\/)?receta-compartida\.js'/;
+
+/**
+ * Los archivos a los que el resolver NO les aplica, cada uno con su razón. Añadir uno aquí es una
+ * DECISIÓN que se lee en el diff — que es justamente lo que se quiere: nadie desactiva la regla sin
+ * decir por qué.
+ */
+const EXCEPCIONES: Record<string, string> = {
+  'src/dominio/modelos/versiones.ts':
+    'Copia la receta a una VERSIÓN recién nacida (linaje de VERSIONES, no el 1:N: la versión se ' +
+    'lleva una copia CONGELADA a propósito). ⚠️ El mecanismo exacto importa, porque es lo que ' +
+    'alguien va a ir a verificar: NO basta con decir "un modelo de desarrollo nunca lleva la ' +
+    'columna" — lo que cierra la puerta es que `versiones.ts:207` RECHAZA versionar un modelo sin ' +
+    '`codigoDesarrollo`, y un hijo del 1:N nace con `codigoDesarrollo = null` ' +
+    '(`marcaProduccionDerivada`, `nomenclatura.ts`). Es decir: un hijo NO SE PUEDE VERSIONAR, así ' +
+    'que aquí `idPadre` nunca es uno. Si alguna vez se permitiera, esta línea es la que hay que ' +
+    'volver a discutir: hoy la versión de un hijo nacería con la receta VACÍA.',
+  'migracion/cuadre-fase.ts':
+    'Cuadre del ETL: son `.count()` GLOBALES sin `where` — cuenta las filas de la tabla entera, ' +
+    'no la receta de un modelo. No hay nada que resolver.',
+  'migracion/loaders/bom-modelos.ts':
+    'Cargador del ETL: carga el BOM de los ~4,987 modelos MIGRADOS del Access, que llevan ' +
+    '`idModeloDesarrollo = NULL` (REGLA 0-B: sin backfill, a propósito) ⇒ el resolver es la ' +
+    'identidad. Queda DECLARADO aquí y no fuera del barrido: si el ETL algún día cargara sobre un ' +
+    'hijo del linaje 1:N, ésta es la línea donde hay que discutirlo.',
+  'migracion/loaders/fotos-modelos.ts':
+    'Cargador del ETL de fotos del arte, sobre los mismos modelos migrados (`idModeloDesarrollo = ' +
+    'NULL`) ⇒ resolver = identidad. Misma razón que `bom-modelos.ts`.',
+};
+
+/** Carpetas que no son código de negocio (generado por Prisma, ayudas de prueba). */
+const CARPETAS_FUERA = ['src/datos/generated', 'src/pruebas'];
+
+/** Todos los `.ts` de producción del backend (sin generados, sin pruebas), en las dos raíces. */
+function fuentesDeProduccion(carpeta: string, acumulado: string[] = []): string[] {
+  for (const entrada of readdirSync(carpeta)) {
+    const completa = path.join(carpeta, entrada);
+    const relativa = path.relative(RAIZ_BACKEND, completa).replaceAll(path.sep, '/');
+    if (CARPETAS_FUERA.some((fuera) => relativa === fuera || relativa.startsWith(`${fuera}/`))) {
+      continue;
+    }
+    if (entrada === 'node_modules') continue;
+    if (statSync(completa).isDirectory()) {
+      fuentesDeProduccion(completa, acumulado);
+    } else if (entrada.endsWith('.ts') && !entrada.endsWith('.test.ts')) {
+      acumulado.push(relativa);
+    }
+  }
+  return acumulado;
+}
+
+describe('El guardián de las lecturas de receta (V1-E9b)', () => {
+  const fuentes = RAICES.flatMap((raiz) => fuentesDeProduccion(path.join(RAIZ_BACKEND, raiz)));
+  const codigo = new Map(
+    fuentes.map((f) => [f, readFileSync(path.join(RAIZ_BACKEND, f), 'utf8')] as const),
+  );
+  const lectores = fuentes.filter((f) => LEE_RECETA(codigo.get(f) ?? ''));
+
+  it('la prueba está mirando el código de verdad (si no, no vigila nada)', () => {
+    // Defensa contra el fallo silencioso: si la ruta se rompiera, la lista quedaría vacía y todas
+    // las aserciones de abajo pasarían por no tener nada que revisar.
+    expect(fuentes.length).toBeGreaterThan(100);
+    expect(fuentes).toContain('src/dominio/modelos/bom-modelo.ts');
+    expect(fuentes.some((f) => f.startsWith('migracion/'))).toBe(true);
+  });
+
+  it('detecta la lectura DIRECTA (`tx.modeloTela.findMany(…)`)', () => {
+    expect(lectores).toContain('src/dominio/modelos/bom-modelo.ts');
+    expect(lectores).toContain('src/dominio/produccion/receta-orden.ts');
+    // Y no confunde una ESCRITURA con una lectura: el embudo vigila esas.
+    expect(LEE_DIRECTO.test('await tx.modeloTela.createMany({ data })')).toBe(false);
+  });
+
+  it('🔴 detecta la lectura ANIDADA por `include` — la clase que el plan no vio', () => {
+    // `costos/pre-costo.ts` NO nombra ni una vez `modeloTela`/`modeloAvio`/`modeloArte`: su receta
+    // entra entera por `include: incluirReceta`. Que aparezca aquí ES la prueba de que la
+    // detección anidada funciona; si dejara de aparecer, el guardián estaría ciego justo donde el
+    // defecto silencioso vive.
+    expect(codigo.get('src/dominio/costos/pre-costo.ts')).not.toMatch(LEE_DIRECTO);
+    expect(lectores).toContain('src/dominio/costos/pre-costo.ts');
+    expect(lectores).toContain('src/dominio/desarrollo/precostos.ts');
+  });
+
+  it('no confunde una DECLARACIÓN DE TIPO con una consulta', () => {
+    // Los mismos archivos declaran `telas: { idTela: number; … }[]`. Si eso contara, el guardián
+    // marcaría medio backend y acabaría desactivado a fuerza de excepciones.
+    expect(LEE_ANIDADO.test('  telas: { idTela: number; consumo: number }[];')).toBe(false);
+    expect(LEE_ANIDADO.test("  artes: { flexDirection: 'row', gap: 8 },")).toBe(false);
+    expect(LEE_ANIDADO.test('    telas: { where: { paraPreCosto: true },')).toBe(true);
+    expect(LEE_ANIDADO.test('    avios: { select: { idAvio: true } },')).toBe(true);
+  });
+
+  it('TODO archivo que lee la receta conoce el resolver (o está DECLARADO como excepción)', () => {
+    const olvidados = lectores.filter(
+      (f) => !(f in EXCEPCIONES) && !CONOCE_EL_RESOLVER.test(codigo.get(f) ?? ''),
+    );
+    expect(olvidados).toEqual([]);
+  });
+
+  it('las excepciones declaradas SIGUEN EXISTIENDO y siguen leyendo la receta', () => {
+    // Una excepción que ya no aplica es peor que ninguna: parece que alguien lo pensó cuando en
+    // realidad protege a un archivo que ya no está o que ya dejó de leer la receta.
+    for (const archivo of Object.keys(EXCEPCIONES)) {
+      expect(fuentes, `la excepción "${archivo}" ya no existe: bórrala`).toContain(archivo);
+      expect(lectores, `"${archivo}" ya no lee la receta: bórralo de las excepciones`).toContain(
+        archivo,
+      );
+    }
+  });
+
+  it('🔴 quien trae la receta por `include` TIENE que injertarla, no sólo importar el resolver', () => {
+    // La regla de arriba se conforma con que el archivo importe algo del resolver. Para la forma 3
+    // eso no basta: importar `resolverIdRecetaDeModelo` y seguir usando el `include` tal cual
+    // dejaría el precosto vacío igual. Aquí se exige la función que de verdad lo arregla.
+    const conInclude = lectores.filter((f) => LEE_ANIDADO.test(codigo.get(f) ?? ''));
+    expect(conInclude).toEqual([
+      'src/dominio/costos/pre-costo.ts',
+      'src/dominio/desarrollo/precostos.ts',
+    ]);
+    for (const archivo of conInclude) {
+      expect(codigo.get(archivo), `${archivo} usa un \`include\` de receta sin injertarla`).toMatch(
+        /conRecetaCompartida(DeUno)?\(/,
+      );
+    }
+  });
+});
