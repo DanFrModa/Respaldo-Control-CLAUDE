@@ -41,6 +41,7 @@ import { crearModeloMigrado } from './migracion.js';
 import { actualizarModelo, crearModelo, listarModelos, pasarModeloAProduccion } from './modelos.js';
 import {
   consultarPropuestaProduccion,
+  derivarModeloDeProduccion,
   digitosDelModelo,
   leerSerie,
   mintearCodigoDesarrollo,
@@ -1330,5 +1331,401 @@ describe('crearModeloMigrado (modo migración del ETL)', () => {
     expect(enBd.origen).toBe('produccion');
     expect(enBd.numeroProduccion).toBeNull();
     expect(enBd.codigoDesarrollo).toBeNull();
+  });
+});
+
+// ── ⭐⭐ V1-E9a · EL LINAJE 1:N: derivar N modelos de producción de un desarrollo ───────────────
+
+/**
+ * §Post-F9.135 (DANIEL): cuatro órdenes de compra del cliente para cuatro COLORES del mismo modelo
+ * tienen que dar **cuatro modelos de producción** —uno por color, con su número de 5 dígitos— y
+ * **una sola receta**, la del desarrollo. Aquí se prueba el vínculo (E1); el resolver que lee la
+ * receta por él es la etapa siguiente.
+ *
+ * Lo que sólo la BASE puede demostrar y por eso vive en integración:
+ *  (a) que los N hijos salen del MISMO padre con números DISTINTOS de la misma serie;
+ *  (b) que el padre no se mueve de su catálogo ni pierde su código de desarrollo (D3);
+ *  (c) que **la receta NO se copia** — la diferencia entera con `mintearVersionDeModelo`;
+ *  (d) que las CADENAS son imposibles, por dominio Y por CHECK de la base;
+ *  (e) que el advisory lock del par también serializa esta puerta (A3, ADR-0018).
+ */
+describe('derivarModeloDeProduccion — el linaje 1:N', () => {
+  /** Crea el desarrollo del que van a nacer los hijos, con su ficha completa. */
+  async function crearDesarrolloConFicha(codigo: string): Promise<number> {
+    const temporada = await cliente.temporada.create({ data: { nombre: `Temp ${codigo}` } });
+    const curva = await cliente.curvaTalla.create({ data: { nombre: `Curva ${codigo}` } });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo,
+        codigoDesarrollo: codigo,
+        origen: 'desarrollo',
+        descripcion: 'Sudadera con cierre',
+        composicion: '80% algodón / 20% poliéster',
+        maquilaBase: 42.5,
+        corteBase: 3.25,
+        numOperaciones: 17,
+        secuenciaEstampado: 'despues',
+        llevaArte: false,
+        idTemporada: temporada.id,
+        idCurvaTalla: curva.id,
+        idTipoProducto: pantalon.id,
+        idGenero: caballero.id,
+      },
+      select: { id: true },
+    });
+    return modelo.id;
+  }
+
+  it('⭐ el caso de Daniel: 4 colores → 4 modelos de producción, UN solo desarrollo', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-001');
+
+    const hijos = [];
+    for (const color of ['Negro', 'Blanco', 'Marino', 'Gris']) {
+      hijos.push(
+        await enTx((tx) =>
+          derivarModeloDeProduccion(tx, sesion(), idDesarrollo, {
+            descripcion: `Sudadera con cierre — ${color}`,
+          }),
+        ),
+      );
+    }
+
+    // 1) Cuatro números DISTINTOS y consecutivos de la serie 71 (Pantalón 7 + Caballero 1).
+    expect(hijos.map((h) => h.numeroProduccion)).toEqual([71_001, 71_002, 71_003, 71_004]);
+    expect(hijos.map((h) => h.codigo)).toEqual(['71001', '71002', '71003', '71004']);
+    // 2) Los cuatro apuntan al MISMO desarrollo: es la promesa entera de la etapa.
+    expect(new Set(hijos.map((h) => h.idModeloDesarrollo))).toEqual(new Set([idDesarrollo]));
+    expect(new Set(hijos.map((h) => h.idModelo)).size).toBe(4);
+
+    const enBd = await cliente.modelo.findMany({
+      where: { idModeloDesarrollo: idDesarrollo },
+      select: {
+        codigo: true,
+        origen: true,
+        codigoDesarrollo: true,
+        numeroProduccion: true,
+        idModeloPadre: true,
+        versionDesarrollo: true,
+        revisionEstado: true,
+        descripcion: true,
+      },
+      orderBy: { numeroProduccion: 'asc' },
+    });
+    expect(enBd).toHaveLength(4);
+    for (const hijo of enBd) {
+      expect(hijo.origen).toBe('produccion');
+      // `codigoDesarrollo` es @unique: si los cuatro se lo llevaran, el segundo reventaría. El
+      // número de desarrollo NO se pierde (D3) — sigue en el padre, y se llega por el vínculo.
+      expect(hijo.codigoDesarrollo).toBeNull();
+      // Un hijo NO es una versión: ni padre de versión, ni sufijo, ni revisión propia.
+      expect(hijo.idModeloPadre).toBeNull();
+      expect(hijo.versionDesarrollo).toBeNull();
+      expect(hijo.revisionEstado).toBeNull();
+    }
+    expect(enBd.map((h) => h.descripcion)).toEqual([
+      'Sudadera con cierre — Negro',
+      'Sudadera con cierre — Blanco',
+      'Sudadera con cierre — Marino',
+      'Sudadera con cierre — Gris',
+    ]);
+
+    // 3) El PADRE no se movió: sigue en desarrollo, con su código y sin número (D3).
+    const padre = await cliente.modelo.findUniqueOrThrow({
+      where: { id: idDesarrollo },
+      select: { codigo: true, origen: true, codigoDesarrollo: true, numeroProduccion: true },
+    });
+    expect(padre).toEqual({
+      codigo: 'CYA-26-71-001',
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001',
+      numeroProduccion: null,
+    });
+  });
+
+  it('el hijo HEREDA la ficha del padre (y sólo la descripción se puede cambiar)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-002');
+    const padre = await cliente.modelo.findUniqueOrThrow({ where: { id: idDesarrollo } });
+
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+    const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: hijo.idModelo } });
+
+    // Se comparan los CAMPOS DE FICHA uno por uno: si `CAMPOS_FICHA_HEREDADOS` pierde uno, este
+    // `toEqual` lo enseña por nombre en vez de con un conteo.
+    expect({
+      descripcion: fila.descripcion,
+      composicion: fila.composicion,
+      maquilaBase: fila.maquilaBase?.toString(),
+      corteBase: fila.corteBase?.toString(),
+      idTemporada: fila.idTemporada,
+      idCurvaTalla: fila.idCurvaTalla,
+      idGenero: fila.idGenero,
+      idTipoProducto: fila.idTipoProducto,
+      idMaquileroCotizado: fila.idMaquileroCotizado,
+      numOperaciones: fila.numOperaciones,
+      secuenciaEstampado: fila.secuenciaEstampado,
+      llevaArte: fila.llevaArte,
+    }).toEqual({
+      descripcion: padre.descripcion,
+      composicion: padre.composicion,
+      maquilaBase: padre.maquilaBase?.toString(),
+      corteBase: padre.corteBase?.toString(),
+      idTemporada: padre.idTemporada,
+      idCurvaTalla: padre.idCurvaTalla,
+      idGenero: padre.idGenero,
+      idTipoProducto: padre.idTipoProducto,
+      idMaquileroCotizado: padre.idMaquileroCotizado,
+      numOperaciones: padre.numOperaciones,
+      secuenciaEstampado: padre.secuenciaEstampado,
+      llevaArte: padre.llevaArte,
+    });
+    // Los valores NO son los defaults de la base: si lo fueran, la herencia podría estar rota y la
+    // comparación de arriba seguiría en verde por casualidad.
+    expect(fila.llevaArte).toBe(false);
+    expect(fila.secuenciaEstampado).toBe('despues');
+    expect(fila.numOperaciones).toBe(17);
+  });
+
+  /**
+   * 🔑 **LA PRUEBA QUE DEFINE LA ETAPA.** `mintearVersionDeModelo` COPIA la receta; ésta la
+   * COMPARTE. Si alguien "mejorara" esta función copiándola —que es lo que el vecino hace— las
+   * cuatro recetas se desincronizarían a la semana siguiente, que es exactamente lo que la decisión
+   * de Daniel vino a impedir. Esta prueba muere si eso pasa.
+   */
+  it('⭐ NO copia la receta: el hijo nace VACÍO y el padre conserva la suya entera', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-003');
+    const tela = await cliente.tela.create({ data: { nombre: 'Felpa Suiza' } });
+    await cliente.modeloTela.create({
+      data: { idModelo: idDesarrollo, idTela: tela.id, consumoPorPrenda: 1.25 },
+    });
+
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    expect(await cliente.modeloTela.count({ where: { idModelo: hijo.idModelo } })).toBe(0);
+    expect(await cliente.modeloAvio.count({ where: { idModelo: hijo.idModelo } })).toBe(0);
+    expect(await cliente.modeloArte.count({ where: { idModelo: hijo.idModelo } })).toBe(0);
+    // Y la del padre sigue completa: derivar no toca la receta de nadie.
+    expect(await cliente.modeloTela.count({ where: { idModelo: idDesarrollo } })).toBe(1);
+    // Tampoco marca la receta como "tocada" (V1-E8d): no la movió.
+    const padre = await cliente.modelo.findUniqueOrThrow({
+      where: { id: idDesarrollo },
+      select: { recetaTocadaEn: true, recetaTocadaCambio: true },
+    });
+    expect(padre).toEqual({ recetaTocadaEn: null, recetaTocadaCambio: null });
+  });
+
+  it('deja en la bitácora de qué desarrollo salió el hijo (A7)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-004');
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    const renglones = await cliente.bitacora.findMany({
+      where: { entidad: 'Modelo', idEntidad: String(hijo.idModelo) },
+      select: { datos: true },
+    });
+    const derivacion = renglones
+      .map((r) => r.datos as Record<string, unknown>)
+      .find((d) => d.operacion === 'derivar-modelo-de-produccion');
+    expect(derivacion).toMatchObject({
+      codigo: '71001',
+      numeroProduccion: 71_001,
+      numeroCapturado: false,
+      idModeloDesarrollo: idDesarrollo,
+      codigoModeloDesarrollo: 'CYA-26-71-001',
+      numeroDeDesarrollo: 'CYA-26-71-001',
+    });
+  });
+
+  // ── Las cuatro guardas ──────────────────────────────────────────────────────────
+
+  it('el desarrollo tiene que existir', async () => {
+    await expect(
+      enTx((tx) => derivarModeloDeProduccion(tx, sesion(), 999_999)),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  /**
+   * ⭐ Y ESTA ES LA PRUEBA DE QUE NO HAY CADENAS: derivar de un hijo (que es de producción) rebota.
+   * Como todo hijo nace en producción y sólo se puede derivar de un desarrollo, la profundidad
+   * máxima del linaje es 1 — sin necesidad de una comprobación aparte de "el padre no es hijo".
+   */
+  it('⭐ no se puede derivar de un modelo que YA es de producción (así no hay cadenas)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-005');
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    // (a) de un hijo del linaje 1:N
+    await expect(
+      enTx((tx) => derivarModeloDeProduccion(tx, sesion(), hijo.idModelo)),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    // (b) y de un modelo de producción cualquiera (los ~4,987 migrados del Access)
+    await sembrarProduccion(['71900']);
+    const migrado = await cliente.modelo.findFirstOrThrow({ where: { codigo: '71900' } });
+    await expect(
+      enTx((tx) => derivarModeloDeProduccion(tx, sesion(), migrado.id)),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    // Y nadie nació de esos intentos.
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: hijo.idModelo } })).toBe(0);
+  });
+
+  it('un desarrollo DESCONTINUADO no produce hijos (se reactiva a mano, §Post-F9.119)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-006');
+    await cliente.modelo.update({ where: { id: idDesarrollo }, data: { activo: false } });
+
+    await expect(
+      enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo)),
+    ).rejects.toThrow(/descontinuado/i);
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(0);
+  });
+
+  /**
+   * LA COMPUERTA de V1-E7d (§Post-F9.110), evaluada contra el PADRE — que es lo correcto: el hijo
+   * no existe todavía cuando hay que decidir, y no lleva revisión propia porque su receta es la del
+   * padre. Sin esto, derivar sería la TERCERA puerta lateral por la que una versión sin revisar
+   * llegaría a producción.
+   */
+  it('⭐ una VERSIÓN sin revisar no puede derivar hijos (la compuerta se evalúa contra el padre)', async () => {
+    const idRaiz = await crearDesarrolloConFicha('CYA-26-71-007');
+    const version = await cliente.modelo.create({
+      data: {
+        codigo: 'CYA-26-71-007-01',
+        codigoDesarrollo: 'CYA-26-71-007-01',
+        origen: 'desarrollo',
+        idModeloPadre: idRaiz,
+        versionDesarrollo: 1,
+        revisionEstado: 'pendiente',
+        idTipoProducto: pantalon.id,
+        idGenero: caballero.id,
+      },
+      select: { id: true },
+    });
+
+    await expect(enTx((tx) => derivarModeloDeProduccion(tx, sesion(), version.id))).rejects.toThrow(
+      /REVISIÓN/,
+    );
+
+    // Aprobada, sí deriva — si no, la prueba pasaría igual con la derivación rota del todo.
+    await cliente.modelo.update({
+      where: { id: version.id },
+      data: { revisionEstado: 'aprobada' },
+    });
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), version.id));
+    expect(hijo.numeroProduccion).toBe(71_001);
+  });
+
+  // ── El número: mismas reglas que la promoción ───────────────────────────────────
+
+  it('respeta los huecos de la serie y acepta un número capturado a mano, con su aviso', async () => {
+    await sembrarProduccion(['71001', '71003']);
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-008');
+
+    // Sin capturar: el hueco libre MÁS BAJO (002), no el que sigue al máximo.
+    const auto = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+    expect(auto.numeroProduccion).toBe(71_002);
+    expect(auto.numeroCapturado).toBe(false);
+
+    // Capturado de OTRO par: se guarda igual y AVISA (§Post-F9.34 punto 7: la excepción es suya).
+    const aMano = await enTx((tx) =>
+      derivarModeloDeProduccion(tx, sesion(), idDesarrollo, { numeroCapturado: 39_500 }),
+    );
+    expect(aMano.numeroProduccion).toBe(39_500);
+    expect(aMano.numeroCapturado).toBe(true);
+    expect(aMano.avisos.join(' ')).toContain('39');
+
+    // Repetido: eso SÍ bloquea.
+    await expect(
+      enTx((tx) =>
+        derivarModeloDeProduccion(tx, sesion(), idDesarrollo, { numeroCapturado: 71_003 }),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  /**
+   * 🔴 EL CASO QUE EL CENTINELA DEL CÓDIGO LIBRE **NO** ALCANZA: un modelo cuyo `numeroProduccion`
+   * está ocupado pero cuyo `codigo` es OTRO. El número es editable a mano (§Post-F9.46), así que las
+   * dos columnas se pueden desalinear, y ahí `exigirCodigoLibre` mira el sitio equivocado. Sin el
+   * centinela del NÚMERO, esto llegaría al `@unique` de la base y **abortaría la transacción
+   * entera** — que en la salida a producción se lleva por delante las otras órdenes del lote.
+   */
+  it('⭐ rebota el número ocupado aunque el que lo ocupa tenga OTRO código', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-014');
+    await cliente.modelo.create({
+      data: { codigo: 'MODELO-VIEJO', origen: 'produccion', numeroProduccion: 71_003 },
+    });
+
+    await expect(
+      enTx((tx) =>
+        derivarModeloDeProduccion(tx, sesion(), idDesarrollo, { numeroCapturado: 71_003 }),
+      ),
+    ).rejects.toThrow(
+      'El número de producción 71003 ya está ocupado por el modelo "MODELO-VIEJO".',
+    );
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(0);
+  });
+
+  /**
+   * El mismo candado que la promoción, por la misma razón (ADR-0018): el consecutivo de producción
+   * no sale de una secuencia, sale del hueco libre más bajo, y "elegirlo" y "escribirlo" tienen que
+   * ser un solo hecho. Aquí es MÁS necesario que en la promoción, porque el caso de negocio es
+   * justamente hacer nacer varios hijos a la vez del mismo padre.
+   */
+  it('⭐ N derivaciones SIMULTÁNEAS del mismo desarrollo sacan N números distintos', async () => {
+    const CONCURRENTES = 8;
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-009');
+
+    const resultados = await Promise.allSettled(
+      Array.from({ length: CONCURRENTES }, () =>
+        enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo)),
+      ),
+    );
+    expect(resultados.filter((r) => r.status === 'rejected').map((r) => String(r.reason))).toEqual(
+      [],
+    );
+
+    const numeros = resultados
+      .filter(
+        (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof derivarModeloDeProduccion>>> =>
+          r.status === 'fulfilled',
+      )
+      .map((r) => r.value.numeroProduccion)
+      .sort((a, b) => a - b);
+    expect(numeros).toEqual(Array.from({ length: CONCURRENTES }, (_, i) => 71_000 + i + 1));
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(
+      CONCURRENTES,
+    );
+  });
+
+  // ── Lo que vigila la BASE, no el dominio ────────────────────────────────────────
+
+  /**
+   * Las dos invariantes de la migración `20260831190000_el_linaje_de_los_modelos`. Se prueban con
+   * SQL crudo a propósito: son la red que queda cuando alguien escriba la columna por un camino que
+   * hoy no existe — que es exactamente para lo que sirve un CHECK.
+   */
+  it('⭐ la BASE impide que un modelo sea su propio padre de receta', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-010');
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    await expect(
+      cliente.$executeRawUnsafe(
+        `UPDATE "modelos" SET "id_modelo_desarrollo" = "id" WHERE "id" = ${String(hijo.idModelo)}`,
+      ),
+    ).rejects.toThrow(/modelos_linaje_desarrollo_no_es_si_mismo_check/);
+  });
+
+  it('⭐ la BASE impide que un modelo de DESARROLLO lleve el vínculo (es lo que mata las cadenas)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-011');
+    const otro = await crearDesarrolloConFicha('CYA-26-71-012');
+
+    await expect(
+      cliente.$executeRawUnsafe(
+        `UPDATE "modelos" SET "id_modelo_desarrollo" = ${String(idDesarrollo)} WHERE "id" = ${String(otro)}`,
+      ),
+    ).rejects.toThrow(/modelos_linaje_desarrollo_solo_produccion_check/);
+  });
+
+  it('⭐ la BASE impide borrar el desarrollo mientras tenga hijos (Restrict, D3)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-013');
+    await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    await expect(cliente.modelo.delete({ where: { id: idDesarrollo } })).rejects.toThrow();
+    expect(await cliente.modelo.count({ where: { id: idDesarrollo } })).toBe(1);
   });
 });

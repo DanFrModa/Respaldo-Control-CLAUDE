@@ -48,6 +48,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
 import {
+  CAMPOS_FICHA_HEREDADOS,
   exigirDigitosDeNomenclatura,
   incluirRelacionesModelo,
   type ModeloConRelaciones,
@@ -154,22 +155,6 @@ export interface DatosVersionModelo {
   /** Descripción de la versión; si se omite, hereda la del padre. */
   descripcion?: string | undefined;
 }
-
-/** Campos de FICHA que la versión hereda del padre (la receta se copia aparte). */
-const CAMPOS_FICHA_HEREDADOS = {
-  descripcion: true,
-  composicion: true,
-  maquilaBase: true,
-  corteBase: true,
-  idTemporada: true,
-  idCurvaTalla: true,
-  idGenero: true,
-  idTipoProducto: true,
-  idMaquileroCotizado: true,
-  numOperaciones: true,
-  secuenciaEstampado: true,
-  llevaArte: true,
-} as const;
 
 /**
  * MINTEA la versión de un modelo: crea el modelo NUEVO con el siguiente sufijo de la familia,

@@ -628,6 +628,22 @@ export const esquemaModeloSalida = z
       .describe(
         'Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión.',
       ),
+    // ⭐⭐ V1-E9a (§Post-F9.135) — LINAJE 1:N. Molde idéntico al de `idModeloPadre`/`codigoPadre`:
+    // el id para preguntar, el código para enseñarlo con liga. Son EJES DISTINTOS y no se mezclan —
+    // una VERSIÓN copia la receta del padre y lleva revisión propia; un HIJO de producción la
+    // COMPARTE y no lleva ninguna. La ficha los necesita separados para no enseñarle a un hijo el
+    // chip de revisión de una versión (§Post-F9.167 punto 2).
+    idModeloDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya.',
+      ),
+    codigoModeloDesarrollo: z
+      .string()
+      .nullable()
+      .describe('Código del modelo de desarrollo del que nació (para enseñar el linaje), o null.'),
     // ⭐ V1-E7d (§Post-F9.110) — LA REVISIÓN antes de mandar a producir. Sólo la llevan las
     // VERSIONES; en cualquier otro modelo los cuatro campos vienen en null (= no aplica) y su
     // conducta no cambió.

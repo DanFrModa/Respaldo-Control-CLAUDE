@@ -55,6 +55,10 @@ export function marcaProduccionMigrada(codigo: string): MarcaNomenclaturaModelo 
     origen: 'produccion',
     codigoDesarrollo: null,
     numeroProduccion: numeroProduccionDeCodigo(codigo),
+    // V1-E9a: el histórico del Access no deriva de ningún desarrollo — su receta es la suya, que es
+    // lo que `null` significa. Sin backfill, y por decisión (REGLA 0-B): inventarles un padre sería
+    // mentir sobre 4,987 modelos.
+    idModeloDesarrollo: null,
   };
 }
 

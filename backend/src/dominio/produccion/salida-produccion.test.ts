@@ -64,6 +64,7 @@ function modeloFalso(extra: Record<string, unknown> = {}): Record<string, unknow
     idGenero: 4,
     idModeloPadre: 7,
     versionDesarrollo: 1,
+    idModeloDesarrollo: null,
     revisionEstado: 'pendiente',
     revisadoEn: null,
     revisionNota: null,

@@ -2259,6 +2259,42 @@ model Modelo {
   /// serie: es sufijo del código que ya existía, no un código nuevo.
   versionDesarrollo Int? @map("version_desarrollo")
 
+  /// ⭐⭐ V1-E9a (§Post-F9.135 + §Post-F9.167) — **EL LINAJE 1:N: de qué modelo de DESARROLLO nació
+  /// este modelo de PRODUCCIÓN, y por lo tanto DE QUIÉN ES SU RECETA.**
+  ///
+  /// El caso de Daniel: cuatro órdenes de compra del cliente para **cuatro colores del mismo
+  /// modelo** tienen que producir **cuatro modelos de producción** —uno por color, cada uno con su
+  /// número de 5 dígitos— y **una sola receta**, la del desarrollo del que salieron. Esta columna
+  /// es el vínculo que lo hace posible; el resolver que la usa para leer la receta llega en la
+  /// etapa siguiente (V1-E9b).
+  ///
+  /// ⚠️ **NO es `idModeloPadre`, y no se puede reusar.** Aquélla es el linaje de las VERSIONES
+  /// (`CYA-26-71-001` → `-01`), que es otra cosa: una versión NACE EN DESARROLLO, hereda una COPIA
+  /// congelada de la receta y **lleva su propia revisión**. Un hijo de producción nace **ya en
+  /// producción**, **comparte** la receta del padre (no la copia) y **no lleva revisión propia**:
+  /// la firma que lo habilita es la del padre. Meterlos en la misma columna haría que cada hijo se
+  /// enseñara como *«Revisión pendiente · no puede mandarse a producir»* **sin ningún botón para
+  /// arreglarlo**, sobre un modelo que ya está en producción (§Post-F9.167 punto 2).
+  ///
+  /// `NULL` = **«la receta es la mía»**, que es la conducta de siempre: es el caso de los ~4,987
+  /// modelos migrados del Access, de los capturados a mano y de todo lo que existe hoy. La
+  /// migración es aditiva y **sin backfill** a propósito (REGLA 0-B): inventarles un padre sería
+  /// mentir. `Restrict`: un desarrollo con hijos de producción no se borra físico (se
+  /// descontinúa, D3).
+  ///
+  /// 🔒 **Dos invariantes que vigila la BASE, no sólo el dominio**
+  /// (`20260831190000_el_linaje_de_los_modelos`):
+  ///  • `modelos_linaje_desarrollo_no_es_si_mismo_check` — un modelo no puede ser su propio padre
+  ///    de receta.
+  ///  • `modelos_linaje_desarrollo_solo_produccion_check` — sólo un modelo de PRODUCCIÓN puede
+  ///    llevar esta columna. Con ella, **las cadenas son imposibles**: el único escritor
+  ///    (`derivarModeloDeProduccion`) exige que el padre sea de DESARROLLO, y un modelo de
+  ///    desarrollo nunca puede llevar la columna ⇒ un hijo jamás puede ser padre de otro.
+  idModeloDesarrollo Int?     @map("id_modelo_desarrollo")
+  modeloDesarrollo   Modelo?  @relation("ModeloDerivadoDeDesarrollo", fields: [idModeloDesarrollo], references: [id], onDelete: Restrict)
+  /// La otra pata: los modelos de PRODUCCIÓN (uno por color/OC) que nacieron de ESTE desarrollo.
+  modelosDeProduccion Modelo[] @relation("ModeloDerivadoDeDesarrollo")
+
   /// ⭐ V1-E7d (§Post-F9.110) — LA REVISIÓN ANTES DE MANDAR A PRODUCIR. La negociación mueve la
   /// receta EN VIVO, frente al cliente; estas cuatro columnas son la bisagra en la que una
   /// decisión de mesa se vuelve un compromiso de producción, FIRMADA (A7: quién y cuándo).
@@ -2399,6 +2435,9 @@ model Modelo {
   @@index([origen, activo])
   /// Linaje de versiones (V1-E7b): "dame las versiones de este modelo" sin recorrer la tabla.
   @@index([idModeloPadre])
+  /// Linaje 1:N (V1-E9a): "dame los modelos de producción de este desarrollo" — y es por donde
+  /// entrará el resolver de la receta compartida (V1-E9b), que se pregunta en cada lectura.
+  @@index([idModeloDesarrollo])
   @@map("modelos")
 }
 

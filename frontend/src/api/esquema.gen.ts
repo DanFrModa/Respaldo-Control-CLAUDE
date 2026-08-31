@@ -13598,6 +13598,10 @@ export interface paths {
                 codigoPadre: string | null;
                 /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
                 versionDesarrollo: number | null;
+                /** @description Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya. */
+                idModeloDesarrollo: number | null;
+                /** @description Código del modelo de desarrollo del que nació (para enseñar el linaje), o null. */
+                codigoModeloDesarrollo: string | null;
                 /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
                 revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
                 /** @description Id de quien firmó la revisión, o null. */
@@ -13825,6 +13829,10 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya. */
+              idModeloDesarrollo: number | null;
+              /** @description Código del modelo de desarrollo del que nació (para enseñar el linaje), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
               revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
               /** @description Id de quien firmó la revisión, o null. */
@@ -14035,6 +14043,10 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya. */
+              idModeloDesarrollo: number | null;
+              /** @description Código del modelo de desarrollo del que nació (para enseñar el linaje), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
               revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
               /** @description Id de quien firmó la revisión, o null. */
@@ -14379,6 +14391,10 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya. */
+              idModeloDesarrollo: number | null;
+              /** @description Código del modelo de desarrollo del que nació (para enseñar el linaje), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
               revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
               /** @description Id de quien firmó la revisión, o null. */
@@ -14602,6 +14618,10 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya. */
+              idModeloDesarrollo: number | null;
+              /** @description Código del modelo de desarrollo del que nació (para enseñar el linaje), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
               revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
               /** @description Id de quien firmó la revisión, o null. */
@@ -15238,6 +15258,10 @@ export interface paths {
                 codigoPadre: string | null;
                 /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
                 versionDesarrollo: number | null;
+                /** @description Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya. */
+                idModeloDesarrollo: number | null;
+                /** @description Código del modelo de desarrollo del que nació (para enseñar el linaje), o null. */
+                codigoModeloDesarrollo: string | null;
                 /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
                 revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
                 /** @description Id de quien firmó la revisión, o null. */
@@ -15468,6 +15492,10 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya. */
+              idModeloDesarrollo: number | null;
+              /** @description Código del modelo de desarrollo del que nació (para enseñar el linaje), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
               revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
               /** @description Id de quien firmó la revisión, o null. */

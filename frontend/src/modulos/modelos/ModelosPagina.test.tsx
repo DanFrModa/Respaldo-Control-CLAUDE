@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -122,6 +122,8 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     idModeloPadre: null,
     codigoPadre: null,
     versionDesarrollo: null,
+    idModeloDesarrollo: null,
+    codigoModeloDesarrollo: null,
     // ⭐ V1-E7d — no son versiones, así que NO llevan revisión: los cuatro campos en null.
     revisionEstado: null,
     idRevisadoPor: null,
@@ -948,6 +950,61 @@ describe('<ModelosPagina>', () => {
     expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
     // Y lo que SÍ le toca sigue estando: versionarlo es lo que le abre la puerta a la revisión.
     expect(screen.getByTestId('crear-version-modelo')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ V1-E9a (§Post-F9.167 punto 2) — EL CHIP FANTASMA QUE NO VA A NACER.
+   *
+   * Un HIJO del linaje 1:N (uno de los N modelos de producción que salen de un desarrollo, uno por
+   * color de la OC) **no lleva revisión propia**: su receta es la de su padre y la firma que lo
+   * habilitó a producir se exigió contra el padre, antes de que él existiera. Si esta pantalla le
+   * pintara el chip, diría *«Revisión pendiente · no puede mandarse a producir»* **sin ningún botón
+   * para arreglarlo** —el backend rechaza firmar cualquier cosa que ya sea de producción— sobre un
+   * modelo que YA está produciéndose. Es la cicatriz de §Post-F9.119 otra vez.
+   *
+   * ⚠️ **Los dos casos, y en qué se diferencian.** (a) es el hijo TAL COMO NACE HOY: sin
+   * `idModeloPadre` ni `versionDesarrollo`, así que el predicado ya lo dejaría fuera aunque nadie
+   * hubiera tocado nada — es la conducta documentada, no la guarda. (b) es el hijo con
+   * `idModeloPadre` puesto, la forma que produciría una etapa futura que quisiera "guardar de dónde
+   * salió": **ése es el caso que la exclusión de V1-E9a existe para atajar**, y el único de los dos
+   * que se pone rojo si alguien la quita.
+   */
+  it('⭐ un HIJO del linaje 1:N no enseña revisión, ni siquiera con el linaje de versiones puesto', () => {
+    // (a) tal como nace hoy
+    const hijo = modelo(31, '71004', true, {
+      origen: 'produccion',
+      numeroProduccion: 71_004,
+      idModeloDesarrollo: 7,
+      codigoModeloDesarrollo: 'CYA-26-71-001',
+    });
+    abrirModelo(hijo, ['modelos.ver', 'modelos.aprobar-receta']);
+    expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
+
+    // (b) el mismo hijo si además cargara el linaje de VERSIONES: sigue sin llevar revisión.
+    cleanup();
+    abrirModelo({ ...hijo, idModeloPadre: 7, codigoPadre: 'CYA-26-71-001', versionDesarrollo: 1 }, [
+      'modelos.ver',
+      'modelos.aprobar-receta',
+    ]);
+    expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+
+    // Y el control: la MISMA fila sin el vínculo 1:N sí es una versión y sí enseña el chip. Sin
+    // esta línea, las dos de arriba pasarían con la ficha rota del todo.
+    cleanup();
+    abrirModelo(
+      {
+        ...hijo,
+        idModeloDesarrollo: null,
+        codigoModeloDesarrollo: null,
+        idModeloPadre: 7,
+        codigoPadre: 'CYA-26-71-001',
+        versionDesarrollo: 1,
+      },
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+    expect(screen.getByTestId('revision-modelo')).toBeInTheDocument();
   });
 
   it('una versión APROBADA ya no ofrece aprobar (no hay nada que firmar dos veces)', () => {

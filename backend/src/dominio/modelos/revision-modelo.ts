@@ -57,6 +57,12 @@ export interface RevisionDeModelo {
   idModeloPadre: number | null;
   /** Nº del sufijo de versión (`-01` → 1), o null si el modelo es raíz. */
   versionDesarrollo: number | null;
+  /**
+   * ⭐ V1-E9a — Modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (el linaje 1:N), o
+   * null. Viaja aquí porque {@link esVersionDeModelo} lo mira para EXCLUIR a los hijos: ver el
+   * porqué en esa función.
+   */
+  idModeloDesarrollo: number | null;
   /** En qué quedó el último acto de revisión. Null = sin revisar (o no aplica). */
   revisionEstado: EstadoRevision | null;
   /** Cuándo se firmó ese acto, o null. */
@@ -66,16 +72,48 @@ export interface RevisionDeModelo {
 }
 
 /**
- * ¿Este modelo nació de una NEGOCIACIÓN? Se miran las DOS columnas del linaje, no una:
+ * ¿Este modelo nació de una NEGOCIACIÓN? Se miran las DOS columnas del linaje de VERSIONES, no una:
  * `versionDesarrollo` puede faltar en una versión cuyo código se capturó a mano, y `idModeloPadre`
  * puede faltar si algún día se importa una versión sin su padre. Cualquiera de las dos basta para
  * que el modelo caiga bajo la revisión — la lectura CONSERVADORA es exigir la firma de más, nunca
  * de menos.
+ *
+ * ⭐⭐ **V1-E9a (§Post-F9.167 punto 2) — Y LOS HIJOS DE PRODUCCIÓN QUEDAN FUERA, SIEMPRE.** Un
+ * modelo que lleva `idModeloDesarrollo` es un HIJO del linaje 1:N: nació **ya en producción**,
+ * **comparte** la receta de su padre de desarrollo (no la copia) y **no lleva revisión propia** —
+ * la firma que lo habilitó a producir es la del padre, y se exigió antes de que él existiera.
+ *
+ * 🔴 **Qué evita esta línea, en concreto.** La ficha del modelo pinta el chip de la revisión
+ * preguntando este mismo predicado y **sin mirar `origen`**. Si un hijo llegara a contestar `true`
+ * —hoy no puede, porque nace con las dos columnas de versión en `null`, pero basta con que una
+ * etapa futura le ponga `idModeloPadre` para "guardar de dónde salió"— se enseñaría a sí mismo como
+ * *«Revisión pendiente · no puede mandarse a producir»*, **sin ningún botón para arreglarlo**,
+ * sobre un modelo que YA está en producción: `exigirVersionRevisable` rechaza firmar cualquier cosa
+ * que ya sea de producción. Es exactamente la cicatriz de §Post-F9.119 que V1-E7d vino a cerrar.
+ * La guarda va aquí, en el predicado ÚNICO, y no en la pantalla: aquí la heredan las tres copias
+ * (dominio, SQL y ficha) de una sola vez.
+ *
+ * ⚠️ **La exclusión es lo PRIMERO que se mira, y no un `&&` al final.** Un hijo no es "una versión
+ * que además comparte receta": no es una versión, punto — el linaje de versiones y el 1:N son dos
+ * ejes distintos y el segundo manda sobre este predicado.
+ *
+ * 🔴 **Y por qué se pregunta `typeof === 'number'` y no `!== null`.** Esta exclusión es la única
+ * parte del predicado que puede ABRIR la compuerta, así que su modo de fallo tiene que caer del
+ * lado seguro. Con `!== null`, un objeto al que le FALTE la clave —`undefined`, no `null`— contesta
+ * "es un hijo" y la versión sin revisar se va a producción sin firma. **No es hipotético:** al
+ * construir esta etapa, siete pruebas de `promoverAProduccionNucleo` y `salidaAProduccion` que
+ * arman la fila como `Record<string, unknown>` se pusieron en rojo por exactamente eso, y TypeScript
+ * no las alcanza. Sólo un id de verdad excluye; lo que no se sabe, no excluye — que es la misma
+ * lectura conservadora del párrafo de arriba: exigir la firma de más, nunca de menos.
  */
 export function esVersionDeModelo(modelo: {
   idModeloPadre: number | null;
   versionDesarrollo: number | null;
+  idModeloDesarrollo: number | null;
 }): boolean {
+  if (typeof modelo.idModeloDesarrollo === 'number') {
+    return false;
+  }
   return modelo.idModeloPadre !== null || modelo.versionDesarrollo !== null;
 }
 
@@ -105,7 +143,10 @@ export function esVersionDeModelo(modelo: {
  * por fila: si alguien mueve una y no la otra, esa prueba muere.
  */
 export function revisionBloqueaProduccion(
-  modelo: Pick<RevisionDeModelo, 'idModeloPadre' | 'versionDesarrollo' | 'revisionEstado'>,
+  modelo: Pick<
+    RevisionDeModelo,
+    'idModeloPadre' | 'versionDesarrollo' | 'idModeloDesarrollo' | 'revisionEstado'
+  >,
 ): boolean {
   return esVersionDeModelo(modelo) && modelo.revisionEstado !== 'aprobada';
 }
@@ -121,7 +162,8 @@ export function revisionBloqueaProduccion(
  * para un `WHERE`— y las versiones sin firma se caerían de la lista justo por ser las más viejas.
  */
 export const SQL_REVISION_BLOQUEA_PRODUCCION: Prisma.Sql = Prisma.sql`(
-  (m."id_modelo_padre" IS NOT NULL OR m."version_desarrollo" IS NOT NULL)
+  m."id_modelo_desarrollo" IS NULL
+  AND (m."id_modelo_padre" IS NOT NULL OR m."version_desarrollo" IS NOT NULL)
   AND m."revision_estado" IS DISTINCT FROM 'aprobada'
 )`;
 
@@ -209,6 +251,8 @@ const SELECT_REVISION = {
   origen: true,
   idModeloPadre: true,
   versionDesarrollo: true,
+  // ⭐ V1-E9a — lo lee `esVersionDeModelo` para dejar fuera a los hijos del linaje 1:N.
+  idModeloDesarrollo: true,
   revisionEstado: true,
   revisadoEn: true,
   revisionNota: true,
@@ -227,6 +271,7 @@ async function exigirVersionRevisable(
   origen: string;
   idModeloPadre: number | null;
   versionDesarrollo: number | null;
+  idModeloDesarrollo: number | null;
   revisionEstado: EstadoRevision | null;
   revisionNota: string | null;
   revisadoEn: Date | null;
