@@ -32,6 +32,8 @@ function renglon(
     nombreEstado: estado === 'dropeado' ? 'Dropeado' : 'Abierto',
     estadoPorId: null,
     estadoEn: null,
+    // ⭐ V1-E8y: los PENDIENTES del modelo (la libreta de la cita). Vacíos aquí.
+    pendientes: [],
     id,
     idDesarrollo: id * 10,
     idPrecosto: id * 100,
@@ -70,6 +72,8 @@ function lista(lineas: ListaLinea[]): ListaDetalle {
     regaliasPct: 5,
     costoVentasPct: 5,
     notas: null,
+    // ⭐ V1-E8y: el LUGAR de la cita (§Post-F9.152).
+    lugar: null,
     lineas,
     creadoEn: '2026-03-12T00:00:00.000Z',
     creadoPorId: null,

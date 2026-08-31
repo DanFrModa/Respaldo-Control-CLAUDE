@@ -54,6 +54,78 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > del costo, avanza con lo demás»*—, pero **sus tres decisiones ya están tomadas y escritas**
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. El número queda reservado.
 
+## 0.064 · 31-ago-2026 · **en prueba** — **Cotizar en la cita un modelo que no existe**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Crear un modelo en plena cita y cotizarlo ahí mismo.** Tus palabras: *«a veces estando en la cita,
+  me piden cotizar algún modelo que no tengamos en muestrario que llevamos. Y tengo que darles ahí un
+  precio»*. Desde la lista que estás negociando, botón **«Agregar modelos» → «Modelo nuevo»**: eliges el
+  proyecto (o creas uno ahí), el tipo de prenda, el género y el año, y el sistema **le pone el código
+  solo** (`CYA-26-71-004`) y te deja el **precosto en borrador** listo para teclear estimados. Cuando lo
+  congelas, se agrega a la lista.
+
+- ⭐⭐ **Copiar un modelo que ya tenemos y cambiarle cosas.** Marcas «Copiar un modelo que ya tenemos» y
+  eliges cuál: el nuevo se lleva **la receta completa** (telas, avíos con sus medidas por talla, arte)
+  **y también su costo de maquila, de corte, sus operaciones y su composición** — así el precosto sale
+  **con números reales desde el primer momento**, no en ceros. El modelo original **no se toca**.
+
+- ⭐⭐ **Agregar modelos a una lista que ya existe.** Hasta hoy una lista **nacía con sus modelos y no
+  admitía ni uno más**: para meter otro había que **borrarla y volver a armarla**, perdiendo las
+  aprobaciones, las rondas y todo el historial de la negociación. Ahora se agregan cuando haga falta, y
+  los que ya estaban **no se mueven** (el precio del nuevo se calcula con los mismos factores de esa
+  lista, no con otros).
+
+- ⭐ **Guardar quién es tu contacto en cada cliente — la compradora.** Hasta hoy el cliente sólo tenía
+  **un** nombre suelto, así que no se podía anotar a la compradora de NIÑOS *y* a la de DAMAS. Ahora se
+  agregan los que hagan falta desde la ficha del cliente, con su puesto en texto libre y, **si aplica**,
+  su departamento: *«Laura · compradora · NIÑOS»*, *«Carlos · crédito y cobranza»* (éste sin departamento,
+  porque atiende a todo el cliente). Quien se va **se archiva**, no se borra.
+
+- ⭐ **Anotar pendientes por modelo.** Dentro de la lista, al abrir un renglón: *«falta muestra de color»*,
+  *«pedir precio de la jareta»*. Se tachan cuando se resuelven, se corrigen si te equivocaste y se borran
+  si sobran. En la fila se ve **cuántos quedan sin tachar**, para que no se te olviden.
+
+- **El LUGAR de la cita**, junto a la fecha de la lista («oficinas de C&A, Santa Fe», «Zoom»). Meses
+  después es lo que ayuda a acordarse de qué se habló.
+
+- **Y las NOTAS de la lista por fin se corrigen.** Existían desde siempre pero **sólo se podían escribir
+  al crearla**: si te equivocabas, ahí se quedaban.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **El modelo nuevo NO entra a la lista de inmediato, y es a propósito.** Un renglón de la lista
+  necesita un costo **congelado**, y un modelo que acaba de nacer no tiene nada costeado todavía. Por eso
+  después de crearlo aparece una tira arriba de la tabla con los dos botones que faltan: **«Costear»** y
+  **«Agregar a la lista»**. Si le picas a agregar antes de congelar, el sistema te dice exactamente qué
+  falta.
+
+- ⚠️ **Si el cliente no tiene ABREVIATURA capturada, no se le pueden crear modelos** — de ella sale el
+  código («el CYA de CYA-26-71-001»). El sistema **te lo avisa arriba del formulario, antes de que
+  teclees nada**, y apaga el botón: la idea es que no te truene con el cliente enfrente. Se captura en la
+  ficha del cliente.
+
+- ⚠️ **Copiar un modelo que venga del sistema viejo puede no funcionar**: los modelos que se importaron de
+  Access **no traen género**, y sin él no se puede armar el código. En ese caso el sistema **dice cuál
+  es** y te deja elegir el tipo de prenda y el género a mano.
+
+- **Un modelo descontinuado no se copia** hasta reactivarlo. Es un clic, pero tiene que ser una decisión
+  tuya y no un efecto secundario de copiar.
+
+- **Los contactos nacen vacíos.** Los nombres sueltos que ya estaban capturados en la ficha de cada
+  cliente **se quedan donde están** y se siguen viendo: no se convirtieron en contactos. La lista nueva
+  se llena de aquí en adelante.
+
+### Qué sigue pendiente o roto
+
+- **Los pendientes no salen en ningún papel** (ni PDF, ni Excel, ni cotización) y **no se pueden buscar**
+  desde otra pantalla: viven pegados a su modelo dentro de la lista. Si hiciera falta una vista de «todo
+  lo que tengo pendiente», es trabajo aparte.
+- **Un avío sin precio sigue entrando en silencio** al precosto (viene de la 0.063, sin cambios).
+- **El contacto del cliente todavía no se usa en ningún documento**: por ahora es directorio.
+
+---
+
 ## 0.063 · 30-ago-2026 · **en prueba** — Ya no se puede **fijar un precio sobre un costo vacío**
 
 ### Qué se puede hacer ahora que antes no

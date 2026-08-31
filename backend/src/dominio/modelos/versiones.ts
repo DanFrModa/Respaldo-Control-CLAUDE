@@ -42,7 +42,7 @@
  * colisión no se absorbía —se dejaba llegar al `@unique`— y abortaba la transacción entera en vez
  * de avanzar al siguiente sufijo libre.
  */
-import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
+import { aJsonBitacora, datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
@@ -364,7 +364,7 @@ export async function mintearVersionDeModelo(
     select: { id: true },
   });
 
-  const copiada = await copiarRecetaAlHijo(tx, sesion, padre.id, hija.id);
+  const copiada = await copiarRecetaAModeloNuevo(tx, sesion, padre.id, hija.id);
 
   await registrarBitacora(tx, sesion, {
     entidad: 'Modelo',
@@ -380,13 +380,21 @@ export async function mintearVersionDeModelo(
       codigoPadre: padre.codigo,
       codigoDesarrolloPadre: padre.codigoDesarrollo,
       raiz,
-      recetaCopiada: copiada,
+      recetaCopiada: aJsonBitacora(copiada),
       // V1-E7d: nace pendiente de revisión, y el acto de firmarla deja su propio renglón.
       revisionEstado: 'pendiente',
     },
   });
 
   return hija.id;
+}
+
+/** Qué se copió de la receta (telas, avíos, sus medidas por talla y artes). */
+export interface RecetaCopiada {
+  telas: number;
+  avios: number;
+  medidas: number;
+  artes: number;
 }
 
 /**
@@ -399,13 +407,21 @@ export async function mintearVersionDeModelo(
  * Aquí, además, el destino acaba de nacer VACÍO: no hay nada que reemplazar, fusionar ni
  * deduplicar, así que el camino es recto. Tampoco se reusa `copiarRecetaDelModelo`
  * (`produccion/receta-orden.ts`): ése es modelo→ORDEN y congela PRECIOS, que aquí no aplican.
+ *
+ * ⭐ **V1-E8y la EXPORTA** (§Post-F9.152). «Copiar un modelo» desde la mesa de negociación necesita
+ * exactamente esto —un destino recién nacido y vacío que hereda la receta entera— y la alternativa
+ * era escribir una segunda copia reducida, que en este proyecto siempre termina derivando. Lo que
+ * NO se reusó es `mintearVersionDeModelo` completa, y por una razón de negocio: una VERSIÓN cuelga
+ * de la familia del padre (`CYA-26-71-001` → `-01`) y ese código lleva dentro la abreviatura del
+ * cliente del padre. Copiar el modelo de un cliente para cotizárselo a OTRO tiene que **mintear un
+ * código nuevo** del cliente de la mesa, no colgarse de la familia ajena.
  */
-async function copiarRecetaAlHijo(
+export async function copiarRecetaAModeloNuevo(
   tx: Tx,
   sesion: SesionUsuario,
   idPadre: number,
   idHijo: number,
-): Promise<{ telas: number; avios: number; medidas: number; artes: number }> {
+): Promise<RecetaCopiada> {
   const auditoria = datosCreacion(sesion);
 
   const [telas, avios, artes] = await Promise.all([

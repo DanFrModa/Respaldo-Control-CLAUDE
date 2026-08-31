@@ -38,6 +38,9 @@ function listaEjemplo(): ListaPreciosDetalle {
     regaliasPct: 5,
     costoVentasPct: 5,
     notas: 'Temporada otoño',
+    // ⭐ V1-E8y: el LUGAR de la cita. No sale en el impreso (el papel es de precios), pero la
+    // lista ya lo trae, así que el fixture lo lleva.
+    lugar: 'Oficinas de C&A, Santa Fe',
     lineas: [
       {
         id: 10,
@@ -65,6 +68,9 @@ function listaEjemplo(): ListaPreciosDetalle {
         nombreEstado: 'Abierto',
         estadoPorId: null,
         estadoEn: null,
+        // ⭐ V1-E8y: los pendientes del modelo NO son el papel (no salen en PDF/Excel/cotización);
+        // aquí van vacíos porque el impreso ni los mira.
+        pendientes: [],
       },
       {
         id: 11,
@@ -87,6 +93,9 @@ function listaEjemplo(): ListaPreciosDetalle {
         nombreEstado: 'Abierto',
         estadoPorId: null,
         estadoEn: null,
+        // ⭐ V1-E8y: los pendientes del modelo NO son el papel (no salen en PDF/Excel/cotización);
+        // aquí van vacíos porque el impreso ni los mira.
+        pendientes: [],
       },
     ],
     creadoEn: '2026-07-06T00:00:00.000Z',

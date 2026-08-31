@@ -7,7 +7,7 @@
 | Entidad v2 | Tablas v2 | Fuente (CSV viejo) | Etapa |
 |---|---|---|---|
 | Empresa | `empresas` | `Empresas.csv` | F1-E1 |
-| Cliente | `clientes`, `cliente_campo` | `Clientes.csv` | F1-E2 |
+| Cliente | `clientes`, `cliente_campo`, `cliente_departamento`, **`cliente_contacto`** | `Clientes.csv` | F1-E2 · F8-E1 · **V1-E8y** |
 | EtiquetaMarca | `etiquetas_marca` | `EtiquetasM.csv` | F1-E1 |
 | Genero | `generos` | `IPT_Generos.csv` | F1-E1 |
 | Temporada | `temporadas` | `Temporadas.csv` (vacío) | F1-E1 |
@@ -22,6 +22,18 @@
 | Talla / CurvaTalla | `tallas`, `curvas_talla` | derivadas de `Ordenes.Tallas` | F1-E2 |
 
 ## Decisiones de diseño (ver también `DECISIONES.md`)
+
+- ⭐ **CONTACTOS del cliente — la compradora (V1-E8y, §Post-F9.152).** Espejo de `ProveedorContacto`
+  (V1-E3f) con **una diferencia decidida por Daniel: el DEPARTAMENTO es OPCIONAL** — *«así "Laura,
+  compradora de NIÑOS" se distingue, y "Carlos, crédito" no necesita departamento inventado»*. La columna
+  es nullable y **no entra en ninguna unicidad** (dos personas pueden llamarse igual). El **puesto es
+  TEXTO LIBRE**, como en el proveedor. Borrado **suave** (`activo`), sin permisos nuevos
+  (`clientes.ver`/`.administrar`).
+  🔴 **La FUSIÓN de departamentos la REPUNTA** como a las otras cuatro referencias
+  (`REFERENCIAS_A_REPUNTAR`, §Post-F9.122a): si no, la compradora quedaría colgada de un departamento
+  apagado. La prueba que **lee `schema.prisma`** obliga a que ninguna relación nueva se olvide.
+  🔴 **La tabla nace VACÍA**: los `Cliente.contacto`/`telefono`/`email` viejos **no se migran** (REGLA 0-B
+  — los datos de hoy se limpian, no se reparan) y se siguen leyendo donde están.
 
 - **D4 Tallas ilimitadas:** columnas `T1..T8` del viejo → tabla `Talla` + tabla pivot `CurvaTalla`.
 - ⭐ **El ORDEN de las tallas (V1-E3r, §Post-F9.81).** `Talla.orden` es `Int @default(0)` y el **0 es el

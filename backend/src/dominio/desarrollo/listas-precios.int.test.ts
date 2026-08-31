@@ -34,7 +34,6 @@ import { guardarMesa, registrarRonda } from './negociacion.js';
 import {
   ajustarPrecioLinea,
   aprobarLinea,
-  candidatosParaLista,
   crearLista,
   desgloseCostoLinea,
   diagnosticoCandidatosLista,
@@ -406,7 +405,10 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
         },
         bd(),
       ),
-    ).rejects.toThrow(/ya está en otra lista/);
+      // ⚠️ El mensaje pasó a NEUTRO en la 0.064: `problemasDeCandidatura` lo comparte entre crear una
+      // lista y agregarle renglones, y en el segundo caso «otra» era FALSO — el modelo estaba en la
+      // lista que el usuario tenía enfrente. Aquí (alta) siempre es otra, pero el texto es el mismo.
+    ).rejects.toThrow(/ya está en una lista de precios/);
   });
 
   it('rechaza un desarrollo que no es del cliente/departamento indicado', async () => {
@@ -664,15 +666,31 @@ describe('aprobar / ajustar precio de un renglón', () => {
   });
 });
 
-describe('candidatosParaLista', () => {
+/**
+ * ⭐ V1-E8y — estas tres probaban `candidatosParaLista`, que **se retiró** en esta etapa: llevaba dos
+ * etapas sin un solo llamador de producción (la ruta usa el diagnóstico completo desde V1-E8f) y su
+ * propio docstring decía que si seguía así se retiraba. Se PORTARON al camino real
+ * (`diagnosticoCandidatosLista(...).candidatos`) en vez de borrarse: lo que verificaban —que la
+ * consulta de verdad traiga al cotizado, con su costo, y deje de traerlo al colocarlo— sigue siendo
+ * la promesa del sistema; la que se fue era la envoltura.
+ */
+describe('los CANDIDATOS que devuelve el diagnóstico', () => {
+  /** Sólo los que SÍ califican, por el camino de producción. */
+  async function candidatos(parametros: {
+    idCliente: number;
+    idClienteDepartamento: number;
+    idProyecto?: number;
+  }) {
+    return (await diagnosticoCandidatosLista(sesion(), parametros, bd())).candidatos;
+  }
+
   it('lista los cotizados sin renglón en una lista y los excluye al meterlos', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-CAND');
-    const antes = await candidatosParaLista(
-      sesion(),
-      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
-      bd(),
-    );
+    const antes = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+    });
     expect(antes.map((c) => c.idDesarrollo)).toContain(id);
     expect(antes.find((c) => c.idDesarrollo === id)?.costoTotal).toBe(42.2);
 
@@ -681,11 +699,10 @@ describe('candidatosParaLista', () => {
       { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
       bd(),
     );
-    const despues = await candidatosParaLista(
-      sesion(),
-      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
-      bd(),
-    );
+    const despues = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+    });
     expect(despues.map((c) => c.idDesarrollo)).not.toContain(id);
   });
 
@@ -696,34 +713,28 @@ describe('candidatosParaLista', () => {
     const idB = await desarrolloConPrecosto('MOD-PROY-B');
     const a = await obtenerDesarrollo(sesion(), idA, bd());
 
-    const todos = await candidatosParaLista(
-      sesion(),
-      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
-      bd(),
-    );
+    const todos = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+    });
     expect(todos.map((c) => c.idDesarrollo)).toEqual(expect.arrayContaining([idA, idB]));
 
-    const soloA = await candidatosParaLista(
-      sesion(),
-      {
-        idCliente: clienteNegocio.id,
-        idClienteDepartamento: departamento.id,
-        idProyecto: a.idProyecto,
-      },
-      bd(),
-    );
+    const soloA = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+      idProyecto: a.idProyecto,
+    });
     expect(soloA.map((c) => c.idDesarrollo)).toEqual([idA]);
   });
 
   it('un desarrollo SIN precosto congelado no es candidato', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-NOCAND', false);
-    const candidatos = await candidatosParaLista(
-      sesion(),
-      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
-      bd(),
-    );
-    expect(candidatos.map((c) => c.idDesarrollo)).not.toContain(id);
+    const lista = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+    });
+    expect(lista.map((c) => c.idDesarrollo)).not.toContain(id);
   });
 });
 

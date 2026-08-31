@@ -1256,6 +1256,9 @@ model Cliente {
   modeloLigas            ClienteModeloLiga[]
   /// Movimientos de cuenta corriente (CxC) de este cliente (F9-E1). Restrict.
   movimientosTerceros    MovimientoTercero[]
+  /// ⭐ V1-E8y (§Post-F9.152) — LAS PERSONAS del cliente (la compradora, crédito, tráfico…).
+  /// Cascade: son datos DEL cliente, igual que `ProveedorContacto`.
+  contactos              ClienteContacto[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -7214,6 +7217,9 @@ model ClienteDepartamento {
   listasPrecios ListaPrecios[]
   /// Cotizaciones emitidas para este departamento (V1-E7c). Restrict.
   cotizaciones  Cotizacion[]
+  /// ⭐ V1-E8y (§Post-F9.152): las personas del cliente que atienden ESTE departamento (la
+  /// compradora de NIÑOS). SetNull — el contacto sobrevive a su departamento. La FUSIÓN la repunta.
+  contactos     ClienteContacto[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -7223,6 +7229,59 @@ model ClienteDepartamento {
   @@unique([idCliente, nombre])
   @@index([idCliente])
   @@map("cliente_departamento")
+}
+
+/// ⭐ V1-E8y (§Post-F9.152) — CONTACTO del cliente: **la compradora con la que se negocia**.
+///
+/// Daniel pidió cotizar en la cita un modelo que no existe, y al medir la mesa apareció el hueco de
+/// al lado: **el cliente no guardaba a NADIE**. Sólo tenía tres campos sueltos en su ficha
+/// (`contacto`/`telefono`/`email`), uno por cliente — con eso no se puede anotar a la compradora de
+/// NIÑOS *y* a la de DAMAS, que es justo lo que hay en la mesa.
+///
+/// Es el ESPEJO de `ProveedorContacto` (V1-E3f), con **una diferencia decidida por Daniel**: el
+/// **departamento es OPCIONAL**. Así «Laura, compradora, NIÑOS» se distingue de «Laura, compradora,
+/// DAMAS», y «Carlos, crédito y cobranza» —que atiende a todo el cliente— **no necesita que le
+/// inventen un departamento**. Por eso la columna es nullable y NO entra en ninguna unicidad.
+///
+/// El **puesto es TEXTO LIBRE** (mismo criterio que el proveedor: *"deja el campo abierto qué rol
+/// tiene cada persona"*). Nada se borra (D3): un contacto que se fue se archiva con `activo=false`.
+///
+/// 🔴 **Los tres campos viejos del cliente NO se migran aquí** (REGLA 0-B, §Post-F9.163): los datos de
+/// hoy son basura y se van a limpiar, así que esta tabla **nace vacía** y `Cliente.contacto` se queda
+/// donde está, leyéndose como siempre. No hay backfill ni hay que buscarle uno.
+///
+/// Cascade hacia `Cliente` (son datos suyos). Hacia `ClienteDepartamento` va **SetNull**: perder el
+/// departamento no puede llevarse por delante a la persona. Y la FUSIÓN de departamentos
+/// (§Post-F9.122a) **repunta esta tabla** como las otras cuatro — está en `REFERENCIAS_A_REPUNTAR`,
+/// con la prueba que lee el esquema vigilando que no se olvide.
+model ClienteContacto {
+  id                    Int                  @id @default(autoincrement())
+  idCliente             Int                  @map("id_cliente")
+  cliente               Cliente              @relation(fields: [idCliente], references: [id], onDelete: Cascade)
+  /// Departamento al que atiende esta persona, **OPCIONAL** (decisión de Daniel): null = atiende al
+  /// cliente completo (crédito, tráfico, dirección), no a un departamento en particular.
+  idClienteDepartamento Int?                 @map("id_cliente_departamento")
+  clienteDepartamento   ClienteDepartamento? @relation(fields: [idClienteDepartamento], references: [id], onDelete: SetNull)
+
+  /// Nombre de la persona. Lo único obligatorio: un contacto sin nombre no sirve para nada.
+  nombre   String
+  /// Qué hace, en TEXTO LIBRE ("compradora", "crédito y cobranza", "tráfico"…). NO es catálogo.
+  puesto   String?
+  telefono String?
+  email    String?
+  notas    String?
+
+  /// Borrado SUAVE (D3): quien se fue se archiva, no se borra.
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idCliente])
+  @@index([idClienteDepartamento])
+  @@map("cliente_contacto")
 }
 
 /// Precio de una TELA por PROVEEDOR (F8-E1, D13/R17 — el hueco grande: hoy solo hay
@@ -7592,6 +7651,10 @@ model ListaPrecios {
   regaliasPct           Decimal             @map("regalias_pct") @db.Decimal(5, 2)
   costoVentasPct        Decimal             @map("costo_ventas_pct") @db.Decimal(5, 2)
   notas                 String?             @db.Text
+  /// ⭐ V1-E8y (§Post-F9.152) — DÓNDE fue la cita ("oficinas de C&A, Santa Fe", "showroom", "Zoom").
+  /// Texto libre y opcional: la lista de precios es el papel de una junta, y meses después *dónde
+  /// fue* es lo que ayuda a acordarse de qué se habló. No es catálogo ni bloquea nada.
+  lugar                 String?
 
   lineas       ListaPreciosLinea[]
   /// Cotizaciones EMITIDAS desde esta lista (V1-E7c). Restrict: el papel que ya salió al cliente
@@ -7694,6 +7757,10 @@ model ListaPreciosLinea {
   /// Renglones de cotización EMITIDOS desde este renglón (V1-E7c). Restrict: un renglón ya
   /// cotizado al cliente no se puede quitar de la lista (la cotización lo referencia).
   cotizacionLineas CotizacionLinea[]
+  /// ⭐ V1-E8y (§Post-F9.152) — LOS PENDIENTES DE ESTE MODELO (*"falta muestra de color"*, *"pedir
+  /// precio de jareta"*). Van por MODELO y no por cita: lo decidió Daniel así porque son de un
+  /// modelo concreto. Cascade (mueren con el renglón; `quitarLineaLista` los fotografía antes).
+  pendientes       ListaPreciosLineaPendiente[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -7706,6 +7773,45 @@ model ListaPreciosLinea {
   @@unique([idDesarrollo])
   @@index([idPrecosto])
   @@map("lista_precios_linea")
+}
+
+/// ⭐ V1-E8y (§Post-F9.152) — UN PENDIENTE DEL MODELO dentro de la lista. Daniel eligió **por
+/// modelo, no por cita**: *"falta muestra de color"* y *"pedir precio de jareta"* son de un modelo
+/// concreto, y una nota general de la junta los revolvería todos.
+///
+/// 🔴 **NO es la bitácora de la negociación, y NO se confunde con ella.** `NegociacionEvento.acuerdo`
+/// es INMUTABLE y obligatorio: lo que se pactó con el cliente (D3, nunca se edita). Esto es la
+/// **libreta**: se escribe a la carrera en la cita, se corrige, se tacha y se borra. Por eso el texto
+/// **sí se edita** y el renglón **sí se elimina** — con su foto en la bitácora, que es lo que D3 pide
+/// de algo que se retira.
+///
+/// ⚠️ **Los pendientes NO son el papel.** No salen en el PDF, ni en el Excel, ni en la cotización, así
+/// que **no los frena el cierre de la lista ni el estado del renglón** (`cerrado`/`dropeado`): tachar
+/// *"falta la muestra de color"* dos semanas después de cerrar el modelo es exactamente para lo que
+/// sirven. Es UNA regla, la misma para las cuatro operaciones, y está escrita aquí para que nadie le
+/// añada media excepción después.
+model ListaPreciosLineaPendiente {
+  id           Int               @id @default(autoincrement())
+  idListaLinea Int               @map("id_lista_linea")
+  listaLinea   ListaPreciosLinea @relation(fields: [idListaLinea], references: [id], onDelete: Cascade)
+
+  /// Lo que falta, en palabras de quien lo anotó. Texto libre, obligatorio.
+  texto    String  @db.Text
+  /// TACHADO: ya se resolvió. Se conserva (tachar ≠ borrar) para saber qué se cerró y cuándo.
+  resuelto Boolean @default(false)
+
+  /// Quién lo tachó y cuándo (la firma vigente; null mientras siga pendiente). Al des-tacharlo se
+  /// limpian los dos: la firma tiene que corresponder al estado que hay, no al que hubo.
+  resueltoEn    DateTime? @map("resuelto_en")
+  resueltoPorId String?   @map("resuelto_por_id")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idListaLinea])
+  @@map("lista_precios_linea_pendiente")
 }
 
 /// Evento de negociación por renglón (F8-E5, R20b) — bitácora INMUTABLE (A7: se agrega, jamás se

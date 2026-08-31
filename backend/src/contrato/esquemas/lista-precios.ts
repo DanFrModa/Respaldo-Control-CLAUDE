@@ -21,6 +21,16 @@ const notasLista = z
   .max(1000, { error: 'Las notas no pueden tener más de 1000 caracteres' });
 
 /**
+ * ⭐ V1-E8y (§Post-F9.152) — DÓNDE fue la cita ("oficinas de C&A Santa Fe", "showroom", "Zoom").
+ * Texto libre y opcional: meses después, *dónde fue* es lo que ayuda a acordarse de qué se habló.
+ * No es catálogo (el lugar de una junta no se administra) y no bloquea nada.
+ */
+const lugarCita = z
+  .string()
+  .trim()
+  .max(200, { error: 'El lugar no puede tener más de 200 caracteres' });
+
+/**
  * Un porcentaje de factor de la lista: 0 ≤ % (finito). El tope fino (`margen < 100`; suma de los
  * otros tres `< 100`) lo valida el dominio con mensaje claro; aquí el piso y el rango físico
  * `Decimal(5,2)`.
@@ -61,6 +71,7 @@ export const esquemaListaPreciosCrear = z.object({
     .optional()
     .describe('Fecha de la lista (YYYY-MM-DD); default = hoy.'),
   notas: notasLista.nullable().optional().describe('Notas de la lista (opcional).'),
+  lugar: lugarCita.nullable().optional().describe('Dónde fue la cita (opcional, texto libre).'),
 });
 
 /** Datos validados de alta de una lista. */
@@ -161,6 +172,64 @@ export const esquemaCambiarEstadoRenglon = z.object({
 /** Datos validados del cambio de estado de un renglón. */
 export type DatosCambiarEstadoRenglon = z.infer<typeof esquemaCambiarEstadoRenglon>;
 
+// ── ⭐ V1-E8y (§Post-F9.152) — PENDIENTES POR MODELO ────────────────────────────────────────────
+//
+// Daniel eligió **por modelo, no por cita**: *«falta muestra de color»* y *«pedir precio de jareta»*
+// son de un modelo concreto, y una nota general de la junta los revolvería todos.
+//
+// 🔴 **NO es `NegociacionEvento.acuerdo`**, y no se reusa: aquél es el libro INMUTABLE de lo que se
+// pactó con el cliente (D3, obligatorio, nunca se edita). Esto es la LIBRETA de la cita: se escribe
+// a la carrera, se corrige, se tacha y se borra.
+
+/** Texto de un pendiente (lo que falta, en palabras de quien lo anotó). */
+const textoPendiente = z
+  .string({ error: 'Escribe qué falta' })
+  .trim()
+  .min(1, { error: 'Escribe qué falta' })
+  .max(500, { error: 'El pendiente no puede tener más de 500 caracteres' });
+
+/** Alta de un pendiente en un renglón (el renglón va en la URL). */
+export const esquemaPendienteLineaCrear = z
+  .object({ texto: textoPendiente.describe('Qué falta (texto libre).') })
+  .describe('Alta de un pendiente del modelo dentro de la lista.');
+
+/** Datos validados del alta de un pendiente. */
+export type DatosPendienteLineaCrear = z.infer<typeof esquemaPendienteLineaCrear>;
+
+/**
+ * Edición PARCIAL de un pendiente: el TEXTO se corrige y `resuelto` lo TACHA/destacha. Omitir = no
+ * tocar. Los dos en el mismo PATCH porque son el mismo acto de libreta.
+ */
+export const esquemaPendienteLineaEditar = z
+  .object({
+    texto: textoPendiente.optional().describe('Nuevo texto (omitir = no tocar).'),
+    resuelto: z
+      .boolean({ error: 'Resuelto debe ser verdadero o falso' })
+      .optional()
+      .describe('true lo TACHA, false lo devuelve a pendiente (omitir = no tocar).'),
+  })
+  .describe('Edición de un pendiente del modelo.');
+
+/** Datos validados de la edición de un pendiente. */
+export type DatosPendienteLineaEditar = z.infer<typeof esquemaPendienteLineaEditar>;
+
+/** Un pendiente tal como sale de la API. */
+export const esquemaPendienteLineaSalida = z
+  .object({
+    id: z.number().int().describe('Id del pendiente.'),
+    idListaLinea: z.number().int().describe('Renglón (modelo) al que pertenece.'),
+    texto: z.string().describe('Qué falta.'),
+    resuelto: z.boolean().describe('¿Ya se tachó?'),
+    resueltoEn: z.iso.datetime().nullable().describe('Cuándo se tachó (ISO 8601), o null.'),
+    resueltoPorId: z.string().nullable().describe('Quién lo tachó, o null.'),
+    creadoEn: z.iso.datetime().describe('Cuándo se anotó (ISO 8601).'),
+    creadoPorId: z.string().nullable().describe('Quién lo anotó, o null.'),
+  })
+  .describe('Un pendiente anotado sobre un modelo de la lista.');
+
+/** Forma de un pendiente. */
+export type PendienteLineaSalida = z.infer<typeof esquemaPendienteLineaSalida>;
+
 /** Un renglón de la lista (con datos del desarrollo/modelo y los precios; importes ocultos sin permiso). */
 export const esquemaListaPreciosLineaSalida = z
   .object({
@@ -233,6 +302,17 @@ export const esquemaListaPreciosLineaSalida = z
           'receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: ' +
           'no bloquea aprobar ni bajar documentos (§Post-F9.127).',
       ),
+    /**
+     * ⭐ V1-E8y (§Post-F9.152) — LOS PENDIENTES DE ESTE MODELO. Daniel los quiso **por modelo, no
+     * por cita**: *«falta muestra de color»*, *«pedir precio de jareta»* son de un modelo concreto.
+     *
+     * Viajan EMBEBIDOS en el renglón a propósito: la mesa los enseña fila por fila, y pedirlos
+     * aparte serían N llamadas para pintar una lista de 20 modelos. No son importes ni factores —
+     * se ven completos sin `consultas.ver-importes`.
+     */
+    pendientes: z
+      .array(esquemaPendienteLineaSalida)
+      .describe('Pendientes anotados de este modelo (los tachados incluidos).'),
   })
   .describe('Renglón de una lista de precios.');
 
@@ -268,6 +348,9 @@ export const esquemaListaPreciosDetalle = z
       .nullable()
       .describe('Snapshot % costo de ventas (o null sin `listas.aprobar`).'),
     notas: z.string().nullable().describe('Notas de la lista, o null.'),
+    // ⭐ V1-E8y (§Post-F9.152): DÓNDE fue la cita. No es un importe ni un factor: lo ve todo el que
+    // puede abrir la lista.
+    lugar: z.string().nullable().describe('Dónde fue la cita (texto libre), o null.'),
     lineas: z.array(esquemaListaPreciosLineaSalida).describe('Renglones (uno por desarrollo).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que la creó.'),
@@ -545,3 +628,211 @@ export const esquemaDesgloseCostoLinea = z
 
 /** Forma del desglose de costo. */
 export type DesgloseCostoLinea = z.infer<typeof esquemaDesgloseCostoLinea>;
+
+// ── ⭐⭐ V1-E8y (§Post-F9.152) — LA MESA ABIERTA: AGREGAR RENGLONES A UNA LISTA YA CREADA ────────
+//
+// 🔴 **Éste era el hueco de verdad.** Hasta hoy el ÚNICO escritor de `lista_precios_linea` era el
+// `createMany` de `crearLista`: una lista nacía con sus modelos y **no admitía ni uno más**. Sin
+// esto, *«el modelo nace dentro de la lista que está negociando»* (§Post-F9.152 punto 2) es
+// literalmente imposible — habría que borrar la lista y rehacerla, perdiendo aprobaciones,
+// negociación e historial.
+
+/** Agregar uno o varios desarrollos YA COTIZADOS a una lista existente (la lista va en la URL). */
+export const esquemaAgregarLineasLista = z
+  .object({
+    idsDesarrollo: z
+      .array(
+        z
+          .number({ error: 'El id del desarrollo debe ser un número' })
+          .int({ error: 'El id del desarrollo debe ser entero' })
+          .positive({ error: 'El id del desarrollo debe ser positivo' }),
+      )
+      .min(1, { error: 'Selecciona al menos un modelo para agregar' })
+      .describe('Desarrollos (cotizados) a agregar como renglones nuevos.'),
+  })
+  .describe('Agregar renglones a una lista de precios ya creada.');
+
+/** Datos validados de agregar renglones. */
+export type DatosAgregarLineasLista = z.infer<typeof esquemaAgregarLineasLista>;
+
+/**
+ * Editar el ENCABEZADO de la lista: el LUGAR de la cita y las NOTAS. PATCH parcial (M1): omitir =
+ * no tocar, `null`/'' = vaciar.
+ *
+ * ⚠️ `notas` existía en la tabla desde F8-E4 pero **sólo se escribía al crear la lista**: quien se
+ * equivocaba al teclearlas no tenía cómo corregirlas. Se abre aquí junto al lugar, que es el mismo
+ * acto (los datos de la junta), en vez de dejar media puerta.
+ */
+export const esquemaListaEncabezadoEditar = z
+  .object({
+    lugar: lugarCita.nullable().optional().describe('Dónde fue la cita (null para vaciarlo).'),
+    notas: notasLista.nullable().optional().describe('Notas de la lista (null para vaciarlas).'),
+  })
+  .describe('Editar el lugar de la cita y las notas de una lista de precios.');
+
+/** Datos validados de la edición del encabezado. */
+export type DatosListaEncabezadoEditar = z.infer<typeof esquemaListaEncabezadoEditar>;
+
+/**
+ * ⭐⭐ **COTIZAR EN LA CITA UN MODELO QUE NO EXISTE** (§Post-F9.152) — el cuerpo del alta desde la
+ * mesa. Daniel: *«a veces estando en la cita, me piden cotizar algún modelo que no tengamos en
+ * muestrario… Necesito armarlo desde cero estimando cosas. O bien podría copiar algún modelo de los
+ * que ya tenemos desarrollados y cambiarle cosas»*.
+ *
+ * Son SUS DOS CAMINOS, y los distingue un solo campo:
+ *  • **desde cero** → sin `idModeloOrigen`: hay que decir el tipo de prenda y el género (los dos
+ *    dígitos del número; §Post-F9.134). El código NO se teclea: lo mintea el sistema.
+ *  • **copiando** → con `idModeloOrigen`: el tipo, el género, la curva, la composición, **la maquila
+ *    y el corte** y la RECETA entera se heredan del modelo copiado. Se pueden pisar mandándolos.
+ *
+ * 🔴 **La copia hereda los COSTOS de la ficha, no sólo la receta.** `copiarBom` copia telas, avíos y
+ * arte —pero `maquilaBase`, `corteBase`, `numOperaciones`, `composicion` y `idCurvaTalla` son
+ * columnas de `Modelo`, no del BOM—, así que un modelo copiado con él precostearía con **maquila $0
+ * y corte $0, en silencio**, y de ahí sale el precio que se le dice al cliente en la cara. Por eso
+ * este camino copia la FICHA además del BOM. Está medido, no supuesto.
+ *
+ * El desarrollo tiene que vivir en un PROYECTO (es su dueño natural, y de él sale el cliente para
+ * armar el código). En la cita casi siempre ya hay uno: se manda `idProyecto`. Si no lo hay, se
+ * manda `nombreProyectoNuevo` y **se crea en la misma transacción** — nunca dos llamadas sueltas
+ * desde la pantalla (la lección de §Post-F9.34: si la segunda falla, la primera no puede quedar).
+ */
+export const esquemaModeloNuevoEnLista = z
+  .object({
+    idModeloOrigen: z
+      .number({ error: 'El id del modelo a copiar debe ser un número' })
+      .int({ error: 'El id del modelo a copiar debe ser entero' })
+      .positive({ error: 'El id del modelo a copiar debe ser positivo' })
+      .optional()
+      .describe('Modelo del que se COPIA la ficha + la receta. Omitir = armarlo desde cero.'),
+    anioEntrega: z
+      .number({ error: 'El año de entrega es obligatorio' })
+      .int({ error: 'El año de entrega debe ser entero' })
+      .min(2020, { error: 'El año de entrega no puede ser anterior a 2020' })
+      .max(2100, { error: 'El año de entrega no puede ser posterior a 2100' })
+      .describe('Año de ENTREGA (el que se congela en el código del modelo).'),
+    idTipoProducto: z
+      .number({ error: 'El id del tipo de prenda debe ser un número' })
+      .int({ error: 'El id del tipo de prenda debe ser entero' })
+      .positive({ error: 'El id del tipo de prenda debe ser positivo' })
+      .optional()
+      .describe('Tipo de prenda (1er dígito). Obligatorio desde cero; al copiar se hereda.'),
+    idGenero: z
+      .number({ error: 'El id del género debe ser un número' })
+      .int({ error: 'El id del género debe ser entero' })
+      .positive({ error: 'El id del género debe ser positivo' })
+      .optional()
+      .describe('Género (2º dígito). Obligatorio desde cero; al copiar se hereda.'),
+    descripcion: z
+      .string()
+      .trim()
+      .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
+      .optional()
+      .describe('Descripción del modelo (al copiar, hereda la del origen si se omite).'),
+    idCurvaTalla: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Curva de tallas (al copiar, hereda la del origen si se omite).'),
+    numeroCliente: z
+      .string()
+      .trim()
+      .max(100, { error: 'El número del cliente no puede tener más de 100 caracteres' })
+      .optional()
+      .describe('Número que el cliente le da a este modelo (opcional).'),
+    idProyecto: z
+      .number({ error: 'El id del proyecto debe ser un número' })
+      .int({ error: 'El id del proyecto debe ser entero' })
+      .positive({ error: 'El id del proyecto debe ser positivo' })
+      .optional()
+      .describe('Proyecto donde nace el desarrollo. O manda `nombreProyectoNuevo`.'),
+    nombreProyectoNuevo: z
+      .string()
+      .trim()
+      .min(1, { error: 'El nombre del proyecto es obligatorio' })
+      .max(200, { error: 'El nombre del proyecto no puede tener más de 200 caracteres' })
+      .optional()
+      .describe(
+        'Nombre del proyecto NUEVO a crear (en la misma transacción). O manda `idProyecto`.',
+      ),
+  })
+  .superRefine((datos, ctx) => {
+    // Exactamente UN destino: ni cero (el desarrollo no tendría dónde vivir) ni los dos (¿cuál
+    // gana?). Se valida aquí y no en el dominio porque es forma de la ENTRADA, no regla de negocio.
+    const tieneProyecto = datos.idProyecto !== undefined;
+    const tieneNombre = datos.nombreProyectoNuevo !== undefined;
+    if (tieneProyecto === tieneNombre) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['idProyecto'],
+        message: tieneProyecto
+          ? 'Elige un proyecto existente o escribe el nombre de uno nuevo, no las dos cosas.'
+          : 'Elige el proyecto donde nace el modelo (o escribe el nombre de uno nuevo).',
+      });
+    }
+    // Desde cero, los DOS DÍGITOS son obligatorios (§Post-F9.134): sin ellos el modelo nace sin
+    // poder recibir su nº de producción. Al COPIAR se heredan del origen, así que no se piden.
+    if (datos.idModeloOrigen === undefined) {
+      if (datos.idTipoProducto === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['idTipoProducto'],
+          message: 'El tipo de prenda es obligatorio (o copia un modelo que ya lo tenga).',
+        });
+      }
+      if (datos.idGenero === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['idGenero'],
+          message: 'El género es obligatorio (o copia un modelo que ya lo tenga).',
+        });
+      }
+    }
+  })
+  .describe('Alta de un modelo NUEVO (desde cero o copiando otro) desde la mesa de negociación.');
+
+/** Datos validados del alta de un modelo nuevo desde la mesa. */
+export type DatosModeloNuevoEnLista = z.infer<typeof esquemaModeloNuevoEnLista>;
+
+/**
+ * Lo que devuelve el alta desde la mesa: **el desarrollo recién nacido y su precosto BORRADOR ya
+ * generado**, listo para teclearle los estimados.
+ *
+ * ⚠️ **No agrega el renglón a la lista, y es a propósito.** Un renglón de lista necesita un precosto
+ * CONGELADO (`ListaPreciosLinea.idPrecosto` no es nullable) y un precosto sólo se puede congelar
+ * cuando algo que no sea el empaque aporta importe (§Post-F9.153 punto 8 + el candado de la 0.063).
+ * Un modelo recién nacido desde cero **no cumple todavía**: primero se teclean los estimados. Así
+ * que la mesa hace dos actos visibles —«créalo» y «agrégalo»— en vez de uno que a veces funciona.
+ */
+export const esquemaModeloNuevoEnListaSalida = z
+  .object({
+    idDesarrollo: z.number().int().describe('Desarrollo recién creado.'),
+    idModelo: z.number().int().describe('Modelo recién creado.'),
+    codigoModelo: z.string().describe('Código que le minteó el sistema (ej. CYA-26-71-004).'),
+    descripcionModelo: z.string().nullable().describe('Descripción del modelo, o null.'),
+    idProyecto: z.number().int().describe('Proyecto donde quedó el desarrollo.'),
+    folioProyecto: z.number().int().describe('Folio del proyecto.'),
+    nombreProyecto: z.string().describe('Nombre del proyecto.'),
+    proyectoCreado: z.boolean().describe('¿El proyecto se creó en esta misma llamada?'),
+    idPrecosto: z.number().int().describe('Precosto BORRADOR generado, listo para estimar.'),
+    versionPrecosto: z.number().int().describe('Versión del precosto generado.'),
+    copiadoDeIdModelo: z.number().int().nullable().describe('Modelo del que se copió, o null.'),
+    copiadoDeCodigo: z.string().nullable().describe('Código del modelo del que se copió, o null.'),
+    receta: z
+      .object({
+        telas: z.number().int().describe('Renglones de tela copiados.'),
+        avios: z.number().int().describe('Renglones de avío copiados.'),
+        medidas: z.number().int().describe('Medidas por talla copiadas.'),
+        artes: z.number().int().describe('Artes copiados.'),
+      })
+      .describe('Qué se copió de la receta (todo en cero si nació desde cero).'),
+  })
+  .describe('Modelo nuevo creado desde la mesa, con su precosto borrador.');
+
+/** Forma de la respuesta del alta desde la mesa. */
+export type ModeloNuevoEnListaSalida = z.infer<typeof esquemaModeloNuevoEnListaSalida>;
+
+/** Respuesta del listado de pendientes de un renglón. */
+export const esquemaPendientesLineaLista = z
+  .object({ datos: z.array(esquemaPendienteLineaSalida).describe('Pendientes del modelo.') })
+  .describe('Pendientes de un modelo dentro de la lista.');

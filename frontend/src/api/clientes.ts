@@ -15,6 +15,9 @@ import { CLAVE_PROYECTOS } from './proyectos';
 import type {
   Cliente,
   ClienteCampo,
+  ClienteContacto,
+  ClienteContactoCrear,
+  ClienteContactoEditar,
   ClienteCampoCrear,
   ClienteCampoEditar,
   ClienteCrear,
@@ -608,5 +611,118 @@ export function useFusionarDepartamentos(): UseMutationResult<
       void queryClient.invalidateQueries({ queryKey: CLAVE_LISTAS });
       void queryClient.invalidateQueries({ queryKey: CLAVE_COTIZACIONES });
     },
+  });
+}
+
+// ── ⭐ CONTACTOS del cliente (V1-E8y, §Post-F9.152 — la compradora) ───────────
+
+/** Clave de cache de los contactos de un cliente. */
+function claveContactosCliente(idCliente: number): readonly unknown[] {
+  return [...CLAVE_CLIENTES, 'contactos', idCliente];
+}
+
+/** Lista los contactos de un cliente (`GET /api/clientes/{id}/contactos`). */
+async function listarContactosCliente(
+  id: number,
+  incluirInactivos: boolean,
+): Promise<ClienteContacto[]> {
+  const { data, error } = await api.GET('/api/clientes/{id}/contactos', {
+    params: { path: { id }, query: { incluirInactivos: String(incluirInactivos) } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Agrega un contacto (`POST /api/clientes/{id}/contactos`). */
+async function crearContactoCliente(
+  id: number,
+  cuerpo: ClienteContactoCrear,
+): Promise<ClienteContacto> {
+  const { data, error } = await api.POST('/api/clientes/{id}/contactos', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Edita (o ARCHIVA con `activo: false`) un contacto del cliente. */
+async function actualizarContactoCliente(
+  id: number,
+  idContacto: number,
+  cuerpo: ClienteContactoEditar,
+): Promise<ClienteContacto> {
+  const { data, error } = await api.PATCH('/api/clientes/{id}/contactos/{idContacto}', {
+    params: { path: { id, idContacto } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Contactos ACTIVOS de un cliente; deshabilitada hasta que haya id.
+ *
+ * Se piden aparte (no vienen en la ficha del cliente, a diferencia de los del proveedor) porque el
+ * consumidor natural es la MESA de negociación, que sólo conoce el `idCliente` de la lista y no
+ * quiere arrastrar el cliente entero con sus campos de referencia para leer dos nombres.
+ */
+export function useContactosCliente(
+  idCliente: number | undefined,
+  incluirInactivos = false,
+): UseQueryResult<ClienteContacto[], ErrorDeApi> {
+  return useQuery({
+    queryKey: [...claveContactosCliente(idCliente ?? 0), incluirInactivos],
+    queryFn: () => listarContactosCliente(idCliente as number, incluirInactivos),
+    enabled: idCliente !== undefined,
+  });
+}
+
+/** Argumentos del alta de contacto de cliente. */
+export interface ArgsCrearContactoCliente {
+  idCliente: number;
+  cuerpo: ClienteContactoCrear;
+}
+
+/** Agrega un contacto al cliente e invalida su lista de contactos. */
+export function useCrearContactoCliente(): UseMutationResult<
+  ClienteContacto,
+  ErrorDeApi,
+  ArgsCrearContactoCliente
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idCliente, cuerpo }: ArgsCrearContactoCliente) =>
+      crearContactoCliente(idCliente, cuerpo),
+    onSuccess: (_resultado, variables) =>
+      queryClient.invalidateQueries({ queryKey: claveContactosCliente(variables.idCliente) }),
+  });
+}
+
+/** Argumentos de la edición/archivado de contacto de cliente. */
+export interface ArgsActualizarContactoCliente {
+  idCliente: number;
+  idContacto: number;
+  cuerpo: ClienteContactoEditar;
+}
+
+/** Edita o archiva un contacto e invalida su lista. */
+export function useActualizarContactoCliente(): UseMutationResult<
+  ClienteContacto,
+  ErrorDeApi,
+  ArgsActualizarContactoCliente
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idCliente, idContacto, cuerpo }: ArgsActualizarContactoCliente) =>
+      actualizarContactoCliente(idCliente, idContacto, cuerpo),
+    onSuccess: (_resultado, variables) =>
+      queryClient.invalidateQueries({ queryKey: claveContactosCliente(variables.idCliente) }),
   });
 }

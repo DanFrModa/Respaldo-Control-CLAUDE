@@ -5,17 +5,21 @@ import {
   ChevronDownIcon,
   ChevronLeft,
   ChevronRightIcon,
+  ClipboardListIcon,
   FileDown,
   FileText,
   Info,
+  Loader2Icon,
   LockIcon,
+  MapPinIcon,
   MessagesSquareIcon,
   PencilIcon,
   Plus,
+  PlusIcon,
   TargetIcon,
   Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -34,8 +38,11 @@ import {
   useDesgloseCostoLinea,
   useListaPrecios,
   useListasPrecios,
+  useEditarEncabezadoLista,
+  type ListaDetalle,
   type ListaLinea,
   type ListasQuery,
+  type ModeloNuevoCreado,
 } from '@/api/listas-precios';
 import { useCambiarEstadoRenglon } from '@/api/negociacion';
 import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
@@ -74,9 +81,12 @@ import { Historial } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
 import { CotizacionesDeLista } from './CotizacionesDeLista';
+import { DialogoAgregarModelos } from './DialogoAgregarModelos';
 import { DialogoCrearLista } from './DialogoCrearLista';
 import { DialogoEditarFactoresLista } from './DialogoEditarFactoresLista';
 import { DialogoNegociacionRenglon } from './DialogoNegociacionRenglon';
+import { ModeloNuevoEnMesa } from './ModeloNuevoEnMesa';
+import { PendientesRenglon } from './PendientesRenglon';
 import { puedeIrAPrecosteos, RUTA_PRECOSTEOS } from './puerta-precosteos';
 import { SelectorEstadoLista } from './SelectorEstadoLista';
 
@@ -464,6 +474,11 @@ function PaginaLista({
   const puedeMoverFactores = puedeAprobar;
   const [borrarListaAbierto, setBorrarListaAbierto] = useState(false);
   const borrarLista = useEliminarLista();
+  // ⭐⭐ V1-E8y (§Post-F9.152) — la mesa ABIERTA: agregar modelos (cotizados o nuevos), el LUGAR de
+  // la cita y la tira del modelo que se acaba de crear y todavía no puede entrar a la lista.
+  const [agregarAbierto, setAgregarAbierto] = useState(false);
+  const [citaAbierta, setCitaAbierta] = useState(false);
+  const [modeloNuevo, setModeloNuevo] = useState<ModeloNuevoCreado | null>(null);
 
   const consulta = useListaPrecios(idLista);
   const [editarFactoresAbierto, setEditarFactoresAbierto] = useState(false);
@@ -570,6 +585,28 @@ function PaginaLista({
               ? ` (${String(papel.vigentes.length)} vigentes · ${String(papel.dropeados.length)} dropeados)`
               : ''}{' '}
             · {formatearFecha(lista.fecha)}
+            {/* ⭐ V1-E8y: DÓNDE fue la cita. Meses después es lo que ayuda a acordarse de qué se
+                habló; por eso va pegado a la fecha y no escondido en un panel. */}
+            {lista.lugar === null || lista.lugar === '' ? null : (
+              <span data-testid="lugar-cita">
+                {' · '}
+                <MapPinIcon className="mr-0.5 inline size-3.5 align-[-2px]" aria-hidden />
+                {lista.lugar}
+              </span>
+            )}
+            {puedeAdministrar ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-1 h-6 px-1.5 text-[11.5px]"
+                onClick={() => setCitaAbierta(true)}
+                data-testid="editar-datos-cita"
+              >
+                <PencilIcon className="size-3" aria-hidden />
+                {lista.lugar === null || lista.lugar === '' ? 'Lugar de la cita' : 'Editar'}
+              </Button>
+            ) : null}
           </p>
           {lista.notas === null || lista.notas === '' ? null : (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -720,10 +757,35 @@ function PaginaLista({
         </section>
       ) : null}
 
+      {/* ⭐⭐ V1-E8y — el modelo que se acaba de crear en la cita: falta costearlo y agregarlo. */}
+      {modeloNuevo === null ? null : (
+        <ModeloNuevoEnMesa
+          creado={modeloNuevo}
+          idLista={lista.id}
+          alOcultar={() => setModeloNuevo(null)}
+        />
+      )}
+
       {/* ── Card: precios por modelo (aprobación renglón por renglón) ───────── */}
       <div className="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex flex-wrap items-center gap-2.5 border-b px-3.5 py-3">
           <h3 className="text-[13.5px] font-semibold">Precios por modelo</h3>
+          {/* ⭐⭐ V1-E8y (§Post-F9.152): hasta esta versión una lista nacía con sus modelos y NO
+              admitía ni uno más — agregar uno obligaba a borrarla y rehacerla. Va aquí, en el card
+              de los modelos, y no en las acciones del encabezado: aquéllas sólo se pintan a quien
+              ve importes, y agregar un modelo no es ver un precio. */}
+          {puedeAdministrar ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAgregarAbierto(true)}
+              data-testid="abrir-agregar-modelos"
+            >
+              <PlusIcon aria-hidden />
+              Agregar modelos
+            </Button>
+          ) : null}
           {verImportes ? (
             <span className="ml-auto text-[11.5px] text-faint">
               Costo Σ <b className="num text-foreground">{formatearMoneda(sumaCosto)}</b> · Precio Σ{' '}
@@ -809,6 +871,28 @@ function PaginaLista({
         lista={lista}
       />
 
+      {/* ⭐⭐ V1-E8y: agregar modelos ya cotizados, o crear uno en plena cita.
+          ⚠️ Se monta SÓLO mientras está abierto: dispara cinco consultas (entre ellas el diagnóstico
+          de candidatos, que crece monótonamente por cliente) y `useProyectos` no admite `enabled`, así
+          que montado siempre las pagaría al abrir CUALQUIER lista. */}
+      {agregarAbierto ? (
+        <DialogoAgregarModelos
+          abierto
+          alCambiarAbierto={setAgregarAbierto}
+          mesa={{
+            id: lista.id,
+            idCliente: lista.idCliente,
+            idClienteDepartamento: lista.idClienteDepartamento,
+            nombreCliente: lista.nombreCliente,
+            nombreDepartamento: lista.nombreDepartamento,
+          }}
+          alCrearModeloNuevo={setModeloNuevo}
+        />
+      ) : null}
+
+      {/* ⭐ V1-E8y: el LUGAR de la cita y las notas (que sólo se podían escribir al crear). */}
+      <DialogoDatosCita abierto={citaAbierta} alCambiarAbierto={setCitaAbierta} lista={lista} />
+
       {/* V1-E4 (punto 4): borrar la lista completa. */}
       <DialogoConfirmacion
         abierto={borrarListaAbierto}
@@ -885,6 +969,9 @@ function FilaRenglon({
   const [tecleoAbierto, setTecleoAbierto] = useState(false);
   const [negociacionAbierta, setNegociacionAbierta] = useState(false);
   const [expandido, setExpandido] = useState(false);
+  // ⭐ V1-E8y: los pendientes SIN tachar de este modelo (los tachados no se cuentan: ya no son
+  // pendientes, aunque se conserven).
+  const pendientesAbiertos = linea.pendientes.filter((p) => !p.resuelto).length;
 
   function alAprobar(): void {
     aprobar.mutate(linea.id, {
@@ -933,6 +1020,19 @@ function FilaRenglon({
               <div className="num truncate text-xs text-muted-foreground">
                 Nuestro {linea.codigoModelo}
                 {linea.numeroCliente === null ? '' : ` · ${linea.numeroCliente}`}
+                {/* ⭐ V1-E8y: cuántos pendientes SIN tachar tiene este modelo. Se enseña en la fila
+                    (no sólo dentro del cajón) porque el pendiente existe para no olvidarse de él:
+                    escondido detrás de un clic no cumple su función. */}
+                {pendientesAbiertos === 0 ? null : (
+                  <span
+                    className="ml-1.5 inline-flex items-center gap-1 rounded-md bg-warn-soft px-1.5 py-px text-[10.5px] font-semibold text-warn"
+                    title={`${String(pendientesAbiertos)} pendiente(s) sin resolver`}
+                    data-testid="chip-pendientes"
+                  >
+                    <ClipboardListIcon className="size-3" aria-hidden />
+                    {pendientesAbiertos}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1117,6 +1217,16 @@ function FilaRenglon({
         <TablaDensaFila data-testid="desglose-renglon">
           <TablaDensaCelda colSpan={7} className="bg-muted/30">
             <DesgloseCosto idLinea={linea.id} verImportes={verImportes} />
+            {/* ⭐ V1-E8y (§Post-F9.152) — LA LIBRETA de este modelo, en el mismo cajón que su
+                desglose: en la cita se abre el renglón, se mira el costo y se anota lo que falta. */}
+            <div className="mt-3 border-t pt-3">
+              <PendientesRenglon
+                idLinea={linea.id}
+                codigoModelo={linea.codigoModelo}
+                pendientes={linea.pendientes}
+                puedeEditar={puedeAdministrar}
+              />
+            </div>
           </TablaDensaCelda>
         </TablaDensaFila>
       ) : null}
@@ -1187,6 +1297,116 @@ function SelectorEstadoRenglon({ linea }: { linea: ListaLinea }): React.JSX.Elem
         </option>
       ))}
     </SelectNativo>
+  );
+}
+
+/**
+ * ⭐ V1-E8y (§Post-F9.152) — LOS DATOS DE LA CITA: el **LUGAR** y las **NOTAS**.
+ *
+ * El lugar es nuevo («oficinas de C&A Santa Fe», «Zoom»): meses después es lo que ayuda a acordarse
+ * de qué se habló en esa junta.
+ *
+ * ⚠️ Las notas **existían desde F8-E4 y no se podían corregir**: el único sitio que las escribía era
+ * el alta de la lista. Se abren aquí junto al lugar porque son el mismo acto —los datos de la
+ * junta—; dejar el campo nuevo editable y el viejo no habría sido la clase de asimetría que nadie
+ * recuerda después.
+ */
+function DialogoDatosCita({
+  abierto,
+  alCambiarAbierto,
+  lista,
+}: {
+  abierto: boolean;
+  alCambiarAbierto: (abierto: boolean) => void;
+  lista: ListaDetalle;
+}): React.JSX.Element {
+  const guardar = useEditarEncabezadoLista();
+  const [lugar, setLugar] = useState(lista.lugar ?? '');
+  const [notas, setNotas] = useState(lista.notas ?? '');
+
+  // Al abrir se re-siembra con lo que hay guardado: si otra pestaña lo movió, no se pisa con lo que
+  // este diálogo tenía en memoria de la vez pasada.
+  useEffect(() => {
+    if (abierto) {
+      setLugar(lista.lugar ?? '');
+      setNotas(lista.notas ?? '');
+    }
+  }, [abierto, lista.lugar, lista.notas]);
+
+  function alGuardar(): void {
+    guardar.mutate(
+      {
+        id: lista.id,
+        // '' → null: vaciar el campo es un acto legítimo (M1), no "no tocar".
+        cuerpo: {
+          lugar: lugar.trim() === '' ? null : lugar.trim(),
+          notas: notas.trim() === '' ? null : notas.trim(),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Datos de la cita guardados.');
+          alCambiarAbierto(false);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  return (
+    <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Datos de la cita</DialogTitle>
+          <DialogDescription>
+            Dónde fue la junta y las notas de la lista #{lista.folio}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Field>
+            <FieldLabel htmlFor="cita-lugar">Lugar</FieldLabel>
+            <Input
+              id="cita-lugar"
+              placeholder="Ej. Oficinas de C&A, Santa Fe"
+              value={lugar}
+              disabled={guardar.isPending}
+              onChange={(e) => setLugar(e.target.value)}
+              data-testid="input-lugar-cita"
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="cita-notas">Notas</FieldLabel>
+            <Input
+              id="cita-notas"
+              placeholder="Ej. Junta de temporada otoño"
+              value={notas}
+              disabled={guardar.isPending}
+              onChange={(e) => setNotas(e.target.value)}
+              data-testid="input-notas-cita"
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => alCambiarAbierto(false)}
+            disabled={guardar.isPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={alGuardar}
+            disabled={guardar.isPending}
+            data-testid="guardar-datos-cita"
+          >
+            {guardar.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

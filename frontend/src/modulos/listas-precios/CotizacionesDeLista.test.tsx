@@ -61,6 +61,8 @@ const LISTA: ListaDetalle = {
   regaliasPct: 5,
   costoVentasPct: 5,
   notas: null,
+  // ⭐ V1-E8y: el LUGAR de la cita (§Post-F9.152).
+  lugar: null,
   lineas: [],
   creadoEn: '2026-03-12T00:00:00.000Z',
   creadoPorId: null,

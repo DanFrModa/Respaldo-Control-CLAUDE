@@ -62,6 +62,9 @@ function filaLinea(caso: CasoRenglon): Record<string, unknown> {
       },
     },
     precosto: { version: 3, congeladoEn: caso.congeladoEn },
+    // ⭐ V1-E8y: el renglón trae sus PENDIENTES (vacíos aquí: esta prueba habla del aviso de costo
+    // viejo). La proyección los lee, así que la clave tiene que estar — igual que en producción.
+    pendientes: [],
   };
 }
 

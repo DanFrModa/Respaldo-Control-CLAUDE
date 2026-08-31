@@ -51,6 +51,11 @@ vi.mock('@/api/clientes', () => ({
   useDesactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useReactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useFusionarDepartamentos: () => ({ mutate: vi.fn(), isPending: false }),
+  // ⭐ V1-E8y: hooks del editor de CONTACTOS (montado en el detalle): inertes. Tiene su propia
+  // prueba (`EditorContactosCliente.test.tsx`); aquí sólo hace falta que la página monte.
+  useContactosCliente: () => ({ data: [], isPending: false, isError: false, error: null }),
+  useCrearContactoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarContactoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   usePreviaFusionDepartamentos: () => ({
     data: undefined,
     isPending: false,

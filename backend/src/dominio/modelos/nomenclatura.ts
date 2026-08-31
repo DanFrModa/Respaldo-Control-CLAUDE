@@ -514,6 +514,56 @@ async function pisoConsecutivoDesarrollo(tx: Tx, prefijo: string): Promise<numbe
 export const MAX_INTENTOS_CODIGO_DESARROLLO = 1000;
 
 /**
+ * ⭐ V1-E8y — LOS DOS DÍGITOS DEL CÓDIGO, leídos del catálogo con sus candados.
+ *
+ * El código de desarrollo (`CYA-26-**71**-001`) y el nº de producción de 5 dígitos llevan **los
+ * mismos dos**: el `digitoConcepto` del tipo de prenda y el `digitoNomenclatura` del género. Esta
+ * función los saca, y de paso hace cumplir las cuatro condiciones que hacen falta para armar
+ * cualquiera de los dos códigos: que existan, que estén ACTIVOS y que tengan su dígito capturado.
+ *
+ * 🔑 **Vive aquí y se COMPARTE porque hay dos puertas que arman el mismo código**: el alta de
+ * desarrollo con modelo nuevo (`desarrollo/desarrollos.ts`) y el alta desde la MESA de negociación
+ * (`desarrollo/modelo-en-la-mesa.ts`, V1-E8y). El bloque estaba escrito a mano en la primera; la
+ * segunda lo habría copiado, y en este proyecto la copia reducida siempre termina derivando (es la
+ * lección de R3-H1). Los mensajes dicen **qué falta y dónde capturarlo**: se leen en plena cita.
+ */
+export async function digitosDeNomenclatura(
+  tx: Tx,
+  idTipoProducto: number,
+  idGenero: number,
+): Promise<{ concepto: number; genero: number }> {
+  const [tipo, genero] = await Promise.all([
+    tx.tipoProducto.findUnique({
+      where: { id: idTipoProducto },
+      select: { nombre: true, activo: true, digitoConcepto: true },
+    }),
+    tx.genero.findUnique({
+      where: { id: idGenero },
+      select: { nombre: true, activo: true, digitoNomenclatura: true },
+    }),
+  ]);
+  if (tipo === null || !tipo.activo) {
+    throw new ErrorValidacion('El tipo de producto seleccionado no existe o está desactivado.');
+  }
+  if (genero === null || !genero.activo) {
+    throw new ErrorValidacion('El género seleccionado no existe o está desactivado.');
+  }
+  if (tipo.digitoConcepto === null) {
+    throw new ErrorValidacion(
+      `El tipo de producto "${tipo.nombre}" no tiene dígito de concepto capturado, y sin él no se ` +
+        `puede armar el código del modelo. Captúralo en su catálogo.`,
+    );
+  }
+  if (genero.digitoNomenclatura === null) {
+    throw new ErrorValidacion(
+      `El género "${genero.nombre}" no tiene dígito de nomenclatura capturado, y sin él no se ` +
+        `puede armar el código del modelo. Captúralo en su catálogo.`,
+    );
+  }
+  return { concepto: tipo.digitoConcepto, genero: genero.digitoNomenclatura };
+}
+
+/**
  * MINTEA el código de desarrollo de un modelo nuevo, en la transacción del llamador. El
  * consecutivo sale de una secuencia GLOBAL atómica (A3) —nunca `Max()+1`— cuya clave es
  * **`cliente + año`**, tal como Daniel lo cerró el 25-ago-2026: *"Me gusta solo por cliente por

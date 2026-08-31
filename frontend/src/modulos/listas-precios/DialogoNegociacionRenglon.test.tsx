@@ -79,6 +79,8 @@ function linea(): ListaLinea {
     nombreEstado: 'Abierto',
     estadoPorId: null,
     estadoEn: null,
+    // ⭐ V1-E8y: los PENDIENTES del modelo (la libreta de la cita). Vacíos aquí.
+    pendientes: [],
   };
 }
 

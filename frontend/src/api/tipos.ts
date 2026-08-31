@@ -281,6 +281,18 @@ export type ClienteDepartamentoFusionar =
 export type FusionDepartamentosPrevia =
   paths['/api/clientes/{idCliente}/departamentos/fusionar/previa']['post']['responses']['200']['content']['application/json'];
 
+/** Lista de CONTACTOS de un cliente (V1-E8y, §Post-F9.152 — la compradora). */
+export type ClienteContactosLista =
+  paths['/api/clientes/{id}/contactos']['get']['responses']['200']['content']['application/json'];
+/** Un contacto del cliente (departamento OPCIONAL: null = atiende al cliente completo). */
+export type ClienteContacto = ClienteContactosLista['datos'][number];
+/** Cuerpo de alta de un contacto del cliente (`POST /api/clientes/{id}/contactos`). */
+export type ClienteContactoCrear =
+  paths['/api/clientes/{id}/contactos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion/archivado (`PATCH /api/clientes/{id}/contactos/{idContacto}`). */
+export type ClienteContactoEditar =
+  paths['/api/clientes/{id}/contactos/{idContacto}']['patch']['requestBody']['content']['application/json'];
+
 // ── Pedidos (Modulo PEDIDOS, F2-E1) — pedido interno + pedido real ────────────
 
 /** Pagina de pedidos internos (`GET /api/pedidos`). */

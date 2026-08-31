@@ -86,6 +86,12 @@ configurable) → `ListaPreciosLinea` (**`idDesarrollo @unique`**, `precioCalcul
 una orden liga a lo más UN desarrollo; un desarrollo tiene N órdenes por resurtidos). Adjuntos R6:
 `OrdenArchivo` (puente `Orden`↔`Archivo`, `idArchivo @unique`, espejo de `ProveedorArchivo` sin `tipo`).
 
+⭐ **V1-E8y (§Post-F9.152)** suma tres piezas a este mapa: **`ListaPrecios.lugar`** (dónde fue la cita),
+**`ListaPreciosLineaPendiente`** (la LIBRETA por modelo: texto editable + `resuelto`, cascade desde el
+renglón) y **`ClienteContacto`** (la compradora; cuelga del **cliente** con `idClienteDepartamento`
+**NULLABLE** — decisión de Daniel: *«Carlos, crédito» no necesita departamento inventado*). Los pendientes
+**no son** `NegociacionEvento.acuerdo`, que sigue siendo el libro INMUTABLE de lo pactado.
+
 ## Resolución de precios en cascada (compartida precosto ↔ MRP)
 
 - **Tela** (`resolverPrecioTela`, 4 pasos): **amarre-color** (`TelaProveedorColor.precio` del proveedor
@@ -220,6 +226,43 @@ una versión nueva **y** registrar una ronda, las dos a mano.
   cambiar**, y un cambio de receta puede no mover el costo ni un peso. **Consecuencias declaradas:** el
   aviso se puede ignorar —la cotización, el PDF y el Excel siguen saliendo— y un desfase **anterior al
   despliegue** no se detecta (la columna nace en NULL = *no se sabe*).
+
+## ⭐⭐ La MESA ABIERTA: la lista acepta modelos después de nacer (V1-E8y, §Post-F9.152)
+
+Hasta esta etapa el **único escritor** de `lista_precios_linea` era el `createMany` de `crearLista`: una
+lista nacía con sus modelos y **no admitía ni uno más** — meter otro obligaba a **borrarla y rehacerla**,
+perdiendo aprobaciones, rondas, acuerdos e historial.
+
+- **`agregarLineasLista`** (`POST /listas-precios/:id/lineas`, `listas.administrar`) agrega desarrollos ya
+  cotizados. Reusa **la misma** clasificación que el alta (`problemasDeCandidatura`, extraída y
+  compartida) y calcula el precio con **el SNAPSHOT de la lista**, no con los factores vigentes del
+  cliente: si no, un renglón agregado después saldría con otro margen que sus hermanos y **nadie lo
+  vería** (el encabezado seguiría diciendo los porcentajes de siempre).
+- 🔑 **Es la ÚNICA función que toma los DOS advisory locks**, y el orden canónico es **EMPRESA → LISTA**:
+  el de empresa (`NAMESPACE_LOCK_CREAR_LISTA`) cierra el TOCTOU del `@@unique([idDesarrollo])` que
+  `crearLista` ya cerraba; el de lista hace race-free a `exigirListaNoCerrada`. Ninguna otra función toma
+  el de lista y después el de empresa ⇒ no hay ciclo posible.
+- **`crearModeloEnLista`** (`POST /listas-precios/:id/modelo-nuevo`) da de alta **en la cita** un modelo
+  que no existe —desde cero o **copiando** otro— con su proyecto (si se pide uno nuevo, por nombre), su
+  desarrollo y su **precosto BORRADOR**, todo en UNA transacción.
+  🔴 **La copia arrastra la FICHA además de la receta** (`fichaHeredadaDeModelo`): `maquilaBase`,
+  `corteBase`, `numOperaciones`, `composicion` e `idCurvaTalla` son columnas de **`Modelo`**, no del BOM,
+  y `generarPrecosto` lee la maquila y el corte **de ahí** ⇒ copiar sólo el BOM dejaba el precosto con
+  **$0 de maquila y $0 de corte, en silencio**.
+  ⚖️ **Copiar ≠ versionar:** `crearVersionDeModelo` también arrastra los costos, pero cuelga al hijo de la
+  **familia del padre**, cuyo código lleva **la abreviatura de OTRO cliente**. Aquí se mintea código nuevo
+  y se reusa sólo `copiarRecetaAModeloNuevo` (exportada de `modelos/versiones.ts`).
+  ⚠️ **NO agrega el renglón**: eso exige precosto CONGELADO y un modelo recién nacido no tiene nada
+  costeado (candado de la 0.063). Son **dos actos visibles**, no uno que a veces funciona.
+- **`editarEncabezadoLista`** (`PATCH /listas-precios/:id/encabezado`) guarda el **lugar de la cita** y
+  corrige las **notas**, que existían desde F8-E4 y sólo se escribían al crear la lista.
+- **Pendientes por modelo** (`pendientes-linea.ts`): **UNA sola regla de acceso — no son el papel**, así
+  que **no los frena el cierre de la lista ni el estado del renglón**. Se corrigen, se tachan y se borran
+  (con su `antes` en la bitácora). Viajan **embebidos** en cada renglón del detalle (nada de N llamadas
+  para pintar 20 modelos).
+- 🔴 **Las dos rutas de borrado fotografían los pendientes** antes de que se los lleve la cascada
+  (`quitarLineaLista` y `eliminarLista`) — la misma corrección que V1-E8w tuvo que hacer con los
+  `NegociacionEventoCosto`.
 
 ## Negociación por versiones (R20b)
 

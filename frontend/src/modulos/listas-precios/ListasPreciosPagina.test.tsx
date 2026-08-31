@@ -51,12 +51,24 @@ vi.mock('@/api/listas-precios', () => ({
   useEditarFactoresLista: () => ({ mutate: vi.fn(), isPending: false }),
   // ⭐ V1-E8w (§Post-F9.150): el TARGET del cliente lo captura Aurora desde este renglón.
   useFijarPrecioTarget: () => ({ mutate: targetMutate, isPending: false }),
+  // ⭐ V1-E8y (§Post-F9.152) — la mesa abierta: agregar renglones, el encabezado de la cita y los
+  // pendientes por modelo. Inertes aquí; cada pieza tiene su propia prueba.
+  useAgregarLineasLista: () => ({ mutate: vi.fn(), isPending: false }),
+  useEditarEncabezadoLista: () => ({ mutate: vi.fn(), isPending: false }),
+  useCrearModeloEnLista: () => ({ mutate: vi.fn(), isPending: false }),
+  useCrearPendiente: () => ({ mutate: vi.fn(), isPending: false }),
+  useEditarPendiente: () => ({ mutate: vi.fn(), isPending: false }),
+  useEliminarPendiente: () => ({ mutate: vi.fn(), isPending: false }),
   imprimirListaPdf: vi.fn(),
   descargarListaExcel: vi.fn(),
 }));
 vi.mock('@/api/clientes', () => ({
   useClientes: () => ({ data: { datos: [] }, isPending: false, isFetching: false }),
   useDepartamentosCliente: () => ({ data: [], isPending: false }),
+  // ⭐ V1-E8y: el diálogo de agregar modelos lee al CLIENTE para avisar, antes de teclear nada, si
+  // le falta la abreviatura (sin ella el código del modelo no se puede armar). Con `undefined` el
+  // aviso no se pinta, que es la rama neutra para las pruebas de esta página.
+  useCliente: () => ({ data: undefined, isPending: false }),
 }));
 vi.mock('@/api/estados-lista', () => ({
   // ⚠️ Con UN estado, el chip existe y se puede pulsar: eso es lo que enciende el filtro DE
@@ -107,6 +119,9 @@ const LISTA = {
   regaliasPct: 5,
   costoVentasPct: 5,
   notas: null,
+  // ⭐ V1-E8y: el LUGAR de la cita (§Post-F9.152). `as string | null` para que las variantes lo
+  // puedan encender.
+  lugar: null as string | null,
   lineas: [
     {
       id: 91,
@@ -137,6 +152,9 @@ const LISTA = {
       nombreEstado: 'Abierto',
       estadoPorId: null as string | null,
       estadoEn: null as string | null,
+      // ⭐ V1-E8y: los PENDIENTES del modelo (la libreta de la cita). Anotados para que las
+      // variantes puedan poblarlos.
+      pendientes: [] as ListaLinea['pendientes'],
     },
   ],
   creadoEn: '2026-08-10T10:00:00.000Z',
@@ -763,5 +781,82 @@ describe('⭐⭐ V1-E8x — el estado del MODELO dentro de la lista', () => {
     expect(fila).toHaveAttribute('data-estado', 'dropeado');
     expect(fila.className).toContain('opacity-60');
     expect(fila).toHaveTextContent('Playera Cherry');
+  });
+});
+
+describe('⭐⭐ V1-E8y — la mesa abierta (§Post-F9.152)', () => {
+  beforeEach(() => {
+    useListaPreciosMock.mockReset();
+    useListasPreciosMock.mockReset();
+  });
+
+  it('🔴 el diálogo de agregar modelos NO se monta hasta pulsarlo (dispara 5 consultas)', async () => {
+    const usuario = userEvent.setup();
+    await abrirDetalle();
+
+    // Cerrado: ni el panel ni sus pestañas existen en el DOM.
+    expect(screen.queryByTestId('panel-cotizados')).not.toBeInTheDocument();
+
+    await usuario.click(screen.getByTestId('abrir-agregar-modelos'));
+    expect(await screen.findByTestId('modo-agregar')).toBeInTheDocument();
+  });
+
+  it('sin `listas.administrar` no se ofrece agregar modelos', async () => {
+    await abrirDetalle(['listas.ver', 'consultas.ver-importes']);
+    expect(screen.queryByTestId('abrir-agregar-modelos')).not.toBeInTheDocument();
+  });
+
+  it('⭐ el LUGAR de la cita se enseña junto a la fecha cuando lo hay', async () => {
+    await abrirDetalle(PERM, { ...LISTA, lugar: 'Oficinas de C&A, Santa Fe' });
+    expect(screen.getByTestId('lugar-cita')).toHaveTextContent('Oficinas de C&A, Santa Fe');
+  });
+
+  it('sin lugar capturado no se pinta un hueco, y el botón invita a ponerlo', async () => {
+    await abrirDetalle();
+    expect(screen.queryByTestId('lugar-cita')).not.toBeInTheDocument();
+    expect(screen.getByTestId('editar-datos-cita')).toHaveTextContent(/Lugar de la cita/i);
+  });
+
+  it('🔴 el chip cuenta los pendientes SIN tachar (los tachados ya no son pendientes)', async () => {
+    const base = LISTA.lineas[0];
+    if (base === undefined) {
+      throw new Error('El fixture LISTA perdió su renglón: la prueba ya no prueba lo que dice.');
+    }
+    await abrirDetalle(PERM, {
+      ...LISTA,
+      lineas: [
+        {
+          ...base,
+          pendientes: [
+            {
+              id: 1,
+              idListaLinea: 91,
+              texto: 'Falta muestra de color',
+              resuelto: false,
+              resueltoEn: null,
+              resueltoPorId: null,
+              creadoEn: '2026-08-31T00:00:00.000Z',
+              creadoPorId: 'u1',
+            },
+            {
+              id: 2,
+              idListaLinea: 91,
+              texto: 'Ya se pidió el precio',
+              resuelto: true,
+              resueltoEn: '2026-08-31T01:00:00.000Z',
+              resueltoPorId: 'u1',
+              creadoEn: '2026-08-31T00:00:00.000Z',
+              creadoPorId: 'u1',
+            },
+          ],
+        },
+      ],
+    });
+    expect(screen.getByTestId('chip-pendientes')).toHaveTextContent('1');
+  });
+
+  it('sin pendientes abiertos no se pinta el chip (no hay nada que recordar)', async () => {
+    await abrirDetalle();
+    expect(screen.queryByTestId('chip-pendientes')).not.toBeInTheDocument();
   });
 });
