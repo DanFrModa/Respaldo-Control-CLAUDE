@@ -16,7 +16,11 @@
 import type { ConfiguracionEmpresa, Empresa } from '../../datos/index.js';
 import { z } from 'zod';
 
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import {
+  eliminarObjetosBestEffort,
+  servicioArchivos,
+  type ServicioArchivos,
+} from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -692,10 +696,12 @@ export async function confirmarLogo(
 
   await inspeccionarLogoAntesDeConfirmar(clienteLectura(bd), idEmpresa, idArchivo, archivos);
 
-  await enTransaccion(async (tx) => {
+  // Key del logo ANTERIOR, si la transacción llegó a borrarlo (0.081a): su objeto se borra de R2
+  // tras el commit. `null` cuando no había logo previo o cuando la confirmación fue idempotente.
+  const keyR2Anterior = await enTransaccion(async (tx) => {
     const actual = await exigirEmpresa(tx, idEmpresa);
     if (actual.idArchivoLogo === idArchivo) {
-      return; // ya confirmado: idempotente
+      return null; // ya confirmado: idempotente
     }
 
     const archivo = await tx.archivo.findUnique({
@@ -715,9 +721,19 @@ export async function confirmarLogo(
     });
 
     // El logo anterior queda huérfano: se borra en la MISMA transacción (la FK ya apunta al nuevo,
-    // así que el SetNull del borrado no toca al nuevo). El objeto R2 huérfano es inofensivo.
+    // así que el SetNull del borrado no toca al nuevo). Su OBJETO de R2 se borra tras el commit.
+    let keyAnterior: string | null = null;
     if (actual.idArchivoLogo !== null) {
-      await tx.archivo.deleteMany({ where: { id: actual.idArchivoLogo } });
+      const previo = await tx.archivo.findUnique({
+        where: { id: actual.idArchivoLogo },
+        select: { key: true },
+      });
+      const borrados = await tx.archivo.deleteMany({ where: { id: actual.idArchivoLogo } });
+      // Solo si ESTA transacción lo borró de verdad: si otra confirmación en paralelo se le
+      // adelantó, `count` es 0 y el objeto es del logo que el otro camino ya está manejando.
+      if (borrados.count > 0) {
+        keyAnterior = previo?.key ?? null;
+      }
     }
 
     await registrarBitacora(tx, sesion, {
@@ -729,29 +745,48 @@ export async function confirmarLogo(
         archivo: archivo.nombreOriginal,
       },
     });
+
+    return keyAnterior;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keyR2Anterior === null ? [] : [keyR2Anterior],
+    `el logo anterior de la empresa ${String(idEmpresa)}`,
+  );
 
   invalidarLogoEmpresa(idEmpresa);
 }
 
 /**
  * Quita el LOGO de la empresa en UNA transacción (A2): borra el `Archivo` (el `onDelete SetNull` de
- * la FK deja `idArchivoLogo` en null, sin huérfanos) y deja constancia en la bitácora. A partir de
- * ahí, impresos y app vuelven al logo EMPAQUETADO del repo. Requiere `empresas.administrar`; si la
- * empresa no tiene logo → `ErrorConflicto` (la pantalla estaba desactualizada).
+ * la FK deja `idArchivoLogo` en null, sin huérfanos) y deja constancia en la bitácora. TRAS el
+ * commit borra el OBJETO físico de R2 en modo BEST-EFFORT (0.081a). A partir de ahí, impresos y app
+ * vuelven al logo EMPAQUETADO del repo. Requiere `empresas.administrar`; si la empresa no tiene
+ * logo → `ErrorConflicto` (la pantalla estaba desactualizada).
+ *
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto): el borrado físico corre
+ * DESPUÉS del commit — ver {@link eliminarObjetosBestEffort}.
  */
 export async function quitarLogo(
   sesion: SesionUsuario,
   idEmpresa: number,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'empresas.administrar');
 
-  await enTransaccion(async (tx) => {
+  const keyR2 = await enTransaccion(async (tx) => {
     const actual = await exigirEmpresa(tx, idEmpresa);
     if (actual.idArchivoLogo === null) {
       throw new ErrorConflicto(`La empresa "${actual.nombre}" no tiene logo.`);
     }
+
+    // La key del objeto R2 se lee ANTES del borrado: después la fila ya no está.
+    const previo = await tx.archivo.findUnique({
+      where: { id: actual.idArchivoLogo },
+      select: { key: true },
+    });
 
     // `deleteMany` (no `delete`): con dos peticiones de "quitar" en paralelo, ambas leen el mismo
     // `idArchivoLogo` y la segunda encontraría la fila ya borrada. `delete` lanzaría P2025 → 500;
@@ -768,7 +803,15 @@ export async function quitarLogo(
       accion: 'MODIFICAR',
       datos: { logo: 'quitar' },
     });
+
+    return previo?.key ?? null;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keyR2 === null ? [] : [keyR2],
+    `el logo de la empresa ${String(idEmpresa)}`,
+  );
 
   invalidarLogoEmpresa(idEmpresa);
 }

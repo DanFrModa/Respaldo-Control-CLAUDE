@@ -39,6 +39,8 @@
  * MISMO `Archivo` — el objeto de R2 no se puede duplicar desde una migración SQL y `archivos.key`
  * es único. Lo mismo hace «copiar arte de otro modelo». Por eso, al quitar una foto, el `Archivo`
  * solo se borra cuando NINGUNA otra foto de arte lo referencia (`borrarArchivoSiQuedoHuerfano`).
+ * Cuando SÍ se borra, su objeto de R2 se borra también —tras el commit y best-effort (0.081a)—; si
+ * lo comparte otro arte, el objeto NO se toca (borrarlo dejaría a ese arte apuntando a la nada).
  */
 import {
   esquemaArteCopiarCuerpo,
@@ -50,7 +52,11 @@ import {
 import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import {
+  eliminarObjetosBestEffort,
+  servicioArchivos,
+  type ServicioArchivos,
+} from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { armarPagina, rangoPrisma, type Pagina } from '../../comun/paginacion.js';
@@ -520,27 +526,38 @@ export async function actualizarArte(
  * se quita como se quita una tela o un avío (el borrado suave del catálogo viejo ya no aplica).
  * Queda constancia en la bitácora con TODO lo que decía el renglón (D3: nada se borra en
  * silencio). Sus FOTOS se van con él (Cascade) y sus `Archivo` se borran con el mismo cuidado que
- * en `quitarFotoArte`: solo si ningún otro arte los comparte. La traza del precosto se pone en
- * NULL sola (SetNull): el precio usado ya vive en `PrecostoLinea.precioUnit`.
+ * en `quitarFotoArte`: solo si ningún otro arte los comparte. Los OBJETOS de R2 de los que sí se
+ * borraron se eliminan TRAS el commit, en modo BEST-EFFORT (0.081a). La traza del precosto se pone
+ * en NULL sola (SetNull): el precio usado ya vive en `PrecostoLinea.precioUnit`.
+ *
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto): el borrado físico corre
+ * DESPUÉS del commit — ver {@link eliminarObjetosBestEffort}.
  */
 export async function eliminarArte(
   sesion: SesionUsuario,
   idModelo: number,
   idArte: number,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
-  return enTransaccion(async (tx) => {
+
+  // Las keys de R2 de los `Archivo` que la tx REALMENTE borró (los compartidos no vienen).
+  const keysR2 = await enTransaccion(async (tx) => {
     // ⭐ V1-E9b pieza B — antes del 404 de `exigirArte`, misma razón que en `actualizarArte`.
     await exigirRecetaPropia(tx, idModelo);
     const actual = await exigirArte(tx, idModelo, idArte);
 
     // Los renglones de foto se van por Cascade; los `Archivo` hay que evaluarlos DESPUÉS (si
     // quedan sin dueño). Se guardan antes de borrar porque el borrado se los lleva.
-    const archivos = actual.fotos.map((f) => f.idArchivo);
+    const idsArchivo = actual.fotos.map((f) => f.idArchivo);
     await tx.modeloArte.delete({ where: { id: idArte } });
-    for (const idArchivo of new Set(archivos)) {
-      await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+    const keys: string[] = [];
+    for (const idArchivo of new Set(idsArchivo)) {
+      const key = await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+      if (key !== null) {
+        keys.push(key);
+      }
     }
 
     await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
@@ -554,7 +571,15 @@ export async function eliminarArte(
       accion: 'MODIFICAR',
       datos: { operacion: 'quitar', idModelo, ...datosArteParaBitacora(actual) },
     });
+
+    return keys;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keysR2,
+    `las fotos del arte ${String(idArte)} del modelo ${String(idModelo)}`,
+  );
 }
 
 /**
@@ -808,8 +833,17 @@ export interface FotoArteConUrl {
 /**
  * Borra el registro `Archivo` SOLO si ya nadie lo usa. Es la contrapartida de que varios artes
  * puedan COMPARTIR foto (migración de los artes duplicados + «copiar arte de otro modelo»):
- * borrarlo a ciegas dejaría a los demás artes sin su imagen. El objeto en R2 se queda (deuda ya
- * documentada en `comun/archivos.ts`: no hay DeleteObject).
+ * borrarlo a ciegas dejaría a los demás artes sin su imagen.
+ *
+ * ⭐ **Devuelve la key de R2 del archivo que borró, o `null` si no borró nada** (porque otro arte
+ * sigue usándolo, o porque otro camino ya lo había borrado). No borra el objeto de R2 aquí: corre
+ * DENTRO de la transacción, y el `DeleteObject` tiene que ir DESPUÉS del commit (si no, un rollback
+ * dejaría el objeto borrado con su fila viva). Cada llamador junta las keys que le devuelve y las
+ * pasa a {@link eliminarObjetosBestEffort} una vez cerrada la transacción — 0.081a.
+ *
+ * 🔴 El `null` NO es decorativo: es lo que impide borrar de R2 la foto que OTRO arte sigue
+ * enseñando. Devolver la key incondicionalmente sería exactamente la carrera nº 1 de abajo, pero
+ * consumada en el bucket y sin vuelta atrás.
  *
  * Se EXPORTA porque el arte se borra desde DOS caminos: {@link eliminarArte} y «copiar receta con
  * reemplazo» (`bom-modelo.ts`), que barre el arte del destino y debe cuidar sus fotos igual.
@@ -834,17 +868,25 @@ export interface FotoArteConUrl {
  * no devuelve fila, el `Archivo` ya lo borró otro camino y aquí no hay nada que hacer (evita un
  * P2025 → 500 por borrar dos veces).
  */
-export async function borrarArchivoSiQuedoHuerfano(tx: Tx, idArchivo: string): Promise<void> {
+export async function borrarArchivoSiQuedoHuerfano(
+  tx: Tx,
+  idArchivo: string,
+): Promise<string | null> {
+  // La `key` viaja con el candado: es el único momento en que la fila está garantizada viva y
+  // bloqueada, y sin ella el llamador no sabría qué objeto de R2 borrar tras el commit.
   const bloqueado = await tx.$queryRaw<
-    { id: string }[]
-  >`SELECT "id" FROM "archivos" WHERE "id" = ${idArchivo} FOR UPDATE`;
-  if (bloqueado.length === 0) {
-    return; // ya no existe: otro camino lo borró y su fila está commiteada
+    { id: string; key: string }[]
+  >`SELECT "id", "key" FROM "archivos" WHERE "id" = ${idArchivo} FOR UPDATE`;
+  const fila = bloqueado[0];
+  if (fila === undefined) {
+    return null; // ya no existe: otro camino lo borró y su fila está commiteada
   }
   const enUso = await tx.modeloArteFoto.count({ where: { idArchivo } });
-  if (enUso === 0) {
-    await tx.archivo.delete({ where: { id: idArchivo } });
+  if (enUso > 0) {
+    return null; // otro arte lo sigue enseñando: NI la fila NI el objeto se tocan
   }
+  await tx.archivo.delete({ where: { id: idArchivo } });
+  return fila.key;
 }
 
 /**
@@ -984,6 +1026,10 @@ export async function listarFotosArte(
  * `Archivo` **si ninguna otra foto de arte lo comparte**. Requiere `modelos.administrar`. Si la
  * foto no pertenece a ese arte (o el arte no es de ese modelo) → `ErrorNoEncontrado`.
  *
+ * Si el `Archivo` se llegó a borrar (nadie más lo comparte), su OBJETO de R2 se borra TRAS el
+ * commit en modo BEST-EFFORT (0.081a). Si OTRO arte sigue usando la foto, el objeto NO se toca.
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR — ver {@link eliminarObjetosBestEffort}.
+ *
  * El `idFoto` identifica exactamente la foto a quitar, así que ya no hace falta el acotamiento por
  * `idArchivo` que necesitaba la foto única (V1-E3d): la LIMPIEZA del flujo presigned del frontend
  * borra por el `idFoto` que su propia subida creó y nunca puede tocar la de otro usuario.
@@ -994,9 +1040,12 @@ export async function quitarFotoArte(
   idArte: number,
   idFoto: number,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
-  return enTransaccion(async (tx) => {
+
+  // `null` si la foto la COMPARTE otro arte: entonces el objeto de R2 NO se toca.
+  const keyR2 = await enTransaccion(async (tx) => {
     // ⭐ V1-E9b pieza B — la otra mitad de la asimetría de `solicitarSubidaFotoArte`: el botón
     // «quitar» de una foto HEREDADA daba 404. Ahora dice de quién es la receta.
     await exigirRecetaPropia(tx, idModelo);
@@ -1010,7 +1059,7 @@ export async function quitarFotoArte(
     }
 
     await tx.modeloArteFoto.delete({ where: { id: foto.id } });
-    await borrarArchivoSiQuedoHuerfano(tx, foto.idArchivo);
+    const key = await borrarArchivoSiQuedoHuerfano(tx, foto.idArchivo);
 
     await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     await registrarBitacora(tx, sesion, {
@@ -1019,5 +1068,13 @@ export async function quitarFotoArte(
       accion: 'MODIFICAR',
       datos: { idModelo, foto: 'quitar', idFoto, archivo: foto.idArchivo },
     });
+
+    return key;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keyR2 === null ? [] : [keyR2],
+    `la foto ${String(idFoto)} del arte ${String(idArte)}`,
+  );
 }

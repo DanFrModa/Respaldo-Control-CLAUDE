@@ -60,6 +60,7 @@ import {
 import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { eliminarObjetosBestEffort, type ServicioArchivos } from '../../comun/archivos.js';
 
 import {
   borrarArchivoSiQuedoHuerfano,
@@ -972,6 +973,12 @@ export async function listarAviosBom(
  * su padre) no es el mismo id **pero es la misma receta**: sin resolver los dos lados, la copia
  * borraría la receta y la volvería a poner sobre sí misma. Comparar los ids crudos no lo ve.
  *
+ * **Al REEMPLAZAR se borran los artes del destino**, y las fotos que quedan sin dueño se borran
+ * también de R2 (objeto físico incluido), TRAS el commit y en modo BEST-EFFORT (0.081a). Las fotos
+ * que OTRO arte siga compartiendo no se tocan.
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto) — ver
+ * {@link eliminarObjetosBestEffort}.
+ *
  * @example
  * await copiarBom(sesion, idDestino, { idOrigen: idBase, reemplazar: true });
  */
@@ -980,6 +987,7 @@ export async function copiarBom(
   idDestino: number,
   entrada: EntradaCopiarBom,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<BomModelo> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaModeloCopiarBomCuerpo, entrada);
@@ -991,7 +999,12 @@ export async function copiarBom(
     throw new ErrorValidacion('El modelo de origen y el de destino no pueden ser el mismo.');
   }
 
-  return enTransaccion(async (tx) => {
+  // Keys de R2 de las fotos de arte que el REEMPLAZO dejó sin dueño y la tx llegó a borrar. Se
+  // acumulan dentro de la transacción y se consumen DESPUÉS del commit (0.081a): si la tx revienta,
+  // la excepción se lleva por delante el borrado físico y no se toca un solo objeto del bucket.
+  const keysR2: string[] = [];
+
+  const bom = await enTransaccion(async (tx) => {
     await exigirModelo(tx, idDestino);
     await exigirModelo(tx, datos.idOrigen);
     // ⭐ V1-E9b pieza B — el DESTINO no puede ser un hijo del linaje 1:N (ver la nota de arriba).
@@ -1060,7 +1073,10 @@ export async function copiarBom(
         for (const idArchivo of new Set(
           artesBorradas.flatMap((a) => a.fotos.map((f) => f.idArchivo)),
         )) {
-          await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+          const key = await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+          if (key !== null) {
+            keysR2.push(key);
+          }
         }
       }
     }
@@ -1206,4 +1222,12 @@ export async function copiarBom(
 
     return leerBom(tx, idDestino, sesion.idEmpresaActiva);
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keysR2,
+    `las fotos de arte que reemplazó la copia de receta al modelo ${String(idDestino)}`,
+  );
+
+  return bom;
 }
