@@ -11771,3 +11771,49 @@ aprobó dos veces**: §Post-F9.135 p.4 (*«se debe de poder hacer, **pero advirt
 - **Aplica en:** **0.087**. **Fecha:** 2026-09-01.
 
 ---
+
+#### (Post-F9.175) — ⏳ PENDIENTE DE DANIEL: ¿se retira el botón «Pasar a producción» del catálogo? (1-sep-2026)
+
+**Sale de E3.** Con los modelos por color, ese botón **transforma el modelo de desarrollo en sitio** y le da
+**UN número a todos sus colores**. Medido por el reviewer, con un clic:
+
+```
+4 OC de 4 colores tras pulsar «Pasar a producción»
+  → heredado:71001 | heredado:71001 | heredado:71001 | heredado:71001
+  → MODELOS DISTINTOS EN LAS 4 OP = 1        (E3 quiere 4)
+```
+
+⇒ **reproduce el bug de Daniel al pie de la letra**, y **para siempre**: ese modelo queda en la rama
+heredada.
+
+### Lo que E3 SÍ cerró, y por qué no cerró el resto
+
+✅ **Guarda puesta:** un desarrollo **que ya tiene hijos** no se promueve (`ErrorConflicto` que **nombra al
+hijo**). Eso tapa el agujero que la base no puede ver — un CHECK no mira otra fila, así que no puede impedir
+que el padre **deje de ser** de desarrollo *después*.
+
+🔴 **La segunda guarda —«con ficha de Desarrollo no se promueve»— se probó y se RETIRÓ, medido:** rompe un
+camino **existente y probado** (`crearDesarrolloConModeloNuevo` → promover). Razón del coder, y se comparte:
+
+> *«Eso no es una valla contra un descuido: es **retirar una capacidad**, y esa es una decisión de producto
+> que no me toca.»*
+
+**Y no se dejó en silencio: se dejó MEDIDA.** Hay una prueba `⚠️ RESIDUO MEDIDO` que fija el
+comportamiento actual —*«el día que se decida retirar el botón, es la que hay que dar vuelta»*— y un **aviso
+ámbar antes de pulsar**: *«esto le da UN número a todo el modelo, no uno por color… no hay vuelta atrás»*.
+
+### La pregunta, con default
+
+**¿El botón se retira del catálogo, o se queda para el modelo suelto que no va por colores?**
+
+⭐ **DEFAULT PROPUESTO: se QUEDA, con la guarda y el aviso que ya tiene.** Razón: hay modelos que **no** se
+producen por color (una sola corrida, un solo tono), y para ésos el botón es el camino corto y correcto. La
+guarda ya impide el caso peligroso —promover algo que **ya** tiene colores—, y el aviso hace que el otro
+caso sea **una decisión, no un accidente**.
+
+📌 **NO bloquea nada.** E3 entra con lo que tiene. Si Daniel prefiere retirarlo, es media jornada y la
+prueba del residuo ya dice qué hay que invertir.
+
+- **Aplica en:** una etapa propia sólo si se decide retirarlo. **Fecha:** 2026-09-01.
+
+---
