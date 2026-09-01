@@ -906,7 +906,9 @@ Cierra la deuda (ii) que B1 dejó declarada: la entrada por factura no tocaba la
 
 **1. UNA sola puerta para recibir tela (decisión de Daniel).** Había dos caminos —recepción desde la OC (F4) y entrada por factura (B1)— y hacerlos convivir permitía recibir la misma tela **dos veces**, una por cada uno, inflando el inventario sin que nada lo impidiera. Se eligió que la **factura sea la puerta**: `recibirCompra` **rechaza** los renglones de tela con un mensaje que dice a dónde ir; los **avíos y las líneas libres siguen recibiéndose desde la OC**, sin cambio.
 
-**2. La liga es POR RENGLÓN, no por documento (decisión de Daniel).** `EntradaTelaLinea.idOrdenCompraLinea` (nullable). Así una misma factura puede amparar tela de **dos OCs distintas** y, en el mismo documento, tela **suelta** sin orden de compra — que es como facturan los proveedores. `NULL` sigue siendo un caso válido y frecuente.
+**2. La liga es POR RENGLÓN, no por documento (decisión de Daniel).** `EntradaTelaLinea.idOrdenCompraLinea` (nullable). Así una misma factura puede amparar tela de **dos OCs distintas** en el mismo documento — que es como facturan los proveedores.
+
+   🔴 **SUPERADO EN PARTE por §Post-F9.159(a) (30-ago-2026):** esta línea decía además *"y, en el mismo documento, tela **suelta** sin orden de compra… `NULL` sigue siendo un caso válido y frecuente"*. **Ya no lo es**: Daniel cerró esa vía (*«sin OC no podemos recibir tela»*) y el dominio la rechaza. Lo que SIGUE vigente de este punto es la liga **por renglón** (una factura, dos OCs). La columna se queda `nullable` sólo por los documentos anteriores a esa decisión, que se siguen leyendo (D3 + REGLA 0-B).
 
 **3. Confirmar la factura ES la recepción.** Al confirmar, los renglones con OC generan una `RecepcionCompra` **por cada OC surtida** (`recepciones_compra.id_entrada_tela` guarda de qué documento nació) con la MISMA contabilidad de F4: renglones contra `OrdenCompraLinea`, recálculo del estatus (R7 → `recibida_parcial`/`recibida_total`) y evento `material-recibido` al outbox, que es lo que hace avanzar la Ruta Crítica. **No mueve inventario otra vez**: reusa la partida y el movimiento de kardex que la entrada ya creó. Por eso la tela entra una vez al kardex y suma una vez a lo recibido.
 
@@ -933,7 +935,9 @@ Daniel, después de probar §Post-F9.14: *"El punto 3 no me gustó cómo quedó.
 - Lo único que queda por capturar es **el color que llegó** (y el lote), que es justo lo que la OC no define. Cantidades y precio son editables: lo que llegó puede no ser lo pedido.
   > ⭐⭐ **SUPERADO por §Post-F9.89 (V1-E3u, 22-ago-2026):** la OC **ya define el color**. La captura lo **preselecciona** desde el renglón de OC (y lo enseña en el panel de pendientes, con su pantone); sigue **editable** porque manda lo que de verdad llegó, y el confirmar **cuadra** los dos y lo dice si no coinciden. Lo que se conserva de esta decisión es el punto de partida y la contabilidad, no la frase *"la OC no lo define"*.
 
-**Lo que NO cambió:** la contabilidad de §Post-F9.14 sigue intacta —la factura es la que mueve inventario, genera la recepción por OC, marca el estatus y avisa a la RC—; esto es **el punto de entrada**, no el mecanismo. El **selector "Renglón de OC" se retiró**: ya no hace falta buscar la liga porque viene de la orden. La captura **desde el menú** queda para la tela **suelta** (sin OC), y ahí no se pinta el panel.
+**Lo que NO cambió:** la contabilidad de §Post-F9.14 sigue intacta —la factura es la que mueve inventario, genera la recepción por OC, marca el estatus y avisa a la RC—; esto es **el punto de entrada**, no el mecanismo. El **selector "Renglón de OC" se retiró**: ya no hace falta buscar la liga porque viene de la orden.
+
+> 🔴 **SUPERADO por §Post-F9.159(a) (30-ago-2026):** aquí decía *"la captura **desde el menú** queda para la tela **suelta** (sin OC), y ahí no se pinta el panel"*. Al cerrarse la vía sin OC eso habría dejado el menú **sin ninguna salida**, así que la captura desde el menú **ahora SÍ pinta el panel**: se elige el proveedor y se ofrece todo lo que tiene pendiente de recibir en sus órdenes abiertas (llegando desde una OC concreta, el panel sigue acotado a ESA orden, como dice el punto de abajo). Lo demás de esta decisión se conserva tal cual.
 
 - **El proveedor viaja en el enlace** (`state: { idOrdenCompra, idProveedor }`) en vez de releer la OC: la pantalla que manda ya lo tiene, y así el panel de pendientes se puede pedir de inmediato (necesita el proveedor).
 - **Pendiente ACOTADO a esa OC:** `GET /api/compras/lineas-tela-pendientes` acepta `idOrdenCompra`. Llegando desde una orden solo se ofrece lo de ESA orden, no todo lo abierto del proveedor.
@@ -10803,7 +10807,19 @@ opuestas**, y nadie había zanjado cuál manda:
 preferencia operativa, es que **no puede ocurrir físicamente** — *«¿de quién recibiríamos sin OC?»*.
 ⚠️ **La línea 736 queda SUPERADA** (venía de la propuesta original de Finanzas/proveedores, anterior a que
 la cadena de compras se construyera): **prevalece 5252 y esta decisión**. Al construir el letrero de
-`CapturaRenglonesTelaColor` (versión **0.072**), el camino «sin OC» **no se advierte: se cierra**.
+`CapturaRenglonesTelaColor`, el camino «sin OC» **no se advierte: se cierra**.
+
+> ✅ **CONSTRUIDO en la versión 0.080** (1-sep-2026, ficha `V1-E9l`), **no en la 0.072 como decía esta
+> línea.** Era una **predicción**, no un hecho: se escribió el 30-ago dando por sentado qué versión
+> llevaría el cierre, y la 0.072 acabó siendo otra cosa (la receta compartida, pieza B). Se corrige
+> porque una predicción que envejece **se lee como historia**, y `HOJA-DE-RUTA.md` numeraba este mismo
+> trabajo como fila **0.078** ⇒ dos números para una cosa. 📌 **La fila numera el PLAN y la entrega
+> numera la LLEGADA** (ver «Cómo se numeran» en `HISTORIAL-DE-VERSIONES.md`): plan **0.078**, entrega
+> **0.080**, y la 0.072 no tiene nada que ver.
+>
+> Y se cerró **más fuerte** de lo que esta línea anticipaba: no es sólo el letrero. La guarda vive en el
+> **dominio**, en el embudo por el que pasan capturar, editar **y confirmar**, y el contrato exige el
+> renglón de OC. El letrero es la cara visible, no el candado.
 
 ### (b) El dígito de continuación YA estaba decidido — el error fue presentarlo como pendiente
 

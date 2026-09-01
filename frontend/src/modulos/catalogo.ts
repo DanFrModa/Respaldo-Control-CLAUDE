@@ -647,7 +647,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             clave: 'inventario-telas-entradas',
             titulo: 'Entradas de tela por factura',
             descripcion:
-              'Entrada SIN orden de compra: factura o remisión del proveedor con N partidas y su PDF',
+              'Factura o remisión del proveedor contra su orden de compra, con N partidas y su PDF',
             ruta: '/inventarios/telas/entradas',
             icono: 'paquete',
             permisos: ['inventario-telas.ver'],

@@ -39,8 +39,10 @@ export const ORIGEN = {
   /** Entrada de tela/avío por recepción de compra (F4-E3 — el `origenId` es la recepción/OC). */
   recepcionCompra: 'recepcion-compra',
   /**
-   * Entrada de TELA por FACTURA/REMISIÓN del proveedor, SIN orden de compra (B1 — la segunda vía de
-   * entrada que pidió Daniel, §Post-F9.9 punto 7). El `origenId` es el id del documento `EntradaTela`.
+   * Entrada de TELA por FACTURA/REMISIÓN del proveedor (B1), SIEMPRE contra sus órdenes de compra
+   * (§Post-F9.159(a) cerró la vía sin OC de §Post-F9.9 punto 7). El `origenId` es el id del
+   * documento `EntradaTela`. ⚠️ Los movimientos ya escritos con este origen antes de esa decisión
+   * pueden no tener OC detrás: son historia, y se leen igual (D3).
    */
   entradaTela: 'entrada-tela',
   /** Salida de avío por una nota de salida a maquilero (F4-E5 — el `origenId` es la nota). */

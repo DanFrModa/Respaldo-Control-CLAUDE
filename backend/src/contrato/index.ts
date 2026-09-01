@@ -1333,7 +1333,7 @@ export {
   type KardexAvioLista,
 } from './esquemas/inventario-material.js';
 
-// ── Entrada de tela por FACTURA/REMISIÓN sin OC (B1; DECISIONES §Post-F9.9 p.7) ──
+// ── Entrada de tela por FACTURA/REMISIÓN, siempre contra OC (B1; §Post-F9.159(a)) ──
 export {
   esquemaTipoDocumentoEntradaTela,
   esquemaEstatusEntradaTela,

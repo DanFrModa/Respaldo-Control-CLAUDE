@@ -403,3 +403,249 @@ describe('<CapturaRenglonesTelaColor> · V1-E8o: la tela sin colores DICE a dón
     expect(screen.queryByTestId('captura-color-sin-colores')).toBeNull();
   });
 });
+
+/**
+ * 🔴🔴 **§Post-F9.159(a) — NO SE RECIBE TELA SIN ORDEN DE COMPRA.** Daniel, textual: *«es
+ * imposible. Porque sin OC no podemos recibir tela. ¿De quién recibiríamos sin OC? No puede
+ * suceder»*. ⇒ **bloqueo, no aviso**: aquí el renglón suelto no se puede agregar.
+ *
+ * Y §Post-F9.144(d) pide que el callejón sea un DIAGNÓSTICO: no basta con apagar el botón, hay que
+ * decir **qué significa** — que lo que falta está ANTES, en la compra.
+ *
+ * ⚠️ Dónde va la frase, que es lo que se midió: **NO** en el letrero de «esta tela no tiene
+ * colores» (`captura-color-sin-colores`), que se enciende con `tela.colores.length === 0` — ahí no
+ * hay ningún color que contrastar contra ninguna OC y la frase sería FALSA. Va donde alguien
+ * intenta capturar un renglón que no viene de una orden: `captura-color-exige-oc`.
+ */
+describe('<CapturaRenglonesTelaColor> · §Post-F9.159(a): el renglón sin OC se BLOQUEA', () => {
+  it('🔴 con `exigirOrdenCompra`, un renglón capturado a mano NO se puede agregar', async () => {
+    const usuario = userEvent.setup();
+    const onChange = vi.fn();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={onChange}
+        conLoteProveedor
+        conPrecios
+        exigirOrdenCompra
+        lineasOc={[pendienteDeOc(11, 'Marino')]}
+      />,
+    );
+    // Todo lo demás está bien: tela, color y cantidad válidos. Lo único que falta es la OC.
+    await usuario.click(screen.getByTestId('sel-felpa'));
+    await usuario.selectOptions(screen.getByTestId('captura-color-color'), '11');
+    await usuario.type(screen.getByTestId('captura-color-cantidad'), '100');
+
+    expect(screen.getByTestId('captura-color-agregar')).toBeDisabled();
+    await usuario.click(screen.getByTestId('captura-color-agregar'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('⭐ y DICE QUÉ SIGNIFICA: que falta la compra, no que falte un campo', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        exigirOrdenCompra
+        lineasOc={[pendienteDeOc(11, 'Marino')]}
+      />,
+    );
+    await usuario.click(screen.getByTestId('sel-felpa'));
+
+    const aviso = screen.getByTestId('captura-color-exige-oc');
+    expect(aviso).toHaveTextContent('no se recibe tela que no se haya comprado');
+    // Con pendientes de OC, el camino existe: se dice CUÁL es.
+    expect(aviso).toHaveTextContent('Capturar');
+    // Y nunca nombra el campo del contrato: quien recibe no sabe qué es eso.
+    expect(aviso).not.toHaveTextContent('idOrdenCompraLinea');
+  });
+
+  it('⭐ SIN pendientes de OC el diagnóstico cambia: lo que falta es levantar la compra', async () => {
+    // `estadoPendientesOc="ninguno"` = **se preguntó y no había**. Es el ÚNICO estado que autoriza
+    // esta frase; la lista vacía por sí sola no dice nada del proveedor (ver la prueba de abajo).
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        exigirOrdenCompra
+        lineasOc={[]}
+        estadoPendientesOc="ninguno"
+      />,
+    );
+    await usuario.click(screen.getByTestId('sel-felpa'));
+
+    const aviso = screen.getByTestId('captura-color-exige-oc');
+    expect(aviso).toHaveTextContent('levantar');
+    expect(aviso).toHaveTextContent('orden de compra');
+    // Aquí NO se puede mandar a "Capturar" un pendiente: no hay ninguno. Decirlo sería mentir.
+    expect(aviso).not.toHaveTextContent('aquí arriba');
+  });
+
+  it('🔴 `ninguno-en-esta-oc`: habla de LA ORDEN, no del proveedor, y no manda a autorizar', async () => {
+    // El SEXTO camino: llegando desde una OC la consulta va ACOTADA a ella, así que su vacío no
+    // sostiene ninguna frase sobre el proveedor. Y el imperativo «levantar (o autorizar)» es
+    // imposible ahí: el botón «Dar entrada a la tela» sólo aparece en órdenes YA autorizadas.
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        exigirOrdenCompra
+        lineasOc={[]}
+        estadoPendientesOc="ninguno-en-esta-oc"
+      />,
+    );
+    await usuario.click(screen.getByTestId('sel-felpa'));
+
+    const aviso = screen.getByTestId('captura-color-exige-oc');
+    expect(aviso).toHaveTextContent('esta orden de compra ya no tiene tela pendiente de recibir');
+    // …y dice a dónde ir con una tela de OTRA orden, que es la salida que sí existe.
+    expect(aviso).toHaveTextContent('Nueva entrada');
+    // Las DOS mitades que eran falsas cuando este caso caía en `ninguno`.
+    expect(aviso).not.toHaveTextContent('este proveedor no tiene nada pendiente');
+    expect(aviso).not.toHaveTextContent('levantar');
+    // Tampoco puede mandar a «Capturar» un pendiente: aquí no hay ninguno que ofrecer.
+    expect(aviso).not.toHaveTextContent('aquí arriba');
+  });
+
+  it('⭐ y ANTES de haber preguntado NO afirma que no hay nada (sin proveedor)', async () => {
+    // 🔴 El defecto que esta prueba fija: sin proveedor todavía no se le ha preguntado a nadie, así
+    // que «este proveedor no tiene nada pendiente» sería FALSO. Y la frase evita el imperativo
+    // «elige el proveedor» a propósito: cuando el emisor del CFDI no está en el catálogo, la
+    // pantalla DESHABILITA ese selector — mandar a hacer algo imposible es el defecto hermano.
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor renglones={[]} onChange={vi.fn()} exigirOrdenCompra />,
+    );
+    await usuario.click(screen.getByTestId('sel-felpa'));
+
+    const aviso = screen.getByTestId('captura-color-exige-oc');
+    expect(aviso).toHaveTextContent('hasta que la entrada tenga proveedor no se sabe');
+    expect(aviso).not.toHaveTextContent('no tiene nada pendiente');
+  });
+
+  it('mientras la consulta va en camino tampoco concluye nada (`consultando`)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        exigirOrdenCompra
+        lineasOc={[]}
+        estadoPendientesOc="consultando"
+      />,
+    );
+    await usuario.click(screen.getByTestId('sel-felpa'));
+
+    const aviso = screen.getByTestId('captura-color-exige-oc');
+    expect(aviso).toHaveTextContent('Consultando');
+    expect(aviso).not.toHaveTextContent('no tiene nada pendiente');
+  });
+
+  it('🔴 lista OFRECIDA vacía + proveedor CON pendientes: no se le acusa de no haber comprado', async () => {
+    // El caso del camino del XML: ningún concepto cruzó (`lineasOc={[]}`) **pero la consulta dice
+    // que el proveedor sí tiene órdenes abiertas**. Antes, con los dos ejes colapsados, aquí salía
+    // «no tiene nada pendiente» y se mandaba a levantar una OC que YA EXISTE.
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        exigirOrdenCompra
+        lineasOc={[]}
+        estadoPendientesOc="hay"
+      />,
+    );
+    await usuario.click(screen.getByTestId('sel-felpa'));
+
+    const aviso = screen.getByTestId('captura-color-exige-oc');
+    expect(aviso).toHaveTextContent('SÍ tiene tela pendiente de recibir');
+    expect(aviso).toHaveTextContent('suelta la factura');
+    // 🔴 Lo que mata la mutación: NUNCA la frase que culpa a la compra.
+    expect(aviso).not.toHaveTextContent('no tiene nada pendiente');
+    expect(aviso).not.toHaveTextContent('levantar');
+  });
+
+  it('🔴 si la consulta FALLÓ, dice que NO SE SABE — no que no haya', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        exigirOrdenCompra
+        lineasOc={[]}
+        estadoPendientesOc="error"
+      />,
+    );
+    await usuario.click(screen.getByTestId('sel-felpa'));
+
+    const aviso = screen.getByTestId('captura-color-exige-oc');
+    expect(aviso).toHaveTextContent('no se pudo consultar');
+    expect(aviso).not.toHaveTextContent('no tiene nada pendiente');
+  });
+
+  it('pulsando «Capturar» en el pendiente de la OC, el renglón SÍ se agrega y lleva su liga', async () => {
+    const usuario = userEvent.setup();
+    const onChange = vi.fn();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={onChange}
+        conPrecios
+        exigirOrdenCompra
+        lineasOc={[pendienteDeOc(11, 'Marino')]}
+      />,
+    );
+    await usuario.click(screen.getByTestId('captura-color-capturar-oc-500'));
+    // La precarga trae tela, color, cantidad y precio de la orden.
+    expect(screen.queryByTestId('captura-color-exige-oc')).toBeNull();
+    expect(screen.getByTestId('captura-color-agregar')).toBeEnabled();
+
+    await usuario.click(screen.getByTestId('captura-color-agregar'));
+    expect(onChange).toHaveBeenCalledWith([
+      expect.objectContaining({ idTelaColor: 11, idOrdenCompraLinea: 500 }),
+    ]);
+  });
+
+  it('SIN `exigirOrdenCompra` (ajuste, traspaso, salida) nada cambia: se sigue capturando a mano', async () => {
+    // La rama gemela al revés: cerrar la recepción NO puede romper las otras pantallas, donde la
+    // orden de compra no pinta nada (un ajuste es una corrección, no una recepción).
+    const usuario = userEvent.setup();
+    const onChange = vi.fn();
+    renderConProveedores(<CapturaRenglonesTelaColor renglones={[]} onChange={onChange} />);
+    await usuario.click(screen.getByTestId('sel-felpa'));
+    await usuario.selectOptions(screen.getByTestId('captura-color-color'), '11');
+    await usuario.type(screen.getByTestId('captura-color-cantidad'), '10');
+
+    expect(screen.queryByTestId('captura-color-exige-oc')).toBeNull();
+    await usuario.click(screen.getByTestId('captura-color-agregar'));
+    expect(onChange).toHaveBeenCalledWith([expect.objectContaining({ idTelaColor: 11 })]);
+  });
+
+  it('el letrero de «tela sin colores» sólo AÑADE el diagnóstico donde es verdad', async () => {
+    const usuario = userEvent.setup();
+    // (a) En la RECEPCIÓN sí: ahí el color se da de alta en la OC (§Post-F9.144(d)).
+    const { unmount } = renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        exigirOrdenCompra
+        lineasOc={[]}
+        estadoPendientesOc="ninguno"
+      />,
+    );
+    await usuario.click(screen.getByTestId('sel-sin-colores'));
+    expect(screen.getByTestId('captura-color-sin-colores-diagnostico')).toHaveTextContent(
+      'orden de compra',
+    );
+    unmount();
+
+    // (b) En un ajuste o traspaso NO: no hay compra que verificar, así que afirmarlo sería falso.
+    renderConProveedores(<CapturaRenglonesTelaColor renglones={[]} onChange={vi.fn()} />);
+    await usuario.click(screen.getByTestId('sel-sin-colores'));
+    expect(screen.getByTestId('captura-color-sin-colores')).toBeInTheDocument();
+    expect(screen.queryByTestId('captura-color-sin-colores-diagnostico')).toBeNull();
+  });
+});

@@ -1,6 +1,12 @@
 /**
- * Tests de integración de la ENTRADA DE TELA por FACTURA/REMISIÓN sin orden de compra (etapa B1 —
- * Daniel §Post-F9.9 punto 7). Postgres efímero (testcontainers; NO corre en local — lo corre CI).
+ * Tests de integración de la ENTRADA DE TELA por FACTURA/REMISIÓN del proveedor (etapa B1).
+ * Postgres efímero (testcontainers; NO corre en local — lo corre CI).
+ *
+ * 🔴 **§Post-F9.159(a): NO SE RECIBE TELA SIN OC.** Por eso TODA entrada de este archivo nace
+ * contra una orden de compra autorizada (el fixture `ocDeTelasAutorizada` del `beforeEach`): el
+ * renglón suelto ya no es un caso válido, es el caso RECHAZADO —y tiene su propio bloque de
+ * pruebas al final, en positivo y en negativo, por las tres puertas de escritura.
+ *
  * Cubre lo que sólo la base valida:
  *  (a) folio del DOCUMENTO por secuencia atómica por empresa (A3) y aislamiento por empresa (A9);
  *  (b) el borrador NO toca el inventario; CONFIRMAR crea UNA partida por renglón + UN movimiento
@@ -62,6 +68,16 @@ const PERM: ClavePermiso[] = [
   'inventario-telas.mover',
   'telas.ver-totales',
 ];
+/** El fixture de cada prueba levanta y autoriza la OC contra la que se recibe (§Post-F9.159(a)). */
+const PERM_COMPRAS: ClavePermiso[] = [
+  ...PERM,
+  'compras.ver',
+  'compras.administrar',
+  'compras.autorizar',
+];
+/** Renglones de esa OC: uno por tela. Se rellenan en el `beforeEach`. */
+let lineaOcFelpa: number;
+let lineaOcLisa: number;
 const sesion = (permisos: ClavePermiso[] = PERM, idEmpresaActiva?: number) =>
   sesionDePrueba({ idEmpresaActiva: idEmpresaActiva ?? empresa.id, permisos });
 const bd = () => ({ cliente });
@@ -106,7 +122,52 @@ beforeEach(async () => {
       { codigo: 'ajuste-salida', nombre: 'Ajuste (Salida)', direccion: 'salida' },
     ],
   });
+  ({ felpa: lineaOcFelpa, lisa: lineaOcLisa } = await ocDeTelasAutorizada());
 });
+
+/**
+ * LA ORDEN DE COMPRA contra la que reciben todas las pruebas (§Post-F9.159(a)): una sola, autorizada,
+ * del proveedor base, con un renglón por tela.
+ *
+ * Dos decisiones deliberadas del fixture, para que no cambie lo que cada prueba mide:
+ *  • **Cantidades enormes** (100,000): así ninguna entrada la deja en `recibida_total` y la orden
+ *    sigue siendo recibible por la siguiente (`ESTATUS_RECIBIBLES` = autorizada | recibida_parcial).
+ *    Varias pruebas confirman DOS entradas contra la misma orden.
+ *  • **Renglones SIN color**: el cruce de color de §Post-F9.89 solo aplica cuando la OC lo dice, y
+ *    aquí se recibe marino, blanco y negro contra la misma orden.
+ */
+async function ocDeTelasAutorizada(
+  idEmpresaActiva?: number,
+): Promise<{ felpa: number; lisa: number }> {
+  const sesionCompras = sesion(PERM_COMPRAS, idEmpresaActiva);
+  const oc = await crearOC(
+    sesionCompras,
+    {
+      fechaEntrega: '2026-09-30',
+      idDireccionEntrega: direccionEntrega.id,
+      idProveedor: proveedor.id,
+      lineas: [
+        // La felpa lleva Cardigan: §Post-F9.18 exige su cantidad en el mismo renglón.
+        {
+          idTela: telaFelpa.id,
+          cantidad: 100_000,
+          precio: 12,
+          unidad: 'kg',
+          cantidadComplemento: 5_000,
+        },
+        { idTela: telaLisa.id, cantidad: 100_000, precio: 8, unidad: 'm' },
+      ],
+    },
+    bd(),
+  );
+  await autorizarOC(sesionCompras, oc.id, bd());
+  const felpa = oc.lineas.find((l) => l.idTela === telaFelpa.id)?.id;
+  const lisa = oc.lineas.find((l) => l.idTela === telaLisa.id)?.id;
+  if (felpa === undefined || lisa === undefined) {
+    throw new Error('Fixture roto: la OC no devolvió sus renglones de tela.');
+  }
+  return { felpa, lisa };
+}
 
 /** Existencia (cuerpo + complemento) de un color en el almacén (Σ movimientos directa, D3). */
 async function existencia(idTelaColor: number): Promise<{ cuerpo: number; complemento: number }> {
@@ -138,6 +199,7 @@ async function capturarSimple(
           cantidad,
           precioUnit,
           loteProveedor: 'L-77',
+          idOrdenCompraLinea: lineaOcFelpa,
           ...(complemento === undefined
             ? {}
             : {
@@ -160,8 +222,10 @@ describe('Entrada de tela (B1) — captura en borrador y folio atómico (A3/A9)'
     expect(primera.estatus).toBe('borrador');
     expect(primera.idMovimiento).toBeNull();
 
-    // OTRA empresa: su numeración es independiente (A3/A9).
+    // OTRA empresa: su numeración es independiente (A3/A9) — y su PROPIA orden de compra, porque
+    // desde §Post-F9.159(a) no hay entrada sin OC.
     const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa');
+    const ocDeOtra = await ocDeTelasAutorizada(otra.id);
     const deOtra = await crearEntradaTela(
       sesion(PERM, otra.id),
       {
@@ -170,7 +234,7 @@ describe('Entrada de tela (B1) — captura en borrador y folio atómico (A3/A9)'
         idProveedor: proveedor.id,
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: colorMarino.id, cantidad: 5 }],
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 5, idOrdenCompraLinea: ocDeOtra.felpa }],
       },
       bd(),
     );
@@ -199,7 +263,14 @@ describe('Entrada de tela (B1) — captura en borrador y folio atómico (A3/A9)'
           idProveedor: proveedor.id,
           fecha: '2026-08-06',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor: colorNegroLisa.id, cantidad: 10, cantidadComplemento: 3 }],
+          lineas: [
+            {
+              idTelaColor: colorNegroLisa.id,
+              cantidad: 10,
+              cantidadComplemento: 3,
+              idOrdenCompraLinea: lineaOcLisa,
+            },
+          ],
         },
         bd(),
       ),
@@ -220,7 +291,7 @@ describe('Entrada de tela (B1) — captura en borrador y folio atómico (A3/A9)'
           idProveedor: proveedor.id,
           fecha: '2026-08-06',
           idAlmacen: inactivo.id,
-          lineas: [{ idTelaColor: colorMarino.id, cantidad: 10 }],
+          lineas: [{ idTelaColor: colorMarino.id, cantidad: 10, idOrdenCompraLinea: lineaOcFelpa }],
         },
         bd(),
       ),
@@ -239,8 +310,13 @@ describe('Entrada de tela (B1) — captura en borrador y folio atómico (A3/A9)'
         fecha: '2026-08-07',
         idAlmacen: almacen.id,
         lineas: [
-          { idTelaColor: colorMarino.id, cantidad: 40 },
-          { idTelaColor: colorBlanco.id, cantidad: 60, cantidadComplemento: 10 },
+          { idTelaColor: colorMarino.id, cantidad: 40, idOrdenCompraLinea: lineaOcFelpa },
+          {
+            idTelaColor: colorBlanco.id,
+            cantidad: 60,
+            cantidadComplemento: 10,
+            idOrdenCompraLinea: lineaOcFelpa,
+          },
         ],
       },
       bd(),
@@ -274,8 +350,15 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
             precioUnit: 90,
             precioUnitComplemento: 120,
             loteProveedor: 'L-A',
+            idOrdenCompraLinea: lineaOcFelpa,
           },
-          { idTelaColor: colorBlanco.id, cantidad: 100, precioUnit: 85, loteProveedor: 'L-B' },
+          {
+            idTelaColor: colorBlanco.id,
+            cantidad: 100,
+            precioUnit: 85,
+            loteProveedor: 'L-B',
+            idOrdenCompraLinea: lineaOcFelpa,
+          },
         ],
       },
       bd(),
@@ -323,8 +406,18 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
         lineas: [
-          { idTelaColor: colorMarino.id, cantidad: 50, loteProveedor: 'L-1' },
-          { idTelaColor: colorMarino.id, cantidad: 70, loteProveedor: 'L-2' },
+          {
+            idTelaColor: colorMarino.id,
+            cantidad: 50,
+            loteProveedor: 'L-1',
+            idOrdenCompraLinea: lineaOcFelpa,
+          },
+          {
+            idTelaColor: colorMarino.id,
+            cantidad: 70,
+            loteProveedor: 'L-2',
+            idOrdenCompraLinea: lineaOcFelpa,
+          },
         ],
       },
       bd(),
@@ -352,6 +445,7 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
             cantidad: 0,
             cantidadComplemento: 25,
             precioUnitComplemento: 150,
+            idOrdenCompraLinea: lineaOcFelpa,
           },
         ],
       },
@@ -383,6 +477,7 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
             cantidadComplemento: 20,
             precioUnit: 90,
             precioUnitComplemento: 130,
+            idOrdenCompraLinea: lineaOcFelpa,
           },
         ],
       },
@@ -414,7 +509,7 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
           idProveedor: proveedor.id,
           fecha: '2026-08-06',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor: colorMarino.id, cantidad: 1 }],
+          lineas: [{ idTelaColor: colorMarino.id, cantidad: 1, idOrdenCompraLinea: lineaOcFelpa }],
         },
         bd(),
       ),
@@ -442,7 +537,7 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
           idProveedor: proveedor.id,
           fecha: '2026-08-06',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor: colorMarino.id, cantidad: 1 }],
+          lineas: [{ idTelaColor: colorMarino.id, cantidad: 1, idOrdenCompraLinea: lineaOcFelpa }],
         },
         bd(),
       ),
@@ -463,7 +558,7 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
           idProveedor: proveedor.id,
           fecha: '2026-08-06',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor: colorMarino.id, cantidad: 1 }],
+          lineas: [{ idTelaColor: colorMarino.id, cantidad: 1, idOrdenCompraLinea: lineaOcFelpa }],
         },
         bd(),
       ),
@@ -509,7 +604,7 @@ describe('Entrada de tela (B1) — aviso SUAVE de factura repetida (no bloquea)'
         idProveedor: otroProveedor.id,
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: colorMarino.id, cantidad: 5 }],
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 5, idOrdenCompraLinea: lineaOcFelpa }],
       },
       bd(),
     );
@@ -577,7 +672,7 @@ describe('Entrada de tela (B1) — listado: filtros, búsqueda y paginación (A9
         idProveedor: proveedor.id,
         fecha: '2026-08-08',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: colorBlanco.id, cantidad: 15 }],
+        lineas: [{ idTelaColor: colorBlanco.id, cantidad: 15, idOrdenCompraLinea: lineaOcFelpa }],
       },
       bd(),
     );
@@ -608,6 +703,11 @@ describe('Entrada de tela (B1) — listado: filtros, búsqueda y paginación (A9
   it('el listado sólo ve las entradas de la empresa activa (A9)', async () => {
     await capturarSimple();
     const otra = await crearEmpresaPrueba(cliente, 'Empresa Dos');
+    // Su PROPIA orden de compra: la de la empresa A no la surte (A9). Ojo — hoy el CAPTURAR no
+    // verifica de qué empresa es el renglón de OC (eso lo hace `registrarRecepcionesDesdeEntradaTela`
+    // al CONFIRMAR); aun así el fixture usa la correcta, para no dejar escrita una combinación que
+    // el confirmar rechazaría.
+    const ocDeOtra = await ocDeTelasAutorizada(otra.id);
     await crearEntradaTela(
       sesion(PERM, otra.id),
       {
@@ -616,7 +716,9 @@ describe('Entrada de tela (B1) — listado: filtros, búsqueda y paginación (A9
         idProveedor: proveedor.id,
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: colorNegroLisa.id, cantidad: 3 }],
+        lineas: [
+          { idTelaColor: colorNegroLisa.id, cantidad: 3, idOrdenCompraLinea: ocDeOtra.lisa },
+        ],
       },
       bd(),
     );
@@ -636,14 +738,108 @@ describe('Entrada de tela (B1) — listado: filtros, búsqueda y paginación (A9
   });
 });
 
-describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', () => {
-  const PERM_COMPRAS: ClavePermiso[] = [
-    ...PERM,
-    'compras.ver',
-    'compras.administrar',
-    'compras.autorizar',
-  ];
+describe('Entrada de tela (§Post-F9.159(a)) — 🔴 NO SE RECIBE TELA SIN ORDEN DE COMPRA', () => {
+  /**
+   * Fabrica el caso que de verdad importa: un BORRADOR VIEJO, de los capturados cuando la vía "sin
+   * OC" era válida. No se puede crear por la puerta (el contrato y el dominio lo rechazan), así que
+   * se le quita la liga POR DEBAJO, escribiendo directo en la tabla — que es exactamente lo que hay
+   * hoy en `prueba`.
+   *
+   * ⚠️ Esto NO es reparar datos viejos (REGLA 0-B lo prohíbe): es RECREARLOS para probar que la
+   * puerta de escritura los frena y que las de lectura los siguen mostrando.
+   */
+  async function borradorHeredadoSinOc() {
+    const entrada = await capturarSimple(100);
+    await cliente.entradaTelaLinea.updateMany({
+      where: { idEntradaTela: entrada.id },
+      data: { idOrdenCompraLinea: null },
+    });
+    return entrada;
+  }
 
+  it('CAPTURAR un renglón sin orden de compra se rechaza, y no deja documento a medias', async () => {
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'remision',
+          numeroDocumento: 'R-SIN-OC',
+          idProveedor: proveedor.id,
+          fecha: '2026-08-06',
+          idAlmacen: almacen.id,
+          // Así se capturaba hasta §Post-F9.159(a): "tela suelta", sin decir de qué compra viene.
+          lineas: [{ idTelaColor: colorMarino.id, cantidad: 50 }],
+        } as unknown as Parameters<typeof crearEntradaTela>[1],
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    expect(await cliente.entradaTela.count()).toBe(0);
+  });
+
+  it('EDITAR un borrador quitándole la orden de compra también se rechaza (la rama gemela)', async () => {
+    const entrada = await capturarSimple(100);
+    await expect(
+      actualizarEntradaTela(
+        sesion(),
+        entrada.id,
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A-1001',
+          idProveedor: proveedor.id,
+          fecha: '2026-08-06',
+          idAlmacen: almacen.id,
+          lineas: [{ idTelaColor: colorMarino.id, cantidad: 100 }],
+        } as unknown as Parameters<typeof actualizarEntradaTela>[2],
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    // El borrador se quedó como estaba: la edición es todo-o-nada (A2).
+    const vigente = await obtenerEntradaTela(sesion(), entrada.id, bd());
+    expect(vigente.lineas[0]?.idOrdenCompraLinea).toBe(lineaOcFelpa);
+  });
+
+  it('⭐ CONFIRMAR un borrador VIEJO con renglones sueltos se rechaza: no entra por la puerta de atrás', async () => {
+    const entrada = await borradorHeredadoSinOc();
+
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
+      /no se haya comprado/,
+    );
+
+    // Y NADA se movió: ni partida, ni kardex, ni existencia. El documento sigue en borrador.
+    expect(await cliente.partidaTela.count()).toBe(0);
+    expect(await cliente.movimiento.count()).toBe(0);
+    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 0, complemento: 0 });
+    expect((await obtenerEntradaTela(sesion(), entrada.id, bd())).estatus).toBe('borrador');
+  });
+
+  it('⭐ LEER NO SE ROMPE (D3): el documento viejo se sigue listando y consultando', async () => {
+    const entrada = await borradorHeredadoSinOc();
+
+    // Se consulta por id…
+    const leida = await obtenerEntradaTela(sesion(), entrada.id, bd());
+    expect(leida.lineas).toHaveLength(1);
+    expect(leida.lineas[0]?.idOrdenCompraLinea).toBeNull();
+    expect(leida.lineas[0]?.numCompra).toBeNull();
+    expect(leida.totalCuerpo).toBe(100);
+
+    // …y aparece en el listado, como cualquier otra.
+    const pagina = await listarEntradasTela(sesion(), {}, bd());
+    expect(pagina.datos.map((e) => e.id)).toContain(entrada.id);
+  });
+
+  it('y se puede CANCELAR (la única salida que le queda a un borrador heredado)', async () => {
+    const entrada = await borradorHeredadoSinOc();
+    const cancelada = await cancelarEntradaTela(
+      sesion(),
+      entrada.id,
+      { motivo: 'Se capturó sin orden de compra' },
+      bd(),
+    );
+    expect(cancelada.estatus).toBe('cancelada');
+  });
+});
+
+describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', () => {
   /** OC autorizada del proveedor base con una línea de la felpa. */
   async function ocFelpaAutorizada(cantidad = 100, precio = 12) {
     const oc = await crearOC(
@@ -861,8 +1057,16 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
             cantidadComplemento: 5,
             idOrdenCompraLinea: ocB.lineas[0]!.id,
           },
-          // …y un tercer renglón SIN orden de compra: tela suelta en la misma factura.
-          { idTelaColor: colorBlanco.id, cantidad: 5, precioUnit: 12 },
+          // …y un TERCER renglón contra la MISMA OC que el segundo: dos lotes del mismo color en
+          // una factura son dos partidas (§Post-F9.11 p.4). Antes este renglón iba SIN orden de
+          // compra ("tela suelta"), y §Post-F9.159(a) cerró esa vía: lo que se prueba ahora es que
+          // dos renglones de la misma OC siguen agrupándose en UNA sola recepción.
+          {
+            idTelaColor: colorBlanco.id,
+            cantidad: 5,
+            precioUnit: 12,
+            idOrdenCompraLinea: ocB.lineas[0]!.id,
+          },
         ],
       },
       bd(),
@@ -878,8 +1082,13 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
         'recibida_total',
       );
     }
-    // El renglón suelto entró al inventario igual, sin recepción que lo respalde.
+    // Los dos renglones del blanco entraron al inventario (50 + 5), bajo la MISMA recepción de ocB.
     expect(await existencia(colorBlanco.id)).toEqual({ cuerpo: 55, complemento: 5 });
+    expect(
+      await cliente.recepcionCompraLinea.count({
+        where: { idOrdenCompraLinea: ocB.lineas[0]!.id },
+      }),
+    ).toBe(2);
   });
 
   it('cancelar la factura reversa la recepción y la OC vuelve a quedar pendiente', async () => {
@@ -979,13 +1188,6 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
  * irrecibible** — en silencio, porque nada más se entera. Por eso las dos se prueban aquí.
  */
 describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden de compra', () => {
-  const PERM_COMPRAS: ClavePermiso[] = [
-    ...PERM,
-    'compras.ver',
-    'compras.administrar',
-    'compras.autorizar',
-  ];
-
   /**
    * OC autorizada de la felpa. `idTelaColor` en `null` reproduce **exactamente** el renglón anterior
    * a la etapa (y el de las OC migradas): la OC pide "felpa", sin decir de qué color.

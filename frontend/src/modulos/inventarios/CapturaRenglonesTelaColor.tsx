@@ -59,6 +59,84 @@ export interface LineaOcPendiente {
 }
 
 /**
+ * 🔴 **§Post-F9.159(a) — EL SEGUNDO EJE: qué tiene pendiente de recibir el PROVEEDOR.**
+ *
+ * Es información **distinta** de `lineasOc` (lo que esta pantalla ofrece capturar ahora mismo), y
+ * confundirlas fue un defecto real de la primera versión de esta etapa: por el camino del XML
+ * (§Post-F9.20) `lineasOc` sale de los conceptos de la factura que CRUZARON, así que puede venir
+ * vacía **mientras el proveedor sí tiene órdenes abiertas** — y la pantalla acusaba de no haber
+ * comprado a quien sí había comprado, mandándolo a levantar una OC que ya existía.
+ *
+ * Por eso el estado de la CONSULTA viaja aparte y con sus valores: `sin-proveedor` (todavía no hay
+ * a quién preguntarle) · `consultando` · `error` (se preguntó y NO se sabe) · `ninguno` (se
+ * preguntó por TODO el proveedor y de verdad no hay) · `ninguno-en-esta-oc` (se preguntó SÓLO por
+ * una orden y esa no tiene nada) · `hay`.
+ *
+ * 🔴 **Y el sexto valor existe por el ALCANCE, no por el estatus** (segundo hallazgo del reviewer):
+ * los cinco primeros agotaban en qué situación quedó la CONSULTA —respondió, falló, va en camino—,
+ * pero no POR QUÉ SE PREGUNTÓ. Llegando desde una orden de compra (deep-link) la consulta va
+ * ACOTADA a ESA orden, así que una respuesta vacía significa «esta orden no tiene nada pendiente»
+ * y **no** «este proveedor no tiene nada»: leerla como `ninguno` mandaba a levantar una OC estando
+ * parado dentro de una OC que ya existe y ya está autorizada.
+ *
+ * **Sólo `ninguno` autoriza a decir "este proveedor no tiene nada pendiente"**, y sólo lo produce
+ * la consulta SIN acotar. `hay` sí sobrevive al acotamiento (si esa orden tiene pendiente, el
+ * proveedor también: es un subconjunto), y `error`/`consultando`/`sin-proveedor` no afirman nada.
+ */
+export type EstadoPendientesOc =
+  | 'sin-proveedor'
+  | 'consultando'
+  | 'error'
+  | 'ninguno'
+  | 'ninguno-en-esta-oc'
+  | 'hay';
+
+/**
+ * 🔴 **LA FRASE QUE SIGUE AL BLOQUEO, cada una atada a SU disparador.** Se decide con los DOS ejes
+ * —lo que hay ofrecido aquí y lo que el proveedor tiene pendiente— porque colapsarlos en uno es lo
+ * que hacía que la pantalla acusara de no haber comprado a quien sí había comprado.
+ *
+ * ⚠️ Ninguna rama afirma más de lo que su entrada sostiene: «este proveedor no tiene nada
+ * pendiente» **sólo** con `'ninguno'` (se preguntó por TODO el proveedor y venía vacía); con
+ * `'ninguno-en-esta-oc'` la respuesta vacía sólo cubre UNA orden, así que la frase habla de esa
+ * orden y de nada más; con `'error'` se dice que NO se sabe, que es lo único honesto; y sin
+ * proveedor no se le atribuye nada a nadie.
+ */
+function textoDeLaSalida(hayOfrecidos: boolean, estado: EstadoPendientesOc): string {
+  if (hayOfrecidos) {
+    return 'Captúralo con «Capturar» desde su renglón pendiente, aquí arriba.';
+  }
+  switch (estado) {
+    case 'hay':
+      // Hay compras abiertas pero aquí no se está ofreciendo ninguna: pasa por el camino del XML
+      // cuando ningún concepto de la factura cruzó. Lo que NO se puede es culpar a la compra.
+      return (
+        'Este proveedor SÍ tiene tela pendiente de recibir en sus órdenes de compra, pero aquí no ' +
+        'se está ofreciendo ninguno de esos renglones: suelta la factura leída y captura desde lo ' +
+        'que tenga pendiente.'
+      );
+    case 'ninguno':
+      return 'Y este proveedor no tiene nada pendiente de recibir: lo que falta es levantar (o autorizar) su orden de compra.';
+    case 'ninguno-en-esta-oc':
+      // 🔴 La consulta iba ACOTADA a la orden desde la que se entró, así que aquí NO se puede
+      // hablar del proveedor (no se le preguntó por él) ni mandar a «levantar o autorizar»: a esta
+      // pantalla se llega desde el botón «Dar entrada a la tela», que SÓLO aparece en órdenes ya
+      // autorizadas — sería mandar a hacer lo que ya está hecho.
+      return (
+        'Y esta orden de compra ya no tiene tela pendiente de recibir (aquí sólo se preguntó por ' +
+        'ella, no por todo el proveedor). Si la tela que llegó es de OTRA orden, captúrala desde ' +
+        '«Entradas de tela por factura › Nueva entrada», eligiendo el proveedor.'
+      );
+    case 'error':
+      return 'Y no se pudo consultar lo que este proveedor tiene pendiente de recibir: vuelve a cargar la pantalla antes de dar nada por hecho.';
+    case 'consultando':
+      return 'Consultando lo que este proveedor tiene pendiente de recibir…';
+    case 'sin-proveedor':
+      return 'Todavía no hay órdenes de compra que ofrecer aquí: hasta que la entrada tenga proveedor no se sabe qué tiene pendiente de recibir.';
+  }
+}
+
+/**
  * CAPTURA DE RENGLONES por TELA+COLOR (inventario NUEVO, etapa A2): el usuario elige la tela
  * (typeahead server-side), luego UNO de SUS colores (hijos de la tela, §Post-F9.11) y las DOS
  * cantidades — cuerpo y complemento — que viajan JUNTAS en el mismo renglón (Daniel: el
@@ -68,10 +146,16 @@ export interface LineaOcPendiente {
  * unitarios — prellenados con los del catálogo del color como SUGERENCIA (la fuente de verdad del
  * costo es lo que se captura aquí, D1). Presentación pura (A1): el backend valida.
  *
- * Con `lineasOc` (entrada por factura, §Post-F9.14) cada renglón puede además AMARRARSE a su
- * renglón de orden de compra: el selector solo ofrece los renglones pendientes de la MISMA tela que
- * se está capturando —así no se puede ligar felpa contra una OC de mesh— y deja elegir "sin orden
- * de compra" para la tela suelta.
+ * Con `lineasOc` (entrada por factura, §Post-F9.14) cada renglón se AMARRA a su renglón de orden
+ * de compra pulsando **Capturar** en el panel "Pendiente de la orden de compra": la tela, el color,
+ * la cantidad y el precio salen de la orden. (Aquí decía que además "deja elegir «sin orden de
+ * compra» para la tela suelta" — eso **nunca fue cierto en este componente**, que ya sólo amarra
+ * por ese botón, y desde §Post-F9.159(a) además está PROHIBIDO.)
+ *
+ * 🔴 Con `exigirOrdenCompra` (§Post-F9.159(a), Daniel: *«sin OC no podemos recibir tela. ¿De quién
+ * recibiríamos sin OC?»*) el renglón suelto **no se puede agregar**: el botón se apaga y la
+ * pantalla explica QUÉ SIGNIFICA —que falta la compra—, en vez de dejar mandar al servidor algo que
+ * va a rechazar. Es el "callejón convertido en diagnóstico" de §Post-F9.144(d).
  */
 export function CapturaRenglonesTelaColor({
   renglones,
@@ -81,6 +165,8 @@ export function CapturaRenglonesTelaColor({
   conPrecios = false,
   lineasOc,
   idProveedorTelas,
+  exigirOrdenCompra = false,
+  estadoPendientesOc = 'sin-proveedor',
 }: {
   renglones: RenglonTelaColor[];
   onChange: (renglones: RenglonTelaColor[]) => void;
@@ -93,11 +179,25 @@ export function CapturaRenglonesTelaColor({
    * esta pantalla no liga a órdenes de compra (ajuste, traspaso, salida). Con un arreglo se pinta el
    * panel "Pendiente de la orden de compra": cada renglón trae su botón **Capturar**, que precarga
    * la tela, la cantidad que falta y el precio de la OC — así la liga NO se teclea ni se busca en un
-   * combo, sale de la orden. Sigue siendo posible agregar un renglón a mano (tela suelta).
+   * combo, sale de la orden. 🔴 Con `exigirOrdenCompra` (§Post-F9.159(a)) ése es el ÚNICO camino:
+   * el renglón "a mano", sin orden, dejó de poder agregarse.
    */
-  lineasOc?: readonly LineaOcPendiente[];
+  lineasOc?: readonly LineaOcPendiente[] | undefined;
   /** Acota las telas del buscador al proveedor DUEÑO (§Post-F9.15). */
   idProveedorTelas?: number | undefined;
+  /**
+   * 🔴 §Post-F9.159(a) — esta pantalla RECIBE tela de un proveedor, así que **ningún renglón puede
+   * ir sin su orden de compra**. La pone en `true` la captura de la entrada de tela; las demás
+   * (ajuste, traspaso, salida) la dejan en `false` porque ahí la OC no pinta nada: un ajuste es una
+   * corrección, no una recepción.
+   */
+  exigirOrdenCompra?: boolean;
+  /**
+   * Qué tiene pendiente de recibir el PROVEEDOR, según la consulta de la página — **no** según lo
+   * que esta pantalla esté ofreciendo. Sólo se lee cuando `exigirOrdenCompra`; ver
+   * {@link EstadoPendientesOc} para por qué son dos ejes y no uno.
+   */
+  estadoPendientesOc?: EstadoPendientesOc;
 }): React.JSX.Element {
   const [tela, setTela] = useState<Tela | undefined>(undefined);
   const [idTelaColor, setIdTelaColor] = useState<string>('');
@@ -114,6 +214,18 @@ export function CapturaRenglonesTelaColor({
    */
   const [pendientePrecargando, setPendientePrecargando] = useState<LineaOcPendiente | null>(null);
   const telaPrecargada = useTela(pendientePrecargando?.idTela);
+
+  /**
+   * 🔴 §Post-F9.159(a) — el renglón que se está armando NO viene de ninguna orden de compra. En la
+   * entrada de tela eso lo vuelve incapturable (`exigirOrdenCompra`); en ajustes y traspasos, ni
+   * siquiera aplica. `idLineaOc` sólo se llena pulsando **Capturar** en un pendiente de la OC.
+   */
+  const renglonSinOrdenDeCompra = exigirOrdenCompra && idLineaOc === '';
+  /**
+   * ¿Hay algo que capturar AQUÍ, ahora mismo? Es el eje de "lo ofrecido", y NO dice nada sobre lo
+   * que el proveedor tiene pendiente: eso lo dice `estadoPendientesOc`, que llega aparte.
+   */
+  const hayOfrecidos = lineasOc !== undefined && lineasOc.length > 0;
 
   const llevaComplemento = tela !== undefined && tela.nombreComplemento !== null;
   const colorElegido = tela?.colores.find((c) => String(c.id) === idTelaColor);
@@ -184,6 +296,9 @@ export function CapturaRenglonesTelaColor({
 
   function agregar(): void {
     if (tela === undefined || colorElegido === undefined || !cantidadesValidas) return;
+    // §Post-F9.159(a): el botón ya está apagado en este caso; esto es el cinturón, para que un
+    // Enter o un cambio futuro del `disabled` no cuele un renglón que el servidor va a rechazar.
+    if (renglonSinOrdenDeCompra) return;
     const precioCuerpoNum = precioUnit === '' ? undefined : Number(precioUnit);
     const precioComplNum = precioComplemento === '' ? undefined : Number(precioComplemento);
     const nuevo: RenglonTelaColor = {
@@ -364,6 +479,18 @@ export function CapturaRenglonesTelaColor({
                   «{tela.nombre}» no tiene colores capturados, así que no se puede recibir por
                   color. Dalos de alta en <b>Catálogos › Telas</b> y vuelve — o, si tú compras, en
                   el renglón de la explosión con «＋ Nuevo color…».
+                  {/* §Post-F9.144(d) — el letrero de arriba dice A DÓNDE IR; esta frase dice QUÉ
+                      SIGNIFICA, y sólo se pinta DONDE ES VERDAD: en la pantalla que recibe contra
+                      una OC. En un ajuste o un traspaso no hay compra que verificar, así que
+                      afirmarlo ahí sería mentira. */}
+                  {exigirOrdenCompra ? (
+                    <span data-testid="captura-color-sin-colores-diagnostico">
+                      {' '}
+                      Y si venías a <b>recibirla</b>: el color se da de alta en la orden de compra,
+                      así que verifica que esa compra exista — no debería llegar material que no se
+                      haya comprado.
+                    </span>
+                  ) : null}
                 </p>
               ) : null}
             </Field>
@@ -456,11 +583,32 @@ export function CapturaRenglonesTelaColor({
             renglón (solo {tela.nombreComplemento} = {tela.nombreCuerpo ?? 'cuerpo'} en 0).
           </p>
         ) : null}
+        {/* ⭐⭐ §Post-F9.159(a) — **EL CALLEJÓN CONVERTIDO EN DIAGNÓSTICO**, en el único sitio
+            donde la frase es CIERTA: aquí es donde alguien intentaría capturar un renglón que no
+            viene de ninguna orden de compra.
+            🔴 Ojo con dónde NO va: el letrero de «esta tela no tiene colores» se enciende con
+            `tela.colores.length === 0`, o sea cuando NO HAY NINGÚN COLOR que contrastar contra
+            ninguna OC — poner ahí «este color no viene de ninguna OC» sería afirmar lo que su
+            disparador no sostiene.
+            Las dos redacciones se reparten por su propio disparador: si hay pendientes de OC, lo
+            que falta es capturar desde ellos; si no hay ninguno, lo que falta es la COMPRA. */}
+        {renglonSinOrdenDeCompra ? (
+          <p className="text-xs text-warn" data-testid="captura-color-exige-oc">
+            Este renglón no viene de ninguna orden de compra, y así no se puede recibir:{' '}
+            <b>no se recibe tela que no se haya comprado</b>.{' '}
+            {textoDeLaSalida(hayOfrecidos, estadoPendientesOc)}
+          </p>
+        ) : null}
         <Button
           type="button"
           variant="secondary"
           onClick={agregar}
-          disabled={soloLectura || colorElegido === undefined || !cantidadesValidas}
+          disabled={
+            soloLectura ||
+            colorElegido === undefined ||
+            !cantidadesValidas ||
+            renglonSinOrdenDeCompra
+          }
           data-testid="captura-color-agregar"
         >
           <Plus className="mr-1.5 size-4" aria-hidden /> Agregar
@@ -483,7 +631,9 @@ export function CapturaRenglonesTelaColor({
                   <TableHead className="text-right">Complemento</TableHead>
                 ) : null}
                 {conLoteProveedor ? <TableHead>Lote prov.</TableHead> : null}
-                {lineasOc !== undefined ? <TableHead>Orden de compra</TableHead> : null}
+                {lineasOc !== undefined || exigirOrdenCompra ? (
+                  <TableHead>Orden de compra</TableHead>
+                ) : null}
                 {conPrecios ? <TableHead className="text-right">Precio</TableHead> : null}
                 <TableHead />
               </TableRow>
@@ -510,12 +660,12 @@ export function CapturaRenglonesTelaColor({
                       {r.loteProveedor ?? '—'}
                     </TableCell>
                   ) : null}
-                  {lineasOc !== undefined ? (
+                  {lineasOc !== undefined || exigirOrdenCompra ? (
                     <TableCell className="text-xs text-muted-foreground">
                       {r.idOrdenCompraLinea === undefined
                         ? '—'
                         : `OC ${String(
-                            lineasOc.find((l) => l.idOrdenCompraLinea === r.idOrdenCompraLinea)
+                            lineasOc?.find((l) => l.idOrdenCompraLinea === r.idOrdenCompraLinea)
                               ?.numCompra ?? '',
                           )}`}
                     </TableCell>

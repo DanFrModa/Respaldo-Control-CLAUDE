@@ -71,6 +71,48 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.080 · 1-sep-2026 · **en prueba** — ⭐ **Ya no se puede recibir tela que nadie compró**
+
+### Qué se puede hacer ahora que antes no
+
+**Es al revés: ahora hay algo que YA NO se puede hacer, y es a propósito.** Tú lo dijiste:
+
+> *«es imposible. Porque sin OC no podemos recibir tela. **¿De quién recibiríamos sin OC? No puede
+> suceder.**»*
+
+Hasta hoy el sistema **sí** dejaba: se podía capturar una factura de tela y meter renglones **sin ninguna
+orden de compra detrás**. Ya no. Cada renglón tiene que apuntar a su renglón de orden de compra, y el
+sistema **lo impide** — no lo advierte.
+
+**La factura sigue existiendo como documento.** Su número, su proveedor, su fecha, su almacén y su PDF
+adjunto no se tocan: lo que se cerró es meter tela que nadie compró, no registrar lo que el proveedor
+mandó.
+
+### Qué cambió y puede sorprender
+
+- **Al entrar por «Nueva entrada de tela» ahora se abre solo el panel de pendientes** del proveedor que
+  elijas. Antes había que llegar desde una orden o leyendo un XML; sin eso, la pantalla se habría quedado
+  **sin ninguna salida** al cerrar la captura a mano.
+- **Cuando no se puede capturar, la pantalla dice POR QUÉ y a dónde ir** — y dice cosas distintas según lo
+  que de verdad sepa: si el proveedor no tiene nada pendiente, si **esa orden en concreto** ya no tiene
+  (que no es lo mismo), si todavía está preguntando, o si la consulta falló. Antes decía *«no tiene nada
+  pendiente»* incluso cuando no había preguntado.
+- **Las facturas viejas con renglones sin orden se siguen viendo y se pueden cancelar**, pero **ya no se
+  pueden guardar ni confirmar**. Nada se borró ni se tocó.
+- **Los ajustes de inventario NO cambian.** Meter existencia por un ajuste sigue siendo posible: es una
+  corrección con motivo obligatorio y con rastro, no una forma de recibir de un proveedor. Cerrarlo habría
+  roto la toma de inventario físico.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **El sistema todavía no comprueba, al capturar, que la orden de compra sea de la empresa correcta.**
+  Sólo lo revisa al confirmar. Se puede guardar un borrador apuntando a una orden ajena y morir al
+  confirmarlo — y de paso enseña el folio de esa orden. Es anterior a este cambio y sólo alcanzable
+  llamando al sistema por fuera de las pantallas; queda anotado con ese nombre.
+- Sin permisos nuevos y sin datos que sembrar: el despliegue no necesita nada especial.
+
+---
+
 ## 0.079 · 1-sep-2026 · **en prueba** — El sistema **prometía por escrito** una página que él mismo rechazaba (cambio interno)
 
 ### Qué se puede hacer ahora que antes no

@@ -1,10 +1,29 @@
 /**
- * ENTRADA DE TELA por FACTURA/REMISIÓN, SIN orden de compra (etapa B1 — Daniel `DECISIONES.md`
- * §Post-F9.9 punto 7: *"permitir las dos vías (con orden de compra y por factura/remisión sin OC),
- * con una cabecera por documento y N partidas (cada una con su color y sus telas al tono)"*;
- * §Post-F9.11 para el modelo por color). Es la SEGUNDA vía de entrada del inventario de telas: la
- * primera (con OC) sigue viviendo en `dominio/compras/recepciones.ts`, que desde B1 también entra
- * por color/partida. Toda la lógica vive AQUÍ (A1); las rutas sólo validan permiso + Zod y delegan.
+ * ENTRADA DE TELA por FACTURA/REMISIÓN del proveedor (etapa B1; §Post-F9.11 para el modelo por
+ * color). Toda la lógica vive AQUÍ (A1); las rutas sólo validan permiso + Zod y delegan.
+ *
+ * 🔴 **SIEMPRE CONTRA UNA ORDEN DE COMPRA — §Post-F9.159(a) (Daniel, 30-ago-2026).** El documento
+ * nació como *"la vía sin OC"* (§Post-F9.9 punto 7). Esa línea quedó **SUPERADA**, textual:
+ *
+ *   > *«es imposible. Porque sin OC no podemos recibir tela. **¿De quién recibiríamos sin OC?** No
+ *   > puede suceder.»*
+ *
+ * ⇒ **Se IMPIDE, no se avisa.** Lo que se cerró es el RENGLÓN suelto, no el documento: la
+ * factura/remisión sigue siendo el soporte de lo que mandó el proveedor (su número, su PDF, su
+ * CFDI, su cuenta por pagar), pero **cada renglón tiene que decir qué renglón de OC surte**. El
+ * reencuadre de §Post-F9.144(d) es el porqué: recibir sin OC **no es una función que falte, es el
+ * SÍNTOMA de que faltó la compra** — dejarlo pasar borra la única señal.
+ *
+ * DÓNDE SE EXIGE (embudo): {@link exigirRenglonesConOrdenDeCompra}, llamado desde
+ * `validarCabeceraYLineas`, por el que pasan las TRES puertas de escritura —capturar, editar y
+ * **confirmar**—; un borrador viejo con renglones sueltos tampoco se puede confirmar. El contrato
+ * (`contrato/esquemas/entrada-tela.ts`) además lo exige antes de llegar a la base.
+ *
+ * ⚠️ **LEER NO SE ROMPE (D3).** `EntradaTelaLinea.idOrdenCompraLinea` sigue siendo NULLABLE en la
+ * base **a propósito**: hay documentos anteriores a esta decisión con renglones sueltos y se
+ * siguen listando, consultando e imprimiendo. Ponerla NOT NULL obligaría a tocar esos datos, que es
+ * justo lo que la REGLA 0-B prohíbe (lo viejo se limpia, no se repara). La invariante la sostiene
+ * el dominio, no la columna.
  *
  * Ciclo del documento (`EstatusEntradaTela`):
  *  1. `borrador` — se captura la cabecera (factura|remisión + número + proveedor + fecha + almacén)
@@ -32,10 +51,11 @@
  * cojo. Los precios se conservan además en `EntradaTelaLinea` (el documento es el soporte de lo
  * que se pagó, aunque el kardex ya sepa valuarlo).
  *
- * RUTA CRÍTICA — esta puerta NO dispara el hito `compraTela` de la RC (`reevaluarCompraTela` solo
- * mira `OrdenCompra`) y es a propósito: una `EntradaTela` NO liga orden de producción (nace de una
- * factura del proveedor, no de una OC por orden), así que completar el hito exigiría inventar una
- * liga que el negocio no tiene. La tela que sí debe mover la RC entra por la vía con OC.
+ * RUTA CRÍTICA — esta puerta NO dispara el hito `compraTela`, y es a propósito: ese proceso se
+ * completa al **AUTORIZAR la OC** (`reevaluarCompraTela` mira `OrdenCompra`, evento
+ * `ocTelaResuelta`), que ocurre ANTES de que llegue la tela; recibirla no lo vuelve a mover. Lo que
+ * sí sale desde aquí es el evento `material-recibido` de cada recepción generada (§Post-F9.14),
+ * igual que por la puerta de `dominio/compras/recepciones.ts`.
  *
  * A4 — permisos REUSADOS: `inventario-telas.ver` (leer) / `inventario-telas.mover` (capturar,
  * confirmar, cancelar). CERO permisos nuevos, cero seed. A9 — todo se filtra/sella por la empresa
@@ -165,6 +185,17 @@ const incluirEntradaTela = {
       },
       partida: { select: { folio: true } },
       // §Post-F9.14: la OC que surte el renglón, para mostrar su folio en el documento.
+      //
+      // ⚠️ **DEUDA CONOCIDA — FUGA A9 DE UN FOLIO DE OC DE OTRA EMPRESA** (pre-existente, anterior a
+      // §Post-F9.159(a); nombrada así por la revisión de la 0.078). Este `include` NO filtra por
+      // empresa, y CAPTURAR tampoco valida de quién es el `idOrdenCompraLinea` que llega: quien
+      // llame al API a mano puede guardar un borrador apuntando a la OC de OTRA empresa y la
+      // lectura le devolverá su `numCompra`. No es sólo "falta una validación": **se filtra un dato
+      // de otra empresa**, que es justo lo que A9 prohíbe.
+      // Lo que SÍ está cerrado: CONFIRMAR lo rechaza (`registrarRecepcionesDesdeEntradaTela` exige
+      // `ordenCompra.idEmpresa === cabecera.idEmpresa`, `compras/recepciones.ts:831-834`), así que
+      // no puede convertirse en inventario ni en recepción. El arreglo es validar la OC (empresa +
+      // proveedor) al capturar; no se hizo en esta etapa para no ampliar su alcance.
       ordenCompraLinea: { select: { ordenCompra: { select: { numCompra: true } } } },
     },
   },
@@ -392,20 +423,107 @@ async function exigirBorrador(
 }
 
 /**
+ * Renglón de entrada de tela tal como lo ven las validaciones: el color y sus cantidades
+ * (`LineaColorBase`, que se comparte con ajustes/traspasos/salidas) MÁS el renglón de OC que lo
+ * surte.
+ *
+ * `idOrdenCompraLinea` es OBLIGATORIO **en el tipo** —aunque su valor admita `null`— a propósito:
+ * un llamador nuevo no puede omitirlo por descuido, tiene que escribir de qué OC viene; y si
+ * escribe `null`, el embudo lo rechaza en tiempo de ejecución. Falla cerrada por los dos lados.
+ */
+type LineaEntradaTelaValidable = LineaColorBase & { idOrdenCompraLinea: number | null };
+
+/** Enumera renglones para el mensaje: "el renglón 2", "los renglones 1, 2 y 4". */
+function listarRenglones(posiciones: readonly number[]): string {
+  if (posiciones.length === 1) {
+    return `el renglón ${String(posiciones[0])}`;
+  }
+  const todos = posiciones.map(String);
+  return `los renglones ${todos.slice(0, -1).join(', ')} y ${todos[todos.length - 1] ?? ''}`;
+}
+
+/**
+ * 🔴 **NO SE RECIBE TELA SIN ORDEN DE COMPRA** (§Post-F9.159(a), Daniel: *«es imposible. Porque sin
+ * OC no podemos recibir tela. ¿De quién recibiríamos sin OC? No puede suceder»*). Cada renglón
+ * tiene que apuntar al renglón de OC que surte; el que no lo haga se RECHAZA — bloqueo, no aviso.
+ *
+ * EL MENSAJE NOMBRA LA CAUSA, no el campo: quien captura no tiene por qué saber qué es
+ * `idOrdenCompraLinea`; tiene que enterarse de que **falta la compra** (§Post-F9.144(d): recibir sin
+ * OC no es una función que falte, es el síntoma de que faltó levantar la orden).
+ *
+ * FALLA CERRADA de verdad: acepta el campo AUSENTE además del `null` y trata los dos igual. Si
+ * mañana un llamador construye el renglón sin la propiedad, cae aquí en vez de colarse.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * QUÉ CIERRA Y QUÉ **NO** (medido, no supuesto — para que nadie lo descubra en seis meses creyendo
+ * que la guarda falló):
+ *
+ * ✅ **Cierra la RECEPCIÓN de tela sin OC por las puertas VIVAS.** El tipo de movimiento
+ *    `entrada-recepcion` tiene dos productores en `backend/src`: esta puerta y
+ *    `dominio/compras/recepciones.ts` — que siempre nace de una línea de OC. Con esta guarda, las
+ *    dos exigen orden de compra.
+ *    ⚠️ **Y hay un TERCERO fuera de `src`**, que el absoluto anterior de este comentario ocultaba:
+ *    `backend/migracion/loaders/entradas-salidas-telas.ts:70` (el ETL del histórico de Access) usa
+ *    el mismo tipo por la vía `dominio/inventarios/migracion.ts`, sin pasar por este dominio. Es
+ *    correcto que quede exento —carga historia, no recibe de un proveedor, y REGLA 0-B dice que el
+ *    histórico llega incompleto a propósito—, pero **no se corre por la aplicación** y por eso no
+ *    lo cubre esta guarda.
+ *
+ * ⬜ **NO cierra el AJUSTE DE ENTRADA** (`ajustarInventarioTelaColor`, `inventarios/partidas-telas.ts`)
+ *    ni el inventario físico (`indicadores/inventario-ciclico.ts`). Los dos pueden SUBIR existencia
+ *    de tela —el ajuste hasta guarda lote y factura del proveedor—, así que alguien decidido podría
+ *    meter por ahí material que nunca se compró. **Se quedan abiertos A PROPÓSITO**, y no es un
+ *    descuido:
+ *      • un ajuste **no es recibir de un proveedor**: es una CORRECCIÓN, exige `motivo` obligatorio
+ *        (A7), deja bitácora y entra con `origenTipo = movimiento-manual`, no `entrada-tela` — o
+ *        sea, es visible y rastreable, no una puerta trasera silenciosa;
+ *      • cerrarlo rompería la **toma de inventario físico**, que Daniel no tocó en §Post-F9.159(a).
+ *    Si algún día hay que estrecharlo, es una decisión de Daniel, no de esta guarda.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ */
+export function exigirRenglonesConOrdenDeCompra(
+  // El `| undefined` explícito es necesario con `exactOptionalPropertyTypes` y además es el punto:
+  // la guarda acepta que el campo NO venga, para poder rechazarlo.
+  lineas: readonly { idOrdenCompraLinea?: number | null | undefined }[],
+): void {
+  const sueltos: number[] = [];
+  lineas.forEach((linea, i) => {
+    if (typeof linea.idOrdenCompraLinea !== 'number') {
+      sueltos.push(i + 1);
+    }
+  });
+  if (sueltos.length === 0) {
+    return;
+  }
+  throw new ErrorValidacion(
+    `No se puede recibir tela que no se haya comprado: ${listarRenglones(sueltos)} no ` +
+      `${sueltos.length === 1 ? 'apunta' : 'apuntan'} a ninguna orden de compra. Captura la tela ` +
+      `desde lo que está pendiente de su OC; si no aparece ahí, lo que falta es levantar (y ` +
+      `autorizar) la orden de compra al proveedor.`,
+  );
+}
+
+/**
  * Valida la CABECERA (proveedor vivo + almacén destino de la empresa activa, A9) y los RENGLONES
  * contra el catálogo (colores existentes + reglas del complemento, reusando `resolverColores` de
  * A2), y devuelve el mapa de colores ya resuelto (una sola lectura del catálogo). Se corre TANTO al
  * capturar/editar como al CONFIRMAR (defensa en profundidad: entre el borrador y la confirmación
  * alguien pudo desactivar el almacén o cambiarle el complemento a la tela).
+ *
+ * ⭐ **ES EL EMBUDO de §Post-F9.159(a).** Por aquí pasan las TRES puertas de escritura del módulo
+ * —`crearEntradaTela`, `actualizarEntradaTela` y `confirmarEntradaTela`—, así que la guarda de "sin
+ * OC no se recibe" se pone UNA vez y un llamador nuevo queda cubierto por omisión. Va PRIMERO, y
+ * antes de tocar la base: es la regla que decide si la operación puede existir siquiera.
  */
 async function validarCabeceraYLineas(
   tx: Tx,
   idEmpresa: number,
   idProveedor: number,
   idAlmacen: number,
-  lineas: readonly LineaColorBase[],
+  lineas: readonly LineaEntradaTelaValidable[],
   tipoDocumento?: TipoDocumentoEntradaTela,
 ): ReturnType<typeof resolverColores> {
+  exigirRenglonesConOrdenDeCompra(lineas);
   const proveedor = await tx.proveedor.findUnique({
     where: { id: idProveedor },
     select: { id: true, activo: true, nombre: true, factura: true },
@@ -450,8 +568,9 @@ function aColumnasLinea(
       ? (l.precioUnitComplemento ?? null)
       : null,
     loteProveedor: l.loteProveedor?.trim() || null,
-    // §Post-F9.14: qué renglón de OC surte este renglón (null = tela suelta, sin orden de compra).
-    idOrdenCompraLinea: l.idOrdenCompraLinea ?? null,
+    // §Post-F9.14 + §Post-F9.159(a): qué renglón de OC surte este renglón. Ya no puede faltar —
+    // el contrato lo exige y `validarCabeceraYLineas` lo volvió a verificar antes de llegar aquí.
+    idOrdenCompraLinea: l.idOrdenCompraLinea,
     ...datosCreacion(sesion),
   }));
 }
@@ -906,10 +1025,14 @@ async function confirmarEnTransaccion(
     await bloquearOrdenesDeRenglones(tx, idsLineaOC);
 
     const fecha = documento.fecha.toISOString().slice(0, 10);
-    const lineas: LineaColorBase[] = documento.lineas.map((l) => ({
+    // La liga con la OC VIAJA en el renglón que se le pasa al embudo (antes se caía en este mapeo):
+    // es lo que permite que CONFIRMAR también rechace un borrador viejo con renglones sueltos
+    // (§Post-F9.159(a)) — si sólo se validara al capturar, el borrador de ayer entraría por atrás.
+    const lineas: LineaEntradaTelaValidable[] = documento.lineas.map((l) => ({
       idTelaColor: l.idTelaColor,
       cantidad: Number(l.cantidad),
       cantidadComplemento: aNumero(l.cantidadComplemento) ?? undefined,
+      idOrdenCompraLinea: l.idOrdenCompraLinea,
     }));
     const colores = await validarCabeceraYLineas(
       tx,

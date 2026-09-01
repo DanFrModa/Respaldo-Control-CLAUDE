@@ -55,7 +55,8 @@ function num(valor: number | null): string {
 }
 
 /**
- * ENTRADAS DE TELA por FACTURA/REMISIÓN sin orden de compra (etapa B1 — Daniel §Post-F9.9 punto 7):
+ * ENTRADAS DE TELA por FACTURA/REMISIÓN del proveedor, SIEMPRE contra su orden de compra (etapa B1;
+ * §Post-F9.159(a) cerró la vía sin OC que permitía §Post-F9.9 punto 7):
  * la lista tabla-first de los documentos con su estado, y el CAJÓN de detalle con sus PARTIDAS, el
  * PDF de la factura adjunto y las acciones del ciclo: editar (sólo borrador), CONFIRMAR (crea las
  * partidas y da la entrada al inventario) y CANCELAR (si ya estaba confirmada, el backend genera el
@@ -137,8 +138,8 @@ export function EntradasTelaPagina(): React.JSX.Element {
             Entradas de tela por factura
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Entrada SIN orden de compra: un documento del proveedor (factura o remisión) con N
-            partidas · entra al inventario al confirmarse
+            Un documento del proveedor (factura o remisión) con N partidas, cada una contra su orden
+            de compra · entra al inventario al confirmarse
           </p>
         </div>
         {puedeMover ? (

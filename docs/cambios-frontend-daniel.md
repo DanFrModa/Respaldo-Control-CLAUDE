@@ -1759,9 +1759,13 @@ En *Inventarios › Telas › Entradas*, al capturar la factura, cada renglón t
 - Solo aparecen las órdenes **abiertas de ese proveedor**, y de cada una solo los renglones **de la
   misma tela** que estás capturando (así no se puede ligar una felpa contra una orden de otra tela).
 - Cada opción dice cuánto falta: *"OC 1007 · faltan 60 kg"*.
-- Se puede dejar en **"Sin orden de compra"**: la tela suelta sigue siendo un caso válido.
-- Como la liga es **por renglón**, una misma factura puede surtir **dos órdenes distintas** y traer
-  además tela suelta — que es como facturan los proveedores.
+- ~~Se puede dejar en **"Sin orden de compra"**: la tela suelta sigue siendo un caso válido.~~
+  🔴 **YA NO (versión 0.078, §Post-F9.159(a)):** Daniel cerró esa vía —*«sin OC no podemos recibir
+  tela. ¿De quién recibiríamos sin OC?»*—, así que **cada renglón tiene que venir de una orden de
+  compra**. Si intentas capturar uno suelto, el botón no se enciende y la pantalla te dice qué
+  falta.
+- Como la liga es **por renglón**, una misma factura puede surtir **dos órdenes distintas** en el
+  mismo documento — que es como facturan los proveedores.
 
 ### Qué pasa al confirmar la factura
 
@@ -1831,8 +1835,11 @@ llegó puede no ser exactamente lo pedido.
 **Se quitó el campo "Renglón de OC"** que había que buscar en una lista: ya no hace falta, la liga
 viene de la orden.
 
-La captura **desde el menú** (*Inventarios › Telas › Entradas › nueva*) sigue existiendo para la
-**tela suelta**, la que no viene de una orden de compra. Ahí no aparece el panel.
+La captura **desde el menú** (*Inventarios › Telas › Entradas › nueva*) sigue existiendo, pero
+~~para la **tela suelta**, la que no viene de una orden de compra. Ahí no aparece el panel~~ —
+🔴 **cambió en la versión 0.078 (§Post-F9.159(a)):** como ya no hay tela suelta, ahí **sí aparece
+el panel**. Eliges el proveedor y la pantalla te enseña todo lo que tiene pendiente de recibir en
+sus órdenes abiertas, para que captures desde ahí.
 
 ### Lo que NO cambió
 
