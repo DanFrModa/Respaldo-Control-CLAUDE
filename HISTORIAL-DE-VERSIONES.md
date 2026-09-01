@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.081 · 1-sep-2026 · **en prueba** — Borrar una foto ya **no deja el archivo pagándose para siempre** (cambio interno)
+
+### Qué se puede hacer ahora que antes no
+
+**Nada nuevo que se vea**, y conviene decirlo sin adornos.
+
+Lo que se arregló: **borrar una foto o un adjunto quitaba el registro del sistema pero dejaba el archivo
+guardado en la nube** — invisible, imposible de encontrar y **pagándose todos los meses**. Ahora se borra
+de los dos sitios.
+
+### Qué cambió y puede sorprender
+
+- **Alcanza a más sitios de los que parecía:** las fotos del modelo, las del arte, los adjuntos del
+  proveedor, **el logo de la empresa** (también cuando lo reemplazas por otro) y la copia de receta que
+  sustituye artes. **Siete puertas** en total.
+- **Si la nube falla, tu operación NO se cae.** La foto ya se borró del sistema; que el archivo remoto no
+  se pudiera quitar en ese momento queda anotado para revisarlo, pero no te bloquea el trabajo.
+- ⭐ **Una foto que otro modelo esté usando NO se borra.** Es la parte delicada de todo esto: antes de
+  tocar la nube, el sistema comprueba —con el registro bloqueado, para que nadie se cuele en medio— que
+  nadie más la referencia. Si la comparten, sólo se suelta el vínculo.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Los archivos que YA quedaron huérfanos siguen ahí.** Esto arregla la entrada; **no limpia el
+  pasado**. Recuperar ese espacio es un trabajo aparte y hay que pedirlo.
+- ⚠️ **Si algún día se construye un «eliminar modelo» (o pedido, u orden) completo**, sus archivos
+  volverían a quedar huérfanos **por otra puerta** que este arreglo no vigila. **Hoy no puede pasar**
+  porque nada del sistema borra esas fichas del todo; queda anotado para que no se olvide el día que se
+  haga.
+- Sin permisos nuevos y sin datos que sembrar: el despliegue no necesita nada especial.
+
+---
+
 ## 0.080 · 1-sep-2026 · **en prueba** — ⭐ **Ya no se puede recibir tela que nadie compró**
 
 ### Qué se puede hacer ahora que antes no

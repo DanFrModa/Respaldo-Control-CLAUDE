@@ -577,6 +577,48 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivosCompl
   };
 }
 
+/**
+ * Borra objetos de R2 en modo BEST-EFFORT, **DESPUÉS** del commit de la transacción que borró sus
+ * registros `Archivo`. Es la extracción literal del bloque que ya repiten los adjuntos de orden,
+ * pedido, desarrollo y entrada de tela (los cuatro `adjuntos-*.ts` del dominio): intentar el borrado físico y,
+ * si R2 falla, **loguear y seguir** — el registro ya se borró y el usuario ya vio desaparecer su
+ * archivo, así que reventar aquí convertiría un objeto huérfano (inofensivo, se paga y ya) en un
+ * error 500 sobre una operación que de hecho tuvo éxito. NUNCA propaga el error.
+ *
+ * ⚠️ **Nunca la llames DENTRO de una transacción.** El llamador debe invocarla tras `enTransaccion`,
+ * y las funciones que la usan deben llamarse SIEMPRE a nivel superior (sin recibir un `bd.tx` ya
+ * abierto). Si corriera dentro de una transacción, el `DeleteObject` se ejecutaría antes del commit
+ * real y un rollback del llamador dejaría **el objeto borrado y su fila viva**: el huérfano al revés,
+ * y peor — una fila que apunta a un archivo que ya no existe.
+ *
+ * Acepta una LISTA porque hay borrados que se llevan N archivos de un golpe (quitar un arte con
+ * varias fotos, copiar una receta con reemplazo). Cada key se intenta por separado: que una falle no
+ * impide intentar las demás. Una lista vacía no hace nada (el caso normal cuando no se borró nada).
+ *
+ * ⭐ El servicio se resuelve **PEREZOSAMENTE y DENTRO del try**, no como valor por defecto del
+ * llamador. Las dos cosas importan: con una lista vacía —el caso normal cuando no se borró nada— no
+ * se construye nada, y si el entorno no tiene R2 configurado (`configR2DesdeEnv` lanza), eso también
+ * se degrada a un aviso en vez de tumbar una operación que en la base YA hizo commit. Un default
+ * `= servicioArchivos()` en la firma se evaluaría al ENTRAR a la función, fuera del try, y
+ * convertiría un R2 mal configurado en un 500 sobre un borrado que de hecho tuvo éxito.
+ *
+ * @param contexto Qué se estaba borrando, para el aviso. Se lee como
+ *   `No se pudo borrar el objeto R2 "<key>" de <contexto>.` — p. ej. `la foto del modelo 7`.
+ */
+export async function eliminarObjetosBestEffort(
+  archivos: Pick<ServicioArchivos, 'eliminarObjeto'> | undefined,
+  keys: readonly string[],
+  contexto: string,
+): Promise<void> {
+  for (const key of keys) {
+    try {
+      await (archivos ?? servicioArchivos()).eliminarObjeto(key);
+    } catch (error) {
+      console.warn(`No se pudo borrar el objeto R2 "${key}" de ${contexto}.`, error);
+    }
+  }
+}
+
 let servicioDesdeEnv: ServicioArchivosCompleto | undefined;
 
 /**

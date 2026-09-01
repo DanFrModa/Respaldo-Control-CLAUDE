@@ -1218,6 +1218,111 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9m · LOS ARCHIVOS QUE SE ACUMULAN SIN QUE NADIE LOS VEA (1-sep-2026, versión **0.081**) — ✅ HECHA
+
+Fila **0.081(a)**. Borrar una foto o un adjunto eliminaba la fila **pero no el objeto en Cloudflare R2**
+⇒ el archivo quedaba **pagándose para siempre**, invisible.
+
+### Qué se construyó — el embudo, y más puertas de las previstas
+
+`eliminarObjetosBestEffort(archivos, keys, contexto)` en `comun/archivos.ts`, cableado en **7 puertas**
+(el lead sólo había medido 3; el coder encontró el **logo de empresas** —también al reemplazarlo— y el
+**BOM**): `quitarFoto` · `eliminarArte` · `quitarFotoArte` · `copiarBom` · `quitarAdjuntoProveedor` ·
+`quitarLogo` · `confirmarLogo`.
+
+⚠️ **Aritmética corregida por el reviewer:** son **9 sitios de borrado** en producción, de los que **5 son
+nuevos** — `arte-modelo.ts:888` es **UN sitio que sirve a TRES puertas**. El «7» cuenta **puertas**, no
+sitios; puntos de borrado en R2: **11**.
+
+**La pieza fina:** `borrarArchivoSiQuedoHuerfano` pasó de `void` a `Promise<string | null>` y devuelve la
+key **sólo si de verdad borró la fila**, con la key dentro del `SELECT … FOR UPDATE`. **Ese `null` es lo
+único que impide borrar del bucket una foto que otro arte comparte** — el fallo que destruiría datos
+ajenos. El reviewer lo atacó y aguanta: el `FOR UPDATE` se toma **antes** del `count`, serializa contra
+otro borrado **y** contra un INSERT concurrente de `copiarArte` (el chequeo de FK toma `FOR KEY SHARE`
+sobre la misma fila), y **`Archivo.key` no se actualiza en ningún sitio del backend** ⇒ ninguna key leída
+puede ser rancia.
+
+### 🔴 EL RECHAZO: la invariante estrella no tenía NI UN guardián — y 34 pruebas verdes lo tapaban
+
+La invariante (`adjuntos-orden.ts:196`): **`eliminarObjeto` va DESPUÉS del commit**; dentro de la
+transacción, un rollback dejaría **el objeto borrado con su fila viva**.
+
+El reviewer movió la llamada **dentro** de la transacción ⇒ **34/34 en verde**.
+
+⭐⭐ **Y la causa es estructural, no un descuido:** las 34 pruebas llamaban con `bd = { tx }`, y con eso
+`comun/transaccion.ts:78` hace `return fn(bd.tx)` ⇒ **nunca hay commit**. *La suite no podía distinguir
+«antes del commit» de «después», porque no existía el commit.* Ninguna ejercitaba el camino real.
+
+📌 **Y la pregunta que lo volvió bloqueante:** ¿hay algo que **impida** la violación? **No.**
+`bd?: ContextoBd` es público y sólo lo guarda un comentario ⇒ un llamador futuro con su `tx` rompía la
+garantía **en silencio**.
+
+### El cierre: un guardián POR PUERTA, y que no se puede apagar callado
+
+Helper compartido `backend/src/pruebas/commit-r2.ts` con **tres** aserciones, y las tres hacen falta:
+
+1. **`commits > 0`** — que la operación pasó de verdad por `cliente.$transaction`. **Guarda al guardián**:
+   sin ella se neutraliza pasándole el contexto equivocado y aprueba cualquier cosa.
+2. **`!tocadoAntesDelCommit`** — la invariante.
+3. **las keys esperadas** — impide el paso **vacuo**: sin ella, un código que no borrara nada cumpliría
+   (1) y (2) de sobra.
+
+**Uno por puerta, no uno representativo**, porque la invariante es propiedad **de cada punto de llamada**:
+medido, **con una sola prueba seis de las siete mutaciones habrían pasado en verde**.
+
+### Verificación — el guardián es el entregable, así que se atacó a él
+
+**7/7 M5 muertos, cada uno matando exactamente el guardián de SU puerta** (independientes y precisos).
+El reviewer le buscó **cuatro neutralizaciones más** que el coder no probó, y **las cuatro fallan
+ruidosamente**:
+
+- **`bd = { ...bd, tx }`** (con `cliente` **y** `tx`) → `enTransaccion` mira `bd?.tx` primero ⇒ aserción 1.
+- ⭐ **el sitio de llamada pasa OTRO espía** — la más sutil, porque **1 y 2 pasan de calle**; la mata la
+  **aserción 3**. *Es la prueba empírica de que la tercera no es decorativa.*
+- **`$transaction` llamado dos veces**, en sus dos formas → muere: `tocadoAntesDelCommit` **no se resetea**
+  ⇒ **más commits hacen al guardián MÁS estricto, no más débil**.
+- **la función deja de honrar `bd`** → revienta ruidoso.
+
+**El punto de medida está donde debe:** `eliminarObjetosBestEffort` invoca `eliminarObjeto`
+**sincrónicamente** hasta el primer `await`, así que un borrado en cualquier posición dentro de la
+transacción queda fotografiado.
+
+### ⚠️ El acoplamiento del helper, medido y aceptado con su regla escrita
+
+El reviewer quitó la aserción 2 **del helper** y re-aplicó M5: **41/41 en verde con el bug dentro**. Un
+solo edit apaga los siete guardianes. **Aun así se aprueba el diseño compartido**, con dos razones
+medidas: con 7 copias el mismo apagón cuesta 7 ediciones pero **se disimula mejor repartido**, y este
+archivo *es* la invariante, así que es el sitio más auditable que existe.
+📌 **La regla que queda escrita: tocar `src/pruebas/commit-r2.ts` es tocar las 7 puertas a la vez, y
+merece la misma ceremonia que tocar producción.**
+
+**Higiene de build verificada:** `tsconfig.build.json` excluye `src/pruebas/**`, ninguna ruta de
+producción lo importa y `vitest` sigue siendo `devDependency` ⇒ **no puede filtrarse a la imagen**.
+
+### Tres cuentas del lead que la medición desmintió
+
+1. **La cadena causal del error de tipos era otra**: el `vi.fn` se declara en su propia línea, así que TS
+   le fija el tipo ahí ⇒ **arreglar sólo la firma del helper habría dejado el typecheck igual de rojo**.
+2. **No faltaba ninguna aserción de llave**: los 7 sitios ya comprobaban **qué** key se borra.
+3. **Lo perezoso/ansioso era al revés**: `empresas.ts` ya traía el patrón perezoso **antes** de esta etapa;
+   los outliers son los 4 `adjuntos-*`.
+
+⭐ **Y un hallazgo del coder que conviene no olvidar:** `toHaveBeenCalledWith` **NO está tipado** contra la
+firma del mock (probado pasándole un número donde va una cadena: typecheck verde) ⇒ **la verificación de
+la llave descansa en tiempo de ejecución, no en los tipos.**
+
+### Gates y residuos
+
+**Gates (lead):** `typecheck` · `lint` (con `--max-old-space-size=8192`) · `format:check` ·
+`test:unit` **2,566** (eran 2,559; **+7 guardianes**). `openapi` md5 idéntico ⇒ **contrato intacto**.
+**Sin migración, permisos ni seed.**
+
+**Residuos declarados:** el **huérfano invisible** de las cascadas (fila **0.091**, latente y verificado) ·
+**cero limpieza retroactiva** del bucket (REGLA 0-B) · los **4 `adjuntos-*` sin guardián** (§4, fuera de
+alcance) · los guardianes prueban el orden contra un **commit simulado**, no contra Postgres.
+
+---
+
 ## V1-E9l · ⭐ NO SE RECIBE TELA SIN OC — se IMPIDE (1-sep-2026, versión **0.080**) — ✅ HECHA
 
 Fila **0.078** del programa. Daniel (§Post-F9.159(a)): *«es imposible. Porque sin OC no podemos recibir

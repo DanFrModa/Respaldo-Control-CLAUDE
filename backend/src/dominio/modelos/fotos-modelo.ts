@@ -15,7 +15,8 @@
  *    al primer lugar y reindexa el resto. La principal NO es una bandera: es la PRIMERA (ver
  *    `orden-principal.ts`), la misma que ya encabeza la galería, el listado (`urlFotoPrincipal`)
  *    y el impreso de la orden.
- *  • `quitarFoto` borra el `Archivo` (Cascade arrastra el `ModeloFoto`) en UNA transacción (A2).
+ *  • `quitarFoto` borra el `Archivo` (Cascade arrastra el `ModeloFoto`) en UNA transacción (A2) y,
+ *    TRAS el commit, borra el OBJETO físico de R2 en modo BEST-EFFORT (0.081a).
  * El servicio de archivos se INYECTA (default `servicioArchivos()` lazy) para poder pasar un
  * fake en tests sin R2 real (igual que bordados/proveedores). Permiso `modelos.ver` para leer,
  * `modelos.administrar` para mutar (A4).
@@ -27,7 +28,11 @@ import {
 import type { ModeloFoto } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import {
+  eliminarObjetosBestEffort,
+  servicioArchivos,
+  type ServicioArchivos,
+} from '../../comun/archivos.js';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
@@ -386,19 +391,30 @@ export async function marcarFotoPrincipal(
 
 /**
  * Quita UNA foto del modelo (R2) en UNA transacción (A2): borra el `Archivo` (el `onDelete
- * Cascade` arrastra el `ModeloFoto`); hacerlo en un solo paso evita un huérfano. El objeto R2
- * huérfano es inofensivo (lo documenta `comun/archivos.ts`). Requiere `modelos.administrar`. Si
- * la foto no pertenece al modelo → `ErrorNoEncontrado`.
+ * Cascade` arrastra el `ModeloFoto`); hacerlo en un solo paso evita un huérfano. TRAS el commit
+ * borra el OBJETO físico de R2 en modo BEST-EFFORT (0.081a: antes solo se borraba el registro y el
+ * objeto se quedaba en el bucket pagándose para siempre, sin que nadie pudiera verlo). Requiere
+ * `modelos.administrar`. Si la foto no pertenece al modelo → `ErrorNoEncontrado`.
+ *
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto): el borrado físico corre
+ * DESPUÉS del commit — ver {@link eliminarObjetosBestEffort}.
  */
 export async function quitarFoto(
   sesion: SesionUsuario,
   idModelo: number,
   idFoto: number,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
-  return enTransaccion(async (tx) => {
+
+  // La key del objeto R2 se captura DENTRO de la tx para borrarlo best-effort tras el commit.
+  const keyR2 = await enTransaccion(async (tx) => {
     const foto = await exigirFotoDelModelo(tx, idModelo, idFoto);
+    const archivo = await tx.archivo.findUnique({
+      where: { id: foto.idArchivo },
+      select: { key: true },
+    });
 
     // Borrar el Archivo arrastra el ModeloFoto (onDelete Cascade).
     await tx.archivo.delete({ where: { id: foto.idArchivo } });
@@ -409,5 +425,13 @@ export async function quitarFoto(
       accion: 'MODIFICAR',
       datos: { foto: 'quitar', idFoto },
     });
+
+    return archivo?.key ?? null;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keyR2 === null ? [] : [keyR2],
+    `la foto ${String(idFoto)} del modelo ${String(idModelo)}`,
+  );
 }

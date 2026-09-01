@@ -47,7 +47,11 @@ import type {
 } from '../../datos/index.js';
 import { z } from 'zod';
 
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import {
+  eliminarObjetosBestEffort,
+  servicioArchivos,
+  type ServicioArchivos,
+} from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -816,21 +820,28 @@ export async function listarAdjuntosProveedor(
 
 /**
  * Quita un adjunto del proveedor (R15 §4) en UNA transacción (A2): borra el
- * `ProveedorArchivo` y su `Archivo` (el objeto R2 huérfano es inofensivo — lo
- * documenta `comun/archivos.ts`). Requiere `proveedores.administrar`. Si el adjunto
- * no pertenece a ese proveedor → `ErrorNoEncontrado`.
+ * `ProveedorArchivo` y su `Archivo` y, TRAS el commit, borra el OBJETO físico de R2 en
+ * modo BEST-EFFORT (0.081a: antes el objeto se quedaba en el bucket para siempre). Si R2
+ * falla NO revierte el borrado del registro. Requiere `proveedores.administrar`. Si el
+ * adjunto no pertenece a ese proveedor → `ErrorNoEncontrado`.
+ *
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto): el borrado físico
+ * corre DESPUÉS del commit — ver {@link eliminarObjetosBestEffort}.
  */
 export async function quitarAdjuntoProveedor(
   sesion: SesionUsuario,
   idProveedor: number,
   idArchivo: string,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'proveedores.administrar');
-  return enTransaccion(async (tx) => {
+
+  // La key del objeto R2 se captura DENTRO de la tx para borrarlo best-effort tras el commit.
+  const keyR2 = await enTransaccion(async (tx) => {
     const adjunto = await tx.proveedorArchivo.findFirst({
       where: { idProveedor, idArchivo },
-      include: { archivo: { select: { nombreOriginal: true } } },
+      include: { archivo: { select: { key: true, nombreOriginal: true } } },
     });
     if (adjunto === null) {
       throw new ErrorNoEncontrado('Adjunto del proveedor', idArchivo);
@@ -846,7 +857,15 @@ export async function quitarAdjuntoProveedor(
       accion: 'MODIFICAR',
       datos: { adjunto: 'quitar', archivo: adjunto.archivo.nombreOriginal },
     });
+
+    return adjunto.archivo.key;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    [keyR2],
+    `el adjunto del proveedor ${String(idProveedor)}`,
+  );
 }
 
 // ── Avíos que surte el proveedor (B17, R9 — lado PROVEEDOR de AvioProveedor) ────
