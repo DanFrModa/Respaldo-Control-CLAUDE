@@ -55,7 +55,7 @@ import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { pendientePorCelda } from './incompletas.js';
-import { armarBusqueda } from './ordenes.js';
+import { armarBusquedaConSinonimos } from './ordenes.js';
 
 /** Cliente de LECTURA (sin transacción) — el tipo del resultado de `clienteLectura`. */
 type ClienteLectura = ReturnType<typeof clienteLectura>;
@@ -501,7 +501,8 @@ export async function agregadoWip(
 /**
  * TABLERO WIP de la empresa activa (A9): lista LIGERA de órdenes con su avance AGREGADO por etapa
  * (totales por etapa + pendientes derivados, form `Proceso`). Filtros por modelo/cliente/estado +
- * búsqueda combinada (folio, modelo, cliente, valor de referencia D7, reusa `armarBusqueda`).
+ * búsqueda combinada (folio, modelo, cliente, valor de referencia D7, reusa
+ * `armarBusquedaConSinonimos` — así el tablero entiende los departamentos fusionados, §Post-F9.172(a)).
  *
  * Sobre `soloPendientes`: el filtro "solo órdenes con algo pendiente" se aplica DESPUÉS de derivar
  * (el pendiente no es una columna persistida, no se puede filtrar en SQL). Para que la paginación
@@ -525,7 +526,7 @@ export async function consultarWip(
       : { estado: filtros.estado }),
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
-    ...armarBusqueda(filtros.busqueda),
+    ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
   };
 
   const paginacion: Paginacion = { pagina: filtros.pagina, porPagina: filtros.porPagina };

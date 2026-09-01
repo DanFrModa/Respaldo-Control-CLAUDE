@@ -25,7 +25,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { REFERENCIAS_A_REPUNTAR } from './cliente-departamentos-fusion-referencias.js';
+import {
+  REFERENCIAS_A_REPUNTAR,
+  RELACIONES_FUERA_DE_LA_FUSION,
+} from './cliente-departamentos-fusion-referencias.js';
 
 /** Nombres de las relaciones de vuelta declaradas en `model ClienteDepartamento` del esquema. */
 function relacionesDeModeloClienteDepartamento(): string[] {
@@ -54,8 +57,27 @@ describe('REFERENCIAS_A_REPUNTAR', () => {
     expect(enElEsquema).toContain('factores');
     expect(enElEsquema.length).toBeGreaterThanOrEqual(4);
 
+    // Las EXCLUIDAS a propósito se restan aquí y en ningún otro lado: la igualdad sigue siendo
+    // exacta, y una exclusión nueva obliga a declararla en `RELACIONES_FUERA_DE_LA_FUSION` con su
+    // porqué. Sin esto, `absorbidos` (§Post-F9.172(a)) habría puesto la prueba en rojo o —peor— se
+    // habría colado a la lista de repunte, aplanando la cadena de fusiones.
+    const repuntables = enElEsquema.filter((r) => !RELACIONES_FUERA_DE_LA_FUSION.includes(r));
     const cubiertas = REFERENCIAS_A_REPUNTAR.map((r) => r.relacion).sort();
-    expect(cubiertas).toEqual([...enElEsquema].sort());
+    expect(cubiertas).toEqual([...repuntables].sort());
+  });
+
+  it('⭐ cada relación EXCLUIDA existe de verdad en el esquema (una exclusión muerta no protege nada)', () => {
+    const enElEsquema = relacionesDeModeloClienteDepartamento();
+    expect(RELACIONES_FUERA_DE_LA_FUSION.length).toBeGreaterThan(0);
+    for (const excluida of RELACIONES_FUERA_DE_LA_FUSION) {
+      expect(enElEsquema).toContain(excluida);
+    }
+  });
+
+  it('⭐ ninguna relación está a la vez repuntada y excluida (la lista no se contradice)', () => {
+    for (const r of REFERENCIAS_A_REPUNTAR) {
+      expect(RELACIONES_FUERA_DE_LA_FUSION).not.toContain(r.relacion);
+    }
   });
 
   it('no repite relaciones', () => {

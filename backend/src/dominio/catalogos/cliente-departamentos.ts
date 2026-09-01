@@ -239,6 +239,17 @@ export async function actualizarDepartamentoCliente(
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
       }
+      // ⭐⭐ §Post-F9.172(a) — REACTIVAR A MANO ES DESHACER LA FUSIÓN, así que se BORRA el rastro
+      // (`idFusionadoEn`), igual que en `actualizarColor`. Si no se borrara, el departamento
+      // quedaría activo pero seguiría diciendo "a mí me absorbió aquél", y la búsqueda seguiría
+      // tratando los dos nombres como uno solo cuando su dueño acaba de separarlos a propósito. El
+      // rastro sólo vale mientras el departamento está apagado. `deshaceFusion` deja en la bitácora
+      // de quién se lo desamarró (A7). Es además, con la limpieza del canónico en la fusión, lo que
+      // impide que el DOMINIO cierre un anillo.
+      const deshaceFusion = reactiva && actual.idFusionadoEn !== null ? actual.idFusionadoEn : null;
+      if (reactiva) {
+        cambios.fusionadoEn = { disconnect: true };
+      }
 
       const departamento = await tx.clienteDepartamento.update({
         where: { id: datos.id },
@@ -255,6 +266,7 @@ export async function actualizarDepartamentoCliente(
             idDepartamento: departamento.id,
             ...(cambiaNombre ? { nombre: { de: actual.nombre, a: departamento.nombre } } : {}),
             ...(reactiva ? { operacion: 'reactivar' } : {}),
+            ...(deshaceFusion !== null ? { deshaceFusionDe: deshaceFusion } : {}),
           },
         });
       }
@@ -403,14 +415,23 @@ export async function fusionarDepartamentosCliente(
       }
       referenciasMovidas += movidosDeEsteOrigen;
 
-      // Borrado SUAVE del absorbido (idempotente si ya estaba apagado). NUNCA físico: el
-      // departamento sigue existiendo, y su bitácora dice en cuál se fusionó.
-      if (origen.activo) {
-        await tx.clienteDepartamento.update({
-          where: { id: idOrigen },
-          data: { activo: false, ...datosModificacion(sesion) },
-        });
-      }
+      // Borrado SUAVE del absorbido (NUNCA físico: el departamento sigue existiendo) + ⭐⭐
+      // §Post-F9.172(a): el RASTRO de quién se lo llevó (`idFusionadoEn`).
+      //
+      // Se escribe SIEMPRE, aunque el absorbido ya estuviera apagado: el dato nuevo es a DÓNDE se
+      // fue, y sin él nadie aguas abajo puede distinguir "lo apagó su dueño" de "lo absorbió una
+      // fusión". De esa distinción vive la BÚSQUEDA de órdenes: el texto que el cliente escribió en
+      // su OC («2-HOMBRE») viaja a la orden como referencia de TEXTO y no se reescribe nunca, así
+      // que buscar «Caballeros» sólo puede encontrarlo si el catálogo dice que uno se fusionó en el
+      // otro (ver `cliente-departamentos-sinonimos.ts`).
+      await tx.clienteDepartamento.update({
+        where: { id: idOrigen },
+        data: {
+          activo: false,
+          fusionadoEn: { connect: { id: datos.idDestino } },
+          ...datosModificacion(sesion),
+        },
+      });
       absorbidos.push({ id: origen.id, nombre: origen.nombre });
 
       // Bitácora por cada absorbido (auditoría granular A7). Aquí es donde quedan los factores
@@ -431,9 +452,12 @@ export async function fusionarDepartamentosCliente(
     }
 
     // El canónico sobrevive y queda ACTIVO. Toca `modificadoPor` y, si estaba apagado, lo reactiva.
+    // ⭐⭐ §Post-F9.172(a): además se le LIMPIA el rastro — al que se queda no lo absorbe nadie. Es
+    // la mitad de la regla que impide un anillo (la otra mitad la pone reactivar a mano): un
+    // departamento con rastro está, por definición, apagado y absorbido.
     const destinoActualizado = await tx.clienteDepartamento.update({
       where: { id: datos.idDestino },
-      data: { activo: true, ...datosModificacion(sesion) },
+      data: { activo: true, fusionadoEn: { disconnect: true }, ...datosModificacion(sesion) },
     });
 
     await registrarBitacora(tx, sesion, {
