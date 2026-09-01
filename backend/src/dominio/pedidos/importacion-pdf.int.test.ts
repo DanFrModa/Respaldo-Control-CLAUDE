@@ -283,13 +283,25 @@ describe('confirmar importación por PDF (1 PDF)', () => {
     });
     expect(liga?.idModelo).toBe(idModelo);
 
-    // ⭐ El modelo PASÓ A PRODUCCIÓN al generar la OP (§Post-F9.34): serie 71 vacía → 71001, el
-    // código sustituido y el de desarrollo conservado (D3).
-    const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
-    expect(modelo.numeroProduccion).toBe(71_001);
-    expect(modelo.codigo).toBe('71001');
-    expect(modelo.origen).toBe('produccion');
-    expect(modelo.codigoDesarrollo).toBe('DEV-CYA-1');
+    // ⭐⭐ V1-E3 (§Post-F9.172(b)): generar la OP hace NACER el modelo de producción DE ESE COLOR
+    // —serie 71 vacía → 71001— y el DESARROLLO se queda como estaba, en su catálogo y con su código.
+    // Éste es el camino que le importa a Daniel: un PDF de C&A = una OC = una OP = UN color.
+    const desarrollo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
+    expect(desarrollo.origen).toBe('desarrollo');
+    expect(desarrollo.codigo).toBe('DEV-CYA-1');
+    expect(desarrollo.numeroProduccion).toBeNull();
+
+    const hijo = await cliente.modelo.findFirstOrThrow({ where: { idModeloDesarrollo: idModelo } });
+    expect(hijo.numeroProduccion).toBe(71_001);
+    expect(hijo.codigo).toBe('71001');
+    expect(hijo.origen).toBe('produccion');
+    // El color del PDF (uno solo por OP) es la IDENTIDAD del hijo…
+    expect(hijo.idColor).not.toBeNull();
+    // …y la ORDEN lleva al hijo, mientras el renglón del pedido sigue con su desarrollo.
+    const ordenDelPdf = await cliente.orden.findFirstOrThrow({
+      where: { idPedidoLinea: linea.id },
+    });
+    expect(ordenDelPdf.idModelo).toBe(hijo.id);
     // Evento outbox de la RC (orden-creada) encolado.
     const eventos = await cliente.eventoOutbox.count();
     expect(eventos).toBeGreaterThanOrEqual(1);
@@ -494,9 +506,10 @@ describe('⭐ la misma OC del cliente NO se importa dos veces (V1-E4)', () => {
     expect(await cliente.pedido.count()).toBe(1);
     expect(await cliente.orden.count()).toBe(1);
     expect(await cliente.pedidoLinea.count()).toBe(1);
-    // Y el modelo se promovió UNA sola vez: el primer libre de la serie, no el segundo.
-    const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
-    expect(modelo.numeroProduccion).toBe(71_001);
+    // Y nació UN solo modelo de producción, con el primer libre de la serie (no el segundo).
+    const hijos = await cliente.modelo.findMany({ where: { idModeloDesarrollo: idModelo } });
+    expect(hijos).toHaveLength(1);
+    expect(hijos[0]?.numeroProduccion).toBe(71_001);
   });
 
   it('la OC de OTRO cliente no bloquea (el nº de orden solo identifica dentro de su cliente)', async () => {

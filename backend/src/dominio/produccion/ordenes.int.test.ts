@@ -198,6 +198,35 @@ describe('Órdenes (F2-E2) — alta desde pedido + autorrelleno (A2, A9)', () =>
     );
   });
 
+  /**
+   * ⭐⭐ V1-E3 — LA MISMA REGLA, POR LA PUERTA NUEVA. `opciones.idModeloDeLaOrden` sella la orden con
+   * OTRO modelo que el del renglón (el hijo de producción por color de `salidaAProduccion`), y ese
+   * modelo tiene que pasar por la MISMA guarda: producir un modelo dado de baja está prohibido, dé
+   * igual por qué puerta llegue. Hoy `salidaAProduccion` ya lo comprueba antes —el reuso rebota un
+   * hijo descontinuado—, así que esto es la red del SEAM de dominio, no de ese camino: aquí se
+   * ejercita directamente para que sea una red PROBADA y no una rama que nadie pisa.
+   */
+  it('⭐⭐ RECHAZA sellar la orden con un modelo descontinuado pasado por `idModeloDeLaOrden`', async () => {
+    const s = sesion([...PERM_TODOS]);
+    // El renglón apunta a un modelo VIVO: lo que está de baja es el modelo que se le quiere poner
+    // a la orden. Si la guarda se cayera, la OP nacería del modelo descontinuado sin una queja.
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+    await expect(
+      crearOrden(s, { idPedidoLinea: renglon.id }, bd(), {
+        idModeloDeLaOrden: modeloInactivo.id,
+      }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    expect(await cliente.orden.count({ where: { idPedidoLinea: renglon.id } })).toBe(0);
+  });
+
+  it('⭐ y un modelo que NO EXISTE por esa misma puerta da 404 (no un 500 crudo de FK)', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+    await expect(
+      crearOrden(s, { idPedidoLinea: renglon.id }, bd(), { idModeloDeLaOrden: 999_999 }),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
   it('un renglón de pedido de OTRA empresa no existe para esta sesión (A9)', async () => {
     const s = sesion([...PERM_TODOS]);
     const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa');

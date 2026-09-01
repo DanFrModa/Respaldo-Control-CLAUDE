@@ -73,11 +73,12 @@ async function crearPedidoF2(
  * GENERA la OP de un renglón sin orden del pedido del cliente dado (pantalla nueva de Pedidos,
  * R3): matriz de `piezas` en el color/talla de la corrida.
  *
- * Devuelve el folio de la OP **y el código VIGENTE del modelo**, que puede haber cambiado: desde
- * V1-E8j el modelo nace en desarrollo, así que **la primera OP lo pasa a producción y le cambia el
- * código** por su nº de 5 dígitos (`salidaAProduccion` paso 4). Quien llame tiene que seguir usando
- * el código que devuelve este ayudante, no el que tecleó al darlo de alta — ése queda guardado como
- * nº de desarrollo y sigue siendo buscable (D3), pero **ya no es el que se enseña**.
+ * Devuelve el folio de la OP **y el código del MODELO QUE QUEDÓ EN LA ORDEN**, que casi nunca es el
+ * que se tecleó al dar de alta: desde V1-E8j el modelo nace en desarrollo, y desde V1-E3
+ * (§Post-F9.172(b)) la salida a producción **hace nacer un modelo de producción POR COLOR** con su
+ * nº de 5 dígitos y deja el desarrollo intacto. Quien llame tiene que usar el código que devuelve
+ * este ayudante para buscar la orden en pantalla — el de desarrollo sigue vivo y buscable (D3),
+ * pero **no es el de la OP**.
  */
 async function generarOp(
   page: Page,
@@ -118,27 +119,31 @@ async function generarOp(
   // El toast del éxito lo arma `PanelGenerarOP.tsx` (~L187) en UNA sola frase, con tres trozos
   // CONDICIONALES en medio. Aquí:
   //  • «· ligado a su desarrollo» NO sale: el pedido se capturó por la edición F2, sin desarrollo.
-  //  • ⭐ V1-E8j — «· modelo de producción N (antes CODIGO, que se conserva)» SÍ sale **en la
-  //    PRIMERA** OP del modelo, y NO en las siguientes. Antes de esta etapa no salía nunca, porque
-  //    un modelo dado de alta en `/modelos` ya nacía en producción y no había nada que promover;
-  //    hoy nace en DESARROLLO y **es su OP la que lo pasa a producción**, que es exactamente lo que
-  //    pidió Daniel. Por eso el trozo va OPCIONAL en el patrón, y las dos puntas siguen pegadas
-  //    —«OP N creada …· Ruta Crítica programándose sola»— para que un toast a medias no pase.
+  //  • ⭐⭐ V1-E3 (§Post-F9.172(b)) — el trozo del MODELO sale SIEMPRE, y dice cuál de las tres
+  //    cosas pasó: «· nace el modelo de producción N del desarrollo X, que se conserva» la PRIMERA
+  //    vez de ese color, «· con el modelo N, que ese color ya tenía» en las siguientes (el número
+  //    es del modelo, no de la orden) y «· modelo N» cuando el renglón ya apuntaba a un modelo de
+  //    producción (histórico del Access). Antes había un caso sin trozo —la 2ª OP, cuando la 1ª
+  //    había PROMOVIDO el modelo—; ya no lo hay, porque el desarrollo nunca se transforma.
   const toast = page
-    .getByText(/OP \d+ creada(?: · modelo de producción \d+.*?)? · Ruta Crítica programándose sola/)
+    .getByText(
+      /OP \d+ creada · (?:nace el modelo de producción \d+[^·]*|con el modelo \d+[^·]*|modelo [^·]+) · Ruta Crítica programándose sola/,
+    )
     .first();
   await expect(toast).toBeVisible();
   const texto = (await toast.textContent()) ?? '';
   const folio = /OP (\d+) creada/.exec(texto)?.[1] ?? '';
   expect(folio).not.toBe('');
-  // Si hubo promoción, el código VIGENTE del modelo pasa a ser ese número.
-  const promovido = /modelo de producción (\d+)/.exec(texto)?.[1] ?? null;
-  const codigoModelo = promovido ?? nombres.codigoModelo;
+  // El código del modelo QUE QUEDÓ EN LA ORDEN, salga por la frase que salga.
+  const enLaOrden = /· (?:nace el |con el )?modelo(?: de producción)? ([^\s,·]+)/.exec(texto)?.[1];
+  const codigoModelo = enLaOrden ?? nombres.codigoModelo;
   // El toast largo tapa botones; se espera a que SE VAYA antes de seguir interactuando (sonner lo
   // retira solo a los ~4 s y lo desmonta 200 ms después, así que `toBeHidden` termina en cuanto
   // desaparece del DOM). De paso deja el ayudante REENTRANTE: la siguiente llamada no puede leerle
   // el folio al toast de la anterior.
   //
+  // ⚠️ (V1-E3 lo volvió a barrer: el toast cambió de «(antes X, que se conserva)» a «del desarrollo
+  // X, que se conserva», y la 2ª OP pasó de NO tener trozo de modelo a decir «con el modelo N».)
   // ⚠️ Aquí vivía una línea que esperaba a que APARECIERA `/salió a producción como modelo #\d+/`
   // —lo contrario de lo que promete el comentario de arriba—. Y ojo con la historia, porque la
   // lección está ahí: ese texto SÍ existía; era el toast de antes. `cd4cd88` (V1-E3n) lo reescribió

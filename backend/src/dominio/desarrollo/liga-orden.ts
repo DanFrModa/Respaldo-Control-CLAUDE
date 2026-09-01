@@ -5,12 +5,15 @@
  *
  *  1. `ligarOrden` — crea la `DesarrolloOrden` (una orden liga a lo más UN desarrollo, `idOrden @unique`;
  *     un desarrollo tiene N órdenes por resurtidos). Coherencia (A1): mismo MODELO Y mismo CLIENTE que la
- *     orden, misma empresa (A9), desarrollo no apagado. El estado del desarrollo pasa a
+ *     orden, misma empresa (A9), desarrollo no apagado. ⭐ V1-E3: «mismo modelo» se mide contra el
+ *     LINAJE de la orden (`idModeloDesarrollo ?? idModelo`), porque una OP nacida por color lleva el
+ *     HIJO mientras el desarrollo apunta al PADRE. El estado del desarrollo pasa a
  *     `ligado-produccion` SOLO por el derivado `calcularEstadoDesarrollo` (que cuenta las órdenes) — no se
  *     toca aquí. Permiso `desarrollo.administrar`.
  *  2. `quitarLiga` — borra la fila (la única mutación destructiva del expediente; la liga no es un
  *     snapshot D3, es una relación viva). Permiso `desarrollo.administrar`.
- *  3. `sugerenciaLigaOrden` — PROPUESTA para la UI: el desarrollo candidato (mismo modelo/cliente/empresa,
+ *  3. `sugerenciaLigaOrden` — PROPUESTA para la UI: el desarrollo candidato (mismo modelo —por LINAJE,
+ *     V1-E3— /cliente/empresa,
  *     no apagado, aún no ligado) + `precioSugeridoPedido` = precio del renglón de lista más reciente
  *     (`precioAprobado ?? precioCalculado`). NO escribe el pedido (el flujo F2 aplica el precio). `desarrollo.ver`.
  *  4. `expedienteOrden` — VISTA 360 desde la orden ligada: proyecto, desarrollo (estado derivado),
@@ -49,6 +52,7 @@ import { num, numOrNull } from '../costos/decimales.js';
 import { aEventoSalida, incluirEvento, nombresDeAutores } from './negociacion.js';
 import { calcularEstadoDesarrollo, incluirEstadoDesarrollo } from './desarrollos.js';
 import { conteosDesarrollos } from './proyectos.js';
+import { idModeloDeLaReceta, SELECT_LINAJE_RECETA } from '../modelos/receta-compartida.js';
 
 /** Cliente de lectura (tx o Prisma), para los helpers de proyección. */
 type ClienteBd = ReturnType<typeof clienteLectura>;
@@ -121,6 +125,8 @@ export async function ligarOrdenNucleo(
       estado: true,
       idModelo: true,
       idCliente: true,
+      // ⭐⭐ V1-E3: el LINAJE del modelo de la orden, no sólo su id. Ver la comparación de abajo.
+      modelo: { select: SELECT_LINAJE_RECETA },
       desarrolloOrden: { select: { id: true } },
     },
   });
@@ -156,7 +162,18 @@ export async function ligarOrdenNucleo(
       `El desarrollo "${desarrollo.modelo.codigo}" está apagado; reactívalo para ligarlo.`,
     );
   }
-  if (desarrollo.idModelo !== orden.idModelo) {
+  // ⭐⭐ V1-E3 — LA COHERENCIA SE MIDE CONTRA EL LINAJE, NO CONTRA EL ID PELADO.
+  //
+  // 🔴 Esta línea decía `desarrollo.idModelo !== orden.idModelo` y **reventaba el paso 4 de la
+  // propia `salidaAProduccion`**: `Desarrollo.idModelo` apunta al modelo de DESARROLLO (el PADRE) y,
+  // desde V1-E3, `Orden.idModelo` apunta al modelo de producción del color (el HIJO). Dos ids
+  // distintos para la MISMA prenda ⇒ toda OP nacida por color se caía al ligarse.
+  //
+  // `idModeloDeLaReceta` (V1-E9b) es `idModeloDesarrollo ?? id`: para un hijo devuelve su padre y
+  // para todo lo demás —los ~4,987 migrados, lo capturado a mano, los propios desarrollos— devuelve
+  // el mismo id, así que la regla de siempre queda **exactamente igual** donde no hay linaje.
+  const idModeloDelLinaje = idModeloDeLaReceta(orden.modelo);
+  if (desarrollo.idModelo !== idModeloDelLinaje) {
     throw new ErrorValidacion(
       'El desarrollo es de otro modelo; liga un desarrollo del mismo modelo de la orden.',
     );
@@ -277,6 +294,8 @@ export async function sugerenciaLigaOrden(
       folio: true,
       idModelo: true,
       idCliente: true,
+      // ⭐⭐ V1-E3: mismo motivo que en `ligarOrdenNucleo` — se busca por el LINAJE.
+      modelo: { select: SELECT_LINAJE_RECETA },
       desarrolloOrden: { select: { id: true } },
     },
   });
@@ -287,7 +306,11 @@ export async function sugerenciaLigaOrden(
   const candidatos = await cliente.desarrollo.findMany({
     where: {
       apagado: false,
-      idModelo: orden.idModelo,
+      // ⭐⭐ V1-E3 — CONTRA EL LINAJE, no contra el id pelado. Con `orden.idModelo` a secas, la
+      // pantalla «ligar orden a desarrollo» devolvía **CERO candidatos** para toda orden nacida por
+      // color: sus desarrollos apuntan al PADRE y la orden al HIJO. Y el síntoma habría sido el
+      // peor posible — no un error, una lista vacía: *"esta orden no tiene desarrollo"*.
+      idModelo: idModeloDeLaReceta(orden.modelo),
       proyecto: { idEmpresa, idCliente: orden.idCliente },
       ordenLigadas: { none: {} },
     },

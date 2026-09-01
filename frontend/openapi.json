@@ -52904,7 +52904,16 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Nº de producción del modelo (5 dígitos), o null si aún no lo tiene."
+                                  "description": "Nº de producción del modelo DEL RENGLÓN (5 dígitos), o null. ⚠️ V1-E3: para un renglón de modelo de DESARROLLO es SIEMPRE null y lo seguirá siendo — el desarrollo ya no se promueve, ahora nacen modelos de producción POR COLOR y sus números están en `numerosProduccion`. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción)."
+                                },
+                                "numerosProduccion": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "description": "⭐ V1-E3 (§Post-F9.172(b)): nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP viva, sin repetir y en orden ascendente. Es lo que la pantalla enseña como `prod. #…`: cuatro OC de cuatro colores dan cuatro números aquí, sobre un renglón que sigue apuntando a su modelo de desarrollo. Vacío = el renglón todavía no tiene OP (o sus modelos no tienen número de 5 dígitos, caso del histórico `51783a`/`M-18`)."
                                 },
                                 "cantidad": {
                                   "type": "integer",
@@ -52982,6 +52991,7 @@
                                 "idDesarrollo",
                                 "numeroCliente",
                                 "numeroProduccion",
+                                "numerosProduccion",
                                 "cantidad",
                                 "precio",
                                 "importe",
@@ -53701,7 +53711,7 @@
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                   },
                   "numeroProduccion": {
-                    "description": "Nº de producción CONFIRMADO para un modelo que todavía es de desarrollo (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se ignora si el modelo ya está en producción.",
+                    "description": "Nº de producción CONFIRMADO para el modelo que va a NACER de este color (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se IGNORA —con aviso, sin bloquear— si ese color ya tenía modelo (se reusa el suyo) y también si el renglón ya apunta a un modelo de producción.",
                     "type": "integer",
                     "minimum": 10000,
                     "maximum": 99999
@@ -54384,6 +54394,16 @@
                       "additionalProperties": false,
                       "description": "La orden de producción recién creada (con su matriz)."
                     },
+                    "idModeloProduccion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Modelo de PRODUCCIÓN con el que quedó sellada la OP (el hijo por color, o el del renglón en el caso legado)."
+                    },
+                    "codigoModeloProduccion": {
+                      "type": "string",
+                      "description": "Código VIGENTE de ese modelo (= su nº de 5 dígitos cuando nació por esta puerta)."
+                    },
                     "numeroProduccion": {
                       "anyOf": [
                         {
@@ -54395,13 +54415,31 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nº de producción del modelo (asignado aquí si venía de desarrollo). Null cuando el modelo ya era de producción pero su código no es numérico de 5 dígitos (histórico tipo `51783a` o `M-18`)."
+                      "description": "Nº de producción del modelo de la OP. Null sólo en el caso legado, cuando el modelo del renglón ya era de producción con código NO numérico de 5 dígitos (histórico tipo `51783a` o `M-18`)."
                     },
-                    "numeroProduccionMinteado": {
-                      "type": "boolean",
-                      "description": "true si ESTA salida pasó el modelo de desarrollo a producción asignándole su número; false si el modelo ya estaba en producción."
+                    "modeloDeProduccion": {
+                      "type": "string",
+                      "enum": [
+                        "nacido",
+                        "reusado",
+                        "heredado"
+                      ],
+                      "description": "Qué pasó con el modelo de la OP (V1-E3): `nacido` = ESTA salida hizo nacer el modelo de producción de ese color, con su número; `reusado` = ese color ya tenía modelo y se usó el suyo (el número es del modelo, no de la orden); `heredado` = el renglón ya apuntaba a un modelo de producción (histórico del Access) y la OP lo lleva tal cual, sin que nazca nada."
                     },
-                    "codigoModeloAnterior": {
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el de la OP — y de quien es, por lo tanto, la receta que comparten todos sus colores. Null en el caso `heredado`."
+                    },
+                    "codigoModeloDesarrollo": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -54410,14 +54448,14 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Código que TENÍA el modelo antes de pasar a producción (su nº de desarrollo), o null si no hubo promoción."
+                      "description": "Nº de desarrollo de ese padre (se CONSERVA y sigue buscable, D3), o null en el caso `heredado`."
                     },
                     "avisosNumeroProduccion": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       },
-                      "description": "Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope). NUNCA bloquean."
+                      "description": "Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope, número capturado que no se usó porque el color ya tenía modelo). NUNCA bloquean."
                     },
                     "idDesarrollo": {
                       "anyOf": [
@@ -54439,9 +54477,12 @@
                   },
                   "required": [
                     "orden",
+                    "idModeloProduccion",
+                    "codigoModeloProduccion",
                     "numeroProduccion",
-                    "numeroProduccionMinteado",
-                    "codigoModeloAnterior",
+                    "modeloDeProduccion",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "avisosNumeroProduccion",
                     "idDesarrollo",
                     "ligaCreada"

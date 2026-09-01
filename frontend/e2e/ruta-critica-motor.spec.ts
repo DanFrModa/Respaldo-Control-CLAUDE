@@ -151,9 +151,10 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     const textoOp = (await toastOp.textContent()) ?? '';
     const folioOrden = /OP (\d+) creada/.exec(textoOp)?.[1] ?? '';
     expect(folioOrden).not.toBe('');
-    // ⭐ V1-E8j — esta OP PROMOVIÓ el modelo: su código vigente ya es el nº de 5 dígitos que anuncia
-    // el toast («· modelo de producción N»). El de desarrollo se conserva y sigue buscable (D3),
-    // pero lo que el centro de comando enseña de aquí en adelante es el nuevo.
+    // ⭐⭐ V1-E3 (§Post-F9.172(b)) — esta OP hizo NACER el modelo de producción de su color: el
+    // código que el centro de comando enseña para esta orden es el nº de 5 dígitos que anuncia el
+    // toast («· nace el modelo de producción N …»). El desarrollo se queda intacto y en su
+    // catálogo con su código, que sigue buscable (D3) — pero NO es el de la OP.
     const codigoVigente = /modelo de producción (\d+)/.exec(textoOp)?.[1] ?? codigoModelo;
     expect(codigoVigente).not.toBe(codigoModelo);
 

@@ -51,6 +51,7 @@ import {
   promoverAProduccionNucleo,
   type ResultadoPromocion,
 } from './nomenclatura.js';
+import { idModeloDeLasFotos } from './fotos-modelo.js';
 import { repartirFilasDeReceta, repartoDeRecetas } from './receta-compartida.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
@@ -519,6 +520,17 @@ export interface MarcaNomenclaturaModelo {
    * razonamiento por el que `origen` y los dos números viajan juntos aquí en vez de como banderas.
    */
   idModeloDesarrollo: number | null;
+  /**
+   * ⭐⭐ V1-E3 (§Post-F9.172(b)) — COLOR del que nace este modelo, la otra mitad de la identidad del
+   * hijo del linaje. `null` en todas las altas que no nacen por un color (= todas menos la
+   * derivación por color), y **obligatorio** por la misma razón que `idModeloDesarrollo`: viaja en
+   * la marca para que una puerta de alta nueva **no compile** hasta declararlo.
+   *
+   * ⚠️ Sólo un HIJO puede llevarlo — lo vigila el CHECK `modelos_color_solo_con_linaje_check` — y
+   * junto con el linaje forma la llave `modelos_linaje_color_unico`, que es la que evita estrenar
+   * dos números para la misma prenda.
+   */
+  idColor: number | null;
 }
 
 /** La marca del alta normal (V1-E8j): nace en DESARROLLO, sin nº de producción (§Post-F9.134). */
@@ -535,6 +547,9 @@ export function marcaDesarrollo(codigo: string): MarcaNomenclaturaModelo {
     // CHECK `modelos_linaje_desarrollo_solo_produccion_check` prohíbe que un modelo de DESARROLLO
     // lleve el vínculo, que es lo que hace imposibles las cadenas (V1-E9a).
     idModeloDesarrollo: null,
+    // Y sin linaje no puede haber color (CHECK `modelos_color_solo_con_linaje_check`, V1-E3): un
+    // modelo de desarrollo es EL modelo, no el de un color.
+    idColor: null,
   };
 }
 
@@ -940,9 +955,42 @@ export interface ModeloPromovido extends ResultadoPromocion {
 /**
  * Pasa un modelo de DESARROLLO al catálogo de PRODUCCIÓN (§Post-F9.34 punto 4 / §Post-F9.46): le
  * asigna el nº de 5 dígitos —el que propone el sistema, o el que capture Daniel— y lo saca del
- * filtro de desarrollo. **Nada se pierde (D3):** conserva su `codigoDesarrollo` (buscable) y todo
- * lo que cuelga del modelo (BOM, arte, fotos, precosteo, listas, órdenes) sigue igual, porque nada
- * de eso apunta al código: apuntan al `id`, que no cambia.
+ * filtro de desarrollo.
+ *
+ * ---
+ * ## 🔴🔴 V1-E3 — QUÉ SIGNIFICA PULSAR ESTE BOTÓN HOY, Y LA PREGUNTA ABIERTA PARA DANIEL
+ *
+ * Desde V1-E3 (§Post-F9.172(b)) **el camino normal de entrar a producción es generar la OP**, que
+ * hace nacer **un modelo de producción por COLOR** compartiendo la receta del desarrollo. Este
+ * botón hace lo CONTRARIO: **transforma el modelo de desarrollo en el de producción**, con UN solo
+ * número, y **no tiene vuelta atrás** — a partir de ahí sus OP salen todas por la rama `heredado`.
+ *
+ * `promoverAProduccionNucleo` rechaza **UN solo caso** —el único en que promover rompe algo que ya
+ * existe—: un modelo **con hijos**, porque le daría un segundo número a una prenda que ya tiene el
+ * suyo por color. **Es la única guarda, y hay que leerla por lo que NO cubre.**
+ *
+ * 🔴 **LO QUE QUEDA ABIERTO ES CUALQUIER DESARROLLO SIN HIJOS TODAVÍA — tenga o no ficha de
+ * Desarrollo.** Medido: un modelo CON ficha y sin hijos se promueve sin una queja, y a partir de
+ * ahí sus cuatro OC de cuatro colores salen **las cuatro por la rama `heredado` con UN SOLO
+ * modelo** — *el bug de Daniel, al pie de la letra, y sin vuelta atrás*. Que tenga ficha **no lo
+ * protege**: se probó una segunda guarda por ahí y se retiró, porque rompía un camino existente y
+ * probado (`crearDesarrolloConModeloNuevo` → promover, `nomenclatura.int.test.ts`), o sea que no
+ * era una valla contra un descuido sino **retirar una capacidad** — y eso lo decide Daniel.
+ *
+ * ⚠️ Por eso el residuo **no se dejó silencioso**: lo fija la prueba `RESIDUO MEDIDO` de
+ * `nomenclatura.int.test.ts`, y el diálogo lo avisa en ámbar ANTES del clic
+ * (`DialogoPasarAProduccion.tsx`: *"UN número a todo el modelo, no uno por color… no hay vuelta
+ * atrás"*). Es lo único que hay entre el usuario y el bug: si alguien ordena ese diálogo y se lleva
+ * el aviso, el clic vuelve a ser silencioso.
+ *
+ * ⚠️ **Decisión pendiente de Daniel** (la plantea V1-E3, no la resuelve): ¿el botón se **retira**
+ * del catálogo —porque desde V1-E8j «todo modelo nace en desarrollo» y desde V1-E3 el número se lo
+ * da su OP, así que ya no habría razón de asignarlo a mano— o **se queda**? Mientras no se conteste
+ * queda **con esa única guarda, la prueba del residuo y el aviso**.
+ *
+ * **Nada se pierde (D3):** conserva su `codigoDesarrollo` (buscable) y todo lo que cuelga del
+ * modelo (BOM, arte, fotos, precosteo, listas, órdenes) sigue igual, porque nada de eso apunta al
+ * código: apuntan al `id`, que no cambia.
  *
  * Todo en UNA transacción (A2) con el lock del par y la bitácora dentro (A7). El re-leído del
  * modelo va en la MISMA transacción a propósito: así el llamador ve la promoción ya aplicada sin
@@ -1058,19 +1106,30 @@ export async function listarModelos(
  * Detalle de la consulta única: se traen TODAS las fotos de los modelos de la página de un
  * golpe (`idModelo in [...]`), ordenadas; al recorrerlas, la PRIMERA de cada modelo es su
  * principal (el resto se ignora). Las URLs prefirmadas se generan en paralelo.
+ *
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)) — es la forma EN LOTE de {@link idModeloDeLasFotos}: un modelo nacido
+ * POR COLOR sin fotos propias enseña la principal de su modelo de DESARROLLO. Sin esto, los cuatro
+ * modelos que nacen de un desarrollo salían **todos sin miniatura** en la galería — que es
+ * justamente donde se ven, porque el filtro por default del catálogo (`origen = produccion`)
+ * esconde al padre que sí las tiene. La consulta sigue siendo UNA (los ids de los padres se suman
+ * al mismo `in`), así que no aparece un N+1 nuevo.
  */
 async function adjuntarFotoPrincipal(
   cliente: ReturnType<typeof clienteLectura>,
   modelos: ModeloConRelaciones[],
   archivos: ServicioArchivos,
 ): Promise<ModeloConRelaciones[]> {
-  const conFotos = modelos.filter((m) => m._count.fotos > 0).map((m) => m.id);
-  if (conFotos.length === 0) {
+  // De quién son las fotos de CADA modelo de la página (la propia gana; si no tiene, las del padre).
+  const duenoPorModelo = new Map<number, number>(
+    modelos.map((m) => [m.id, idModeloDeLasFotos(m, m._count.fotos > 0)]),
+  );
+  const idsAConsultar = [...new Set(duenoPorModelo.values())];
+  if (idsAConsultar.length === 0) {
     return modelos.map((m) => ({ ...m, urlFotoPrincipal: null }));
   }
 
   const fotos = await cliente.modeloFoto.findMany({
-    where: { idModelo: { in: conFotos } },
+    where: { idModelo: { in: idsAConsultar } },
     orderBy: [{ orden: 'asc' }, { id: 'asc' }],
     select: { idModelo: true, archivo: { select: { key: true } } },
   });
@@ -1095,7 +1154,12 @@ async function adjuntarFotoPrincipal(
     ),
   );
 
-  return modelos.map((m) => ({ ...m, urlFotoPrincipal: urlPorModelo.get(m.id) ?? null }));
+  // El camino de VUELTA: cada modelo recibe la URL de SU dueño de fotos (varios hijos pueden
+  // compartir el mismo padre, así que el mapa se lee por el dueño y no por el id del modelo).
+  return modelos.map((m) => ({
+    ...m,
+    urlFotoPrincipal: urlPorModelo.get(duenoPorModelo.get(m.id) ?? m.id) ?? null,
+  }));
 }
 
 /**

@@ -341,6 +341,104 @@ describe('digitosDelModelo', () => {
 
 // ── (c) Pasar a producción ─────────────────────────────────────────────────────────
 
+/**
+ * ⭐⭐⭐ V1-E3 (§Post-F9.172(b)) — **EL BOTÓN «PASAR A PRODUCCIÓN» YA NO PUEDE DESHACER LA ETAPA.**
+ *
+ * Promover **transforma** el modelo: al terminar su `origen` es `produccion` **para siempre**, y
+ * `derivarModeloDeProduccion` exige un padre de DESARROLLO ⇒ un clic dejaba al modelo **incapaz de
+ * tener modelos por color, definitivamente**. Los dos daños se midieron y los dos eran
+ * **silenciosos** — ni error ni aviso.
+ *
+ * 🔴 Y el segundo es el que la base **no puede** vigilar: el CHECK
+ * `modelos_linaje_desarrollo_solo_produccion_check` no mira otra fila, así que no ve que el padre
+ * **deje de ser de desarrollo DESPUÉS** de que ya nacieron sus hijos.
+ */
+describe('⭐⭐ pasarModeloAProduccion — las guardas que protegen el linaje (V1-E3)', () => {
+  it('🔴 GUARDA A · un padre que YA tiene modelos por color NO se promueve (dos números, misma prenda)', async () => {
+    const idPadre = await crearModeloDesarrollo('CYA-26-71-020');
+    const color = await cliente.color.create({ data: { nombre: 'Rojo guarda A' } });
+    await cliente.modelo.create({
+      data: {
+        codigo: '71001',
+        origen: 'produccion',
+        numeroProduccion: 71_001,
+        idModeloDesarrollo: idPadre,
+        idColor: color.id,
+      },
+    });
+
+    // Sin la guarda, medido: el padre se llevaba el 71002 de la MISMA serie mientras su hijo Rojo
+    // tenía el 71001 ⇒ la misma prenda con DOS números de catálogo, que es justo lo que la decisión
+    // (B) de §Post-F9.172 existe para impedir.
+    const error = await pasarModeloAProduccion(sesion(), idPadre, {}, bd()).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    expect(error?.message).toContain('71001');
+    // Y NADA se movió: el padre sigue en desarrollo, con su código y sin número.
+    const padre = await cliente.modelo.findUniqueOrThrow({ where: { id: idPadre } });
+    expect(padre.origen).toBe('desarrollo');
+    expect(padre.codigo).toBe('CYA-26-71-020');
+    expect(padre.numeroProduccion).toBeNull();
+  });
+
+  /**
+   * ⚠️⚠️ **EL LÍMITE DE LA GUARDA, PROBADO EN VEZ DE CALLADO.** Promover ANTES de que llegue
+   * ninguna OC **sigue siendo posible**, y deja al modelo con UN número para todos sus colores,
+   * sin vuelta atrás. Es el bug que Daniel reportó, reproducible por un clic informado.
+   *
+   * 🔴 No se tapó con una guarda porque la que haría falta («con ficha de Desarrollo no se
+   * promueve») **rompe un camino existente y probado** —`crearDesarrolloConModeloNuevo` → promover,
+   * en este mismo archivo—: no sería una valla contra un descuido, sería RETIRAR una capacidad, y
+   * eso lo decide Daniel. Lo que V1-E3 sí hizo es que el clic deje de ser silencioso (el diálogo lo
+   * avisa antes, `DialogoPasarAProduccion.tsx`).
+   *
+   * Esta prueba existe para que el residuo esté **medido y a la vista**: el día que se decida
+   * retirar el botón, es la que hay que dar vuelta.
+   */
+  it('⚠️ RESIDUO MEDIDO · promover ANTES de las OC deja UN modelo para todos los colores', async () => {
+    // ⚠️ CON ficha de Desarrollo A PROPÓSITO: es el caso REAL (el flujo de C&A) y el que reproduce
+    // el bug de Daniel. La ficha **no protege** — eso es justo lo que esta prueba fija, porque el
+    // docstring de `pasarModeloAProduccion` lo afirma y una afirmación sin prueba es la que se
+    // pudre.
+    const idModelo = await crearModeloDesarrollo('CYA-26-71-021');
+    const departamento = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteCyA.id, nombre: 'NIÑOS' },
+    });
+    const proyecto = await cliente.proyecto.create({
+      data: {
+        folio: 7001n,
+        idEmpresa: empresa.id,
+        idCliente: clienteCyA.id,
+        idClienteDepartamento: departamento.id,
+        nombre: 'Joggers PV26',
+      },
+    });
+    await cliente.desarrollo.create({ data: { idProyecto: proyecto.id, idModelo } });
+
+    await pasarModeloAProduccion(sesion(), idModelo, {}, bd());
+
+    const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
+    // Quedó TRANSFORMADO: ya es de producción, y por eso `derivarModeloDeProduccion` —que exige un
+    // padre de DESARROLLO— nunca podrá hacerle nacer un modelo por color. Sus OP saldrán todas por
+    // la rama `heredado`, con ESTE único modelo.
+    expect(modelo.origen).toBe('produccion');
+    expect(modelo.numeroProduccion).toBe(71_001);
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(0);
+  });
+
+  it('⚠️ un desarrollo SIN HIJOS TODAVÍA se sigue promoviendo (lo determinante es "sin hijos")', async () => {
+    // El control negativo, y el límite declarado de LA guarda —una, no dos—: es el uso para el que
+    // el botón se construyó (§Post-F9.34/§Post-F9.46). Si esta prueba cayera, la guarda se habría
+    // comido el endpoint entero sin que nadie lo decidiera.
+    const id = await crearModeloDesarrollo('CYA-26-71-022');
+    const promovido = await pasarModeloAProduccion(sesion(), id, {}, bd());
+    expect(promovido.numeroProduccion).toBe(71_001);
+  });
+});
+
 describe('pasarModeloAProduccion', () => {
   it('asigna el número propuesto, cambia el código y CONSERVA el de desarrollo', async () => {
     await sembrarProduccion(['71001', '71002']);

@@ -78,7 +78,14 @@ export const esquemaPedidoMesRenglon = z
       .number()
       .int()
       .nullable()
-      .describe('Nº de producción del modelo (5 dígitos), o null si aún no lo tiene.'),
+      .describe(
+        'Nº de producción del modelo DEL RENGLÓN (5 dígitos), o null. ⚠️ V1-E3: para un renglón de modelo de DESARROLLO es SIEMPRE null y lo seguirá siendo — el desarrollo ya no se promueve, ahora nacen modelos de producción POR COLOR y sus números están en `numerosProduccion`. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción).',
+      ),
+    numerosProduccion: z
+      .array(z.number().int())
+      .describe(
+        '⭐ V1-E3 (§Post-F9.172(b)): nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP viva, sin repetir y en orden ascendente. Es lo que la pantalla enseña como `prod. #…`: cuatro OC de cuatro colores dan cuatro números aquí, sobre un renglón que sigue apuntando a su modelo de desarrollo. Vacío = el renglón todavía no tiene OP (o sus modelos no tienen número de 5 dígitos, caso del histórico `51783a`/`M-18`).',
+      ),
     cantidad: z.number().int().describe('Cantidad pedida del renglón.'),
     precio: z.number().nullable().describe('Precio por prenda, o null sin `pedidos.importes`.'),
     importe: z

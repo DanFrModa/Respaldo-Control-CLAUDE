@@ -133,6 +133,36 @@ describe('<DialogoPasarAProduccion>', () => {
     expect(screen.getByTestId('confirmar-pasar-a-produccion')).toBeDisabled();
   });
 
+  /**
+   * ⭐⭐ V1-E3 (§Post-F9.172(b)) — **EL AVISO ES LA ÚNICA MITIGACIÓN DEL RESIDUO QUE NO SE TAPÓ.**
+   *
+   * `promoverAProduccionNucleo` tiene UNA guarda —modelo con hijos— y por eso **cualquier
+   * desarrollo SIN hijos todavía se sigue promoviendo**, tenga o no ficha de Desarrollo. Al
+   * promoverlo queda con UN número para todos sus colores y **sin vuelta atrás**: sus OP salen
+   * todas por la rama `heredado`. Es el bug que Daniel reportó, reproducible por un clic.
+   *
+   * 🔴 Se decidió no ponerle una valla (la que haría falta retira una capacidad, y eso lo decide
+   * Daniel), así que **lo único que queda entre el usuario y el bug es este aviso**. Sin esta
+   * prueba, quien ordene el diálogo se lo lleva por delante sin que nada se ponga rojo — y el clic
+   * vuelve a ser silencioso, que es exactamente el estado que V1-E3 vino a sacar.
+   */
+  it('⭐⭐ AVISA, antes del clic, que esto le da UN número a todo el modelo y no tiene vuelta atrás', async () => {
+    propuestaMock.mockReturnValue(propuesta(71_003));
+    renderConProveedores(
+      <DialogoPasarAProduccion abierto alCambiarAbierto={() => {}} modelo={modeloDesarrollo()} />,
+      { sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']) },
+    );
+
+    const aviso = await screen.findByTestId('aviso-un-numero-para-todos-los-colores');
+    // Las TRES cosas que el aviso tiene que decir, cada una por separado: qué hace, cuál es el
+    // camino normal, y que no se puede deshacer.
+    expect(aviso).toHaveTextContent('UN número a todo el modelo, no uno por color');
+    expect(aviso).toHaveTextContent('OP');
+    expect(aviso).toHaveTextContent('No hay vuelta atrás');
+    // Y avisa SIN estorbar: el botón sigue disponible (no es una valla, es una advertencia).
+    expect(screen.getByTestId('confirmar-pasar-a-produccion')).toBeEnabled();
+  });
+
   it('no deja confirmar un número que no tiene 5 dígitos', async () => {
     propuestaMock.mockReturnValue(propuesta(71_003));
     const usuario = userEvent.setup();

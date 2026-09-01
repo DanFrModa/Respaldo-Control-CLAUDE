@@ -674,6 +674,31 @@ describe('armarDatosImpresoOrden', () => {
     expect(datos.pedidoCliente).toBe('OC-99');
   });
 
+  /**
+   * ⭐⭐ V1-E3 (§Post-F9.172(b)) — el papel pide las fotos AL MODELO DE LA ORDEN, **tal cual**.
+   *
+   * 🔴 Y eso es lo correcto justamente porque la resolución del linaje NO vive aquí: vive dentro de
+   * `leerFotosModelo` (`idModeloDeLasFotos` — la foto propia del hijo gana, y si no tiene, se ven
+   * las del padre). Resolverla ANTES de llamar, como hizo la primera versión de esta etapa, dejaría
+   * la foto propia de un hijo **invisible para siempre**. Que el hijo sin fotos vea las del padre lo
+   * demuestra `fotos-modelo.int.test.ts`, contra datos reales.
+   */
+  it('⭐⭐ las FOTOS se piden al modelo de la ORDEN tal cual (el linaje lo resuelve la lectura)', async () => {
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
+    const pedidasPara: number[] = [];
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida({ idModelo: 77 }), bom, []),
+      leerFotosModelo: (idModelo: number) => {
+        pedidasPara.push(idModelo);
+        return Promise.resolve([{ url: 'https://r2/f1.jpg' } as unknown as FotoModeloConUrl]);
+      },
+      descargarImagen: (url: string) => Promise.resolve(`data:img;${url}`),
+    });
+
+    expect(pedidasPara).toEqual([77]);
+    expect(datos.fotos).toHaveLength(1);
+  });
+
   it('descarta fotos que no se pudieron descargar (best-effort) y conserva las buenas', async () => {
     const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const fotos = [

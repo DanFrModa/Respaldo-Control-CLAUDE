@@ -16,10 +16,12 @@ import {
  *  • se copia el SNAPSHOT de la OC del cliente (`Pedido.ocCliente` → `Orden.ocCliente`, B3),
  *  • se LIGA la orden a su desarrollo (`DesarrolloOrden`, núcleo de `ligarOrden` F8-E6) si el
  *    renglón tiene desarrollo (sin desarrollo = caso legado: la OP nace sin liga),
- *  • se PASA A PRODUCCIÓN el modelo si venía de DESARROLLO (§Post-F9.34/§Post-F9.46): se le
- *    asigna su nº de 5 dígitos —el que propone el sistema o el que confirmó el usuario— y su
- *    código pasa a ser ese; el de desarrollo se conserva. Si el modelo ya era de producción, la
- *    OP simplemente hereda el número que ya tenía,
+ *  • ⭐⭐ **se REUSA —o NACE— el MODELO DE PRODUCCIÓN DE ESE COLOR** (V1-E3, §Post-F9.172(b)): si el
+ *    renglón apunta a un modelo de DESARROLLO, la OP se sella con un modelo de producción propio,
+ *    con su nº de 5 dígitos y COMPARTIENDO la receta del desarrollo, que se queda intacto y en su
+ *    catálogo. Cuatro OC de cuatro colores ⇒ cuatro modelos y UNA receta. Si el mismo color ya
+ *    tenía modelo, se REUSA (el número es del modelo, no de la orden); si el renglón ya apunta a un
+ *    modelo de producción (todo el histórico del Access), la OP lo HEREDA y nada nace,
  *  • y se ENCOLA la generación automática de la Ruta Crítica (outbox, B5).
  *
  * También aquí: los CANDIDATOS de desarrollo para el selector del constructor (búsqueda
@@ -62,7 +64,7 @@ export const esquemaSalidaProduccionCuerpo = z
       .max(99_999, { error: 'El número de producción debe tener 5 dígitos' })
       .optional()
       .describe(
-        'Nº de producción CONFIRMADO para un modelo que todavía es de desarrollo (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se ignora si el modelo ya está en producción.',
+        'Nº de producción CONFIRMADO para el modelo que va a NACER de este color (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se IGNORA —con aviso, sin bloquear— si ese color ya tenía modelo (se reusa el suyo) y también si el renglón ya apunta a un modelo de producción.',
       ),
   })
   .describe('Datos para generar la OP (salida a producción) de un renglón de pedido.');
@@ -74,28 +76,46 @@ export type DatosSalidaProduccion = z.infer<typeof esquemaSalidaProduccionCuerpo
 export const esquemaSalidaProduccionSalida = z
   .object({
     orden: esquemaOrdenSalida.describe('La orden de producción recién creada (con su matriz).'),
+    idModeloProduccion: z
+      .number()
+      .int()
+      .describe(
+        'Modelo de PRODUCCIÓN con el que quedó sellada la OP (el hijo por color, o el del renglón en el caso legado).',
+      ),
+    codigoModeloProduccion: z
+      .string()
+      .describe(
+        'Código VIGENTE de ese modelo (= su nº de 5 dígitos cuando nació por esta puerta).',
+      ),
     numeroProduccion: z
       .number()
       .int()
       .nullable()
       .describe(
-        'Nº de producción del modelo (asignado aquí si venía de desarrollo). Null cuando el modelo ya era de producción pero su código no es numérico de 5 dígitos (histórico tipo `51783a` o `M-18`).',
+        'Nº de producción del modelo de la OP. Null sólo en el caso legado, cuando el modelo del renglón ya era de producción con código NO numérico de 5 dígitos (histórico tipo `51783a` o `M-18`).',
       ),
-    numeroProduccionMinteado: z
-      .boolean()
+    modeloDeProduccion: z
+      .enum(['nacido', 'reusado', 'heredado'])
       .describe(
-        'true si ESTA salida pasó el modelo de desarrollo a producción asignándole su número; false si el modelo ya estaba en producción.',
+        'Qué pasó con el modelo de la OP (V1-E3): `nacido` = ESTA salida hizo nacer el modelo de producción de ese color, con su número; `reusado` = ese color ya tenía modelo y se usó el suyo (el número es del modelo, no de la orden); `heredado` = el renglón ya apuntaba a un modelo de producción (histórico del Access) y la OP lo lleva tal cual, sin que nazca nada.',
       ),
-    codigoModeloAnterior: z
+    idModeloDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Modelo de DESARROLLO del que nació el de la OP — y de quien es, por lo tanto, la receta que comparten todos sus colores. Null en el caso `heredado`.',
+      ),
+    codigoModeloDesarrollo: z
       .string()
       .nullable()
       .describe(
-        'Código que TENÍA el modelo antes de pasar a producción (su nº de desarrollo), o null si no hubo promoción.',
+        'Nº de desarrollo de ese padre (se CONSERVA y sigue buscable, D3), o null en el caso `heredado`.',
       ),
     avisosNumeroProduccion: z
       .array(z.string())
       .describe(
-        'Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope). NUNCA bloquean.',
+        'Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope, número capturado que no se usó porque el color ya tenía modelo). NUNCA bloquean.',
       ),
     idDesarrollo: z
       .number()

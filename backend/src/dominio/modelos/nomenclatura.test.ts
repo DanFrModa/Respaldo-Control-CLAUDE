@@ -22,6 +22,7 @@ import {
   MAX_INTENTOS_CODIGO_DESARROLLO,
   mintearCodigoDesarrollo,
   numeroProduccionDeCodigo,
+  obtenerODerivarModeloDeProduccion,
   parDe,
   parTexto,
   promoverAProduccionNucleo,
@@ -633,7 +634,15 @@ describe('mintearCodigoDesarrollo — el centinela, última red DETRÁS del piso
  * libre), el centinela de choque y la escritura + bitácora. No filtra `where`: por eso lo que se
  * afirma es QUÉ se llamó y qué NO, nunca el resultado de una consulta.
  */
-function txPromocion(modelo: Record<string, unknown> | null): {
+function txPromocion(
+  modelo: Record<string, unknown> | null,
+  /**
+   * ⭐⭐ V1-E3 — los HIJOS por color que ya nacieron de este modelo, para la GUARDA A de
+   * `promoverAProduccionNucleo` (un padre con hijos no se transforma: le daría un segundo número
+   * a la misma prenda). Por defecto ninguno, que es el caso de todo lo de antes de esta etapa.
+   */
+  hijos: Record<string, unknown>[] = [],
+): {
   tx: Tx;
   llamadas: { metodo: string; args: unknown }[];
 } {
@@ -646,6 +655,7 @@ function txPromocion(modelo: Record<string, unknown> | null): {
     modelo: {
       findUnique: (args: unknown) => reg('modelo.findUnique', args, modelo),
       findFirst: (args: unknown) => reg('modelo.findFirst', args, null),
+      findMany: (args: unknown) => reg('modelo.findMany', args, hijos),
       update: (args: unknown) => reg('modelo.update', args, {}),
     },
     tipoProducto: {
@@ -757,6 +767,32 @@ describe('promoverAProduccionNucleo — la REVISIÓN ya NO detiene producir (V1-
   });
 });
 
+describe('⭐⭐ promoverAProduccionNucleo — GUARDA A: un padre CON HIJOS no se transforma (V1-E3)', () => {
+  it('🔴 rechaza promover un modelo que ya tiene modelos de producción por color, y NO escribe', async () => {
+    // Medido sin la guarda: el padre se llevaba un SEGUNDO número de la misma serie mientras su
+    // hijo Rojo ya tenía el suyo ⇒ la misma prenda con DOS números de catálogo. Y deja a los hijos
+    // colgando de un padre que ya no es de desarrollo — lo único que la base NO puede vigilar sola
+    // (un CHECK no mira otra fila).
+    const { tx, llamadas } = txPromocion(paraPromover(), [{ codigo: '71001' }]);
+
+    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+    // El mensaje NOMBRA al hijo: quien lo lee tiene que poder ir a verlo.
+    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow('71001');
+    // Y nada se movió.
+    expect(llamadas.filter((l) => l.metodo === 'modelo.update')).toEqual([]);
+  });
+
+  it('un modelo SIN hijos se promueve igual que siempre (control negativo)', async () => {
+    // Si la guarda se pasara de frenada, este caso —el 100 % de lo que había antes de V1-E3— caería.
+    const { tx } = txPromocion(paraPromover());
+    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).resolves.toMatchObject({
+      numeroProduccion: 71_001,
+    });
+  });
+});
+
 // ── ⭐⭐ V1-E9a · derivarModeloDeProduccion: LAS GUARDAS y LA MARCA ───────────────────────────
 
 /**
@@ -783,6 +819,16 @@ function txDerivacion(
    * unitaria muerda de verdad.
    */
   choque: Record<string, unknown> | null = null,
+  /**
+   * ⭐⭐ V1-E3 — el hijo que YA existe para ese `(desarrollo, color)`, para el camino de REUSO de
+   * `obtenerODerivarModeloDeProduccion`. `null` = ese color todavía no tiene modelo.
+   *
+   * 🔴 Es el TERCER uso de `modelo.findFirst` en este camino, y por eso el doble tiene que
+   * distinguir los tres por su `where` (número repetido / código libre / hijo del color). Con un
+   * doble que contestara lo mismo a todos, la prueba del reuso pasaría también si el código
+   * derivara siempre: el `create` es lo único que las separa.
+   */
+  hijoExistente: Record<string, unknown> | null = null,
 ): {
   tx: Tx;
   llamadas: { metodo: string; args: unknown }[];
@@ -799,7 +845,15 @@ function txDerivacion(
       // Sólo el centinela del NÚMERO pregunta por `numeroProduccion` en su `OR`; el del código
       // libre mira `codigo`/`codigoDesarrollo` y nada más. Por ahí se distinguen (ver `choque`).
       findFirst: (args: unknown) => {
-        const donde = (args as { where?: { OR?: Record<string, unknown>[] } }).where;
+        const donde = (
+          args as {
+            where?: { OR?: Record<string, unknown>[]; idModeloDesarrollo?: number };
+          }
+        ).where;
+        // V1-E3: el buscador del hijo del color pregunta por `idModeloDesarrollo` a secas (sin OR).
+        if (donde?.idModeloDesarrollo !== undefined) {
+          return reg('modelo.findFirst', args, hijoExistente);
+        }
         const preguntaPorElNumero = (donde?.OR ?? []).some((c) => 'numeroProduccion' in c);
         return reg('modelo.findFirst', args, preguntaPorElNumero ? choque : null);
       },
@@ -1063,5 +1117,170 @@ describe('derivarModeloDeProduccion — las guardas', () => {
     await expect(derivarModeloDeProduccion(tx, SESION_PROMOCION, 42)).resolves.toMatchObject({
       numeroProduccion: 71_001,
     });
+  });
+});
+
+// ── ⭐⭐ V1-E3 · obtenerODerivarModeloDeProduccion: REUSAR O NACER ─────────────────────────────
+
+/**
+ * §Post-F9.172(b) — DANIEL: ***«se reúsa cuando sea el mismo modelo»***. Esta puerta es la que
+ * cumple esa frase **y**, de paso, la ÚNICA idempotencia que tiene la salida a producción: hasta
+ * V1-E3 el freno del doble clic era un efecto de borde (la 1ª salida promovía el modelo, así que la
+ * 2ª ya no entraba), y con el linaje el desarrollo se queda en desarrollo **para siempre**.
+ *
+ * Las dos ramas se prueban por SEPARADO y por lo que ESCRIBEN, no por lo que devuelven: el reuso se
+ * distingue de nacer en que **no hay `modelo.create`**. Lo que sólo Postgres puede demostrar (que
+ * dos llamadas de verdad dejan un solo modelo, y que la llave `(desarrollo, color)` lo ata) vive en
+ * `nomenclatura.int.test.ts` y en `salida-produccion.int.test.ts`.
+ */
+describe('obtenerODerivarModeloDeProduccion — reusa el modelo del color, y si no hay, lo hace nacer', () => {
+  /** El hijo que ya existe para un color (lo que devuelve el buscador del reuso). */
+  const hijoDelColor = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+    id: 99,
+    codigo: '71007',
+    numeroProduccion: 71_007,
+    activo: true,
+    ...extra,
+  });
+
+  it('⭐⭐ NACE: si ese color no tiene modelo, deriva uno y le graba el color', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar());
+
+    const salida = await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, {
+      idColor: 8,
+    });
+
+    expect(salida).toMatchObject({
+      idModelo: 77,
+      idModeloDesarrollo: 42,
+      numeroProduccion: 71_001,
+      codigo: '71001',
+      reusado: false,
+    });
+    const create = llamadas.find((l) => l.metodo === 'modelo.create')?.args as {
+      data: Record<string, unknown>;
+    };
+    // El COLOR es la mitad de la identidad del hijo: sin él, la llave `(desarrollo, color)` no
+    // podría reconocerlo la próxima vez y la OC siguiente estrenaría otro número.
+    expect(create.data).toMatchObject({ idModeloDesarrollo: 42, idColor: 8 });
+  });
+
+  it('⭐⭐ REUSA: si ese color YA tiene modelo, devuelve el suyo y NO crea nada', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar(), null, hijoDelColor());
+
+    const salida = await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, {
+      idColor: 8,
+    });
+
+    expect(salida).toMatchObject({
+      idModelo: 99,
+      idModeloDesarrollo: 42,
+      numeroProduccion: 71_007,
+      codigo: '71007',
+      reusado: true,
+      avisos: [],
+    });
+    // 🔴 LA ASERCIÓN DE LA ETAPA: reusar es NO escribir. Si esta puerta derivara igual, dos clics
+    // harían nacer dos modelos y quemarían dos de los 999 números que tiene la serie del par.
+    expect(llamadas.filter((l) => l.metodo === 'modelo.create')).toEqual([]);
+  });
+
+  it('el color se busca TAL CUAL viene: multicolor (null) es su propia llave, no "cualquiera"', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar());
+
+    await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: null });
+
+    const busqueda = llamadas.find(
+      (l) =>
+        l.metodo === 'modelo.findFirst' &&
+        (l.args as { where?: { idModeloDesarrollo?: number } }).where?.idModeloDesarrollo !==
+          undefined,
+    )?.args as { where: Record<string, unknown> };
+    expect(busqueda.where).toMatchObject({ idModeloDesarrollo: 42, idColor: null });
+    // Y el hijo multicolor nace SIN color (no con uno inventado).
+    const create = llamadas.find((l) => l.metodo === 'modelo.create')?.args as {
+      data: Record<string, unknown>;
+    };
+    expect(create.data).toMatchObject({ idColor: null });
+  });
+
+  it('⭐ toma el LOCK del desarrollo ANTES de mirar si el color ya tiene modelo', async () => {
+    // Sin el lock, dos salidas simultáneas del mismo color verían las dos "no existe" y las dos
+    // derivarían: el `findFirst` del reuso NO puede ir primero.
+    const { tx, llamadas } = txDerivacion(paraDerivar(), null, hijoDelColor());
+    await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: 8 });
+
+    const iLock = llamadas.findIndex((l) => l.metodo === '$executeRaw');
+    const iBusqueda = llamadas.findIndex((l) => l.metodo === 'modelo.findFirst');
+    expect(iLock).toBeGreaterThanOrEqual(0);
+    expect(iBusqueda).toBeGreaterThan(iLock);
+    // …y el lock es el del DESARROLLO (segunda clave = el id del padre), no el de la serie.
+    expect((llamadas[iLock]!.args as { valores: unknown[] }).valores).toEqual([20_548, 42]);
+  });
+
+  it('⭐ el nº CAPTURADO no pisa al modelo reusado: se AVISA y la orden sale igual', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar(), null, hijoDelColor());
+
+    const salida = await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, {
+      idColor: 8,
+      numeroCapturado: 71_050,
+    });
+
+    expect(salida.numeroProduccion).toBe(71_007);
+    expect(salida.avisos).toHaveLength(1);
+    expect(salida.avisos[0]).toContain('71007');
+    expect(salida.avisos[0]).toContain('71050');
+    // Renombrar un modelo que ya tiene órdenes e inventario colgando NO es una opción.
+    expect(llamadas.filter((l) => l.metodo === 'modelo.update')).toEqual([]);
+  });
+
+  it('no avisa cuando el nº capturado es EL MISMO que ya tenía el modelo del color', async () => {
+    const { tx } = txDerivacion(paraDerivar(), null, hijoDelColor());
+    const salida = await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, {
+      idColor: 8,
+      numeroCapturado: 71_007,
+    });
+    expect(salida.avisos).toEqual([]);
+  });
+
+  it('⭐ el modelo del color DESCONTINUADO se rebota: se reactiva a mano, nunca por una OP', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar(), null, hijoDelColor({ activo: false }));
+
+    await expect(
+      obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: 8 }),
+    ).rejects.toThrow('71007');
+    // Y NO se le da la vuelta haciendo nacer otro con otro número (§Post-F9.119).
+    expect(llamadas.filter((l) => l.metodo === 'modelo.create')).toEqual([]);
+  });
+
+  it('⭐ el DESARROLLO descontinuado rebota también al REUSAR, con el mismo texto que al nacer', async () => {
+    // Las dos ramas tienen que decidir igual: si bloquea estrenar un color nuevo de un desarrollo
+    // dado de baja, no puede dejar pasar el resurtido de otro — la receta que se produce es la suya.
+    const padreApagado = paraDerivar({ activo: false });
+    const { tx: txReuso } = txDerivacion(padreApagado, null, hijoDelColor());
+    const { tx: txNace } = txDerivacion(padreApagado);
+
+    const alReusar = await obtenerODerivarModeloDeProduccion(txReuso, SESION_PROMOCION, 42, {
+      idColor: 8,
+    }).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+    const alNacer = await derivarModeloDeProduccion(txNace, SESION_PROMOCION, 42).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(alReusar).toBeInstanceOf(ErrorConflicto);
+    expect(alNacer).toBeInstanceOf(ErrorConflicto);
+    expect(alReusar?.message).toContain('descontinuado');
+    expect(alReusar?.message).toBe(alNacer?.message);
+  });
+
+  it('el desarrollo que NO existe rebota al reusar (404, no un reuso a ciegas)', async () => {
+    const { tx } = txDerivacion(null, null, hijoDelColor());
+    await expect(
+      obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: 8 }),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });

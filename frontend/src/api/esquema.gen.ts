@@ -22175,8 +22175,10 @@ export interface paths {
                   idDesarrollo: number | null;
                   /** @description Nº del cliente para el modelo (del desarrollo), o null. */
                   numeroCliente: string | null;
-                  /** @description Nº de producción del modelo (5 dígitos), o null si aún no lo tiene. */
+                  /** @description Nº de producción del modelo DEL RENGLÓN (5 dígitos), o null. ⚠️ V1-E3: para un renglón de modelo de DESARROLLO es SIEMPRE null y lo seguirá siendo — el desarrollo ya no se promueve, ahora nacen modelos de producción POR COLOR y sus números están en `numerosProduccion`. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). */
                   numeroProduccion: number | null;
+                  /** @description ⭐ V1-E3 (§Post-F9.172(b)): nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP viva, sin repetir y en orden ascendente. Es lo que la pantalla enseña como `prod. #…`: cuatro OC de cuatro colores dan cuatro números aquí, sobre un renglón que sigue apuntando a su modelo de desarrollo. Vacío = el renglón todavía no tiene OP (o sus modelos no tienen número de 5 dígitos, caso del histórico `51783a`/`M-18`). */
+                  numerosProduccion: number[];
                   /** @description Cantidad pedida del renglón. */
                   cantidad: number;
                   /** @description Precio por prenda, o null sin `pedidos.importes`. */
@@ -22522,7 +22524,7 @@ export interface paths {
              * @description Fecha de entrega comprometida de la OP; si se omite, hereda la ventana del pedido (fechaHasta ?? fechaDe).
              */
             fechaEntrega?: string;
-            /** @description Nº de producción CONFIRMADO para un modelo que todavía es de desarrollo (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se ignora si el modelo ya está en producción. */
+            /** @description Nº de producción CONFIRMADO para el modelo que va a NACER de este color (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se IGNORA —con aviso, sin bloquear— si ese color ya tenía modelo (se reusa el suyo) y también si el renglón ya apunta a un modelo de producción. */
             numeroProduccion?: number;
           };
         };
@@ -22685,13 +22687,22 @@ export interface paths {
                 /** @description Id del último usuario que la modificó. */
                 modificadoPorId: string | null;
               };
-              /** @description Nº de producción del modelo (asignado aquí si venía de desarrollo). Null cuando el modelo ya era de producción pero su código no es numérico de 5 dígitos (histórico tipo `51783a` o `M-18`). */
+              /** @description Modelo de PRODUCCIÓN con el que quedó sellada la OP (el hijo por color, o el del renglón en el caso legado). */
+              idModeloProduccion: number;
+              /** @description Código VIGENTE de ese modelo (= su nº de 5 dígitos cuando nació por esta puerta). */
+              codigoModeloProduccion: string;
+              /** @description Nº de producción del modelo de la OP. Null sólo en el caso legado, cuando el modelo del renglón ya era de producción con código NO numérico de 5 dígitos (histórico tipo `51783a` o `M-18`). */
               numeroProduccion: number | null;
-              /** @description true si ESTA salida pasó el modelo de desarrollo a producción asignándole su número; false si el modelo ya estaba en producción. */
-              numeroProduccionMinteado: boolean;
-              /** @description Código que TENÍA el modelo antes de pasar a producción (su nº de desarrollo), o null si no hubo promoción. */
-              codigoModeloAnterior: string | null;
-              /** @description Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope). NUNCA bloquean. */
+              /**
+               * @description Qué pasó con el modelo de la OP (V1-E3): `nacido` = ESTA salida hizo nacer el modelo de producción de ese color, con su número; `reusado` = ese color ya tenía modelo y se usó el suyo (el número es del modelo, no de la orden); `heredado` = el renglón ya apuntaba a un modelo de producción (histórico del Access) y la OP lo lleva tal cual, sin que nazca nada.
+               * @enum {string}
+               */
+              modeloDeProduccion: 'nacido' | 'reusado' | 'heredado';
+              /** @description Modelo de DESARROLLO del que nació el de la OP — y de quien es, por lo tanto, la receta que comparten todos sus colores. Null en el caso `heredado`. */
+              idModeloDesarrollo: number | null;
+              /** @description Nº de desarrollo de ese padre (se CONSERVA y sigue buscable, D3), o null en el caso `heredado`. */
+              codigoModeloDesarrollo: string | null;
+              /** @description Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope, número capturado que no se usó porque el color ya tenía modelo). NUNCA bloquean. */
               avisosNumeroProduccion: string[];
               /** @description Desarrollo ligado a la OP, o null (renglón sin desarrollo = caso legado). */
               idDesarrollo: number | null;

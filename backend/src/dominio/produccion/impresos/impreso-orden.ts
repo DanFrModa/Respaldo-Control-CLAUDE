@@ -376,6 +376,11 @@ export async function armarDatosImpresoOrden(
     leer(cliente, orden.idModelo, sesion.idEmpresaActiva),
     leerRecetaImpreso(cliente, id),
   ]);
+  // ⭐⭐ V1-E3 (§Post-F9.172(b)) — la orden de un modelo nacido POR COLOR apunta al HIJO, que no
+  // trae fotos propias: enseña las de su desarrollo. Esa resolución vive DENTRO de
+  // `leerFotosModelo` (`idModeloDeLasFotos`: la propia gana, y si no hay, las del padre) y NO aquí
+  // — resolverla antes de llamar haría que la foto PROPIA del hijo, si un día se le sube, no
+  // ganara nunca. Aquí se pasa el modelo de la ORDEN, tal cual.
   const fotos = await leerFotos(orden.idModelo, bd, archivos);
 
   // TELA (petición Daniel): la que de verdad se compró para la orden. BEST-EFFORT: si la lectura

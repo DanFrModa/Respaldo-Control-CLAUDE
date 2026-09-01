@@ -171,7 +171,14 @@ export async function pedidosPorMes(
       : await cliente.orden.findMany({
           where: { idPedidoLinea: { in: idsLineaPagina }, estado: { not: 'cancelada' } },
           orderBy: { folio: 'asc' },
-          select: { id: true, folio: true, idPedidoLinea: true },
+          select: {
+            id: true,
+            folio: true,
+            idPedidoLinea: true,
+            // ⭐ V1-E3: el nº de producción del modelo DE LA ORDEN. Va por `include` sobre la
+            // consulta que YA se hacía por lote de renglones — sin consulta nueva y sin N+1.
+            modelo: { select: { numeroProduccion: true } },
+          },
         });
   const idsOrdenPagina = ordenesVivas.map((o) => o.id);
   const cortes =
@@ -192,6 +199,18 @@ export async function pedidosPorMes(
     ultima: { id: number; folio: number } | null;
     numOrdenes: number;
     cortado: number;
+    /**
+     * ⭐⭐ V1-E3 — los nº de producción de los MODELOS de las OPs vivas del renglón, sin repetir.
+     *
+     * 🔴 **Sin esto la pantalla de Pedidos enseñaría el código de desarrollo para siempre.** El
+     * renglón sigue apuntando a su modelo de DESARROLLO (que ya nunca se promueve), así que
+     * `linea.modelo.numeroProduccion` es null de forma permanente: el número que Daniel quiere ver
+     * —uno por color— vive ahora en el modelo de CADA OP.
+     *
+     * Se acumula en un `Set` porque un resurtido del mismo color repite modelo y el número sólo
+     * tiene que salir una vez.
+     */
+    numerosProduccion: Set<number>;
   }
   const ordenesPorLinea = new Map<number, OrdenesDeLinea>();
   for (const orden of ordenesVivas) {
@@ -200,9 +219,13 @@ export async function pedidosPorMes(
       ultima: null,
       numOrdenes: 0,
       cortado: 0,
+      numerosProduccion: new Set<number>(),
     };
     agregado.numOrdenes += 1;
     agregado.cortado += cortadoPorOrden.get(orden.id) ?? 0;
+    if (orden.modelo.numeroProduccion !== null) {
+      agregado.numerosProduccion.add(orden.modelo.numeroProduccion);
+    }
     // El orderBy folio asc deja al FINAL la más reciente: basta con pisar en cada vuelta.
     agregado.ultima = { id: orden.id, folio: Number(orden.folio) };
     ordenesPorLinea.set(orden.idPedidoLinea, agregado);
@@ -268,6 +291,9 @@ export async function pedidosPorMes(
         idDesarrollo: linea.idDesarrollo,
         numeroCliente: linea.desarrollo?.numeroCliente ?? null,
         numeroProduccion: linea.modelo.numeroProduccion,
+        // Orden ASCENDENTE y estable: el mismo renglón tiene que enseñar los mismos números en el
+        // mismo orden entre recargas (un `Set` conserva el de inserción, que depende del folio).
+        numerosProduccion: [...(ordenes?.numerosProduccion ?? [])].sort((a, b) => a - b),
         cantidad: linea.cantidadPedida,
         precio: puedeVerImportes ? precio : null,
         importe: puedeVerImportes ? importe : null,
