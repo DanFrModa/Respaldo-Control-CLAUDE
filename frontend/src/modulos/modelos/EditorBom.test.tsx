@@ -29,6 +29,45 @@ let favoritosMock: {
   yaEnLaReceta: unknown[];
   sinCantidad: unknown[];
 } = { sugeridos: [], yaEnLaReceta: [], sinCantidad: [] };
+/**
+ * V1-E9b: lo que el servidor propone de CURVA. Configurable porque la curva es lo ÚNICO de esta
+ * pantalla que NO es receta: en un modelo hijo del linaje 1:N tiene que seguir editándose, y sin
+ * una propuesta el bloque no pinta nada que se pueda mirar.
+ */
+let curvasMock: {
+  idModelo: number;
+  yaTieneCurva: boolean;
+  sugerencias: {
+    idsTalla: number[];
+    etiquetas: string[];
+    nombre: string;
+    ordenes: number;
+    folios: string[];
+    idCurvaExistente: number | null;
+  }[];
+} = { idModelo: 1, yaTieneCurva: false, sugerencias: [] };
+/** V1-E9b: la matriz por talla del avío 5, ya cargada (ver la nota del mock de abajo). */
+const medidasMock = {
+  idModelo: 1,
+  idAvio: 5,
+  consumoPorTalla: true,
+  tieneCurva: true,
+  modoCaptura: 'consumo' as const,
+  unidadConsumo: 'pza',
+  unidadMedida: null,
+  avisos: [] as string[],
+  tallas: [
+    {
+      idTalla: 3,
+      etiquetaTalla: 'CH',
+      consumo: 2,
+      enCurva: true,
+      idAvioMedida: null,
+      medidaAmarrada: null,
+      precioMedida: null,
+    },
+  ],
+};
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -40,7 +79,7 @@ vi.mock('@/api/modelos', () => ({
   useCopiarBom: () => ({ mutate: vi.fn(), isPending: false }),
   // V1-E3r: el bloque de la curva vive arriba del editor; aquí no se ejercita (tiene su propia
   // prueba en `CurvaDelModelo.test.tsx`), así que la propuesta llega vacía.
-  useCurvasSugeridas: () => ({ data: { idModelo: 1, yaTieneCurva: false, sugerencias: [] } }),
+  useCurvasSugeridas: () => ({ data: curvasMock }),
   useAsignarCurvaDesdeOrdenes: () => ({ mutate: vi.fn(), isPending: false }),
   // V1-E3v: la sugerencia de avíos favoritos vive arriba de la sección de avíos y tiene su propia
   // prueba (`SugerenciaAviosFavoritos.test.tsx`); aquí llega vacía para no estorbar.
@@ -127,9 +166,19 @@ vi.mock('@/api/tela-proveedores', () => ({
     error: null,
   }),
 }));
-// El panel de consumo por talla tiene su propia capa de datos (se prueba en su archivo).
+/**
+ * El panel de consumo por talla tiene su propia capa de datos (y su propio archivo de pruebas),
+ * pero **aquí tiene que llegar CARGADO**.
+ *
+ * 🔴 Cicatriz de la revisión de V1-E9b: este mock devolvía `isPending: true`, así que el panel
+ * pintaba un `Skeleton` y su botón de guardar NO existía **nunca**. Cualquier aserción de que el
+ * botón no está habría pasado por la razón equivocada — y de hecho la regresión real
+ * (`EditorMedidasAvio` recibiendo `puedeAdministrar` en vez de `puedeEditarReceta`) sobrevivió la
+ * suite entera. El panel es una de las DOCE puertas de la receta (`guardarMedidasAvio`): tiene su
+ * propio botón y su propio endpoint, así que su cierre hay que verlo de verdad.
+ */
 vi.mock('@/api/modelo-medidas', () => ({
-  useMedidasAvio: () => ({ data: undefined, isPending: true, isError: false, error: null }),
+  useMedidasAvio: () => ({ data: medidasMock, isPending: false, isError: false, error: null }),
   useReemplazarMedidasAvio: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/api/medidas-avio', () => ({
@@ -243,6 +292,7 @@ describe('<EditorBom> — secciones de la receta', () => {
     guardarTelasMutate.mockReset();
     guardarAviosMutate.mockReset();
     favoritosMock = { sugeridos: [], yaEnLaReceta: [], sinCantidad: [] };
+    curvasMock = { idModelo: 1, yaTieneCurva: false, sugerencias: [] };
   });
 
   // ── ⭐ V1-E3v (§Post-F9.90) — la sugerencia de favoritos TIENE que verse ──────
@@ -776,5 +826,195 @@ describe('<EditorBom> — secciones de la receta', () => {
     // El arte NO se guarda con "Guardar receta": tiene sus propias acciones.
     expect(screen.queryByTestId('guardar-bom-artes')).not.toBeInTheDocument();
     expect(screen.getByTestId('agregar-arte')).toBeInTheDocument();
+  });
+
+  // ── ⭐⭐ V1-E9b pieza B (§Post-F9.135) — LA RECETA COMPARTIDA ES DE SOLO LECTURA ──────────────
+  //
+  // Un modelo de PRODUCCIÓN nacido de un desarrollo (linaje 1:N) COMPARTE su receta: la ve entera y
+  // la edita allá. Sin esto la pantalla ofrecía guardar telas, avíos, medidas, arte y copiar receta
+  // sobre una receta que no es suya — y el usuario sólo descubría el problema al recibir el error
+  // del servidor, después de teclear.
+  describe('la receta HEREDADA (linaje 1:N) se ve pero no se toca', () => {
+    /**
+     * Un avío YA GUARDADO en la receta. Hace falta para llegar a las dos piezas que la primera
+     * entrega dejó sin prueba: el AMARRE del avío y el panel de MEDIDAS POR TALLA (que sólo se monta
+     * para avíos guardados, `idsAviosGuardados`).
+     */
+    const avioGuardado = (): ModeloFicha['avios'] => [
+      {
+        idAvio: 5,
+        clave: 'CIE-01',
+        descripcion: 'Cierre',
+        consumoPorPrenda: 1,
+        paraPreCosto: true,
+        paraProduccion: true,
+        paraCosto: true,
+        consumoPorTalla: true,
+        idAvioProveedor: null,
+        proveedorAmarrado: null,
+        precioCosteo: 4.2,
+        origenPrecio: 'referencia' as const,
+        proveedorPrecio: null,
+        amarreIgnorado: false,
+        precioReferencia: 4.2,
+      },
+    ];
+
+    /** La ficha de un HIJO: la receta que enseña es la de su modelo de desarrollo. */
+    const fichaHija = (): ModeloFicha =>
+      fichaBase([], {
+        idModeloDesarrollo: 7,
+        codigoModeloDesarrollo: 'CYA-26-71-001',
+        avios: avioGuardado(),
+      });
+
+    function pintarHija(): void {
+      renderConProveedores(<EditorBom ficha={fichaHija()} puedeAdministrar />, {
+        sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+      });
+    }
+
+    it('⭐ dice DE QUIÉN es la receta, con el código del desarrollo', () => {
+      pintarHija();
+      const letrero = screen.getByTestId('receta-del-desarrollo');
+      expect(letrero).toHaveTextContent('La receta es del modelo de desarrollo CYA-26-71-001');
+      // Y dice a DÓNDE ir con una divergencia de un solo color (decisión de Daniel: va en la OP).
+      expect(letrero).toHaveTextContent(/ORDEN de producción/);
+    });
+
+    it('🔴 cierra los botones de TELAS: ni guardar, ni agregar, ni capturar', () => {
+      pintarHija();
+      expect(screen.queryByTestId('guardar-bom-telas')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('agregar-tela-bom')).not.toBeInTheDocument();
+      // Pero la receta SÍ se ve: es de solo lectura, no está escondida.
+      expect(screen.getByTestId('renglon-bom-9')).toBeInTheDocument();
+      expect(screen.getByTestId('consumo-bom-9')).toBeDisabled();
+    });
+
+    it('🔴 cierra AVÍOS y su sugerencia de favoritos', async () => {
+      favoritosMock = {
+        sugeridos: [
+          {
+            idAvio: 7,
+            clave: 'ETQ-LAV',
+            descripcion: 'Etiqueta de lavado',
+            cantidadSugerida: 1,
+            unidad: 'pza',
+          },
+        ],
+        yaEnLaReceta: [],
+        sinCantidad: [],
+      };
+      const usuario = userEvent.setup();
+      pintarHija();
+      await usuario.click(screen.getByTestId('tab-bom-avios'));
+      expect(screen.queryByTestId('guardar-bom-avios')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('agregar-avio-bom')).not.toBeInTheDocument();
+      // La sugerencia de favoritos escribiría en el hijo lo que calculó contra el padre: fuera.
+      expect(screen.queryByTestId('sugerencia-avios-favoritos')).not.toBeInTheDocument();
+    });
+
+    it('🔴🔴 cierra las MEDIDAS POR TALLA — la sexta pata, y la que se quedó suelta', async () => {
+      // ⭐ Ésta es la prueba que faltaba en la primera entrega, y su ausencia dejó viva una
+      // regresión real: `<EditorMedidasAvio>` con `puedeAdministrar` en vez de `puedeEditarReceta`
+      // sobrevivía la suite entera. No es adorno — el panel tiene SU PROPIO botón y SU PROPIO
+      // endpoint (`guardarMedidasAvio`, una de las doce puertas), así que sobre un hijo se teclea
+      // la matriz completa para recibir el error del servidor: justo lo que el letrero vino a
+      // evitar. La simetría del código no se hereda a las pruebas.
+      const usuario = userEvent.setup();
+      pintarHija();
+      await usuario.click(screen.getByTestId('tab-bom-avios'));
+      // El panel por talla vive dentro del cajón del renglón (`renderExtra`), así que primero se
+      // expande el avío y luego se abre la matriz.
+      await usuario.click(screen.getByTestId('expandir-bom-5'));
+      await usuario.click(screen.getByTestId('toggle-medidas-avio-5'));
+      expect(screen.getByTestId('panel-medidas-avio-5')).toBeInTheDocument();
+      // Se VE (es solo lectura, no está escondida)…
+      expect(screen.getByTestId('tabla-tallas-avio-5')).toBeInTheDocument();
+      // …y no se puede tocar ni guardar.
+      expect(screen.queryByTestId('guardar-medidas-avio-5')).not.toBeInTheDocument();
+      expect(screen.getByTestId('consumo-por-talla-5')).toBeDisabled();
+      expect(screen.getByTestId('consumo-talla-5-3')).toBeDisabled();
+    });
+
+    it('🔴 cierra los AMARRES de precio (R17) de tela y de avío', async () => {
+      // El amarre viaja dentro del set-completo de telas/avíos: cambiarlo ES cambiar la receta.
+      // Los dos selectores sobrevivían igual que las medidas.
+      const usuario = userEvent.setup();
+      pintarHija();
+      await usuario.click(screen.getByTestId('expandir-bom-9'));
+      expect(screen.getByTestId('selector-amarre-tela-9')).toBeDisabled();
+      await usuario.click(screen.getByTestId('tab-bom-avios'));
+      await usuario.click(screen.getByTestId('expandir-bom-5'));
+      expect(screen.getByTestId('selector-amarre-avio-5')).toBeDisabled();
+    });
+
+    it('🔴 cierra el ARTE y el "Copiar receta de…"', async () => {
+      const usuario = userEvent.setup();
+      pintarHija();
+      // `copiarBom` con `reemplazar: true` (su default) es la más destructiva de las trece puertas.
+      expect(screen.queryByTestId('abrir-copiar-bom')).not.toBeInTheDocument();
+      await usuario.click(screen.getByTestId('tab-bom-artes'));
+      expect(screen.getByTestId('seccion-bom-artes')).toBeInTheDocument();
+      expect(screen.queryByTestId('agregar-arte')).not.toBeInTheDocument();
+    });
+
+    it('⭐ y en un modelo NORMAL todo eso sigue abierto (la otra mitad de la regla)', async () => {
+      // Sin esta prueba, cerrar los botones para TODO EL MUNDO pasaría las cuatro de arriba.
+      const usuario = userEvent.setup();
+      renderConProveedores(<EditorBom ficha={fichaBase()} puedeAdministrar />, {
+        sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+      });
+      expect(screen.queryByTestId('receta-del-desarrollo')).not.toBeInTheDocument();
+      expect(screen.getByTestId('guardar-bom-telas')).toBeInTheDocument();
+      expect(screen.getByTestId('agregar-tela-bom')).toBeInTheDocument();
+      expect(screen.getByTestId('consumo-bom-9')).toBeEnabled();
+      expect(screen.getByTestId('abrir-copiar-bom')).toBeInTheDocument();
+      await usuario.click(screen.getByTestId('expandir-bom-9'));
+      expect(screen.getByTestId('selector-amarre-tela-9')).toBeEnabled();
+      await usuario.click(screen.getByTestId('tab-bom-artes'));
+      expect(screen.getByTestId('agregar-arte')).toBeInTheDocument();
+    });
+
+    it('⭐ y las MEDIDAS y el amarre del AVÍO siguen abiertos en un modelo normal', async () => {
+      // La otra mitad de las dos pruebas nuevas de arriba: sin esto, cerrar el panel para todo el
+      // mundo las pasaría las dos.
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <EditorBom ficha={fichaBase([], { avios: avioGuardado() })} puedeAdministrar />,
+        { sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']) },
+      );
+      await usuario.click(screen.getByTestId('tab-bom-avios'));
+      await usuario.click(screen.getByTestId('expandir-bom-5'));
+      expect(screen.getByTestId('selector-amarre-avio-5')).toBeEnabled();
+      await usuario.click(screen.getByTestId('toggle-medidas-avio-5'));
+      expect(screen.getByTestId('guardar-medidas-avio-5')).toBeInTheDocument();
+      expect(screen.getByTestId('consumo-por-talla-5')).toBeEnabled();
+      expect(screen.getByTestId('consumo-talla-5-3')).toBeEnabled();
+    });
+
+    it('🔑 pero la CURVA del modelo SIGUE editándose: no es receta, es suya', () => {
+      // La trampa de esta pantalla: la curva vive dentro del editor de receta y se pasa el MISMO
+      // `puedeAdministrar`. Cerrarla "de paso" le quitaría a un modelo de producción la única
+      // forma de arreglar sus tallas — y la curva del hijo NO es la del padre (lo dice el propio
+      // dominio: `leerMedidasAvio` toma la curva de `idModelo` y las medidas de la receta).
+      curvasMock = {
+        idModelo: 1,
+        yaTieneCurva: false,
+        sugerencias: [
+          {
+            idsTalla: [3, 4],
+            etiquetas: ['CH', 'G'],
+            nombre: 'Dama CH-G',
+            ordenes: 2,
+            folios: ['1001'],
+            idCurvaExistente: null,
+          },
+        ],
+      };
+      pintarHija();
+      const sugerida = screen.getByTestId('curva-sugerida-3-4');
+      expect(within(sugerida).getByRole('button', { name: /Asignar esta curva/ })).toBeEnabled();
+    });
   });
 });

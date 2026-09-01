@@ -71,6 +71,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.072 · 1-sep-2026 · **en prueba** — La receta de un color **ya no se puede cambiar por accidente a los cuatro** (cambio interno)
+
+> 📌 **Todavía no cambia nada que puedas ver**, porque los modelos por color aún no existen: los crea una
+> versión posterior. Es el tercer ladrillo de la obra, y **el que tenía que ir antes que ellos**.
+
+### Qué se está construyendo
+
+La versión anterior hizo que los cuatro colores **lean** una sola receta, la del desarrollo. Ésta gobierna
+lo contrario: **quién puede escribirla.**
+
+La regla quedó como tú la dijiste: la receta la mueve **quien es responsable de definirla y aprobarla**, en
+el desarrollo. Y la diferencia de un color —*«no hubo cierre de ese tono y se compró otro sólo para la
+café»*— **se hace en la orden**, avisando de la diferencia, no en el modelo.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **El plan pedía lo contrario, y habría sido peor que no hacer nada.** Decía «que los escritores también
+  resuelvan», igual que las lecturas. Con eso, **editar la receta parado en el color café habría reescrito
+  la de los cuatro colores en silencio**: *«cambié un cierre sólo en la café y se le cambió a todos»*, con
+  los cuatro costos movidos y **el precio ya dicho al cliente**.
+- 🔴 **Copiar un modelo en la cita te habría dado un precio más bajo, sin avisar.** Había una puerta que
+  **no estaba en ninguna lista**: al copiar uno de los colores para cotizar, la receta llegaba **vacía**, y
+  el costo salía con sólo maquila, corte y empaque. No lanzaba ningún error: se veía normal.
+- **Y el aviso de «la receta cambió después de congelarse el costo» habría dejado de salir**, dejando la
+  cotización con el precio viejo y sin alarma.
+
+### Qué cambió y puede sorprender
+
+**La ficha de un color enseña la receta del desarrollo y ya no deja editarla ahí**, con un letrero que dice
+de dónde viene. Lo que sí se puede seguir cambiando en cada color es **la curva de tallas**, que no es
+receta y sí es suya.
+
+### Qué sigue pendiente o roto
+
+- **Nada de esta pieza.** La obra de los colores sigue: falta la versión que los hace nacer.
+- ⚠️ **Sin cambios de permisos ni de datos**: el despliegue no necesita nada especial.
+
+---
+
 ## 0.071 · 31-ago-2026 · **en prueba** — Una receta a medio firmar **ya no detiene la producción**: sólo frena la compra
 
 > 📌 **Se planeó como «0.065».** Salió con el número 0.071 porque esperó tu respuesta mientras las dos

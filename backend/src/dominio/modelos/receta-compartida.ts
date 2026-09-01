@@ -55,9 +55,21 @@
  *
  * **NO HAY CICLOS.** El CHECK `modelos_linaje_desarrollo_no_es_si_mismo_check` impide que un modelo
  * sea su propio padre, y la ausencia de cadenas impide cualquier ciclo más largo.
+ *
+ * ---
+ * ## Y LA OTRA MITAD: quién puede **ESCRIBIRLA** (pieza B)
+ *
+ * Todo lo de arriba es de LECTURA. La escritura **no se resuelve: se BLOQUEA**
+ * ({@link exigirRecetaPropia}). Resolverla reescribiría en silencio la receta del desarrollo y la
+ * de los hermanos desde el hijo de un solo color; el porqué, con las palabras de Daniel, está en
+ * esa función. La única escritura que sí resuelve es la MARCA DE AGUA
+ * (`revision-modelo.ts` → `tocarModeloPorCambioDeReceta`), que no escribe la receta sino el hecho
+ * de que cambió.
  */
 import type { PrismaClient } from '../../datos/index.js';
 import type { Tx } from '../../comun/transaccion.js';
+
+import { ErrorValidacion } from '../../comun/errores.js';
 
 /** Cualquier cliente con el que se puede LEER (dentro o fuera de transacción). */
 type Lector = Tx | PrismaClient;
@@ -269,4 +281,86 @@ export async function conRecetaCompartidaDeUno<M extends ModeloConRecetaAnidada>
     return modelo;
   }
   return injertarRecetaDeUno(modelo, await leerPadre(idPadre));
+}
+
+// ── ⭐⭐ LA OTRA MITAD DE LA REGLA: QUIÉN PUEDE **ESCRIBIR** LA RECETA ──────────────────────────
+
+/**
+ * ⭐⭐ V1-E9b pieza B — **UN MODELO QUE COMPARTE LA RECETA NO LA EDITA: LA MIRA.**
+ *
+ * Lanza si `idModelo` es un HIJO del linaje 1:N (lleva `idModeloDesarrollo`), y no hace nada en
+ * cualquier otro caso — que es el 100 % de los modelos de hoy (REGLA 0-B: la columna nace en NULL
+ * y sin backfill, y NULL significa *«la receta es la mía»*).
+ *
+ * ---
+ * ## 🔴 POR QUÉ SE BLOQUEA Y **NO** SE RESUELVE, que es toda la decisión de esta pieza
+ *
+ * A las LECTURAS se les mete el resolver (`idModelo → idModeloDeLaReceta`) y quedan bien: el hijo
+ * enseña la receta de su padre. La tentación es hacer lo mismo con las escrituras — y sería **el
+ * defecto con otro nombre**: guardar la receta parado en el hijo del color café **reescribiría la
+ * del desarrollo y la de los tres hermanos**, sin decirlo. El síntoma que llegaría es *«cambié un
+ * cierre sólo en la café y se le cambió a los cuatro colores»*, con los cuatro precostos movidos ⇒
+ * **precio equivocado al cliente**. Un `update` silencioso sobre cuatro modelos es exactamente lo
+ * que la receta compartida vino a EVITAR, no a facilitar.
+ *
+ * **La dirección la dio Daniel y no hay que volver a preguntarla** (§Post-F9.135):
+ *  • p.5 — la receta la mueve *«quien sea responsable de definir y aprobar las recetas»* ⇒ se edita
+ *    **en el modelo de desarrollo**, que es donde vive.
+ *  • p.4 — *«puede pasar que una OP del grupo se le cambie algún avío… se debe de poder hacer, pero
+ *    advirtiendo de la diferencia»* ⇒ la divergencia **por color** vive **en la OP** (que lleva su
+ *    receta congelada y editable, `produccion/receta-orden.ts`), no en el modelo.
+ *
+ * ⇒ El bloqueo no le quita nada a nadie: manda al sitio donde el cambio SÍ significa lo que el
+ * usuario quiere. Por eso el mensaje nombra al modelo de desarrollo y a la orden, en vez de ser un
+ * "no se puede" a secas.
+ *
+ * ## ⚠️ La ÚNICA escritura que sí resuelve, y por qué no está aquí
+ *
+ * `tocarModeloPorCambioDeReceta` (`revision-modelo.ts`) — la MARCA DE AGUA. No escribe la receta:
+ * escribe *«la receta cambió»*, y ese hecho es del modelo **dueño** de la receta. Sellado en el
+ * hijo, el aviso *«tu precio está sobre un costo viejo»* (`desarrollo/costo-viejo.ts`) **nunca
+ * saldría**, porque lo lee por el padre (`listas-precios.ts`), y la cotización seguiría con el
+ * precio viejo **sin alarma**. Ver la nota de esa función.
+ *
+ * ## 🔑 Y por qué el `if` está escrito al revés que en `esVersionDeModelo`
+ *
+ * Aquí la rama que **ABRE** (deja escribir) es `idModeloDesarrollo === null`, así que es ella la
+ * que tiene que exigir conocimiento positivo: lo que no se sabe —una clave ausente, un `undefined`
+ * de un objeto armado a mano— cae del lado de BLOQUEAR. Un bloqueo de más es ruidoso e inofensivo;
+ * una escritura de más se lleva por delante la receta de cuatro modelos en silencio. En
+ * `esVersionDeModelo` (`revision-modelo.ts`) el reparto es el opuesto —ahí la rama que abre la
+ * compuerta es la del hijo— y por eso allá se pregunta `typeof === 'number'`. **Mismo principio,
+ * operadores distintos:** no se copian el uno del otro.
+ *
+ * ⚠️ Que el modelo NO EXISTA no lo decide esta función (mismo criterio que
+ * {@link resolverIdRecetaDeModelo}): sale sin lanzar y quien llamó —que siempre exige el modelo, el
+ * arte o el renglón del BOM— da su propio 404. Convertirla en una guarda de existencia le cambiaría
+ * el error a media docena de puertas.
+ */
+export async function exigirRecetaPropia(lector: Lector, idModelo: number): Promise<void> {
+  const modelo = await lector.modelo.findUnique({
+    where: { id: idModelo },
+    select: {
+      codigo: true,
+      idModeloDesarrollo: true,
+      modeloDesarrollo: { select: { codigo: true } },
+    },
+  });
+  if (modelo === null) {
+    return;
+  }
+  if (modelo.idModeloDesarrollo === null) {
+    return;
+  }
+  // `?.` y no `=== null`: si la relación no viniera (un lector de mentira, un `select` recortado),
+  // lo que tiene que salir es el error de NEGOCIO con la frase genérica, no un `TypeError` que la
+  // ruta traduciría a un 500 opaco. La guarda ya decidió que hay que bloquear; el nombre del padre
+  // es adorno del mensaje, y un adorno no puede cambiar el error.
+  const padre = modelo.modeloDesarrollo?.codigo ?? null;
+  throw new ErrorValidacion(
+    `La receta de "${modelo.codigo}" no es suya: la COMPARTE con el modelo de desarrollo ` +
+      `${padre === null ? 'del que nació' : `"${padre}"`}, y por eso los demás colores de ese ` +
+      `desarrollo ven exactamente la misma. Edítala ahí y les cambia a todos a la vez. Si lo que ` +
+      `hay que cambiar es SÓLO este color, el cambio va en su ORDEN de producción, no en el modelo.`,
+  );
 }

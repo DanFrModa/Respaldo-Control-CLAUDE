@@ -57,7 +57,7 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
-import { resolverIdRecetaDeModelo } from './receta-compartida.js';
+import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
@@ -857,6 +857,9 @@ export async function reemplazarTelasBom(
   const deseados = validarEntrada(esquemaModeloTelas, telas);
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — la receta de un HIJO del linaje 1:N no se edita desde el hijo: guardar
+    // aquí reescribiría la del desarrollo y la de sus hermanos de color, en silencio.
+    await exigirRecetaPropia(tx, idModelo);
     const cambio = await sincronizarTelas(tx, sesion, idModelo, deseados);
     if (cambio) {
       await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'telas');
@@ -882,6 +885,8 @@ export async function reemplazarAviosBom(
   const deseados = validarEntrada(esquemaModeloAvios, avios);
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — misma razón que en las telas: la receta del hijo es de solo lectura.
+    await exigirRecetaPropia(tx, idModelo);
     const cambio = await sincronizarAvios(tx, sesion, idModelo, deseados);
     if (cambio) {
       await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'avios');
@@ -950,26 +955,22 @@ export async function listarAviosBom(
  * `arte-modelo.ts` (D3: nada se borra en silencio).
  *
  * ---
- * ## 🔴 DEUDA DECLARADA DE V1-E9b — **LA LECTURA DEL ORIGEN NO RESUELVE LA RECETA COMPARTIDA**
+ * ## ⭐ V1-E9b pieza B — LOS DOS LADOS DE LA RECETA COMPARTIDA, Y SE TRATAN DISTINTO
  *
- * *(Nómbrala así, por su nombre: **«la lectura del origen de `copiarBom`»**. NO es «parte de
- * copiarBom» ni «un escritor»: el alcance de la pieza B se definió como «los escritores», y este
- * renglón **es una LECTURA** — puede caerse justo entre las dos piezas si nadie lo nombra.)*
+ * **El DESTINO se BLOQUEA** ({@link exigirRecetaPropia}). Copiar sobre un hijo del linaje 1:N
+ * reescribiría la receta del desarrollo y la de sus hermanos de color — y con `reemplazar: true`,
+ * que es el DEFAULT (`CopiarBomDialogo.tsx`), primero la BORRA. El arte se borra **de verdad** (ver
+ * el aviso de arriba) y sólo sobrevive en la bitácora. Ése era el defecto silencioso y destructivo
+ * que esta pieza vino a cerrar: la operación “salía bien”, sin error y sin aviso.
  *
- * Las cuatro consultas de abajo leen `where: { idModelo: datos.idOrigen }` **en crudo**, sin pasar
- * por el resolver de {@link ../modelos/receta-compartida.js}. El día que exista un modelo hijo del
- * linaje 1:N (V1-E9a → V1-E9c), **copiar DESDE un hijo trae VACÍO** — porque su receta no es suya,
- * es la de su padre.
+ * **El ORIGEN se RESUELVE.** Leerlo es una LECTURA como cualquier otra: copiar DESDE un hijo tiene
+ * que traer la receta que ese hijo enseña —la de su padre— y no una lista vacía. Las cuatro
+ * consultas de abajo (telas, avíos, arte y las medidas por talla) usan `idRecetaOrigen`, nunca
+ * `datos.idOrigen` en crudo.
  *
- * 🔴 **Y con `reemplazar: true`, que es el DEFAULT, eso no devuelve una lista vacía: BORRA la
- * receta del destino y la sustituye por nada.** El arte se borra **de verdad** (ver el aviso de
- * arriba) y sólo sobrevive en la bitácora. Es **silencioso y destructivo**: la operación “sale
- * bien”, sin error y sin aviso.
- *
- * ⚠️ Hoy **no es alcanzable**: no existe ninguna puerta que cree un hijo (`derivarModeloDeProduccion`
- * no tiene llamador de producción y `idModeloDesarrollo` no es campo de entrada de ningún alta), y
- * por eso V1-E9b se despliega sola. Se arregla **antes o junto con** la etapa que estrene el alta de
- * hijos, resolviendo `datos.idOrigen` igual que hacen las cuatro lecturas canónicas.
+ * **Y la guarda origen≠destino se compara YA RESUELTA.** Copiar del padre a un hijo (o de un hijo a
+ * su padre) no es el mismo id **pero es la misma receta**: sin resolver los dos lados, la copia
+ * borraría la receta y la volvería a poner sobre sí misma. Comparar los ids crudos no lo ve.
  *
  * @example
  * await copiarBom(sesion, idDestino, { idOrigen: idBase, reemplazar: true });
@@ -983,6 +984,9 @@ export async function copiarBom(
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaModeloCopiarBomCuerpo, entrada);
 
+  // El choque LITERAL se ataja antes de abrir la transacción: es el error común (elegirse a uno
+  // mismo en el selector) y no necesita la base. El choque por receta COMPARTIDA —que sí la
+  // necesita— se comprueba adentro, con su propio mensaje.
   if (datos.idOrigen === idDestino) {
     throw new ErrorValidacion('El modelo de origen y el de destino no pueden ser el mismo.');
   }
@@ -990,14 +994,30 @@ export async function copiarBom(
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idDestino);
     await exigirModelo(tx, datos.idOrigen);
+    // ⭐ V1-E9b pieza B — el DESTINO no puede ser un hijo del linaje 1:N (ver la nota de arriba).
+    await exigirRecetaPropia(tx, idDestino);
+
+    // Los DOS lados resueltos, no uno: la guarda de abajo compara RECETAS, no modelos, y el
+    // origen se lee de quien de verdad tiene las filas. Se resuelven los dos aunque el destino
+    // acabe de pasar por `exigirRecetaPropia`, para que la comparación no dependa de esa guarda.
+    const [idRecetaOrigen, idRecetaDestino] = await Promise.all([
+      resolverIdRecetaDeModelo(tx, datos.idOrigen),
+      resolverIdRecetaDeModelo(tx, idDestino),
+    ]);
+    if (idRecetaOrigen === idRecetaDestino) {
+      throw new ErrorValidacion(
+        'Esos dos modelos COMPARTEN la misma receta (uno nació del otro), así que copiarla sería ' +
+          'copiarla sobre sí misma. Elige un modelo de origen de otro desarrollo.',
+      );
+    }
 
     const [telasOrigen, aviosOrigen, artesOrigen] = await Promise.all([
-      tx.modeloTela.findMany({ where: { idModelo: datos.idOrigen } }),
-      tx.modeloAvio.findMany({ where: { idModelo: datos.idOrigen } }),
+      tx.modeloTela.findMany({ where: { idModelo: idRecetaOrigen } }),
+      tx.modeloAvio.findMany({ where: { idModelo: idRecetaOrigen } }),
       // Ordenados como se despliegan: al FUSIONAR se reindexan detrás de lo que ya tiene el
       // destino, así que el orden relativo del origen (su arte principal primero) se respeta.
       tx.modeloArte.findMany({
-        where: { idModelo: datos.idOrigen },
+        where: { idModelo: idRecetaOrigen },
         orderBy: [{ orden: 'asc' }, { id: 'asc' }],
         include: { fotos: { select: { idArchivo: true, orden: true }, orderBy: { orden: 'asc' } } },
       }),
@@ -1108,7 +1128,7 @@ export async function copiarBom(
       // "se consume por talla" encendido y la matriz VACÍA — el destino quedaba con un avío que
       // dice costear por talla y no tiene ni una medida (y su amarre medida×talla, perdido).
       const medidasOrigen = await tx.modeloAvioTalla.findMany({
-        where: { idModelo: datos.idOrigen, idAvio: { in: aviosACrear.map((a) => a.idAvio) } },
+        where: { idModelo: idRecetaOrigen, idAvio: { in: aviosACrear.map((a) => a.idAvio) } },
       });
       if (medidasOrigen.length > 0) {
         await tx.modeloAvioTalla.createMany({
@@ -1174,6 +1194,9 @@ export async function copiarBom(
       datos: {
         bom: 'copiar',
         idOrigen: datos.idOrigen,
+        // Si el origen era un HIJO del linaje 1:N, la receta salió de OTRO modelo (su desarrollo):
+        // el rastro tiene que decir de dónde vinieron de verdad las filas (A7/D3).
+        ...(idRecetaOrigen === datos.idOrigen ? {} : { idModeloDeLaRecetaOrigen: idRecetaOrigen }),
         reemplazar: datos.reemplazar,
         telas: telasACrear.length,
         avios: aviosACrear.length,

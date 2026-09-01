@@ -54,6 +54,7 @@ import {
   incluirRelacionesModelo,
   type ModeloConRelaciones,
 } from './modelos.js';
+import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 
 /**
  * Namespace del `pg_advisory_xact_lock` que serializa el minteo del SUFIJO de versión de UNA
@@ -194,6 +195,8 @@ export async function mintearVersionDeModelo(
       codigoDesarrollo: true,
       versionDesarrollo: true,
       activo: true,
+      // ⭐ V1-E9b pieza B — el linaje 1:N, para la guarda EXPLÍCITA de abajo.
+      idModeloDesarrollo: true,
       ...CAMPOS_FICHA_HEREDADOS,
     },
   });
@@ -201,25 +204,31 @@ export async function mintearVersionDeModelo(
     throw new ErrorNoEncontrado('Modelo', idModeloPadre);
   }
 
+  // ⭐⭐ V1-E9b pieza B — **UN HIJO DEL LINAJE 1:N NO SE VERSIONA.** Va PRIMERO y por separado, con
+  // su propio mensaje, y eso es la corrección entera de este trozo.
+  //
+  // Hasta hoy esto lo cerraba —de refilón— la guarda de abajo: un hijo nace con
+  // `codigoDesarrollo = null` (`marcaProduccionDerivada`, `nomenclatura.ts`) ⇒ rebotaba ahí. Pero
+  // esa guarda existe por OTRA razón (el sufijo cuelga del código de desarrollo) y su propio
+  // comentario dice que versionar un modelo de producción *«es una decisión de negocio que Daniel
+  // todavía no ha tomado»*: **el día que la tome, se afloja por un motivo que no tiene nada que ver
+  // con el 1:N, y la versión de un hijo nacería con una receta que no es la suya.** Dos invariantes
+  // colgando del mismo `if` es como se pierde una sin que nada se ponga rojo.
+  //
+  // Versionar es un acto del mundo de DESARROLLO: se versiona el desarrollo, no cada color que
+  // salió de él. Por eso el mensaje manda al padre en vez de decir "no se puede".
+  if (padre.idModeloDesarrollo !== null) {
+    throw new ErrorValidacion(
+      `El modelo "${padre.codigo}" nació de un modelo de DESARROLLO y COMPARTE su receta: no es ` +
+        `él quien se versiona, sino el desarrollo del que salió. Ve a ese modelo y versiónalo ` +
+        `ahí; los modelos de producción que cuelgan de él no llevan receta propia.`,
+    );
+  }
+
   // El versionado vive en el mundo de DESARROLLO (regla 4): el sufijo cuelga del código de
   // desarrollo, y un modelo que nunca lo tuvo —los 4,987 migrados del Access— no tiene de dónde
   // colgarlo. Se rechaza en vez de inventarle uno: versionar un modelo puramente de producción es
   // una decisión de negocio que Daniel todavía no ha tomado, y esta etapa NO la toma por él.
-  // 🔴 DEUDA DECLARADA DE V1-E9b — **ESTA GUARDA ESTÁ SOSTENIENDO UNA INVARIANTE QUE NO ES SUYA.**
-  //
-  // Hoy cierra, y por eso `versiones.ts` es excepción del guardián de lecturas de receta
-  // (`receta-compartida-guardian.test.ts`): un modelo HIJO del linaje 1:N nace con
-  // `codigoDesarrollo = null` (`marcaProduccionDerivada`, `nomenclatura.ts`) ⇒ rebota aquí ⇒
-  // `copiarRecetaAModeloNuevo` nunca lee la receta de un hijo, que si la leyera vendría VACÍA.
-  //
-  // ⚠️ Pero el comentario de arriba dice que versionar un modelo de producción *«es una decisión de
-  // negocio que Daniel todavía no ha tomado»*. **El día que la tome, esta guarda se afloja por una
-  // razón que no tiene nada que ver con el linaje 1:N — y la versión de un hijo nacería con la
-  // receta VACÍA, con el guardián en verde.** Dos invariantes distintas colgando del mismo `if`.
-  //
-  // ⇒ **En V1-E9b pieza B hay que rechazar EXPLÍCITAMENTE `padre.idModeloDesarrollo !== null`
-  // aquí**, con su propio mensaje, para que la excepción del guardián deje de depender de una
-  // guarda ajena que alguien puede mover sin verla.
   if (padre.codigoDesarrollo === null) {
     throw new ErrorValidacion(
       `El modelo "${padre.codigo}" no tiene número de DESARROLLO, y la versión con sufijo cuelga ` +
@@ -416,6 +425,30 @@ export interface RecetaCopiada {
  * de la familia del padre (`CYA-26-71-001` → `-01`) y ese código lleva dentro la abreviatura del
  * cliente del padre. Copiar el modelo de un cliente para cotizárselo a OTRO tiene que **mintear un
  * código nuevo** del cliente de la mesa, no colgarse de la familia ajena.
+ *
+ * ---
+ * ## 🔴🔴 V1-E9b pieza B — **EL ORIGEN SE RESUELVE, Y AQUÍ ESTABA EL RIESGO Nº1 DE TODO EL 1:N**
+ *
+ * Esta función tiene **DOS** llamadores, y el segundo no pasa por ninguna guarda de linaje:
+ *
+ *  1. {@link mintearVersionDeModelo} — su padre nunca es un hijo del 1:N (lo rechaza explícito).
+ *  2. `desarrollo/modelo-en-la-mesa.ts` → **entra por debajo, directo**, con el id que el usuario
+ *     eligió en el selector de «copiar un modelo» de la cita, y `leerModeloOrigen` **acepta
+ *     cualquier modelo activo**.
+ *
+ * ⇒ Sin resolver, copiar un modelo HIJO en la mesa producía un modelo nuevo con la **receta VACÍA**
+ * —sólo maquila, corte y empaque—, **sin lanzar y sin verse raro**, y de ese precosto sale el
+ * precio que se le dice al cliente **en la cara**.
+ *
+ * ⚠️ **Y aquí se RESUELVE, al revés que en las trece puertas que ESCRIBEN la receta** (donde
+ * resolver es el defecto, ver `receta-compartida.ts` → `exigirRecetaPropia`). La diferencia no es
+ * de gusto: esto es una **LECTURA del origen** para crear un modelo nuevo e independiente — no
+ * reescribe la receta de nadie. Bloquearlo le quitaría a Daniel *«copiar uno ya desarrollado»*
+ * desde la cita, que es una función que él pidió (0.064).
+ *
+ * 🔑 El **destino** (`idHijo`) sí va en crudo, y debe seguir así: acaba de nacer en la misma
+ * transacción de los dos llamadores, así que su receta es suya por construcción. Resolverlo sería
+ * exactamente el defecto que la pieza B vino a impedir.
  */
 export async function copiarRecetaAModeloNuevo(
   tx: Tx,
@@ -425,11 +458,15 @@ export async function copiarRecetaAModeloNuevo(
 ): Promise<RecetaCopiada> {
   const auditoria = datosCreacion(sesion);
 
+  // ⭐ V1-E9b: de quién es la receta del origen (ver la nota de arriba). Con un modelo normal es
+  // la identidad, así que no cambia nada de lo de hoy.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idPadre);
+
   const [telas, avios, artes] = await Promise.all([
-    tx.modeloTela.findMany({ where: { idModelo: idPadre } }),
-    tx.modeloAvio.findMany({ where: { idModelo: idPadre } }),
+    tx.modeloTela.findMany({ where: { idModelo: idReceta } }),
+    tx.modeloAvio.findMany({ where: { idModelo: idReceta } }),
     tx.modeloArte.findMany({
-      where: { idModelo: idPadre },
+      where: { idModelo: idReceta },
       orderBy: [{ orden: 'asc' }, { id: 'asc' }],
       include: { fotos: { select: { idArchivo: true, orden: true }, orderBy: { orden: 'asc' } } },
     }),
@@ -471,7 +508,7 @@ export async function copiarRecetaAModeloNuevo(
 
     // MEDIDAS POR TALLA (R18): sin ellas la versión heredaría el toggle "se consume por talla"
     // encendido y la matriz VACÍA — un avío que dice costear por talla y no tiene ni una medida.
-    const medidasPadre = await tx.modeloAvioTalla.findMany({ where: { idModelo: idPadre } });
+    const medidasPadre = await tx.modeloAvioTalla.findMany({ where: { idModelo: idReceta } });
     if (medidasPadre.length > 0) {
       await tx.modeloAvioTalla.createMany({
         data: medidasPadre.map((m) => ({

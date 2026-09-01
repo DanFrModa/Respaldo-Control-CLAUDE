@@ -360,6 +360,63 @@ describe('crearModeloEnLista — cotizar en la cita un modelo que no existe', ()
     expect(total - (2 * 30 + 2.2)).toBeCloseTo(45.75, 2);
   });
 
+  it('🔴🔴 V1-E9b — copiar un modelo HIJO del 1:N trae la receta de su DESARROLLO, no una vacía', async () => {
+    // ⭐⭐ LA PUERTA QUE NO ESTABA EN NINGUNA LISTA. `leerModeloOrigen` acepta CUALQUIER modelo
+    // activo (sólo filtra `activo`), y de aquí se baja directo a `copiarRecetaAModeloNuevo` sin
+    // pasar por ninguna guarda de linaje. Un modelo HIJO no tiene receta propia —la comparte con su
+    // desarrollo—, así que sin resolver el origen esta copia nacía con la RECETA VACÍA: un precosto
+    // con sólo maquila, corte y empaque, **sin lanzar y sin verse raro**. Y de ese número sale el
+    // precio que se le dice al cliente EN LA CARA, en plena cita.
+    const { idLista } = await listaConUnModelo();
+    const tela = await cliente.tela.create({ data: { nombre: 'Felpa 1N', precioSugerido: 30 } });
+    const desarrollo = await cliente.modelo.create({
+      data: {
+        codigo: 'CYA-26-71-900',
+        codigoDesarrollo: 'CYA-26-71-900',
+        origen: 'desarrollo',
+        maquilaBase: 20,
+        idTipoProducto: pantalon.id,
+        idGenero: caballero.id,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 2 }] },
+      },
+    });
+    // El HIJO: nace ya en producción, hereda la ficha y **apunta** a la receta del padre.
+    const hijo = await cliente.modelo.create({
+      data: {
+        codigo: '71900',
+        origen: 'produccion',
+        idModeloDesarrollo: desarrollo.id,
+        maquilaBase: 20,
+        idTipoProducto: pantalon.id,
+        idGenero: caballero.id,
+      },
+    });
+    expect(await cliente.modeloTela.count({ where: { idModelo: hijo.id } })).toBe(0);
+
+    const creado = await crearModeloEnLista(
+      sesion(),
+      idLista,
+      { anioEntrega: 2026, idModeloOrigen: hijo.id, nombreProyectoNuevo: 'Cita 1:N' },
+      bd(),
+    );
+
+    expect(creado.copiadoDeCodigo).toBe('71900');
+    expect(creado.receta.telas).toBe(1);
+    // La aserción escrita AL REVÉS, que es la del defecto: no puede nacer vacío.
+    expect(creado.receta.telas).not.toBe(0);
+    // Y la copia es PROPIA del modelo nuevo (no vuelve a compartir: es un desarrollo independiente).
+    const propias = await cliente.modeloTela.findMany({ where: { idModelo: creado.idModelo } });
+    expect(propias.map((t) => t.idTela)).toEqual([tela.id]);
+    const nuevo = await cliente.modelo.findUniqueOrThrow({ where: { id: creado.idModelo } });
+    expect(nuevo.idModeloDesarrollo).toBeNull();
+
+    // De punta a punta, con el número: tela 2×30 = 60 + maquila 20 + empaque 2.20 = 82.20. Con la
+    // receta vacía habrían sido 22.20, y nada habría avisado.
+    const precosto = await obtenerPrecosto(sesion(), creado.idPrecosto, bd());
+    const total = precosto.lineas.reduce((suma, l) => suma + (l.importe ?? 0), 0);
+    expect(total).toBeCloseTo(82.2, 2);
+  });
+
   it('el modelo copiado ENTRA a la lista en cuanto se congela su precosto (el ciclo de la cita, completo)', async () => {
     const { idLista } = await listaConUnModelo();
     const tela = await cliente.tela.create({ data: { nombre: 'Felpa ciclo', precioSugerido: 30 } });
