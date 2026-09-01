@@ -267,9 +267,9 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // inverso (D3), existencias (vistas) y kardex. Importes de telas ocultos sin telas.ver-totales
   // (ex-acceso #7). RBAC inventario-telas/.avios ver/.mover.
   await app.register(rutasInventarioTelas, { prefix: '/api' });
-  // ENTRADA de tela por FACTURA/REMISIÓN sin orden de compra (B1, DECISIONES §Post-F9.9 p.7): la
-  // segunda vía de entrada del inventario por color — documento con cabecera + N partidas, PDF de
-  // la factura adjunto en R2, confirmación que crea partidas + kardex y cancelación por inverso.
+  // ENTRADA de tela por FACTURA/REMISIÓN del proveedor, SIEMPRE contra su orden de compra (B1;
+  // §Post-F9.159(a) cerró la vía sin OC) — documento con cabecera + N partidas, PDF de la factura
+  // adjunto en R2, confirmación que crea partidas + kardex y cancelación por inverso.
   await app.register(rutasEntradasTela, { prefix: '/api' });
   await app.register(rutasInventarioAvios, { prefix: '/api' });
   // Producción / WIP — ETAPAS (F3-E2): corte + envío a maquila unificado (M/A por TipoProceso, D8),

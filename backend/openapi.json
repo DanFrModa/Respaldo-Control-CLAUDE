@@ -122579,7 +122579,7 @@
     },
     "/api/inventarios/telas/entradas": {
       "get": {
-        "summary": "Listar las entradas de tela por factura/remisión (sin orden de compra)",
+        "summary": "Listar las entradas de tela por factura/remisión del proveedor",
         "tags": [
           "inventario-telas"
         ],
@@ -123069,7 +123069,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                                  "description": "Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede."
                                 },
                                 "numCompra": {
                                   "anyOf": [
@@ -123482,22 +123482,16 @@
                           "maxLength": 100
                         },
                         "idOrdenCompraLinea": {
-                          "description": "Renglón de OC que surte este renglón, o null si la tela no viene de una OC.",
-                          "anyOf": [
-                            {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Renglón de OC que surte este renglón. OBLIGATORIO: no se recibe tela sin orden de compra (§Post-F9.159(a))."
                         }
                       },
                       "required": [
                         "idTelaColor",
-                        "cantidad"
+                        "cantidad",
+                        "idOrdenCompraLinea"
                       ],
                       "description": "Renglón (= partida) de una entrada de tela por factura/remisión."
                     }
@@ -123511,11 +123505,11 @@
                   "idAlmacen",
                   "lineas"
                 ],
-                "description": "Alta de una entrada de tela por factura/remisión (sin orden de compra)."
+                "description": "Alta de una entrada de tela por factura/remisión, SIEMPRE contra órdenes de compra (§Post-F9.159(a): no se recibe tela que no se haya comprado)."
               }
             }
           },
-          "description": "Alta de una entrada de tela por factura/remisión (sin orden de compra)."
+          "description": "Alta de una entrada de tela por factura/remisión, SIEMPRE contra órdenes de compra (§Post-F9.159(a): no se recibe tela que no se haya comprado)."
         },
         "security": [
           {
@@ -123862,7 +123856,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede."
                           },
                           "numCompra": {
                             "anyOf": [
@@ -124931,7 +124925,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede."
                           },
                           "numCompra": {
                             "anyOf": [
@@ -125298,22 +125292,16 @@
                           "maxLength": 100
                         },
                         "idOrdenCompraLinea": {
-                          "description": "Renglón de OC que surte este renglón, o null si la tela no viene de una OC.",
-                          "anyOf": [
-                            {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Renglón de OC que surte este renglón. OBLIGATORIO: no se recibe tela sin orden de compra (§Post-F9.159(a))."
                         }
                       },
                       "required": [
                         "idTelaColor",
-                        "cantidad"
+                        "cantidad",
+                        "idOrdenCompraLinea"
                       ],
                       "description": "Renglón (= partida) de una entrada de tela por factura/remisión."
                     }
@@ -125691,7 +125679,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede."
                           },
                           "numCompra": {
                             "anyOf": [
@@ -126329,7 +126317,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede."
                           },
                           "numCompra": {
                             "anyOf": [
@@ -126989,7 +126977,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede."
                           },
                           "numCompra": {
                             "anyOf": [

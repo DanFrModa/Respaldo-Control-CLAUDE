@@ -213,6 +213,34 @@ function cruzarConceptos(
 }
 
 /**
+ * 🔴 **EL AVISO DE «no hay nada pendiente», atado a HASTA DÓNDE SE PREGUNTÓ** (§Post-F9.159(a),
+ * segundo hallazgo del reviewer de esta etapa).
+ *
+ * `lineasTelaPendientesDeProveedor` va ACOTADA a una orden cuando la lectura llegó desde ella
+ * (`idOrdenCompra`, §Post-F9.15). Con ese acotamiento, una respuesta vacía significa *«esta orden
+ * no tiene tela pendiente»* y **no** *«este proveedor no tiene nada»* — y el imperativo *«levanta
+ * (o autoriza) la orden»* es además imposible por ese camino, porque a él sólo se llega desde el
+ * botón «Dar entrada a la tela», que sólo aparece en órdenes YA autorizadas.
+ *
+ * ⚠️ La lección de la ronda anterior, escrita aquí para que no se repita: **al corregir una frase
+ * falsa haciéndola más específica se la vuelve MÁS falsable**. La versión anterior de este aviso
+ * afirmaba en plural sobre *todas* las órdenes del proveedor con un dato que podía cubrir una
+ * sola. Una frase más fuerte necesita un disparador más estrecho, no más ancho.
+ *
+ * Es pura a propósito: así el texto y su disparador se prueban sin Postgres.
+ */
+export function avisoSinPendientesDeTela(acotadoAUnaOrden: boolean): string {
+  return acotadoAUnaOrden
+    ? 'Esta orden de compra ya no tiene renglones de tela pendientes de recibir, así que la ' +
+        'factura NO se puede capturar contra ella: no se recibe tela que no se haya comprado. Si ' +
+        'lo que llegó es de OTRA orden, captúralo desde «Entradas de tela por factura › Nueva ' +
+        'entrada», eligiendo el proveedor.'
+    : 'Ese proveedor no tiene renglones de tela pendientes en órdenes de compra abiertas, así que ' +
+        'esta factura NO se puede capturar todavía: no se recibe tela que no se haya comprado. ' +
+        'Levanta (o autoriza) la orden de compra de esta tela y vuelve.';
+}
+
+/**
  * Lee un CFDI y devuelve la propuesta para llenar la captura de la entrada de tela. **No escribe
  * nada**: la persona revisa, corrige y captura el color antes de guardar.
  */
@@ -292,17 +320,28 @@ export async function leerCfdiParaEntradaTela(
       : await lineasTelaPendientesDeProveedor(sesion, proveedor.id, entrada.idOrdenCompra, bd);
   const conceptos = cruzarConceptos(parsed.conceptos, pendientes);
 
+  // 🔴 §Post-F9.159(a) — este aviso PROMETÍA lo que ahora está prohibido: *"la tela de esta factura
+  // entrará como tela SUELTA (sin cerrar ninguna orden)"*. Desde que no se recibe tela sin OC, esa
+  // entrada ni siquiera se puede guardar: el mensaje mandaba a un callejón. Ahora dice lo que de
+  // verdad pasa y a dónde ir.
+  //
+  // 🔴 Y **dice hasta dónde alcanza lo que se preguntó**: `pendientes` sale acotado a UNA orden
+  // cuando la lectura llegó desde ella (`entrada.idOrdenCompra`, §Post-F9.15), así que su vacío NO
+  // sostiene ninguna frase sobre el proveedor entero — ni el imperativo de «levanta (o autoriza) la
+  // orden», que en ese camino es imposible: el botón «Dar entrada a la tela» sólo aparece en
+  // órdenes YA autorizadas. Al corregir una frase falsa haciéndola más específica se la vuelve más
+  // falsable, y esa versión se coló en la ronda anterior.
   if (proveedor !== null && pendientes.length === 0) {
-    avisos.push(
-      'Ese proveedor no tiene renglones de tela pendientes en órdenes de compra abiertas: la tela ' +
-        'de esta factura entrará como tela SUELTA (sin cerrar ninguna orden).',
-    );
+    avisos.push(avisoSinPendientesDeTela(entrada.idOrdenCompra !== undefined));
   }
   const sinCruce = conceptos.filter((c) => c.sugerencia === null).length;
   if (pendientes.length > 0 && sinCruce > 0) {
+    // También se corrigió por §Post-F9.159(a): decía *"elígelos a mano"*, y capturar un renglón a
+    // mano —sin orden de compra— dejó de existir. El camino real es el panel de pendientes.
     avisos.push(
       `${String(sinCruce)} concepto(s) de la factura no se pudieron cruzar con un renglón de la ` +
-        `orden de compra: elígelos a mano (puede ser flete, otro material o un nombre distinto).`,
+        `orden de compra: captúralos desde el panel "Pendiente de la orden de compra" (puede ser ` +
+        `flete, otro material o un nombre distinto, y entonces no se capturan aquí).`,
     );
   }
 

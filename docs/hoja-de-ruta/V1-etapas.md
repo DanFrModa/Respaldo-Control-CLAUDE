@@ -1218,6 +1218,105 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9l · ⭐ NO SE RECIBE TELA SIN OC — se IMPIDE (1-sep-2026, versión **0.080**) — ✅ HECHA
+
+Fila **0.078** del programa. Daniel (§Post-F9.159(a)): *«es imposible. Porque sin OC no podemos recibir
+tela. **¿De quién recibiríamos sin OC? No puede suceder.**»* ⇒ **bloqueo, no aviso.**
+
+⚠️ §Post-F9.9 punto 7 (*«permitir las dos vías… sin OC»*) quedó **SUPERADA** por escrito. El archivo tenía
+**las dos respuestas, opuestas**, y ésa fue la causa real de que la decisión pareciera abierta.
+
+### Qué se cerró, y qué NO — la línea se decidió midiendo
+
+**Se cierra el RENGLÓN sin OC, no el DOCUMENTO.** La `EntradaTela` (factura/remisión con su número,
+proveedor, fecha, almacén y **su PDF**) se queda: es el soporte de lo que el proveedor mandó, y Daniel
+nunca pidió retirarlo.
+
+**Los AJUSTES de inventario quedan fuera, y ahora está medido, no supuesto:** exigen `motivo`
+(`inventario-material.ts:422-426`), dejan bitácora y llevan `origenTipo = movimientoManual`
+(`partidas-telas.ts:454`) ⇒ son **corrección auditada y visible**, no una puerta trasera; cerrarlos
+rompería la toma de inventario físico. Enumerado además: `entrada-recepcion` tiene **dos** productores en
+`backend/src` —`entradas-tela.ts` y `compras/recepciones.ts`— **más el ETL histórico**
+(`migracion/loaders/entradas-salidas-telas.ts:70`), exento por REGLA 0-B.
+
+### La guarda: en el embudo, y falla cerrada
+
+`exigirRenglonesConOrdenDeCompra` va **en primera línea** de `validarCabeceraYLineas`, el embudo por el
+que pasan **crear (`:617`), actualizar (`:731`) y confirmar (`:1020`)** ⇒ un llamador nuevo queda cubierto
+**por omisión**. El contrato exige `idOrdenCompraLinea`, y **TypeScript obligó a 41 sitios de prueba a
+declararlo** — la mejor red posible. Falla cerrada con `typeof !== 'number'`, no `=== null`.
+
+🔴 **Un bug real que sólo apareció al construir la guarda:** `confirmarEnTransaccion` **tiraba**
+`idOrdenCompraLinea` al armar `LineaColorBase[]` ⇒ confirmar quedaba **fuera** del embudo y un borrador
+viejo entraba por la puerta de atrás.
+
+**LEER no se rompe (D3):** la columna sigue **nullable** a propósito y la salida del contrato **no** se
+endureció; los documentos viejos se listan, se consultan y se cancelan. **Sin backfill** (REGLA 0-B).
+
+### 🔴 DOS RECHAZOS, y los dos por el MISMO defecto que la etapa venía a cerrar
+
+**1ª vuelta — el letrero afirmaba sin haber preguntado.** Los tres estados salían de **una** variable, pero
+la página la alimentaba desde **dos ramas** y sólo se midió una: si el XML no cruzaba ningún concepto,
+salía `[]` ⇒ *«este proveedor no tiene nada pendiente»* — **falso, y el propio servidor lo prueba**
+(`cfdi-entrada-tela.ts:300-306` emite un aviso para ese caso exacto) ⇒ mandaba a levantar **una OC que ya
+existe**. Y **dos mensajes en vivo** seguían ofreciendo la vía cerrada, uno de ellos en el archivo que el
+coder acababa de reescribir.
+
+**2ª vuelta — el SEXTO camino, y una regresión de la propia corrección.** Llegando por deep-link desde una
+OC, la consulta va **acotada a esa orden** (`recepciones.ts:1248`) ⇒ `[]` significa *«esta orden no tiene»*,
+no *«el proveedor no tiene»*. ⭐ **Y el aviso corregido era PEOR que el original**: al hacerse más
+específico (*«en órdenes de compra abiertas»*, en plural sobre todo el proveedor, más un imperativo
+imposible desde una OC ya autorizada) se volvió **más falsable**.
+
+> ⭐⭐ **La lección de la etapa: al corregir una frase falsa haciéndola más específica se puede volver MÁS
+> falsable. Una frase más fuerte necesita un disparador más ESTRECHO, no más ancho.**
+
+Alcanzable con una configuración **corriente**: una OC con tela y avíos, tela ya recibida, avío abierto ⇒
+`recibida_parcial` ⇒ el botón se pinta (no comprueba que quede tela pendiente) ⇒ consulta acotada vacía.
+
+### El cierre: seis estados, exhaustivos sobre estatus **y** alcance
+
+`sin-proveedor · consultando · error · ninguno · ninguno-en-esta-oc · hay`. Se eligió el sexto estado sobre
+la alternativa (consulta sin acotar) **midiendo**: ésta costaba un GET extra por apertura **y aun así
+necesitaba una rama nueva**, porque el texto de `'hay'` dice *«suelta la factura leída»* y por el botón se
+llega **sin XML**. Sólo **dos** ramas afirman un hecho (`ninguno` y `hay`) y las dos se verificaron.
+
+### 🔴 Dos pruebas que pasaban por la razón equivocada — y cómo se demostró
+
+1. **`'ninguno-en-esta-oc'` CONTIENE `'ninguno'`**, y las aserciones eran `toHaveTextContent` (*substring*).
+   ⭐ **El reviewer no lo dedujo: rompió el productor para que la lógica de alcance quedara COMPLETAMENTE
+   MUERTA y las 25 pruebas pasaron.** Con el ancla `/^ninguno$/`, 1 roja. **El ancla ES lo que convierte
+   esa prueba en guardia**; sin ella la suite habría certificado el arreglo con el arreglo desactivado.
+2. **Un espía sin limpiar** entre pruebas ⇒ las aserciones de alcance podían pasar con llamadas de la
+   prueba anterior.
+
+### Verificación
+
+**14 mutaciones del coder + 4 del reviewer, todas muertas**, con la inyección comprobada en el archivo
+antes de creer cada resultado. **Una superviviente DECLARADA**: el cableado `entrada.idOrdenCompra !==
+undefined` sólo lo mata la prueba de integración —**y el reviewer la leyó y verificó sus precondiciones
+una a una** (RFC del emisor, el renglón «Fletes» excluido por `idTela: { not: null }`, la prueba hermana
+intacta) antes de aceptarla. **CI es el juez.**
+
+**Gates (lead, sobre `prueba` con la 0.079 dentro):** backend **2,540** · `typecheck` · `lint` (con
+`--max-old-space-size=8192`) · `format:check`; frontend **1,941** · `tsc -b` · `format:check`. **Cero
+drift.** `schema.prisma` verificado **byte a byte sin las líneas `///`** ⇒ **sólo comentarios, cero
+migración**. **Sin permisos ni seed** ⇒ no requiere `SEED_ON_START`.
+
+### ⏳ Residuos declarados
+
+1. **Fuga A9**: al **capturar** nadie valida que el `idOrdenCompraLinea` sea de la empresa correcta, y la
+   lectura devuelve el `numCompra` de esa orden (`entradas-tela.ts:255-256`, sin filtro de empresa).
+   Pre-existente, sólo por API a mano, y **confirmar sí lo rechaza** (`recepciones.ts:831-834`).
+   ⚠️ Se renombró a propósito: no es *«falta una validación»*, es **una fuga de un folio de otra empresa**.
+2. **Higiene de pruebas** (§4): limpiar los espías del `describe` viejo y anclar el `toHaveTextContent('hay')`
+   de `:675`. **Medido: hoy no miente** —se añadieron los `mockClear()` y las 25 siguieron pasando— el
+   riesgo es **latente**, no vivo.
+3. El encabezado «Pendiente de la orden de compra» es singular aunque liste varias OC; **no se cambió** y
+   el reviewer estuvo de acuerdo: cada fila trae su `· OC {numCompra}`, así que no afirma un alcance falso.
+
+---
+
 ## V1-E9k · EL CONTRATO PROMETÍA UNA PÁGINA QUE EL SISTEMA RECHAZA (1-sep-2026, versión **0.079**) — ✅ HECHA
 
 Fila **0.083**. Cuatro esquemas del contrato publicaban `porPagina` **máx 500**; sus dominios re-validan

@@ -263,7 +263,7 @@ const router = createBrowserRouter([
           { path: 'inventarios/telas/ajuste', element: <AjusteTelaColorPagina /> },
           { path: 'inventarios/telas/traspaso', element: <TraspasoTelaColorPagina /> },
           { path: 'inventarios/telas/salida-orden', element: <SalidaTelaColorOrdenPagina /> },
-          // Entrada de tela por FACTURA/REMISIÓN sin orden de compra (B1). Las rutas ESTÁTICAS
+          // Entrada de tela por FACTURA/REMISIÓN contra su OC (B1). Las rutas ESTÁTICAS
           // ('nueva') van ANTES de las que llevan :param, si no 'nueva' caería en el detalle.
           { path: 'inventarios/telas/entradas', element: <EntradasTelaPagina /> },
           { path: 'inventarios/telas/entradas/nueva', element: <CapturaEntradaTelaPagina /> },

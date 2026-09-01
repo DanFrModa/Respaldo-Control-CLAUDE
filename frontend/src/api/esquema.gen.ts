@@ -47279,7 +47279,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Listar las entradas de tela por factura/remisión (sin orden de compra) */
+    /** Listar las entradas de tela por factura/remisión del proveedor */
     get: {
       parameters: {
         query?: {
@@ -47390,7 +47390,7 @@ export interface paths {
                   idPartida: number | null;
                   /** @description Folio de la partida, o null. */
                   partidaFolio: number | null;
-                  /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                  /** @description Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede. */
                   idOrdenCompraLinea: number | null;
                   /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                   numCompra: number | null;
@@ -47508,7 +47508,7 @@ export interface paths {
         path?: never;
         cookie?: never;
       };
-      /** @description Alta de una entrada de tela por factura/remisión (sin orden de compra). */
+      /** @description Alta de una entrada de tela por factura/remisión, SIEMPRE contra órdenes de compra (§Post-F9.159(a): no se recibe tela que no se haya comprado). */
       requestBody: {
         content: {
           'application/json': {
@@ -47540,8 +47540,8 @@ export interface paths {
               precioUnitComplemento?: number;
               /** @description Número de lote del proveedor de esta partida (opcional). */
               loteProveedor?: string;
-              /** @description Renglón de OC que surte este renglón, o null si la tela no viene de una OC. */
-              idOrdenCompraLinea?: number | null;
+              /** @description Renglón de OC que surte este renglón. OBLIGATORIO: no se recibe tela sin orden de compra (§Post-F9.159(a)). */
+              idOrdenCompraLinea: number;
             }[];
           };
         };
@@ -47623,7 +47623,7 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
-                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede. */
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
@@ -48006,7 +48006,7 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
-                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede. */
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
@@ -48150,8 +48150,8 @@ export interface paths {
               precioUnitComplemento?: number;
               /** @description Número de lote del proveedor de esta partida (opcional). */
               loteProveedor?: string;
-              /** @description Renglón de OC que surte este renglón, o null si la tela no viene de una OC. */
-              idOrdenCompraLinea?: number | null;
+              /** @description Renglón de OC que surte este renglón. OBLIGATORIO: no se recibe tela sin orden de compra (§Post-F9.159(a)). */
+              idOrdenCompraLinea: number;
             }[];
           };
         };
@@ -48233,7 +48233,7 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
-                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede. */
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
@@ -48441,7 +48441,7 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
-                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede. */
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
@@ -48655,7 +48655,7 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
-                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a §Post-F9.159(a): capturar hoy sin OC ya no se puede. */
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { sellarCfdiEnEntrada } from './cfdi-entrada-tela.js';
+import { avisoSinPendientesDeTela, sellarCfdiEnEntrada } from './cfdi-entrada-tela.js';
 
 describe('sellarCfdiEnEntrada — sin factura no hace nada (§Post-F9.21)', () => {
   const sinR2 = () => {
@@ -40,5 +40,37 @@ describe('sellarCfdiEnEntrada — sin factura no hace nada (§Post-F9.21)', () =
     } finally {
       restaurar();
     }
+  });
+});
+
+/**
+ * 🔴🔴 **EL AVISO NO PUEDE AFIRMAR MÁS DE LO QUE SE PREGUNTÓ** (§Post-F9.159(a)).
+ *
+ * Los pendientes se consultan ACOTADOS a una orden cuando la lectura llegó desde ella, así que su
+ * vacío no sostiene ninguna frase sobre el proveedor entero. Aquí se prueba el TEXTO y su
+ * disparador sin base de datos; que el disparador se alimente del `idOrdenCompra` de la lectura lo
+ * cubre `cfdi-entrada-tela.int.test.ts` (lo corre CI, contra Postgres).
+ */
+describe('avisoSinPendientesDeTela — la frase mide hasta dónde se preguntó', () => {
+  it('SIN acotar: se preguntó por TODO el proveedor, así que la frase puede nombrarlo', () => {
+    const aviso = avisoSinPendientesDeTela(false);
+    expect(aviso).toMatch(/Ese proveedor no tiene renglones de tela pendientes/);
+    // Ahí sí es cierto que lo que falta es la COMPRA.
+    expect(aviso).toMatch(/Levanta \(o autoriza\)/);
+  });
+
+  it('🔴 ACOTADO a una orden: habla de ESA orden y no manda a autorizar lo ya autorizado', () => {
+    const aviso = avisoSinPendientesDeTela(true);
+    expect(aviso).toMatch(/Esta orden de compra ya no tiene renglones de tela pendientes/);
+    // Las dos mitades falsas de la versión anterior: el proveedor (al que no se le preguntó) y el
+    // imperativo imposible (a este camino se llega desde una OC que YA está autorizada).
+    expect(aviso).not.toMatch(/Ese proveedor/);
+    expect(aviso).not.toMatch(/Levanta \(o autoriza\)/);
+    // Y deja una salida real para la tela que sí es de otra orden.
+    expect(aviso).toMatch(/Nueva entrada/);
+  });
+
+  it('las dos frases son DISTINTAS (una sola redacción no puede ser cierta en los dos alcances)', () => {
+    expect(avisoSinPendientesDeTela(true)).not.toBe(avisoSinPendientesDeTela(false));
   });
 });

@@ -90,7 +90,7 @@ model Empresa {
   movimientos            Movimiento[]
   /// Partidas de tela (entradas del inventario nuevo por color, A2 §Post-F9.11; folio por empresa). Restrict.
   partidasTela           PartidaTela[]
-  /// Documentos de ENTRADA de tela por factura/remisión SIN orden de compra (B1; folio por empresa). Restrict.
+  /// Documentos de ENTRADA de tela por factura/remisión del proveedor, contra su OC (B1; §Post-F9.159(a)). Restrict.
   entradasTela           EntradaTela[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
   cargosEsMa             EsMaCargo[]
@@ -753,7 +753,7 @@ model Proveedor {
   lotes                   Lote[]
   /// Órdenes de compra emitidas a este proveedor (F4-E2). Restrict.
   ordenesCompra           OrdenCompra[]
-  /// Entradas de tela por factura/remisión SIN OC surtidas por este proveedor (B1). Restrict.
+  /// Entradas de tela por factura/remisión de este proveedor, contra sus OC (B1; §Post-F9.159(a)). Restrict.
   entradasTela            EntradaTela[]
   /// Requerimientos de explosión MRP donde es el proveedor SUGERIDO (F4-E4, R1/R3). Restrict.
   requerimientosSugeridos RequerimientoOrden[] @relation("RequerimientoProveedorSugerido")
@@ -1673,9 +1673,9 @@ model PartidaTela {
   @@map("partidas_tela")
 }
 
-/// Tipo del DOCUMENTO del proveedor que ampara una entrada de tela sin orden de compra (B1 —
-/// Daniel §Post-F9.9 punto 7: *"permitir las dos vías (con orden de compra y por factura/remisión
-/// sin OC)"*).
+/// Tipo del DOCUMENTO del proveedor que ampara una entrada de tela (B1). La factura/remisión sigue
+/// siendo el soporte de lo que mandó el proveedor; lo que YA NO existe es la entrada sin orden de
+/// compra (§Post-F9.159(a) superó la línea de §Post-F9.9 punto 7 que permitía "las dos vías").
 enum TipoDocumentoEntradaTela {
   factura
   remision
@@ -1695,11 +1695,12 @@ enum EstatusEntradaTela {
   @@map("estatus_entrada_tela")
 }
 
-/// DOCUMENTO DE ENTRADA de tela por FACTURA/REMISIÓN, SIN orden de compra (etapa B1 — Daniel
-/// §Post-F9.9 punto 7 y §Post-F9.11). Es la segunda vía de entrada al inventario de telas por
-/// COLOR: una CABECERA por documento del proveedor (factura o remisión, con su número) y N
-/// PARTIDAS (`EntradaTelaLinea`), cada una con su color y sus cantidades de cuerpo/complemento.
-/// La vía con OC sigue siendo `RecepcionCompra` (que desde B1 también entra por color/partida).
+/// DOCUMENTO DE ENTRADA de tela por FACTURA/REMISIÓN del proveedor, SIEMPRE contra sus órdenes de
+/// compra (etapa B1 y §Post-F9.11; §Post-F9.159(a) cerró la vía "sin OC" de §Post-F9.9 punto 7 —
+/// Daniel: *"sin OC no podemos recibir tela. ¿De quién recibiríamos sin OC?"*). Una CABECERA por
+/// documento del proveedor (factura o remisión, con su número) y N PARTIDAS (`EntradaTelaLinea`),
+/// cada una con su color, sus cantidades de cuerpo/complemento y **su renglón de OC**. Confirmarlo
+/// genera la `RecepcionCompra` de cada OC surtida (§Post-F9.14).
 ///
 /// Reglas: folio propio consecutivo POR EMPRESA (A3, secuencia `entrada-tela`); scope por empresa
 /// (A9); auditoría uniforme (A7). Al CONFIRMAR, en UNA transacción (A2), cada renglón crea SU
@@ -1821,9 +1822,15 @@ model EntradaTelaLinea {
 
   /// Renglón de ORDEN DE COMPRA que este renglón de la factura SURTE (§Post-F9.14, petición de
   /// Daniel 7-ago-2026: *"al dar entrada de tela de una factura, la relacionemos con la OC de esa
-  /// tela… se marca con estatus de recibido"*). NULL = tela sin orden de compra (compra suelta),
-  /// que sigue siendo un caso válido. Es POR RENGLÓN a propósito: una factura del proveedor puede
-  /// amparar tela de dos OCs distintas y hasta tela suelta en el mismo documento.
+  /// tela… se marca con estatus de recibido"*). Es POR RENGLÓN a propósito: una factura del
+  /// proveedor puede amparar tela de **dos OCs distintas** en el mismo documento.
+  ///
+  /// 🔴 **OBLIGATORIO desde §Post-F9.159(a)** (Daniel, 30-ago-2026: *"sin OC no podemos recibir
+  /// tela"*). Aquí decía *"NULL = tela sin orden de compra (compra suelta), que sigue siendo un caso
+  /// válido"*: **ya no lo es**. La columna se queda NULLABLE **sólo por los documentos anteriores a
+  /// esa decisión** —que se siguen leyendo, listando e imprimiendo (D3)—; ponerla NOT NULL exigiría
+  /// tocar esos datos, que es lo que la REGLA 0-B prohíbe. La invariante la sostiene el dominio
+  /// (`exigirRenglonesConOrdenDeCompra`, embudo `validarCabeceraYLineas`), no la columna.
   ///
   /// Al CONFIRMAR el documento, los renglones con este campo generan la `RecepcionCompra` de su OC
   /// —la misma contabilidad que la recepción de F4— y por eso la OC pasa a `recibida_parcial` o

@@ -14,6 +14,7 @@ import type {
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { autorizarOC, crearOC } from '../compras/ordenes-compra.js';
 import { crearEntradaTela } from './entradas-tela.js';
 import {
   eliminarAdjuntoEntradaTela,
@@ -36,8 +37,16 @@ let proveedor: Proveedor;
 let tela: Tela;
 let color: TelaColor;
 let almacen: Almacen;
+let idDireccionEntrega: number;
 
 const PERM_TODOS: ClavePermiso[] = ['inventario-telas.ver', 'inventario-telas.mover'];
+/** §Post-F9.159(a): ya no hay entrada sin OC, y levantarla exige los permisos de compras. */
+const PERM_CON_COMPRAS: ClavePermiso[] = [
+  ...PERM_TODOS,
+  'compras.ver',
+  'compras.administrar',
+  'compras.autorizar',
+];
 
 function sesion(permisos: ClavePermiso[], idEmpresaActiva = empresa.id): SesionUsuario {
   return sesionDePrueba({ idEmpresaActiva, permisos });
@@ -95,8 +104,29 @@ function archivosFalsos(): ServicioArchivos {
   };
 }
 
-/** Captura un documento de entrada (borrador) en la empresa dada y devuelve su id. */
+/**
+ * Captura un documento de entrada (borrador) en la empresa dada y devuelve su id.
+ *
+ * §Post-F9.159(a) — no se recibe tela sin OC, así que le levanta y autoriza SU orden de compra en
+ * ESA empresa (una entrada de la empresa B no se surte con la orden de la A, A9).
+ */
 async function crearEntradaDePrueba(idEmpresa: number): Promise<number> {
+  const sesionCompras = sesion([...PERM_CON_COMPRAS], idEmpresa);
+  const oc = await crearOC(
+    sesionCompras,
+    {
+      fechaEntrega: '2026-09-30',
+      idDireccionEntrega,
+      idProveedor: proveedor.id,
+      lineas: [{ idTela: tela.id, cantidad: 1_000, precio: 1, unidad: 'kg' }],
+    },
+    bd(),
+  );
+  await autorizarOC(sesionCompras, oc.id, bd());
+  const idOrdenCompraLinea = oc.lineas[0]?.id;
+  if (idOrdenCompraLinea === undefined) {
+    throw new Error('Fixture roto: la OC no devolvió su renglón de tela.');
+  }
   const entrada = await crearEntradaTela(
     sesion([...PERM_TODOS], idEmpresa),
     {
@@ -105,7 +135,7 @@ async function crearEntradaDePrueba(idEmpresa: number): Promise<number> {
       idProveedor: proveedor.id,
       fecha: '2026-08-06',
       idAlmacen: almacen.id,
-      lineas: [{ idTelaColor: color.id, cantidad: 10 }],
+      lineas: [{ idTelaColor: color.id, cantidad: 10, idOrdenCompraLinea }],
     },
     bd(),
   );
@@ -128,6 +158,10 @@ beforeEach(async () => {
   tela = await cliente.tela.create({ data: { nombre: 'Felpa Suiza' } });
   color = await cliente.telaColor.create({ data: { idTela: tela.id, nombre: 'Marino' } });
   almacen = await cliente.almacen.create({ data: { nombre: 'Bodega Telas', tipo: 'TELA' } });
+  const direccion = await cliente.direccionEntrega.create({
+    data: { nombre: 'Bodega Naucalpan', direccion: 'Av. Siempre Viva 123', favorita: true },
+  });
+  idDireccionEntrega = direccion.id;
   eliminarObjetoSpy = vi.fn<(key: string) => void>();
 });
 

@@ -53,9 +53,12 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - **El inventario arranca DESDE CERO** (conteo físico, decisión §Post-F9.11 punto 5): no se migran
   existencias del `Lote` legado ni del sistema viejo. Los consumos históricos 2025-2026 entrarán
   como datos de orden SIN tocar existencias (etapa posterior del track).
-- **La entrada por factura LIGADA a su orden de compra (§Post-F9.14, 7-ago-2026):**
-  `EntradaTelaLinea.idOrdenCompraLinea` (nullable, **por renglón**: una factura puede surtir dos OCs
-  y traer tela suelta). Al CONFIRMAR, `confirmarEntradaTela` llama a
+- **La entrada por factura LIGADA a su orden de compra (§Post-F9.14, 7-ago-2026; OBLIGATORIA desde
+  §Post-F9.159(a), 30-ago-2026):** `EntradaTelaLinea.idOrdenCompraLinea` (**por renglón**: una
+  factura puede surtir dos OCs en el mismo documento). Aquí decía *"y traer tela suelta"*: esa vía
+  **se cerró** —Daniel: *«sin OC no podemos recibir tela»*— y el dominio la rechaza en su embudo
+  (`exigirRenglonesConOrdenDeCompra`). La columna sigue `nullable` **sólo** por los documentos
+  anteriores a la decisión, que se siguen leyendo (D3 + REGLA 0-B). Al CONFIRMAR, `confirmarEntradaTela` llama a
   `registrarRecepcionesDesdeEntradaTela` (`dominio/compras/recepciones.ts`) y escribe una
   `RecepcionCompra` por OC surtida —con `id_entrada_tela` como traza— reusando la partida y el
   movimiento ya creados: la tela entra UNA vez al kardex y suma UNA vez a lo recibido. La OC pasa
