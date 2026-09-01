@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useAgregarComentario } from '@/api/ordenes';
 import type { Orden } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
-import { formatearFechaHora } from '@/lib/formato';
+import { formatearFechaHora, nombreDeAutor } from '@/lib/formato';
 
 /**
  * Panel de COMENTARIOS de una orden (F2-E3): lista cronológica (usuario + fecha + texto) y una caja
@@ -49,7 +49,11 @@ export function PanelComentarios({
           {orden.comentarios.map((comentario) => (
             <li key={comentario.id} className="rounded-lg border p-3" data-testid="comentario">
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span>{comentario.idUsuario ?? 'Sistema'}</span>
+                {/* El NOMBRE de quien lo escribió, no su id (V1). El renglón se ve siempre:
+                    dar de baja a alguien no borra su comentario (D3). */}
+                <span data-testid="autor-comentario">
+                  {nombreDeAutor(comentario.idUsuario, comentario.nombreUsuario) ?? 'Sistema'}
+                </span>
                 <span>{formatearFechaHora(comentario.fecha)}</span>
               </div>
               <p className="mt-1 text-sm break-words whitespace-pre-wrap">

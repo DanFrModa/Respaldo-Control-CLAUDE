@@ -27,6 +27,7 @@ import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
@@ -129,8 +130,18 @@ export type DesarrolloConDetalle = Prisma.DesarrolloGetPayload<{
   include: typeof incluirDesarrollo;
 }>;
 
-/** Proyecta un desarrollo (con detalle) a la forma JSON del contrato, calculando su estado derivado. */
-export function aDesarrolloSalida(desarrollo: DesarrolloConDetalle): DesarrolloSalida {
+/**
+ * Proyecta un desarrollo (con detalle) a la forma JSON del contrato, calculando su estado derivado.
+ *
+ * `nombrePorId` llega YA RESUELTO del llamador (esta función es SÍNCRONA y no consulta la base): el
+ * detalle de un proyecto trae N desarrollos y resolver el nombre uno por uno sería N+1. El mapa es
+ * OBLIGATORIO a propósito (sin default): un llamador nuevo que lo olvide debe ser error de
+ * compilación, no un `nombreApagadoPor: null` silencioso.
+ */
+export function aDesarrolloSalida(
+  desarrollo: DesarrolloConDetalle,
+  nombrePorId: ReadonlyMap<string, string>,
+): DesarrolloSalida {
   return {
     id: desarrollo.id,
     idProyecto: desarrollo.idProyecto,
@@ -148,6 +159,7 @@ export function aDesarrolloSalida(desarrollo: DesarrolloConDetalle): DesarrolloS
     apagado: desarrollo.apagado,
     apagadoEn: desarrollo.apagadoEn === null ? null : desarrollo.apagadoEn.toISOString(),
     apagadoPorId: desarrollo.apagadoPorId,
+    nombreApagadoPor: nombreDeUsuario(nombrePorId, desarrollo.apagadoPorId),
     motivoApagado: desarrollo.motivoApagado,
     creadoEn: desarrollo.creadoEn.toISOString(),
     creadoPorId: desarrollo.creadoPorId,
@@ -519,5 +531,6 @@ export async function obtenerDesarrollo(
   if (desarrollo === null) {
     throw new ErrorNoEncontrado('Desarrollo', id);
   }
-  return aDesarrolloSalida(desarrollo);
+  const nombrePorId = await nombresDeUsuarios(clienteLectura(bd), [desarrollo.apagadoPorId]);
+  return aDesarrolloSalida(desarrollo, nombrePorId);
 }

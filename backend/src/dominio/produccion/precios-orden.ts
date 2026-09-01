@@ -28,6 +28,7 @@ import { esquemaOrdenPreciosPatchCuerpo } from '../../contrato/index.js';
 
 import { registrarBitacora, datosModificacion } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
   clienteLectura,
@@ -78,33 +79,15 @@ async function bloquearPreciosDeOrden(tx: Tx, idEmpresa: number, idOrden: number
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
 }
 
-/**
- * Resuelve el nombre de cada `capturadoPorId` en UN viaje (mismo patrón que la RC de F5-E5:
- * `capturadoPorId` es texto sin FK física; los ids que no existan quedan sin nombre).
- */
-async function nombresDeUsuarios(
-  cliente: ReturnType<typeof clienteLectura>,
-  ids: (string | null)[],
-): Promise<Map<string, string>> {
-  const unicos = [...new Set(ids.filter((x): x is string => x !== null))];
-  if (unicos.length === 0) return new Map();
-  const usuarios = await cliente.usuario.findMany({
-    where: { id: { in: unicos } },
-    select: { id: true, nombre: true },
-  });
-  return new Map(usuarios.map((u) => [u.id, u.nombre]));
-}
-
 /** Proyecta un evento al resumen "quién · cuándo · proveedor" (sin montos). */
 function aUltimoEvento(
   evento: EventoCrudo | undefined,
-  nombres: Map<string, string>,
+  nombres: ReadonlyMap<string, string>,
 ): OrdenPrecioUltimoEvento | null {
   if (evento === undefined) return null;
   return {
     capturadoPorId: evento.capturadoPorId,
-    capturadoPor:
-      evento.capturadoPorId === null ? null : (nombres.get(evento.capturadoPorId) ?? null),
+    capturadoPor: nombreDeUsuario(nombres, evento.capturadoPorId),
     capturadoEn: evento.capturadoEn.toISOString(),
     idProveedor: evento.idProveedor,
     proveedor: evento.proveedor?.nombre ?? null,
@@ -316,7 +299,7 @@ export async function listarEventosPrecioOrden(
       proveedor: e.proveedor?.nombre ?? null,
       nota: e.nota,
       capturadoPorId: e.capturadoPorId,
-      capturadoPor: e.capturadoPorId === null ? null : (nombres.get(e.capturadoPorId) ?? null),
+      capturadoPor: nombreDeUsuario(nombres, e.capturadoPorId),
       capturadoEn: e.capturadoEn.toISOString(),
     })),
   };

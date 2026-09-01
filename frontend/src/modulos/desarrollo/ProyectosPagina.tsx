@@ -41,7 +41,7 @@ import {
 import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
-import { formatearFecha, formatearFechaHora } from '@/lib/formato';
+import { formatearFecha, formatearFechaHora, nombreDeAutor } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
 import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
@@ -736,47 +736,51 @@ function PaginaProyecto({
               className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3.5"
               data-testid="desarrollos-apagados"
             >
-              {apagados.map((d) => (
-                <div
-                  key={d.id}
-                  className="rounded-[14px] border bg-card opacity-80"
-                  data-testid="fila-desarrollo-apagado"
-                >
-                  <div className="flex items-center gap-2.5 border-b px-3.5 py-3">
-                    <span className="grid size-11 shrink-0 place-items-center rounded-[10px] border bg-secondary text-faint">
-                      <Shirt className="size-5" aria-hidden />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">{d.codigoModelo}</div>
-                      <div className="num truncate text-xs text-muted-foreground">
-                        {d.descripcionModelo ?? '—'}
+              {apagados.map((d) => {
+                // El NOMBRE de quien lo apagó, no su id (V1). `null` = nadie ⇒ se omite el « · por ».
+                const autorApagado = nombreDeAutor(d.apagadoPorId, d.nombreApagadoPor);
+                return (
+                  <div
+                    key={d.id}
+                    className="rounded-[14px] border bg-card opacity-80"
+                    data-testid="fila-desarrollo-apagado"
+                  >
+                    <div className="flex items-center gap-2.5 border-b px-3.5 py-3">
+                      <span className="grid size-11 shrink-0 place-items-center rounded-[10px] border bg-secondary text-faint">
+                        <Shirt className="size-5" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">{d.codigoModelo}</div>
+                        <div className="num truncate text-xs text-muted-foreground">
+                          {d.descripcionModelo ?? '—'}
+                        </div>
                       </div>
+                      <BadgeEstado estado="apagado" />
                     </div>
-                    <BadgeEstado estado="apagado" />
-                  </div>
-                  <div className="space-y-1 px-3.5 py-3 text-xs text-muted-foreground">
-                    <p>{d.motivoApagado ?? 'Sin motivo registrado'}</p>
-                    <p className="num">
-                      {formatearFechaHora(d.apagadoEn)}
-                      {d.apagadoPorId === null ? '' : ` · por ${d.apagadoPorId}`}
-                    </p>
-                  </div>
-                  {puedeAdministrar ? (
-                    <div className="border-t bg-secondary px-3.5 py-2.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => alReactivar(d)}
-                        disabled={reactivar.isPending}
-                        data-testid="reactivar-desarrollo"
-                      >
-                        <PowerIcon aria-hidden />
-                        Reactivar
-                      </Button>
+                    <div className="space-y-1 px-3.5 py-3 text-xs text-muted-foreground">
+                      <p>{d.motivoApagado ?? 'Sin motivo registrado'}</p>
+                      <p className="num">
+                        {formatearFechaHora(d.apagadoEn)}
+                        {autorApagado === null ? '' : ` · por ${autorApagado}`}
+                      </p>
                     </div>
-                  ) : null}
-                </div>
-              ))}
+                    {puedeAdministrar ? (
+                      <div className="border-t bg-secondary px-3.5 py-2.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => alReactivar(d)}
+                          disabled={reactivar.isPending}
+                          data-testid="reactivar-desarrollo"
+                        >
+                          <PowerIcon aria-hidden />
+                          Reactivar
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           ) : null}
         </div>

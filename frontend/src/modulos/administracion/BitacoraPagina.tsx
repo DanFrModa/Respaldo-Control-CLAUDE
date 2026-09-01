@@ -53,6 +53,13 @@ function formatearFecha(iso: string): string {
  * rediseño R1: `TablaDensa` (tabla-first) + `CajonDetalle` para el JSON de cada
  * registro (antes un `<pre>` inline). Tabla paginada en servidor con filtros por
  * entidad, idEntidad, idUsuario, accion, desde/hasta. Requiere `admin.ver-bitacora`.
+ *
+ * 🔴 **Excepción deliberada a `nombreDeAutor` (`lib/formato`), decidida en V1 «los nombres, en vez de
+ * los ids».** Las pantallas operativas nunca pintan el id crudo: con id y sin nombre dicen «Usuario
+ * dado de baja». Aquí NO. Ésta es la pantalla de AUDITORÍA: `idUsuario` es su clave de filtro (el
+ * campo «Id de usuario» de arriba), y un id que ya no resuelve es la última evidencia de quién
+ * actuó — taparlo destruiría información forense. Por eso se conserva
+ * `nombreUsuario ?? idUsuario ?? '(sistema)'`: el nombre manda, y el id es la red de seguridad.
  */
 export function BitacoraPagina(): React.JSX.Element {
   const [entidad, setEntidad] = useState('');

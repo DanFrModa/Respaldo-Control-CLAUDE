@@ -538,6 +538,30 @@ describe('<ModelosPagina>', () => {
     expect(filas[1]).not.toHaveTextContent('desarrollo');
   });
 
+  /**
+   * ⭐ V1 — la MISMA regla, en la tarjeta de MÓVIL.
+   *
+   * 🔴 La prueba de arriba mira `fila-modelo`, que es la tabla de ESCRITORIO: pasaba en verde
+   * mientras el teléfono no pintaba el nº de desarrollo por ningún lado. Es la rama gemela de
+   * siempre —PC y móvil son dos caras del mismo dato— y ya tiene lección propia en este repo
+   * (V1-E8j hizo exactamente esta corrección con el chip de la etapa). Por eso la aserción de móvil
+   * va APARTE y contra su propio testid: la de escritorio no la cubre.
+   */
+  it('el nº de DESARROLLO también se ve en la tarjeta de móvil (no sólo en la tabla)', () => {
+    const promovido = modelo(1, '71050', true, {
+      codigoDesarrollo: 'CYA-26-71-003',
+      numeroProduccion: 71_050,
+    });
+    const dePlano = modelo(2, '51001', true, { numeroProduccion: 51_001 });
+    useModelos.mockReturnValue(listaConDatos([promovido, dePlano]));
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+
+    const tarjetas = screen.getAllByTestId('modelo-tarjeta');
+    expect(tarjetas[0]).toHaveTextContent('desarrollo CYA-26-71-003');
+    // Y al que nunca fue de desarrollo tampoco se le inventa la línea en el teléfono.
+    expect(tarjetas[1]).not.toHaveTextContent('desarrollo');
+  });
+
   it('«Pasar a producción» sólo se ofrece en los modelos de DESARROLLO', async () => {
     const enDesarrollo = modelo(1, 'CYA-26-71-001', true, {
       origen: 'desarrollo',

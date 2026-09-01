@@ -1218,6 +1218,86 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9e · LOS NOMBRES, EN VEZ DE LOS IDS (1-sep-2026, versión **0.073**) — ✅ HECHA
+
+**Cinco pantallas pintaban el id crudo de un usuario donde va su nombre**, y **tres se montan en el mismo
+diálogo de orden** — así que arreglar sólo una dejaba **dos hermanas visibles a cinco centímetros**.
+
+### 🔴 El encargo del lead estaba mal en TRES cosas, y el coder lo midió
+
+1. **Decía «el bloque está duplicado 2 veces». Eran SEIS.** Se plegaron las cuatro que faltaban, una de
+   ellas **con el nombre exacto de la función canónica**, conviviendo con ella. *Un embudo con cuatro
+   desagües paralelos —uno homónimo— no es un embudo.*
+2. **Mandaba a copiar el estándar equivocado.** El encargo señalaba `BitacoraPagina`
+   (`nombreUsuario ?? idUsuario ?? '(sistema)'`), que **cae al id crudo**. El embudo del frontend **ya
+   existía** —`autorDeEvento`, de V1-E8q, cuyo comentario describe **este mismo fallo**— y su regla es
+   **no pintar el id nunca**. Se generalizó a `nombreDeAutor(id, nombre)` en vez de añadir un sexto criterio.
+3. **La trampa del «usuario dado de baja» estaba mal planteada.** `Usuario` es de **borrado SUAVE**: un
+   inactivo **sí resuelve y sí se pinta** —que es lo que D3 quiere—; el `null` es para **un id sin fila**.
+   Hay prueba que **cae** si alguien mete `activo: true` en ese `where`.
+
+### La única excepción, decidida y escrita en los dos sitios
+
+**La bitácora sigue pintando el id.** No es descuido: es la pantalla **forense**, tiene el campo «Id de
+usuario» a un centímetro como **clave de filtro**, y un id que ya no resuelve es **la última evidencia de
+quién actuó** ⇒ taparlo con «Usuario dado de baja» **destruiría esa evidencia**. Queda escrito en
+`formato.ts` **y** en `BitacoraPagina.tsx`, para que el repo **no guarde dos estándares mudos**.
+
+### 🔴 Lo que encontró la revisión
+
+**Tres cableados del servidor no los fijaba NINGUNA prueba** — las mutaciones **sobrevivían los ocho
+gates**, y uno de los módulos **no tenía archivo de pruebas, ninguno**. ⚠️ **El modo de fallo era peor que
+«falta cobertura»**: si uno devolvía `null`, la pantalla **no cae al id** — pinta **«Usuario dado de baja»
+en todos los renglones**, dejando por escrito que a alguien lo dieron de baja **cuando ahí sigue**.
+
+Y otra vez la asimetría: de dos archivos **copia carácter por carácter**, uno recibió **dos pruebas nuevas
+en este mismo diff** y **el otro cero**.
+
+⭐ **El archivo que nació entero, y su ironía:** al cerrarlo no se le puso sólo la aserción que faltaba,
+sino **la cobertura completa que su gemela ya tenía** (permisos deny-by-default, ligado de archivos, scope
+por empresa, borrado). Razón del coder: *«cerrar la asimetría con una aserción y dejar el resto asimétrico
+habría sido el mismo error un nivel más abajo»*. 🔴 **Y no alcanzó la paridad al primer intento**: su `it()`
+se llamaba *«subir/eliminar exigen `desarrollo.administrar`»* y **nunca llamaba a eliminar** ⇒ **borrar esa
+reja sobrevivía el archivo entero: escalada de privilegio sobre tech packs**. Hoy las dos gemelas están en
+**7 `it()` y 4 llamadas** exactas.
+
+### ⭐⭐ LA LECCIÓN MÁS CARA: verificar con `grep` una cadena que YA EXISTÍA
+
+Una corrección **se reportó como hecha y no estaba en el árbol**. La autopsia, del propio coder:
+
+- Su `assert` buscaba la llamada **en una línea** y el archivo la tenía **envuelta en cinco** — la había
+  envuelto el `prettier --write` que él mismo corrió.
+- **Atribuyó mal el traceback** y arregló el bloque equivocado.
+- 🔴 **Y verificó con `grep -c "PÁGINA COMPLETA"` → 1, leyéndolo como éxito. Esa frase ya estaba en el
+  comentario viejo:** habría dado `1` con el edit aplicado **y sin él**.
+
+⚠️ **Y era la SEGUNDA vez con la misma forma:** antes contó `grep -c "desarrollo {m.codigoDesarrollo}"` → 2
+y lo leyó como «móvil + escritorio» cuando era **«bloque corrupto + escritorio»**.
+
+> ### La regla, con la vuelta de tuerca del reviewer
+>
+> **Verificar un cambio con `grep` de una cadena que podía preexistir no verifica nada.** Usa una que **no
+> pueda** existir antes. Y aun así: **un `grep` prueba presencia de texto, nunca comportamiento** — el
+> texto puede estar y no hacer nada. **Lo único que no miente es correr la prueba o mutar el código.**
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,352** · frontend `typecheck` (`tsc -b`)/`lint`/
+`format:check` · **1,881**. **Mueve el contrato** (5 esquemas) ⇒ regenerado, **cero drift**. **Sin
+migración · sin permisos · sin seed** ⇒ **no requiere `SEED_ON_START`**.
+
+⚠️ **Sin N+1, verificado camino por camino:** `aOrdenSalida` es **síncrona** y recibe el mapa **ya
+resuelto**, armado con un `flatMap` sobre **la página completa**; y se le quitó el `= new Map()` por
+defecto —**y a los dos que lo heredaban en `rutaOrden` y `etapas`**— para que un llamador que lo olvide sea
+**error de compilación**, no un `null` mudo en toda la pantalla.
+
+**Superviviente declarada:** la mutación `slice(0,1)` de la página completa **sobrevive las unitarias** — es
+el resultado sano: ese cableado lo guarda **sólo** la prueba de integración, y **CI es el único juez**. El
+kill queda demostrado **estáticamente** por una guardia (`posVieja > 0`) que además **impide que la prueba
+pase por la razón equivocada** si algún día cambiara el orden. Revisión independiente: **tres rondas**.
+
+---
+
 ## V1-E9d · ⭐⭐ LA RECETA COMPARTIDA, pieza B — LOS ESCRITORES (1-sep-2026, versión **0.072**) — ✅ HECHA
 
 **La mitad que faltaba de la 0.070.** Las lecturas ya resolvían; ésta gobierna la ESCRITURA.
