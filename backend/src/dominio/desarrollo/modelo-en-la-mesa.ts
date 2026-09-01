@@ -384,6 +384,17 @@ export async function crearModeloEnLista(
       ...(datos.idCurvaTalla === undefined ? {} : { idCurvaTalla: datos.idCurvaTalla }),
     });
 
+    // ⭐⭐ V1-E9b pieza B — ESTA LÍNEA ERA EL RIESGO Nº1 DEL LINAJE 1:N, y por eso lleva nota.
+    // `leerModeloOrigen` acepta CUALQUIER modelo activo (sólo filtra `activo`), incluido un HIJO
+    // del 1:N — que no tiene receta propia. Entrando aquí con el id crudo, copiar un hijo desde la
+    // cita producía un modelo nuevo con la RECETA VACÍA (sólo maquila, corte y empaque), **sin
+    // lanzar y sin verse raro**, y de ese precosto sale el precio que se le dice al cliente en la
+    // cara. Hoy `copiarRecetaAModeloNuevo` RESUELVE el origen por dentro (ver su nota), así que
+    // copiar un hijo trae la receta de su desarrollo. ⚠️ Si algún día esa resolución se mueve al
+    // llamador, tiene que venir AQUÍ: es el único de los dos llamadores sin guarda de linaje.
+    //
+    // Y el selector de la mesa SÍ debe seguir listando hijos (default de la etapa): copiar un
+    // modelo de producción ya desarrollado es justo lo que Daniel pidió en 0.064.
     const receta: RecetaCopiada =
       origen === null
         ? { telas: 0, avios: 0, medidas: 0, artes: 0 }

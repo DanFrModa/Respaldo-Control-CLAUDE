@@ -1,4 +1,4 @@
-import { ChevronRight, Loader2Icon, Trash2Icon } from 'lucide-react';
+import { ChevronRight, InfoIcon, Loader2Icon, Trash2Icon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -38,6 +38,25 @@ import { SugerenciaAviosFavoritos } from './SugerenciaAviosFavoritos';
 
 /** Las tres secciones de la receta (telas y avíos son SET completo; el ARTE es CRUD por renglón). */
 type SeccionBom = 'telas' | 'avios' | 'artes';
+
+/**
+ * ⭐⭐ V1-E9b pieza B — ¿la receta que enseña esta ficha es de OTRO modelo?
+ *
+ * Un modelo de PRODUCCIÓN nacido de un desarrollo (linaje 1:N, V1-E9a) **comparte** la receta de su
+ * padre: la ve completa, pero no la edita. La edita quien es responsable de las recetas, en el
+ * modelo de desarrollo, y el cambio les llega a todos los colores a la vez (§Post-F9.135 p.5). Si
+ * un color necesita algo distinto, eso vive en su ORDEN (p.4), no en el modelo.
+ *
+ * 🔑 **Por qué `typeof === 'number'` y no `!== null`, y por qué la razón NO es la del dominio.** En
+ * `esVersionDeModelo` (dominio y `ModelosPagina`) ese operador está porque su rama es la que ABRE la
+ * compuerta de producción. Aquí es al revés —ésta es la rama que CIERRA el editor— y el operador
+ * coincide por otro motivo: si el campo faltara, cerrar el editor de TODOS los modelos sería
+ * catastrófico, mientras que dejarlo abierto sólo consigue que el backend rechace el guardado con
+ * su mensaje (él es la autoridad, A1). El modo de fallo barato es el de dejar abierto.
+ */
+function recetaEsDelDesarrollo(ficha: Pick<ModeloFicha, 'idModeloDesarrollo'>): boolean {
+  return typeof ficha.idModeloDesarrollo === 'number';
+}
 
 /** De qué escalón de la cascada salió el precio que costea (lo resuelve el backend). */
 type OrigenPrecio = ModeloTela['origenPrecio'];
@@ -199,6 +218,14 @@ export function EditorBom({
   const [seccion, setSeccion] = useState<SeccionBom>('telas');
   const [copiarAbierto, setCopiarAbierto] = useState(false);
 
+  // ⭐⭐ V1-E9b pieza B — ¿la receta que se está viendo es de OTRO modelo? Un modelo de PRODUCCIÓN
+  // nacido de un desarrollo (linaje 1:N) **comparte** la receta de su padre: la ve entera, y la
+  // edita allá. Ver {@link recetaEsDelDesarrollo} para el porqué del `typeof`.
+  const heredada = recetaEsDelDesarrollo(ficha);
+  // 🔑 El gate de la RECETA. `puedeAdministrar` sigue mandando en lo que es del modelo (su CURVA,
+  // que NO es receta y sí es suya): por eso hay dos variables y no una.
+  const puedeEditarReceta = puedeAdministrar && !heredada;
+
   const [telas, setTelas] = useState<RenglonComponente[]>([]);
   const [avios, setAvios] = useState<RenglonComponente[]>([]);
 
@@ -331,6 +358,29 @@ export function EditorBom({
           tallas realmente?"). Avisa si difiere de la de sus OP; propone si el modelo no tiene. */}
       <CurvaDelModelo ficha={ficha} puedeAdministrar={puedeAdministrar} />
 
+      {/* ⭐⭐ V1-E9b — EL LETRERO. Sin él, la pantalla ofrecía guardar telas, avíos, medidas, arte y
+          copiar receta sobre un modelo cuya receta es de otro: el backend lo rechaza (bien), pero
+          el usuario sólo veía un error después de teclear. Aquí se dice ANTES y se dice DÓNDE. */}
+      {heredada ? (
+        <div
+          className="flex items-start gap-2 rounded-lg border border-primary/40 bg-primary-soft p-3"
+          data-testid="receta-del-desarrollo"
+        >
+          <InfoIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+          <div className="space-y-0.5 text-sm">
+            <p className="font-medium">
+              La receta es del modelo de desarrollo
+              {ficha.codigoModeloDesarrollo === null ? '' : ` ${ficha.codigoModeloDesarrollo}`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Este modelo la COMPARTE, no la copia: se ve completa aquí y se edita allá, y el cambio
+              les llega a todos los colores de ese desarrollo a la vez. Si hay que cambiar algo sólo
+              para este color, se hace en su ORDEN de producción.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {/* Pestañas + copiar receta */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-1" role="tablist" aria-label="Secciones de la receta">
@@ -355,7 +405,7 @@ export function EditorBom({
             </Button>
           ))}
         </div>
-        {puedeAdministrar ? (
+        {puedeEditarReceta ? (
           <Button
             type="button"
             variant="outline"
@@ -374,7 +424,7 @@ export function EditorBom({
           titulo="telas"
           renglones={telas}
           alCambiar={setTelas}
-          puedeAdministrar={puedeAdministrar}
+          puedeAdministrar={puedeEditarReceta}
           guardando={guardarTelas.isPending}
           deshabilitadoGlobal={guardando}
           alGuardar={guardarSeccionTelas}
@@ -389,7 +439,7 @@ export function EditorBom({
           renderAmarre={(r, alAmarrar) => (
             <AmarreTela
               renglon={r}
-              deshabilitado={!puedeAdministrar || guardando}
+              deshabilitado={!puedeEditarReceta || guardando}
               alAmarrar={alAmarrar}
             />
           )}
@@ -400,7 +450,7 @@ export function EditorBom({
               acto. Quién es favorito y con cuánta cantidad lo dice el servidor (A1). */}
           <SugerenciaAviosFavoritos
             idModelo={ficha.id}
-            puedeAdministrar={puedeAdministrar}
+            puedeAdministrar={puedeEditarReceta}
             hayCambiosSinGuardar={aviosSinGuardar}
             deshabilitado={guardando}
           />
@@ -408,7 +458,7 @@ export function EditorBom({
             titulo="avíos"
             renglones={avios}
             alCambiar={setAvios}
-            puedeAdministrar={puedeAdministrar}
+            puedeAdministrar={puedeEditarReceta}
             guardando={guardarAvios.isPending}
             deshabilitadoGlobal={guardando}
             alGuardar={guardarSeccionAvios}
@@ -423,7 +473,7 @@ export function EditorBom({
             renderAmarre={(r, alAmarrar) => (
               <AmarreAvio
                 renglon={r}
-                deshabilitado={!puedeAdministrar || guardando}
+                deshabilitado={!puedeEditarReceta || guardando}
                 alAmarrar={alAmarrar}
               />
             )}
@@ -432,7 +482,7 @@ export function EditorBom({
                 <EditorMedidasAvio
                   idModelo={ficha.id}
                   idAvio={r.id}
-                  puedeAdministrar={puedeAdministrar}
+                  puedeAdministrar={puedeEditarReceta}
                   tieneCurvaModelo={ficha.tallasCurva.length > 0}
                 />
               ) : (
@@ -444,7 +494,7 @@ export function EditorBom({
           />
         </div>
       ) : (
-        <SeccionArte idModelo={ficha.id} artes={ficha.artes} puedeAdministrar={puedeAdministrar} />
+        <SeccionArte idModelo={ficha.id} artes={ficha.artes} puedeAdministrar={puedeEditarReceta} />
       )}
 
       <CopiarBomDialogo

@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
+import { nombreDeAutor } from '@/lib/formato';
 
 /** Los 6 tipos de hito EN ORDEN, con su etiqueta para la UI. */
 const TIPOS_HITO: { tipo: TipoHitoOrden; etiqueta: string }[] = [
@@ -83,6 +84,9 @@ export function PanelHitosOrden({
       <ul className="divide-y rounded-lg border">
         {TIPOS_HITO.map(({ tipo, etiqueta }) => {
           const vivo = vivoPorTipo.get(tipo) ?? null;
+          // El NOMBRE de quien lo registró, no su id (V1). `null` = nadie ⇒ se omite el « · por ».
+          const autorHito =
+            vivo === null ? null : nombreDeAutor(vivo.registradoPorId, vivo.nombreRegistradoPor);
           return (
             <li
               key={tipo}
@@ -101,7 +105,7 @@ export function PanelHitosOrden({
                 {vivo ? (
                   <p className="pl-6 text-xs text-muted-foreground">
                     {fechaCorta(vivo.fecha)}
-                    {vivo.registradoPorId ? ` · por ${vivo.registradoPorId}` : ''}
+                    {autorHito === null ? '' : ` · por ${autorHito}`}
                   </p>
                 ) : (
                   <p className="pl-6 text-xs text-muted-foreground">Pendiente</p>

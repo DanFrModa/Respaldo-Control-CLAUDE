@@ -562,6 +562,15 @@ export function ModelosPagina(): React.JSX.Element {
                                 {m.codigo}
                               </div>
                             ) : null}
+                            {/* ⭐ V1 — el nº de DESARROLLO también en la tarjeta de móvil. La tabla
+                                de escritorio ya lo pintaba y el teléfono no: la misma divergencia
+                                PC/móvil que la etapa (V1-E8j) ya había corregido dos líneas abajo.
+                                Los dos códigos son suyos y los dos son buscables (D3). */}
+                            {m.codigoDesarrollo !== null && m.codigoDesarrollo !== m.codigo ? (
+                              <div className="mono truncate text-xs text-faint">
+                                desarrollo {m.codigoDesarrollo}
+                              </div>
+                            ) : null}
                           </div>
                           <EstadoBadge activo={m.activo} />
                         </div>

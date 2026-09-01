@@ -9,9 +9,12 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
+import { ErrorValidacion } from '../../comun/errores.js';
+
 import {
   conRecetaCompartida,
   conRecetaCompartidaDeUno,
+  exigirRecetaPropia,
   idModeloDeLaReceta,
   injertarRecetaCompartida,
   injertarRecetaDeUno,
@@ -288,5 +291,88 @@ describe('conRecetaCompartida — el injerto que sí consulta', () => {
     const injertado = await conRecetaCompartidaDeUno(hijoVacio(2, '71001'), leerPadre);
     expect(leerPadre).toHaveBeenCalledWith(1);
     expect(injertado.telas).toEqual(['Algodón']);
+  });
+});
+
+// ── LA OTRA MITAD: LA ESCRITURA SE BLOQUEA ────────────────────────────────────────────────────
+
+/**
+ * Lector de mentira para {@link exigirRecetaPropia}: devuelve la fila con el `select` que la guarda
+ * pide (código propio + linaje + código del padre). Se arma a mano —y no reusando
+ * `lectorDeMentira`— porque la guarda pide COLUMNAS DISTINTAS que el resolver, y compartir el fake
+ * escondería el día que una de las dos deje de pedir lo que necesita.
+ */
+function lectorConLinaje(
+  filas: { id: number; codigo: string; idModeloDesarrollo: number | null; codigoPadre?: string }[],
+) {
+  const porId = new Map(filas.map((f) => [f.id, f]));
+  const lector = {
+    modelo: {
+      findUnique: ({ where }: { where: { id: number } }) => {
+        const f = porId.get(where.id);
+        return Promise.resolve(
+          f === undefined
+            ? null
+            : {
+                codigo: f.codigo,
+                idModeloDesarrollo: f.idModeloDesarrollo,
+                modeloDesarrollo: f.codigoPadre === undefined ? null : { codigo: f.codigoPadre },
+              },
+        );
+      },
+    },
+  };
+  return lector as unknown as Parameters<typeof exigirRecetaPropia>[0];
+}
+
+describe('exigirRecetaPropia — la receta compartida NO se edita desde el hijo', () => {
+  const lector = () =>
+    lectorConLinaje([
+      { id: 1, codigo: 'CYA-26-71-001', idModeloDesarrollo: null },
+      { id: 2, codigo: '71001', idModeloDesarrollo: 1, codigoPadre: 'CYA-26-71-001' },
+      // Un hijo cuyo padre no vino en el `include` (no puede pasar por datos: la FK es RESTRICT).
+      { id: 3, codigo: '71002', idModeloDesarrollo: 1 },
+    ]);
+
+  it('un modelo con receta PROPIA (la columna en null) pasa sin lanzar', async () => {
+    await expect(exigirRecetaPropia(lector(), 1)).resolves.toBeUndefined();
+  });
+
+  it('🔴 un HIJO del linaje 1:N se RECHAZA — es el defecto entero de la pieza', async () => {
+    // Sin esto, guardar la receta parado en el hijo del color café reescribiría la del desarrollo
+    // y la de los tres hermanos, sin decirlo, y los cuatro precostos se moverían.
+    await expect(exigirRecetaPropia(lector(), 2)).rejects.toThrow(ErrorValidacion);
+  });
+
+  it('el mensaje MANDA al modelo de desarrollo y a la orden (no es un "no se puede")', async () => {
+    // La dirección es de Daniel (§Post-F9.135): la receta se edita donde vive, y la divergencia
+    // por color vive en la OP. Un mensaje que sólo negara dejaría al usuario sin salida.
+    await expect(exigirRecetaPropia(lector(), 2)).rejects.toThrow(/modelo de desarrollo/i);
+    await expect(exigirRecetaPropia(lector(), 2)).rejects.toThrow(/"CYA-26-71-001"/);
+    await expect(exigirRecetaPropia(lector(), 2)).rejects.toThrow(/ORDEN de producción/);
+  });
+
+  it('sin el código del padre a la mano sigue rechazando (no se cae al armar la frase)', async () => {
+    await expect(exigirRecetaPropia(lector(), 3)).rejects.toThrow(ErrorValidacion);
+    await expect(exigirRecetaPropia(lector(), 3)).rejects.toThrow(/del que nació/);
+  });
+
+  it('un modelo que NO EXISTE sale sin lanzar: la existencia la decide quien llamó', async () => {
+    // Mismo criterio que `resolverIdRecetaDeModelo`. Convertir esto en una guarda de existencia le
+    // cambiaría el error a media docena de puertas que hoy dan su propio 404 con su entidad.
+    await expect(exigirRecetaPropia(lector(), 999)).resolves.toBeUndefined();
+  });
+
+  it('🔑 lo que NO SE SABE cae del lado de BLOQUEAR (la rama que abre exige saber)', async () => {
+    // Aquí la rama que ABRE es `idModeloDesarrollo === null`, así que un `undefined` —una fila
+    // armada a mano, un `select` al que le falte la columna— tiene que BLOQUEAR, no dejar pasar.
+    // Es el reparto contrario al de `esVersionDeModelo` (donde la rama que abre la compuerta es la
+    // del hijo, y por eso allá se pregunta `typeof === 'number'`): mismo principio, operadores
+    // distintos. Un bloqueo de más es ruidoso e inofensivo; una escritura de más se lleva por
+    // delante la receta de cuatro modelos en silencio.
+    const sinColumna = {
+      modelo: { findUnique: () => Promise.resolve({ codigo: '71003' }) },
+    } as unknown as Parameters<typeof exigirRecetaPropia>[0];
+    await expect(exigirRecetaPropia(sinColumna, 4)).rejects.toThrow(ErrorValidacion);
   });
 });

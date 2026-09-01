@@ -66,7 +66,7 @@ import {
 
 import { avisosDeCurvaDelModelo } from './curva-desde-ordenes.js';
 import { exigirModelo, leerTallasCurvaModelo } from './modelos.js';
-import { resolverIdRecetaDeModelo } from './receta-compartida.js';
+import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 
 /** Cuerpo de guardar medidas tal como LLEGA al dominio (se re-valida con `validarEntrada`). */
@@ -527,6 +527,11 @@ export async function guardarMedidasAvio(
 
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — VA ANTES de `exigirRenglonAvio`, y el orden es el mensaje: sobre un hijo
+    // del linaje 1:N el renglón del BOM no existe (vive en el padre), así que sin esta línea la
+    // respuesta era un 404 «Avío en el BOM del modelo» sobre un avío que la ficha ACABA de enseñar.
+    // Primero se explica de quién es la receta; el 404 queda para el avío que de verdad no está.
+    await exigirRecetaPropia(tx, idModelo);
     const contexto = await exigirRenglonAvio(tx, idModelo, idAvio);
 
     // ⭐ En modo `medida` la cantidad NO varía por talla (el cierre es 1 pza), así que el toggle se

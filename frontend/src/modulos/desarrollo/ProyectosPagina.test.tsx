@@ -141,6 +141,7 @@ function desarrollo(id: number, codigo: string, estado: EstadoDesarrollo): Desar
     apagado,
     apagadoEn: apagado ? '2026-07-04T00:00:00.000Z' : null,
     apagadoPorId: apagado ? 'usuario-x' : null,
+    nombreApagadoPor: apagado ? 'Ana Ruiz' : null,
     motivoApagado: apagado ? 'Fuera de temporada' : null,
     creadoEn: '2026-07-04T00:00:00.000Z',
     creadoPorId: null,
@@ -440,6 +441,60 @@ describe('<ProyectosPagina>', () => {
     expect(motivo).toHaveTextContent(/apagados/i);
     expect(motivo).toHaveTextContent(/Reactívalos/i);
     expect(motivo).not.toHaveTextContent(/todavía no tiene modelos/i);
+  });
+
+  /**
+   * V1 «los nombres, en vez de los ids» — la tarjeta del desarrollo apagado pintaba
+   * `d.apagadoPorId`, o sea un cuid. Gemela de las tres del diálogo de orden (comentarios, hitos y
+   * adjuntos) y de la del tech pack: cada una lleva su prueba.
+   */
+  describe('quién apagó el desarrollo (V1)', () => {
+    /** Un id crudo con la pinta REAL de los del sistema (cuid) — no debe verse nunca. */
+    const ID_CRUDO = 'cm2f6x1d0000rrrr1357ijkl';
+
+    /** Abre el detalle del proyecto y despliega el bloque de apagados. */
+    async function abrirApagados(apagadoPorId: string | null, nombreApagadoPor: string | null) {
+      const usuario = userEvent.setup();
+      useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+      detalle = {
+        ...proyecto(1, 101, 'Joggers'),
+        desarrollos: [{ ...desarrollo(1, 'A-100', 'apagado'), apagadoPorId, nombreApagadoPor }],
+      };
+      renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+      await usuario.click(screen.getByTestId('fila-proyecto'));
+      await usuario.click(screen.getByTestId('mostrar-apagados-desarrollos'));
+      return screen.getByTestId('fila-desarrollo-apagado');
+    }
+
+    it('pinta el NOMBRE de quien lo apagó, nunca su id', async () => {
+      const fila = await abrirApagados(ID_CRUDO, 'Ana Ruiz');
+
+      expect(fila).toHaveTextContent('por Ana Ruiz');
+      expect(document.body.textContent).not.toContain(ID_CRUDO);
+    });
+
+    /** 🔴 D3 — el desarrollo apagado se sigue viendo (y reactivable) sin el nombre de quien lo apagó. */
+    it('un autor cuyo id ya no resuelve: el desarrollo SIGUE visible y reactivable', async () => {
+      const fila = await abrirApagados(ID_CRUDO, null);
+
+      expect(fila).toHaveTextContent('por Usuario dado de baja');
+      // El motivo y el remedio no se pierden por no poder nombrar a quien lo apagó.
+      expect(fila).toHaveTextContent('Fuera de temporada');
+      expect(screen.getByTestId('reactivar-desarrollo')).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain(ID_CRUDO);
+    });
+
+    it('sin autor, omite el « · por …» (no dice «Sistema»)', async () => {
+      const fila = await abrirApagados(null, null);
+
+      // 🔴 La aserción tiene que morder la OMISIÓN, no sólo el texto «Usuario dado de baja»: con
+      // `not.toHaveTextContent('por Usuario')` la prueba pasaba aunque la rama nula pintara
+      // « · por (nadie)». No se puede usar `'por'` a secas —el renglón dice «Fuera de temPORada»—,
+      // así que se asevera contra el separador completo, que sólo existe si hubo autor.
+      expect(fila).not.toHaveTextContent('· por');
+      // Y lo que sí tiene que seguir ahí.
+      expect(fila).toHaveTextContent('Fuera de temporada');
+    });
   });
 
   it('si la consulta de candidatos FALLA, lo dice en vez de inventar un motivo', async () => {

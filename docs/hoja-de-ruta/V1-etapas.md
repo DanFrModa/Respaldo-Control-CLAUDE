@@ -1218,6 +1218,205 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9e · LOS NOMBRES, EN VEZ DE LOS IDS (1-sep-2026, versión **0.073**) — ✅ HECHA
+
+**Cinco pantallas pintaban el id crudo de un usuario donde va su nombre**, y **tres se montan en el mismo
+diálogo de orden** — así que arreglar sólo una dejaba **dos hermanas visibles a cinco centímetros**.
+
+### 🔴 El encargo del lead estaba mal en TRES cosas, y el coder lo midió
+
+1. **Decía «el bloque está duplicado 2 veces». Eran SEIS.** Se plegaron las cuatro que faltaban, una de
+   ellas **con el nombre exacto de la función canónica**, conviviendo con ella. *Un embudo con cuatro
+   desagües paralelos —uno homónimo— no es un embudo.*
+2. **Mandaba a copiar el estándar equivocado.** El encargo señalaba `BitacoraPagina`
+   (`nombreUsuario ?? idUsuario ?? '(sistema)'`), que **cae al id crudo**. El embudo del frontend **ya
+   existía** —`autorDeEvento`, de V1-E8q, cuyo comentario describe **este mismo fallo**— y su regla es
+   **no pintar el id nunca**. Se generalizó a `nombreDeAutor(id, nombre)` en vez de añadir un sexto criterio.
+3. **La trampa del «usuario dado de baja» estaba mal planteada.** `Usuario` es de **borrado SUAVE**: un
+   inactivo **sí resuelve y sí se pinta** —que es lo que D3 quiere—; el `null` es para **un id sin fila**.
+   Hay prueba que **cae** si alguien mete `activo: true` en ese `where`.
+
+### La única excepción, decidida y escrita en los dos sitios
+
+**La bitácora sigue pintando el id.** No es descuido: es la pantalla **forense**, tiene el campo «Id de
+usuario» a un centímetro como **clave de filtro**, y un id que ya no resuelve es **la última evidencia de
+quién actuó** ⇒ taparlo con «Usuario dado de baja» **destruiría esa evidencia**. Queda escrito en
+`formato.ts` **y** en `BitacoraPagina.tsx`, para que el repo **no guarde dos estándares mudos**.
+
+### 🔴 Lo que encontró la revisión
+
+**Tres cableados del servidor no los fijaba NINGUNA prueba** — las mutaciones **sobrevivían los ocho
+gates**, y uno de los módulos **no tenía archivo de pruebas, ninguno**. ⚠️ **El modo de fallo era peor que
+«falta cobertura»**: si uno devolvía `null`, la pantalla **no cae al id** — pinta **«Usuario dado de baja»
+en todos los renglones**, dejando por escrito que a alguien lo dieron de baja **cuando ahí sigue**.
+
+Y otra vez la asimetría: de dos archivos **copia carácter por carácter**, uno recibió **dos pruebas nuevas
+en este mismo diff** y **el otro cero**.
+
+⭐ **El archivo que nació entero, y su ironía:** al cerrarlo no se le puso sólo la aserción que faltaba,
+sino **la cobertura completa que su gemela ya tenía** (permisos deny-by-default, ligado de archivos, scope
+por empresa, borrado). Razón del coder: *«cerrar la asimetría con una aserción y dejar el resto asimétrico
+habría sido el mismo error un nivel más abajo»*. 🔴 **Y no alcanzó la paridad al primer intento**: su `it()`
+se llamaba *«subir/eliminar exigen `desarrollo.administrar`»* y **nunca llamaba a eliminar** ⇒ **borrar esa
+reja sobrevivía el archivo entero: escalada de privilegio sobre tech packs**. Hoy las dos gemelas están en
+**7 `it()` y 4 llamadas** exactas.
+
+### ⭐⭐ LA LECCIÓN MÁS CARA: verificar con `grep` una cadena que YA EXISTÍA
+
+Una corrección **se reportó como hecha y no estaba en el árbol**. La autopsia, del propio coder:
+
+- Su `assert` buscaba la llamada **en una línea** y el archivo la tenía **envuelta en cinco** — la había
+  envuelto el `prettier --write` que él mismo corrió.
+- **Atribuyó mal el traceback** y arregló el bloque equivocado.
+- 🔴 **Y verificó con `grep -c "PÁGINA COMPLETA"` → 1, leyéndolo como éxito. Esa frase ya estaba en el
+  comentario viejo:** habría dado `1` con el edit aplicado **y sin él**.
+
+⚠️ **Y era la SEGUNDA vez con la misma forma:** antes contó `grep -c "desarrollo {m.codigoDesarrollo}"` → 2
+y lo leyó como «móvil + escritorio» cuando era **«bloque corrupto + escritorio»**.
+
+> ### La regla, con la vuelta de tuerca del reviewer
+>
+> **Verificar un cambio con `grep` de una cadena que podía preexistir no verifica nada.** Usa una que **no
+> pueda** existir antes. Y aun así: **un `grep` prueba presencia de texto, nunca comportamiento** — el
+> texto puede estar y no hacer nada. **Lo único que no miente es correr la prueba o mutar el código.**
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,352** · frontend `typecheck` (`tsc -b`)/`lint`/
+`format:check` · **1,881**. **Mueve el contrato** (5 esquemas) ⇒ regenerado, **cero drift**. **Sin
+migración · sin permisos · sin seed** ⇒ **no requiere `SEED_ON_START`**.
+
+⚠️ **Sin N+1, verificado camino por camino:** `aOrdenSalida` es **síncrona** y recibe el mapa **ya
+resuelto**, armado con un `flatMap` sobre **la página completa**; y se le quitó el `= new Map()` por
+defecto —**y a los dos que lo heredaban en `rutaOrden` y `etapas`**— para que un llamador que lo olvide sea
+**error de compilación**, no un `null` mudo en toda la pantalla.
+
+**Superviviente declarada:** la mutación `slice(0,1)` de la página completa **sobrevive las unitarias** — es
+el resultado sano: ese cableado lo guarda **sólo** la prueba de integración, y **CI es el único juez**. El
+kill queda demostrado **estáticamente** por una guardia (`posVieja > 0`) que además **impide que la prueba
+pase por la razón equivocada** si algún día cambiara el orden. Revisión independiente: **tres rondas**.
+
+---
+
+## V1-E9d · ⭐⭐ LA RECETA COMPARTIDA, pieza B — LOS ESCRITORES (1-sep-2026, versión **0.072**) — ✅ HECHA
+
+**La mitad que faltaba de la 0.070.** Las lecturas ya resolvían; ésta gobierna la ESCRITURA.
+
+### 🔴 «Resolver los escritores» ERA EL DEFECTO CON OTRO NOMBRE
+
+El plan pedía meterle el resolver a los escritores, igual que a las lecturas. **Habría sido el desastre**:
+editar la receta parado en el modelo del color café **reescribiría la del desarrollo** y con ella la de los
+tres hermanos, en silencio. Síntoma para Daniel: *«cambié un cierre sólo en la café y se le cambió a los
+cuatro colores»*, con los cuatro precostos movidos ⇒ **precio equivocado hacia el cliente**.
+
+**La dirección estaba en sus propias palabras, sin preguntarle nada nuevo:** la receta la mueve *«quien sea
+responsable de definir y aprobar las recetas»* (§Post-F9.135 p.5) y la diferencia por color *«se debe de
+poder hacer, **pero advirtiendo de la diferencia**»* (p.4) — **en la OP, que sí es suya**.
+
+⇒ **Se BLOQUEA**, con un mensaje que manda al modelo de desarrollo. **13 puertas: 12 bloquean.**
+
+### Las tres excepciones que SÍ resuelven, y por qué cada una
+
+1. **`tocarModeloPorCambioDeReceta`** (la marca de agua). Sus 12 llamadas pasaban el id **crudo**. Su único
+   lector, `avisoDeCostoViejo`, llega **por el padre** ⇒ si la marca se sella en el hijo, el aviso *«la
+   receta cambió después de congelarse el costo»* **nunca sale** y la cotización sigue con el precio viejo,
+   **sin alarma**.
+2. **El ORIGEN de `copiarBom`** — leer para copiar a otro sitio no reescribe la receta de nadie.
+3. **El ORIGEN de `copiarRecetaAModeloNuevo`** — la puerta que **no estaba en ninguna lista de deudas**.
+
+### 🔴 La puerta que nadie tenía anotada, y era el riesgo nº1 del 1:N
+
+`dominio/desarrollo/modelo-en-la-mesa.ts` llama **directo** a `copiarRecetaAModeloNuevo` con el id crudo, y
+`leerModeloOrigen` **acepta cualquier modelo activo**. ⇒ **copiar un hijo en la mesa de negociación daba un
+modelo nuevo con la receta VACÍA**, y de ahí un precosto con sólo maquila, corte y empaque: **el precio que
+se dice en la cara del cliente, y no lanza ningún error.**
+
+⭐ **Y el hueco era DOBLE: la excepción del guardián de lecturas se justificaba con un argumento que esta
+puerta no cumple.** Decía que `versiones.ts` era seguro *«porque un hijo NO SE PUEDE VERSIONAR, así que
+aquí `idPadre` nunca es uno»* — premisa cierta, **conclusión falsa**: `modelo-en-la-mesa.ts` **no pasa por
+`crearVersionDeModelo`**, entra por debajo. **Razonaba sobre una de las dos puertas y concluía sobre la
+función.** Es la rama gemela **dentro del guardián que existe para cazar ramas gemelas**. La excepción se
+**borró**, con candado anti-re-añadido.
+
+### El guardián nuevo, y las TRES rondas que costó — la lección vale más que el arreglo
+
+Hoy **no existía ninguna red capaz de cazar un escritor que no resuelve**: la de lecturas trabaja **por
+archivo**, y los archivos ya importaban el resolver. El guardián nuevo trabaja **por función**.
+
+🔴 **Se dio por cerrado TRES VECES, y las tres la forma de al lado salió verde:**
+
+| ronda | lo que se arregló | lo que salió verde |
+|---|---|---|
+| 1 | `export async function` · `= async (` | `= async function` · método de clase · método de objeto |
+| 2 | el **conteo** (archivo entero vs. suma de trozos) | las mismas formas **en un archivo YA LISTADO** |
+| 3 | `class` como binding | **`export abstract class`** · `export default class` · `export default async function` |
+
+⚠️ **Y las de la ronda 3 no eran de laboratorio: ya se escriben en este repo** — `export abstract class` es
+`ErrorDominio`, la raíz de los cinco errores de dominio (`src/comun/errores.ts`).
+
+**Por qué se repitió, en palabras del coder:** en la ronda 2 escribió *«lo único que puede faltar es lo que
+quede por DELANTE de la primera declaración»* — **medio cierta, que es lo peor que puede ser una frase**.
+Lo de delante **falta**; lo de detrás **no falta: se acredita al vecino**, porque el trozo de cada función
+llega hasta la siguiente marca. *«Escribí la mitad verdadera, la leí como entera, y probé sólo la mitad que
+confirmaba lo que ya creía.»*
+
+> ### ⭐⭐ EL ARREGLO ESTRUCTURAL NO FUE EL REGEX
+>
+> Fue que **el conjunto de formas dejó de vivir en prosa**. Nació `FORMAS_DE_DECLARAR`: diez renglones con
+> su sintaxis, su nombre de binding esperado y una escritura dentro, y el `describe` **genera un `it` por
+> renglón**, ejercitando cada forma **detrás de una función ya declarada** —la posición que se quedaba
+> verde—. **Cada renglón lleva marcada la ronda que lo dejó pasar**, así que las tres reincidencias quedan
+> **ejecutándose, no narradas**.
+>
+> **Mientras la lista estuvo en un comentario se olvidó tres veces seguidas. Un comentario no ejecuta.**
+
+Y una prueba que **lee el código real** y exige que `export abstract class` siga existiendo: si desaparece,
+avisa de que el ejemplo que justifica la regla dejó de aplicar — porque **una justificación que ya no
+aplica es peor que ninguna**.
+
+### Lo demás que entró
+
+- **`mintearVersionDeModelo`** rechaza explícitamente `idModeloDesarrollo !== null`: la invariante del 1:N
+  **deja de colgar del `if` de `codigoDesarrollo`**, que sostenía dos invariantes a la vez.
+- **La asimetría que dejó la pieza A**: `listarFotosArte` resolvía pero sus dos escritores no ⇒ la ficha del
+  hijo listaba las fotos heredadas y **sus botones daban 404 sobre un renglón recién pintado**.
+- **`FotosArte`** recibe `idModelo` **de la pantalla**, no del renglón: con la receta injertada,
+  `fila.idModelo` **es el padre**. La clase se llama *«el id que le llega a la puerta»*.
+- **El letrero y el cierre de la ficha del hijo.** La **CURVA se deja abierta a propósito**: no es receta.
+
+### 🔴 Dos pruebas VACÍAS, cazadas por la revisión
+
+Se llamaban *«ninguna de ellas dejó una sola fila en el hijo»* y *«la receta del padre quedó intacta»* —
+pero el `beforeEach` **truncaba entre `it`s**, así que medían el fixture recién sembrado: **eran verdaderas
+por construcción y habrían pasado con las doce guardas borradas.** Ahora las doce se lanzan **dentro** de
+cada `it`, por un helper que devuelve **los nombres de las que NO rechazaron**.
+
+⭐ **Y el segundo `it` cubre más de lo que su nombre dice, a favor:** contra *«se resolvió en vez de
+bloquear»* —una pieza C plausible— las seis del 404 pasarían a escribir **en el padre**, los conteos del
+hijo seguirían en 0, y **sólo esas tres aserciones caerían**. Cubre **las doce puertas**, no seis.
+
+### La rama gemela del frontend, y su RAÍZ
+
+Cerrar el editor de medidas no lo fijaba ninguna prueba (la mutación sobrevivía 21/21). Al arreglarlo
+apareció la causa: **el mock devolvía «cargando»**, así que el panel pintaba un esqueleto y **su botón de
+guardar no existía nunca** ⇒ cualquier aserción sobre él **habría pasado por la razón equivocada**.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,376** · frontend `typecheck` (`tsc -b`)/`lint`/
+`format:check` · **1,870**. **Sin migración · sin permisos · sin seed · sin contrato** ⇒ **no requiere
+`SEED_ON_START`**. **No-op sobre los datos de hoy**: `idModeloDesarrollo` es NULL en el 100 % de las filas.
+
+**Mutaciones: 13 re-corridas en la última ronda, las 13 muertas.** Superviviente declarada: **M19** (quitar
+la guarda origen≠destino resuelta de `copiarBom`) — un guardián de fuente exige presencia, no ausencia; la
+mata `receta-escritura.int.test.ts` **en CI**. Revisión independiente: **cuatro rondas, tres rechazos**.
+
+📌 **Deuda que deja, anotada y no bloqueante:** el guardián **no puede cazar por nombre** un `export
+default` **anónimo** (`export default class { … }`), porque no hay binding que declarar. **Cero en el
+ámbito barrido** hoy; la salida limpia sería prohibirlo por lint.
+
+---
+
 ## V1-E9c · ⭐ DISOLVER LA COMPUERTA DE LA REVISIÓN (31-ago-2026, versión **0.071**) — ✅ HECHA
 
 > 📌 **Se planeó como «0.065» y salió como `0.071`.** El número del programa es una **posición en la

@@ -71,6 +71,79 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.073 · 1-sep-2026 · **en prueba** — Ahora sí dice **quién** hizo cada cosa, en vez de un número raro
+
+### Qué se puede hacer ahora que antes no
+
+**Ver el nombre de la persona** donde el sistema te enseñaba un código como `cm3x9k2q0000abcd1234`. Pasaba
+en **cinco pantallas**, y **tres de ellas están en el mismo diálogo de una orden**: los comentarios, los
+hitos y los archivos adjuntos. Abrir una orden te enseñaba **tres códigos ilegibles a la vez**.
+
+También en el tech pack de un desarrollo y en la lista de proyectos. Y de paso, la **tarjeta de móvil** de
+Modelos ya enseña el número de desarrollo, que en pantalla grande sí salía.
+
+### Qué cambió y puede sorprender
+
+- **Si alguien fue dado de baja, su nombre se sigue viendo.** Dar de baja no borra la historia: lo que
+  escribió esa persona sigue diciendo quién lo escribió. Sólo se lee *«Usuario dado de baja»* cuando el
+  usuario **ya no existe** en el sistema, que es otro caso.
+- **La bitácora sigue enseñando el código, a propósito.** Es la pantalla donde se investiga qué pasó, tiene
+  un campo «Id de usuario» al lado que sirve para filtrar, y un código que ya no resuelve **es la última
+  evidencia de quién actuó**. Taparlo ahí sería borrar una pista.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **Tres de los cinco arreglos no los vigilaba ninguna prueba**, y su forma de fallar era fea: en vez de
+  volver al código, la pantalla habría escrito **«Usuario dado de baja» en todos los renglones** — dejando
+  por escrito que a alguien lo dieron de baja **cuando ahí sigue trabajando**.
+- 🔴 **Y una pantalla de archivos tenía una puerta abierta**: la regla que impide que cualquiera borre un
+  tech pack existía, pero **nada la vigilaba** — se podía quitar sin que nada se rompiera. Ahora está fijada.
+
+### Qué sigue pendiente o roto
+
+- **Nada de esta pieza.** No cambia permisos ni datos: el despliegue no necesita nada especial.
+
+---
+
+## 0.072 · 1-sep-2026 · **en prueba** — La receta de un color **ya no se puede cambiar por accidente a los cuatro** (cambio interno)
+
+> 📌 **Todavía no cambia nada que puedas ver**, porque los modelos por color aún no existen: los crea una
+> versión posterior. Es el tercer ladrillo de la obra, y **el que tenía que ir antes que ellos**.
+
+### Qué se está construyendo
+
+La versión anterior hizo que los cuatro colores **lean** una sola receta, la del desarrollo. Ésta gobierna
+lo contrario: **quién puede escribirla.**
+
+La regla quedó como tú la dijiste: la receta la mueve **quien es responsable de definirla y aprobarla**, en
+el desarrollo. Y la diferencia de un color —*«no hubo cierre de ese tono y se compró otro sólo para la
+café»*— **se hace en la orden**, avisando de la diferencia, no en el modelo.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **El plan pedía lo contrario, y habría sido peor que no hacer nada.** Decía «que los escritores también
+  resuelvan», igual que las lecturas. Con eso, **editar la receta parado en el color café habría reescrito
+  la de los cuatro colores en silencio**: *«cambié un cierre sólo en la café y se le cambió a todos»*, con
+  los cuatro costos movidos y **el precio ya dicho al cliente**.
+- 🔴 **Copiar un modelo en la cita te habría dado un precio más bajo, sin avisar.** Había una puerta que
+  **no estaba en ninguna lista**: al copiar uno de los colores para cotizar, la receta llegaba **vacía**, y
+  el costo salía con sólo maquila, corte y empaque. No lanzaba ningún error: se veía normal.
+- **Y el aviso de «la receta cambió después de congelarse el costo» habría dejado de salir**, dejando la
+  cotización con el precio viejo y sin alarma.
+
+### Qué cambió y puede sorprender
+
+**La ficha de un color enseña la receta del desarrollo y ya no deja editarla ahí**, con un letrero que dice
+de dónde viene. Lo que sí se puede seguir cambiando en cada color es **la curva de tallas**, que no es
+receta y sí es suya.
+
+### Qué sigue pendiente o roto
+
+- **Nada de esta pieza.** La obra de los colores sigue: falta la versión que los hace nacer.
+- ⚠️ **Sin cambios de permisos ni de datos**: el despliegue no necesita nada especial.
+
+---
+
 ## 0.071 · 31-ago-2026 · **en prueba** — Una receta a medio firmar **ya no detiene la producción**: sólo frena la compra
 
 > 📌 **Se planeó como «0.065».** Salió con el número 0.071 porque esperó tu respuesta mientras las dos

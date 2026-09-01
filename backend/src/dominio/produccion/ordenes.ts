@@ -120,6 +120,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -492,8 +493,19 @@ async function reemplazarTallas(
  * (`precios-orden.ts`), `maquilaOrd`/`aplicacionOrd` son el PRECIO REAL negociado — sin el permiso
  * `ordenes.ver-precio-real-maquila` van null también aquí (paridad con el acceso 36 del viejo;
  * antes eran dato inerte del ETL y se exponían con solo `ordenes.ver`).
+ *
+ * `nombrePorId` llega YA RESUELTO desde el llamador (mismo patrón que `aEventoSalida`): esta función
+ * es SÍNCRONA a propósito y no puede consultar la base. Resolver el nombre del autor renglón por
+ * renglón haría N+1 en el LISTADO de órdenes —cada orden trae sus comentarios embebidos—, así que
+ * `listarOrdenes` resuelve la página COMPLETA de una sola consulta. El mapa es OBLIGATORIO a
+ * propósito (sin default): si mañana aparece un tercer llamador y olvida resolver los nombres, que
+ * sea un error de compilación y no un `nombreUsuario: null` silencioso en toda la pantalla.
  */
-function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSalida {
+function aOrdenSalida(
+  orden: OrdenConDetalle,
+  ocultarPrecios: boolean,
+  nombrePorId: ReadonlyMap<string, string>,
+): OrdenSalida {
   let totalPiezas = 0;
   const lineas = orden.lineas.map((l) => {
     let totalLinea = 0;
@@ -567,6 +579,7 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
     comentarios: orden.comentarios.map((c) => ({
       id: c.id,
       idUsuario: c.idUsuario,
+      nombreUsuario: nombreDeUsuario(nombrePorId, c.idUsuario),
       comentario: c.comentario,
       fecha: c.fecha.toISOString(),
     })),
@@ -1175,7 +1188,11 @@ export async function obtenerOrden(
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', id);
   }
-  return aOrdenSalida(orden, !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'));
+  const nombrePorId = await nombresDeUsuarios(
+    clienteLectura(bd),
+    orden.comentarios.map((c) => c.idUsuario),
+  );
+  return aOrdenSalida(orden, !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'), nombrePorId);
 }
 
 /**
@@ -1218,7 +1235,12 @@ export async function listarOrdenes(
   ]);
 
   const ocultarPrecios = !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
-  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle, ocultarPrecios));
+  // Los autores de los comentarios de TODA la página, en UNA consulta (nunca una por orden).
+  const nombrePorId = await nombresDeUsuarios(
+    cliente,
+    datos.flatMap((o) => (o as OrdenConDetalle).comentarios.map((c) => c.idUsuario)),
+  );
+  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle, ocultarPrecios, nombrePorId));
   return armarPagina(salida, total, filtros);
 }
 

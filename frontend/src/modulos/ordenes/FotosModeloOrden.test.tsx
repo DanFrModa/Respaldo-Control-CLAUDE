@@ -49,6 +49,7 @@ function adjunto(idArchivo: string, tipoMime: string, url: string): OrdenAdjunto
     tamanoBytes: 100,
     creadoEn: '2026-07-18T00:00:00Z',
     subidoPorId: 'u1',
+    nombreSubidoPor: 'Daniel Masri',
   };
 }
 

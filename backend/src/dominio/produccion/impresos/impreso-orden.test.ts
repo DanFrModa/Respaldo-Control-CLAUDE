@@ -506,6 +506,7 @@ describe('armarDatosImpresoOrden', () => {
       tamanoBytes: 10,
       urlDescarga: 'https://r2/arte',
       subidoPorId: null,
+      nombreSubidoPor: null,
       creadoEn: new Date('2026-07-01'),
       ...over,
     };
