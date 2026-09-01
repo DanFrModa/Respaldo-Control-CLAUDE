@@ -71,6 +71,48 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.083 · 1-sep-2026 · **en prueba** — ⭐ Las fotos **del arte** también son de la OP (y el arte que agregas a mano por fin puede llevar foto)
+
+### Qué se puede hacer ahora que antes no
+
+**Es la otra mitad de lo que pediste**, y aquí no había nada que arreglar: **había que construirlo entero.**
+Hasta hoy, en la OP el arte **no tenía ninguna foto** — ni propia ni heredada: no se veía en ninguna parte.
+
+Ahora, en la receta de la orden, **cada renglón de arte tiene su tira de fotos**:
+
+- **hereda** las del arte del modelo,
+- **le quitas** las que no aplican **en esa orden**,
+- **le subes** las suyas.
+
+⭐ **Y el arte que agregas a mano en la OP por fin puede llevar foto.** Antes era imposible: como no venía
+del modelo, no había dónde ponerla. Eso también arregla su impreso, que salía sin imagen.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Quitar no es borrar.** La foto sigue en el arte del modelo, sigue en la nube, y **las demás órdenes
+  del mismo modelo la siguen viendo**. Sólo desaparece de la orden donde la quitaste, y se puede traer de
+  vuelta.
+- **El PDF de la orden respeta lo que quitaste**, imprime las que subiste a la OP y **por fin saca el arte
+  agregado a mano**.
+- **Quién puede tocarlas: quien puede tocar la receta de la OP** — el permiso de Desarrollo, el mismo con
+  el que se le cambia la descripción, el precio o el proveedor a ese renglón. No es el permiso de órdenes:
+  con ése, la pantalla habría enseñado el botón y el sistema lo habría rechazado.
+- **Un renglón de arte excluido enseña su foto pero no deja tocarla** — es una lápida: se ve, no se edita.
+- **Una orden cancelada no admite cambios de foto**, igual que no admite ningún otro cambio de su receta.
+- **La estrella dice «primera foto», no «foto principal».** El arte del modelo **no tiene** el concepto de
+  foto principal; en la pantalla marca la primera de cada arte y en el papel sirve para que no se recorte.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **La «Ficha de arte» que va al estampador sigue sin imprimir ninguna imagen** — ni antes ni ahora. Si
+  la OP manda sobre la foto del arte, **ése es el papel que el proveedor tiene en la mano**. Está
+  numerado y **esperando tu palabra**; si dices que sí, es barato, porque esta versión ya resuelve **cuál**
+  foto manda en cada orden.
+- Sin permisos nuevos y sin datos que sembrar. **Lleva migración**, aditiva: el despliegue no necesita nada
+  especial.
+
+---
+
 ## 0.082 · 1-sep-2026 · **en prueba** — ⭐ Cada OP puede tener **sus propias fotos**: ya se puede quitar una que venga del modelo
 
 ### Qué se puede hacer ahora que antes no

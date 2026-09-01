@@ -29,6 +29,7 @@ import {
   useRestaurarRenglonReceta,
   useTraerDelModelo,
 } from '@/api/receta-orden';
+import { useFotosArteOrden } from '@/api/fotos-arte-orden';
 import { useMedidasAvio as useMedidasDelCatalogo } from '@/api/medidas-avio';
 import type { ErrorDeApi } from '@/api/errores';
 import type {
@@ -71,6 +72,7 @@ import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
 import { ChipsOcComprometidas } from '@/modulos/ordenes-compra/piezas';
 import { useSesion } from '@/sesion/useSesion';
 
+import { FotosArteOrden } from './FotosArteOrden';
 import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './receta-piezas';
 
 /**
@@ -2052,6 +2054,17 @@ function SeccionArtes({
   alResponder: ReportarReceta;
 }): React.JSX.Element {
   const editar = recordandoElAviso(useEditarRenglonReceta(), alResponder);
+  /*
+   * ⭐ §Post-F9.177 — LAS FOTOS DEL ARTE SON DE LA OP. Daniel: *"un modelo de desarrollo que se va a
+   * usar para 4 órdenes diferentes no puede usar la misma foto ni del modelo ni de arte para todas
+   * las OP… la OP es de donde cuelgan las fotos directamente, no del desarrollo"*.
+   *
+   * UNA sola consulta para TODOS los renglones (nunca una por fila): el servidor devuelve ya
+   * resuelto qué enseña cada uno —heredado del arte del modelo, apagado por esta OP, o subido a
+   * ella—. Aquí no se decide nada (A1); sólo se reparte por renglón.
+   */
+  const fotosPorRenglon = useFotosArteOrden(idOrden);
+  const fotosDe = new Map((fotosPorRenglon.data ?? []).map((a) => [a.idOrdenArte, a]));
   return (
     <Seccion titulo="Arte" testid="receta-seccion-artes" vacio={receta.artes.length === 0}>
       <TablaDensa>
@@ -2079,6 +2092,16 @@ function SeccionArtes({
                   ({a.tipoArte.toLocaleLowerCase('es')}
                   {a.posicion === null ? '' : ` · ${a.posicion}`})
                 </span>
+                {/* ⭐ §Post-F9.177 — las fotos de ESTE arte EN ESTA OP. Se heredan del arte del
+                    modelo, se pueden apagar (sin borrarlas de él, D3) y se pueden agregar propias
+                    —lo único que le da foto a un arte agregado a mano—. Un renglón EXCLUIDO ya no
+                    se lleva: sus fotos no se pueden tocar. */}
+                <FotosArteOrden
+                  idOrden={idOrden}
+                  arte={fotosDe.get(a.id)}
+                  puedeAdministrar={editable && !a.excluido}
+                  ocupado={ocupado}
+                />
               </TablaDensaCelda>
               <TablaDensaCelda>
                 <ChipsRenglon

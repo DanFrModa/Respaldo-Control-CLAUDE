@@ -79,6 +79,7 @@ import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
 import { rutasRecetaOrden } from './api/produccion/receta-orden.rutas.js';
 import { rutasAdjuntosOrden } from './api/produccion/adjuntos-orden.rutas.js';
+import { rutasFotosArteOrden } from './api/produccion/fotos-arte-orden.rutas.js';
 import { rutasFotosOcultasOrden } from './api/produccion/fotos-ocultas-orden.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
@@ -229,6 +230,7 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // una foto HEREDADA del modelo, y traerla de vuelta. NO borra nada (D3) y NO toca R2: pone/quita
   // una marca por (orden, foto). Permisos `ordenes.ver` / `ordenes.administrar`; sin permisos nuevos.
   await app.register(rutasFotosOcultasOrden, { prefix: '/api' });
+  await app.register(rutasFotosArteOrden, { prefix: '/api' });
   // Órdenes — CONSULTAS/TABLEROS/BÚSQUEDA (F2-E4 PIEZA B): consulta ligera, incompletas con
   // semáforo, tablero "pedidos por mes" y buscador global. Solo lectura (`ordenes.ver`). Sus paths
   // estáticos se registran ANTES de nada que choque con `/ordenes/:id` (Fastify los prioriza).

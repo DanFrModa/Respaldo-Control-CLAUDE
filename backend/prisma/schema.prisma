@@ -589,6 +589,11 @@ model Archivo {
   entradaTelaArchivo     EntradaTelaArchivo?
   /// Entradas de tela cuyo CFDI es este XML (§Post-F9.21: respalda el cargo fiscal de CxP).
   entradasTelaCfdi       EntradaTela[]       @relation("EntradaTelaCfdi")
+  /// Foto de arte SUBIDA A UNA OP que apunta a este archivo (§Post-F9.177), si la hay. Inversa de
+  /// `OrdenArteFoto.archivo`; 0 o 1 — y ahí está la diferencia con `modeloArteFotos`, que sí es
+  /// lista: una foto que la OP subió NACIÓ en esa OP y no la comparte nadie, así que quitarla puede
+  /// liberar su objeto de R2 sin preguntarle a nadie (`@@unique([idArchivo])` en `OrdenArteFoto`).
+  ordenArteFoto          OrdenArteFoto?
 
   @@map("archivos")
 }
@@ -2736,6 +2741,11 @@ model ModeloArteFoto {
   arte    ModeloArte @relation(fields: [idModeloArte], references: [id], onDelete: Cascade)
   archivo Archivo    @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
 
+  /// Renglones de arte de una OP que decidieron NO enseñar esta foto (§Post-F9.177). Cascade desde
+  /// el lado de la marca: si la foto se va del arte del modelo, la marca que la escondía deja de
+  /// significar algo. Espejo exacto de `ModeloFoto.ocultaEnOrdenes` (§Post-F9.169(b), la prenda).
+  ocultaEnOrdenes OrdenArteFotoOculta[]
+
   creadoEn    DateTime @default(now()) @map("creado_en")
   creadoPorId String?  @map("creado_por_id")
 
@@ -3864,6 +3874,13 @@ model OrdenArte {
   /// nadie se despierte con la puerta cerrada el día del deploy).
   liberadoPorId String?   @map("liberado_por_id")
 
+  /// ⭐ §Post-F9.177 — LAS FOTOS DEL ARTE SON DE LA OP. Fotos que ESTE renglón subió (viven en R2 y
+  /// nacieron aquí) y fotos HEREDADAS del arte del modelo que este renglón dejó de enseñar. Las
+  /// heredadas NO se copian (D3: la galería del arte del modelo no se toca nunca) — se leen vivas
+  /// por la traza `idModeloArte` y esta lista sólo guarda cuáles se apagaron.
+  fotos        OrdenArteFoto[]
+  fotosOcultas OrdenArteFotoOculta[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -3876,6 +3893,91 @@ model OrdenArte {
   @@index([idProveedor])
   @@index([idTipoArte])
   @@map("orden_arte")
+}
+
+/// ⭐ §Post-F9.177 — FOTO DE ARTE **SUBIDA A UNA OP**, colgada del renglón de arte de ESA orden.
+///
+/// 🔴 DANIEL, textual: *«Un modelo de desarrollo que se va a usar para 4 órdenes diferentes no puede
+/// usar la misma foto ni del modelo ni de arte para todas las OP. Tendría que haber la posibilidad
+/// de modificar las fotos directamente en la OP… Y aplica para fotos de la prenda pero también del
+/// arte.»*
+///
+/// Es la mitad de "agregar" de la pareja **heredar → ocultar → agregar** (la misma que la prenda
+/// resolvió en §Post-F9.169(b)): lo que el arte del modelo tiene se HEREDA vivo por la traza
+/// `OrdenArte.idModeloArte`, {@link OrdenArteFotoOculta} apaga las heredadas que esta OP no quiere,
+/// y esta tabla guarda las que esta OP puso de su bolsillo.
+///
+/// ⭐ **Y es la ÚNICA forma que tiene de llevar foto un arte AGREGADO A MANO** (`idModeloArte`
+/// NULL): ése no hereda de nadie, así que antes de esta tabla no tenía dónde poner una.
+///
+/// ⚠️ **`@@unique([idArchivo])`, al revés que `ModeloArteFoto`** (que a propósito NO lo lleva porque
+/// varios artes comparten objeto de R2 tras la migración del catálogo). Aquí el archivo NACE en esta
+/// OP y no lo comparte nadie: por eso quitarlo puede borrar su `Archivo` —y su objeto de R2— sin la
+/// cuenta de huérfanos que necesita el lado del modelo (`borrarArchivoSiQuedoHuerfano`).
+///
+/// `onDelete`: Cascade hacia `OrdenArte` (la foto es del renglón) y Cascade hacia `Archivo` (borrar
+/// el registro se lleva el renglón; el objeto de R2 se borra tras el commit, best-effort — 0.081a).
+model OrdenArteFoto {
+  id          Int    @id @default(autoincrement())
+  idOrdenArte Int    @map("id_orden_arte")
+  idArchivo   String @map("id_archivo")
+  /// Posición dentro de las fotos PROPIAS del renglón (espejo de `ModeloArteFoto.orden`). Las
+  /// heredadas van primero y no compiten por este número: son de otro dueño.
+  orden       Int    @default(0)
+
+  arte    OrdenArte @relation(fields: [idOrdenArte], references: [id], onDelete: Cascade)
+  archivo Archivo   @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idArchivo])
+  @@index([idOrdenArte])
+  @@map("orden_arte_foto")
+}
+
+/// ⭐ §Post-F9.177 — LA MARCA de que un renglón de arte de una OP **no enseña** una foto heredada
+/// del arte del modelo. Espejo exacto de `OrdenFotoOculta` (la prenda, §Post-F9.169(b)).
+///
+/// 🔴 **OCULTAR NO ES BORRAR (D3).** La foto sigue en el arte del modelo, sigue siendo su principal
+/// si lo era, **otra orden del mismo modelo la sigue viendo** y **R2 no se toca jamás**: aquí sólo
+/// nace o muere una fila de 4 columnas. Sin fila = se ve (el comportamiento de todo lo ya
+/// capturado, REGLA 0-B); con fila = este renglón no la enseña.
+///
+/// ⚠️ **Por qué NO se congelan las fotos en `OrdenArte`**, que es lo que hace el resto del renglón
+/// (descripción, posición, puntadas, precio, proveedor). Se midió y sale caro por tres lados:
+///  1. `borrarArchivoSiQuedoHuerfano` (arte del modelo) cuenta SÓLO `ModeloArteFoto`: unas filas
+///     congeladas que compartieran `idArchivo` se irían en silencio —con su objeto de R2— en cuanto
+///     el dueño del modelo quitara la foto. Y contarlas ahí volvería a dejar el objeto pagándose
+///     para siempre, deshaciendo la 0.081.
+///  2. `copiarRecetaDelModelo` sólo corre al CREAR la orden: sin backfill (REGLA 0-B) **todas** las
+///     órdenes que ya existen se quedarían sin fotos de arte en su impreso, que hoy sí las lleva.
+///     No gastar en reparar el pasado no es permiso para romper lo que hoy funciona.
+///  3. La desalineación (`calcularDesalineacion`, `dominio/produccion/receta-orden.ts`) compara
+///     existencia y precio —para el ARTE ni siquiera el consumo— y **fotos no compara ninguna**:
+///     una foto que el modelo gane después no llegaría a la OP y nadie se enteraría.
+///
+/// `onDelete`: Cascade hacia `OrdenArte` (la decisión es del renglón) y Cascade hacia
+/// `ModeloArteFoto` —y NO Restrict, la costumbre de la casa para catálogos en uso— a propósito:
+/// esconder una foto en una OP **no puede secuestrar el arte del modelo**.
+model OrdenArteFotoOculta {
+  id          Int       @id @default(autoincrement())
+  idOrdenArte Int       @map("id_orden_arte")
+  arte        OrdenArte @relation(fields: [idOrdenArte], references: [id], onDelete: Cascade)
+
+  /// La foto del arte del MODELO que este renglón no enseña. Es una foto del arte al que apunta
+  /// `OrdenArte.idModeloArte`, que YA viene resuelto por linaje (un modelo hijo por color copia la
+  /// receta de su modelo de desarrollo, V1-E9b) — así que aquí no hace falta volver a resolverlo.
+  idModeloArteFoto Int            @map("id_modelo_arte_foto")
+  modeloArteFoto   ModeloArteFoto @relation(fields: [idModeloArteFoto], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idOrdenArte, idModeloArteFoto])
+  @@index([idOrdenArte])
+  @@index([idModeloArteFoto])
+  @@map("orden_arte_foto_oculta")
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

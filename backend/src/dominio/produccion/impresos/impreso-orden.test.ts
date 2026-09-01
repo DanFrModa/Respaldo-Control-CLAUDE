@@ -21,6 +21,7 @@ import type { BomModelo } from '../../modelos/bom-modelo.js';
 import type { FotoModeloConUrl } from '../../modelos/fotos-modelo.js';
 import type { RecetaParaImpreso } from '../receta-orden.js';
 import type { AdjuntoOrdenConUrl } from '../adjuntos-orden.js';
+import type { ArteOrdenFotosImpreso } from '../fotos-arte-orden.js';
 
 import {
   armarDatosImpresoOrden,
@@ -549,6 +550,7 @@ describe('armarDatosImpresoOrden', () => {
     adjuntos: AdjuntoOrdenConUrl[] = [],
     telasCompradas: TelaCompradaOrden[] = [],
     ocultas: number[] = [],
+    arteOrden: ArteOrdenFotosImpreso[] = [],
   ): DepsImpreso {
     return {
       archivos: archivosFake,
@@ -563,6 +565,9 @@ describe('armarDatosImpresoOrden', () => {
       // §Post-F9.169(b): por omisión la OP no oculta ninguna foto del modelo — el caso normal, y el
       // que describen todas las expectativas históricas de este archivo.
       leerIdsFotosOcultas: () => Promise.resolve(ocultas),
+      // §Post-F9.177: por omisión la OP no apagó ninguna foto de arte ni subió ninguna propia — el
+      // caso normal, y el que describen todas las expectativas históricas de este archivo.
+      leerArteOrdenFotos: () => Promise.resolve(arteOrden),
       listarAdjuntos: () => Promise.resolve(adjuntos),
       leerTelasCompradas: () => Promise.resolve(telasCompradas),
       ...(descargarImagen ? { descargarImagen } : {}),
@@ -790,6 +795,239 @@ describe('armarDatosImpresoOrden', () => {
       { dataUrl: 'data:img;https://r2/f1', principal: true },
       { dataUrl: 'data:img;https://r2/f2' },
     ]);
+  });
+
+  /*
+   * ⭐⭐ §Post-F9.177 — LAS FOTOS DEL ARTE SON DE LA OP, **TAMBIÉN EN EL PAPEL**.
+   *
+   * Daniel: *"un modelo de desarrollo que se va a usar para 4 órdenes diferentes no puede usar la
+   * misma foto ni del modelo ni de arte para todas las OP… aplica para fotos de la prenda pero
+   * también del arte"*. La segunda superficie es ésta: si la pantalla deja de enseñar una foto de
+   * arte y el impreso la sigue imprimiendo, es *"añadí lo nuevo y dejé lo viejo debajo"*.
+   *
+   * Nota: `arteBom({ id, keysFoto })` numera sus fotos `id * 100 + i`, así que la primera foto del
+   * arte 1 es `idFoto: 100` — que es lo que apaga `ocultas`.
+   */
+  it('⭐ NO imprime la foto de arte que ESTE renglón apagó (y sí la otra)', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      artes: [arteBom({ id: 1, nombre: 'Logo pecho', keysFoto: ['uno.png', 'dos.png'] })],
+    };
+    const decisiones: ArteOrdenFotosImpreso[] = [
+      {
+        idOrdenArte: 10,
+        idModeloArte: 1,
+        descripcion: 'Logo pecho',
+        ocultas: [100],
+        propias: [],
+      },
+    ];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(
+        ordenSalida(),
+        bom,
+        [],
+        (url) => Promise.resolve(`data:img;${url}`),
+        [],
+        [],
+        [],
+        decisiones,
+      ),
+      archivos: archivosQuePresignan(),
+    });
+
+    // Sale sólo la segunda… y NO como principal: ser principal es una decisión sobre una foto
+    // concreta, no un puesto que la siguiente ocupe (mismo criterio que la prenda).
+    expect(datos.artes).toEqual([{ dataUrl: 'data:img;https://r2/dos.png', titulo: 'Logo pecho' }]);
+    expect(datos.artes.some((a) => a.principal === true)).toBe(false);
+  });
+
+  it('⭐ SÍ imprime las fotos de arte que ESTA OP subió, detrás de las heredadas', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      artes: [arteBom({ id: 1, nombre: 'Logo pecho', keysFoto: ['uno.png'] })],
+    };
+    const decisiones: ArteOrdenFotosImpreso[] = [
+      {
+        idOrdenArte: 10,
+        idModeloArte: 1,
+        descripcion: 'Logo pecho',
+        ocultas: [],
+        propias: [{ idFoto: 900, key: 'op/propia.png' }],
+      },
+    ];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(
+        ordenSalida(),
+        bom,
+        [],
+        (url) => Promise.resolve(`data:img;${url}`),
+        [],
+        [],
+        [],
+        decisiones,
+      ),
+      archivos: archivosQuePresignan(),
+    });
+
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/uno.png', titulo: 'Logo pecho', principal: true },
+      // La de la OP va DETRÁS y sin estrella: la principal la elige el dueño del modelo.
+      { dataUrl: 'data:img;https://r2/op/propia.png', titulo: 'Logo pecho' },
+    ]);
+  });
+
+  it('⭐ el arte AGREGADO A MANO por fin sale en el papel, con la foto que le subió la OP', async () => {
+    // Antes de esta etapa era IMPOSIBLE: no está en el BOM del modelo, así que no tenía de quién
+    // heredar imagen ni dónde ponerle una propia.
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      artes: [arteBom({ id: 1, nombre: 'Logo pecho', keysFoto: ['uno.png'] })],
+    };
+    const decisiones: ArteOrdenFotosImpreso[] = [
+      { idOrdenArte: 10, idModeloArte: 1, descripcion: 'Logo pecho', ocultas: [], propias: [] },
+      {
+        idOrdenArte: 11,
+        idModeloArte: null,
+        descripcion: 'Etiqueta especial',
+        ocultas: [],
+        propias: [{ idFoto: 901, key: 'op/etiqueta.png' }],
+      },
+    ];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(
+        ordenSalida(),
+        bom,
+        [],
+        (url) => Promise.resolve(`data:img;${url}`),
+        [],
+        [],
+        [],
+        decisiones,
+      ),
+      archivos: archivosQuePresignan(),
+    });
+
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/uno.png', titulo: 'Logo pecho', principal: true },
+      // Va al FINAL y con su propio rótulo: no desplaza al arte principal del modelo.
+      { dataUrl: 'data:img;https://r2/op/etiqueta.png', titulo: 'Etiqueta especial' },
+    ]);
+  });
+
+  it('🔴 cada renglón manda sobre SU arte: apagar en uno no apaga en el otro', async () => {
+    // Con un solo arte, una búsqueda equivocada de la decisión (por posición en vez de por la
+    // traza) daría el mismo resultado. Con DOS y decisiones distintas, se cruzan y se nota.
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      artes: [
+        arteBom({ id: 1, nombre: 'Frente', keysFoto: ['a1.png'] }),
+        arteBom({ id: 2, nombre: 'Espalda', keysFoto: ['b1.png'] }),
+      ],
+    };
+    const decisiones: ArteOrdenFotosImpreso[] = [
+      // El PRIMER renglón no apaga nada…
+      { idOrdenArte: 10, idModeloArte: 1, descripcion: 'Frente', ocultas: [], propias: [] },
+      // …y el SEGUNDO apaga su única foto (`arteBom` numera las fotos del arte 2 como 200).
+      { idOrdenArte: 11, idModeloArte: 2, descripcion: 'Espalda', ocultas: [200], propias: [] },
+    ];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(
+        ordenSalida(),
+        bom,
+        [],
+        (url) => Promise.resolve(`data:img;${url}`),
+        [],
+        [],
+        [],
+        decisiones,
+      ),
+      archivos: archivosQuePresignan(),
+    });
+
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/a1.png', titulo: 'Frente', principal: true },
+    ]);
+  });
+
+  it('🔴 y las propias tampoco se cruzan de renglón', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      artes: [
+        arteBom({ id: 1, nombre: 'Frente', keysFoto: ['a1.png'] }),
+        arteBom({ id: 2, nombre: 'Espalda', keysFoto: ['b1.png'] }),
+      ],
+    };
+    const decisiones: ArteOrdenFotosImpreso[] = [
+      { idOrdenArte: 10, idModeloArte: 1, descripcion: 'Frente', ocultas: [], propias: [] },
+      {
+        idOrdenArte: 11,
+        idModeloArte: 2,
+        descripcion: 'Espalda',
+        ocultas: [],
+        propias: [{ idFoto: 900, key: 'op/solo-espalda.png' }],
+      },
+    ];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(
+        ordenSalida(),
+        bom,
+        [],
+        (url) => Promise.resolve(`data:img;${url}`),
+        [],
+        [],
+        [],
+        decisiones,
+      ),
+      archivos: archivosQuePresignan(),
+    });
+
+    // La foto propia cuelga de «Espalda» y de nadie más — su rótulo lo delata.
+    expect(datos.artes.map((a) => [a.titulo, a.dataUrl])).toEqual([
+      ['Frente', 'data:img;https://r2/a1.png'],
+      ['Espalda', 'data:img;https://r2/b1.png'],
+      ['Espalda', 'data:img;https://r2/op/solo-espalda.png'],
+    ]);
+  });
+
+  it('una OP sin decisiones sobre el arte imprime EXACTAMENTE lo de siempre (REGLA 0-B)', async () => {
+    // Todo lo ya capturado cae aquí: ni una fila en las tablas nuevas ⇒ el papel no cambia.
+    const bom = bomDosArtes(['Principal', 'uno.png'], ['Secundario', 'dos.png']);
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, [], (url) => Promise.resolve(`data:img;${url}`)),
+      archivos: archivosQuePresignan(),
+    });
+
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/uno.png', titulo: 'Principal', principal: true },
+      { dataUrl: 'data:img;https://r2/dos.png', titulo: 'Secundario' },
+    ]);
+  });
+
+  it('si la lectura de las decisiones TRUENA, el papel sale con el arte del modelo (best-effort)', async () => {
+    const bom = bomDosArtes(['Principal', 'uno.png'], ['Secundario', 'dos.png']);
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, [], (url) => Promise.resolve(`data:img;${url}`)),
+      archivos: archivosQuePresignan(),
+      leerArteOrdenFotos: () => Promise.reject(new Error('BD caída')),
+    });
+
+    // Jamás se trunca el PDF por esto: degrada a lo que había antes de la etapa.
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/uno.png', titulo: 'Principal', principal: true },
+      { dataUrl: 'data:img;https://r2/dos.png', titulo: 'Secundario' },
+    ]);
+    expect(esPdf(await generarPdfOrden(datos))).toBe(true);
   });
 
   it('trae como ARTES solo los adjuntos de la orden con tipoMime image/*', async () => {
