@@ -752,7 +752,11 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 - **Aplica en:** rama `claude/cambios-prueba-xv95r8`. Migración `20260730120000_unidad_tela` (automática). SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-07-30.
 
-#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ MITAD CONSTRUIDA, MITAD ABIERTA
+#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ MITAD CONSTRUIDA, MITAD ABIERTA ⇒ **ES LA 0.085… no: ES LA 0.084**
+
+> 📌 **No espera nada de Daniel: es TRABAJO, y ya tiene número (0.084, asignado el 1-sep).** Estuvo
+> **cuatro semanas sin número** —lo encontró el repaso que él mismo pidió— y por eso este encabezado
+> lleva ⏳: marca **pendiente de construir**, no pendiente de respuesta.
 
 > ⚖️ **AJUSTE (28-ago-2026) — el bullet de «Migración» de abajo (*partir los colores ya creados en
 > color + pack*) queda SIN EFECTO para lo capturado en `prueba`:** *«Lo viejo ahorita es irrelevante»*
@@ -9646,9 +9650,20 @@ uno de los dos:
 *(Dos momentos, dos renglones.)* ⇒ **es exactamente el principio de arriba:** *mientras está desandado,
 se congela lo que dependa de ello*.
 
-#### ⏳ EL CASO DE BORDE — con default propuesto, SIN contestar
+#### ✅ EL CASO DE BORDE — CONTESTADO POR DANIEL (1-sep-2026, §Post-F9.173(a))
 
-**¿Qué pasa con lo que YA se compró antes de abrir?** Dicho a Daniel, **todavía sin respuesta suya**:
+> ⚠️ **Este encabezado decía «SIN contestar» una hora después de que Daniel lo contestara** — es la
+> octava marca de esta clase corregida en 24 h, y la más reciente de todas. **El patrón no falla:** la
+> respuesta se registra en una entrada nueva (§Post-F9.173) y **el sitio viejo nadie lo vuelve a mirar**.
+>
+> ### ✅ Daniel, textual: *«Si ya está comprado, **solo avisa** que ya está comprado… **no se puede
+> cancelar la OC en automático, eso hay que negociarlo con el proveedor**.»*
+>
+> ⇒ **El default de abajo se CONFIRMA** —abrir frena lo nuevo, no revierte lo hecho— **y se le añade lo
+> que faltaba: el AVISO**, que hoy no existe. Detalle y alcance medido en **§Post-F9.173(a)**; se
+> construye en la **0.085**.
+
+**¿Qué pasa con lo que YA se compró antes de abrir?** Lo que se le dijo, y su respuesta lo confirmó:
 
 > **Default propuesto: lo ya comprado NO se deshace solo.** La OC autorizada sigue en pie; para
 > desandarla está **`desautorizarOC`**, que ya existe y ya es del dueño. ⇒ **abrir frena lo nuevo, no
@@ -11546,7 +11561,13 @@ sigue abierta, pero deja de ser urgente.
 
 ---
 
-#### (Post-F9.172) — ⏳ DOS PREGUNTAS ABIERTAS DE DANIEL, CON DEFAULT PROPUESTO (31-ago-2026)
+#### (Post-F9.172) — ✅ LAS DOS, CONTESTADAS POR DANIEL EL MISMO DÍA (31-ago-2026)
+
+> ⚠️ **Este encabezado decía «DOS PREGUNTAS ABIERTAS» y Daniel ya había contestado las dos** — (a)
+> *«está bien la 3»* y (b) *«se reúsa cuando sea el mismo modelo»*, ambas registradas abajo el mismo
+> día. Se corrige por la misma razón de siempre: un chat nuevo hace `grep` de «pendiente» y le
+> **vuelve a preguntar al dueño**. De (b) queda **sólo el borde (A) vs (B)**, con default **(B)**, que
+> se construye en E3.
 
 > **Ninguna de las dos frena nada** (REGLA 0): quedan aquí con su default y el programa sigue. Se anotan
 > **con su medición**, para que un chat nuevo no las re-descubra ni se las vuelva a preguntar mal.
@@ -11659,5 +11680,94 @@ natural (`Orden.findFirst({ where: { idPedidoLinea } })` + `pg_advisory_xact_loc
 - **Aplica en:** (a) ✅ **CERRADA** — etapa propia, sin número, **con migración**. (b) ✅ **CERRADA**:
   **se reusa**. Queda por precisar sólo **el borde (A) vs (B)**, con default **(B)**; se construye en
   **E3**, que la necesita como llave. **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.173) — ⭐ SI YA SE COMPRÓ, EL SISTEMA **AVISA**; CANCELAR SE NEGOCIA · y los parámetros de calidad esperan a las CALIFICACIONES (DANIEL, 1-sep-2026)
+
+### (a) 🔴 CORRIGE lo que la 0.067 construyó: falta el AVISO
+
+**Daniel, textual:**
+
+> *«Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede cancelar la OC interna,
+> o que **el comprador sepa que cambió**, para hacer lo que tenga que hacer. **No se puede cancelar la OC
+> en automático… eso hay que negociarlo con el proveedor.**»*
+
+**Qué confirma y qué corrige.** La mitad construida está bien: **reabrir la receta NO revierte nada** —la
+OC autorizada sigue en pie— porque **el sistema no puede deshacer un compromiso con un tercero**. Eso era
+el default y él lo ratifica con la razón de fondo: *cancelar se negocia, no se ejecuta*.
+
+🔴 **Lo que FALTA, y es lo que él pidió: el sistema hoy se queda CALLADO.** Reabrir una receta con compra
+detrás no avisa a nadie. El comprador **se entera cuando se entera**, y para entonces la tela puede venir
+en camino. ⇒ **El aviso no es cosmético: es el que permite que alguien alcance a negociar.**
+
+**Lo que hay que construir** (queda como **0.085**):
+1. **Al reabrir una receta, decir que ya hay compra**, con qué se compró y en qué OC — para que se vea si
+   la OC interna se puede cancelar.
+2. **Que le llegue al COMPRADOR**, que es quien tiene que hacer algo — no sólo a quien reabre.
+3. ⛔ **NUNCA cancelar la OC en automático.** Si acaso, **llevar** a `desautorizarOC`, que ya existe y ya
+   es del dueño. *(Mismo patrón que §Post-F9.145: el aviso que pide un acto tiene que llevar a hacerlo.)*
+
+### (b) ⏳ Los parámetros de aceptación: NO se fijan ahora
+
+**Daniel, textual:**
+
+> *«En alguna conversación hablamos de que hay que **fijar un parámetro de aceptación de faltantes y
+> segundas**. Aún no fijamos los parámetros… **lo haremos cuando hagamos las calificaciones de
+> maquileros**.»*
+
+⇒ **La pregunta O3 de V1-E8k queda CONTESTADA por reencuadre, no por defecto.** Se preguntaba si el KPI de
+calidad debía contar las incompletas. **La respuesta es que esa pregunta no se decide sola**: pertenece a
+una pieza mayor —**las calificaciones de maquileros**— donde se fijan **los parámetros de aceptación de
+faltantes Y de segundas**, juntos. Decidir sólo lo de las incompletas sería fijar medio criterio.
+
+⇒ **NO se le vuelve a preguntar** hasta que esa pieza arranque, y entonces se le pregunta **entera**. Queda
+como **0.086**.
+
+- **Aplica en:** (a) **0.085** — corrige y completa lo de la 0.067. (b) **0.086** — y **cierra O3**.
+  **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.174) — ⏳ PENDIENTE DE DANIEL: la receta se COMPARTE, pero la FICHA se COPIA — y diverge (medido el 1-sep-2026)
+
+### El hallazgo, medido por el reviewer de E3 (no deducido)
+
+```
+padre editado a           → "95% ALGODON 5% ELASTANO"
+hijo Rojo (nacido ANTES)  → "ALGODON 100%"              ← se quedó viejo
+hijo Azul (nacido DESPUÉS)→ "95% ALGODON 5% ELASTANO"
+la OP del Rojo se lleva   → "ALGODON 100%"              ← al papel del cliente
+```
+
+### Por qué importa, con sus propias palabras
+
+Daniel preguntó en agosto: ***«todos los modelos deben de llevar lo mismo, ¿cómo lo controlas?»***. La
+respuesta que se construyó —**una sola receta**, §Post-F9.170— **cubre el BOM y NO la ficha**.
+
+`CAMPOS_FICHA_HEREDADOS` (`dominio/modelos/modelos.ts`) **copia** al nacer: composición, maquila y corte
+base, curva de tallas, temporada, género, tipo de prenda, nº de operaciones, secuencia de estampado y
+`llevaArte`. Copiar ≠ compartir ⇒ **dos colores de la misma prenda pueden acabar con composición distinta**,
+y **la OP se la lleva al papel**.
+
+⚠️ **Es PREEXISTENTE de V1-E9a**, no lo introduce E3. **Pero E3 lo pone en el camino principal**: hasta hoy
+casi no había hijos; a partir de E3 nacen cuatro por cada modelo que se produce en cuatro colores.
+
+### Las tres salidas, con su precio
+
+| | Qué haría | Precio |
+|---|---|---|
+| **(a)** Dejarlo | cada hijo congela la ficha del día que nació | La divergencia sigue, silenciosa. Es lo de hoy |
+| **(b)** Compartir también la ficha | el hijo lee del padre, como la receta | ⚠️ Un cambio de composición **reescribiría** lo que dicen OP ya impresas |
+| **(c)** Avisar de la divergencia | el hijo la conserva, y el sistema **dice** que difiere del padre | No reescribe nada; el patrón *«avisar no es bloquear»* que este sistema ya usa |
+
+⭐ **DEFAULT PROPUESTO: (c).** Razón: (b) tiene el mismo problema que Daniel rechazó para el texto de la
+División —reescribir un hecho ya impreso—, y (a) es lo que produjo el hallazgo. **(c) es el patrón que él ya
+aprobó dos veces**: §Post-F9.135 p.4 (*«se debe de poder hacer, **pero advirtiendo de la diferencia**»*) y
+§Post-F9.64 (*«avisar no es bloquear»*).
+
+📌 **NO bloquea nada.** E3 entra sin esto; se construye después, en la **0.087**.
+
+- **Aplica en:** **0.087**. **Fecha:** 2026-09-01.
 
 ---
