@@ -786,8 +786,13 @@ describe('Órdenes — búsqueda por el SINÓNIMO del departamento fusionado (§
     return { destino: destino.id, origen: origen.id };
   }
 
-  it('DESTINO → ORIGEN: buscar «Caballeros» encuentra la orden que dice «2-HOMBRE»', async () => {
-    const idOrden = await ordenConReferencia('2-HOMBRE');
+  it('DESTINO → ORIGEN: buscar «Caballeros» encuentra la orden que dice «2-hombre»', async () => {
+    // 🔴 LA GRAFÍA ES DISTINTA A PROPÓSITO: la orden dice «2-hombre» y el catálogo «2-HOMBRE».
+    // Es la PREMISA de la etapa —el texto de la OC y el nombre del catálogo se escriben distinto— y
+    // es lo ÚNICO que ejercita de verdad el `mode: 'insensitive'` del `equals` CONTRA POSTGRES:
+    // las unit fijan la FORMA de la cláusula, no su semántica en la base. Con las dos grafías
+    // iguales, un `equals` sensible a mayúsculas pasaría esta prueba en verde.
+    const idOrden = await ordenConReferencia('2-hombre');
     await fusionarHombreEnCaballeros();
     const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: 'Caballeros' }, bd());
     expect(pagina.datos.some((o) => o.id === idOrden)).toBe(true);
@@ -801,7 +806,8 @@ describe('Órdenes — búsqueda por el SINÓNIMO del departamento fusionado (§
   });
 
   it('⭐ SIN fusionar, la misma búsqueda NO la encuentra (es la fusión la que la trae, no el texto)', async () => {
-    const idOrden = await ordenConReferencia('2-HOMBRE');
+    // Misma grafía «2-hombre» que el caso de arriba: si el control usara otra, no controlaría nada.
+    const idOrden = await ordenConReferencia('2-hombre');
     await cliente.clienteDepartamento.create({
       data: { idCliente: clienteNegocio.id, nombre: 'Caballeros' },
     });

@@ -12,23 +12,36 @@
  * estado prohibido que esta etapa viene a impedir. Aquí ese olvido se convierte en un rojo de CI.
  *
  * Es la misma red que se puso en los colores (`colores-fusion-referencias.test.ts`) después de que
- * aquella lista se enumerara mal TRES veces. La diferencia: allá la lista es de «relaciones que
- * BLOQUEAN» y excluye la única que se mueve; aquí **todas** se mueven, así que la igualdad es contra
- * el conjunto completo.
+ * aquella lista se enumerara mal TRES veces.
  *
- * ⚠️ **Y se protege de sí misma:** antes de comparar afirma que el regex encontró relaciones
- * CONOCIDAS y que hay al menos cuatro. Sin eso, un reformateo del esquema que rompiera el regex
- * dejaría la prueba pasando **en vacío** — verde, y sin verificar nada.
+ * 🔴 **LA EXCEPCIÓN VA AQUÍ, COMO LITERAL, Y NO EN PRODUCCIÓN — no es un detalle de estilo.**
+ * `absorbidos` (§Post-F9.172(a)) es la única relación entrante que la fusión no repunta, y su nombre
+ * está escrito **a mano dentro de la aserción**, no en una lista configurable que producción
+ * exporte. La primera versión de esta etapa sí exportó esa lista desde
+ * `cliente-departamentos-fusion-referencias.ts`, y **aflojó la red**: se pudo sacar `contactos` de
+ * `REFERENCIAS_A_REPUNTAR` —o sea, dejar de repuntar la compradora del departamento, el estado
+ * prohibido exacto— declararlo excluido, y la prueba quedó **VERDE**. La aserción se derivaba del
+ * mismo módulo que debía vigilar, y el escape era **una palabra en el archivo que el desarrollador
+ * ya estaba editando**.
+ *
+ * Con el literal no hay lista que crecer: para tapar un olvido hay que **editar esta prueba y
+ * escribir el nombre de la relación en la aserción** — un acto deliberado y visible en el diff.
+ * (Es lo que hace `NO_BLOQUEAN` en la prueba de colores: vive en la PRUEBA, nunca en producción.)
+ *
+ * 🔑 **Y la red no existe para la quinta relación, sino para la SEXTA** —la que nadie ha escrito— que
+ * por definición no va a tener su propia prueba de integración. Para ésa, el camino de menor
+ * resistencia («se puso roja → la excluyo») tiene que costar caro.
+ *
+ * ⚠️ **Se protege de sí misma:** antes de comparar afirma que el regex encontró relaciones CONOCIDAS
+ * y que hay al menos cuatro. Sin eso, un reformateo del esquema que rompiera el regex dejaría la
+ * prueba pasando **en vacío** — verde, y sin verificar nada.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  REFERENCIAS_A_REPUNTAR,
-  RELACIONES_FUERA_DE_LA_FUSION,
-} from './cliente-departamentos-fusion-referencias.js';
+import { REFERENCIAS_A_REPUNTAR } from './cliente-departamentos-fusion-referencias.js';
 
 /** Nombres de las relaciones de vuelta declaradas en `model ClienteDepartamento` del esquema. */
 function relacionesDeModeloClienteDepartamento(): string[] {
@@ -52,32 +65,29 @@ describe('REFERENCIAS_A_REPUNTAR', () => {
     const enElEsquema = relacionesDeModeloClienteDepartamento();
 
     // Red de seguridad de la propia prueba: si el regex dejara de casar, esto lo delata en vez de
-    // dejar pasar una comparación de dos listas vacías.
+    // dejar pasar una comparación de dos listas vacías. `absorbidos` va aquí para que, si algún día
+    // se quitara la relación reflexiva de la fusión, la excepción de abajo no quede muerta en
+    // silencio (misma protección que en la prueba de colores).
     expect(enElEsquema).toContain('proyectos');
     expect(enElEsquema).toContain('factores');
+    expect(enElEsquema).toContain('absorbidos');
     expect(enElEsquema.length).toBeGreaterThanOrEqual(4);
 
-    // Las EXCLUIDAS a propósito se restan aquí y en ningún otro lado: la igualdad sigue siendo
-    // exacta, y una exclusión nueva obliga a declararla en `RELACIONES_FUERA_DE_LA_FUSION` con su
-    // porqué. Sin esto, `absorbidos` (§Post-F9.172(a)) habría puesto la prueba en rojo o —peor— se
-    // habría colado a la lista de repunte, aplanando la cadena de fusiones.
-    const repuntables = enElEsquema.filter((r) => !RELACIONES_FUERA_DE_LA_FUSION.includes(r));
     const cubiertas = REFERENCIAS_A_REPUNTAR.map((r) => r.relacion).sort();
-    expect(cubiertas).toEqual([...repuntables].sort());
+
+    // 🔴 LA PUERTA CERRADA. Lo que el esquema tiene y la fusión NO repunta debe ser EXACTAMENTE
+    // `absorbidos` — el nombre escrito a mano aquí, sin lista intermedia que ampliar. Si alguien
+    // deja de repuntar `contactos` (o cualquier relación futura), aparece en este arreglo y la
+    // prueba se pone ROJA: la única salida es repuntarla o escribir su nombre en esta línea.
+    const sinRepuntar = enElEsquema.filter((r) => !cubiertas.includes(r)).sort();
+    expect(sinRepuntar).toEqual(['absorbidos']);
+
+    // Y en el otro sentido: SOBRAR también es rojo (una entrada que el esquema ya no tiene).
+    expect(cubiertas).toEqual(enElEsquema.filter((r) => r !== 'absorbidos').sort());
   });
 
-  it('⭐ cada relación EXCLUIDA existe de verdad en el esquema (una exclusión muerta no protege nada)', () => {
-    const enElEsquema = relacionesDeModeloClienteDepartamento();
-    expect(RELACIONES_FUERA_DE_LA_FUSION.length).toBeGreaterThan(0);
-    for (const excluida of RELACIONES_FUERA_DE_LA_FUSION) {
-      expect(enElEsquema).toContain(excluida);
-    }
-  });
-
-  it('⭐ ninguna relación está a la vez repuntada y excluida (la lista no se contradice)', () => {
-    for (const r of REFERENCIAS_A_REPUNTAR) {
-      expect(RELACIONES_FUERA_DE_LA_FUSION).not.toContain(r.relacion);
-    }
+  it('⭐ `absorbidos` NO está en la lista de repunte (aplanaría la cadena de fusiones)', () => {
+    expect(REFERENCIAS_A_REPUNTAR.map((r) => r.relacion)).not.toContain('absorbidos');
   });
 
   it('no repite relaciones', () => {

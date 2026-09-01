@@ -168,25 +168,20 @@ export async function colisionDeFactores(
  * departamentos revueltos son el mismo, sus compradoras son las del departamento bueno. Se repunta
  * como las demás, y sin colisión posible: no hay unicidad sobre `(cliente, departamento, persona)`
  * —dos personas pueden llamarse igual— así que un `updateMany` a secas es correcto.
- */
-/**
- * 🔴 Relaciones entrantes de `ClienteDepartamento` que la fusión **NO repunta a propósito**. Existe
- * para que la prueba-red (`cliente-departamentos-fusion-referencias.test.ts`) siga exigiendo
- * IGUALDAD EXACTA sin que una exclusión se cuele en silencio: lo que no está aquí ni en
- * {@link REFERENCIAS_A_REPUNTAR} pone la prueba en rojo.
  *
- * **`absorbidos`** (§Post-F9.172(a)) es la relación reflexiva de la propia fusión
- * (`idFusionadoEn`): los departamentos que ÉSTE se llevó. **No es algo que cuelgue del
- * departamento, es la contabilidad de la fusión misma** — la misma exclusión, y por la misma razón,
- * que `colores-fusion-referencias.ts` hace con la suya.
+ * 🔴 **LA ÚNICA QUE NO ESTÁ AQUÍ, Y POR QUÉ: `absorbidos`** (§Post-F9.172(a)). Es la relación
+ * REFLEXIVA de la propia fusión (`idFusionadoEn`): los departamentos que ÉSTE se llevó. No es algo
+ * que cuelgue del departamento, **es la contabilidad de la fusión misma**. Y repuntarla estaría MAL,
+ * no sólo de más: aplanaría la cadena reescribiendo un hecho histórico («a A se lo llevó B» pasaría
+ * a decir «se lo llevó C»). Al fusionar B en C se forma A→B→C y así se queda; quien la lee
+ * (`sinonimosDeDepartamentos`) la recorre entera, en los dos sentidos, sin necesidad de aplanarla.
  *
- * ⚠️ Y repuntarla estaría MAL, no sólo de más: aplanaría la cadena reescribiendo un hecho histórico
- * («a A se lo llevó B» pasaría a decir «se lo llevó C»). Al fusionar B en C se forma la cadena
- * A→B→C, y así se queda: quien la lee (`sinonimosDeDepartamentos`) la recorre entera, en los dos
- * sentidos, sin necesidad de aplanarla.
+ * ⚠️ **Esa excepción NO se declara aquí, a propósito.** Vive como LITERAL dentro de
+ * `cliente-departamentos-fusion-referencias.test.ts` —igual que `NO_BLOQUEAN` en la prueba gemela de
+ * los colores—, para que ampliarla obligue a **editar la prueba**, un acto visible en el diff. Si
+ * viviera en este archivo, saltarse la red sería agregar **una palabra en el mismo archivo que el
+ * desarrollador ya está editando**, que es exactamente el escape que la red existe para cerrar.
  */
-export const RELACIONES_FUERA_DE_LA_FUSION: readonly string[] = ['absorbidos'];
-
 export const REFERENCIAS_A_REPUNTAR: ReferenciaARepuntar[] = [
   {
     relacion: 'proyectos',
