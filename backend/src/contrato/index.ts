@@ -1164,6 +1164,16 @@ export {
   type OrdenAdjuntosLista,
 } from './esquemas/adjunto-orden.js';
 
+// ── Fotos del MODELO ocultas en una ORDEN (§Post-F9.169(b)) ──
+export {
+  esquemaOrdenFotoOcultar,
+  esquemaOrdenFotoOcultaSalida,
+  esquemaOrdenFotosOcultasLista,
+  type DatosOrdenFotoOcultar,
+  type OrdenFotoOcultaSalida,
+  type OrdenFotosOcultasLista,
+} from './esquemas/foto-oculta-orden.js';
+
 // ── Adjuntos / tech pack del desarrollo (rediseño R5, B16) ──
 export {
   esquemaDesarrolloAdjuntoCrear,

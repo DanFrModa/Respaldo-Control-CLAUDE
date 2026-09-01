@@ -83,6 +83,10 @@ import { leerFotosModelo } from '../../modelos/fotos-modelo.js';
 // exige exactamente `ordenes.ver` (el mismo permiso que ya autoriza esta impresión), así que no
 // introduce ningún 403 nuevo; la descarga de sus bytes es igual de best-effort que las fotos.
 import { listarAdjuntos, type AdjuntoOrdenConUrl } from '../adjuntos-orden.js';
+// Fotos del modelo que ESTA orden quitó (§Post-F9.169(b)). Lectura de BAJO NIVEL, sin permiso
+// propio: la impresión ya está autorizada por `ordenes.ver` y qué fotos lleva la OP es parte del
+// documento de la orden (mismo criterio que `leerFotosModelo`).
+import { leerIdsFotosOcultasOrden } from '../fotos-ocultas-orden.js';
 import { obtenerOrden } from '../ordenes.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin red ni BD) ──────────────────────────────────
@@ -295,6 +299,11 @@ export interface DepsImpreso {
   /** Receta CONGELADA de la orden (V1-E3d): lo que de verdad lleva ESTA orden. */
   leerRecetaParaImpreso?: typeof leerRecetaParaImpreso;
   leerFotosModelo?: typeof leerFotosModelo;
+  /**
+   * Fotos del modelo que ESTA orden decidió no enseñar (§Post-F9.169(b)). Devuelve ids de
+   * `ModeloFoto`; vacío = la OP enseña todas (el caso normal y el de todo lo ya capturado).
+   */
+  leerIdsFotosOcultas?: typeof leerIdsFotosOcultasOrden;
   listarAdjuntos?: typeof listarAdjuntos;
   leerTelasCompradas?: LeerTelasCompradas;
 }
@@ -359,6 +368,7 @@ export async function armarDatosImpresoOrden(
   const leer = deps.leerBom ?? leerBom;
   const leerRecetaImpreso = deps.leerRecetaParaImpreso ?? leerRecetaParaImpreso;
   const leerFotos = deps.leerFotosModelo ?? leerFotosModelo;
+  const leerOcultas = deps.leerIdsFotosOcultas ?? leerIdsFotosOcultasOrden;
   const listarAdjuntosOrden = deps.listarAdjuntos ?? listarAdjuntos;
   const leerTelasOc = deps.leerTelasCompradas ?? leerTelasCompradasOrden;
 
@@ -381,7 +391,19 @@ export async function armarDatosImpresoOrden(
   // `leerFotosModelo` (`idModeloDeLasFotos`: la propia gana, y si no hay, las del padre) y NO aquí
   // — resolverla antes de llamar haría que la foto PROPIA del hijo, si un día se le sube, no
   // ganara nunca. Aquí se pasa el modelo de la ORDEN, tal cual.
-  const fotos = await leerFotos(orden.idModelo, bd, archivos);
+  const fotosDelModelo = await leerFotos(orden.idModelo, bd, archivos);
+
+  // ⭐ §Post-F9.169(b) — LAS FOTOS QUE ESTA OP QUITÓ no salen en su papel. Daniel pidió que la foto
+  // fuera "de la OP, no del desarrollo": si la pantalla deja de enseñarla y el impreso la sigue
+  // imprimiendo, la mitad del sistema no se enteró. La marca vive en `OrdenFotoOculta` y **no toca
+  // la foto del modelo** (D3): otra orden del mismo modelo la sigue imprimiendo.
+  const ocultasEnLaOrden = new Set(await leerOcultas(cliente, id));
+  // ⚠️ SER PRINCIPAL NO ES UN PUESTO QUE SE TRANSFIERA (mismo criterio que el arte principal sin
+  // foto, arriba): si esta OP ocultó la principal del modelo, esta OP se imprime SIN principal —
+  // la segunda foto no hereda la estrella ni el blindaje contra el tope.
+  const principalOculta =
+    fotosDelModelo.length > 0 && ocultasEnLaOrden.has(fotosDelModelo[0]?.idFoto as number);
+  const fotos = fotosDelModelo.filter((f) => !ocultasEnLaOrden.has(f.idFoto));
 
   // TELA (petición Daniel): la que de verdad se compró para la orden. BEST-EFFORT: si la lectura
   // truena, el impreso degrada al valor capturado a mano en la orden (jamás se trunca el PDF).
@@ -464,7 +486,9 @@ export async function armarDatosImpresoOrden(
   // para que el bloque de fotos la ponga al frente y el tope nunca la recorte. Si esa foto no se
   // pudo bajar, simplemente no hay principal (best-effort de siempre) y las demás salen igual.
   const fotosImpreso: FotoImpreso[] = dataUrls.flatMap((dataUrl, i) =>
-    dataUrl === null ? [] : [i === 0 ? { dataUrl, principal: true } : { dataUrl }],
+    dataUrl === null
+      ? []
+      : [i === 0 && !principalOculta ? { dataUrl, principal: true } : { dataUrl }],
   );
   // El arte del BOM va PRIMERO (es el arte del modelo) y lleva su nombre como rótulo; luego las
   // imágenes subidas a la orden (sin rótulo, como hasta hoy).

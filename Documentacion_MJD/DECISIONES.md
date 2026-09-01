@@ -11553,8 +11553,8 @@ de **39 renglones firmados de 40**, donde no se podrá congelar— porque la alt
 | **Quitar** un arte de la OP sin tocar el modelo | ✅ ya se puede |
 | **Agregar** un arte a mano, sin vínculo al modelo | ✅ `idModeloArte` es `NULL` = agregado a mano |
 | Descripción y posición propias de esa orden | ✅ viven en `OrdenArte` |
-| 🔴 **Meter FOTOS directo a la OP** | ❌ **NO existe** |
-| 🔴 **Quitar una foto sólo en la OP** | ❌ **NO existe** |
+| ~~🔴 **Meter FOTOS directo a la OP**~~ | 🔴 **ESTA LÍNEA ERA FALSA — corregida el 1-sep-2026.** Para las fotos del **MODELO** ✅ **SÍ existe**, desde F2-E3 y ajustado en jul-2026 **a petición del propio Daniel**: `frontend/src/modulos/ordenes/FotosModeloOrden.tsx` combina las fotos del modelo con las **subidas a la orden**, deja **subir** a la orden y **quitar** las subidas. ⭐ **Daniel dijo «eso me parece que ya existe» y TENÍA RAZÓN**; la medición que lo desmintió era la equivocada. *(Para las fotos del **ARTE** sí sigue siendo cierto: `OrdenArte` no expone fotos en absoluto.)* |
+| 🔴 **Quitar una foto sólo en la OP** | ❌ **NO existe** — y **verificado el 1-sep-2026 que sigue siendo cierto**: el botón de quitar sólo se pinta con `foto.origen === 'orden'` (`FotosModeloOrden.tsx`, el botón sólo se pintaba con `foto.origen === 'orden'` — **la línea se movió al construirlo**, por eso se nombra la condición y no el número) y no hay ningún mecanismo de ocultar/excluir en el backend. **Es la media frase de Daniel que de verdad falta** |
 
 **Las fotos cuelgan de `ModeloArteFoto` → `ModeloArte`**, o sea **del modelo**. `OrdenArte` **no tiene fotos
 propias**: las toma del arte del modelo por su vínculo. ⇒ **Consecuencia hoy: un arte agregado a mano en la
@@ -11852,5 +11852,78 @@ reponerla sea **un acto visible y deliberado, no un silencio**.
 
 - **Aplica en:** el catálogo de modelos (`pasarModeloAProduccion` + `DialogoPasarAProduccion`).
   **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.176) — ⏳ PENDIENTE DE DANIEL: «la foto de la OP», ¿la del ARTE o la del MODELO? (medido el 1-sep-2026)
+
+### Por qué se pregunta: las dos lecturas dan trabajos de tamaños muy distintos
+
+Al medir la fila **0.079** contra el código apareció que **§Post-F9.169(b) tenía una línea falsa** (ya
+corregida arriba): meter fotos directo a la OP **sí existe** para las fotos del **MODELO**. ⇒ la frase de
+Daniel admite dos lecturas, y **sólo una de ellas es trabajo grande**:
+
+| | Qué falta de verdad | Tamaño |
+|---|---|---|
+| **(a)** habla de la foto del **ARTE** | **TODO**: `OrdenArte` **no expone fotos en absoluto**; cuelgan de `ModeloArteFoto → ModeloArte` | migración + contrato + dominio + frontend |
+| **(b)** habla de la foto del **MODELO** en la OP | **sólo** poder **ocultar una heredada** | pequeño |
+
+> ### ⭐ DEFAULT PROPUESTO: **(b)**
+>
+> Y no por comodidad, sino por sus propias palabras: dijo ***«eso me parece que ya existe»***, y lo que
+> existe es exactamente el mecanismo del **MODELO** (heredar + subir a la orden + quitar las subidas). Si
+> hablara del **arte** —que no tiene **ninguna** foto en la OP— difícilmente habría dicho que ya existe.
+
+⚠️ **Un dato que importa si la respuesta es (a):** un arte **agregado a mano** en la OP
+(`idModeloArte = NULL`) **hoy no puede tener foto en absoluto** — no es que herede una que no quiere: es
+que **no hay dónde ponerla**.
+
+📌 **Cómo se construye (b) sin romper D3:** **ocultar ≠ borrar**. La foto del modelo **no se toca**; se
+guarda una **exclusión por orden**, igual que `OrdenArte.excluido` ya hace con los artes. Reversible,
+auditada, y la galería del modelo intacta.
+
+**NO bloquea nada:** se construye (b) —que es lo que él nombró y falta en las dos lecturas— y si contesta
+(a), el arte se hace aparte.
+
+- **Aplica en:** fila **0.079**. **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.177) — ✅ CERRADA (DANIEL, 1-sep-2026): las fotos son **de la OP**, y aplica a la PRENDA **y** al ARTE
+
+> *«Un modelo de desarrollo que se va a usar para **4 órdenes diferentes** no puede usar la misma foto ni
+> del modelo ni de arte para todas las OP. Tendría que haber la posibilidad de **modificar las fotos
+> directamente en la OP**. Entiendo que **la OP es de donde cuelgan las fotos directamente, no del
+> desarrollo**. ¿Así está?»*
+>
+> *«Y **aplica para fotos de la prenda pero también del arte**.»*
+
+⇒ **Cierra §Post-F9.176 en el lado GRANDE: no era (b), eran LAS DOS.** El default propuesto era (b) —sólo
+la prenda— razonando sobre su *«eso me parece que ya existe»*. 🔴 **Se equivocaba el default, no él**: lo
+que ya existía era el mecanismo de la **prenda**, y él estaba enunciando el **principio** para ambas.
+
+### La respuesta a su pregunta, medida el 1-sep-2026: **así está A MEDIAS**
+
+| | Estado real |
+|---|---|
+| **PRENDA — heredar del modelo** | ✅ existe desde F2-E3 (ajuste jul-2026 **a petición suya**) |
+| **PRENDA — subir fotos propias a la OP** | ✅ existe (adjuntos de orden, presigned a R2) |
+| **PRENDA — quitar de la OP una heredada** | ✅ **construido el 1-sep** (versión **0.082**) — era la media frase que faltaba |
+| **ARTE — cualquier foto en la OP** | ❌ **NO EXISTE NADA**: `OrdenArte` no tiene campo de fotos, ningún endpoint las expone, ninguna pantalla las pinta ⇒ fila **0.093** |
+
+🔴 **Agravante medido:** un arte **agregado a mano** en la OP (`idModeloArte = NULL`) **hoy no puede tener
+foto en absoluto** — no es que herede una que no quiere: **no hay dónde ponerla**.
+
+### ⚠️ El matiz que gobierna el diseño, confirmado con él
+
+**«Hereda por defecto y la OP manda»**, NO «la OP nace vacía» — apoyado en sus propias palabras previas
+(§Post-F9.169(b)): *«si el desarrollo tiene fotos está bien que podamos **heredarlas**»*. Con heredar +
+quitar + agregar, cuatro órdenes acaban con **cuatro juegos distintos** sin obligarle a resubir lo mismo
+cuatro veces. *(Si algún día quiere que la OP nazca en blanco, es cambiar el default — decisión suya.)*
+
+📌 **Y la invariante que no se mueve (D3): OCULTAR NO ES BORRAR.** La galería del modelo no se toca nunca,
+R2 no se toca nunca, y **lo que una OP oculta las demás lo siguen viendo**.
+
+- **Aplica en:** la prenda → versión **0.082**. El **ARTE** → fila **0.093**. **Fecha:** 2026-09-01.
 
 ---

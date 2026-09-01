@@ -548,6 +548,7 @@ describe('armarDatosImpresoOrden', () => {
     descargarImagen?: DepsImpreso['descargarImagen'],
     adjuntos: AdjuntoOrdenConUrl[] = [],
     telasCompradas: TelaCompradaOrden[] = [],
+    ocultas: number[] = [],
   ): DepsImpreso {
     return {
       archivos: archivosFake,
@@ -559,6 +560,9 @@ describe('armarDatosImpresoOrden', () => {
       // que las expectativas históricas sigan describiendo exactamente el mismo escenario.
       leerRecetaParaImpreso: () => Promise.resolve(recetaDesdeBom(bom)),
       leerFotosModelo: () => Promise.resolve(fotos),
+      // §Post-F9.169(b): por omisión la OP no oculta ninguna foto del modelo — el caso normal, y el
+      // que describen todas las expectativas históricas de este archivo.
+      leerIdsFotosOcultas: () => Promise.resolve(ocultas),
       listarAdjuntos: () => Promise.resolve(adjuntos),
       leerTelasCompradas: () => Promise.resolve(telasCompradas),
       ...(descargarImagen ? { descargarImagen } : {}),
@@ -721,6 +725,71 @@ describe('armarDatosImpresoOrden', () => {
     // El PDF se genera igual con la foto buena (y sin truncar por la faltante).
     const buffer = await generarPdfOrden(datos);
     expect(esPdf(buffer)).toBe(true);
+  });
+
+  // ⭐ §Post-F9.169(b) — LAS FOTOS QUE LA OP QUITÓ NO SALEN EN SU PAPEL. Si la pantalla deja de
+  // enseñarlas y el impreso las sigue imprimiendo, la mitad del sistema no se enteró.
+  it('⭐ NO imprime las fotos del modelo que ESTA OP quitó (y sí las demás)', async () => {
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
+    const fotos = [
+      { idFoto: 1, urlDescarga: 'https://r2/f1' },
+      { idFoto: 2, urlDescarga: 'https://r2/f2' },
+      { idFoto: 3, urlDescarga: 'https://r2/f3' },
+    ] as unknown as FotoModeloConUrl[];
+    const descargarImagen = vi.fn((url: string) => Promise.resolve(`data:img;${url}`));
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, fotos, descargarImagen, [], [], [2]),
+    });
+
+    expect(datos.fotos).toEqual([
+      { dataUrl: 'data:img;https://r2/f1', principal: true },
+      { dataUrl: 'data:img;https://r2/f3' },
+    ]);
+    // 🔴 Y no se gastó ni una descarga en la foto quitada: se filtra ANTES de tocar R2.
+    expect(descargarImagen).not.toHaveBeenCalledWith('https://r2/f2');
+  });
+
+  it('⭐ si la OP quitó la PRINCIPAL, el papel sale SIN principal (la estrella no se hereda)', async () => {
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
+    const fotos = [
+      { idFoto: 1, urlDescarga: 'https://r2/f1' },
+      { idFoto: 2, urlDescarga: 'https://r2/f2' },
+    ] as unknown as FotoModeloConUrl[];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(
+        ordenSalida(),
+        bom,
+        fotos,
+        (url: string) => Promise.resolve(`data:img;${url}`),
+        [],
+        [],
+        [1],
+      ),
+    });
+
+    // Sale sólo la segunda, y NO como principal: ser principal es una decisión sobre una foto
+    // concreta, no un puesto que la siguiente ocupe (mismo criterio que el arte principal sin foto).
+    expect(datos.fotos).toEqual([{ dataUrl: 'data:img;https://r2/f2' }]);
+    expect(datos.fotos.some((f) => f.principal === true)).toBe(false);
+  });
+
+  it('una OP que no quitó nada imprime EXACTAMENTE lo de siempre (REGLA 0-B)', async () => {
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
+    const fotos = [
+      { idFoto: 1, urlDescarga: 'https://r2/f1' },
+      { idFoto: 2, urlDescarga: 'https://r2/f2' },
+    ] as unknown as FotoModeloConUrl[];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, fotos, (url: string) => Promise.resolve(`data:img;${url}`)),
+    });
+
+    expect(datos.fotos).toEqual([
+      { dataUrl: 'data:img;https://r2/f1', principal: true },
+      { dataUrl: 'data:img;https://r2/f2' },
+    ]);
   });
 
   it('trae como ARTES solo los adjuntos de la orden con tipoMime image/*', async () => {

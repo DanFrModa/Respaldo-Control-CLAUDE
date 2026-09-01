@@ -71,6 +71,44 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.082 · 1-sep-2026 · **en prueba** — ⭐ Cada OP puede tener **sus propias fotos**: ya se puede quitar una que venga del modelo
+
+### Qué se puede hacer ahora que antes no
+
+**Quitar de una orden una foto que viene del modelo.** Es la pieza que faltaba para lo que pediste: un
+desarrollo que se usa en **cuatro órdenes distintas** no tiene por qué enseñar las mismas fotos en las
+cuatro.
+
+Con esto, cada OP arma su propio juego: **hereda** las del modelo, **le quitas** las que no aplican y
+**le subes** las suyas — estas dos últimas ya existían.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Quitar NO es borrar.** La foto sigue en la galería del modelo, sigue en la nube, y **las demás
+  órdenes del mismo modelo la siguen viendo**. Sólo desaparece de la orden donde la quitaste. Y se puede
+  **volver a traer** cuando quieras.
+- **También desaparece del PDF de la orden.** Si sólo se hubiera quitado de la pantalla, el papel la
+  seguiría imprimiendo — que es justo el error que esto vino a evitar.
+- **Si quitas la foto principal, la siguiente NO hereda la estrella.** La orden se queda sin principal, en
+  vez de ascender una que tú no elegiste.
+- **Funciona con los modelos por color** de la 0.078: un modelo de color que no tiene fotos propias
+  enseña las de su desarrollo, y también se le pueden quitar desde la orden.
+- ⚠️ **En «Modificar» verás las imágenes adjuntas de la orden dos veces**: como miniatura arriba, en la
+  tira de fotos, y en la lista de adjuntos de más abajo. Es el precio de que esa pantalla respete lo que
+  quitaste; la lista de abajo sigue siendo la que tiene descarga y papelera.
+- **Quitar y traer de vuelta se hace en el Centro de Órdenes.** En «Modificar» las fotos **sólo se miran**.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Las fotos del ARTE siguen sin existir en la OP** — ni propias ni heredadas: no se ven en ninguna
+  parte. Tú mismo dijiste que aplica también al arte; **queda como trabajo aparte** porque hay que
+  construirlo entero. Y ahí hay un caso extra: un arte que **agregas a mano** en la orden hoy **no puede
+  llevar foto de ninguna manera**.
+- Sin permisos nuevos y sin datos que sembrar. **Lleva migración**, pero es aditiva: el despliegue no
+  necesita nada especial.
+
+---
+
 ## 0.081 · 1-sep-2026 · **en prueba** — Borrar una foto ya **no deja el archivo pagándose para siempre** (cambio interno)
 
 ### Qué se puede hacer ahora que antes no

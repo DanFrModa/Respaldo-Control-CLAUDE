@@ -79,6 +79,7 @@ import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
 import { rutasRecetaOrden } from './api/produccion/receta-orden.rutas.js';
 import { rutasAdjuntosOrden } from './api/produccion/adjuntos-orden.rutas.js';
+import { rutasFotosOcultasOrden } from './api/produccion/fotos-ocultas-orden.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
@@ -224,6 +225,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // ligados a una orden vía presigned. Permisos `ordenes.ver` (listar/descargar) / `ordenes.administrar`
   // (subir/eliminar); el DELETE borra también el objeto físico de R2 (best-effort). Sin permisos nuevos.
   await app.register(rutasAdjuntosOrden, { prefix: '/api' });
+  // Órdenes — FOTOS DEL MODELO OCULTAS en la OP (§Post-F9.169(b)): la orden puede dejar de enseñar
+  // una foto HEREDADA del modelo, y traerla de vuelta. NO borra nada (D3) y NO toca R2: pone/quita
+  // una marca por (orden, foto). Permisos `ordenes.ver` / `ordenes.administrar`; sin permisos nuevos.
+  await app.register(rutasFotosOcultasOrden, { prefix: '/api' });
   // Órdenes — CONSULTAS/TABLEROS/BÚSQUEDA (F2-E4 PIEZA B): consulta ligera, incompletas con
   // semáforo, tablero "pedidos por mes" y buscador global. Solo lectura (`ordenes.ver`). Sus paths
   // estáticos se registran ANTES de nada que choque con `/ordenes/:id` (Fastify los prioriza).
