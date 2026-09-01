@@ -65,7 +65,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { exigirModelo } from './modelos.js';
 import { reordenarComoPrincipal } from './orden-principal.js';
-import { resolverIdRecetaDeModelo } from './receta-compartida.js';
+import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 
 /** Carpeta R2 de las fotos del arte (la key real se ordena por id, no por nombre, A5). */
@@ -378,6 +378,10 @@ export async function crearArte(
 
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — el arte de un HIJO del linaje 1:N es el de su desarrollo: agregarle uno
+    // aquí crearía un renglón que su propia ficha NO enseña (ella lee la del padre) y que ninguna
+    // pantalla podría volver a encontrar. Se edita en el modelo de desarrollo.
+    await exigirRecetaPropia(tx, idModelo);
     await exigirTipoArteValido(tx, datos.idTipoArte);
     if (datos.idProveedor !== undefined) {
       await exigirProveedorValido(tx, datos.idProveedor);
@@ -445,6 +449,10 @@ export async function actualizarArte(
   const datos = validarEntrada(esquemaArteEditar, entrada);
 
   return enTransaccion(async (tx) => {
+    // ⭐ V1-E9b pieza B — ANTES de `exigirArte`, y el orden es el mensaje: sobre un hijo el arte no
+    // le pertenece (vive en el padre) y la respuesta era un 404 sobre un renglón que la ficha ACABA
+    // de listar. Primero se dice de quién es la receta.
+    await exigirRecetaPropia(tx, idModelo);
     const actual = await exigirArte(tx, idModelo, datos.id);
 
     const cambios: Prisma.ModeloArteUpdateInput = { ...datosModificacion(sesion) };
@@ -523,6 +531,8 @@ export async function eliminarArte(
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
   return enTransaccion(async (tx) => {
+    // ⭐ V1-E9b pieza B — antes del 404 de `exigirArte`, misma razón que en `actualizarArte`.
+    await exigirRecetaPropia(tx, idModelo);
     const actual = await exigirArte(tx, idModelo, idArte);
 
     // Los renglones de foto se van por Cascade; los `Archivo` hay que evaluarlos DESPUÉS (si
@@ -574,6 +584,9 @@ export async function marcarArtePrincipal(
     // ANTES de leer: serializa el reordenamiento de ESTE modelo (ver nota de concurrencia arriba).
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_ARTE}::int, ${idModelo}::int)`;
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — un hijo no tiene arte propio: el reordenamiento no le toca. Sin esto la
+    // respuesta era un 404 «Arte del modelo» porque su lista sale vacía.
+    await exigirRecetaPropia(tx, idModelo);
 
     // MISMO orden que la lectura: de ahí sale el orden relativo que se conserva.
     const actuales = await tx.modeloArte.findMany({
@@ -630,6 +643,9 @@ export async function copiarArteDeOtroModelo(
 
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — el DESTINO no puede ser un hijo del linaje 1:N (misma razón que en
+    // `crearArte`: el renglón caería en un modelo cuya ficha enseña la receta de otro).
+    await exigirRecetaPropia(tx, idModelo);
     const origen = await tx.modeloArte.findUnique({
       where: { id: datos.idArteOrigen },
       select: SELECT_ARTE,
@@ -637,13 +653,13 @@ export async function copiarArteDeOtroModelo(
     if (origen === null) {
       throw new ErrorNoEncontrado('Arte del modelo', datos.idArteOrigen);
     }
-    // 🔴 DEUDA DECLARADA DE V1-E9b — el GEMELO MENOR de «la lectura del origen de `copiarBom`».
-    // Esta guarda compara contra el modelo LITERAL, no contra el de su receta: sobre un modelo
-    // hijo del linaje 1:N (V1-E9a) NO ataja copiarle un arte **de su propio padre**, que es el
-    // arte que su ficha ya le enseña ⇒ quedaría un renglón DUPLICADO e invisible (la ficha lee del
-    // padre y la copia vive en el hijo). Hoy no es alcanzable —no hay puerta que cree un hijo—; se
-    // cierra con la pieza B comparando `idModeloDeLaReceta` de los dos lados.
-    if (origen.idModelo === idModelo) {
+    // ⭐ V1-E9b pieza B — el GEMELO MENOR de la guarda origen≠destino de `copiarBom`, y aquí queda
+    // cerrado: la comparación es contra el modelo de la RECETA del destino, no contra el destino
+    // literal. Copiarse un arte de su PROPIO padre dejaría un renglón duplicado e invisible (la
+    // ficha lee la del padre y la copia viviría en el hijo). Se resuelve el destino en vez de
+    // apoyarse en `exigirRecetaPropia` de arriba: así la guarda dice la verdad por sí sola, aunque
+    // algún día se mueva la otra.
+    if (origen.idModelo === (await resolverIdRecetaDeModelo(tx, idModelo))) {
       throw new ErrorValidacion('Ese arte ya es de este modelo: elige el arte de otro modelo.');
     }
 
@@ -861,6 +877,11 @@ export async function solicitarSubidaFotoArte(
   const datos = validarEntrada(esquemaArteFotoCrear, entrada);
 
   return enTransaccion(async (tx) => {
+    // ⭐ V1-E9b pieza B — LA ASIMETRÍA QUE DEJÓ LA PIEZA A, cerrada: `listarFotosArte` resuelve (la
+    // ficha del hijo LISTA las fotos heredadas), así que sin esto sus botones daban 404 sobre un
+    // renglón recién pintado. La foto ES el arte que el bordador va a hacer: se sube en el modelo
+    // de desarrollo, donde el arte vive.
+    await exigirRecetaPropia(tx, idModelo);
     await exigirArte(tx, idModelo, idArte);
 
     const ultima = await tx.modeloArteFoto.aggregate({
@@ -976,6 +997,9 @@ export async function quitarFotoArte(
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
   return enTransaccion(async (tx) => {
+    // ⭐ V1-E9b pieza B — la otra mitad de la asimetría de `solicitarSubidaFotoArte`: el botón
+    // «quitar» de una foto HEREDADA daba 404. Ahora dice de quién es la receta.
+    await exigirRecetaPropia(tx, idModelo);
     // Un solo `findFirst` amarra las tres pertenencias (modelo → arte → foto): A9 del sub-recurso.
     const foto = await tx.modeloArteFoto.findFirst({
       where: { id: idFoto, idModeloArte: idArte, arte: { idModelo } },

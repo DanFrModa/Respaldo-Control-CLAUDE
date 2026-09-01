@@ -91,15 +91,22 @@ const CONOCE_EL_RESOLVER = /from '(?:\.{1,2}\/)+(?:modelos\/)?receta-compartida\
  * decir por qué.
  */
 const EXCEPCIONES: Record<string, string> = {
-  'src/dominio/modelos/versiones.ts':
-    'Copia la receta a una VERSIÓN recién nacida (linaje de VERSIONES, no el 1:N: la versión se ' +
-    'lleva una copia CONGELADA a propósito). ⚠️ El mecanismo exacto importa, porque es lo que ' +
-    'alguien va a ir a verificar: NO basta con decir "un modelo de desarrollo nunca lleva la ' +
-    'columna" — lo que cierra la puerta es que `versiones.ts:207` RECHAZA versionar un modelo sin ' +
-    '`codigoDesarrollo`, y un hijo del 1:N nace con `codigoDesarrollo = null` ' +
-    '(`marcaProduccionDerivada`, `nomenclatura.ts`). Es decir: un hijo NO SE PUEDE VERSIONAR, así ' +
-    'que aquí `idPadre` nunca es uno. Si alguna vez se permitiera, esta línea es la que hay que ' +
-    'volver a discutir: hoy la versión de un hijo nacería con la receta VACÍA.',
+  // ⭐⭐ V1-E9b pieza B — LA EXCEPCIÓN DE `versiones.ts` SE BORRÓ, y merece quedar dicho aquí
+  // porque el hueco era doble y muy caro:
+  //
+  // Su razón era un ARGUMENTO EN PROSA: «un hijo no se puede versionar (rebota en la guarda de
+  // `codigoDesarrollo`), así que `copiarRecetaAModeloNuevo` nunca lee la receta de un hijo». La
+  // premisa era cierta y **la conclusión no se seguía**: `desarrollo/modelo-en-la-mesa.ts` llama a
+  // `copiarRecetaAModeloNuevo` DIRECTO, sin pasar por `crearVersionDeModelo`, con el id que el
+  // usuario eligió en el selector de la cita — y ahí copiar un hijo daba un modelo nuevo con la
+  // receta VACÍA, del que sale el precio que se le dice al cliente en la cara. La excepción razonaba
+  // sobre UNA de las dos puertas y concluía sobre la FUNCIÓN: la rama gemela, dentro del guardián
+  // que existe para cazar ramas gemelas.
+  //
+  // ⇒ Hoy `copiarRecetaAModeloNuevo` RESUELVE el origen por dentro, `versiones.ts` importa el
+  // resolver como cualquier otro lector, y **ya no hay ninguna prosa que verificar**. Es la lección
+  // de la etapa: una excepción declarada vale lo que vale su argumento, y un argumento no lo
+  // ejecuta nadie.
   'migracion/cuadre-fase.ts':
     'Cuadre del ETL: son `.count()` GLOBALES sin `where` — cuenta las filas de la tabla entera, ' +
     'no la receta de un modelo. No hay nada que resolver.',
@@ -182,6 +189,17 @@ describe('El guardián de las lecturas de receta (V1-E9b)', () => {
     expect(olvidados).toEqual([]);
   });
 
+  it('⭐⭐ `versiones.ts` YA NO es excepción: conoce el resolver de verdad', () => {
+    // El candado del arreglo de esta pieza. Su excepción se justificaba con un argumento en PROSA
+    // («un hijo no se puede versionar») que era cierto y NO cerraba la puerta: la segunda entrada,
+    // `desarrollo/modelo-en-la-mesa.ts`, llama a `copiarRecetaAModeloNuevo` directo, y por ahí
+    // copiar un hijo daba un modelo nuevo con la receta VACÍA. Si alguien vuelve a añadirla a
+    // EXCEPCIONES —o le quita el resolver— esto se pone rojo antes que nada.
+    expect(Object.keys(EXCEPCIONES)).not.toContain('src/dominio/modelos/versiones.ts');
+    expect(lectores).toContain('src/dominio/modelos/versiones.ts');
+    expect(codigo.get('src/dominio/modelos/versiones.ts') ?? '').toMatch(CONOCE_EL_RESOLVER);
+  });
+
   it('las excepciones declaradas SIGUEN EXISTIENDO y siguen leyendo la receta', () => {
     // Una excepción que ya no aplica es peor que ninguna: parece que alguien lo pensó cuando en
     // realidad protege a un archivo que ya no está o que ya dejó de leer la receta.
@@ -208,11 +226,14 @@ describe('El guardián de las lecturas de receta (V1-E9b)', () => {
     /** Los únicos que pueden, cada uno con su razón. */
     const PUEDEN: Record<string, string> = {
       'src/dominio/modelos/bom-modelo.ts':
-        'ALOJA la canónica `leerMedidasAvioBom` (y `copiarBom`, deuda declarada de la pieza B).',
+        'ALOJA la canónica `leerMedidasAvioBom`. Y `copiarBom`, que desde la pieza B lee sus ' +
+        'medidas de `idRecetaOrigen` (el origen RESUELTO), no del id crudo.',
       'src/dominio/modelos/medidas-avio-talla.ts':
         'Es el módulo DUEÑO de la tabla: la captura por talla se lee y se escribe aquí.',
       'src/dominio/modelos/versiones.ts':
-        'Excepción ya declarada arriba (copia congelada a una versión; un hijo no se versiona).',
+        '`copiarRecetaAModeloNuevo` copia las medidas a un modelo RECIÉN NACIDO, y desde la pieza ' +
+        'B las lee del origen RESUELTO (`resolverIdRecetaDeModelo`), igual que la canónica. Ya no ' +
+        'es una excepción del guardián de arriba: importa el resolver y lo llama.',
     };
     const leenMedidas = fuentes.filter((f) => LEE_MEDIDAS.test(codigo.get(f) ?? ''));
     expect(leenMedidas.filter((f) => !(f in PUEDEN))).toEqual([]);

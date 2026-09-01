@@ -283,7 +283,19 @@ function bdConArte(idModelo: number, artes: { id: number; orden: number; nombre:
   const tx = {
     $executeRaw: lock,
     modelo: {
-      findUnique: vi.fn(() => Promise.resolve({ id: idModelo })),
+      // ⭐ V1-E9b pieza B — la fila tiene que traer el LINAJE 1:N, aunque sea `null`.
+      // `marcarArtePrincipal` pasa por `exigirRecetaPropia` (el arte ES receta), y esa guarda falla
+      // CERRADA a propósito: lo que no se sabe, no abre — una escritura de más se lleva por delante
+      // la receta de cuatro modelos en silencio, y un bloqueo de más es ruidoso e inofensivo. En
+      // producción Prisma siempre devuelve la columna; un fake que la omita se lee como un hijo.
+      findUnique: vi.fn(() =>
+        Promise.resolve({
+          id: idModelo,
+          codigo: `MOD-${String(idModelo)}`,
+          idModeloDesarrollo: null,
+          modeloDesarrollo: null,
+        }),
+      ),
       update: vi.fn(() => Promise.resolve({})),
     },
     modeloArte: {
