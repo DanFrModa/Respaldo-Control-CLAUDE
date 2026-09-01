@@ -61,11 +61,17 @@ async function crearColorHttp(cookie: string, nombre: string): Promise<number> {
   return res.json<ColorHttp>().id;
 }
 
-/** Lista los colores (incluidos los apagados) y los devuelve por nombre. */
+/**
+ * Lista los colores (incluidos los apagados) y los devuelve por nombre.
+ *
+ * `porPagina=50` y no el tope: cada prueba siembra dos o tres colores, así que 50 sobra, y pedir el
+ * MÁXIMO exacto ataría esta prueba al tope. Si algún día ese tope baja, quien tiene que ponerse roja
+ * es la promesa del contrato —para eso está su `.max()`—, no una prueba de la fusión de colores.
+ */
 async function listarPorNombre(cookie: string): Promise<Map<string, ColorHttp>> {
   const res = await app.inject({
     method: 'GET',
-    url: '/api/colores?incluirInactivos=true&porPagina=500',
+    url: '/api/colores?incluirInactivos=true&porPagina=50',
     headers: { cookie },
   });
   expect(res.statusCode).toBe(200);

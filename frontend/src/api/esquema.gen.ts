@@ -5514,7 +5514,7 @@ export interface paths {
         query?: {
           /** @description Página (1-based). */
           pagina?: number;
-          /** @description Renglones por página (máx 500). */
+          /** @description Renglones por página (máx 100). */
           porPagina?: number;
           /** @description Texto a buscar en el nombre (insensible a mayúsculas). */
           busqueda?: string;
