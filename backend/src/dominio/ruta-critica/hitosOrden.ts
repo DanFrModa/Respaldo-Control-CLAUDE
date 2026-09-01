@@ -39,6 +39,7 @@ import {
   registrarEventoOutbox,
   type EventoHitoOrden,
 } from '../../comun/eventos-dominio.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
@@ -97,13 +98,20 @@ const seleccionHito = {
 
 type HitoBd = Prisma.HitoOrdenGetPayload<{ select: typeof seleccionHito }>;
 
-/** Proyecta un hito (con detalle) a la forma JSON del contrato. */
-function aHitoSalida(h: HitoBd): HitoOrdenSalida {
+/**
+ * Proyecta un hito (con detalle) a la forma JSON del contrato.
+ *
+ * `nombrePorId` llega YA RESUELTO del llamador: `HitoOrden.registradoPorId` no tiene FK física (es
+ * un registro inmutable), así que el nombre se busca en bloque una sola vez para todos los hitos de
+ * la orden. Un id que no resuelve sale con `nombreRegistradoPor: null` y el hito se sigue viendo.
+ */
+function aHitoSalida(h: HitoBd, nombrePorId: ReadonlyMap<string, string>): HitoOrdenSalida {
   return {
     id: h.id,
     idOrden: h.idOrden,
     tipo: h.tipo,
     registradoPorId: h.registradoPorId,
+    nombreRegistradoPor: nombreDeUsuario(nombrePorId, h.registradoPorId),
     fecha: aFechaIso(h.fecha),
     creadoEn: h.creadoEn.toISOString(),
   };
@@ -148,7 +156,11 @@ export async function listarHitosOrden(
     select: seleccionHito,
     orderBy: [{ tipo: 'asc' }, { id: 'asc' }],
   });
-  return hitos.map(aHitoSalida);
+  const nombrePorId = await nombresDeUsuarios(
+    cliente,
+    hitos.map((h) => h.registradoPorId),
+  );
+  return hitos.map((h) => aHitoSalida(h, nombrePorId));
 }
 
 /** Mensaje único de "ya hay un hito vivo de este tipo" (lo comparten el check y el backstop del índice). */

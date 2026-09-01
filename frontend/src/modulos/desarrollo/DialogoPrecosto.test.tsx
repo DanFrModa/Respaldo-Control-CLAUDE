@@ -83,6 +83,7 @@ function desarrollo(): Desarrollo {
     apagado: false,
     apagadoEn: null,
     apagadoPorId: null,
+    nombreApagadoPor: null,
     motivoApagado: null,
     creadoEn: '2026-07-05T00:00:00.000Z',
     creadoPorId: null,

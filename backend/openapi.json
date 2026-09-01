@@ -54268,6 +54268,17 @@
                                 ],
                                 "description": "Usuario que lo escribió, o null."
                               },
+                              "nombreUsuario": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                              },
                               "comentario": {
                                 "type": "string",
                                 "description": "Texto del comentario."
@@ -54282,6 +54293,7 @@
                             "required": [
                               "id",
                               "idUsuario",
+                              "nombreUsuario",
                               "comentario",
                               "fecha"
                             ],
@@ -58188,6 +58200,17 @@
                                   ],
                                   "description": "Usuario que lo escribió, o null."
                                 },
+                                "nombreUsuario": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                                },
                                 "comentario": {
                                   "type": "string",
                                   "description": "Texto del comentario."
@@ -58202,6 +58225,7 @@
                               "required": [
                                 "id",
                                 "idUsuario",
+                                "nombreUsuario",
                                 "comentario",
                                 "fecha"
                               ],
@@ -59212,6 +59236,17 @@
                             ],
                             "description": "Usuario que lo escribió, o null."
                           },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
                           "comentario": {
                             "type": "string",
                             "description": "Texto del comentario."
@@ -59226,6 +59261,7 @@
                         "required": [
                           "id",
                           "idUsuario",
+                          "nombreUsuario",
                           "comentario",
                           "fecha"
                         ],
@@ -60022,6 +60058,17 @@
                             ],
                             "description": "Usuario que lo escribió, o null."
                           },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
                           "comentario": {
                             "type": "string",
                             "description": "Texto del comentario."
@@ -60036,6 +60083,7 @@
                         "required": [
                           "id",
                           "idUsuario",
+                          "nombreUsuario",
                           "comentario",
                           "fecha"
                         ],
@@ -60951,6 +60999,17 @@
                             ],
                             "description": "Usuario que lo escribió, o null."
                           },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
                           "comentario": {
                             "type": "string",
                             "description": "Texto del comentario."
@@ -60965,6 +61024,7 @@
                         "required": [
                           "id",
                           "idUsuario",
+                          "nombreUsuario",
                           "comentario",
                           "fecha"
                         ],
@@ -61838,6 +61898,17 @@
                             ],
                             "description": "Usuario que lo escribió, o null."
                           },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
                           "comentario": {
                             "type": "string",
                             "description": "Texto del comentario."
@@ -61852,6 +61923,7 @@
                         "required": [
                           "id",
                           "idUsuario",
+                          "nombreUsuario",
                           "comentario",
                           "fecha"
                         ],
@@ -62669,6 +62741,17 @@
                             ],
                             "description": "Usuario que lo escribió, o null."
                           },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
                           "comentario": {
                             "type": "string",
                             "description": "Texto del comentario."
@@ -62683,6 +62766,7 @@
                         "required": [
                           "id",
                           "idUsuario",
+                          "nombreUsuario",
                           "comentario",
                           "fecha"
                         ],
@@ -63500,6 +63584,17 @@
                             ],
                             "description": "Usuario que lo escribió, o null."
                           },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
                           "comentario": {
                             "type": "string",
                             "description": "Texto del comentario."
@@ -63514,6 +63609,7 @@
                         "required": [
                           "id",
                           "idUsuario",
+                          "nombreUsuario",
                           "comentario",
                           "fecha"
                         ],
@@ -64349,6 +64445,17 @@
                             ],
                             "description": "Usuario que lo escribió, o null."
                           },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
                           "comentario": {
                             "type": "string",
                             "description": "Texto del comentario."
@@ -64363,6 +64470,7 @@
                         "required": [
                           "id",
                           "idUsuario",
+                          "nombreUsuario",
                           "comentario",
                           "fecha"
                         ],
@@ -66766,6 +66874,17 @@
                             ],
                             "description": "Usuario que lo escribió, o null."
                           },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
                           "comentario": {
                             "type": "string",
                             "description": "Texto del comentario."
@@ -66780,6 +66899,7 @@
                         "required": [
                           "id",
                           "idUsuario",
+                          "nombreUsuario",
                           "comentario",
                           "fecha"
                         ],
@@ -82430,6 +82550,17 @@
                             ],
                             "description": "Quién subió el archivo, o null."
                           },
+                          "nombreSubidoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo subió; null si el id no resuelve (el adjunto se sigue viendo)."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -82444,6 +82575,7 @@
                           "tamanoBytes",
                           "urlDescarga",
                           "subidoPorId",
+                          "nombreSubidoPor",
                           "creadoEn"
                         ],
                         "additionalProperties": false,
@@ -173671,6 +173803,17 @@
                         ],
                         "description": "Usuario que registró el hito (o null)."
                       },
+                      "nombreRegistradoPor": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Nombre de quien lo registró; null si el id no resuelve (el hito se sigue viendo)."
+                      },
                       "fecha": {
                         "type": "string",
                         "format": "date",
@@ -173689,6 +173832,7 @@
                       "idOrden",
                       "tipo",
                       "registradoPorId",
+                      "nombreRegistradoPor",
                       "fecha",
                       "creadoEn"
                     ],
@@ -173950,6 +174094,17 @@
                         ],
                         "description": "Usuario que registró el hito (o null)."
                       },
+                      "nombreRegistradoPor": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Nombre de quien lo registró; null si el id no resuelve (el hito se sigue viendo)."
+                      },
                       "fecha": {
                         "type": "string",
                         "format": "date",
@@ -173968,6 +174123,7 @@
                       "idOrden",
                       "tipo",
                       "registradoPorId",
+                      "nombreRegistradoPor",
                       "fecha",
                       "creadoEn"
                     ],
@@ -174230,6 +174386,17 @@
                         ],
                         "description": "Usuario que registró el hito (o null)."
                       },
+                      "nombreRegistradoPor": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Nombre de quien lo registró; null si el id no resuelve (el hito se sigue viendo)."
+                      },
                       "fecha": {
                         "type": "string",
                         "format": "date",
@@ -174248,6 +174415,7 @@
                       "idOrden",
                       "tipo",
                       "registradoPorId",
+                      "nombreRegistradoPor",
                       "fecha",
                       "creadoEn"
                     ],
@@ -220761,6 +220929,17 @@
                             ],
                             "description": "Quién lo apagó, o null."
                           },
+                          "nombreApagadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                          },
                           "motivoApagado": {
                             "anyOf": [
                               {
@@ -220823,6 +221002,7 @@
                           "apagado",
                           "apagadoEn",
                           "apagadoPorId",
+                          "nombreApagadoPor",
                           "motivoApagado",
                           "creadoEn",
                           "creadoPorId",
@@ -221326,6 +221506,17 @@
                             ],
                             "description": "Quién lo apagó, o null."
                           },
+                          "nombreApagadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                          },
                           "motivoApagado": {
                             "anyOf": [
                               {
@@ -221388,6 +221579,7 @@
                           "apagado",
                           "apagadoEn",
                           "apagadoPorId",
+                          "nombreApagadoPor",
                           "motivoApagado",
                           "creadoEn",
                           "creadoPorId",
@@ -221938,6 +222130,17 @@
                             ],
                             "description": "Quién lo apagó, o null."
                           },
+                          "nombreApagadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                          },
                           "motivoApagado": {
                             "anyOf": [
                               {
@@ -222000,6 +222203,7 @@
                           "apagado",
                           "apagadoEn",
                           "apagadoPorId",
+                          "nombreApagadoPor",
                           "motivoApagado",
                           "creadoEn",
                           "creadoPorId",
@@ -222503,6 +222707,17 @@
                             ],
                             "description": "Quién lo apagó, o null."
                           },
+                          "nombreApagadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                          },
                           "motivoApagado": {
                             "anyOf": [
                               {
@@ -222565,6 +222780,7 @@
                           "apagado",
                           "apagadoEn",
                           "apagadoPorId",
+                          "nombreApagadoPor",
                           "motivoApagado",
                           "creadoEn",
                           "creadoPorId",
@@ -223068,6 +223284,17 @@
                             ],
                             "description": "Quién lo apagó, o null."
                           },
+                          "nombreApagadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                          },
                           "motivoApagado": {
                             "anyOf": [
                               {
@@ -223130,6 +223357,7 @@
                           "apagado",
                           "apagadoEn",
                           "apagadoPorId",
+                          "nombreApagadoPor",
                           "motivoApagado",
                           "creadoEn",
                           "creadoPorId",
@@ -223493,6 +223721,17 @@
                       ],
                       "description": "Quién lo apagó, o null."
                     },
+                    "nombreApagadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                    },
                     "motivoApagado": {
                       "anyOf": [
                         {
@@ -223555,6 +223794,7 @@
                     "apagado",
                     "apagadoEn",
                     "apagadoPorId",
+                    "nombreApagadoPor",
                     "motivoApagado",
                     "creadoEn",
                     "creadoPorId",
@@ -223917,6 +224157,17 @@
                       ],
                       "description": "Quién lo apagó, o null."
                     },
+                    "nombreApagadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                    },
                     "motivoApagado": {
                       "anyOf": [
                         {
@@ -223979,6 +224230,7 @@
                     "apagado",
                     "apagadoEn",
                     "apagadoPorId",
+                    "nombreApagadoPor",
                     "motivoApagado",
                     "creadoEn",
                     "creadoPorId",
@@ -224285,6 +224537,17 @@
                       ],
                       "description": "Quién lo apagó, o null."
                     },
+                    "nombreApagadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                    },
                     "motivoApagado": {
                       "anyOf": [
                         {
@@ -224347,6 +224610,7 @@
                     "apagado",
                     "apagadoEn",
                     "apagadoPorId",
+                    "nombreApagadoPor",
                     "motivoApagado",
                     "creadoEn",
                     "creadoPorId",
@@ -224687,6 +224951,17 @@
                       ],
                       "description": "Quién lo apagó, o null."
                     },
+                    "nombreApagadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                    },
                     "motivoApagado": {
                       "anyOf": [
                         {
@@ -224749,6 +225024,7 @@
                     "apagado",
                     "apagadoEn",
                     "apagadoPorId",
+                    "nombreApagadoPor",
                     "motivoApagado",
                     "creadoEn",
                     "creadoPorId",
@@ -225076,6 +225352,17 @@
                       ],
                       "description": "Quién lo apagó, o null."
                     },
+                    "nombreApagadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                    },
                     "motivoApagado": {
                       "anyOf": [
                         {
@@ -225138,6 +225425,7 @@
                     "apagado",
                     "apagadoEn",
                     "apagadoPorId",
+                    "nombreApagadoPor",
                     "motivoApagado",
                     "creadoEn",
                     "creadoPorId",
@@ -225444,6 +225732,17 @@
                       ],
                       "description": "Quién lo apagó, o null."
                     },
+                    "nombreApagadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo)."
+                    },
                     "motivoApagado": {
                       "anyOf": [
                         {
@@ -225506,6 +225805,7 @@
                     "apagado",
                     "apagadoEn",
                     "apagadoPorId",
+                    "nombreApagadoPor",
                     "motivoApagado",
                     "creadoEn",
                     "creadoPorId",
@@ -230572,6 +230872,17 @@
                             ],
                             "description": "Quién subió el archivo, o null."
                           },
+                          "nombreSubidoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo subió; null si el id no resuelve (el adjunto se sigue viendo)."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -230586,6 +230897,7 @@
                           "tamanoBytes",
                           "urlDescarga",
                           "subidoPorId",
+                          "nombreSubidoPor",
                           "creadoEn"
                         ],
                         "additionalProperties": false,

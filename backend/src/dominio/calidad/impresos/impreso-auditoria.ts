@@ -38,6 +38,7 @@ import {
   type ResultadoAuditoriaClave,
   type TipoAuditoriaClave,
 } from '../../../contrato/index.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../../comun/nombres-usuario.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 import { obtenerAuditoria } from '../auditorias.js';
@@ -108,19 +109,11 @@ export async function armarDatosImpresoAuditoria(
   });
   const pagPorId = new Map(pags.map((p) => [p.id, p.pag]));
 
-  const idsUsuario = [auditoria.elaboroPorId, auditoria.auditorPorId].filter(
-    (x): x is string => x !== null,
-  );
-  const usuarios =
-    idsUsuario.length === 0
-      ? []
-      : await cliente.usuario.findMany({
-          where: { id: { in: idsUsuario } },
-          select: { id: true, nombre: true },
-        });
-  const nombrePorId = new Map(usuarios.map((u) => [u.id, u.nombre]));
-  const nombreUsuario = (id: string | null): string | null =>
-    id === null ? null : (nombrePorId.get(id) ?? null);
+  const nombrePorId = await nombresDeUsuarios(cliente, [
+    auditoria.elaboroPorId,
+    auditoria.auditorPorId,
+  ]);
+  const nombreUsuario = (id: string | null): string | null => nombreDeUsuario(nombrePorId, id);
 
   return {
     empresa: sesion.nombreEmpresaActiva,

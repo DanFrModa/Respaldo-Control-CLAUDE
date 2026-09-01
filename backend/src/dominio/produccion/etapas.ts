@@ -68,6 +68,7 @@ import {
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
 import { ORIGEN } from '../../comun/origenes.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -342,23 +343,6 @@ async function sumarCeldas(
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────
 
 /**
- * Resuelve el nombre de cada `creadoPorId` en UN viaje (rediseño R2 §4.4.4 "capturado por · fecha";
- * mismo patrón que la RC de F5-E5: el id es texto sin FK física, los que no existan quedan null).
- */
-async function nombresDeCaptura(
-  cliente: ReturnType<typeof clienteLectura>,
-  ids: (string | null)[],
-): Promise<Map<string, string>> {
-  const unicos = [...new Set(ids.filter((x): x is string => x !== null))];
-  if (unicos.length === 0) return new Map();
-  const usuarios = await cliente.usuario.findMany({
-    where: { id: { in: unicos } },
-    select: { id: true, nombre: true },
-  });
-  return new Map(usuarios.map((u) => [u.id, u.nombre]));
-}
-
-/**
  * Proyecta una etapa (con detalle) a la forma JSON del contrato. El total se DERIVA por suma.
  * `ocultarPrecio` (rediseño R2, §4.4.3): `precioPactado` es, en la práctica, el precio REAL de
  * maquila de esa etapa — sin `ordenes.ver-precio-real-maquila` va null (el MISMO permiso que
@@ -367,7 +351,7 @@ async function nombresDeCaptura(
  */
 function aEtapaSalida(
   etapa: EtapaConDetalle,
-  nombres?: Map<string, string>,
+  nombres: ReadonlyMap<string, string>,
   ocultarPrecio = false,
 ): EtapaSalida {
   // Agrupa el detalle por color, ordenando las tallas por su `orden` del catálogo.
@@ -421,7 +405,7 @@ function aEtapaSalida(
     totalPiezas,
     creadoEn: etapa.creadoEn.toISOString(),
     creadoPorId: etapa.creadoPorId,
-    creadoPorNombre: etapa.creadoPorId === null ? null : (nombres?.get(etapa.creadoPorId) ?? null),
+    creadoPorNombre: nombreDeUsuario(nombres, etapa.creadoPorId),
   };
 }
 
@@ -934,7 +918,7 @@ export async function obtenerEtapa(
   if (etapa === null) {
     throw new ErrorNoEncontrado('EtapaMovimiento', idEtapa);
   }
-  const nombres = await nombresDeCaptura(cliente, [etapa.creadoPorId]);
+  const nombres = await nombresDeUsuarios(cliente, [etapa.creadoPorId]);
   const ocultarPrecio =
     opciones.ocultarPrecio ?? !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
   return aEtapaSalida(etapa, nombres, ocultarPrecio);
@@ -983,7 +967,7 @@ export async function listarEtapasOrden(
     include: incluirEtapa,
   });
 
-  const nombres = await nombresDeCaptura(
+  const nombres = await nombresDeUsuarios(
     cliente,
     etapas.map((e) => e.creadoPorId),
   );

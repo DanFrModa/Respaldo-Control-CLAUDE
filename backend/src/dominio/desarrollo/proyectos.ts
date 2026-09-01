@@ -35,6 +35,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
+import { nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -187,11 +188,19 @@ function aProyectoSalida(proyecto: ProyectoLista): ProyectoSalida {
   return aProyectoBase(proyecto, conteosDesarrollos(proyecto.desarrollos));
 }
 
-/** Proyecta el DETALLE de un proyecto (conteos + el arreglo de desarrollos con su estado). */
-function aProyectoDetalleSalida(proyecto: ProyectoDetalle): ProyectoDetalleSalida {
+/**
+ * Proyecta el DETALLE de un proyecto (conteos + el arreglo de desarrollos con su estado).
+ *
+ * `nombrePorId` (quién apagó cada desarrollo) llega ya resuelto: son N desarrollos y se buscan de
+ * UNA consulta, no una por desarrollo.
+ */
+function aProyectoDetalleSalida(
+  proyecto: ProyectoDetalle,
+  nombrePorId: ReadonlyMap<string, string>,
+): ProyectoDetalleSalida {
   return {
     ...aProyectoBase(proyecto, conteosDesarrollos(proyecto.desarrollos)),
-    desarrollos: proyecto.desarrollos.map(aDesarrolloSalida),
+    desarrollos: proyecto.desarrollos.map((d) => aDesarrolloSalida(d, nombrePorId)),
   };
 }
 
@@ -501,7 +510,11 @@ export async function obtenerProyecto(
   if (proyecto === null) {
     throw new ErrorNoEncontrado('Proyecto', id);
   }
-  return aProyectoDetalleSalida(proyecto);
+  const nombrePorId = await nombresDeUsuarios(
+    clienteLectura(bd),
+    proyecto.desarrollos.map((d) => d.apagadoPorId),
+  );
+  return aProyectoDetalleSalida(proyecto, nombrePorId);
 }
 
 /**

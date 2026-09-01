@@ -383,6 +383,12 @@ export const esquemaOrdenComentarioSalida = z
   .object({
     id: z.number().int().describe('Id del comentario.'),
     idUsuario: z.string().nullable().describe('Usuario que lo escribió, o null.'),
+    nombreUsuario: z
+      .string()
+      .nullable()
+      .describe(
+        'Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo).',
+      ),
     comentario: z.string().describe('Texto del comentario.'),
     fecha: z.iso.datetime().describe('Fecha del comentario (ISO 8601).'),
   })
