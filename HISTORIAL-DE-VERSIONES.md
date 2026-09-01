@@ -71,6 +71,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.076 · 1-sep-2026 · **en prueba** — La ruta crítica ya **no se recalcula dos veces a la vez**, ni pierde un cambio a medio camino (cambio interno)
+
+> 📌 **No cambia nada que puedas ver.** Es una protección que el sistema **decía tener y no tenía**.
+
+### Qué se arregló
+
+Cuando pasan varias cosas seguidas sobre la misma orden —se corta, se recibe, se entrega— la ruta crítica
+se recalcula. El código **afirmaba por escrito** que esos recálculos no se pisan entre sí: que si ya hay uno
+en marcha, el siguiente se junta con él.
+
+🔴 **No era cierto.** Alguien lo comprobó ejecutándolo: se lanzaban **los tres**. La protección estaba
+escrita en el comentario y **no existía en el sistema**.
+
+Ahora existe de verdad: **uno se calcula y a lo sumo uno espera**, y el que espera **vuelve a leer todo**
+cuando le toca, así que **no se pierde ningún cambio** que haya ocurrido mientras tanto.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **La protección que cumplía la promesa al pie de la letra habría PERDIDO CAMBIOS.** Se midieron las
+  cinco opciones posibles: la que decía exactamente lo que prometía el comentario **descarta** el cambio que
+  llega mientras se está recalculando — y la ruta se quedaría con fechas viejas hasta el siguiente
+  movimiento, que puede tardar días. **Se prefirió cambiar la frase a que el sistema pierda información por
+  respetarla.**
+- **Y no bastaba con declararla:** resulta que ese ajuste **no se puede cambiar en caliente** — el sistema
+  lo aceptaba **en silencio sin aplicarlo**. Sin descubrir eso, la versión habría sido puro papel.
+
+### Qué cambió y puede sorprender
+
+- **Al primer arranque saldrán dos mensajes en rojo** que dicen que dos colas «se recrean». **Son
+  esperados** y ocurren **una sola vez**; a partir del siguiente arranque, ninguno.
+- Si pulsas **«Refrescar KPIs» dos veces seguidas**, la segunda te dirá que no encoló nada. **No es un
+  error**: se juntó con la primera, y el refresco llega igual.
+
+### Qué sigue pendiente o roto
+
+- **Nada de esta pieza.** Sin permisos, sin datos, sin migración: el despliegue no necesita nada especial.
+
+---
+
 ## 0.075 · 1-sep-2026 · **en prueba** — Al juntar dos departamentos repetidos, **la búsqueda entiende los dos nombres**
 
 > 📌 Entra **después** de la 0.074 (el color fusionado). Es la que pediste el 31-ago: *«está bien la 3»*.
