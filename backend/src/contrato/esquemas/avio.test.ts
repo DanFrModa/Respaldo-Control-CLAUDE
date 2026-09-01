@@ -167,10 +167,13 @@ describe('esquemaListarAvios (querystring coaccionado)', () => {
     });
   });
 
-  it('rechaza columnas de orden fuera del enum y porPagina > 500', () => {
+  it('rechaza columnas de orden fuera del enum y porPagina > 100', () => {
     expect(esquemaListarAvios.safeParse({ ordenarPor: 'favorito' }).success).toBe(false);
-    // El tope se subió a 500 para que los dropdowns carguen todo el catálogo (fix dropdowns).
-    expect(esquemaListarAvios.safeParse({ porPagina: '500' }).success).toBe(true);
-    expect(esquemaListarAvios.safeParse({ porPagina: '501' }).success).toBe(false);
+    // El tope es 100 porque es el que aplica el DOMINIO al re-validar (`esquemaPaginacion`).
+    // Estuvo publicado en 500 —para que los dropdowns cargaran el catálogo entero— pero el
+    // dominio nunca lo acompañó: pedir 500 devolvía 400, no 500 renglones. La coherencia
+    // entre los dos lados la vigila `paginacion-honesta.test.ts`; aquí sólo se fija el borde.
+    expect(esquemaListarAvios.safeParse({ porPagina: '100' }).success).toBe(true);
+    expect(esquemaListarAvios.safeParse({ porPagina: '101' }).success).toBe(false);
   });
 });

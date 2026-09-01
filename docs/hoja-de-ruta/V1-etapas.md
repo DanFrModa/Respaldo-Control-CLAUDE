@@ -1218,6 +1218,90 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9k · EL CONTRATO PROMETÍA UNA PÁGINA QUE EL SISTEMA RECHAZA (1-sep-2026, versión **0.079**) — ✅ HECHA
+
+Fila **0.083**. Cuatro esquemas del contrato publicaban `porPagina` **máx 500**; sus dominios re-validan
+con `esquemaPaginacion` (`comun/paginacion.ts:17`, tope **100**) ⇒ pedir 500 devuelve **400**. En esta
+arquitectura **el OpenAPI es lo único compartido** entre los dos servicios: un contrato que miente no es
+cosmético.
+
+### 🔴 Dos correcciones DEL LEAD, y las dos eran del mismo error
+
+**(1) «Son tres, no cuatro» — falso.** Medí que telas honraba los 500 porque su dominio *«valida con **su
+propio** esquema»*. Hay **DOS** `esquemaListarTelas`: el del contrato (`tela.ts:651`, 500) y el del dominio
+(`catalogos/telas.ts:625`), y **el del dominio es `esquemaPaginacion.extend(...)`** ⇒ también corta en 100.
+🔑 **Leí la declaración y no seguí de qué estaba hecha.** La fila original decía cuatro y **tenía razón**.
+
+**(2) «Nadie pide 500 ⇒ es cosmético» — falso, y al revés.** El coder encontró
+`frontend/src/modulos/ruta-critica/ConcentradoPagina.tsx:45`: *«Topan en porPagina 100 (**el backend
+desplegado rechaza >100**)»*. ⭐ **Alguien ya se estrelló y lo rodeó** ⇒ la ausencia de llamadas era la
+**CICATRIZ**, no la prueba de que no dolía.
+
+⭐ **Las dos las zanjó EJECUTAR una sonda**, después de que razonar diera la respuesta equivocada — dos
+veces. *Cuando algo se puede ejecutar, se ejecuta.*
+
+### La regla estructural, que vale más que los cuatro números
+
+> **Un listado es honesto ⟺ el dominio y la ruta validan con el MISMO esquema.**
+
+Por eso los dos de `max(200)` **sí** cumplen (`directorio-terceros.ts:63`, `historico-ordenes.ts:182`
+re-validan con el mismo objeto del contrato) y los cuatro mentirosos no.
+
+### 🔴 El entregable no eran los cuatro números: era el guardián — y lo rechazaron por MUDO
+
+**1ª vuelta.** La prueba comprobaba por **fuente** que los dominios colgaran de `esquemaPaginacion`, y su
+comentario prometía avisar *«si alguien les da un tope propio»*. El reviewer **metió un override DENTRO
+del `extend`**, dejando la cadena intacta: dominio a 50, contrato a 100 ⇒ el defecto entero resucitado, y
+**`6 passed (6)`**. La rama gemela **dentro del guardián que venía a cazarla**, con un comentario jurando
+lo contrario — lo que lo volvía peligroso: **compraba confianza**.
+⇒ Dos `export` (`avios.ts:102`, `consultas.ts:186`), la tabla contra los dominios **reales**, y la prueba
+por fuente **borrada**. Con eso la mutación mata.
+
+**Y el defecto ya había reincidido CINCO veces** (`color.ts` en `f40ddf33`, más estos cuatro) ⇒ se cerró
+**la clase, no el caso**: barrido **por comportamiento** con `import.meta.glob`, que importa los esquemas
+de verdad, saca `shape.porPagina` y le **descubre** el tope por búsqueda binaria. Un archivo nuevo entra
+**sin que nadie lo apunte** (patrón embudo). Con prueba de **excepción zombi**: si una deja de ser real,
+obliga a borrarla en vez de dejarla tapando casos nuevos.
+
+**Un cuarto defecto que el coder se cazó SOLO:** un mutante **sobrevivió** (8/8). Su red anti-silencio
+contaba en fuente con `/^\s*porPagina: z\./gm` — **anclada a inicio de línea** —, así que un
+`z.object({ porPagina: … })` **en una sola línea** no se contaba y **el silencio quedaba en verde**: el
+mismo pecado, en la red que debía impedirlo.
+
+**2ª vuelta — la tercera forma, y es estructural.** A petición del lead, el reviewer buscó otra: un
+esquema mentiroso **en un subdirectorio** ⇒ **8/8 verde**. La causa: `enFuente` recorre
+`Object.keys(modulosDelContrato)`, **el mismo glob** ⇒ la red **se compara consigo misma** y por
+construcción **no puede ver un archivo que el glob nunca miró**. ⭐ *Una red que se mide con la misma vara
+que vigila no es una red.* Arreglo de **un carácter** (`'./**/*.ts'`), verificado en las dos direcciones y
+con una prueba intrusa de que la exclusión recursiva de `.test.ts` sigue funcionando.
+
+### Los conteos: el reviewer se corrigió a sí mismo
+
+Dijo 64 esquemas de entrada; midiendo **con la introspección del propio guardián** (no con regex): **58**
+(56 en 100 + 2 en 200) + 56 de respuesta = **114**. Su 64 era artefacto de su regex. Reparto real:
+**58 contrato + 6 dominio propio + 1 compartido = 65**.
+
+### Verificación
+
+**7 mutaciones, 7 muertas**, cada inyección comprobada en el archivo antes de creer el resultado (hubo dos
+**inyecciones fallidas** reportadas: `tela.ts` rechazó el ancla por tener 4 bloques idénticos — *un mutante
+que no se inyectó es un falso verde tan malo como el que se venía a matar*). `Tests no tests` verificado
+como **Failed Suite con EXIT=1**: un fallo de carga **no** se lee como verde.
+
+**Gates (lead, sobre `prueba` con la 0.078 dentro):** backend `test:unit` **2,525** · `typecheck` ·
+`lint` · `format:check`; frontend **1,919** · `tsc -b` · `format:check`. **Contrato regenerado, cero
+drift.** **Sin migración, permisos ni seed** ⇒ no requiere `SEED_ON_START`.
+
+### ⏳ Deuda declarada (§4), no callada
+
+**El barrido ancla sólo el lado del contrato**: el del dominio se verifica en **4 de 58**. Medido bajando
+`kpis.ts:372` de 100 a 50 con su contrato prometiendo 100 ⇒ **8/8 verde**: misma clase, alcanzable desde el
+dominio. **No se cierra hoy** porque exigiría exportar ~54 esquemas *module-private* — más riesgo que el
+defecto que evita — y **hoy no hay ninguna mentira**: verificados los 58, los 6 y el compartido.
+*(Y una cuarta forma rebuscada: `.transform()` **más** el campo extraído a una const compartida.)*
+
+---
+
 ## V1-E9j · ⭐⭐ UN MODELO DE PRODUCCIÓN POR COLOR (1-sep-2026, versión **0.078**) — ✅ HECHA
 
 **La etapa más grande del programa** (fila **0.071/E3**) y el cierre del arco que empezó la 0.069: el
@@ -2287,7 +2371,7 @@ abrir. **Bloquea el gasto, no la lectura.** Las OC ya autorizadas **no se tocan*
 ve**: la bandeja cambió de plan para listarla, porque si sólo se marca no tendría renglones sin firmar y
 habría quedado **congelada e invisible**.
 
-⚠️ **PENDIENTE DE DANIEL (§Post-F9.168):** abrir exige la receta **liberada completa**, no «al menos una
+✅ **CERRADA (Daniel, 31-ago-2026 — §Post-F9.168):** *«Lo del candado con receta a medio firmar. **Está bien como dices.**»* ⇒ se confirma el default: **sólo se congela la compra de una orden con la receta liberada por completo**, aceptando con conocimiento el caso de 39 renglones firmados de 40. **No hay trabajo pendiente**: la 0.067 ya está en `prueba`. 🔴 **Este encabezado decía «PENDIENTE DE DANIEL» un día después de que él lo contestara** — es el **noveno** marcador rancio de esta familia (el 31-ago se corrigieron ocho, el último escrito por el propio lead una hora antes). El patrón no falla: **la respuesta se registra donde se recibe y no se apaga donde se preguntó**, así que un chat nuevo hace `grep "PENDIENTE DE DANIEL"` y **le vuelve a preguntar al dueño algo que ya contestó**. Se corrige en su sitio y **sin borrar**. *(Texto original:)* ~~abrir exige la receta liberada completa, no «al menos una
 firma». Es más seguro —evita una orden imposible de cerrar— pero **deja fuera un caso real**: 39 de 40
 renglones firmados con OC emitidas y el 40 sin firmar; el único rodeo sería **firmar el 40 sin revisarlo**,
 justo lo que §Post-F9.80 prohíbe. La regla **no se tocó**; la pregunta está escrita.

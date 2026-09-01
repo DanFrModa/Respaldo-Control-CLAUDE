@@ -183,7 +183,7 @@ export function semaforoPorDias(dias: number): SemaforoOrden {
  * coaccionado lanzaría (Zod 4.4.x: `stringbool` solo acepta texto) → 400 espurio; por eso el dominio
  * tiene su propio esquema con `z.boolean()` — mismo patrón que `esquemaListarTallas`/`*Dominio`.
  */
-const esquemaConsultaOrdenesDominio = esquemaPaginacion.extend({
+export const esquemaConsultaOrdenesDominio = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(200).optional(),
   idModelo: z.number().int().positive().optional(),
   idCliente: z.number().int().positive().optional(),
