@@ -3430,7 +3430,7 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
     const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
 
     expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.ocsComprometidas).toEqual([
-      { idOrdenCompra: idOc, folio, estatus: 'autorizada' },
+      { idOrdenCompra: idOc, folio, estatus: 'autorizada', recibida: false },
     ]);
     // Y va POR MATERIAL: el botón, que nadie compró, no hereda la OC de la jareta.
     expect(r.avios.find((a) => a.idAvio === avioBoton.id)?.ocsComprometidas).toEqual([]);
@@ -3502,7 +3502,9 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
 
     const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
     const fila = pagina.datos.find((f) => f.idOrden === ordenA)!;
-    expect(fila.ocsComprometidas).toEqual([{ idOrdenCompra: idOc, folio, estatus: 'autorizada' }]);
+    expect(fila.ocsComprometidas).toEqual([
+      { idOrdenCompra: idOc, folio, estatus: 'autorizada', recibida: false },
+    ]);
     // La orden que no tiene compra comprometida sale con la lista vacía, no ausente.
     expect(pagina.datos.find((f) => f.idOrden === ordenB)?.ocsComprometidas).toEqual([]);
   });
