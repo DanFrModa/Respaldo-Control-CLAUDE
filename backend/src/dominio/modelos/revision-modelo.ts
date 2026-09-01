@@ -211,9 +211,15 @@ export function estadoRevisionEfectivo(estado: EstadoRevision | null): EstadoRev
 // porque la BANDEJA y la ficha del modelo las preguntan. Lo único que se fue es el `throw`.
 //
 // 🚧 **La deuda que esto NO cierra** (para que nadie la dé por cerrada): `POST /api/ordenes` →
-// `crearOrden` se salta **la PROMOCIÓN ENTERA** (§Post-F9.34), no sólo la compuerta — por esa ruta
-// nace una OP de un modelo que sigue en `origen = 'desarrollo'` y **sin `numeroProduccion`**. Es
-// alcance de V1-E3 y sigue anotada en `docs/hoja-de-ruta/V1-etapas.md`.
+// `crearOrden` se salta **la entrada a producción ENTERA** (§Post-F9.34), no sólo la compuerta — por
+// esa ruta nace una OP de un modelo que sigue en `origen = 'desarrollo'` y **sin
+// `numeroProduccion`**.
+//
+// ⚠️ **V1-E3 (§Post-F9.172(b)) NO la cerró, y cambió su forma:** ya no se trata de «promover» — la
+// salida a producción hace nacer un modelo de producción POR COLOR, y quien lo hace es
+// `salidaAProduccion`, el ÚNICO que le pasa a `crearOrden` su `idModeloDeLaOrden`. `POST
+// /api/ordenes` sigue sin pasarlo ⇒ su OP se queda con el modelo de desarrollo del renglón y sin
+// ningún modelo por color. Sigue anotada en `docs/hoja-de-ruta/V1-etapas.md`.
 
 /** Lo que se devuelve tras firmar (o al consultar) la revisión de un modelo. */
 export interface RevisionModeloSalida {

@@ -258,7 +258,7 @@ export const esquemaPedidoLineaSalida = z
       .int()
       .nullable()
       .describe(
-        'Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción.',
+        'Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`).',
       ),
   })
   .describe('Renglón de un pedido interno.');

@@ -173,7 +173,9 @@ export const esquemaCandidatoDesarrollo = z
       .number()
       .int()
       .nullable()
-      .describe('Nº interno de producción del modelo (si ya salió a producción), o null.'),
+      .describe(
+        'Nº interno de producción del modelo del DESARROLLO, o null. ⚠️ V1-E3 (§Post-F9.172(b)): es null SIEMPRE para un modelo de desarrollo, no «si ya salió» — generar la OP hace nacer un modelo de producción POR COLOR y el desarrollo se queda intacto. Sólo trae número el caso legado.',
+      ),
     idProyecto: z.number().int().describe('Proyecto del desarrollo.'),
     folioProyecto: z.number().int().describe('Folio del proyecto.'),
     nombreProyecto: z.string().describe('Nombre/tema del proyecto.'),

@@ -277,9 +277,27 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await page.getByTestId('buscar-pedido').fill(cliente);
     await page.getByTestId('fila-pedido').filter({ hasText: cliente }).first().click();
     const detallePedido = page.getByTestId('detalle-pedido');
-    // Mismo motivo que arriba: el renglón enseña el código vigente del modelo, el de producción.
+    // ⭐⭐ V1-E3 (§Post-F9.172(b)) — el renglón enseña el código de DESARROLLO, y es correcto.
+    //
+    // 🔴 Aquí decía *"el código vigente del modelo, el de producción"* y esperaba el nº de 5
+    // dígitos. Eso era verdad mientras generar la OP **transformaba** el modelo de desarrollo; desde
+    // V1-E3 el desarrollo **se queda como está** —por eso de él pueden nacer cuatro modelos, uno por
+    // color— y el renglón del pedido sigue apuntando a él. `PedidosPagina.tsx` pinta
+    // `l.codigoModelo`, que es el del renglón.
+    //
+    // ⚠️ Es la GEMELA de la aserción de la vista por MES (arriba), que además enseña `prod. #<nº>`.
+    // Y la diferencia NO es que a esta forma le falte el campo: `esquemaPedidoLineaSalida` **sí
+    // tiene `numeroProduccion`** (comprobado compilando contra `PedidoLinea`). Lo que pasa es que
+    // ese campo es el número del modelo **DEL RENGLÓN**, y tras V1-E3 el renglón apunta al
+    // DESARROLLO —que ya no se promueve nunca— ⇒ **vale `null` para siempre**. Enseñarlo no
+    // devolvería el número: enseñaría un hueco.
+    //
+    // Los números que Daniel quiere ver son los de los modelos HIJOS, uno por color, y ésos piden
+    // la misma agregación en servidor que la vista del mes (`numerosProduccion`): contrato +
+    // dominio + frontend ⇒ **etapa aparte (0.089)**, no un parche a esta prueba. Mientras tanto lo
+    // que el detalle enseña —el nº de desarrollo— es dato cierto y buscable (D3).
     await expect(
-      detallePedido.getByTestId('renglon-pedido').filter({ hasText: numeroProduccion }),
+      detallePedido.getByTestId('renglon-pedido').filter({ hasText: codigoDesarrollo }),
     ).toBeVisible();
     await detallePedido.getByTestId('nuevo-pedido-real').click();
     const dialogoReal = page.getByRole('dialog');

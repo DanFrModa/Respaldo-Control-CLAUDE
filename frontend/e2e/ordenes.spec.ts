@@ -208,8 +208,9 @@ async function abrirOrdenEnCaptura(page: Page, folio: string, codigoModelo: stri
 /**
  * Crea cliente + modelo + pedido (F2) y una OP de 20 pzas vía "Generar OP".
  *
- * Devuelve el folio **y el código vigente del modelo tras la OP** (V1-E8j: esa primera OP lo pasa a
- * producción y le cambia el código por su nº de 5 dígitos).
+ * Devuelve el folio **y el código del MODELO QUE QUEDÓ EN LA ORDEN** — que no es el que se tecleó:
+ * V1-E3 (§Post-F9.172(b)) hace NACER un modelo de producción por color, con su nº de 5 dígitos. El
+ * modelo del renglón **no se transforma**: se queda en desarrollo, con su código.
  */
 async function crearOrdenConMatriz(
   page: Page,
@@ -271,10 +272,11 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await crearModeloUI(page, codigoModelo);
 
     // ── Pedido con DOS renglones (dos OPs: una para copiarle la matriz a la otra) ─
-    //    ⭐ V1-E8j — el pedido se captura con el código de DESARROLLO (el que se tecleó); la
-    //    PRIMERA OP pasa el modelo a producción y le cambia el código, así que de ahí en adelante
-    //    todo lo que busca al modelo en pantalla usa `codigoVigente`. El de desarrollo se conserva
-    //    y sigue siendo buscable (D3), pero ya no es el que se enseña.
+    //    ⭐ V1-E3 (§Post-F9.172(b)) — el pedido se captura con el código de DESARROLLO (el que se
+    //    tecleó), y **ahí se queda**: la OP no transforma ese modelo, hace NACER otro para su color.
+    //    Por eso lo que busca la ORDEN en pantalla usa `codigoVigente` (el del modelo nuevo, que es
+    //    el que la orden lleva) mientras el PEDIDO sigue enseñando el de desarrollo — los dos son
+    //    ciertos, y son cosas distintas.
     await crearPedidoF2(page, { cliente, codigoModelo }, 2);
     const { folio: folio1, codigoModelo: codigoVigente } = await generarOp(
       page,
