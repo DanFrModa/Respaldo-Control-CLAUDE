@@ -11546,7 +11546,13 @@ sigue abierta, pero deja de ser urgente.
 
 ---
 
-#### (Post-F9.172) — ⏳ DOS PREGUNTAS ABIERTAS DE DANIEL, CON DEFAULT PROPUESTO (31-ago-2026)
+#### (Post-F9.172) — ✅ LAS DOS, CONTESTADAS POR DANIEL EL MISMO DÍA (31-ago-2026)
+
+> ⚠️ **Este encabezado decía «DOS PREGUNTAS ABIERTAS» y Daniel ya había contestado las dos** — (a)
+> *«está bien la 3»* y (b) *«se reúsa cuando sea el mismo modelo»*, ambas registradas abajo el mismo
+> día. Se corrige por la misma razón de siempre: un chat nuevo hace `grep` de «pendiente» y le
+> **vuelve a preguntar al dueño**. De (b) queda **sólo el borde (A) vs (B)**, con default **(B)**, que
+> se construye en E3.
 
 > **Ninguna de las dos frena nada** (REGLA 0): quedan aquí con su default y el programa sigue. Se anotan
 > **con su medición**, para que un chat nuevo no las re-descubra ni se las vuelva a preguntar mal.
