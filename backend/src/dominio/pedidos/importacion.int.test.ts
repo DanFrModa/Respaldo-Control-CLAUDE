@@ -256,8 +256,9 @@ describe('confirmar importación (alta transaccional)', () => {
     });
     expect(liga?.idDesarrollo).toBe(dev114.idDesarrollo);
 
-    // ⭐ El modelo pasó a producción al generar la OP (§Post-F9.34): la serie 71 estaba vacía, así
-    // que el primero de los dos modelos importados se queda el 71001 y el otro el 71002.
+    // ⭐⭐ V1-E3: generar la OP hace NACER el modelo de producción (§Post-F9.34 + §Post-F9.172(b)).
+    // La serie 71 estaba vacía, así que el primero de los dos importados se queda el 71001 y el
+    // otro el 71002 — pero los números son de los HIJOS, no de los desarrollos.
     const numeros = (
       await cliente.modelo.findMany({
         where: { numeroProduccion: { not: null } },
@@ -267,6 +268,31 @@ describe('confirmar importación (alta transaccional)', () => {
     ).map((m) => m.numeroProduccion);
     expect(numeros).toEqual([71_001, 71_002]);
     expect(op114?.numeroProduccion).toBeGreaterThan(0);
+
+    // 🔴 Y los DESARROLLOS se quedaron intactos, en su catálogo y con su código: es lo único que
+    // permite que de uno salgan varios modelos de producción.
+    const desarrollos = await cliente.modelo.findMany({
+      where: { origen: 'desarrollo' },
+      select: { codigo: true, numeroProduccion: true },
+      orderBy: { codigo: 'asc' },
+    });
+    expect(desarrollos.map((d) => d.codigo)).toEqual(['DEV-114', 'DEV-115']);
+    expect(desarrollos.every((d) => d.numeroProduccion === null)).toBe(true);
+
+    // ⭐⭐ Y AQUÍ SE VE LA REGLA DEL COLOR CON LOS DOS CASOS EN LA MISMA CORRIDA, porque el
+    // importador por EXCEL agrupa por MODELO (no por color) y el archivo de demo trae los dos:
+    //  • `CA-KM-114` viene en Rojo Y Azul marino ⇒ su OP es MULTICOLOR y su hijo nace SIN color
+    //    (no hay "el color del que nació"): cubre los dos, igual que antes de V1-E3.
+    //  • `CA-KM-115` viene sólo en Negro ⇒ su hijo SÍ nace con ese color, y la próxima OC de negro
+    //    de ese desarrollo lo REUSARÁ en vez de estrenar número.
+    const hijos = await cliente.modelo.findMany({ where: { idModeloDesarrollo: { not: null } } });
+    expect(hijos).toHaveLength(2);
+    const hijo114 = hijos.find((h) => h.idModeloDesarrollo === dev114.idModelo);
+    const hijo115 = hijos.find((h) => h.idModeloDesarrollo !== dev114.idModelo);
+    expect(hijo114?.idColor).toBeNull();
+    expect(hijo115?.idColor).not.toBeNull();
+    // …y la OP de 114 lleva a SU hijo, no al modelo de desarrollo del renglón.
+    expect(orden114?.idModelo).toBe(hijo114?.id);
     const eventos = await cliente.eventoOutbox.count({ where: { tipo: 'orden-creada' } });
     expect(eventos).toBe(2);
   });

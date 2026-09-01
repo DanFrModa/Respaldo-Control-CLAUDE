@@ -171,8 +171,12 @@ export interface DatosVersionModelo {
  *    un gramo de lo que el padre ya tiene.
  *
  * Qué NO hereda:
- *  • El `numeroProduccion`: la versión NACE en desarrollo (regla 4) y estrenará el suyo cuando se
- *    promueva. El CHECK de la base (`modelos_desarrollo_sin_numero_produccion_check`) lo exige.
+ *  • El `numeroProduccion`: la versión NACE en desarrollo (regla 4) y se queda **sin número**. El
+ *    CHECK de la base (`modelos_desarrollo_sin_numero_produccion_check`) lo exige.
+ *    ⚠️ V1-E3 (§Post-F9.172(b)): por el camino NORMAL la versión **nunca estrena uno** — generar su
+ *    OP no la transforma, hace nacer un modelo de producción POR COLOR que se lleva el número. Sólo
+ *    se lo quedaría ella si alguien la pasa a producción a mano («pasar a producción»), que es la
+ *    puerta que deja al modelo con UN número para todos sus colores.
  *  • Las FOTOS del modelo (`ModeloFoto`): son la foto de ESE modelo y viven en R2; duplicar el
  *    registro no duplicaría el objeto, pero tampoco es lo que se espera de un modelo recién
  *    nacido — se le suben las suyas. (Las fotos del ARTE sí viajan, pero **compartiendo** el mismo

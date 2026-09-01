@@ -81,6 +81,9 @@ function paginaDeEjemplo(conImportes: boolean): PedidosPorMes {
             idDesarrollo: 5,
             numeroCliente: 'CA-KM-114',
             numeroProduccion: 51114,
+            // V1-E3: los nº de los modelos de producción del renglón (uno por color/OP). Aquí el
+            // caso LEGADO —el renglón ya apuntaba a un modelo de producción—, con su única OP.
+            numerosProduccion: [51114],
             cantidad: 100,
             precio: conImportes ? 148 : null,
             importe: conImportes ? 14800 : null,
@@ -118,9 +121,67 @@ function consulta(datos: PedidosPorMes): unknown {
   };
 }
 
+/**
+ * ⭐⭐ V1-E3 — un renglón de modelo de DESARROLLO con DOS OPs de dos colores. Su
+ * `numeroProduccion` (el del modelo del renglón) es `null` **para siempre**: desde esta etapa el
+ * desarrollo ya no se promueve, y el número vive en el modelo de cada OP.
+ */
+function paginaPorColor(numerosProduccion: number[] = [71001, 71002]): PedidosPorMes {
+  const pagina = paginaDeEjemplo(true);
+  const [fila] = pagina.datos;
+  if (fila === undefined) throw new Error('la página de ejemplo perdió su pedido');
+  const [renglon] = fila.renglones;
+  if (renglon === undefined) throw new Error('la página de ejemplo perdió su renglón');
+  return {
+    ...pagina,
+    datos: [
+      {
+        ...fila,
+        renglones: [
+          {
+            ...renglon,
+            codigoModelo: 'CYA-26-71-003',
+            origenModelo: 'desarrollo',
+            numeroProduccion: null,
+            numerosProduccion,
+            numOrdenes: numerosProduccion.length,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe('<PedidosMesPagina>', () => {
   beforeEach(() => {
     usePedidosPorMes.mockReset();
+  });
+
+  /**
+   * 🔴 LA PRUEBA DE V1-E3 EN LA PANTALLA. Sin `numerosProduccion`, la fila de un renglón de
+   * desarrollo enseñaría su código (`CYA-26-71-003`) **y ningún número, nunca**, porque el modelo
+   * del renglón ya no se promueve. Si alguien vuelve a leer `renglon.numeroProduccion` para pintar
+   * el `prod. #…`, esta prueba cae.
+   */
+  it('⭐⭐ enseña los nº de producción de los MODELOS POR COLOR del renglón, no el del renglón', () => {
+    usePedidosPorMes.mockReturnValue(consulta(paginaPorColor()));
+    renderConProveedores(<PedidosMesPagina />, {
+      sesion: estadoSesionDePrueba(['pedidos.ver', 'pedidos.importes']),
+    });
+
+    expect(screen.getByText('CYA-26-71-003')).toBeInTheDocument();
+    expect(screen.getByText('prod. #71001 · #71002')).toBeInTheDocument();
+  });
+
+  it('un renglón sin ninguna OP y sin nº no pinta el chip de producción', () => {
+    // Control negativo: si el helper devolviera algo siempre, la prueba de arriba pasaría con todo
+    // roto (bastaría con pintar el texto vacío).
+    usePedidosPorMes.mockReturnValue(consulta(paginaPorColor([])));
+    renderConProveedores(<PedidosMesPagina />, {
+      sesion: estadoSesionDePrueba(['pedidos.ver', 'pedidos.importes']),
+    });
+
+    expect(screen.queryByText(/prod\. #/)).not.toBeInTheDocument();
   });
 
   it('CON pedidos.importes pinta Precio/Importe y el Importe total de la barra', () => {

@@ -430,7 +430,7 @@ export const esquemaOrdenPdfImportada = z
       .int()
       .nullable()
       .describe(
-        'Nº de producción del modelo (asignado si venía de desarrollo, heredado si ya estaba en producción), o null si su código histórico no es numérico de 5 dígitos.',
+        'Nº de producción del modelo CON EL QUE QUEDÓ LA OP, o null si su código histórico no es numérico de 5 dígitos. ⚠️ V1-E3 (§Post-F9.172(b)): cuando el renglón es de un modelo de DESARROLLO, este número es del modelo de producción que NACIÓ para el color de esta OC —el desarrollo se queda como está, no se transforma—; en el caso legado es el que el modelo del renglón ya tenía. Es el camino de C&A: un PDF = una OC = un color = un modelo.',
       ),
     codigoModelo: z.string().describe('Nº de desarrollo de NUESTRO modelo.'),
     modeloCliente: z.string().describe('Modelo ID del cliente (del PDF).'),

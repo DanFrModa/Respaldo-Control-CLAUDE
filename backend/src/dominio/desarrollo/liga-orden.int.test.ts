@@ -179,6 +179,52 @@ describe('ligarOrden — coherencia + estado derivado', () => {
     ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 
+  /**
+   * ⭐⭐ V1-E3 — **LA ORDEN DE UN MODELO NACIDO POR COLOR SE LIGA AL DESARROLLO DE SU PADRE.**
+   *
+   * 🔴 Ésta es la prueba del bloqueante que la etapa vino a quitar: `ligarOrdenNucleo` comparaba
+   * `desarrollo.idModelo !== orden.idModelo` a pelo, y desde V1-E3 la orden lleva el HIJO mientras
+   * el desarrollo apunta al PADRE ⇒ **el paso 4 de la propia `salidaAProduccion` reventaba**, con
+   * la OP y todo lo demás dentro de la misma transacción. La coherencia se mide contra el LINAJE.
+   */
+  it('⭐⭐ liga la orden de un modelo HIJO (nacido por color) al desarrollo de su PADRE', async () => {
+    const hijo = await cliente.modelo.create({
+      data: {
+        codigo: `71${String(codigoSeq++).padStart(3, '0')}`,
+        origen: 'produccion',
+        idModeloDesarrollo: modeloA.id,
+      },
+    });
+    const idDesarrollo = await nuevoDesarrollo(modeloA.id);
+    const idOrden = await nuevaOrden(hijo.id, clienteNegocio.id);
+
+    const liga = await ligarOrden(sesion(), idOrden, { idDesarrollo }, bd());
+
+    expect(liga.idDesarrollo).toBe(idDesarrollo);
+    expect(liga.estadoDesarrollo).toBe('ligado-produccion');
+  });
+
+  /**
+   * El control negativo del de arriba: que la regla se mida por el linaje NO la afloja. Un hijo de
+   * OTRO desarrollo sigue rebotando — si `idModeloDeLaReceta` se hubiera cambiado por "cualquiera",
+   * esta prueba caería y la de arriba no.
+   */
+  it('⭐ rechaza ligar la orden de un hijo al desarrollo de OTRO modelo (ErrorValidacion)', async () => {
+    const hijo = await cliente.modelo.create({
+      data: {
+        codigo: `71${String(codigoSeq++).padStart(3, '0')}`,
+        origen: 'produccion',
+        idModeloDesarrollo: modeloA.id,
+      },
+    });
+    const idDesarrollo = await nuevoDesarrollo(modeloB.id);
+    const idOrden = await nuevaOrden(hijo.id, clienteNegocio.id);
+
+    await expect(ligarOrden(sesion(), idOrden, { idDesarrollo }, bd())).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+  });
+
   it('rechaza si el desarrollo es de OTRO modelo (ErrorValidacion)', async () => {
     const idDesarrollo = await nuevoDesarrollo(modeloB.id); // modelo B
     const idOrden = await nuevaOrden(modeloA.id, clienteNegocio.id); // modelo A
@@ -265,6 +311,38 @@ describe('sugerenciaLigaOrden — candidato + precio propuesto', () => {
     const idOrden = await nuevaOrden(modeloB.id, clienteNegocio.id); // no hay desarrollo de B
     const sug = await sugerenciaLigaOrden(sesion(), idOrden, bd());
     expect(sug.candidato).toBeNull();
+  });
+
+  /**
+   * ⭐⭐ V1-E3 — la orden de un HIJO encuentra el desarrollo de su PADRE.
+   *
+   * 🔴 El segundo bloqueante de la etapa, y el de síntoma más traicionero: con `idModelo:
+   * orden.idModelo` a pelo, esta consulta devolvía **CERO candidatos** para toda orden nacida por
+   * color. No un error — una lista vacía, que la pantalla enseña como *"esta orden no tiene
+   * desarrollo"*. La prueba de arriba (`candidato null`) es su control negativo: las dos caen por
+   * separado.
+   */
+  it('⭐⭐ propone el desarrollo del PADRE para la orden de un modelo nacido por color', async () => {
+    const idDesarrollo = await nuevoDesarrollo(modeloA.id);
+    const idPrecosto = await congelarPrecosto(idDesarrollo, 50);
+    await crearListaLinea(idDesarrollo, idPrecosto, {
+      costoUnit: 50,
+      precioCalculado: 100,
+      precioAprobado: 130,
+    });
+    const hijo = await cliente.modelo.create({
+      data: {
+        codigo: `71${String(codigoSeq++).padStart(3, '0')}`,
+        origen: 'produccion',
+        idModeloDesarrollo: modeloA.id,
+      },
+    });
+    const idOrden = await nuevaOrden(hijo.id, clienteNegocio.id);
+
+    const sug = await sugerenciaLigaOrden(sesion(), idOrden, bd());
+
+    expect(sug.candidato?.idDesarrollo).toBe(idDesarrollo);
+    expect(sug.candidato?.precioSugeridoPedido).toBeCloseTo(130);
   });
 });
 

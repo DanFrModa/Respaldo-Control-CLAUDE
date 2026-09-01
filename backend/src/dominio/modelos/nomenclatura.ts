@@ -83,6 +83,23 @@ export const LIBRES_PARA_AVISAR = 50;
  */
 const NAMESPACE_LOCK_NUMERO_PRODUCCION = 20_546;
 
+/**
+ * ⭐⭐ V1-E3 — Namespace del `pg_advisory_xact_lock` que serializa **el reuso o nacimiento del modelo
+ * de un color** dentro de UN desarrollo. Segunda clave = el id del modelo de DESARROLLO (el padre).
+ * Estrena el 20_548 de la familia 20_5xx.
+ *
+ * 🔴 **Por qué hace falta un lock APARTE del de la serie.** La llave `modelos_linaje_color_unico`
+ * ata al (desarrollo, color) *concreto*, pero la decisión de reusar se toma ANTES de escribir: dos
+ * salidas simultáneas del mismo color mirarían las dos "no existe" y las dos derivarían. La de la
+ * serie (`NAMESPACE_LOCK_NUMERO_PRODUCCION`) no sirve para esto: se toma DENTRO de derivar, o sea
+ * después de haber decidido. Y para los hijos MULTICOLOR (`idColor = null`) este lock es la
+ * ÚNICA red, porque un índice único no ata dos NULL.
+ *
+ * ⚠️ **Orden de los locks:** éste SIEMPRE antes que el de la serie (nunca al revés), que es lo que
+ * impide un abrazo mortal entre dos salidas del mismo par de dígitos.
+ */
+const NAMESPACE_LOCK_MODELO_POR_COLOR = 20_548;
+
 /** Un código de producción es SIEMPRE numérico de 5 dígitos (concepto ≥ 2 → nunca empieza en 0). */
 const PATRON_CODIGO_PRODUCCION = /^\d{5}$/;
 
@@ -676,9 +693,48 @@ export interface ResultadoPromocion {
 }
 
 /**
- * Toma el lock del par y calcula/valida el número. Núcleo compartido por el endpoint «pasar a
- * producción» y por la salida a producción (generar OP), para que los dos apliquen las MISMAS
- * reglas dentro de la MISMA transacción (A2).
+ * Toma el lock del par y calcula/valida el número, y **TRANSFORMA LA FILA** del modelo: le cambia
+ * el código, le pone el número y lo muda al catálogo de producción.
+ *
+ * ⚠️ **Desde V1-E3 su ÚNICO llamador es el endpoint «pasar a producción»** (`modelos.ts` →
+ * `pasarModeloAProduccion`). La salida a producción ya NO pasa por aquí: usa
+ * {@link obtenerODerivarModeloDeProduccion}, que **crea una fila nueva por color** y deja el
+ * desarrollo intacto — que es lo único que permite que de un mismo desarrollo salgan cuatro.
+ *
+ * ---
+ * ## 🔴🔴 V1-E3 — LAS DOS GUARDAS NUEVAS, Y POR QUÉ SIN ELLAS ESTA PUERTA DESHACE LA ETAPA
+ *
+ * Promover **transforma** el modelo: al terminar, su `origen` es `produccion` **para siempre** (no
+ * hay camino de vuelta), y `derivarModeloDeProduccion` exige un padre de DESARROLLO. Es decir: un
+ * clic aquí deja al modelo **incapaz de tener modelos por color, definitivamente**. Se midieron los
+ * dos daños, y los dos eran **silenciosos** —ni error, ni aviso—:
+ *
+ *  • **Promover DESPUÉS de que ya nació un hijo** — lo que ESTA guarda impide: el padre se llevaba
+ *    el **71002** de la misma serie mientras su hijo Rojo tenía el **71001** ⇒ **la misma prenda con
+ *    DOS números de catálogo**, que es exactamente lo que la decisión (B) de §Post-F9.172 existe
+ *    para impedir.
+ *  • **Promover ANTES de las OC** — lo que esta guarda **NO** impide, y hay que decirlo con todas
+ *    las letras: las cuatro OC de cuatro colores salen las cuatro por la rama `heredado` con **UN
+ *    SOLO modelo** —*el bug de Daniel, al pie de la letra*— y sin vuelta atrás. Ver el límite, abajo.
+ *
+ * ⚠️ Y la guarda A tapa un agujero que **ningún CHECK de la base puede ver**: el
+ * `modelos_linaje_desarrollo_solo_produccion_check` garantiza que un hijo apunte a un padre, pero
+ * un CHECK **no mira otra fila**, así que no puede impedir que el padre **deje de ser de
+ * desarrollo DESPUÉS**. La nota de `schema.prisma` ya lo decía —*"quien escriba esta columna por
+ * otra puerta tiene que comprobar él mismo que el padre es de DESARROLLO"*—; esto es la otra mitad:
+ * quien **cambie el origen de un padre** tiene que comprobar que no tenga hijos.
+ *
+ * ⚠️ **EL LÍMITE DE ESTA GUARDA, dicho con todas las letras.** Sólo mira los hijos que YA
+ * nacieron. Un modelo de desarrollo **sin hijos todavía** —tenga o no ficha de Desarrollo— sigue
+ * siendo promovible, y al promoverlo queda con UN modelo para todos sus colores, para siempre.
+ *
+ * 🔴 **Se probó una segunda guarda («con ficha de Desarrollo no se promueve») y se RETIRÓ a
+ * propósito:** rompía un camino existente y probado (`crearDesarrolloConModeloNuevo` → promover, en
+ * `nomenclatura.int.test.ts`), o sea que no es una valla contra un descuido — es **retirar una
+ * capacidad**, y eso es decisión de producto de Daniel, no de esta función. Lo que V1-E3 sí hace
+ * mientras tanto es que el clic **deje de ser silencioso**: el diálogo lo avisa ANTES de pulsarlo
+ * (`DialogoPasarAProduccion.tsx`) y `pasarModeloAProduccion` lo documenta. La pregunta —¿se retira
+ * el botón del catálogo?— va planteada ahí.
  */
 export async function promoverAProduccionNucleo(
   tx: Tx,
@@ -711,6 +767,25 @@ export async function promoverAProduccionNucleo(
         (modelo.numeroProduccion === null
           ? '.'
           : ` con el número ${codigoDeNumeroProduccion(modelo.numeroProduccion)}.`),
+    );
+  }
+
+  // ── 🔴🔴 V1-E3 · GUARDA A — un padre CON HIJOS no se transforma ──────────────────────────────
+  // Ver el encabezado: promoverlo le daría al padre un segundo número de la misma serie para la
+  // MISMA prenda, y dejaría a sus hijos colgando de un padre que ya no es de desarrollo —lo único
+  // que la base NO puede vigilar sola—.
+  const hijos = await tx.modelo.findMany({
+    where: { idModeloDesarrollo: idModelo },
+    orderBy: { numeroProduccion: 'asc' },
+    select: { codigo: true },
+    take: 5,
+  });
+  if (hijos.length > 0) {
+    throw new ErrorConflicto(
+      `El modelo "${modelo.codigo}" ya tiene modelos de producción nacidos de él por color ` +
+        `(${hijos.map((h) => h.codigo).join(', ')}): su número no es suyo, es el de cada color. ` +
+        `Pasarlo a producción le daría un número MÁS a la misma prenda. Si falta un color, sale ` +
+        `solo al generar la OP de ese color.`,
     );
   }
 
@@ -848,6 +923,16 @@ export interface DatosDerivarModelo {
    * de la validación.
    */
   numeroCapturado?: number | undefined;
+  /**
+   * ⭐⭐ V1-E3 (§Post-F9.172(b)) — COLOR de catálogo del que nace este hijo. Es su IDENTIDAD (con el
+   * padre forma la llave `modelos_linaje_color_unico`), **no una instrucción de producción**: lo que
+   * se corta lo sigue mandando la matriz de la OP.
+   *
+   * `null`/ausente = el hijo **no es de un color**: nace de una salida con matriz MULTICOLOR (el
+   * importador por Excel agrupa por modelo, no por color). Ese hijo cubre varios colores a la vez,
+   * exactamente como se comportaba el sistema antes de esta etapa.
+   */
+  idColor?: number | null | undefined;
 }
 
 /** Resultado de derivar: el hijo que nació, con su número y los avisos de la serie. */
@@ -881,12 +966,14 @@ export interface ResultadoDerivacion {
 function marcaProduccionDerivada(
   numeroProduccion: number,
   idModeloDesarrollo: number,
+  idColor: number | null,
 ): MarcaNomenclaturaModelo {
   return {
     origen: 'produccion',
     codigoDesarrollo: null,
     numeroProduccion,
     idModeloDesarrollo,
+    idColor,
   };
 }
 
@@ -967,12 +1054,11 @@ export async function derivarModeloDeProduccion(
     );
   }
 
-  // Guarda 3 — descontinuado: se reactiva a mano, nunca como efecto lateral (§Post-F9.119).
+  // Guarda 3 — descontinuado: se reactiva a mano, nunca como efecto lateral (§Post-F9.119). El
+  // texto vive en `mensajeDesarrolloDescontinuado` porque el camino de REUSO aplica esta MISMA
+  // guarda (V1-E3) y las dos tienen que decir lo mismo, palabra por palabra.
   if (!padre.activo) {
-    throw new ErrorConflicto(
-      `El modelo "${padre.codigo}" está descontinuado; reactívalo primero si vas a producirlo. Se ` +
-        `hace desde la ficha del modelo, marcándolo como activo.`,
-    );
+    throw new ErrorConflicto(mensajeDesarrolloDescontinuado(padre.codigo));
   }
 
   // 🔴 V1-E9c (§Post-F9.169) — AQUÍ ESTABA LA GUARDA 4: la compuerta de la revisión evaluada
@@ -1053,6 +1139,21 @@ export async function derivarModeloDeProduccion(
       // La ficha del padre, tal cual. `null` se pasa como `undefined` para que el núcleo
       // simplemente no escriba la columna y la base ponga su default (`llevaArte`,
       // `secuenciaEstampado`), en vez de estrellarse contra un NOT NULL.
+      // ⚠️⚠️ **AQUÍ SE COPIA LA FICHA, Y LA COPIA DIVERGE — la pregunta abierta de V1-E3 (N1).**
+      //
+      // La RECETA es COMPARTIDA (el hijo apunta a la del padre, `receta-compartida.ts`), pero estos
+      // campos de FICHA se COPIAN al nacer. Medido: si el padre cambia su `composicion` DESPUÉS,
+      // el hijo que ya había nacido se queda con la vieja y el que nazca después trae la nueva ⇒
+      // dos colores de la misma prenda con composiciones distintas, y la OP de cada uno se lleva
+      // la suya (`crearOrden` hereda la del modelo que queda en la ORDEN, igual que
+      // `actualizarOrden` al re-derivarla: las dos leen el mismo modelo, así que son coherentes
+      // entre sí — lo que diverge es la copia, no el camino).
+      //
+      // 🔴 Es PREEXISTENTE (V1-E9a ya copiaba la ficha), pero V1-E3 lo pone en el camino principal,
+      // porque hasta hoy casi no nacían hijos. **No se resuelve aquí a propósito**: contestar
+      // *«¿la ficha también se comparte, o cada color puede tener la suya?»* es decisión de Daniel
+      // —es exactamente su pregunta *«¿cómo controlas que los cuatro lleven lo mismo?»* aplicada a
+      // la ficha—, y cualquiera de las dos respuestas se implementa en ESTAS líneas.
       ...sinNulos({
         descripcion: datos.descripcion ?? padre.descripcion,
         composicion: padre.composicion,
@@ -1068,7 +1169,7 @@ export async function derivarModeloDeProduccion(
         llevaArte: padre.llevaArte,
       }),
     },
-    marcaProduccionDerivada(numero, padre.id),
+    marcaProduccionDerivada(numero, padre.id, datos.idColor ?? null),
   );
 
   await registrarBitacora(tx, sesion, {
@@ -1087,6 +1188,9 @@ export async function derivarModeloDeProduccion(
       idModeloDesarrollo: padre.id,
       codigoModeloDesarrollo: padre.codigo,
       numeroDeDesarrollo: padre.codigoDesarrollo,
+      // V1-E3: DE QUÉ COLOR nació (o `null` si la salida traía varios). Sin esto la bitácora no
+      // podría contestar "¿por qué el 71004 y el 71005 salieron del mismo desarrollo?".
+      idColor: datos.idColor ?? null,
       avisos,
     },
   });
@@ -1099,6 +1203,157 @@ export async function derivarModeloDeProduccion(
     numeroCapturado: datos.numeroCapturado !== undefined,
     avisos,
   };
+}
+
+/**
+ * Lo que la salida a producción necesita saber del modelo que va a llevar la OP: el mismo cuerpo de
+ * {@link ResultadoDerivacion} más **si nació aquí o ya existía**.
+ *
+ * ⚠️ `numeroProduccion` es anulable aquí y no en aquél a propósito: un hijo recién derivado SIEMPRE
+ * estrena número, pero uno REUSADO se lee de la base tal como esté. Fingir que nunca puede faltar
+ * obligaría a inventar una rama imposible de probar.
+ */
+export interface ResultadoModeloDeLaOp {
+  /** Id del modelo de PRODUCCIÓN que va a llevar la orden. */
+  idModelo: number;
+  /** Id del modelo de DESARROLLO del que nació (y de quien es su receta). */
+  idModeloDesarrollo: number;
+  /** Su nº de producción de 5 dígitos. */
+  numeroProduccion: number | null;
+  /** Su código VIGENTE (= el número, para todo hijo nacido por esta puerta). */
+  codigo: string;
+  /** `true` si el número lo capturó el usuario en vez de aceptar la propuesta del sistema. */
+  numeroCapturado: boolean;
+  /** Avisos que NUNCA bloquean (dígitos que no cuadran, serie cerca del tope, número ignorado). */
+  avisos: string[];
+  /** ⭐ `true` si el modelo YA existía para ese (desarrollo, color) y esta llamada NO estrenó número. */
+  reusado: boolean;
+}
+
+/**
+ * ⭐⭐ **EL MODELO DE PRODUCCIÓN DE ESTE COLOR: se REUSA si ya existe, y sólo si no, NACE** (V1-E3,
+ * §Post-F9.172(b)).
+ *
+ * DANIEL, textual: ***«se reúsa cuando sea el mismo modelo»***. Ese «mismo modelo» tenía dos
+ * lecturas posibles y sólo una cumple la frase — la llave es **(desarrollo, color)**, no el renglón
+ * de pedido: con la llave en el renglón, un resurtido de la misma OC reusaría, pero **una OC nueva
+ * del mismo color estrenaría otro número** y la misma prenda acabaría con dos números de catálogo.
+ * El porqué completo está en la migración `20260901120000_un_modelo_por_color`.
+ *
+ * ---
+ * ## 🔴 ESTA FUNCIÓN ES LA IDEMPOTENCIA, Y ANTES DE V1-E3 NO EXISTÍA
+ *
+ * Hasta hoy el freno del doble clic en «Generar OP» era **un efecto de borde**, no una regla: la
+ * primera salida dejaba el modelo en `produccion`, así que la segunda ya no entraba a promover. Con
+ * el linaje 1:N el desarrollo **se queda en `desarrollo` para siempre** ⇒ sin esta puerta, *cada*
+ * llamada derivaría un hijo más y **dos clics harían nacer dos modelos**, quemando dos números de
+ * una serie que sólo tiene **999 por par** (concepto+género). Por eso el reuso no es una
+ * optimización: es la regla.
+ *
+ * ## Cómo se hace atómica
+ *
+ * `pg_advisory_xact_lock(NAMESPACE, idModeloDesarrollo)` **antes de mirar**: dentro del lock,
+ * "¿ya existe?" y "créalo" son un solo hecho. La llave única `modelos_linaje_color_unico` es la RED
+ * (una escritura por otra puerta), no el mecanismo — y para los hijos MULTICOLOR (`idColor = null`)
+ * el lock es la única red, porque un índice único no ata dos NULL.
+ *
+ * ⚠️ Corre **dentro de la transacción del llamador** (A2), como {@link derivarModeloDeProduccion}:
+ * el lock sólo vale mientras esa transacción viva.
+ *
+ * ## Las dos guardas del camino de REUSO (las del camino de NACER las pone `derivarModeloDeProduccion`)
+ *
+ *  1. **El hijo está ACTIVO.** Reusar un modelo descontinuado lo devolvería a producción como
+ *     efecto lateral de generar una OP — exactamente lo que §Post-F9.119 prohíbe.
+ *  2. **El padre sigue ACTIVO.** Es la MISMA guarda 3 de derivar, aplicada al otro camino: si
+ *     bloquea estrenar un color nuevo de un desarrollo descontinuado, no puede dejar pasar el
+ *     resurtido de otro — y la receta que se va a producir es la del padre.
+ *
+ * ## Y el número capturado, cuando se reusa
+ *
+ * **No se aplica: se AVISA.** El número es del modelo, y el modelo ya tiene el suyo; pisárselo
+ * renombraría un modelo que quizá ya tiene órdenes, inventario y kardex colgando. Ignorarlo en
+ * silencio sería mentirle a quien lo tecleó, así que sale por `avisos` — que nunca bloquean.
+ */
+export async function obtenerODerivarModeloDeProduccion(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idModeloDesarrollo: number,
+  datos: DatosDerivarModelo = {},
+): Promise<ResultadoModeloDeLaOp> {
+  const idColor = datos.idColor ?? null;
+
+  // El lock ANTES de mirar (ver el encabezado). Va SIEMPRE antes que el de la serie, nunca al revés.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_MODELO_POR_COLOR}::int, ${idModeloDesarrollo}::int)`;
+
+  const existente = await tx.modelo.findFirst({
+    where: { idModeloDesarrollo, idColor },
+    // Determinista: si por una escritura de otra puerta hubiera dos multicolor, siempre gana el
+    // primero que nació. Sin `orderBy`, la misma pregunta podría contestar cosas distintas.
+    orderBy: { id: 'asc' },
+    select: { id: true, codigo: true, numeroProduccion: true, activo: true },
+  });
+
+  if (existente !== null) {
+    if (!existente.activo) {
+      throw new ErrorConflicto(
+        `El modelo de producción "${existente.codigo}" de ese color está descontinuado; ` +
+          `reactívalo desde su ficha si vas a producirlo otra vez. No se le puede dar la vuelta ` +
+          `haciendo nacer otro: el número es del modelo, y ese color ya tiene el suyo.`,
+      );
+    }
+    await exigirDesarrolloActivo(tx, idModeloDesarrollo);
+    const avisos: string[] = [];
+    if (
+      datos.numeroCapturado !== undefined &&
+      datos.numeroCapturado !== existente.numeroProduccion
+    ) {
+      avisos.push(
+        `Ese color ya tenía el modelo de producción ${existente.codigo}, así que la orden se hizo ` +
+          `con él y el número ${String(datos.numeroCapturado)} que capturaste NO se usó: el número ` +
+          `es del modelo, no de la orden.`,
+      );
+    }
+    return {
+      idModelo: existente.id,
+      idModeloDesarrollo,
+      numeroProduccion: existente.numeroProduccion,
+      codigo: existente.codigo,
+      // Reusar no captura nada: el número que manda es el que el modelo ya traía.
+      numeroCapturado: false,
+      avisos,
+      reusado: true,
+    };
+  }
+
+  const nacido = await derivarModeloDeProduccion(tx, sesion, idModeloDesarrollo, datos);
+  return { ...nacido, reusado: false };
+}
+
+/**
+ * Exige que el modelo de DESARROLLO siga ACTIVO. Es la guarda 3 de {@link
+ * derivarModeloDeProduccion} extraída para que el camino de REUSO aplique **exactamente la misma
+ * regla con exactamente el mismo texto**: dos frases distintas para la misma prohibición es como se
+ * empiezan a separar dos caminos que deben decidir igual.
+ */
+async function exigirDesarrolloActivo(tx: Tx, idModeloDesarrollo: number): Promise<void> {
+  const padre = await tx.modelo.findUnique({
+    where: { id: idModeloDesarrollo },
+    select: { codigo: true, activo: true },
+  });
+  if (padre === null) {
+    throw new ErrorNoEncontrado('Modelo', idModeloDesarrollo);
+  }
+  if (!padre.activo) {
+    throw new ErrorConflicto(mensajeDesarrolloDescontinuado(padre.codigo));
+  }
+}
+
+/** El texto ÚNICO del desarrollo descontinuado (lo comparten derivar y reusar). */
+function mensajeDesarrolloDescontinuado(codigo: string): string {
+  return (
+    `El modelo "${codigo}" está descontinuado; reactívalo primero si vas a producirlo. Se ` +
+    `hace desde la ficha del modelo, marcándolo como activo.`
+  );
 }
 
 /**

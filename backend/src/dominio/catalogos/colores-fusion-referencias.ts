@@ -103,6 +103,18 @@ export const REFERENCIAS_QUE_BLOQUEAN_FUSION: ReferenciaBloqueante[] = [
     contar: (tx, id) => tx.inventarioCiclicoDet.count({ where: { idColor: id } }),
   },
   {
+    // ⭐⭐ V1-E3 (§Post-F9.172(b)) — LOS MODELOS QUE NACIERON DE ESTE COLOR. Es la referencia con el
+    // daño más SILENCIOSO de toda la lista: `Modelo.idColor` es la mitad de la llave
+    // `modelos_linaje_color_unico`, la que contesta *«¿este color ya tiene modelo?»*. Absorbido el
+    // color por debajo, la siguiente OC de ese color **ya no reconocería el modelo que existe** y
+    // estrenaría OTRO número de 5 dígitos para la MISMA prenda — que es exactamente lo que la
+    // decisión de Daniel (*«se reúsa cuando sea el mismo modelo»*) vino a impedir. Y no lo ataja la
+    // FK: la fusión no BORRA el origen, lo DESACTIVA.
+    relacion: 'modelosPorColor',
+    etiqueta: 'modelos de producción nacidos de este color',
+    contar: (tx, id) => tx.modelo.count({ where: { idColor: id } }),
+  },
+  {
     relacion: 'telaProveedorColores',
     etiqueta: 'precios por color de proveedores de tela',
     contar: (tx, id) => tx.telaProveedorColor.count({ where: { idColor: id } }),

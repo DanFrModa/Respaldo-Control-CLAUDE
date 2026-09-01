@@ -1218,6 +1218,125 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9j · ⭐⭐ UN MODELO DE PRODUCCIÓN POR COLOR (1-sep-2026, versión **0.078**) — ✅ HECHA
+
+**La etapa más grande del programa** (fila **0.071/E3**) y el cierre del arco que empezó la 0.069: el
+linaje, luego la receta compartida en sus dos piezas, y ahora **la identidad del hijo**.
+
+**El bug de Daniel, literal:** sus cuatro OC de cuatro colores del mismo modelo salían con **UN solo
+número** de cinco dígitos. Hoy salen **cuatro modelos, cuatro números y UNA receta**.
+
+### 🔑 Dónde va la llave — la decisión que lo decide todo
+
+Daniel (§Post-F9.172(b)): ***«se reúsa cuando sea el mismo modelo»***. Esa frase sola descarta una de las
+dos formas de construirlo, y la diferencia **no se ve hasta meses después**:
+
+| | Reusa el resurtido de la misma OC | Reusa una **OC nueva** del mismo color |
+|---|---|---|
+| **(A)** llave = **renglón de pedido** | ✅ | ❌ **estrena otro número** ⇒ la misma prenda con DOS números de catálogo |
+| **(B)** llave = **desarrollo + color** | ✅ | ✅ **un número por prenda real** |
+
+⇒ **(B)**. El número de 5 dígitos es **del MODELO, no de la OP**.
+
+⚠️ Y el corolario que evita el malentendido: **el color es IDENTIDAD, no operación.** Nadie lee
+`modelos.idColor` para decidir qué cortar — lo que se produce lo sigue mandando la OP (`OrdenLinea`,
+decisión de Daniel *«el color va en la OP»*). La columna sólo dice **de qué color es este modelo del
+catálogo**.
+
+### Qué se construyó
+
+**Dominio** — `obtenerODerivarModeloDeProduccion` (`dominio/modelos/nomenclatura.ts`), el embudo único:
+
+- **El lock ANTES de mirar**, nunca después (`pg_advisory_xact_lock`, namespace `20_548`, sobre el
+  **desarrollo**) y **siempre antes** que el de la serie de números — dos locks en orden fijo no se
+  abrazan. Sin él, dos OP del mismo color en el mismo segundo derivan dos modelos.
+- **Reuso determinista** (`orderBy: id asc`): si por otra puerta hubiera dos multicolor, siempre gana el
+  primero que nació. Sin `orderBy`, la misma pregunta contestaría cosas distintas.
+- **El hijo descontinuado no se esquiva:** pedir producción de un color cuyo modelo está descontinuado
+  **falla y manda a reactivarlo**, en vez de hacer nacer otro. Si se pudiera rodear, la prenda acabaría
+  con dos números — justo lo que la etapa vino a impedir.
+- **El desarrollo descontinuado comparte el TEXTO EXACTO** con el camino de derivar
+  (`mensajeDesarrolloDescontinuado`): dos frases distintas para la misma prohibición es como empiezan a
+  separarse dos caminos que deben decidir igual.
+- **Si capturaste un número y el color ya tenía modelo, el número NO se usa** — y sale dicho con esas
+  palabras, no en silencio.
+
+**Migración `20260901120000_un_modelo_por_color`** — 100 % aditiva y **SIN backfill** (REGLA 0-B): columna
+`id_color` anulable + FK **RESTRICT** + índice **único `(id_modelo_desarrollo, id_color)`** + CHECK de que
+el color sólo existe con linaje.
+
+⭐ **La llave única es, de paso, la idempotencia que nunca existió.** Hasta hoy el freno del doble clic era
+un **efecto de borde**: la primera salida dejaba el modelo en `produccion`, así que la segunda ya no
+promovía. **Con el linaje el desarrollo se queda en desarrollo para siempre** ⇒ sin esta llave, cada clic
+derivaría un hijo más, **quemando números de una serie que sólo tiene 999 por par** (concepto+género).
+
+⚠️ **De `NULLS DISTINCT` dependen dos cosas a la vez:** los ~4,987 migrados llevan las dos columnas en
+`NULL` y conviven sin chocar —sin esa semántica la migración **no podría ni aplicarse** sobre los datos de
+hoy—; y por lo mismo la llave **no ata a los multicolor** (`idColor IS NULL`, la matriz del importador por
+Excel), a los que serializa el advisory lock. La llave es la red, no el único guardia.
+
+**La fusión de colores no puede absorber un color que ya bautizó modelos.** La FK no lo ataja —
+`fusionarColores` **desactiva** el origen sin borrarlo, D3 — así que la relación entra en
+`REFERENCIAS_QUE_BLOQUEAN_FUSION`, cuyo guardián **lee el esquema** y se pone rojo si alguien agrega una FK
+a `colores` y se olvida de la lista.
+
+**Frontend** — el toast de generar OP distingue las **tres** salidas (*nace* / *se reusó, ese color ya lo
+tenía* / *heredado*), porque de la segunda depende que nadie se extrañe de no ver número nuevo; y el
+renglón del pedido del mes pasó a **«Nº de producción (por color)»**, agregado en el servidor
+(`numerosProduccion`), con caída al número del renglón sólo para el caso legado.
+
+### 🔴 EL RESIDUO: se declara, no se silencia
+
+`promoverAProduccionNucleo` rechaza **UN solo caso** — un desarrollo **con hijos**. **Queda abierto
+cualquier desarrollo SIN HIJOS TODAVÍA, tenga o no ficha de Desarrollo**: promoverlo a mano le pone un
+número a todos los colores, **sin vuelta atrás**.
+
+**Se probó una segunda guarda por la ficha y se retiró**, y la razón importa: rompía un camino existente y
+probado (`crearDesarrolloConModeloNuevo` → promover), o sea que **no era una valla contra un descuido sino
+retirar una capacidad** — y eso lo decide Daniel, no el código.
+
+⇒ El residuo queda **fijado por la prueba `RESIDUO MEDIDO`** y **avisado en ámbar antes del clic**.
+
+### 🔴 Lo que el reviewer independiente encontró — y las dos correcciones fueron de HONESTIDAD, no de lógica
+
+**C1 — un docstring que sobrevivió al retiro de su guarda.** Seguía prometiendo *«las dos guardas»* y
+afirmaba que el caso **con ficha** estaba protegido… **que es exactamente el caso que reproduce el bug de
+Daniel**. Es el defecto de la ronda 1 de la 0.071 otra vez —prosa que dice lo contrario del código— pero
+esta vez **pegada a código correcto**, y contradiciendo el docstring de `nomenclatura.ts`, que sí decía la
+verdad. Corregido **y clavado con prueba**: `RESIDUO MEDIDO` ahora crea el modelo **CON ficha de Desarrollo
+a propósito** — *«una afirmación sin prueba es la que se pudre»*.
+
+**C2 — la única mitigación de cara al usuario no tenía NINGUNA prueba.** El aviso ámbar hasta traía un
+`data-testid` que **nadie usaba**. Ahora exige por separado las tres cosas que tiene que decir (*un número
+a todo el modelo* · el camino bueno es **la OP** · *no hay vuelta atrás*) **y que el botón siga
+habilitado** — es advertencia, no valla.
+
+⭐ **La lección:** el residuo estaba **correctamente construido y correctamente decidido**; lo que estaba
+podrido era **lo que se decía de él**. Un residuo declarado sólo vale lo que valga su declaración, y una
+declaración sin prueba caduca sola.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+**37 mutaciones, las 37 muertas.** Las cuatro de la última ronda: borrar el aviso · suavizarlo a *«revisa
+el número»* · perder el *«no hay vuelta atrás»* · y **reponer la guarda B** ⇒ pone roja la prueba del
+residuo, con lo que reponerla es **un acto visible y deliberado, no un silencio**.
+
+**Gates:** backend `test:unit` **2,517** · integración **2,715** · frontend **1,919** · `typecheck` ×2
+(`tsc -b` del lado del front) · `lint` ×2 · `format:check` ×2 · **contrato regenerado, cero drift**
+(re-verificado **después** de traer `prueba`, que es donde se esconde el roto silencioso). **CI es el
+juez.**
+
+**SIN permisos y SIN seed** ⇒ este deploy **NO requiere `SEED_ON_START`**.
+
+### ⏳ Lo que queda abierto para Daniel (numerado, no suelto)
+
+1. **¿Se retira el botón «Pasar a producción»?** Desde V1-E8j todo modelo nace en desarrollo y desde esta
+   etapa el número se lo da su OP ⇒ ya no habría razón de asignarlo a mano. Mientras no se conteste queda
+   **con su única guarda, la prueba del residuo y el aviso** (§Post-F9.175).
+2. **La receta se comparte pero la ficha se copia — y puede divergir** (fila **0.087**, §Post-F9.174).
+
+---
+
 ## V1-E9i · ⭐ SI YA SE COMPRÓ, AVISA — Y EL AVISO LLEGA AL COMPRADOR (1-sep-2026, versión **0.077**) — ✅ HECHA
 
 **La petición de Daniel (§Post-F9.173(a)), textual:**

@@ -175,28 +175,32 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await expect(panelOp.getByTestId('generar-op-capturado')).toContainText('cuadra');
     await page.getByTestId('confirmar-generar-op').click();
 
-    // ⭐ Toast del flujo COMPLETO. Es UNA sola frase, la que arma `PanelGenerarOP.tsx` (~L187), y
-    // aquí salen sus cuatro trozos porque el modelo era de desarrollo Y el renglón trae ficha:
-    // «OP <folio> creada · modelo de producción <nº> (antes <código de desarrollo>, que se
-    // conserva) · ligado a su desarrollo · Ruta Crítica programándose sola». Se exige ENTERA, con
-    // el número y el código concretos de ESTA corrida: si la promoción se cayera, el toast diría
-    // sólo "OP N creada · Ruta Crítica programándose sola" —que es exactamente lo que pasaba
-    // cuando el modelo nacía en `/modelos`— y esta línea se pondría roja.
+    // ⭐⭐ Toast del flujo COMPLETO. Es UNA sola frase, la que arma `PanelGenerarOP.tsx`, y aquí
+    // salen sus cuatro trozos porque el modelo era de desarrollo Y el renglón trae ficha:
+    // «OP <folio> creada · nace el modelo de producción <nº> del desarrollo <código>, que se
+    // conserva · ligado a su desarrollo · Ruta Crítica programándose sola». Se exige ENTERA, con
+    // el número y el código concretos de ESTA corrida: si el modelo de producción no naciera, el
+    // toast diría sólo "OP N creada · Ruta Crítica programándose sola" y esta línea se pondría roja.
+    //
+    // ⚠️ V1-E3 (§Post-F9.172(b)): antes decía «(antes <código>, que se conserva)» porque la salida
+    // TRANSFORMABA el modelo de desarrollo. Ya no: nace uno NUEVO por color y el desarrollo se
+    // queda como está — por eso la frase cambió de "antes" a "del desarrollo".
     await expect(
       page.getByText(
         new RegExp(
-          `OP \\d+ creada · modelo de producción ${numeroProduccion} ` +
-            `\\(antes ${codigoDesarrollo}, que se conserva\\) · ligado a su desarrollo · ` +
+          `OP \\d+ creada · nace el modelo de producción ${numeroProduccion} ` +
+            `del desarrollo ${codigoDesarrollo}, que se conserva · ligado a su desarrollo · ` +
             `Ruta Crítica programándose sola`,
           'u',
         ),
       ),
     ).toBeVisible();
 
-    // Y la promoción no se quedó en el toast: el renglón del pedido ya enseña el modelo con su
-    // código NUEVO (el de producción) y su marca `prod. #<nº>`.
+    // Y el modelo nuevo no se quedó en el toast: el renglón del pedido —que SIGUE enseñando su
+    // código de DESARROLLO, porque el desarrollo ya no se transforma— ya trae la marca
+    // `prod. #<nº>` del modelo de producción que nació de él (V1-E3).
     await expect(
-      grupo.getByTestId('pedidos-renglon').filter({ hasText: numeroProduccion }),
+      grupo.getByTestId('pedidos-renglon').filter({ hasText: codigoDesarrollo }),
     ).toContainText(`prod. #${numeroProduccion}`);
 
     // El renglón ya trae su No. orden (liga al centro de Órdenes).
@@ -273,9 +277,27 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await page.getByTestId('buscar-pedido').fill(cliente);
     await page.getByTestId('fila-pedido').filter({ hasText: cliente }).first().click();
     const detallePedido = page.getByTestId('detalle-pedido');
-    // Mismo motivo que arriba: el renglón enseña el código vigente del modelo, el de producción.
+    // ⭐⭐ V1-E3 (§Post-F9.172(b)) — el renglón enseña el código de DESARROLLO, y es correcto.
+    //
+    // 🔴 Aquí decía *"el código vigente del modelo, el de producción"* y esperaba el nº de 5
+    // dígitos. Eso era verdad mientras generar la OP **transformaba** el modelo de desarrollo; desde
+    // V1-E3 el desarrollo **se queda como está** —por eso de él pueden nacer cuatro modelos, uno por
+    // color— y el renglón del pedido sigue apuntando a él. `PedidosPagina.tsx` pinta
+    // `l.codigoModelo`, que es el del renglón.
+    //
+    // ⚠️ Es la GEMELA de la aserción de la vista por MES (arriba), que además enseña `prod. #<nº>`.
+    // Y la diferencia NO es que a esta forma le falte el campo: `esquemaPedidoLineaSalida` **sí
+    // tiene `numeroProduccion`** (comprobado compilando contra `PedidoLinea`). Lo que pasa es que
+    // ese campo es el número del modelo **DEL RENGLÓN**, y tras V1-E3 el renglón apunta al
+    // DESARROLLO —que ya no se promueve nunca— ⇒ **vale `null` para siempre**. Enseñarlo no
+    // devolvería el número: enseñaría un hueco.
+    //
+    // Los números que Daniel quiere ver son los de los modelos HIJOS, uno por color, y ésos piden
+    // la misma agregación en servidor que la vista del mes (`numerosProduccion`): contrato +
+    // dominio + frontend ⇒ **etapa aparte (0.089)**, no un parche a esta prueba. Mientras tanto lo
+    // que el detalle enseña —el nº de desarrollo— es dato cierto y buscable (D3).
     await expect(
-      detallePedido.getByTestId('renglon-pedido').filter({ hasText: numeroProduccion }),
+      detallePedido.getByTestId('renglon-pedido').filter({ hasText: codigoDesarrollo }),
     ).toBeVisible();
     await detallePedido.getByTestId('nuevo-pedido-real').click();
     const dialogoReal = page.getByRole('dialog');

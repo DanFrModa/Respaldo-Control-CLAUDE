@@ -59,6 +59,9 @@ export function marcaProduccionMigrada(codigo: string): MarcaNomenclaturaModelo 
     // lo que `null` significa. Sin backfill, y por decisión (REGLA 0-B): inventarles un padre sería
     // mentir sobre 4,987 modelos.
     idModeloDesarrollo: null,
+    // V1-E3: y sin linaje, tampoco color (CHECK `modelos_color_solo_con_linaje_check`). El Access
+    // no tenía el concepto «un modelo por color»; su histórico llega sin él **a propósito**.
+    idColor: null,
   };
 }
 

@@ -18,7 +18,9 @@ import type { DatosPedidoFormulario } from './esquemas';
  *
  * ⚠️ `origen: 'todos'` (V1-E3n): sin esto un modelo de DESARROLLO no se podría poner en un pedido, y
  * con ello quedaría INALCANZABLE por captura manual el camino que la etapa construye — que generar la
- * OP de ese renglón es lo que pasa el modelo a producción.
+ * OP de ese renglón es lo que lo hace entrar a producción. ⭐ V1-E3 (§Post-F9.172(b)) precisa CÓMO:
+ * el renglón se queda con su modelo de desarrollo (no se transforma) y la OP hace **nacer** un
+ * modelo de producción por COLOR, con su nº de 5 dígitos y compartiendo la receta del desarrollo.
  */
 const QUERY_MODELOS = {
   pagina: 1,

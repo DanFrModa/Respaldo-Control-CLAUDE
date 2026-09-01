@@ -266,11 +266,24 @@ interface OrigenPedidoLinea {
  *  • que el pedido NO esté cancelado (`pedCancelado`) ni marcado `noProducir`,
  *  • que el modelo del renglón siga ACTIVO (no producir un modelo descontinuado).
  * Devuelve el modelo/cliente/empresa para sellarlos en la orden.
+ *
+ * ⭐⭐ V1-E3 — `idModeloDeLaOrden` (opcional): el modelo que de verdad va a llevar la orden cuando
+ * NO es el del renglón. Pasa en un solo caso, y es el que da nombre a la etapa: el renglón apunta a
+ * un modelo de DESARROLLO y la salida a producción hace nacer (o reusa) el **modelo de producción de
+ * ese color**, que es quien tiene que quedar en la OP. El renglón NO se toca: sigue apuntando a su
+ * desarrollo, que es de donde salen la receta y el precio.
+ *
+ * ⚠️ Cuando viene, se comprueban **los DOS** modelos: el del renglón (el padre, dueño de la receta)
+ * y el de la orden (el hijo). Que el padre esté vivo no dice nada del hijo, ni al revés — y producir
+ * cualquiera de los dos descontinuado es lo que la guarda existe para impedir. La COMPOSICIÓN se
+ * hereda del modelo que queda en la ORDEN, no del renglón: es la ficha de la prenda que se va a
+ * producir.
  */
 async function resolverOrigenPedido(
   tx: Tx,
   idPedidoLinea: number,
   idEmpresa: number,
+  idModeloDeLaOrden?: number,
 ): Promise<OrigenPedidoLinea> {
   const linea = await tx.pedidoLinea.findUnique({
     where: { id: idPedidoLinea },
@@ -311,13 +324,45 @@ async function resolverOrigenPedido(
       `El modelo "${linea.modelo.codigo}" está descontinuado; no se puede producir.`,
     );
   }
+
+  // V1-E3: la orden puede llevar OTRO modelo que el del renglón (el hijo de producción del color).
+  // `modeloDeLaOrden` es el que se sella en la OP y del que se hereda la composición.
+  const modeloDeLaOrden =
+    idModeloDeLaOrden === undefined || idModeloDeLaOrden === linea.idModelo
+      ? { id: linea.idModelo, ...linea.modelo }
+      : await exigirModeloProducible(tx, idModeloDeLaOrden);
+
   return {
-    idModelo: linea.idModelo,
+    idModelo: modeloDeLaOrden.id,
     idCliente: linea.pedido.idCliente,
     idEmpresa: linea.pedido.idEmpresa,
     ocCliente: linea.pedido.ocCliente,
-    composicionModelo: linea.modelo.composicion,
+    composicionModelo: modeloDeLaOrden.composicion,
   };
+}
+
+/**
+ * Exige que un modelo exista y NO esté descontinuado, con el MISMO texto que la comprobación del
+ * modelo del renglón (V1-E3): las dos prohíben lo mismo —producir un modelo dado de baja— y dos
+ * frases distintas para la misma regla es como se separan dos caminos que deben decidir igual.
+ */
+async function exigirModeloProducible(
+  tx: Tx,
+  idModelo: number,
+): Promise<{ id: number; activo: boolean; codigo: string; composicion: string | null }> {
+  const modelo = await tx.modelo.findUnique({
+    where: { id: idModelo },
+    select: { id: true, activo: true, codigo: true, composicion: true },
+  });
+  if (modelo === null) {
+    throw new ErrorNoEncontrado('Modelo', idModelo);
+  }
+  if (!modelo.activo) {
+    throw new ErrorConflicto(
+      `El modelo "${modelo.codigo}" está descontinuado; no se puede producir.`,
+    );
+  }
+  return modelo;
 }
 
 /** Exige que el maquilero (Proveedor) exista (en F2 NO se valida su rol de maquila, solo asignación). */
@@ -686,6 +731,24 @@ function resolverComposicion(args: {
 // ── Operaciones ───────────────────────────────────────────────────────────────────
 
 /**
+ * ⭐⭐ V1-E3 — Opciones del alta que **NO viajan por el contrato REST** y por eso no viven en
+ * `esquemaOrdenCrear`: son composición dominio→dominio.
+ *
+ * 🔴 **Y que no viajen es la mitad del diseño.** El modelo de una orden es AUTORRELLENO (sale del
+ * renglón del pedido, F2-E2): si esto fuera un campo del cuerpo, cualquier cliente del API podría
+ * crear una orden de un modelo que no tiene nada que ver con su pedido, y el autorrelleno dejaría de
+ * ser una garantía para volverse una sugerencia. Como parámetro de función, la única puerta que lo
+ * puede usar es la que ya decidió el modelo con la regla del negocio.
+ */
+export interface OpcionesAltaOrden {
+  /**
+   * El modelo de PRODUCCIÓN que se sella en la orden cuando NO es el del renglón — el hijo por color
+   * que hace nacer `salidaAProduccion` (V1-E3). Ausente = el de siempre, el del renglón.
+   */
+  idModeloDeLaOrden?: number | undefined;
+}
+
+/**
  * Crea una orden de producción desde un renglón de pedido (`idPedidoLinea`) en UNA transacción
  * (A2). AUTORRELLENO de modelo/cliente/empresa del renglón→pedido; el folio sale de la secuencia
  * atómica `"orden"` de la empresa del pedido (A3/A9). EXIGE el renglón de pedido y rechaza pedidos
@@ -703,17 +766,27 @@ function resolverComposicion(args: {
  * COMPOSICIÓN (Daniel 24-jul-2026): si el alta no la captura, la orden HEREDA
  * `Modelo.composicion` con `compForzada = false`; si la captura, queda como override
  * (`compForzada = true`). Ver `resolverComposicion`.
+ *
+ * ⭐⭐ V1-E3 — `opciones.idModeloDeLaOrden` ({@link OpcionesAltaOrden}) sella la orden con OTRO
+ * modelo que el del renglón: el hijo de producción por color que hace nacer `salidaAProduccion`.
+ * NO viaja por el contrato REST a propósito (ver el tipo). Sin él, todo sigue exactamente igual.
  */
 export async function crearOrden(
   sesion: SesionUsuario,
   entrada: EntradaCrearOrden,
   bd?: ContextoBd,
+  opciones: OpcionesAltaOrden = {},
 ): Promise<OrdenSalida> {
   verificarPermiso(sesion, 'ordenes.administrar');
   const datos = validarEntrada(esquemaOrdenCrear, entrada);
 
   const idOrden = await enTransaccion(async (tx) => {
-    const origen = await resolverOrigenPedido(tx, datos.idPedidoLinea, sesion.idEmpresaActiva);
+    const origen = await resolverOrigenPedido(
+      tx,
+      datos.idPedidoLinea,
+      sesion.idEmpresaActiva,
+      opciones.idModeloDeLaOrden,
+    );
 
     if (datos.idMaquilero != null) {
       await exigirProveedorExiste(tx, datos.idMaquilero);

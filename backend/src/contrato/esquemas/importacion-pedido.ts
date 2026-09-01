@@ -308,7 +308,9 @@ export const esquemaGrupoImportacion = z
       .number()
       .int()
       .nullable()
-      .describe('Nº interno de producción del modelo (si ya salió), o null.'),
+      .describe(
+        'Nº interno de producción del modelo del DESARROLLO, o null. ⚠️ V1-E3 (§Post-F9.172(b)): es null SIEMPRE para un modelo de desarrollo, no «aún no salió» — el desarrollo ya NO se transforma al generar la OP; los números son de los modelos que nacen POR COLOR. Sólo trae número el caso legado (el desarrollo se amarró a un modelo que ya era de producción).',
+      ),
     totalPiezas: z.number().int().describe('Suma de cantidades del grupo.'),
     numRenglones: z.number().int().describe('Renglones del archivo en este grupo.'),
     precio: z
@@ -430,7 +432,7 @@ export const esquemaOrdenImportada = z
       .int()
       .nullable()
       .describe(
-        'Nº de producción del modelo (asignado si venía de desarrollo, heredado si ya estaba en producción), o null si su código histórico no es numérico de 5 dígitos.',
+        'Nº de producción del modelo CON EL QUE QUEDÓ LA OP, o null si su código histórico no es numérico de 5 dígitos. ⚠️ V1-E3 (§Post-F9.172(b)): cuando el renglón es de un modelo de DESARROLLO, este número es del modelo de producción que NACIÓ para ese color —el desarrollo se queda como está, no se transforma—; en el caso legado es el que el modelo del renglón ya tenía.',
       ),
     codigoModelo: z.string().describe('Nº de desarrollo del modelo.'),
     modeloCliente: z.string().describe('Nº/estilo del modelo del cliente (del archivo).'),
