@@ -11728,3 +11728,46 @@ como **0.086**.
   **Fecha:** 2026-09-01.
 
 ---
+
+#### (Post-F9.174) — ⏳ PENDIENTE DE DANIEL: la receta se COMPARTE, pero la FICHA se COPIA — y diverge (medido el 1-sep-2026)
+
+### El hallazgo, medido por el reviewer de E3 (no deducido)
+
+```
+padre editado a           → "95% ALGODON 5% ELASTANO"
+hijo Rojo (nacido ANTES)  → "ALGODON 100%"              ← se quedó viejo
+hijo Azul (nacido DESPUÉS)→ "95% ALGODON 5% ELASTANO"
+la OP del Rojo se lleva   → "ALGODON 100%"              ← al papel del cliente
+```
+
+### Por qué importa, con sus propias palabras
+
+Daniel preguntó en agosto: ***«todos los modelos deben de llevar lo mismo, ¿cómo lo controlas?»***. La
+respuesta que se construyó —**una sola receta**, §Post-F9.170— **cubre el BOM y NO la ficha**.
+
+`CAMPOS_FICHA_HEREDADOS` (`dominio/modelos/modelos.ts`) **copia** al nacer: composición, maquila y corte
+base, curva de tallas, temporada, género, tipo de prenda, nº de operaciones, secuencia de estampado y
+`llevaArte`. Copiar ≠ compartir ⇒ **dos colores de la misma prenda pueden acabar con composición distinta**,
+y **la OP se la lleva al papel**.
+
+⚠️ **Es PREEXISTENTE de V1-E9a**, no lo introduce E3. **Pero E3 lo pone en el camino principal**: hasta hoy
+casi no había hijos; a partir de E3 nacen cuatro por cada modelo que se produce en cuatro colores.
+
+### Las tres salidas, con su precio
+
+| | Qué haría | Precio |
+|---|---|---|
+| **(a)** Dejarlo | cada hijo congela la ficha del día que nació | La divergencia sigue, silenciosa. Es lo de hoy |
+| **(b)** Compartir también la ficha | el hijo lee del padre, como la receta | ⚠️ Un cambio de composición **reescribiría** lo que dicen OP ya impresas |
+| **(c)** Avisar de la divergencia | el hijo la conserva, y el sistema **dice** que difiere del padre | No reescribe nada; el patrón *«avisar no es bloquear»* que este sistema ya usa |
+
+⭐ **DEFAULT PROPUESTO: (c).** Razón: (b) tiene el mismo problema que Daniel rechazó para el texto de la
+División —reescribir un hecho ya impreso—, y (a) es lo que produjo el hallazgo. **(c) es el patrón que él ya
+aprobó dos veces**: §Post-F9.135 p.4 (*«se debe de poder hacer, **pero advirtiendo de la diferencia**»*) y
+§Post-F9.64 (*«avisar no es bloquear»*).
+
+📌 **NO bloquea nada.** E3 entra sin esto; se construye después, en la **0.087**.
+
+- **Aplica en:** **0.087**. **Fecha:** 2026-09-01.
+
+---
