@@ -125,7 +125,18 @@ import { resolverIdRecetaDeModelo } from '../modelos/receta-compartida.js';
 // junto a la otra lista de estatus de OC. La guarda de §Post-F9.79 (no sacar de la receta lo ya
 // comprado) y la de V1-E4c (no cambiarle el color a una tela ya comprada) leen la MISMA: dos copias
 // de "qué es estar comprometido" se desincronizan en la primera corrección.
-import { algunaRecibida, ESTATUS_OC_COMPROMETIDA } from '../compras/comprometido-en-oc.js';
+import { algunaRecibida, claveMaterial } from '../compras/comprometido-en-oc.js';
+// ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — "si ya está comprado, solo avisa". La lectura EN VIVO de qué OC
+// ya comprometieron esta orden, y los textos que la nombran, viven en un módulo propio: los leen la
+// receta (aquí), la bandeja «Recetas por liberar» y la guarda de §Post-F9.79 — que desde esta etapa
+// **no vuelve a consultar por su cuenta**, para que "qué está comprado" tenga UNA sola respuesta.
+import {
+  avisoCambioSobreLoComprado,
+  avisoReabrirConCompraComprometida,
+  comprasComprometidasDeUnaOrden,
+  ocsDeMaterial,
+  type RenglonYaComprado,
+} from '../compras/aviso-ya-comprado.js';
 import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-avios.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
 import { num, redondear2 } from '../costos/decimales.js';
@@ -987,6 +998,7 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     tallasOrden,
     piezas,
     piezasPorTalla,
+    comprometidas,
   ] = await Promise.all([
     tx.ordenTela.findMany({
       where: { idOrden: orden.id },
@@ -1034,6 +1046,19 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     // podía decir que había una contradicción, no cuánto se estaba pidiendo de más (que es lo que
     // hizo comprar 53 veces el cierre). Es la MISMA función que usan las guardas de la edición.
     piezasDeLaOrden(tx, orden.id),
+    /*
+     * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **QUÉ DE ESTA ORDEN YA ESTÁ COMPRADO EN FIRME**, en vivo.
+     *
+     * Va aquí, en la MISMA lectura que arma la receta, y no en una llamada aparte: es un dato del
+     * renglón (*"este material ya está comprado"*), y pedirlo por separado obligaría a la pantalla a
+     * cruzar dos respuestas para saber si lo que está tocando ya tiene dinero detrás — justo lo que
+     * A1 prohíbe. Una consulta más por lectura de receta, sin N+1.
+     *
+     * ⚠️ NO es el `ocs` de arriba: aquél CUENTA cualquier OC no cancelada (borrador incluido) para
+     * decidir si el aviso de desalineación va en rojo. Éste sólo cuenta las COMPROMETIDAS, porque
+     * la pregunta es otra: *"¿hay que negociar con un proveedor?"*.
+     */
+    comprasComprometidasDeUnaOrden(orden.idEmpresa, orden.id, { tx }),
   ]);
 
   // El nombre del proveedor amarrado del AVÍO se resuelve contra el `idAvioProveedor` de LA ORDEN
@@ -1091,6 +1116,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       consumoModelo: delModelo?.consumoPorPrenda ?? null,
       precioModelo: delModelo?.precioCosteo ?? null,
       precioModeloDeCompra: delModelo?.origenPrecio === 'ultimo-precio-compra',
+      // ⭐⭐⭐ 0.085: las OC ya comprometidas que compraron ESTA tela para esta orden.
+      ocsComprometidas: ocsDeMaterial(comprometidas, { idTela: f.idTela, idAvio: null }),
     };
   });
 
@@ -1133,9 +1160,17 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       consumoModelo: delModelo?.consumoPorPrenda ?? null,
       precioModelo: delModelo?.precioCosteo ?? null,
       precioModeloDeCompra: delModelo?.origenPrecio === 'ultimo-precio-compra',
+      // ⭐⭐⭐ 0.085: las OC ya comprometidas que compraron ESTE avío para esta orden.
+      ocsComprometidas: ocsDeMaterial(comprometidas, { idTela: null, idAvio: f.idAvio }),
     };
   });
 
+  /*
+   * ⚠️ EL ARTE **NO** LLEVA `ocsComprometidas`, y no es un olvido: una línea de OC sólo puede
+   * apuntar a una tela o a un avío del catálogo (o ser texto libre). No existe forma de ligar una
+   * orden de compra a un ARTE concreto de la receta — la misma razón por la que la guarda de
+   * §Post-F9.79 tampoco lo comprueba. Inventarle el campo sería prometer un dato que nunca sale.
+   */
   const artes: RecetaOrdenArte[] = filasArte.map((f) => {
     const delModelo = f.idModeloArte === null ? undefined : artePorTraza.get(f.idModeloArte);
     return {
@@ -1279,6 +1314,14 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     // ⭐ V1-E3r: el aviso YA REDACTADO por el servidor (A1), o null si no hay nada que avisar. La
     // pantalla lo pinta tal cual — ni arma la frase, ni resuelve el plural, ni ordena las tallas.
     avisoCurva: aviso === null ? null : aviso.texto,
+    // ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — lo comprometido de TODA la orden, y su aviso ya redactado
+    // (A1). El aviso se pinta ANTES de reabrir; la lista, en la fila y en la bandeja.
+    ocsComprometidas: comprometidas.ocs,
+    avisoCompraComprometida: avisoReabrirConCompraComprometida(comprometidas.ocs),
+    // ⚠️ En una LECTURA siempre `null`: el eco de "acabas de cambiar algo comprado" sólo lo puede
+    // escribir la mutación que lo hizo (`enRecetaEditable`), porque depende de QUÉ se tocó, no del
+    // estado de la receta. Recargar la pantalla no puede resucitar un aviso de algo ya pasado.
+    avisoCambioSobreLoComprado: null,
     resumen,
     telas,
     avios,
@@ -1687,8 +1730,88 @@ async function enRecetaEditable<T>(
       permitirDesCompletar: false,
     });
     const recargada = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
-    return armarReceta(tx, recargada);
+    const receta = await armarReceta(tx, recargada);
+
+    /*
+     * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **SI YA SE COMPRÓ, AVISA.**
+     *
+     * DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede
+     * cancelar la OC interna, o que **el comprador sepa que cambió**, para hacer lo que tenga que
+     * hacer. **No se puede cancelar la OC en automático… eso hay que negociarlo con el
+     * proveedor.**"*
+     *
+     * 🔴 **ÉSTE es el caso que se caía por el hueco, y no pasa por «reabrir».** `exigirNoSacarLoComprado`
+     * (§Post-F9.79) ya frena las siete bocas por las que un material SALE de la receta, pero
+     * cambiarle a un material ya comprado el **consumo por prenda, el precio o el amarre** no lo
+     * frena nada — ni debe: eso es legítimo—. Lo que pasaba era que ocurría **en silencio**: se le
+     * caía la firma (justo arriba) y ahí terminaba todo. La OC decía una cosa, la receta otra, y el
+     * único que puede negociarlo con el proveedor no se enteraba.
+     *
+     * **AVISA; NO BLOQUEA** (mismo espíritu que `compras/desvio-de-compra.ts`). Y va exactamente
+     * sobre `tocados`, la MISMA lista con la que se revoca la firma: lo que cambió de contenido y
+     * sigue vivo. Lo que se AGREGA o se TRAE del modelo no toca nada comprado (nace nuevo), y lo que
+     * se SACA ya lo rechazó la guarda de §Post-F9.79 antes de llegar aquí.
+     *
+     * A7/D3: el aviso queda además en la BITÁCORA. El toast se lo lleva el viento; el rastro de que
+     * alguien movió un material ya comprado —y qué OC quedaron descuadradas— tiene que sobrevivir.
+     */
+    if (opciones.cambiaElContenido === true && !sobreLapida && tocados.length > 0) {
+      const yaComprados = renglonesTocadosYaComprados(receta, tocados);
+      const aviso = avisoCambioSobreLoComprado(yaComprados);
+      if (aviso !== null) {
+        await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+          accion: 'cambio-sobre-material-ya-comprado',
+          renglones: yaComprados.map((r) => ({
+            material: r.material,
+            ocs: r.ocs.map((o) => ({ folio: o.folio, estatus: o.estatus })),
+          })),
+          aviso,
+        });
+        return { ...receta, avisoCambioSobreLoComprado: aviso };
+      }
+    }
+    return receta;
   }, bd);
+}
+
+/**
+ * ⭐⭐ De los renglones TOCADOS, cuáles ya estaban COMPRADOS — y con qué nombre se les llama
+ * (0.085, §Post-F9.173(a)). Función **PURA** sobre la receta ya armada: se prueba sin base.
+ *
+ * Lee `ocsComprometidas` de la fila en vez de volver a consultar, y eso es deliberado: la receta que
+ * se acaba de armar YA trae ese dato calculado en vivo dentro de la misma transacción, así que
+ * preguntarlo otra vez sería una segunda consulta que podría contestar distinto.
+ *
+ * ⚠️ El ARTE se ignora: ninguna línea de OC puede apuntar a un arte (ver `armarReceta`). Un renglón
+ * que ya no está en la receta —un `agregadoAMano` borrado— tampoco aparece, y está bien: quitarlo ya
+ * lo habría rechazado la guarda de §Post-F9.79 si estuviera comprado.
+ */
+export function renglonesTocadosYaComprados(
+  receta: Pick<RecetaOrden, 'telas' | 'avios'>,
+  tocados: readonly { tipo: TipoRenglonRecetaClave; idRenglon: number }[],
+): RenglonYaComprado[] {
+  const salida: RenglonYaComprado[] = [];
+  const vistos = new Set<string>();
+  for (const t of tocados) {
+    const llave = `${t.tipo}-${String(t.idRenglon)}`;
+    if (vistos.has(llave)) continue;
+    vistos.add(llave);
+    if (t.tipo === 'tela') {
+      const fila = receta.telas.find((f) => f.id === t.idRenglon);
+      if (fila !== undefined && fila.ocsComprometidas.length > 0) {
+        salida.push({ material: fila.nombre, ocs: fila.ocsComprometidas });
+      }
+    } else if (t.tipo === 'avio') {
+      const fila = receta.avios.find((f) => f.id === t.idRenglon);
+      if (fila !== undefined && fila.ocsComprometidas.length > 0) {
+        salida.push({
+          material: `${fila.clave} — ${fila.descripcion}`,
+          ocs: fila.ocsComprometidas,
+        });
+      }
+    }
+  }
+  return salida;
 }
 
 /**
@@ -1740,7 +1863,7 @@ export async function agregarRenglonReceta(
     sesion,
     idOrden,
     bd,
-    async (tx, orden) => {
+    async (tx, orden, ctx) => {
       const auditoria = { ...datosCreacion(sesion) };
       /**
        * Lo que marca a un renglón NUEVO (nunca a uno revivido: ése vino del modelo).
@@ -1802,6 +1925,20 @@ export async function agregarRenglonReceta(
         };
 
         if (previo !== null) {
+          /*
+           * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **REVIVIR NO ES CREAR: ES CAMBIARLE EL CONTENIDO A UN
+           * RENGLÓN QUE YA EXISTE**, y por eso declara lo que tocó (hallazgo del reviewer).
+           *
+           * 🔴 El caso NO es teórico. `exigirNoSacarLoComprado` impide EXCLUIR un material ya
+           * comprado, pero nada impide que Compras capture a mano una línea de OC contra un
+           * (orden, material) que YA estaba excluido. Revivirlo entonces le reescribe consumo,
+           * precio, banderas y amarre —justo lo que esta etapa vino a avisar— y hasta aquí lo hacía
+           * **en silencio**, porque esta rama nunca llamaba a `tocoRenglon`.
+           *
+           * ⚠️ Sin doble bitácora ni doble revocación: `comunesRevivido` ya pone `liberadoEn` en
+           * `null`, y `revocarFirmaDeRenglones` sólo revoca lo que la base diga que sigue firmado.
+           */
+          ctx.tocoRenglon('tela', previo.id);
           await tx.ordenTela.update({
             where: { id: previo.id },
             data: { ...soloDefinido(delCuerpo), ...comunesRevivido },
@@ -1874,6 +2011,8 @@ export async function agregarRenglonReceta(
           idAvioProveedor: datos.idAvioProveedor,
         };
 
+        // ⭐⭐⭐ 0.085: revivir una LÁPIDA de avío reescribe su contenido (ver la nota de la tela).
+        if (previo !== null) ctx.tocoRenglon('avio', previo.id);
         const id =
           previo !== null
             ? (
@@ -3718,26 +3857,36 @@ async function exigirNoSacarLoComprado(
    */
   comoArreglarlo: string | null = null,
 ): Promise<void> {
-  const lineas = await tx.ordenCompraLinea.findMany({
-    where: {
-      idOrden: orden.id,
-      ...(tipo === 'tela' ? { idTela: idMaterial } : { idAvio: idMaterial }),
-      ordenCompra: {
-        idEmpresa: orden.idEmpresa,
-        estatus: { in: [...ESTATUS_OC_COMPROMETIDA] },
-      },
-    },
-    select: { ordenCompra: { select: { numCompra: true, estatus: true } } },
-    orderBy: { id: 'asc' },
-  });
-  if (lineas.length === 0) return;
+  /*
+   * ⭐⭐⭐ 0.085 — ESTA CONSULTA YA NO ES SUYA: la comparte con el AVISO (§Post-F9.173(a)).
+   *
+   * Hasta la 0.084 esta guarda tenía su propio `findMany` sobre `ordenCompraLinea`, idéntico al que
+   * la 0.085 necesitaba para avisar. Dos consultas con el mismo `where` son dos respuestas a *"¿qué
+   * está comprado?"* que coinciden **hoy**: el día que una cambie —un estatus nuevo, la empresa, el
+   * criterio de la línea— el sistema BLOQUEARÍA por un criterio y AVISARÍA por otro, que es la
+   * clase de contradicción que este módulo lleva dos etapas persiguiendo. Ahora hay una sola.
+   *
+   * ⚠️⚠️ **PERO EL FILTRO POR MATERIAL DEJÓ DE SER SQL: ahora es `claveMaterial` sobre el mapa.** Eso
+   * apoya esta guarda en un INVARIANTE DE DOMINIO —que una línea de OC lleve tela XOR avío— que la
+   * base **no** garantiza con un `CHECK`. Una línea con las dos se archivaría bajo `tela-N` y este
+   * bloqueo se apagaría **en silencio** para el avío. Los dos únicos escritores lo respetan hoy;
+   * la nota completa, con qué hacer si aparece un tercero, vive en `compras/aviso-ya-comprado.ts`.
+   */
+  const comprometidas = await comprasComprometidasDeUnaOrden(orden.idEmpresa, orden.id, { tx });
+  const ocs =
+    comprometidas.porMaterial.get(
+      claveMaterial(
+        tipo === 'tela'
+          ? { idTela: idMaterial, idAvio: null }
+          : { idTela: null, idAvio: idMaterial },
+      ),
+    ) ?? [];
+  if (ocs.length === 0) return;
 
-  const folios = [...new Set(lineas.map((l) => Number(l.ordenCompra.numCompra)))].sort(
-    (a, b) => a - b,
-  );
+  const folios = [...new Set(ocs.map((o) => o.folio))].sort((a, b) => a - b);
   const listaFolios = folios.map((f) => `#${String(f)}`).join(', ');
   const plural = folios.length > 1;
-  const recibida = algunaRecibida(lineas.map((l) => l.ordenCompra.estatus));
+  const recibida = algunaRecibida(ocs.map((o) => o.estatus));
 
   if (recibida) {
     throw new ErrorConflicto(

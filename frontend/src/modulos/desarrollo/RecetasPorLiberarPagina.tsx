@@ -15,6 +15,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/lib/useDebounce';
+// ⭐⭐⭐ 0.085 (§Post-F9.173(a)): el MISMO chip que pinta la receta de la orden, para que «ya está
+// comprado» se lea idéntico en los dos sitios (y con la única traducción de los estatus de OC).
+import { ChipsOcComprometidas } from '@/modulos/ordenes-compra/piezas';
+import { useSesion } from '@/sesion/useSesion';
 
 /**
  * BANDEJA «RECETAS POR LIBERAR» — V1-E3h (§Post-F9.72). DANIEL, 19-ago-2026: *"está buenísima"*.
@@ -52,6 +56,16 @@ import { useDebounce } from '@/lib/useDebounce';
  */
 export function RecetasPorLiberarPagina(): React.JSX.Element {
   const navigate = useNavigate();
+  /*
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — LA PUERTA QUE SÍ SE LE PUEDE PINTAR AL COMPRADOR.
+   *
+   * Los chips de «ya está comprado» llevan a las compras de esta orden **sólo** con `compras.ver`.
+   * Sin ese permiso informan igual, pero no se pinta un camino que acabaría en 403 (§Post-F9.68).
+   * ⛔ Lo que NO se ofrece nunca desde aquí es des-autorizar la OC: eso es de Dirección
+   * (`compras.desautorizar`) y pintárselo al comprador sería pintarle un rechazo (§Post-F9.145(f)).
+   */
+  const { tienePermiso } = useSesion();
+  const puedeVerCompras = tienePermiso('compras.ver');
   // ⭐ V1-E3j: el destino de la fila es la RECETA de la orden, gobernada por `desarrollo.ver` — el
   // mismo permiso que abre esta bandeja, así que el camino nunca es un enlace muerto (§Post-F9.68).
   // Antes apuntaba al panel de la OP y por eso pedía `ordenes.ver`.
@@ -75,6 +89,11 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
     void navigate(`/produccion/ordenes/${String(idOrden)}/receta`);
   }
 
+  /** ⭐ 0.085: a «Compras por orden», con la orden ya elegida (el deep-link que esa pantalla lee). */
+  function verCompras(idOrden: number): void {
+    void navigate('/compras/por-orden', { state: { idOrden } });
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6">
@@ -88,7 +107,9 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
               compra. «Ver la receta» abre la orden completa: ahí se revisa y se firma renglón por
               renglón, que es la única forma de liberar. Aquí salen también, arriba y marcadas{' '}
               <strong>En corrección</strong>, las recetas que alguien reabrió: ésas tienen la compra
-              de toda su orden congelada hasta que se cierren.
+              de toda su orden congelada hasta que se cierren. La columna{' '}
+              <strong>Ya comprado</strong> dice cuáles ya tienen orden de compra firmada con un
+              proveedor: si eso cambió, hay que negociarlo con él —el sistema no lo cancela solo—.
             </p>
           </div>
         </div>
@@ -157,6 +178,12 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                   <TablaDensaHead>Cliente</TablaDensaHead>
                   <TablaDensaHead>Entrega</TablaDensaHead>
                   <TablaDensaHead>Falta liberar</TablaDensaHead>
+                  {/* ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — LA COLUMNA QUE HACE QUE EL AVISO LLEGUE.
+                      El 409 de la puerta de compra sólo lo lee quien INTENTA gastar, y quien ya
+                      compró no va a volver a intentarlo: ese camino no puede alcanzarlo nunca.
+                      Esta bandeja sí, porque la abre con `desarrollo.ver` y ya lista solas las
+                      órdenes que le importan. */}
+                  <TablaDensaHead>Ya comprado</TablaDensaHead>
                   <TablaDensaHead className="w-40" />
                 </TablaDensaFila>
               </TablaDensaEncabezado>
@@ -203,6 +230,16 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                           </ChipEstado>
                         ) : null}
                       </span>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda data-testid="rpl-ya-comprado">
+                      {f.ocsComprometidas.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <ChipsOcComprometidas
+                          ocs={f.ocsComprometidas}
+                          {...(puedeVerCompras ? { alVer: () => verCompras(f.idOrden) } : {})}
+                        />
+                      )}
                     </TablaDensaCelda>
                     <TablaDensaCelda>
                       <span className="flex flex-wrap justify-end gap-1.5">

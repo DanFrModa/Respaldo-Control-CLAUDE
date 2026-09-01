@@ -985,6 +985,12 @@ export type RecetaOrdenAvio = RecetaOrden['avios'][number];
 export type RecetaOrdenArte = RecetaOrden['artes'][number];
 /** Un cambio del BOM del modelo respecto de la receta congelada. */
 export type CambioReceta = RecetaOrden['desalineacion']['cambios'][number];
+/**
+ * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — una OC que YA comprometió la compra frente al proveedor (folio +
+ * estado). Sale de la receta, de cada renglón y de la bandeja «Recetas por liberar»: es el MISMO
+ * dato en los tres sitios, así que se nombra una sola vez.
+ */
+export type OcComprometida = RecetaOrden['ocsComprometidas'][number];
 /** Estado de revisión de un renglón (sin revisar / revisado / ajustado). */
 export type EstadoRenglonReceta = RecetaOrdenTela['estado'];
 /** Sección de la receta a la que pertenece un renglón. */

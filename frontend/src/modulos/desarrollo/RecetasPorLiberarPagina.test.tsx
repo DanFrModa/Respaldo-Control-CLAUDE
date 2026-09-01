@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useParams } from 'react-router-dom';
+import { Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RecetaPorLiberar } from '@/api/tipos';
@@ -27,6 +27,12 @@ function DestinoReceta(): React.JSX.Element {
   return <p>RECETA COMPLETA de la OP con id {id}</p>;
 }
 
+/** ⭐ 0.085: el destino de los chips «ya comprado», que DELATA de qué orden se le pidieron. */
+function DestinoCompras(): React.JSX.Element {
+  const { state } = useLocation() as { state: { idOrden?: number } | null };
+  return <p>COMPRAS de la OP con id {state?.idOrden}</p>;
+}
+
 /** Una fila de la bandeja (por default: 1 tela y 2 avíos pendientes, sin OC). */
 function fila(over: Partial<RecetaPorLiberar> = {}): RecetaPorLiberar {
   return {
@@ -41,6 +47,8 @@ function fila(over: Partial<RecetaPorLiberar> = {}): RecetaPorLiberar {
     artes: 0,
     porLiberar: 3,
     conOrdenCompra: false,
+    // ⭐⭐⭐ 0.085: por default no hay NADA comprometido con un proveedor.
+    ocsComprometidas: [],
     // ⭐⭐ V1-E8z: por default la receta NO está reabierta (el candado de compra, §Post-F9.160(a)).
     abiertaEn: null,
     abiertaMotivo: null,
@@ -67,6 +75,10 @@ function render(
           pantalla montó — un refactor que perdiera el id mandaría a firmar la receta de OTRA OP y
           las pruebas seguirían verdes. */}
       <Route path="/produccion/ordenes/:id/receta" element={<DestinoReceta />} />
+      {/* ⭐⭐⭐ 0.085: la ÚNICA puerta que se le puede pintar al comprador (des-autorizar la OC es
+          de Dirección y le daría 403). Pinta el id que recibe en el `state` por la misma razón que
+          la ruta de arriba: un rótulo fijo pasaría verde aunque lo mandara a otra orden. */}
+      <Route path="/compras/por-orden" element={<DestinoCompras />} />
     </Routes>,
     {
       sesion: estadoSesionDePrueba(permisos as never),
@@ -266,5 +278,92 @@ describe('<RecetasPorLiberarPagina> · el candado de compra (V1-E8z)', () => {
 
     expect(screen.queryByTestId('rpl-en-correccion')).not.toBeInTheDocument();
     expect(screen.getByTestId('rpl-fila')).toHaveTextContent('1 tela, 2 avíos');
+  });
+});
+
+/**
+ * ⭐⭐⭐ **0.085 (§Post-F9.173(a)) — LA COLUMNA POR LA QUE EL AVISO LLEGA AL COMPRADOR.**
+ *
+ * DANIEL: *"que **el comprador sepa que cambió**, para hacer lo que tenga que hacer. **No se puede
+ * cancelar la OC en automático… eso hay que negociarlo con el proveedor.**"*
+ *
+ * 🔴 Por qué esta columna y no el 409 de la puerta de compra: ese rechazo **sólo lo lee quien
+ * INTENTA gastar**, y quien ya compró no va a volver a intentarlo — nunca lo alcanzaría. Esta
+ * bandeja sí: la abre con `desarrollo.ver` (que el comprador ya tiene) y ya lista solas las órdenes
+ * reabiertas **y** las que tienen un renglón desfirmado, que es como queda un material al que
+ * acaban de cambiarle el consumo, el precio o el amarre.
+ */
+describe('⭐⭐⭐ 0.085 — «Ya comprado» en la bandeja (§Post-F9.173(a))', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('enseña folio Y estado de cada OC comprometida (el estado decide el camino)', () => {
+    render([
+      fila({
+        ocsComprometidas: [
+          { idOrdenCompra: 900, folio: 12, estatus: 'autorizada', recibida: false },
+          { idOrdenCompra: 901, folio: 15, estatus: 'recibida_parcial', recibida: true },
+        ],
+      }),
+    ]);
+
+    // Sin el estado, quien lee no sabe si esa OC todavía se puede des-autorizar o ya no.
+    expect(screen.getByTestId('oc-comprometida-12')).toHaveTextContent('OC 12');
+    expect(screen.getByTestId('oc-comprometida-12')).toHaveTextContent('Autorizada');
+    expect(screen.getByTestId('oc-comprometida-15')).toHaveTextContent('Recibida parcial');
+  });
+
+  it('🔴 EL GEMELO: sin compra comprometida la celda dice «—», no un chip en falso', () => {
+    // Una fila con OC en BORRADOR llega aquí con la lista vacía (el servidor ya la filtró): la
+    // bandeja no puede inventarse un aviso, porque un aviso que grita en falso se aprende a ignorar.
+    render([fila({ conOrdenCompra: true, ocsComprometidas: [] })]);
+
+    expect(screen.queryByTestId('ocs-comprometidas')).not.toBeInTheDocument();
+    // ⚠️ Y la celda dice «—», no se queda en blanco (§Post-F9.68 regla 1: una celda vacía hace
+    // creer que algo falló). Sin esta aserción, quitar el placeholder pasaba verde — el componente
+    // de chips ya devuelve `null` con la lista vacía (mutación superviviente medida el 1-sep-2026).
+    // ⚠️ Acotado A LA CELDA, no a la fila: en la fila el `—` es único **sólo por este fixture**
+    // (la fecha de entrega puede pintar otro). Es la misma dependencia de fixture que ya obligó a
+    // reforzar dos pruebas de esta etapa; aquí se corta de raíz.
+    expect(within(screen.getByTestId('rpl-ya-comprado')).getByText('—')).toBeInTheDocument();
+    // Y la marca VIEJA sigue viva: son dos preguntas distintas sobre la misma orden.
+    expect(screen.getByTestId('rpl-frena-dinero')).toBeInTheDocument();
+  });
+
+  it('⭐ con `compras.ver` el chip LLEVA a las compras DE ESA orden', async () => {
+    const usuario = userEvent.setup();
+    render(
+      [
+        fila({
+          idOrden: 77,
+          ocsComprometidas: [
+            { idOrdenCompra: 900, folio: 12, estatus: 'autorizada', recibida: false },
+          ],
+        }),
+      ],
+      ['desarrollo.ver', 'ordenes.ver', 'compras.ver'],
+    );
+
+    await usuario.click(screen.getByTestId('oc-comprometida-12'));
+    expect(screen.getByText('COMPRAS de la OP con id 77')).toBeInTheDocument();
+  });
+
+  it('🔴 SIN `compras.ver` el chip informa pero NO es un enlace (no se pinta un 403)', () => {
+    render(
+      [
+        fila({
+          ocsComprometidas: [
+            { idOrdenCompra: 900, folio: 12, estatus: 'autorizada', recibida: false },
+          ],
+        }),
+      ],
+      ['desarrollo.ver'],
+    );
+
+    const chip = screen.getByTestId('oc-comprometida-12');
+    expect(chip).toBeInTheDocument();
+    // §Post-F9.145(f)/§Post-F9.68: un camino que va a rebotar es peor que no ofrecerlo.
+    expect(chip.closest('button')).toBeNull();
   });
 });
