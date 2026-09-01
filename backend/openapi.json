@@ -3838,12 +3838,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 500
+              "maximum": 100
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 500)."
+            "description": "Renglones por página (máx 100)."
           },
           {
             "schema": {
@@ -24655,12 +24655,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 500
+              "maximum": 100
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 500)."
+            "description": "Renglones por página (máx 100)."
           },
           {
             "schema": {
@@ -28245,12 +28245,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 500
+              "maximum": 100
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 500)."
+            "description": "Renglones por página (máx 100)."
           },
           {
             "schema": {
@@ -85012,12 +85012,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 500
+              "maximum": 100
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 500)."
+            "description": "Renglones por página (máx 100)."
           },
           {
             "schema": {

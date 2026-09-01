@@ -71,6 +71,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.079 · 1-sep-2026 · **en prueba** — El sistema **prometía por escrito** una página que él mismo rechazaba (cambio interno)
+
+### Qué se puede hacer ahora que antes no
+
+**Nada nuevo que se vea**, y conviene decirlo sin adornos: es un arreglo de los cimientos.
+
+Lo que cambia: **el sistema deja de prometer algo que no cumple.** El «contrato» —el documento donde el
+programa declara qué acepta cada pantalla, y del que se alimenta toda la parte visual— decía que cuatro
+listados (**telas, avíos, proveedores y la consulta de órdenes**) podían traer **500 renglones de golpe**.
+**Ninguno de los cuatro podía.** Al pedir 500, el sistema contestaba con un error.
+
+### Qué cambió y puede sorprender
+
+- **Nadie va a notar la diferencia, y ésa es justo la prueba de que el defecto estaba vivo.** Todas las
+  pantallas piden 100 como mucho — porque **alguien ya se estrelló contra el error y bajó a 100**,
+  dejándolo anotado en el código. Ese rodeo sigue funcionando igual.
+- **De dónde venía:** alguien subió el tope a 500 en los cuatro *«para que los desplegables carguen el
+  catálogo entero»*. **No funcionó en ninguno**, porque el tope de verdad no está donde lo subieron. Quedó
+  la promesa escrita, sin la capacidad detrás. Y **ya había pasado antes**: es la quinta vez que aparece el
+  mismo defecto.
+- **La prueba que debía cazarlo miraba al lado equivocado**: comprobaba lo que el contrato *dice*, nunca lo
+  que el sistema *hace*, así que salía en verde con la función rota.
+
+### Qué sigue pendiente o roto
+
+- Ahora hay un **vigilante que recorre los listados solos** y exige que lo prometido y lo que el sistema
+  acepta **coincidan**. No es una lista de cuatro: un listado nuevo entra **sin que nadie lo apunte**, y si
+  miente, la prueba se pone roja. Las dos excepciones legítimas están nombradas, y si alguna dejara de
+  serlo el propio vigilante obliga a quitarla.
+- ⚠️ **El vigilante mira el lado del contrato, no el del sistema**: comprueba los dos lados en 4 de 58
+  listados. Hacerlo en los 58 exige abrir medio centenar de piezas internas — más riesgo que el problema
+  que evita —, así que **queda anotado como deuda**. Hoy **ninguno miente**: se verificaron los 58.
+- Sin permisos nuevos y sin datos que sembrar: el despliegue no necesita nada especial.
+
+---
+
 ## 0.078 · 1-sep-2026 · **en prueba** — ⭐⭐ Cada **color** tiene su propio modelo y su propio número, con **una sola receta**
 
 ### Qué se puede hacer ahora que antes no

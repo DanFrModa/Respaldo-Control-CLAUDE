@@ -99,7 +99,7 @@ const incluirProveedores = {
  * URL), aquí los tipos ya son nativos. La ruta REST le pasa `request.query` ya coaccionado
  * (output del contrato), y los tests pasan valores nativos. Mismo patrón que el maquilero.
  */
-const esquemaListarAviosDominio = esquemaPaginacion.extend({
+export const esquemaListarAviosDominio = esquemaPaginacion.extend({
   /** Texto a buscar en la clave o la descripción (insensible a mayúsculas). */
   busqueda: z.string().trim().max(200).optional(),
   /** Filtra por avíos genéricos (R4). Omitir = todos. */

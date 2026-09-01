@@ -1631,7 +1631,7 @@ export interface paths {
         query?: {
           /** @description Página (1-based). */
           pagina?: number;
-          /** @description Renglones por página (máx 500). */
+          /** @description Renglones por página (máx 100). */
           porPagina?: number;
           /** @description Texto a buscar en el nombre (insensible a mayúsculas). */
           busqueda?: string;
@@ -10905,7 +10905,7 @@ export interface paths {
         query?: {
           /** @description Página (1-based). */
           pagina?: number;
-          /** @description Renglones por página (máx 500). */
+          /** @description Renglones por página (máx 100). */
           porPagina?: number;
           /** @description Texto a buscar en el nombre de la tela, el nombre que le da su proveedor, el nombre del PROVEEDOR dueño, el nombre de sus colores o su PANTONE (insensible a mayúsculas). */
           busqueda?: string;
@@ -12194,7 +12194,7 @@ export interface paths {
         query?: {
           /** @description Página (1-based). */
           pagina?: number;
-          /** @description Renglones por página (máx 500). */
+          /** @description Renglones por página (máx 100). */
           porPagina?: number;
           /** @description Texto a buscar en la clave o la descripción (insensible a mayúsculas). */
           busqueda?: string;
@@ -32873,7 +32873,7 @@ export interface paths {
         query?: {
           /** @description Página (1-based). */
           pagina?: number;
-          /** @description Renglones por página (máx 500). */
+          /** @description Renglones por página (máx 100). */
           porPagina?: number;
           /** @description Texto a buscar (folio, código de modelo, cliente o valor de referencia). */
           busqueda?: string;
