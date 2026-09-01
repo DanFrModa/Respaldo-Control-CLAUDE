@@ -17,7 +17,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { ErrorConflicto, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { Empresa, PrismaClient } from '../../datos/index.js';
@@ -459,13 +459,12 @@ describe('crearVersionDeModelo — lo que rechaza', () => {
   });
 });
 
-// ── ⭐ V1-E7d: LA REVISIÓN ANTES DE MANDAR A PRODUCIR (§Post-F9.110) ──────────────
+// ── ⭐ LA REVISIÓN DE UNA VERSIÓN (§Post-F9.110), hoy un REGISTRO (V1-E9c, §Post-F9.169) ────────
 
 /**
- * El ciclo completo contra Postgres real, que es lo único que demuestra tres cosas que ningún
- * doble puede: que la MIGRACIÓN cuadra con el esquema (el tipo `estado_revision_modelo` y las
- * cuatro columnas existen de verdad), que la llave foránea del firmante apunta a `usuarios`, y que
- * la compuerta corta la promoción con los datos tal como quedan escritos en la base.
+ * El ciclo completo contra Postgres real, que es lo único que demuestra dos cosas que ningún doble
+ * puede: que la MIGRACIÓN cuadra con el esquema (el tipo `estado_revision_modelo` y las cuatro
+ * columnas existen de verdad) y que la llave foránea del firmante apunta a `usuarios`.
  *
  * ⚠️ El firmante tiene que EXISTIR: a diferencia de `creado_por_id` (texto suelto en todo el
  * esquema), `modelos.id_revisado_por` es FK con RESTRICT — quien firmó una revisión no se puede
@@ -520,24 +519,39 @@ describe('La revisión de una versión (V1-E7d)', () => {
     ).toBeNull();
   });
 
-  it('⭐ sin revisión aprobada NO pasa a producción; con ella, sí', async () => {
+  it('⭐⭐ V1-E9c — SIN revisar pasa a producción igual, y AHÍ todavía se puede firmar', async () => {
+    // 🔴 LAS DOS DECISIONES DE §Post-F9.169 EN UNA SOLA CORRIDA, contra Postgres real. Antes, la
+    // primera mitad era `rejects.toThrow(ErrorConflicto)` y la segunda era imposible.
     const padre = await padreClasificado();
     const version = await crearVersionDeModelo(sesion(), padre.id, {}, bd());
     const admin = sesion(['modelos.ver', 'modelos.administrar']);
 
-    await expect(pasarModeloAProduccion(admin, version.id, {}, bd())).rejects.toThrow(
-      ErrorConflicto,
-    );
-    // Nada se movió: sigue en desarrollo y sin número.
-    const antes = await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } });
-    expect(antes.origen).toBe('desarrollo');
-    expect(antes.numeroProduccion).toBeNull();
-
-    const revisor = await sesionDelRevisor();
-    await aprobarRevisionModelo(revisor, version.id, { nota: 'revisada con Daniel' }, bd());
-
+    // (1) La versión nace `pendiente` y promueve igual: la revisión no detiene producir.
+    expect(
+      (await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } })).revisionEstado,
+    ).toBe('pendiente');
     const promovido = await pasarModeloAProduccion(admin, version.id, {}, bd());
     expect(promovido.numeroProduccion).toBe(71_001);
+
+    const enProduccion = await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } });
+    expect(enProduccion.origen).toBe('produccion');
+    // La revisión NO se tocó al promover: sigue pendiente, y sigue siendo verdad.
+    expect(enProduccion.revisionEstado).toBe('pendiente');
+
+    // (2) Y ahí SIGUE pudiéndose firmar. Sin esto quedaría un acto que nadie puede ejecutar nunca:
+    // la promoción es justo lo que antes cerraba la puerta para siempre.
+    const revisor = await sesionDelRevisor();
+    const firma = await aprobarRevisionModelo(
+      revisor,
+      version.id,
+      { nota: 'revisada con Daniel, con la OP ya generada' },
+      bd(),
+    );
+    expect(firma.revisionEstado).toBe('aprobada');
+
+    const firmado = await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } });
+    expect(firmado.revisionEstado).toBe('aprobada');
+    expect(firmado.idRevisadoPor).toBe(ID_REVISOR);
   });
 
   it('⭐ la firma queda escrita con QUIÉN y CUÁNDO (A7), y el rechazo con su motivo', async () => {
@@ -599,20 +613,20 @@ describe('La revisión de una versión (V1-E7d)', () => {
 // ── ⭐ V1-E7e: LA APROBACIÓN SE INVALIDA SI LA RECETA CAMBIA (§Post-F9.116) ──────
 
 /**
- * **La prueba que decide la etapa, por CADA puerta, contra Postgres real.** Es el ciclo que
- * Daniel mandó cerrar: Aurora aprueba la versión → alguien le mueve la receta → la orden de
- * producción ya NO puede salir. Sin la invalidación, el último paso de cada una de estas pruebas
- * PASA, y la OP se fabrica sobre una receta que Aurora nunca vio.
+ * **La prueba que decide V1-E7e, por CADA puerta, contra Postgres real.** Es el ciclo que Daniel
+ * mandó cerrar: Aurora aprueba la versión → alguien le mueve la receta → **la firma se cae**. Sin
+ * la invalidación, el último paso de cada una de estas pruebas PASA, y el sistema seguiría
+ * presentando como *revisada* una receta que Aurora nunca vio.
  *
  * Va contra la base de verdad porque lo que hay que demostrar es que las PUERTAS REALES —el PUT
  * de telas, el de avíos, los favoritos, las medidas por talla, el arte y el copiado de receta—
  * pasan por el embudo. Un doble sólo probaría que el embudo funciona, que es otra cosa (eso se
  * prueba sin base en `revision-modelo.test.ts`).
  *
- * ⚠️ Se cierra con `pasarModeloAProduccion`, no con la generación de la OP: las dos comparten el
- * MISMO núcleo (`promoverAProduccionNucleo`), que es donde V1-E7d puso la compuerta justamente
- * para que la puerta lateral no existiera. La OP con todo su armado no aporta nada a ESTA
- * afirmación y sí un fixture de pedido/orden entero.
+ * ⚠️ **V1-E9c cambió el cierre, no el ciclo.** Antes se cerraba comprobando que la promoción
+ * volvía a rebotar; esa compuerta ya no existe (§Post-F9.169). Se cierra comprobando **lo que la
+ * invalidación de verdad promete**: que la firma se soltó de la fila, con su motivo, y que el
+ * modelo NO se movió de catálogo por el camino.
  */
 describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
   const ID_AURORA = 'usuario-aurora';
@@ -643,9 +657,13 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
   const admin = () => sesion(['modelos.ver', 'modelos.administrar']);
 
   /**
-   * Deja lista una VERSIÓN con receta heredada y su revisión APROBADA, y comprueba de paso que en
-   * ese punto SÍ podría mandarse a producir (si no, la prueba de abajo no demostraría nada:
-   * pasaría por estar rota desde antes).
+   * Deja lista una VERSIÓN con receta heredada y su revisión APROBADA, y comprueba de paso que la
+   * firma quedó puesta —estado y firmante— para que la prueba de abajo, que la tira, no pase por
+   * estar rota desde antes.
+   *
+   * ⚠️ Decía *"comprueba que en ese punto SÍ podría mandarse a producir"*, y el cuerpo nunca lo
+   * comprobó: sólo lee `revisionEstado` e `idRevisadoPor`. Desde V1-E9c (§Post-F9.169) además
+   * sería falso — la firma no gobierna producir.
    */
   async function versionAprobadaConReceta(): Promise<{
     idVersion: number;
@@ -666,18 +684,16 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
     return { idVersion: version.id, idTela, idAvio };
   }
 
-  /** El paso que decide: la compuerta vuelve a morder y la versión sigue en desarrollo. */
-  async function yaNoSePuedeProducir(idVersion: number): Promise<void> {
-    await expect(pasarModeloAProduccion(admin(), idVersion, {}, bd())).rejects.toThrow(
-      ErrorConflicto,
-    );
+  /** El paso que decide: la firma de Aurora se cayó y la versión volvió a esperar revisión. */
+  async function laFirmaSeCayo(idVersion: number): Promise<void> {
     const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: idVersion } });
     expect(fila.revisionEstado).toBe('pendiente');
     // Nadie ha revisado la receta que hay AHORA: la firma de Aurora se soltó de la fila.
     expect(fila.idRevisadoPor).toBeNull();
     expect(fila.revisadoEn).toBeNull();
     expect(fila.revisionNota).toContain('INVALIDÓ');
-    // Y no se movió a producción por el camino de en medio.
+    // Y cambiar la receta NO mueve el modelo de catálogo (el embudo sólo toca la firma y la marca
+    // de agua): si algún día lo moviera, se vería aquí.
     expect(fila.origen).toBe('desarrollo');
     expect(fila.numeroProduccion).toBeNull();
   }
@@ -702,7 +718,7 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
       bd(),
     );
 
-    await yaNoSePuedeProducir(idVersion);
+    await laFirmaSeCayo(idVersion);
   });
 
   it('⭐ AVÍOS — cambiar el set de avíos le tumba la firma', async () => {
@@ -724,7 +740,7 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
       bd(),
     );
 
-    await yaNoSePuedeProducir(idVersion);
+    await laFirmaSeCayo(idVersion);
   });
 
   it('⭐ AVÍOS FAVORITOS — aceptar la sugerencia del catálogo también le tumba la firma', async () => {
@@ -737,7 +753,7 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
     const resultado = await aceptarAviosFavoritos(admin(), idVersion, bd());
     expect(resultado.agregados).toBe(1);
 
-    await yaNoSePuedeProducir(idVersion);
+    await laFirmaSeCayo(idVersion);
   });
 
   it('⭐ MEDIDAS POR TALLA — mover una medida le tumba la firma', async () => {
@@ -752,7 +768,7 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
       bd(),
     );
 
-    await yaNoSePuedeProducir(idVersion);
+    await laFirmaSeCayo(idVersion);
   });
 
   it('⭐ ARTE — "le mueve el arte" (las palabras de Daniel) le tumba la firma', async () => {
@@ -763,7 +779,7 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
 
     await crearArte(admin(), idVersion, { descripcion: 'Logo espalda', idTipoArte }, bd());
 
-    await yaNoSePuedeProducir(idVersion);
+    await laFirmaSeCayo(idVersion);
   });
 
   it('⭐ COPIAR RECETA — volcarle el BOM de otro modelo le tumba la firma', async () => {
@@ -773,7 +789,7 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
 
     await copiarBom(admin(), idVersion, { idOrigen: otro.id, reemplazar: true }, bd());
 
-    await yaNoSePuedeProducir(idVersion);
+    await laFirmaSeCayo(idVersion);
   });
 
   it('⭐ (c) la BITÁCORA cuenta la secuencia entera: Aurora firmó, se movió la receta, se volvió a firmar', async () => {

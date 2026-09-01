@@ -23,10 +23,11 @@
  *     de 5 dígitos como cualquier otro (`nomenclatura.ts`), y eso no cambia.
  *
  * ⭐ **V1-E7d añadió la quinta regla** (§Post-F9.110, misma decisión): la versión nace **PENDIENTE
- * DE REVISIÓN** y no pasa a producción hasta que alguien con `modelos.aprobar-receta` la firme —
- * *"enfrente del cliente puede ser que se cometa una imprudencia o un error"*. Ver
- * `revision-modelo.ts`; la compuerta vive en `promoverAProduccionNucleo` para cerrar también la
- * puerta lateral de generar la OP.
+ * DE REVISIÓN**, para que alguien con `modelos.aprobar-receta` mire lo que se acordó en la mesa —
+ * *"enfrente del cliente puede ser que se cometa una imprudencia o un error"*. ⚠️ **V1-E9c
+ * (§Post-F9.169) le quitó el muro:** esa firma ya NO detiene la producción; es un REGISTRO, y lo
+ * único que frena el gasto es la firma por renglón de la receta de la orden. Ver
+ * `revision-modelo.ts`.
  *
  * ⚠️ **Por qué hace falta un advisory lock.** El siguiente sufijo es `max(los que ya hay) + 1`
  * sobre la familia de la raíz — un `Max()+1`, que A3 sólo tolera dentro de un lock (mismo caso y
@@ -350,11 +351,11 @@ export async function mintearVersionDeModelo(
       versionDesarrollo: version,
       idModeloPadre: padre.id,
       // ⭐ V1-E7d (§Post-F9.110) — la versión NACE PENDIENTE DE REVISIÓN. La receta que hereda se
-      // acordó en la mesa, frente al cliente, y hasta que alguien con `modelos.aprobar-receta` la
-      // firme no puede mandarse a producir (la compuerta vive en `promoverAProduccionNucleo`, y
-      // por eso también le cierra la puerta lateral de generar la OP). Nacer en `pendiente` y no
-      // en `null` es lo que separa "espera revisión" de "no lleva revisión" (los modelos que no
-      // son versiones).
+      // acordó en la mesa, frente al cliente, y alguien con `modelos.aprobar-receta` tiene que
+      // mirarla. Nacer en `pendiente` y no en `null` es lo que separa "espera revisión" de "no
+      // lleva revisión" (los modelos que no son versiones), y es lo que la mete en la bandeja
+      // «Recetas por revisar». ⚠️ V1-E9c: pendiente ya NO impide producir (§Post-F9.169) — el
+      // gasto lo frena la firma por renglón de la receta de la orden.
       revisionEstado: 'pendiente',
       descripcion: datos.descripcion ?? padre.descripcion,
       composicion: padre.composicion,

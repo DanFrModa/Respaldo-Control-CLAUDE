@@ -859,10 +859,13 @@ describe('<ModelosPagina>', () => {
   // ── ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110) ────────
 
   /**
-   * ⚠️ Lo que estas pruebas fijan es lo que la PANTALLA enseña y manda; NO son la garantía de que
-   * una versión sin revisar no se produzca — eso lo niega el backend dentro del núcleo de la
-   * promoción, y por eso cubre también «generar la OP». Con la URL a mano, un botón escondido no
-   * protege nada.
+   * ⚠️ Lo que estas pruebas fijan es lo que la PANTALLA enseña y manda.
+   *
+   * 🔴 **V1-E9c (§Post-F9.169) — la revisión ya NO impide producir.** Aquí decía que el backend
+   * *"niega producir una versión sin revisar dentro del núcleo de la promoción"*: esa compuerta se
+   * retiró. La firma sobrevive como REGISTRO, y lo que estas pruebas cuidan es que ese registro se
+   * pueda **ver y levantar siempre** —incluido el caso nuevo: la versión que YA está en
+   * producción—, porque un acto que nadie puede ejecutar es peor que no tenerlo.
    */
   function versionPendiente(extra: Partial<Modelo> = {}): Modelo {
     return modelo(9, 'CYA-26-71-001-01', true, {
@@ -898,10 +901,9 @@ describe('<ModelosPagina>', () => {
     // `revisionEstado`?» para decidir si esto es una versión — un PROXY que sólo acierta porque
     // «crear versión» siempre escribe `'pendiente'`. Las versiones que nacieron antes de que esta
     // etapa se desplegara (las que estrenó V1-E7b en `prueba`, que no tenían ni la columna) llegan
-    // con NULL: el backend las lee como PENDIENTES y les niega producción, y aquí no se pintaba ni
-    // el chip ni los botones. Resultado: una versión que no se puede producir y que nadie puede
-    // firmar. Ahora las dos puertas preguntan lo mismo —el LINAJE—, y el null se pinta como lo que
-    // significa: nadie la ha revisado.
+    // con NULL: el backend las lee como PENDIENTES, y aquí no se pintaba ni el chip ni los botones.
+    // Resultado: una versión sin firmar que nadie podía firmar. Ahora las dos puertas preguntan lo
+    // mismo —el LINAJE—, y el null se pinta como lo que significa: nadie la ha revisado.
     abrirModelo(versionPendiente({ revisionEstado: null }), [
       'modelos.ver',
       'modelos.aprobar-receta',
@@ -910,6 +912,22 @@ describe('<ModelosPagina>', () => {
     const chip = screen.getByTestId('revision-modelo');
     expect(chip).toHaveTextContent('Revisión pendiente');
     expect(chip).toHaveTextContent('Nadie la ha revisado todavía');
+    expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
+    expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('⭐⭐ V1-E9c — una versión YA EN PRODUCCIÓN sigue enseñando el chip Y los dos botones', () => {
+    // 🔴 EL CASO QUE ESTA ETAPA ESTRENA, y que **ninguna prueba cubría**: aquí había un filtro
+    // `seleccion.origen === 'desarrollo'` y no había ni una aserción sobre él (quitarlo dejaba todo
+    // en verde). Sin compuerta, generar la OP promueve la versión con la revisión en `pendiente`:
+    // con ese filtro puesto, la ficha enseñaría «Revisión pendiente» SIN ningún botón para
+    // resolverlo, para siempre. Si alguien lo devuelve, esta prueba muere.
+    abrirModelo(
+      versionPendiente({ origen: 'produccion', codigo: '71001', numeroProduccion: 71_001 }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent('Revisión pendiente');
     expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
     expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
   });
@@ -933,11 +951,11 @@ describe('<ModelosPagina>', () => {
   });
 
   it('⭐ un DESARROLLO NORMAL (que no nació de otro modelo) tampoco lleva revisión', () => {
-    // 🔴 EL CASO QUE LA PRUEBA DE ARRIBA NO CUBRÍA, y que dejó viva una mutación: con un modelo de
-    // PRODUCCIÓN, los botones se esconden igual por el filtro `origen === 'desarrollo'`, así que
-    // quitar la condición de la revisión no rompía nada. El caso que de verdad la ejercita es un
-    // desarrollo normal —el caso COMÚN del módulo—: es de desarrollo y NO es versión, así que la
-    // revisión no le toca. Si la condición desapareciera, aquí saldrían dos botones que no van.
+    // 🔴 EL CASO QUE LA PRUEBA DE ARRIBA NO CUBRÍA, y que dejó viva una mutación: con un modelo
+    // MIGRADO los botones se escondían por dos razones a la vez, así que quitar la condición de la
+    // revisión no rompía nada. El caso que de verdad la ejercita es un desarrollo normal —el caso
+    // COMÚN del módulo—: es de desarrollo y NO es versión, así que la revisión no le toca. Si la
+    // condición desapareciera, aquí saldrían dos botones que no van.
     const desarrolloNormal = modelo(3, 'CYA-26-71-005', true, {
       origen: 'desarrollo',
       codigoDesarrollo: 'CYA-26-71-005',
@@ -957,10 +975,10 @@ describe('<ModelosPagina>', () => {
    *
    * Un HIJO del linaje 1:N (uno de los N modelos de producción que salen de un desarrollo, uno por
    * color de la OC) **no lleva revisión propia**: su receta es la de su padre y la firma que lo
-   * habilitó a producir se exigió contra el padre, antes de que él existiera. Si esta pantalla le
-   * pintara el chip, diría *«Revisión pendiente · no puede mandarse a producir»* **sin ningún botón
-   * para arreglarlo** —el backend rechaza firmar cualquier cosa que ya sea de producción— sobre un
-   * modelo que YA está produciéndose. Es la cicatriz de §Post-F9.119 otra vez.
+   * habilitó a producir se firmó contra el padre. Si esta pantalla le pintara el chip, se enseñaría
+   * a sí mismo como *«Revisión pendiente»* y pediría una firma que no le toca: firmar la receta del
+   * hijo sería firmar dos veces la del padre, y de paso lo metería en la bandeja «Recetas por
+   * revisar» a esperar algo que nadie tiene que hacer.
    *
    * ⚠️ **Los dos casos, y en qué se diferencian.** (a) es el hijo TAL COMO NACE HOY: sin
    * `idModeloPadre` ni `versionDesarrollo`, así que el predicado ya lo dejaría fuera aunque nadie
@@ -1054,7 +1072,7 @@ describe('<ModelosPagina>', () => {
     // ninguna aserción, pero enseñaba a quien lo leyera un formato que el sistema ya no produce.
     'Se INVALIDÓ automáticamente el 25/8/2026: después de aprobarse cambió las TELAS de la ' +
     'receta, así que la firma anterior ya no corresponde a lo que se va a fabricar. La ' +
-    'aprobación era del 2026-08-12. Hay que volver a revisarla antes de mandarla a producir.';
+    'aprobación era del 2026-08-12. Hay que volver a revisarla.';
 
   it('⭐ una versión INVALIDADA enseña POR QUÉ perdió la firma (no "nadie la ha revisado")', () => {
     abrirModelo(

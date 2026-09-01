@@ -1,27 +1,26 @@
 /**
- * ⭐⭐ V1-E7d — **LA PUERTA LATERAL** (§Post-F9.110). La prueba más importante de la etapa.
+ * ⭐⭐ **GENERAR LA OP PROMUEVE EL MODELO SOLA** — y desde V1-E9c (§Post-F9.169) lo hace **haya o no
+ * haya revisión firmada**.
  *
- * Daniel pidió una REVISIÓN antes de mandar a producir lo que salió de una negociación. Pero
- * «mandar a producir» tiene DOS puertas, no una:
+ * `salidaAProduccion` paso 4 llama al MISMO núcleo que el endpoint «pasar a producción»
+ * (`promoverAProduccionNucleo`), así que este archivo prueba el segundo de los dos caminos que
+ * promueven.
  *
- *  1. El endpoint «pasar a producción» (`modelos/nomenclatura.ts`, probado en su propio archivo).
- *  2. **Generar la OP**: `salidaAProduccion` paso 4 llama al MISMO núcleo y **promueve el modelo
- *     sola**. Ésta es la puerta por la que una versión sin revisar llegaría a producción sin que
- *     nadie la firmara — y es la única razón por la que la compuerta vive en
- *     `promoverAProduccionNucleo` y no en el endpoint. *Esconder un botón es cortesía; negar la
- *     operación es la regla.*
- *
- * Si este archivo desaparece, la etapa no está hecha.
+ * 🔴 **Este bloque decía lo contrario hasta V1-E9c.** V1-E7d lo escribió como *"la puerta
+ * lateral"*: aquí se demostraba que una versión sin revisar NO podía generar su OP. Daniel disolvió
+ * esa compuerta: *«Todo lo que no está firmado simplemente no se puede comprar. **Pero no detiene
+ * ni la producción** ni los demás renglones ya firmados.»* Las pruebas se dieron **vuelta**, no se
+ * borraron: recorren las mismas poblaciones y ahora exigen que la OP **salga igual** y que el
+ * modelo se promueva. Si alguien vuelve a colgar una guarda de revisión de este camino, este bloque
+ * muere.
  *
  * ⚠️ **Qué se dobla y qué NO.** Se mockean los COLABORADORES que no son la regla —`crearOrden`
  * (que abre media base de datos), la liga al desarrollo y el disparo del outbox— y se le pasa al
- * servicio una transacción de mentiras por `bd.tx` (composición A2). La compuerta corre **de
- * verdad**: `promoverAProduccionNucleo` es código real leyendo el modelo real del doble. Un doble
- * que mockeara la compuerta probaría la suposición del doble, no el sistema.
+ * servicio una transacción de mentiras por `bd.tx` (composición A2). La promoción corre **de
+ * verdad**: `promoverAProduccionNucleo` es código real leyendo el modelo real del doble.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ErrorConflicto } from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
@@ -136,59 +135,47 @@ beforeEach(() => {
   obtenerOrden.mockResolvedValue({ id: 900, folio: 5558, idCliente: 3 });
 });
 
-describe('salidaAProduccion — LA PUERTA LATERAL de la revisión (V1-E7d)', () => {
-  it('⭐⭐ generar la OP de una versión SIN REVISAR se NIEGA', async () => {
-    // Ésta es LA prueba. Con la compuerta puesta sólo en el endpoint «pasar a producción», este
-    // camino promovería la versión igual y la etapa entera sería decorativa.
-    const { tx } = txRegistrador(modeloFalso());
-    await expect(salidaAProduccion(SESION, 1, MATRIZ, { tx })).rejects.toThrow(ErrorConflicto);
+describe('salidaAProduccion — la REVISIÓN ya NO detiene generar la OP (V1-E9c)', () => {
+  /** Genera la OP y comprueba que el modelo se promovió de verdad (no sólo que no lanzó). */
+  async function generaYPromueve(modelo: Record<string, unknown>): Promise<void> {
+    const { tx, llamadas } = txRegistrador(modelo);
+    const salida = await salidaAProduccion(SESION, 1, MATRIZ, { tx });
+
+    expect(salida.numeroProduccion).toBe(71_001);
+    expect(salida.numeroProduccionMinteado).toBe(true);
+    expect(salida.codigoModeloAnterior).toBe(modelo.codigo);
+    expect(llamadas.find((l) => l.metodo === 'modelo.update')?.args).toMatchObject({
+      data: { origen: 'produccion', numeroProduccion: 71_001 },
+    });
+  }
+
+  it('⭐⭐ la OP de una versión SIN REVISAR se genera, y el modelo se promueve', async () => {
+    // 🔴 LA PRUEBA DE LA ETAPA. Antes esto era `rejects.toThrow(ErrorConflicto)`: la orden entra
+    // con la receta pendiente de revisar, y lo que se frena renglón por renglón es COMPRAR.
+    await generaYPromueve(modeloFalso());
   });
 
-  it('⭐⭐ el mensaje es el de la revisión, no un error cualquiera', async () => {
-    const { tx } = txRegistrador(modeloFalso());
-    await expect(salidaAProduccion(SESION, 1, MATRIZ, { tx })).rejects.toThrow(
-      /nació de una negociación y su receta todavía NO pasa la REVISIÓN/,
-    );
+  it('⭐ una versión SIN estado de revisión (null) también genera su OP', async () => {
+    await generaYPromueve(modeloFalso({ revisionEstado: null }));
   });
 
-  it('⭐ el modelo NO se promueve: no se escribe ni se toma el lock del par', async () => {
-    // Todo el paso 4 corre dentro de la transacción del servicio (A2): al lanzar, nada persiste.
-    // Pero además la compuerta corta ANTES de escribir, y eso se ve en las llamadas.
-    const { tx, llamadas } = txRegistrador(modeloFalso());
-    await expect(salidaAProduccion(SESION, 1, MATRIZ, { tx })).rejects.toThrow();
-
-    expect(llamadas.map((l) => l.metodo)).not.toContain('modelo.update');
-    expect(llamadas.map((l) => l.metodo)).not.toContain('$executeRaw');
-  });
-
-  it('una versión RECHAZADA tampoco genera OP, y el motivo llega al mensaje', async () => {
-    const { tx } = txRegistrador(
+  it('⭐⭐ una versión RECHAZADA también genera su OP: el rechazo no detiene producir', async () => {
+    await generaYPromueve(
       modeloFalso({
         revisionEstado: 'rechazada',
         revisadoEn: new Date('2026-08-25T00:00:00.000Z'),
         revisionNota: 'el cierre que se quitó sí costaba',
       }),
     );
-    await expect(salidaAProduccion(SESION, 1, MATRIZ, { tx })).rejects.toThrow(
-      /el cierre que se quitó sí costaba/,
-    );
   });
 
-  it('⭐ una versión APROBADA sí genera su OP y estrena su número de 5 dígitos', async () => {
-    const { tx, llamadas } = txRegistrador(modeloFalso({ revisionEstado: 'aprobada' }));
-    const salida = await salidaAProduccion(SESION, 1, MATRIZ, { tx });
-
-    expect(salida.numeroProduccion).toBe(71_001);
-    expect(salida.numeroProduccionMinteado).toBe(true);
-    expect(salida.codigoModeloAnterior).toBe('CYA-26-71-001-01');
-    expect(llamadas.find((l) => l.metodo === 'modelo.update')?.args).toMatchObject({
-      data: { origen: 'produccion', numeroProduccion: 71_001 },
-    });
+  it('una versión APROBADA genera su OP y estrena su número de 5 dígitos, como siempre', async () => {
+    await generaYPromueve(modeloFalso({ revisionEstado: 'aprobada' }));
   });
 
   it('⭐ un modelo que NO es versión genera su OP como siempre (conducta intacta)', async () => {
-    // Los ~4,987 migrados del Access y todo desarrollo normal: esta etapa NO les puso compuerta.
-    const { tx } = txRegistrador(
+    // Los ~4,987 migrados del Access y todo desarrollo normal: nunca llevaron revisión.
+    await generaYPromueve(
       modeloFalso({
         codigo: 'CYA-26-71-001',
         codigoDesarrollo: 'CYA-26-71-001',
@@ -197,14 +184,11 @@ describe('salidaAProduccion — LA PUERTA LATERAL de la revisión (V1-E7d)', () 
         revisionEstado: null,
       }),
     );
-    const salida = await salidaAProduccion(SESION, 1, MATRIZ, { tx });
-    expect(salida.numeroProduccion).toBe(71_001);
-    expect(salida.numeroProduccionMinteado).toBe(true);
   });
 
-  it('un modelo YA en producción genera su OP sin tocar la revisión', async () => {
-    // Aquí el núcleo ni se llama: la OP hereda el número que el modelo ya tenía. Sirve de control
-    // negativo — si la compuerta se colara en este camino, este caso se rompería.
+  it('un modelo YA en producción hereda su número, sin volver a promoverse', async () => {
+    // Aquí el núcleo ni se llama: la OP hereda el número que el modelo ya tenía. Control negativo
+    // del camino entero — si `salidaAProduccion` empezara a promover lo ya promovido, cae aquí.
     const { tx } = txRegistrador(
       modeloFalso({ origen: 'produccion', codigo: '71001', numeroProduccion: 71_001 }),
     );

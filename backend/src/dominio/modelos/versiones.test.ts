@@ -239,8 +239,9 @@ describe('mintearVersionDeModelo — el código que nace', () => {
     // Nace SIN nº de producción: el sufijo vive en el mundo de desarrollo (regla 4 de Daniel).
     expect(data.numeroProduccion).toBeNull();
     // ⭐ V1-E7d (regla 5) — y nace PENDIENTE DE REVISIÓN: la receta se acordó frente al cliente y
-    // no puede mandarse a producir hasta que alguien la firme. `pendiente` y no `null`: `null` es
-    // "no lleva revisión" (los modelos que no son versiones), que es otra cosa.
+    // alguien tiene que mirarla. `pendiente` y no `null`: `null` es "no lleva revisión" (los
+    // modelos que no son versiones), que es otra cosa. ⚠️ V1-E9c: `pendiente` ya NO impide
+    // producir (§Post-F9.169), lo que hace es meterla en la bandeja «Recetas por revisar».
     expect(data.revisionEstado).toBe('pendiente');
     // Herencia de ficha (una muestra de cada tipo de campo).
     expect(data.descripcion).toBe('Sudadera con cierre');

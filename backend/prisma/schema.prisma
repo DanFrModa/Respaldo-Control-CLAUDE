@@ -2272,9 +2272,22 @@ model Modelo {
   /// (`CYA-26-71-001` → `-01`), que es otra cosa: una versión NACE EN DESARROLLO, hereda una COPIA
   /// congelada de la receta y **lleva su propia revisión**. Un hijo de producción nace **ya en
   /// producción**, **comparte** la receta del padre (no la copia) y **no lleva revisión propia**:
-  /// la firma que lo habilita es la del padre. Meterlos en la misma columna haría que cada hijo se
-  /// enseñara como *«Revisión pendiente · no puede mandarse a producir»* **sin ningún botón para
-  /// arreglarlo**, sobre un modelo que ya está en producción (§Post-F9.167 punto 2).
+  /// la revisión que le toca es la del padre, porque la receta es la del padre. Meterlos en la
+  /// misma columna llenaría la cola de «Recetas por revisar» con un renglón por cada hijo, y firmarlo
+  /// sería **firmar dos veces la MISMA receta compartida** (§Post-F9.167 punto 2).
+  ///
+  /// ⚠️ Aquí decía que la firma del padre *"lo habilita"*, que un hijo sin ella *"no puede mandarse a
+  /// producir"* y que no habría *"ningún botón para arreglarlo"*. Las tres se escribieron en 0.069, con
+  /// la compuerta viva; **V1-E9c la disolvió** (§Post-F9.169) y ninguna firma habilita ni bloquea
+  /// producir.
+  ///
+  /// ⭐ **La decisión de separar las columnas no sólo se sostiene: se sostiene MÁS FUERTE, y por una
+  /// razón distinta de la que aquí se escribió primero.** No es que «el ruido en la cola siga igual»:
+  /// **empeora**. Hasta la 0.069 una fila equivocada era **inerte** —el filtro escondía los botones y
+  /// firmar en producción se rechazaba—; hoy es **accionable**, y firmarla escribiría
+  /// `revisionEstado = 'aprobada'` sobre un hijo cuya receta es **compartida** con el padre ⇒ hijo
+  /// «aprobada» y padre «pendiente» **sobre una sola receta**. Un registro contradictorio es peor que
+  /// ruido.
   ///
   /// `NULL` = **«la receta es la mía»**, que es la conducta de siempre: es el caso de los ~4,987
   /// modelos migrados del Access, de los capturados a mano y de todo lo que existe hoy. La

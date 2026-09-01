@@ -15671,7 +15671,7 @@ export interface paths {
     put?: never;
     /**
      * Aprobar la revisión de la receta de una versión de modelo
-     * @description Firma la revisión (quién y cuándo) y habilita a la versión para pasar a producción — por el endpoint «pasar a producción» o al generarle su OP. Sólo aplica a VERSIONES (modelos con sufijo); aprobar dos veces es conflicto.
+     * @description Firma la revisión (quién y cuándo): deja constancia de que alguien miró la receta que se acordó en la negociación. NO es una compuerta — no condiciona producir ni comprar (eso lo gobierna la liberación por renglón de la receta de la orden). Sólo aplica a VERSIONES (modelos con sufijo), se puede firmar aunque el modelo ya esté en producción, y aprobar dos veces es conflicto.
      */
     post: {
       parameters: {
@@ -15816,7 +15816,7 @@ export interface paths {
     put?: never;
     /**
      * Rechazar la revisión de la receta de una versión de modelo (con motivo)
-     * @description Devuelve la versión con observaciones: sigue existiendo y editándose, pero no puede mandarse a producir. El motivo es obligatorio; el rechazo anterior no se pierde (queda en la bitácora).
+     * @description Devuelve la versión con observaciones: sigue existiendo y editándose, y queda en la bandeja «Recetas por revisar» hasta que se corrija y se firme. El motivo es obligatorio; el rechazo anterior no se pierde (queda en la bitácora).
      */
     post: {
       parameters: {
@@ -15958,8 +15958,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Bandeja «Recetas por revisar»: versiones negociadas que no pueden producirse
-     * @description Las VERSIONES a las que la revisión de V1-E7d les niega producción (pendientes, sin firma y rechazadas), ordenadas por la fecha comprometida del pedido que está esperando. Sólo lectura: lleva a la ficha del modelo, donde se firma viendo la receta.
+     * Bandeja «Recetas por revisar»: versiones negociadas sin firmar
+     * @description Las VERSIONES cuya revisión no está firmada (pendientes, sin firma y rechazadas), estén todavía en desarrollo o ya en producción, ordenadas por la fecha comprometida del pedido que está esperando. Sólo lectura: lleva a la ficha del modelo, donde se firma viendo la receta.
      */
     get: {
       parameters: {
@@ -15998,7 +15998,7 @@ export interface paths {
                 /** @description Nº del sufijo de versión (`-01` → 1), o null si el linaje sólo viene del padre. */
                 versionDesarrollo: number | null;
                 /**
-                 * @description Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (misma lectura que la compuerta). Nunca llega `aprobada`: eso ya no espera nada.
+                 * @description Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (la misma lectura que la ficha del modelo). Nunca llega `aprobada`: eso ya no espera nada.
                  * @enum {string}
                  */
                 estado: 'pendiente' | 'aprobada' | 'rechazada';
@@ -16014,7 +16014,7 @@ export interface paths {
                 fechaCompromiso: string | null;
                 /** @description Piezas de pedido vivas que dependen de esta versión (0 si ninguna). Agregado por el SERVIDOR. */
                 piezasPedidas: number;
-                /** @description ⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión y su OP no puede nacer hasta que la receta se revise. No es lo mismo que una versión recién negociada a la que nadie le pide nada. */
+                /** @description ⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión, así que hay piezas comprometidas esperando detrás de esta receta sin revisar — por eso esta fila va primero en la cola. No es lo mismo que una versión recién negociada a la que nadie le pide nada. ⚠️ Decía «su OP no puede nacer hasta que la receta se revise»: fue verdad hasta V1-E9c (§Post-F9.169), que disolvió la compuerta. La OP nace igual, y esta revisión no condiciona ni producir ni comprar: lo que gobierna la compra es OTRA firma, la liberación POR RENGLÓN de la receta de la ORDEN. */
                 conPedido: boolean;
               }[];
               total: number;

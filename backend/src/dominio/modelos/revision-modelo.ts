@@ -1,28 +1,42 @@
 /**
- * ⭐ V1-E7d — LA REVISIÓN ANTES DE MANDAR A PRODUCIR (§Post-F9.110, decisión de Daniel).
+ * ⭐ LA REVISIÓN DE LA RECETA DE UNA VERSIÓN — nació en V1-E7d (§Post-F9.110) y **cambió de
+ * naturaleza en V1-E9c** (§Post-F9.169).
  *
- * Palabras suyas: *"Creo también que después de la negociación con el cliente, debe de haber una
- * revisión antes de mandar a producir. Porque luego en la negociación enfrente del cliente puede
- * ser que se cometa una imprudencia o un error"*.
+ * Lo que Daniel pidió en §Post-F9.110: *"Creo también que después de la negociación con el
+ * cliente, debe de haber una revisión antes de mandar a producir. Porque luego en la negociación
+ * enfrente del cliente puede ser que se cometa una imprudencia o un error"*. V1-E7b había
+ * construido el MECANISMO de versionar (la negociación mueve la receta en vivo y, en vez de editar
+ * el modelo, nace `CYA-26-71-001-01` con la receta heredada y el padre intacto); esto le puso la
+ * BISAGRA: que ese compromiso quede **firmado, con quién y cuándo** (A7).
  *
- * V1-E7b construyó el MECANISMO de versionar: la negociación mueve la receta en vivo y, en vez de
- * editar el modelo, nace `CYA-26-71-001-01` con la receta heredada y el padre intacto. Lo que
- * faltaba es la BISAGRA: el momento en que esa decisión de mesa se vuelve un compromiso de
- * producción — y que ese momento quede **firmado, con quién y cuándo** (A7).
+ * 🔴🔴 **V1-E9c — LA REVISIÓN YA NO ES UNA PUERTA: ES UN REGISTRO.** Daniel, 31-ago-2026, textual:
+ * *«**Todo lo que no está firmado simplemente no se puede comprar. Pero no detiene ni la
+ * producción ni los demás renglones ya firmados.**»* El único control sobre el gasto es **la firma
+ * POR RENGLÓN de la receta de la orden** (`produccion/receta-orden.ts`:
+ * `exigirRecetaLiberada` / `exigirMaterialesLiberados`), que ya cubre las bocas de gasto.
+ * En consecuencia:
  *
- * ⚠️ **DÓNDE VA LA COMPUERTA, y por qué no va donde parecía.** La regla NO vive en el endpoint
- * «pasar a producción»: vive dentro de {@link promoverAProduccionNucleo} (`nomenclatura.ts`), que
- * es el núcleo que ese endpoint comparte con **generar una OP** (`produccion/salida-produccion.ts`
- * paso 4 — generar la orden PROMUEVE el modelo sola). Puesta en el endpoint, una versión sin
- * revisar llegaría a producción por la **puerta lateral** de generar su OP, que es exactamente lo
- * que esta decisión viene a impedir. Esconder el botón es cortesía; negar la operación es la
- * regla, y con la URL a mano un botón oculto no protege nada.
+ *  • **Se retiró `exigirRevisionAprobadaParaProducir`**, la compuerta que vivía en
+ *    {@link promoverAProduccionNucleo} y le negaba producción a la versión sin firma. Una OP puede
+ *    nacer con la receta pendiente de revisar; lo que no puede es **comprarle material** a un
+ *    renglón sin liberar.
+ *  • **La firma sigue existiendo, y sigue sirviendo:** dice que alguien miró lo que se negoció
+ *    frente al cliente. Lo que ya no hace es gobernar una operación.
+ *  • **Por eso se puede firmar TAMBIÉN con el modelo ya en producción** (ver
+ *    {@link exigirVersionRevisable}) y por eso la BANDEJA «Recetas por revisar» dejó de filtrar por
+ *    `origen = 'desarrollo'`: si el acto se pudiera ejecutar pero nadie lo viera —o se viera pero
+ *    nadie lo pudiera ejecutar— sería un acto de negocio muerto, que es peor que no tenerlo.
+ *
+ * ⚠️ **Lo que NO se retiró, y no se toca:** las 12 puertas de {@link tocarModeloPorCambioDeReceta}
+ * y la invalidación automática de §Post-F9.116. Mover la receta después de firmarla **sigue
+ * tumbando la firma**: eso es lo que mantiene honesto el registro, y sin ello la firma sería un
+ * adorno. Daniel pidió el mecanismo en §Post-F9.140 y nada lo revoca.
  *
  * ⚠️ **A QUIÉN alcanza, y a quién NO.** Sólo a las **versiones** — lo que nació de una
  * negociación (`versionDesarrollo` o `idModeloPadre` no nulos). Los ~4,987 modelos migrados del
  * Access y los desarrollos normales **no cambian de conducta**: su `revisionEstado` es `null`, que
- * aquí significa *no aplica*, y la compuerta ni los mira. Esta etapa NO le puso una revisión nueva
- * al catálogo entero, y ensanchar la compuerta es una decisión de negocio que Daniel no ha tomado.
+ * aquí significa *no aplica*. Ensanchar la revisión al catálogo entero es una decisión de negocio
+ * que Daniel no ha tomado.
  *
  * ⚠️ **EL PERMISO es `modelos.aprobar-receta`** (el que ya creó V1-E7b: Dueño + Gerencial/Aurora).
  * NO es `listas.aprobar`, que es el PRECIO y es SÓLO DEL DUEÑO — Daniel fue explícito: *"el precio
@@ -48,13 +62,16 @@ import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 export type EstadoRevision = 'pendiente' | 'aprobada' | 'rechazada';
 
 /**
- * Lo que la compuerta necesita mirar de un modelo. Es una interfaz ESTRUCTURAL a propósito (no el
- * tipo de Prisma): así {@link exigirRevisionAprobadaParaProducir} es una función pura, probable
- * sin base de datos, y `nomenclatura.ts` puede llamarla con el `select` que ya tenía en la mano.
+ * Lo que hay que mirar de un modelo para saber si su revisión está firmada. Es una interfaz
+ * ESTRUCTURAL a propósito (no el tipo de Prisma): así {@link revisionSinAprobar} es una función
+ * pura, probable sin base de datos, y cualquier `select` que ya traiga estas cuatro columnas sirve.
+ *
+ * ⚠️ **V1-E9c la encogió.** Traía además `codigo`, `revisadoEn` y `revisionNota` porque la
+ * compuerta retirada las necesitaba para redactar su mensaje de rechazo. Sin compuerta, nadie las
+ * pregunta aquí: pedirlas seguiría obligando a todo llamador a hacer un `select` más ancho de lo
+ * necesario para contestar una pregunta de sí o no.
  */
 export interface RevisionDeModelo {
-  /** Código VIGENTE, para que el mensaje diga de qué modelo habla. */
-  codigo: string;
   /** Padre del que nació esta versión (V1-E7b), o null. */
   idModeloPadre: number | null;
   /** Nº del sufijo de versión (`-01` → 1), o null si el modelo es raíz. */
@@ -67,10 +84,6 @@ export interface RevisionDeModelo {
   idModeloDesarrollo: number | null;
   /** En qué quedó el último acto de revisión. Null = sin revisar (o no aplica). */
   revisionEstado: EstadoRevision | null;
-  /** Cuándo se firmó ese acto, o null. */
-  revisadoEn: Date | null;
-  /** Motivo del rechazo / nota de la aprobación, o null. */
-  revisionNota: string | null;
 }
 
 /**
@@ -86,27 +99,26 @@ export interface RevisionDeModelo {
  * la firma que lo habilitó a producir es la del padre, y se exigió antes de que él existiera.
  *
  * 🔴 **Qué evita esta línea, en concreto.** La ficha del modelo pinta el chip de la revisión
- * preguntando este mismo predicado y **sin mirar `origen`**. Si un hijo llegara a contestar `true`
- * —hoy no puede, porque nace con las dos columnas de versión en `null`, pero basta con que una
- * etapa futura le ponga `idModeloPadre` para "guardar de dónde salió"— se enseñaría a sí mismo como
- * *«Revisión pendiente · no puede mandarse a producir»*, **sin ningún botón para arreglarlo**,
- * sobre un modelo que YA está en producción: `exigirVersionRevisable` rechaza firmar cualquier cosa
- * que ya sea de producción. Es exactamente la cicatriz de §Post-F9.119 que V1-E7d vino a cerrar.
- * La guarda va aquí, en el predicado ÚNICO, y no en la pantalla: aquí la heredan las tres copias
- * (dominio, SQL y ficha) de una sola vez.
+ * preguntando este mismo predicado, y la BANDEJA «Recetas por revisar» lista con él. Si un hijo
+ * llegara a contestar `true` —hoy no puede, porque nace con las dos columnas de versión en `null`,
+ * pero basta con que una etapa futura le ponga `idModeloPadre` para "guardar de dónde salió"— se
+ * enseñaría a sí mismo como *«Revisión pendiente»* y se colaría en la bandeja **pidiendo una firma
+ * que no le toca**: su receta es la del padre, y firmarla en el hijo sería firmar dos veces lo
+ * mismo. La guarda va aquí, en el predicado ÚNICO, y no en la pantalla: aquí la heredan las tres
+ * copias (dominio, SQL y ficha) de una sola vez.
  *
  * ⚠️ **La exclusión es lo PRIMERO que se mira, y no un `&&` al final.** Un hijo no es "una versión
  * que además comparte receta": no es una versión, punto — el linaje de versiones y el 1:N son dos
  * ejes distintos y el segundo manda sobre este predicado.
  *
  * 🔴 **Y por qué se pregunta `typeof === 'number'` y no `!== null`.** Esta exclusión es la única
- * parte del predicado que puede ABRIR la compuerta, así que su modo de fallo tiene que caer del
- * lado seguro. Con `!== null`, un objeto al que le FALTE la clave —`undefined`, no `null`— contesta
- * "es un hijo" y la versión sin revisar se va a producción sin firma. **No es hipotético:** al
- * construir esta etapa, siete pruebas de `promoverAProduccionNucleo` y `salidaAProduccion` que
- * arman la fila como `Record<string, unknown>` se pusieron en rojo por exactamente eso, y TypeScript
- * no las alcanza. Sólo un id de verdad excluye; lo que no se sabe, no excluye — que es la misma
- * lectura conservadora del párrafo de arriba: exigir la firma de más, nunca de menos.
+ * parte del predicado que puede DEJAR A UN MODELO FUERA de la revisión, así que su modo de fallo
+ * tiene que caer del lado seguro. Con `!== null`, un objeto al que le FALTE la clave —`undefined`,
+ * no `null`— contesta "es un hijo" y la versión sin firmar desaparece de la bandeja sin que nadie
+ * la revise nunca. **No es hipotético:** al construir V1-E9a, siete pruebas que arman la fila como
+ * `Record<string, unknown>` se pusieron en rojo por exactamente eso, y TypeScript no las alcanza.
+ * Sólo un id de verdad excluye; lo que no se sabe, no excluye — que es la misma lectura
+ * conservadora del párrafo de arriba: pedir la firma de más, nunca de menos.
  */
 export function esVersionDeModelo(modelo: {
   idModeloPadre: number | null;
@@ -125,37 +137,39 @@ export function esVersionDeModelo(modelo: {
 // a `comun/` en vez de copiarse: dos copias del formateador serían dos fechas para el mismo problema.
 
 /**
- * ⭐ V1-E8r (§Post-F9.140) — **EL PREDICADO ÚNICO: ¿la revisión le NIEGA producción a este
- * modelo?** Es lo que {@link exigirRevisionAprobadaParaProducir} decide antes de lanzar, extraído
- * para que la BANDEJA de §Post-F9.140 pueda preguntar **lo mismo** en vez de reimplementarlo.
+ * ⭐ V1-E8r (§Post-F9.140) — **EL PREDICADO ÚNICO: ¿a esta versión le FALTA la firma de la
+ * revisión?** Es con lo que la BANDEJA «Recetas por revisar» arma su cola, y lo que la ficha del
+ * modelo pinta como chip.
+ *
+ * 🔴 **Se llamaba `revisionBloqueaProduccion` hasta V1-E9c, y el nombre había dejado de ser
+ * verdad.** La revisión ya no bloquea producción (§Post-F9.169: *"no detiene ni la producción ni
+ * los demás renglones ya firmados"*); lo único que gobierna la COMPRA es la firma por renglón de
+ * la receta de la orden. Renombrarlo no es cosmética: una función llamada "bloquea producción" que
+ * no bloquea nada es la clase de mentira que hace que el siguiente lector vuelva a cablearla a una
+ * operación "porque para eso está".
  *
  * 🔴 **Por qué existe, y qué defecto evita.** Una bandeja escrita "a ojo" listaría
- * `revisionEstado = 'pendiente'` — y eso NO es lo que la compuerta bloquea. Bloquea también:
+ * `revisionEstado = 'pendiente'` — y eso deja fuera a dos poblaciones que tampoco están firmadas:
  *
  *  • el **`null`** de las versiones que ya existían cuando se desplegó V1-E7d (la migración
  *    `20260826120000` lo dice con todas sus letras: *"para ellas NULL se lee como `pendiente`"*), y
- *  • el **`rechazada`**, que sigue sin poder producirse.
+ *  • el **`rechazada`**, que es lo contrario de una firma.
  *
- * Con el predicado "a ojo", esas versiones quedarían **bloqueadas y a la vez invisibles**: el
- * estado exacto que esta etapa viene a matar. Es la MISMA cicatriz de §Post-F9.119, cuando la
- * ficha del modelo preguntaba `revisionEstado !== null` y dejaba versiones sin chip ni botones.
+ * Con el predicado "a ojo", esas versiones quedarían **sin firmar y a la vez invisibles**: el
+ * estado exacto que V1-E8r vino a matar. Es la MISMA cicatriz de §Post-F9.119, cuando la ficha del
+ * modelo preguntaba `revisionEstado !== null` y dejaba versiones sin chip ni botones.
  *
- * ⚠️ **Su gemela EN SQL vive pegada aquí abajo** ({@link SQL_REVISION_BLOQUEA_PRODUCCION}) y una
- * prueba de integración las corre a las dos sobre las 16 combinaciones posibles y las compara fila
- * por fila: si alguien mueve una y no la otra, esa prueba muere.
+ * ⚠️ **Su gemela EN SQL vive pegada aquí abajo** ({@link SQL_REVISION_SIN_APROBAR}) y una prueba de
+ * integración las corre a las dos sobre las 32 combinaciones posibles y las compara fila por fila:
+ * si alguien mueve una y no la otra, esa prueba muere.
  */
-export function revisionBloqueaProduccion(
-  modelo: Pick<
-    RevisionDeModelo,
-    'idModeloPadre' | 'versionDesarrollo' | 'idModeloDesarrollo' | 'revisionEstado'
-  >,
-): boolean {
+export function revisionSinAprobar(modelo: RevisionDeModelo): boolean {
   return esVersionDeModelo(modelo) && modelo.revisionEstado !== 'aprobada';
 }
 
 /**
- * ⭐ La GEMELA EN SQL de {@link revisionBloqueaProduccion}, para poder **listar** lo que la
- * compuerta bloquea sin bajarse el catálogo entero a memoria (la agregación es del servidor).
+ * ⭐ La GEMELA EN SQL de {@link revisionSinAprobar}, para poder **listar** lo que espera firma sin
+ * bajarse el catálogo entero a memoria (la agregación es del servidor).
  *
  * ⚠️ Espera la tabla `modelos` **aliaseada como `m`**. Va aquí y no en el archivo de la bandeja a
  * propósito: las dos formas del mismo predicado se leen juntas o se desincronizan.
@@ -163,71 +177,43 @@ export function revisionBloqueaProduccion(
  * `IS DISTINCT FROM` y no `<> 'aprobada'`: en SQL un `NULL <> 'aprobada'` es NULL —o sea, FALSO
  * para un `WHERE`— y las versiones sin firma se caerían de la lista justo por ser las más viejas.
  */
-export const SQL_REVISION_BLOQUEA_PRODUCCION: Prisma.Sql = Prisma.sql`(
+export const SQL_REVISION_SIN_APROBAR: Prisma.Sql = Prisma.sql`(
   m."id_modelo_desarrollo" IS NULL
   AND (m."id_modelo_padre" IS NOT NULL OR m."version_desarrollo" IS NOT NULL)
   AND m."revision_estado" IS DISTINCT FROM 'aprobada'
 )`;
 
 /**
- * Con qué estado se LEE la revisión de una versión: el `null` se pliega a `pendiente`, igual que en
- * la compuerta (*"nadie la firmó"*). Se pliega **en el servidor** para que la bandeja y la ficha del
- * modelo no puedan enseñar dos palabras distintas del mismo hecho.
+ * Con qué estado se LEE la revisión de una versión: el `null` se pliega a `pendiente`
+ * (*"nadie la firmó"*). Se pliega **en el servidor** para que la bandeja y la ficha del modelo no
+ * puedan enseñar dos palabras distintas del mismo hecho.
  */
 export function estadoRevisionEfectivo(estado: EstadoRevision | null): EstadoRevision {
   return estado ?? 'pendiente';
 }
 
-/**
- * ⭐ **LA COMPUERTA.** Lanza si el modelo es una VERSIÓN cuya revisión no está aprobada; si no es
- * una versión, no hace absolutamente nada (los modelos normales no cambian de conducta).
- *
- * Se llama desde {@link promoverAProduccionNucleo} y por eso protege **los dos caminos que
- * PROMUEVEN** el modelo: el endpoint «pasar a producción» y la generación de la OP.
- *
- * ⚠️ **No se dice "las dos puertas" a propósito: hay una TERCERA.** `POST /api/ordenes` →
- * `crearOrden` crea una OP **sin promover** el modelo, así que no pasa por
- * {@link promoverAProduccionNucleo} y esta compuerta no la mira. Es un hueco **sólo por API**
- * (no tiene llamador en el frontend, y los dos importadores de pedido reusan `salidaAProduccion`,
- * que sí promueve), **pre-existente** a esta etapa —viene de F2— y que además se salta la
- * promoción de §Post-F9.34 entera. Queda anotado como deuda con nombre en
- * `docs/hoja-de-ruta/V1-etapas.md` §V1-E7d; cerrarlo es tocar el módulo de órdenes.
- *
- * El mensaje dice **qué falta y quién puede hacerlo**: quien lo lee está a punto de mandar a
- * fabricar y necesita saber a quién buscar, no sólo que no se pudo.
- */
-export function exigirRevisionAprobadaParaProducir(modelo: RevisionDeModelo): void {
-  // ⭐ V1-E8r — la compuerta y la BANDEJA preguntan LA MISMA función, no dos resúmenes parecidos.
-  if (!revisionBloqueaProduccion(modelo)) {
-    return;
-  }
-
-  const quien =
-    'Quien tenga el permiso «Aprobar receta» (Dirección o Gerencia) la revisa desde la ficha del ' +
-    'modelo.';
-
-  if (modelo.revisionEstado === 'rechazada') {
-    const cuando = modelo.revisadoEn === null ? '' : ` el ${fechaDelActo(modelo.revisadoEn)}`;
-    const motivo =
-      modelo.revisionNota === null || modelo.revisionNota === ''
-        ? ''
-        : `: "${modelo.revisionNota}"`;
-    throw new ErrorConflicto(
-      `La receta del modelo "${modelo.codigo}" se revisó${cuando} y quedó RECHAZADA${motivo}. ` +
-        `No puede mandarse a producir: corrige lo observado y pide que se vuelva a revisar. ` +
-        quien,
-    );
-  }
-
-  // `pendiente` y `null` se leen IGUAL: nadie la firmó. El `null` es el caso de las versiones que
-  // ya existían antes de esta etapa — no tienen firma, y tampoco se les va a fingir una.
-  throw new ErrorConflicto(
-    `El modelo "${modelo.codigo}" nació de una negociación y su receta todavía NO pasa la ` +
-      `REVISIÓN, así que no puede mandarse a producir. La negociación mueve la receta en vivo, ` +
-      `frente al cliente; esta revisión es la que confirma que lo acordado se puede fabricar. ` +
-      quien,
-  );
-}
+// ── 🔴🔴 V1-E9c (§Post-F9.169) — AQUÍ VIVÍA LA COMPUERTA, Y SE RETIRÓ ─────────────────────────
+//
+// `exigirRevisionAprobadaParaProducir(modelo)` lanzaba `ErrorConflicto` cuando una VERSIÓN sin
+// firma intentaba pasar a producción, y se llamaba desde `promoverAProduccionNucleo` (y, desde
+// V1-E9a, desde `derivarModeloDeProduccion`). Daniel la disolvió, textual:
+//
+//   *«Todo lo que no está firmado simplemente no se puede comprar. Pero no detiene ni la
+//    producción ni los demás renglones ya firmados.»*
+//
+// ⚠️ **SE RETIRÓ ENTERA, no se dejó "por si acaso".** Al quitarle su único acto, una función
+// exportada que lanza y que se llama *"exigir revisión aprobada para producir"* es una invitación
+// a volver a cablearla —el proyecto no tiene `knip` ni `ts-prune`, así que el lint no la habría
+// marcado nunca— y el muro volvería en silencio por la puerta que la cableara.
+//
+// 🔑 **Y no se perdió nada de lo que sabía:** el conocimiento —*"a esta versión le falta la
+// firma"*— vive en `revisionSinAprobar` y en su gemela `SQL_REVISION_SIN_APROBAR`, que siguen aquí
+// porque la BANDEJA y la ficha del modelo las preguntan. Lo único que se fue es el `throw`.
+//
+// 🚧 **La deuda que esto NO cierra** (para que nadie la dé por cerrada): `POST /api/ordenes` →
+// `crearOrden` se salta **la PROMOCIÓN ENTERA** (§Post-F9.34), no sólo la compuerta — por esa ruta
+// nace una OP de un modelo que sigue en `origen = 'desarrollo'` y **sin `numeroProduccion`**. Es
+// alcance de V1-E3 y sigue anotada en `docs/hoja-de-ruta/V1-etapas.md`.
 
 /** Lo que se devuelve tras firmar (o al consultar) la revisión de un modelo. */
 export interface RevisionModeloSalida {
@@ -261,8 +247,21 @@ const SELECT_REVISION = {
 } as const;
 
 /**
- * Lee el modelo y comprueba lo que las DOS firmas exigen igual: que exista, que sea una VERSIÓN y
- * que no esté ya en producción. Devuelve lo leído para que el llamador no repita la consulta.
+ * Lee el modelo y comprueba lo que las DOS firmas exigen igual: que exista y que sea una VERSIÓN.
+ * Devuelve lo leído para que el llamador no repita la consulta.
+ *
+ * 🔴 **V1-E9c — YA NO exige que el modelo siga en DESARROLLO, y eso es media etapa.** Hasta aquí
+ * rebotaba con *"ya está en el catálogo de producción: la revisión es ANTES de mandar a producir"*,
+ * y tenía sentido mientras la firma abriera una compuerta: después de promover no le quedaba nada
+ * que abrir. Al disolverse la compuerta (§Post-F9.169) esa regla se volvió una TRAMPA: generar la
+ * OP promueve el modelo, así que la versión llegaría a producción con la revisión en `pendiente` y
+ * **ya nadie podría firmarla nunca** — un acto de negocio que existe, que nadie puede ejecutar y
+ * que la bandeja tampoco enseñaría. Hoy la revisión es un REGISTRO, y un registro se puede levantar
+ * cuando el revisor de verdad la mira, aunque la orden ya esté corriendo.
+ *
+ * ⚠️ El `origen` se sigue leyendo: viaja a la BITÁCORA (`origenAlFirmar`) para que el acto diga si
+ * se firmó antes o después de que el modelo pasara a producción. Es la única forma de distinguirlo
+ * después, porque la fila del modelo sólo guarda el ÚLTIMO acto (D3).
  */
 async function exigirVersionRevisable(
   tx: Tx,
@@ -290,18 +289,7 @@ async function exigirVersionRevisable(
     throw new ErrorValidacion(
       `El modelo "${modelo.codigo}" no es una VERSIÓN de otro modelo, así que no lleva revisión ` +
         `de receta: la revisión existe para lo que nació de una negociación con el cliente ` +
-        `(los modelos con sufijo, "CYA-26-71-001-01"). Este modelo puede pasar a producción sin ` +
-        `firma, como siempre.`,
-    );
-  }
-
-  // Ya en producción, la firma no tendría a qué compuerta abrirle: la revisión es ANTES de mandar
-  // a producir, y cambiarla después sólo dejaría un dato que ya no gobierna nada.
-  if (modelo.origen === 'produccion') {
-    throw new ErrorConflicto(
-      `El modelo "${modelo.codigo}" ya está en el catálogo de producción: la revisión es ANTES ` +
-        `de mandar a producir y ya no se puede cambiar. Si la receta tiene que cambiar, crea una ` +
-        `versión nueva.`,
+        `(los modelos con sufijo, "CYA-26-71-001-01").`,
     );
   }
 
@@ -334,7 +322,15 @@ export interface DatosAprobarRevision {
 }
 
 /**
- * ⭐ APRUEBA la revisión de una versión: la firma que la habilita para producción.
+ * ⭐ APRUEBA la revisión de una versión: la firma de Desarrollo sobre su receta.
+ *
+ * ⚠️ **V1-E9c (§Post-F9.169) — esta firma NO habilita producción.** Aquí decía *"la firma que
+ * la habilita para producción"*, gemelo del docstring de {@link rechazarRevisionModelo}, y se
+ * quedó vivo cuando aquél se corrigió. Hoy la firma **no abre ni cierra ninguna puerta**: sólo
+ * saca la versión de la cola de «Recetas por revisar» y deja constancia de quién revisó y
+ * cuándo. Lo que gobierna el gasto es la liberación POR RENGLÓN de la receta de la orden
+ * (`exigirRecetaLiberada`, en `../produccion/receta-orden.ts`). Creer lo contrario es exactamente lo
+ * que llevaría a volver a cablear la compuerta que V1-E9c disolvió.
  *
  * Todo en UNA transacción (A2) con la bitácora dentro (A7). Aprobar dos veces es `ErrorConflicto`:
  * la segunda firma no cambiaría nada y sí borraría de la fila a quien firmó primero.
@@ -352,9 +348,7 @@ export async function aprobarRevisionModelo(
     const modelo = await exigirVersionRevisable(tx, idModelo);
 
     if (modelo.revisionEstado === 'aprobada') {
-      throw new ErrorConflicto(
-        `La receta del modelo "${modelo.codigo}" ya está aprobada. Ya puede mandarse a producir.`,
-      );
+      throw new ErrorConflicto(`La receta del modelo "${modelo.codigo}" ya está aprobada.`);
     }
 
     const cuando = new Date();
@@ -383,6 +377,10 @@ export async function aprobarRevisionModelo(
         // (rechazada con tal motivo → aprobada), que es lo que la fila ya no guarda (D3).
         estadoAnterior: modelo.revisionEstado,
         notaAnterior: modelo.revisionNota,
+        // ⭐ V1-E9c — en qué catálogo estaba el modelo AL FIRMAR. Desde §Post-F9.169 se puede
+        // revisar también con la OP ya generada (el modelo ya en `produccion`), y ésta es la
+        // única forma de distinguir después las dos cosas: la fila sólo guarda el último acto.
+        origenAlFirmar: modelo.origen,
         nota,
       },
     });
@@ -399,7 +397,13 @@ export interface DatosRechazarRevision {
 
 /**
  * ⭐ RECHAZA la revisión de una versión, con motivo. La versión sigue existiendo (D3: nada se
- * borra) y sigue editándose; lo que no puede es mandarse a producir.
+ * borra), sigue editándose y **vuelve a la cola** de «Recetas por revisar» hasta que se firme.
+ *
+ * ⚠️ **V1-E9c (§Post-F9.169) — rechazar NO detiene producir.** Aquí decía *"lo que no puede es
+ * mandarse a producir"*, y era verdad mientras existiera la compuerta. Hoy una versión rechazada
+ * genera su OP igual (`../produccion/salida-produccion.test.ts` lo asevera); lo que frena el gasto
+ * es la firma POR RENGLÓN de la receta de la orden. El texto del diálogo que lee quien rechaza dice
+ * esto mismo, y está aseverado en `DialogoRevisionModelo.test.tsx`.
  *
  * ⚠️ **Asimetría deliberada con la aprobación:** aprobar dos veces se rechaza (no cambia nada y
  * borra quién firmó primero), pero rechazar otra vez SÍ se permite — un segundo vistazo con una
@@ -447,6 +451,7 @@ export async function rechazarRevisionModelo(
         idModeloPadre: modelo.idModeloPadre,
         estadoAnterior: modelo.revisionEstado,
         notaAnterior: modelo.revisionNota,
+        origenAlFirmar: modelo.origen,
         motivo,
       },
     });
@@ -570,7 +575,7 @@ export async function invalidarRevisionSiAprobada(
   const nota =
     `Se INVALIDÓ automáticamente el ${fechaDelActo(cuando)}: después de aprobarse cambió ` +
     `${TEXTO_CAMBIO[cambio]} de la receta, así que la firma anterior ya no corresponde a lo que ` +
-    `se va a fabricar.${desde} Hay que volver a revisarla antes de mandarla a producir.`;
+    `se va a fabricar.${desde} Hay que volver a revisarla.`;
 
   await tx.modelo.update({
     where: { id: idModelo },

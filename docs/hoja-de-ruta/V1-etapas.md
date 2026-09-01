@@ -1218,6 +1218,156 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9c · ⭐ DISOLVER LA COMPUERTA DE LA REVISIÓN (31-ago-2026, versión **0.071**) — ✅ HECHA
+
+> 📌 **Se planeó como «0.065» y salió como `0.071`.** El número del programa es una **posición en la
+> fila**; el de entrega se asigna **al entrar a `prueba`**, y ésta esperó la respuesta de Daniel
+> mientras la 0.069 y la 0.070 se adelantaban. Ver *«Cómo se numeran»* en `HISTORIAL-DE-VERSIONES.md`.
+
+**La decisión de Daniel (§Post-F9.169), textual:**
+
+> *«Todo lo que no está firmado simplemente no se puede comprar. Pero **no detiene ni la producción ni
+> los demás renglones ya firmados**.»*
+
+Eso deja **un solo control, y ya existía**: la firma **por renglón** de la receta de la orden. La
+revisión del modelo deja de ser **puerta** y pasa a ser **registro**.
+
+### Qué se quitó, exactamente
+
+`exigirRevisionAprobadaParaProducir` **se eliminó del repo entero** — no se desactivó ni se dejó tras
+una bandera. Una compuerta apagada es una compuerta que alguien vuelve a encender.
+
+🔴 **Y el plan decía «su único sitio de llamada», que ya era FALSO al leerlo.** V1-E7d midió un solo
+llamador (`promoverAProduccionNucleo`) y así quedó escrito. Pero **la 0.069 —dos días antes— añadió el
+segundo**: `derivarModeloDeProduccion`, con la compuerta como su cuarta guarda. Quitar sólo el que el
+plan nombraba habría dejado el muro **vivo justo en el camino nuevo**, el de los modelos 1:N que la
+0.071 va a estrenar. ⇒ **La medición de un plan caduca; se vuelve a medir el día que se codea.**
+
+`revisionBloqueaProduccion` se renombró a **`revisionSinAprobar`** (y su gemela SQL a
+`SQL_REVISION_SIN_APROBAR`): el nombre viejo afirmaba un bloqueo que ya no existe, y quien lo leyera
+volvería a cablear el muro. **Su trabajo no cambió**: sigue siendo lo que llena la cola de «Recetas por
+revisar».
+
+### La segunda pieza era una prueba, no código
+
+El plan pedía «que los renglones de una versión sin revisar nazcan sin firmar». **Ya nacían así** — la
+medición previa lo confirmó. Así que la pieza es `salida-produccion.test.ts` aseverando que una versión
+**rechazada** genera su OP igual, y que sus renglones llegan sin firma. Sin esa prueba, el día que
+alguien recablee la compuerta nada se pondría rojo.
+
+### 🔴 Lo que encontró la revisión: la copia mentía en el segundo de decidir
+
+Los **toasts** se corrigieron en la primera vuelta y la **`DialogDescription`** —veinte líneas más
+abajo, el texto que la persona lee **mientras decide**— se quedó diciendo *«no podrá mandarse a
+producir»*. El argumento del reviewer fue el mismo con el que se justificó borrar la función: decir que
+bloquea cuando no bloquea es la misma mentira, sólo que **aquí la lee un usuario**.
+
+⭐ **Y no basta con retirar la promesa falsa: hay que mandar a la persona al acto que sí frena**, o se
+sustituye una mentira por un vacío. La copia final: *«rechazarla NO detiene su producción. El gasto se
+frena renglón por renglón en la receta de la orden: lo que Desarrollo no libera, no se compra.»*
+
+⭐⭐ **La prueba asevera EN NEGATIVO además de en positivo**, y el reviewer demostró por qué es
+necesario: el modo de fallo realista no es restaurar la frase vieja, es **añadir la nueva y dejar la
+vieja debajo**. Esa mutación **pasa en verde** si se le quitan los dos `not.toContain`.
+
+### 🔴🔴 El patrón que apareció TRES veces seguidas en esta sola etapa
+
+| # | Se arregló | Se quedó vivo |
+|---|---|---|
+| 1 | los toasts | la `DialogDescription` |
+| 2 | la aserción de `origenAlFirmar` al **aprobar** | la misma al **rechazar** (mutación que sobrevivía 48/48 en verde) |
+| 3 | el docstring de `rechazarRevisionModelo` | su **gemelo** en `aprobarRevisionModelo`, 67 líneas más arriba |
+
+⇒ **Corolario, escrito para que no se repita:** *«la simetría del código no se hereda a las pruebas»*
+—el aprendizaje de la 0.070— **tampoco se hereda a la prosa**. Cuando una regla vive en dos ramas
+gemelas, arreglar una **no** arregla la otra, y el verde no lo delata.
+
+**Quedaron corregidas cinco afirmaciones más**, ninguna visible al usuario pero todas capaces de hacer
+que el siguiente vuelva a creer en el muro: los dos JSDoc gemelos (backend y frontend), la oración
+*«pero no puede mandarse a producir»* viva en `frontend/src/api/modelos.ts`, un helper de prueba que
+prometía comprobar algo **que su cuerpo nunca comprobó**, y —la peor— el comentario del
+**`schema.prisma`** que justificaba separar `idModeloDesarrollo` de `idModeloPadre` diciendo que *«la
+firma que lo habilita es la del padre»*. ⭐ Esa decisión **NO dependía de la compuerta** (el ruido en la
+cola de revisión sigue igual), así que se sostiene **con la razón corregida** en vez de caerse con ella.
+
+### Deudas que esta versión NO cierra, y que suben de prioridad
+
+- **`crearOrden` se salta la promoción entera** (deuda de V1-E7d, §Post-F9.34). Antes la compuerta la
+  tapaba a medias; hoy no hay nada que tapar. **No cambia con esta versión** — se nombra para que no se
+  descubra dos veces.
+- **`duplicarOC` y `autorizarOC`** se saltan el candado de compra (declarado en la 0.067 y no cerrado).
+  ⚠️ **Matiz que hay que decir bien:** el muro que se disuelve aquí cubría **sólo las VERSIONES**; para
+  los ~4,987 modelos migrados de Access la firma del renglón **siempre fue el único control**. La
+  gravedad de esos dos huecos **no sube por esta versión** — ya era la que era.
+
+### Cierre
+
+**Gates:** backend `typecheck` · `lint` · `format:check` · `test:unit` **2,344** · frontend `typecheck`
+(`tsc -b`) · `lint` · `format:check` · `test` **1,863**.
+
+**Mutaciones: 11 corridas en la etapa, y UNA sobrevivió** —`origenAlFirmar` en el rechazo, con 48/48
+en verde— hasta que se arregló. **Ese es el dato que vale**, no el conteo final: decir «todas muertas»
+borra justamente la que enseñó algo.
+
+Revisión independiente: **tres rondas, dos rechazos**. El tercero encontró **la sexta gemela** —el
+docstring de la bandeja, 450 líneas debajo de dos que la ronda anterior acababa de arreglar en ese
+mismo archivo— y **tres defectos que introdujo la propia ronda de corrección**: una ruta a un
+directorio inventado en la frase cuya única misión era mandar al lector al mecanismo correcto, una
+cláusula del `schema.prisma` que **esta misma versión falsificó** al quitar los botones que la
+sostenían, y un comentario re-envuelto a medias.
+
+### ⭐ EL MÉTODO, no la anécdota
+
+La gemela apareció **cuatro veces**, la última en el archivo que la ronda anterior acababa de tocar.
+De ahí sale la regla, y conviene aplicarla tal cual:
+
+> **El barrido no se hace sobre lo que cambiaste: se hace sobre LA AFIRMACIÓN, en todo el repo, en
+> MULTILÍNEA, y con `.prisma` y `.sql` dentro.**
+
+Multilínea porque una frase partida en dos renglones no la caza un `grep` por línea — así se
+escaparon la cuarta y la quinta. Y `.prisma` dentro porque de ahí se generan archivos que nadie
+revisa.
+
+🔴 **Y hubo una SÉPTIMA, que se nos escapó a los dos: estaba en el CONTRATO.** Un `.describe()` de
+`contrato/esquemas/modelo.ts` afirmaba *«su OP **no puede nacer** hasta que la receta se revise»* — en el
+único sitio que **viaja fuera del repo**: entra al OpenAPI y de ahí al cliente generado del frontend. La
+cazó, ya con la etapa aprobada, la medición de otra versión.
+
+⚠️ **Y la primera lección que se escribió aquí ERA LA EQUIVOCADA.** Decía *«añadir `contrato/` a la lista
+de sitios del barrido»* — y **eso no habría evitado la séptima**: `contrato/` ya estaba dentro del
+`--include="*.ts"` sobre `backend/src`. **El barrido no falló por DÓNDE miró, sino por QUÉ buscó.** Se
+buscaron las **frases conocidas** (*mandarse a producir*, *habilita*, *niega*, *impide*, *bloquea*), y
+*«no puede nacer hasta que la receta se revise»* **no contiene ninguna**: es la misma afirmación con otras
+palabras. Sumar carpetas no arregla eso — un sinónimo en `dominio/` se escaparía igual.
+
+> ### ⭐⭐ LA LECCIÓN QUE SÍ GENERALIZA
+>
+> **Una afirmación de negocio no se busca por su REDACCIÓN: se busca ENUMERANDO SU SUPERFICIE Y
+> LEYÉNDOLA.** El `grep` sirve para **confirmar que algo se fue**; **no sirve para descubrir que sigue ahí
+> con otras palabras**.
+>
+> En el contrato eso es mecánico y barato, y ya está medido: extraer los `.describe()` (multilínea,
+> concatenaciones incluidas) da **5,476**; filtrar los que llevan un modal deja **82**; leerlos son
+> **minutos, una sola pasada**. Así se comprobó que el único contaminado era el nuestro.
+
+📌 **Y lo específico de este sitio se queda, porque es cierto:** tras corregir el contrato van
+`npm run openapi` y `npm run gen:api`, o **la frase vieja sobrevive en los tres generados** aunque la
+fuente esté corregida. Es el único lugar del repo donde eso pasa.
+
+🔴 **La octava fue la corrección de la séptima.** El primer reemplazo decía que la receta sin firmar
+*«detiene COMPRARLE el material»* — **también falso, y en el mismo renglón del contrato público**. Medido:
+`revisionEstado` aparece **cero veces** en `produccion/receta-orden.ts`, `compras/ordenes-compra.ts` y
+`compras/mrp.ts`; los renglones nacen `liberadoEn: null` **siempre**, aprobada la revisión o no, y sólo
+`liberarReceta` los libera. Son **dos firmas causalmente independientes sobre dos entidades distintas**.
+⇒ **Retirar una afirmación falsa y poner otra en su lugar es el modo de fallo de esta clase de arreglo**:
+al corregir, la pregunta no es *«¿suena bien?»* sino *«¿qué campo es éste, y qué dice el código que
+hace?»*. `conPedido` no afirma qué está bloqueado — es una **señal de prioridad**: hay piezas
+comprometidas detrás de esa receta sin revisar. ⛔ **Excepción que NO se toca: las migraciones ya aplicadas.** `migration.sql` lleva checksum
+en `_prisma_migrations`; editarla aborta el siguiente `migrate deploy` con *«migration was modified
+after it was applied»* y **tumba el despliegue**. La frase muerta se queda ahí, a propósito.
+
+---
+
 ## V1-E9b · ⭐⭐ LA RECETA COMPARTIDA, pieza A (31-ago-2026, versión **0.070**) — ✅ HECHA
 
 **La decisión, ratificada por Daniel el mismo día que se construyó:**
@@ -2924,7 +3074,7 @@ Quedó escrito como **§Post-F9.140**.
 
 | Lo que había que comprobar | Lo que se midió en el código (29-ago) |
 |---|---|
-| ¿Existe la **compuerta**? | ✅ **Sí, de V1-E7d.** `exigirRevisionAprobadaParaProducir` (`modelos/revision-modelo.ts`), llamada desde `promoverAProduccionNucleo` — cubre el endpoint «pasar a producción» **y** la puerta lateral de generar la OP. **No se reconstruyó.** |
+| ¿Existe la **compuerta**? | ✅ **Sí, de V1-E7d.** `exigirRevisionAprobadaParaProducir` (`modelos/revision-modelo.ts`), llamada desde `promoverAProduccionNucleo` — cubre el endpoint «pasar a producción» **y** la puerta lateral de generar la OP. **No se reconstruyó.** ⚠️ **Y ya no existe: `V1-E9c` (0.071) la eliminó del repo** (§Post-F9.169). |
 | ¿Existe **la cola**? | 🔴 **No.** Barrido repo-wide de `revisionEstado`/`revision_estado`: se **escribe** (`versiones.ts` al nacer la versión, `revision-modelo.ts` al firmar y al invalidar) y se **exige** al promover — **ninguna consulta la LISTA**. |
 | ⇒ *«hoy la revisión es un muro al final, no un filtro»* | ✅ **Confirmado.** El único momento en que el estado se mira es al intentar producir. |
 | ¿Hay una forma ya aprobada que copiar? | ✅ **Sí:** «Recetas por liberar» (`produccion/recetas-por-liberar.ts`), de la que Daniel dijo *«está buenísima»*, con su regla **NO FIRMA: LLEVA** (§Post-F9.80). |
