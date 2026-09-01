@@ -37,10 +37,14 @@
  *  2. **`OrdenReferencia.valor`** del campo «División» — el importador guarda el texto CRUDO de la OC
  *     (`"2-HOMBRE"`) como referencia de la orden (D7) y está **indexado para búsqueda**
  *     (`@@index([idClienteCampo, valor])`). ⇒ Después de una fusión, los proyectos y las listas ya
- *     quedan unificados **pero la búsqueda por referencia sigue partida**. Es la QUINTA PIEZA
- *     pendiente de decidir (ver `HOJA-DE-RUTA.md` §4): no se arregla aquí porque tocar un valor
- *     capturado de un documento del cliente es una decisión de negocio de Daniel, no un efecto
- *     colateral de limpiar un catálogo.
+ *     quedan unificados **pero la búsqueda por referencia seguía partida**.
+ *
+ *     ✅ **YA ESTÁ DECIDIDO Y RESUELTO — y el texto SIGUE SIN TOCARSE** (§Post-F9.172(a), Daniel:
+ *     *«Está bien la 3. Lo que propones.»*). Se descartó reescribir el valor: es la única prueba de
+ *     qué pidió el cliente, y reescribirlo sería justo lo que el punto 1 se congela a propósito para
+ *     no hacer. Lo que se hizo fue darle al departamento el **rastro** que ya tenían los colores
+ *     (`ClienteDepartamento.idFusionadoEn`) para que la BÚSQUEDA entienda los dos nombres: ver
+ *     `cliente-departamentos-sinonimos.ts`. La fusión sigue sin tocar una sola letra de la orden.
  */
 import type { Prisma } from '../../datos/index.js';
 import type { Tx } from '../../comun/transaccion.js';
@@ -164,6 +168,19 @@ export async function colisionDeFactores(
  * departamentos revueltos son el mismo, sus compradoras son las del departamento bueno. Se repunta
  * como las demás, y sin colisión posible: no hay unicidad sobre `(cliente, departamento, persona)`
  * —dos personas pueden llamarse igual— así que un `updateMany` a secas es correcto.
+ *
+ * 🔴 **LA ÚNICA QUE NO ESTÁ AQUÍ, Y POR QUÉ: `absorbidos`** (§Post-F9.172(a)). Es la relación
+ * REFLEXIVA de la propia fusión (`idFusionadoEn`): los departamentos que ÉSTE se llevó. No es algo
+ * que cuelgue del departamento, **es la contabilidad de la fusión misma**. Y repuntarla estaría MAL,
+ * no sólo de más: aplanaría la cadena reescribiendo un hecho histórico («a A se lo llevó B» pasaría
+ * a decir «se lo llevó C»). Al fusionar B en C se forma A→B→C y así se queda; quien la lee
+ * (`sinonimosDeDepartamentos`) la recorre entera, en los dos sentidos, sin necesidad de aplanarla.
+ *
+ * ⚠️ **Esa excepción NO se declara aquí, a propósito.** Vive como LITERAL dentro de
+ * `cliente-departamentos-fusion-referencias.test.ts` —igual que `NO_BLOQUEAN` en la prueba gemela de
+ * los colores—, para que ampliarla obligue a **editar la prueba**, un acto visible en el diff. Si
+ * viviera en este archivo, saltarse la red sería agregar **una palabra en el mismo archivo que el
+ * desarrollador ya está editando**, que es exactamente el escape que la red existe para cerrar.
  */
 export const REFERENCIAS_A_REPUNTAR: ReferenciaARepuntar[] = [
   {
