@@ -130,6 +130,9 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+
+import { sinonimosDeDepartamentos } from '../catalogos/cliente-departamentos-sinonimos.js';
+
 import { copiarRecetaDelModelo } from './receta-orden.js';
 import { recalcularEstadoOrden, requisitosOrden } from './requisitos-orden.js';
 
@@ -1293,7 +1296,7 @@ export async function listarOrdenes(
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(filtros.anio === undefined ? {} : { fecha: rangoAnio(filtros.anio) }),
-    ...armarBusqueda(filtros.busqueda),
+    ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
   };
 
   const cliente = clienteLectura(bd);
@@ -1327,8 +1330,22 @@ export const buscarOrdenes = listarOrdenes;
  * Exportado para reusarse en las CONSULTAS ligeras (F2-E4, `consultas.ts`): la consulta y el
  * buscador global comparten EXACTAMENTE esta lógica de búsqueda combinada (folio + modelo + cliente
  * + valor de referencia), con su proyección ligera propia.
+ *
+ * ⭐⭐ `sinonimosDepartamento` (§Post-F9.172(a)) — nombres de departamento que la búsqueda debe
+ * entender ADEMÁS del texto tecleado, porque el catálogo dice que se fusionaron con él. Buscar
+ * «Caballeros» tiene que traer las órdenes cuya referencia dice «2-HOMBRE»: el texto que el cliente
+ * escribió en su OC **no se reescribe nunca**, así que el sinónimo se resuelve al consultar. Se
+ * comparan por IGUALDAD (insensible a mayúsculas), no por `contains`: no son un fragmento que el
+ * usuario tecleó sino nombres EXACTOS del catálogo —los mismos que el importador copió al valor de
+ * la referencia—, y un `contains` con un nombre de una o dos letras arrastraría media base.
+ *
+ * 🔑 Esta función sigue siendo **pura**: quien la llama resuelve el conjunto de sinónimos UNA vez
+ * (`armarBusquedaConSinonimos`) y se lo pasa. Nunca se recorre la cadena de fusiones por fila.
  */
-export function armarBusqueda(busqueda: string | undefined): Prisma.OrdenWhereInput {
+export function armarBusqueda(
+  busqueda: string | undefined,
+  sinonimosDepartamento: readonly string[] = [],
+): Prisma.OrdenWhereInput {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
@@ -1337,11 +1354,53 @@ export function armarBusqueda(busqueda: string | undefined): Prisma.OrdenWhereIn
     { cliente: { nombre: { contains: busqueda, mode: 'insensitive' } } },
     { referencias: { some: { valor: { contains: busqueda, mode: 'insensitive' } } } },
   ];
+  const porSinonimo = condicionSinonimosDepartamento(sinonimosDepartamento);
+  if (porSinonimo !== null) {
+    or.push(porSinonimo);
+  }
   const folio = aFolioBusqueda(busqueda);
   if (folio !== null) {
     or.push({ folio });
   }
   return { OR: or };
+}
+
+/**
+ * Condición "alguna referencia de la orden ES uno de estos nombres de departamento" (§Post-F9.172(a)).
+ * `null` cuando no hay sinónimos, para no meter un `OR` vacío —que en Prisma no casa NADA— en el
+ * `where`. Exportada para el Centro de Órdenes, que arma su propio `OR` (busca sin nombre de
+ * cliente) pero entiende los mismos sinónimos.
+ */
+export function condicionSinonimosDepartamento(
+  sinonimos: readonly string[],
+): Prisma.OrdenWhereInput | null {
+  if (sinonimos.length === 0) {
+    return null;
+  }
+  return {
+    referencias: {
+      some: { OR: sinonimos.map((nombre) => ({ valor: { equals: nombre, mode: 'insensitive' } })) },
+    },
+  };
+}
+
+/**
+ * ⭐⭐ La búsqueda de órdenes CON los sinónimos ya resueltos (§Post-F9.172(a)): el embudo que usan el
+ * listado, las consultas ligeras, el buscador global, el tablero WIP y la lista de costos.
+ *
+ * Es {@link armarBusqueda} + **una** resolución de sinónimos por consulta
+ * ({@link sinonimosDeDepartamentos}, 1 viaje si el texto no casa con ningún departamento). Se hizo
+ * async por esto: el rastro de la fusión vive en el catálogo y hay que leerlo, pero **una sola vez**
+ * — jamás por fila.
+ */
+export async function armarBusquedaConSinonimos(
+  busqueda: string | undefined,
+  bd?: ContextoBd,
+): Promise<Prisma.OrdenWhereInput> {
+  if (busqueda === undefined || busqueda === '') {
+    return {};
+  }
+  return armarBusqueda(busqueda, await sinonimosDeDepartamentos(busqueda, bd));
 }
 
 /** Si la búsqueda es un entero, devuelve el `bigint` para filtrar por folio; si no, `null`. */

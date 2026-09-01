@@ -19,8 +19,10 @@ import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/err
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
+  actualizarDepartamentoCliente,
   fusionarDepartamentosCliente,
   previsualizarFusionDepartamentos,
+  reactivarDepartamentoCliente,
 } from './cliente-departamentos.js';
 
 let cliente: PrismaClient;
@@ -454,5 +456,135 @@ describe('previsualizarFusionDepartamentos (la guarda GEMELA)', () => {
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+});
+
+/**
+ * ⭐⭐ EL RASTRO DE LA FUSIÓN (§Post-F9.172(a)) — `ClienteDepartamento.idFusionadoEn`.
+ *
+ * La fusión repunta bien y deja bitácora, pero hasta esta etapa **ahí se acababa el rastro**: nadie
+ * podía saber, mirando el catálogo, que «2-HOMBRE» se había ido dentro de «Caballeros». Y hacía
+ * falta, porque el texto que el cliente escribió en su OC viaja a la orden como referencia de TEXTO
+ * (`OrdenReferencia.valor`) y **no se reescribe nunca**: la búsqueda sólo puede entender los dos
+ * nombres si el catálogo se lo dice.
+ *
+ * Estas pruebas verifican las TRES reglas que hacen que el rastro sea confiable —se sella en el
+ * absorbido, se limpia en el canónico y reactivar a mano lo borra—, que juntas son además lo que
+ * impide que el DOMINIO cierre un anillo.
+ */
+describe('el RASTRO de la fusión de departamentos (§Post-F9.172(a))', () => {
+  it('⭐ sella `idFusionadoEn` en cada absorbido y lo deja LIMPIO en el canónico', async () => {
+    await fusionarDepartamentosCliente(
+      sesionAdmin(),
+      idCliente,
+      { idDestino: idCaballeros, origenes: [idHombre, idVaron] },
+      bd(),
+    );
+    const hombre = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: idHombre } });
+    const varon = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: idVaron } });
+    const caballeros = await cliente.clienteDepartamento.findUniqueOrThrow({
+      where: { id: idCaballeros },
+    });
+    expect(hombre.idFusionadoEn).toBe(idCaballeros);
+    expect(hombre.activo).toBe(false);
+    expect(varon.idFusionadoEn).toBe(idCaballeros);
+    // Al que se queda no lo absorbe nadie: su rastro queda nulo (media regla del anti-anillo).
+    expect(caballeros.idFusionadoEn).toBeNull();
+    expect(caballeros.activo).toBe(true);
+  });
+
+  it('⭐ un departamento que YA estaba apagado también recibe el rastro (el dato nuevo es a DÓNDE se fue)', async () => {
+    // Apagado a mano ANTES de la fusión: sin esto no se distinguiría "lo apagó su dueño" de
+    // "lo absorbió una fusión", que es justo lo que la búsqueda necesita saber.
+    await cliente.clienteDepartamento.update({
+      where: { id: idHombre },
+      data: { activo: false },
+    });
+    await fusionarDepartamentosCliente(
+      sesionAdmin(),
+      idCliente,
+      { idDestino: idCaballeros, origenes: [idHombre] },
+      bd(),
+    );
+    const hombre = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: idHombre } });
+    expect(hombre.idFusionadoEn).toBe(idCaballeros);
+  });
+
+  it('⭐ REACTIVAR a mano deshace la fusión: borra el rastro y lo deja dicho en la bitácora', async () => {
+    await fusionarDepartamentosCliente(
+      sesionAdmin(),
+      idCliente,
+      { idDestino: idCaballeros, origenes: [idHombre] },
+      bd(),
+    );
+    const reactivado = await reactivarDepartamentoCliente(sesionAdmin(), idCliente, idHombre, bd());
+    expect(reactivado.activo).toBe(true);
+    expect(reactivado.idFusionadoEn).toBeNull();
+
+    const bitacora = await cliente.bitacora.findMany({
+      where: { entidad: 'Cliente', idEntidad: String(idCliente) },
+      orderBy: { id: 'desc' },
+      take: 1,
+    });
+    const datos = bitacora[0]?.datos as { deshaceFusionDe?: number } | null;
+    expect(datos?.deshaceFusionDe).toBe(idCaballeros);
+  });
+
+  it('desactivar NO inventa rastro (apagar a mano no es una fusión)', async () => {
+    await actualizarDepartamentoCliente(
+      sesionAdmin(),
+      idCliente,
+      { id: idHombre, activo: false },
+      bd(),
+    );
+    const hombre = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: idHombre } });
+    expect(hombre.activo).toBe(false);
+    expect(hombre.idFusionadoEn).toBeNull();
+  });
+
+  it('⭐ la CADENA no se aplana: fusionar el canónico en un tercero deja A→B→C', async () => {
+    await fusionarDepartamentosCliente(
+      sesionAdmin(),
+      idCliente,
+      { idDestino: idCaballeros, origenes: [idHombre] },
+      bd(),
+    );
+    await fusionarDepartamentosCliente(
+      sesionAdmin(),
+      idCliente,
+      { idDestino: idVaron, origenes: [idCaballeros] },
+      bd(),
+    );
+    const hombre = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: idHombre } });
+    const caballeros = await cliente.clienteDepartamento.findUniqueOrThrow({
+      where: { id: idCaballeros },
+    });
+    const varon = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: idVaron } });
+    // «2-HOMBRE» sigue diciendo que se lo llevó «Caballeros» — no se le reescribe la historia.
+    expect(hombre.idFusionadoEn).toBe(idCaballeros);
+    expect(caballeros.idFusionadoEn).toBe(idVaron);
+    expect(varon.idFusionadoEn).toBeNull();
+  });
+
+  it('⭐ el DOMINIO no puede cerrar un anillo: fusionar de vuelta deja el destino TERMINAL', async () => {
+    await fusionarDepartamentosCliente(
+      sesionAdmin(),
+      idCliente,
+      { idDestino: idCaballeros, origenes: [idHombre] },
+      bd(),
+    );
+    // Corrección: ahora el bueno era «2-HOMBRE». Fusionar al revés NO deja A→B y B→A.
+    await fusionarDepartamentosCliente(
+      sesionAdmin(),
+      idCliente,
+      { idDestino: idHombre, origenes: [idCaballeros] },
+      bd(),
+    );
+    const hombre = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: idHombre } });
+    const caballeros = await cliente.clienteDepartamento.findUniqueOrThrow({
+      where: { id: idCaballeros },
+    });
+    expect(hombre.idFusionadoEn).toBeNull();
+    expect(caballeros.idFusionadoEn).toBe(idHombre);
   });
 });

@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RecetaOrden } from '@/api/tipos';
+import type { ClavePermiso, RecetaOrden } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { PanelRecetaOrden } from './PanelRecetaOrden';
@@ -74,6 +74,10 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
     abiertaEn: null,
     abiertaPor: null,
     abiertaMotivo: null,
+    // ⭐⭐⭐ 0.085 (§Post-F9.173(a)): por default esta orden NO tiene compra comprometida.
+    ocsComprometidas: [],
+    avisoCompraComprometida: null,
+    avisoCambioSobreLoComprado: null,
     resumen: {
       sinRevisar: 3,
       revisados: 0,
@@ -108,6 +112,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         consumoModelo: 1.5,
         precioModelo: 50,
         precioModeloDeCompra: false,
+        ocsComprometidas: [],
       },
     ],
     avios: [
@@ -144,6 +149,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         consumoModelo: 2,
         precioModelo: 2,
         precioModeloDeCompra: false,
+        ocsComprometidas: [],
       },
       {
         id: 3,
@@ -178,6 +184,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         consumoModelo: 1,
         precioModelo: 8,
         precioModeloDeCompra: false,
+        ocsComprometidas: [],
       },
     ],
     artes: [],
@@ -187,10 +194,17 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
   };
 }
 
-function render(receta: RecetaOrden, puedeAdministrar = true): void {
+function render(
+  receta: RecetaOrden,
+  puedeAdministrar = true,
+  // ⭐ 0.085: `compras.ver` decide si los chips de «ya comprado» llevan a la OC o solo informan.
+  // ⚠️ Tipado como `ClavePermiso[]`: un `as never` apagaba la comprobación de que el permiso
+  // EXISTE, que es justo lo que hace útil a esta lista (un typo pasaría verde sin permisos).
+  permisos: ClavePermiso[] = ['ordenes.ver', 'desarrollo.administrar'],
+): void {
   useRecetaOrdenMock.mockReturnValue({ data: receta, isPending: false, isError: false });
   renderConProveedores(<PanelRecetaOrden idOrden={50} puedeAdministrar={puedeAdministrar} />, {
-    sesion: estadoSesionDePrueba(['ordenes.ver', 'desarrollo.administrar']),
+    sesion: estadoSesionDePrueba(permisos),
   });
 }
 
@@ -1455,5 +1469,254 @@ describe('<PanelRecetaOrden> · el candado de compra (V1-E8z)', () => {
 
     expect(cerrarMutateMock).toHaveBeenCalledTimes(1);
     expect(cerrarMutateMock.mock.calls[0]?.[0]).toBe(50);
+  });
+});
+
+/**
+ * ⭐⭐⭐ **0.085 (§Post-F9.173(a)) — SI YA SE COMPRÓ, AVISA.**
+ *
+ * DANIEL, textual: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede
+ * cancelar la OC interna, o que **el comprador sepa que cambió**, para hacer lo que tenga que hacer.
+ * **No se puede cancelar la OC en automático… eso hay que negociarlo con el proveedor.**"*
+ *
+ * Lo que estas pruebas fijan son los TRES sitios donde el aviso tiene que aparecer, y —tan
+ * importante— los tres donde NO puede aparecer cuando no hay nada comprometido.
+ */
+describe('⭐⭐⭐ 0.085 — «ya está comprado» en la receta (§Post-F9.173(a))', () => {
+  const OC_AUTORIZADA = {
+    idOrdenCompra: 900,
+    folio: 12,
+    estatus: 'autorizada' as const,
+    // ⭐ `recibida` lo calcula el DOMINIO (`algunaRecibida`) y VIAJA: la pantalla no lo deduce.
+    recibida: false,
+  };
+  const AVISO_DEL_SERVIDOR =
+    'Acabas de cambiar un material que YA ESTÁ COMPRADO para esta orden: "Jersey" (la orden de ' +
+    'compra #12 (autorizada)). La orden de compra NO se corrige sola.';
+
+  /**
+   * ⭐⭐ **DISPARA UNA EDICIÓN DE VERDAD** y deja que el mock de la mutación conteste con el aviso.
+   *
+   * 🔴 Nace de un hallazgo del reviewer: las dos primeras versiones de estas pruebas renderizaban
+   * una receta **con el campo ya puesto**, así que su nombre prometía el flujo y el cuerpo sólo
+   * comprobaba el pintado. Hoy el aviso NO viene de la receta —vive en el estado del panel, porque
+   * la invalidación borraba el de la caché—, de modo que la única manera de verlo es **provocarlo**.
+   */
+  async function editarElPrecioDeLaTela(
+    usuario: ReturnType<typeof userEvent.setup>,
+    respuesta: RecetaOrden,
+  ): Promise<void> {
+    editarMutateMock.mockImplementation(
+      (_vars: unknown, opciones?: { onSuccess?: (r: RecetaOrden) => void }) => {
+        opciones?.onSuccess?.(respuesta);
+      },
+    );
+    const campo = screen.getByTestId('precio-receta-tela-1');
+    await usuario.clear(campo);
+    await usuario.type(campo, '77');
+    await usuario.tab();
+  }
+
+  /** La receta con su(s) TELA(S) ya compradas en la OC #12 (y la orden, en consecuencia). */
+  function conTelaComprada(
+    extra: Partial<RecetaOrden['telas'][number]> = {},
+    over: Partial<RecetaOrden> = {},
+  ): RecetaOrden {
+    const r = recetaDePrueba();
+    return {
+      ...r,
+      telas: r.telas.map((t) => ({ ...t, ocsComprometidas: [OC_AUTORIZADA], ...extra })),
+      ocsComprometidas: [OC_AUTORIZADA],
+      ...over,
+    };
+  }
+
+  /** Receta LIBERADA COMPLETA: la única que el servidor deja reabrir (§Post-F9.165 punto 4). */
+  function liberadaCompleta(over: Partial<RecetaOrden> = {}): RecetaOrden {
+    return recetaDePrueba({
+      liberadaEn: '2026-08-30T10:00:00.000Z',
+      liberadaPor: 'usuario-1',
+      puedeComprar: true,
+      todoLiberado: true,
+      resumen: {
+        sinRevisar: 0,
+        revisados: 3,
+        ajustados: 0,
+        excluidos: 0,
+        total: 3,
+        liberados: 3,
+        porLiberar: 0,
+      },
+      ...over,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('el RENGLÓN comprado lo dice en su fila, con folio y estado', () => {
+    render(conTelaComprada());
+
+    expect(screen.getByTestId('oc-comprometida-12')).toHaveTextContent('OC 12');
+    expect(screen.getByTestId('oc-comprometida-12')).toHaveTextContent('Autorizada');
+  });
+
+  it('🔴 EL GEMELO: sin OC comprometidas la fila no lleva chip (nada de gritar en falso)', () => {
+    render(recetaDePrueba());
+    expect(screen.queryByTestId('oc-comprometida-12')).not.toBeInTheDocument();
+  });
+
+  it('⭐ en una LÁPIDA SÍ se pinta: ahí el dato es una CONTRADICCIÓN, no un adorno', () => {
+    // 🔴 Al revés que la firma, que en una lápida se calla. Aquí el hecho es: existe una OC viva
+    // contra un material que esta orden dice que NO lleva — y quien vaya a REVIVIRLO (lo que le
+    // reescribe consumo, precio y amarre) tiene que verlo ANTES. Callarlo en el único renglón donde
+    // el dato es una contradicción sería callarlo justo donde más grita (hallazgo del reviewer).
+    render(conTelaComprada({ excluido: true }));
+    expect(screen.getByTestId('oc-comprometida-12')).toBeInTheDocument();
+  });
+
+  it('⭐⭐ EDITAR algo comprado pinta el aviso del SERVIDOR entero (y no como toast)', async () => {
+    // 🔴 Un toast se va en cuatro segundos; esto no es un «guardado ✓», es «acabas de descuadrar
+    // una OC que ya está con el proveedor». Va como bloque, y el texto viaja REDACTADO (A1).
+    const usuario = userEvent.setup();
+    render(conTelaComprada());
+    // Antes de tocar nada NO hay bloque: es el eco de una acción, no un estado de la receta.
+    expect(screen.queryByTestId('receta-aviso-ya-comprado')).not.toBeInTheDocument();
+
+    await editarElPrecioDeLaTela(
+      usuario,
+      conTelaComprada({}, { avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR }),
+    );
+
+    const bloque = screen.getByTestId('receta-aviso-ya-comprado');
+    expect(bloque).toHaveTextContent('"Jersey"');
+    expect(bloque).toHaveTextContent('#12 (autorizada)');
+    // La pantalla NO arma la frase: si la armara, este texto exacto no podría salir de aquí.
+    expect(within(bloque).getByTestId('oc-comprometida-12')).toBeInTheDocument();
+  });
+
+  it('🔴 EL GEMELO: si la respuesta NO trae aviso, no se pinta el bloque aunque haya OC', async () => {
+    // Rojo si el bloque se colgara de `ocsComprometidas` en vez del aviso: entonces toda orden con
+    // una compra viva llevaría permanentemente un cartel rojo que nadie provocó.
+    const usuario = userEvent.setup();
+    render(conTelaComprada());
+
+    await editarElPrecioDeLaTela(usuario, conTelaComprada());
+
+    expect(screen.queryByTestId('receta-aviso-ya-comprado')).not.toBeInTheDocument();
+  });
+
+  it('⭐⭐ el diálogo de REABRIR nombra las OC ANTES de confirmar (§Post-F9.145(a))', async () => {
+    const usuario = userEvent.setup();
+    render(
+      liberadaCompleta({
+        ocsComprometidas: [OC_AUTORIZADA],
+        avisoCompraComprometida:
+          'Esta orden ya tiene compra comprometida con el proveedor: la orden de compra #12 ' +
+          '(autorizada). Reabrir la receta NO las cancela ni las toca: siguen su curso.',
+      }),
+    );
+
+    await usuario.click(screen.getByTestId('receta-abrir'));
+    const bloque = screen.getByTestId('abrir-receta-compra-comprometida');
+    expect(bloque).toHaveTextContent('#12 (autorizada)');
+    expect(bloque).toHaveTextContent('NO las cancela');
+    // Y sigue siendo posible reabrir: AVISA, no bloquea.
+    expect(screen.getByTestId('motivo-abrir-receta')).toBeInTheDocument();
+  });
+
+  it('🔴 EL GEMELO: sin compra comprometida el diálogo no inventa un aviso', async () => {
+    const usuario = userEvent.setup();
+    render(liberadaCompleta());
+
+    await usuario.click(screen.getByTestId('receta-abrir'));
+    expect(screen.queryByTestId('abrir-receta-compra-comprometida')).not.toBeInTheDocument();
+    expect(screen.getByTestId('motivo-abrir-receta')).toBeInTheDocument();
+  });
+
+  it('🔴 SIN `compras.ver` el chip informa pero NO es enlace (no se pinta un 403)', () => {
+    render(conTelaComprada());
+    expect(screen.getByTestId('oc-comprometida-12').closest('button')).toBeNull();
+  });
+
+  /**
+   * ⭐⭐⭐ **LA DÉCIMA MUTACIÓN: «traer del modelo» TAMBIÉN tiene que apagar el eco** (remate del
+   * reviewer).
+   *
+   * 🔴 `useTraerDelModelo` es la ÚNICA que `recordandoElAviso` no puede envolver —devuelve
+   * `TraerDelModeloResultado`, no `RecetaOrden`—, así que reporta a mano. Sin esa línea el bloque
+   * rojo sobrevivía a la siguiente acción y seguía diciendo *«acabas de cambiar…»* de algo que ya
+   * no era lo último: el *gritar en falso* que este mismo módulo dice que enseña a ignorar avisos.
+   */
+  it('⭐⭐ «Traer del modelo» APAGA el aviso: es otra acción, y el eco es de la ÚLTIMA', async () => {
+    const usuario = userEvent.setup();
+    const conFaltante = conTelaComprada(
+      {},
+      {
+        desalineacion: {
+          hayCambios: true,
+          conOrdenCompra: false,
+          critico: false,
+          cambios: [
+            {
+              tipo: 'avio',
+              idRenglon: null,
+              material: 'E01 — Etiqueta de lavado',
+              idMaterialModelo: 77,
+              que: 'agregado',
+              detalle:
+                'El modelo ahora lleva "E01 — Etiqueta de lavado", y esta orden no lo tiene.',
+            },
+          ],
+        },
+      },
+    );
+    render(conFaltante);
+
+    // 1) Una edición sobre lo comprado enciende el bloque…
+    await editarElPrecioDeLaTela(usuario, {
+      ...conFaltante,
+      avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR,
+    });
+    expect(screen.getByTestId('receta-aviso-ya-comprado')).toBeInTheDocument();
+
+    // 2) …y la SIGUIENTE acción, que no toca nada comprado, lo apaga.
+    traerMutateMock.mockImplementation(
+      (
+        _vars: unknown,
+        opciones?: {
+          onSuccess?: (r: {
+            receta: RecetaOrden;
+            traidos: unknown[];
+            respetados: unknown[];
+          }) => void;
+        },
+      ) => {
+        opciones?.onSuccess?.({
+          receta: conFaltante, // sin aviso: traer del modelo sólo CREA renglones
+          traidos: [{ tipo: 'avio', material: 'E01 — Etiqueta de lavado' }],
+          respetados: [],
+        });
+      },
+    );
+    await usuario.click(screen.getByTestId('traer-del-modelo-todo'));
+
+    expect(screen.queryByTestId('receta-aviso-ya-comprado')).not.toBeInTheDocument();
+  });
+
+  it('⭐ con `compras.ver` el chip del AVISO sí es la puerta a las compras de la orden', async () => {
+    const usuario = userEvent.setup();
+    render(conTelaComprada(), true, ['ordenes.ver', 'desarrollo.administrar', 'compras.ver']);
+
+    await editarElPrecioDeLaTela(
+      usuario,
+      conTelaComprada({}, { avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR }),
+    );
+
+    const bloque = screen.getByTestId('receta-aviso-ya-comprado');
+    // ⛔ Y lo que NUNCA se le ofrece: des-autorizar la OC (es de Dirección; sería un 403 en la cara).
+    expect(bloque).not.toHaveTextContent(/Des-?autorizar la/i);
+    expect(within(bloque).getByTestId('oc-comprometida-12').closest('button')).not.toBeNull();
   });
 });

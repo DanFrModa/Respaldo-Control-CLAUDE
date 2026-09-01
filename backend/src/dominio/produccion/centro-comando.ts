@@ -44,7 +44,10 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { sinonimosDeDepartamentos } from '../catalogos/cliente-departamentos-sinonimos.js';
+
 import { totalesPorOrden } from './consultas.js';
+import { condicionSinonimosDepartamento } from './ordenes.js';
 import { requisitosOrden } from './requisitos-orden.js';
 
 /**
@@ -82,8 +85,17 @@ const CONDICION_OC_TELA = {
  * Búsqueda libre del centro: folio OP (si es entero), código de modelo o pedido del cliente
  * (CUALQUIER valor de `OrdenReferencia`, D7). Deliberadamente SIN nombre de cliente (el proto
  * busca "OP, modelo o pedido del cliente"; para el cliente está su select).
+ *
+ * 🔴 **NO reusa `armarBusqueda` a propósito** (el criterio es otro: aquí el nombre de cliente NO
+ * entra), pero **sí entiende los mismos SINÓNIMOS de departamento** (§Post-F9.172(a)): el defecto
+ * que se arregla vive en `OrdenReferencia.valor`, y esta función lee esa misma columna. Cubrir un
+ * embudo y no el otro habría dejado el Centro de Órdenes —la pantalla que más se usa— sin el
+ * arreglo. Los sinónimos llegan YA resueltos (una vez por consulta, nunca por fila).
  */
-function busquedaCentro(busqueda: string | undefined): Prisma.OrdenWhereInput {
+function busquedaCentro(
+  busqueda: string | undefined,
+  sinonimosDepartamento: readonly string[],
+): Prisma.OrdenWhereInput {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
@@ -91,6 +103,10 @@ function busquedaCentro(busqueda: string | undefined): Prisma.OrdenWhereInput {
     { modelo: { codigo: { contains: busqueda, mode: 'insensitive' } } },
     { referencias: { some: { valor: { contains: busqueda, mode: 'insensitive' } } } },
   ];
+  const porSinonimo = condicionSinonimosDepartamento(sinonimosDepartamento);
+  if (porSinonimo !== null) {
+    or.push(porSinonimo);
+  }
   if (/^\d+$/.test(busqueda)) {
     try {
       or.push({ folio: BigInt(busqueda) });
@@ -178,7 +194,10 @@ export async function centroComandoOrdenes(
   if (filtros.ocTela !== undefined) {
     condiciones.push(filtros.ocTela === 'con' ? CONDICION_OC_TELA : { NOT: CONDICION_OC_TELA });
   }
-  const busqueda = busquedaCentro(filtros.busqueda);
+  const busqueda = busquedaCentro(
+    filtros.busqueda,
+    await sinonimosDeDepartamentos(filtros.busqueda, bd),
+  );
   if (busqueda.OR !== undefined) {
     condiciones.push(busqueda);
   }

@@ -14,6 +14,7 @@
  */
 import { z } from 'zod';
 
+import { esquemaEstatusOrdenCompra } from './compra.js';
 import { esquemaEstadoOrden } from './orden.js';
 
 // ── Vocabulario ────────────────────────────────────────────────────────────────
@@ -60,6 +61,69 @@ export const esquemaTipoCambioReceta = z
 
 /** Clave del tipo de cambio. */
 export type TipoCambioRecetaClave = z.infer<typeof esquemaTipoCambioReceta>;
+
+/**
+ * ⭐⭐⭐ **UNA OC QUE YA COMPROMETIÓ LA COMPRA** (0.085, §Post-F9.173(a)).
+ *
+ * DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado**… **No se puede cancelar la OC
+ * en automático… eso hay que negociarlo con el proveedor.**"*
+ *
+ * ⚖️ **Sólo entran `autorizada`, `recibida_parcial` y `recibida_total`** (`ESTATUS_OC_COMPROMETIDA`,
+ * la MISMA lista que usan las guardas de §Post-F9.79 y V1-E4c). Un `borrador` NO entra: no hay
+ * tercero con quien negociar, se corrige o se borra sin llamarle a nadie — y avisar sobre él sería
+ * gritar en falso, que es como se entrena a la gente a ignorar los avisos.
+ *
+ * ⚠️ Se calcula **EN VIVO** en cada lectura, nunca se guarda: si la OC se des-autoriza después, el
+ * aviso tiene que callarse solo.
+ *
+ * 🔴 El `estatus` viaja porque **decide el camino**: una `autorizada` se puede des-autorizar (con el
+ * permiso de Dirección); una **recibida NO** —el material ya entró al inventario— y ahí lo honesto
+ * es una devolución o un ajuste. Sin este campo, la pantalla mandaría a la mitad de la gente a un
+ * botón que va a rebotar.
+ */
+export const esquemaOcComprometida = z
+  .object({
+    idOrdenCompra: z.number().int().describe('Id de la OC (para poder llevar a ella).'),
+    folio: z.number().int().describe('`numCompra`: el folio con el que se nombra la OC.'),
+    /*
+     * ⚠️ **REUSA EL ENUM COMPLETO A PROPÓSITO, aunque el servidor sólo emita tres.**
+     *
+     * Estrechar aquí a `['autorizada','recibida_parcial','recibida_total']` obligaría a escribir esa
+     * lista **por segunda vez** —y a una tercera (un guard de estrechamiento) en el dominio, porque
+     * `ordenCompra.estatus` llega tipado con los seis—. Tres copias de *"qué significa estar
+     * comprometido"* es exactamente lo que `ESTATUS_OC_COMPROMETIDA` existe para impedir. En un
+     * campo de SALIDA un superconjunto no promete de más: ningún cliente puede mandar nada por
+     * aquí, y quien lo lea con los seis casos cubiertos nunca se rompe.
+     *
+     * 🔑 Y sobre todo: **la pantalla no tiene que ramificar sobre este valor** — para decidir el
+     * camino está `recibida`, que llega ya calculado por el dominio.
+     */
+    estatus: esquemaEstatusOrdenCompra.describe(
+      'Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, ' +
+        '`recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos ' +
+        'que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.',
+    ),
+    recibida: z
+      .boolean()
+      .describe(
+        '⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y ' +
+          'DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una ' +
+          'recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el ' +
+          'sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC).',
+      ),
+  })
+  .describe('Una orden de compra que ya comprometió la compra frente al proveedor.');
+
+/** Una OC ya comprometida frente al proveedor. */
+export type OcComprometida = z.infer<typeof esquemaOcComprometida>;
+
+/** Las OC comprometidas que cubren UN renglón de la receta (vacío = ese material no se ha comprado). */
+const ocsDelRenglon = z
+  .array(esquemaOcComprometida)
+  .describe(
+    '⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ' +
+      'ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado".',
+  );
 
 // ── Salida: los renglones ──────────────────────────────────────────────────────
 
@@ -143,6 +207,7 @@ export const esquemaRecetaOrdenTela = z
         '¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una ' +
           'diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo.',
       ),
+    ocsComprometidas: ocsDelRenglon,
   })
   .describe('Renglón de tela de la receta congelada de una orden.');
 
@@ -248,6 +313,7 @@ export const esquemaRecetaOrdenAvio = z
     precioModeloDeCompra: z
       .boolean()
       .describe('¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela).'),
+    ocsComprometidas: ocsDelRenglon,
   })
   .describe('Renglón de avío de la receta congelada de una orden.');
 
@@ -455,6 +521,39 @@ export const esquemaRecetaOrden = z
           'tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas ' +
           'sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, ' +
           'o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda.',
+      ),
+    /*
+     * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **SI YA SE COMPRÓ, AVISA.**
+     *
+     * DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede
+     * cancelar la OC interna, o que **el comprador sepa que cambió**… **No se puede cancelar la OC
+     * en automático… eso hay que negociarlo con el proveedor.**"*
+     *
+     * Las OC comprometidas de TODA la orden (unión de las de sus renglones más las líneas libres),
+     * sin repetir y por folio. Vacío = esta orden no tiene compra comprometida.
+     *
+     * 🔴 **NO es lo mismo que `desalineacion.critico`.** Aquél pregunta *"¿el MODELO se movió?"*;
+     * éste, *"¿ya hay dinero comprometido con un proveedor?"* — y por eso no cuenta borradores.
+     */
+    ocsComprometidas: z
+      .array(esquemaOcComprometida)
+      .describe('OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado.'),
+    avisoCompraComprometida: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la ' +
+          'receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra ' +
+          'comprometida. NUNCA bloquea: reabrir sigue siendo legítimo.',
+      ),
+    avisoCambioSobreLoComprado: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados ' +
+          'cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de ' +
+          'la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se ' +
+          'recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)).',
       ),
     resumen: esquemaResumenReceta,
     telas: z.array(esquemaRecetaOrdenTela),
@@ -787,6 +886,26 @@ export const esquemaRecetaPorLiberar = z
           'la orden está congelada. null = no está abierta (la fila salió por renglones pendientes).',
       ),
     abiertaMotivo: z.string().nullable().describe('Por qué se reabrió, o null.'),
+    /*
+     * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **LA COLUMNA POR LA QUE EL AVISO LLEGA AL COMPRADOR.**
+     *
+     * El 409 de la puerta de compra sólo alcanza a quien INTENTA gastar; si ya compró, no va a
+     * volver a intentarlo, así que ese camino no puede alcanzarlo jamás. Esta bandeja sí: la ve con
+     * `desarrollo.ver` —que el comprador ya tiene— y ya lista solas tanto las recetas reabiertas
+     * como las órdenes con un renglón desfirmado (que es como queda un material cuyo consumo,
+     * precio o amarre acaba de cambiar).
+     *
+     * ⚠️ **NO es `conOrdenCompra`, y la diferencia es la etapa entera.** Aquella bandera pregunta
+     * *"¿hay ALGUIEN esperando esta firma?"* y por eso cuenta cualquier OC no cancelada —un
+     * borrador incluido: alguien ya se sentó a escribirlo—. Ésta pregunta *"¿hay que negociar con un
+     * proveedor?"*, y ahí un borrador **no cuenta**: se corrige o se borra sin llamarle a nadie.
+     */
+    ocsComprometidas: z
+      .array(esquemaOcComprometida)
+      .describe(
+        '⭐ 0.085: las OC YA COMPROMETIDAS (autorizada / recibida) de esta orden, con folio y ' +
+          'estado. Vacío = no hay nada negociado con un proveedor todavía.',
+      ),
   })
   .describe(
     'Una orden con receta pendiente de liberar o ABIERTA para corregirse (§Post-F9.72/165).',

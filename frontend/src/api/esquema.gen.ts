@@ -5514,7 +5514,7 @@ export interface paths {
         query?: {
           /** @description Página (1-based). */
           pagina?: number;
-          /** @description Renglones por página (máx 500). */
+          /** @description Renglones por página (máx 100). */
           porPagina?: number;
           /** @description Texto a buscar en el nombre (insensible a mayúsculas). */
           busqueda?: string;
@@ -5546,6 +5546,13 @@ export interface paths {
                 nombre: string;
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
+                /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+                fusionadoEn: {
+                  /** @description Id del color canónico que lo absorbió. */
+                  id: number;
+                  /** @description Nombre del color canónico que lo absorbió. */
+                  nombre: string;
+                } | null;
                 /**
                  * Format: date-time
                  * @description Fecha de alta (ISO 8601).
@@ -5684,6 +5691,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -5822,6 +5836,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -5949,6 +5970,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -6083,6 +6111,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -6226,6 +6261,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -23749,12 +23791,14 @@ export interface paths {
                 descripcionModeloSugerido: string | null;
                 /** @description true si el color no existe en el catálogo (se creará al confirmar). */
                 colorNuevo: boolean;
+                /** @description Nombre del color CANÓNICO al que la fusión va a redirigir el color del papel al confirmar, o null si no hay desvío (lo normal). */
+                colorFusionadoEn: string | null;
                 /** @description Tallas del PDF que no existen en el catálogo (se crearán al confirmar). */
                 tallasNuevas: string[];
                 /** @description Advertencias de validación (no bloquean). */
                 advertencias: {
                   /**
-                   * @description Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, y "duplicado": esa OC del cliente ya se importó).
+                   * @description Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, "duplicado": esa OC del cliente ya se importó, y "color-fusionado": el color del papel lo absorbió una fusión y la OP va a nacer en el canónico).
                    * @enum {string}
                    */
                   tipo:
@@ -23764,7 +23808,8 @@ export interface paths {
                     | 'parseo'
                     | 'liga-inactiva'
                     | 'sobrepedido'
-                    | 'duplicado';
+                    | 'duplicado'
+                    | 'color-fusionado';
                   /** @description Mensaje legible para la vista previa. */
                   mensaje: string;
                 }[];
@@ -27324,6 +27369,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -27387,6 +27456,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -27469,6 +27558,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -27748,6 +27857,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -27811,6 +27944,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -27893,6 +28046,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -28136,6 +28309,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -28199,6 +28396,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -28281,6 +28498,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -28528,6 +28765,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -28591,6 +28852,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -28673,6 +28954,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -28904,6 +29205,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -28967,6 +29292,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -29049,6 +29394,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -29285,6 +29650,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -29348,6 +29737,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -29430,6 +29839,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -29661,6 +30090,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -29724,6 +30177,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -29806,6 +30279,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -30052,6 +30545,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -30115,6 +30632,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -30197,6 +30734,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -30436,6 +30993,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -30499,6 +31080,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -30581,6 +31182,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -30812,6 +31433,30 @@ export interface paths {
               abiertaMotivo: string | null;
               /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
               avisoCurva: string | null;
+              /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+              ocsComprometidas: {
+                /** @description Id de la OC (para poder llevar a ella). */
+                idOrdenCompra: number;
+                /** @description `numCompra`: el folio con el que se nombra la OC. */
+                folio: number;
+                /**
+                 * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                 * @enum {string}
+                 */
+                estatus:
+                  | 'borrador'
+                  | 'pendiente_autorizacion'
+                  | 'autorizada'
+                  | 'recibida_parcial'
+                  | 'recibida_total'
+                  | 'cancelada';
+                /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                recibida: boolean;
+              }[];
+              /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+              avisoCompraComprometida: string | null;
+              /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+              avisoCambioSobreLoComprado: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -30875,6 +31520,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               avios: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -30957,6 +31622,26 @@ export interface paths {
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                 precioModeloDeCompra: boolean;
+                /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               artes: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -31213,6 +31898,30 @@ export interface paths {
                 abiertaMotivo: string | null;
                 /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
                 avisoCurva: string | null;
+                /** @description OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado. */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
+                /** @description ⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo. */
+                avisoCompraComprometida: string | null;
+                /** @description ⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)). */
+                avisoCambioSobreLoComprado: string | null;
                 /** @description Conteo de renglones de la receta por estado y por firma. */
                 resumen: {
                   sinRevisar: number;
@@ -31276,6 +31985,26 @@ export interface paths {
                   precioModelo: number | null;
                   /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
                   precioModeloDeCompra: boolean;
+                  /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                  ocsComprometidas: {
+                    /** @description Id de la OC (para poder llevar a ella). */
+                    idOrdenCompra: number;
+                    /** @description `numCompra`: el folio con el que se nombra la OC. */
+                    folio: number;
+                    /**
+                     * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                     * @enum {string}
+                     */
+                    estatus:
+                      | 'borrador'
+                      | 'pendiente_autorizacion'
+                      | 'autorizada'
+                      | 'recibida_parcial'
+                      | 'recibida_total'
+                      | 'cancelada';
+                    /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                    recibida: boolean;
+                  }[];
                 }[];
                 avios: {
                   /** @description Id del renglón de la receta de ESTA orden. */
@@ -31358,6 +32087,26 @@ export interface paths {
                   precioModelo: number | null;
                   /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
                   precioModeloDeCompra: boolean;
+                  /** @description ⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado". */
+                  ocsComprometidas: {
+                    /** @description Id de la OC (para poder llevar a ella). */
+                    idOrdenCompra: number;
+                    /** @description `numCompra`: el folio con el que se nombra la OC. */
+                    folio: number;
+                    /**
+                     * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                     * @enum {string}
+                     */
+                    estatus:
+                      | 'borrador'
+                      | 'pendiente_autorizacion'
+                      | 'autorizada'
+                      | 'recibida_parcial'
+                      | 'recibida_total'
+                      | 'cancelada';
+                    /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                    recibida: boolean;
+                  }[];
                 }[];
                 artes: {
                   /** @description Id del renglón de la receta de ESTA orden. */
@@ -31608,6 +32357,26 @@ export interface paths {
                 abiertaEn: string | null;
                 /** @description Por qué se reabrió, o null. */
                 abiertaMotivo: string | null;
+                /** @description ⭐ 0.085: las OC YA COMPROMETIDAS (autorizada / recibida) de esta orden, con folio y estado. Vacío = no hay nada negociado con un proveedor todavía. */
+                ocsComprometidas: {
+                  /** @description Id de la OC (para poder llevar a ella). */
+                  idOrdenCompra: number;
+                  /** @description `numCompra`: el folio con el que se nombra la OC. */
+                  folio: number;
+                  /**
+                   * @description Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.
+                   * @enum {string}
+                   */
+                  estatus:
+                    | 'borrador'
+                    | 'pendiente_autorizacion'
+                    | 'autorizada'
+                    | 'recibida_parcial'
+                    | 'recibida_total'
+                    | 'cancelada';
+                  /** @description ⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC). */
+                  recibida: boolean;
+                }[];
               }[];
               total: number;
               pagina: number;
@@ -81930,7 +82699,7 @@ export interface paths {
           };
           content: {
             'application/json': {
-              /** @description true si se encoló el refresco (false si el motor está inactivo). */
+              /** @description true si este disparo creó un job de refresco. false NO es un error: ocurre si el motor de jobs está inactivo, y también —lo normal— si ya había un refresco esperando y éste se unió a él (se dedupó). En ambos casos el refresco llega igual; sólo no lo encoló esta llamada. */
               encolado: boolean;
             };
           };

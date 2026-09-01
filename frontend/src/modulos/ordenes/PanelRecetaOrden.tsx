@@ -11,7 +11,9 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
+import type { UseMutationResult } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import {
@@ -28,6 +30,7 @@ import {
   useTraerDelModelo,
 } from '@/api/receta-orden';
 import { useMedidasAvio as useMedidasDelCatalogo } from '@/api/medidas-avio';
+import type { ErrorDeApi } from '@/api/errores';
 import type {
   CambioReceta,
   RecetaOrden,
@@ -62,6 +65,11 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { formatearMoneda } from '@/lib/formato';
 import { SelectorAvio } from '@/modulos/inventarios/SelectorAvio';
 import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
+// ⭐⭐⭐ 0.085 (§Post-F9.173(a)): el chip de «esto ya está comprado» vive en las piezas del módulo de
+// Órdenes de Compra —junto a la ÚNICA traducción de los estatus de OC— para que la receta y la
+// bandeja «Recetas por liberar» lo lean idéntico.
+import { ChipsOcComprometidas } from '@/modulos/ordenes-compra/piezas';
+import { useSesion } from '@/sesion/useSesion';
 
 import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './receta-piezas';
 
@@ -125,6 +133,57 @@ import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './recet
  * Presentación pura (A1): todas las reglas —qué se excluye, qué se borra, cuándo se puede liberar—
  * las decide el backend; esta pantalla solo pide y pinta.
  */
+/**
+ * ⭐⭐⭐ **0.085 (§Post-F9.173(a)) — LA ÚNICA PUERTA POR LA QUE EL AVISO ENTRA A LA PANTALLA.**
+ *
+ * Envuelve una mutación de receta para que **toda** respuesta reporte su
+ * `avisoCambioSobreLoComprado` — el `null` incluido, que es lo que apaga el eco anterior.
+ *
+ * 🔴 **Por qué un envoltorio y no un `onSuccess` en cada `mutate`.** En esta pantalla hay una
+ * docena de llamadas a `mutate` repartidas en cuatro componentes. Cablear el aviso en cada una
+ * significa que **la número trece se olvide** —y el síntoma de ese olvido es exactamente el defecto
+ * que esta etapa vino a cerrar: un cambio sobre material ya comprado que ocurre en silencio—. Aquí
+ * es imposible olvidarlo: se envuelve el HOOK, no la llamada.
+ *
+ * Devuelve sólo lo que esta pantalla usa (`mutate` + `isPending`) en vez del `UseMutationResult`
+ * entero: ése es una unión discriminada por estado y re-armarla con un `mutate` distinto la
+ * rompería. De paso, `tsc` garantiza que ningún llamador toque nada fuera de esas dos claves, así
+ * que el olvido queda **estructuralmente imposible**… en las que caben aquí.
+ *
+ * ⚠️ **LA EXCEPCIÓN, dicha en voz alta: `useTraerDelModelo` NO se puede envolver.** Devuelve
+ * `TraerDelModeloResultado`, no `RecetaOrden`, así que no encaja en esta firma y reporta **a mano**
+ * (`alResponder(r.receta)`, en su propio `onSuccess`). Es la única, está probada aparte, y quien
+ * agregue otra mutación con forma distinta tiene que hacer lo mismo — o el eco se queda pegado.
+ */
+function recordandoElAviso<TVars>(
+  mutacion: UseMutationResult<RecetaOrden, ErrorDeApi, TVars>,
+  alResponder: (receta: RecetaOrden) => void,
+): {
+  mutate: (
+    vars: TVars,
+    opciones?: {
+      onSuccess?: (receta: RecetaOrden) => void;
+      onError?: (error: ErrorDeApi) => void;
+    },
+  ) => void;
+  isPending: boolean;
+} {
+  return {
+    isPending: mutacion.isPending,
+    mutate: (vars, opciones) =>
+      mutacion.mutate(vars, {
+        onSuccess: (recetaNueva) => {
+          alResponder(recetaNueva);
+          opciones?.onSuccess?.(recetaNueva);
+        },
+        ...(opciones?.onError === undefined ? {} : { onError: opciones.onError }),
+      }),
+  };
+}
+
+/** Lo que cada sección necesita para reportar el aviso de «ya está comprado» (0.085). */
+type ReportarReceta = (receta: RecetaOrden) => void;
+
 export function PanelRecetaOrden({
   idOrden,
   puedeAdministrar,
@@ -133,16 +192,59 @@ export function PanelRecetaOrden({
   /** `desarrollo.administrar`: sin él la receta es de solo lectura. */
   puedeAdministrar: boolean;
 }): React.JSX.Element {
+  const navigate = useNavigate();
+  /*
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — LA PUERTA QUE SÍ SE LE PUEDE PINTAR AL COMPRADOR.
+   *
+   * Los chips de «ya está comprado» llevan a **las compras de esta orden** (`/compras/por-orden`),
+   * que es una pantalla de lectura de Compras — y **sólo** si esta sesión tiene `compras.ver`. Sin
+   * ese permiso los chips siguen informando, pero no se pinta un enlace que acabaría en un 403
+   * (§Post-F9.68: esconder lo que no se puede usar; §Post-F9.145(f): no mandar a nadie a rebotar).
+   *
+   * ⛔ Lo que NO se pinta nunca es «des-autorizar la OC»: eso exige `compras.desautorizar`, que el
+   * seed corta a Administrador y Dirección. El texto del servidor ya dice a quién pedírselo.
+   */
+  const { tienePermiso } = useSesion();
+  const puedeVerCompras = tienePermiso('compras.ver');
   const receta = useRecetaOrden(idOrden);
-  const marcar = useMarcarRecetaRevisada();
-  const liberar = useLiberarReceta();
-  const quitar = useQuitarRenglonReceta();
-  const restaurar = useRestaurarRenglonReceta();
-  const agregar = useAgregarRenglonReceta();
+  /*
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **EL AVISO VIVE AQUÍ, NO EN LA CACHÉ DE LA QUERY.**
+   *
+   * 🔴 Y esto no es una preferencia de estilo: la primera versión lo leía de `receta.data` y **se
+   * borraba solo**. `trasMutar` (`api/receta-orden.ts`) mete la receta en caché y acto seguido
+   * invalida `CLAVE_ORDENES = ['ordenes']`, que **por prefijo también casa** con
+   * `['ordenes','receta',id]`; la query está activa, se re-pide, y una LECTURA devuelve
+   * `avisoCambioSobreLoComprado: null` **por diseño** (el backend lo dice en su propio comentario:
+   * *"no es estado de la receta, es la respuesta a lo que se acaba de hacer"*). Medido: el bloque
+   * rojo parpadeaba lo que dura un round-trip y desaparecía.
+   *
+   * ⚠️ **La alternativa —estrechar la invalidación— se descartó**: de `['ordenes']` cuelga media
+   * docena de listas que sí tienen que refrescarse. La respuesta correcta es que el eco viva donde
+   * viven las respuestas: en el estado de esta pantalla.
+   *
+   * Lo alimenta {@link recordandoElAviso}, que envuelve TODA mutación de receta — así una mutación
+   * nueva no puede olvidarse de reportarlo, que es exactamente la clase de olvido que esta etapa
+   * vino a cerrar.
+   */
+  const [avisoYaComprado, setAvisoYaComprado] = useState<string | null>(null);
+  /** Cada respuesta de mutación PISA el eco anterior: `null` incluido, para que no se quede pegado. */
+  const alResponder = (r: RecetaOrden): void => {
+    setAvisoYaComprado(r.avisoCambioSobreLoComprado);
+  };
+  // Cambiar de orden sin desmontar el panel no puede arrastrar el aviso de la anterior.
+  useEffect(() => {
+    setAvisoYaComprado(null);
+  }, [idOrden]);
+
+  const marcar = recordandoElAviso(useMarcarRecetaRevisada(), alResponder);
+  const liberar = recordandoElAviso(useLiberarReceta(), alResponder);
+  const quitar = recordandoElAviso(useQuitarRenglonReceta(), alResponder);
+  const restaurar = recordandoElAviso(useRestaurarRenglonReceta(), alResponder);
+  const agregar = recordandoElAviso(useAgregarRenglonReceta(), alResponder);
   const traer = useTraerDelModelo();
   // ⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a)).
-  const abrir = useAbrirReceta();
-  const cerrar = useCerrarReceta();
+  const abrir = recordandoElAviso(useAbrirReceta(), alResponder);
+  const cerrar = recordandoElAviso(useCerrarReceta(), alResponder);
   const [aQuitar, setAQuitar] = useState<{
     tipo: TipoRenglonReceta;
     id: number;
@@ -204,6 +306,20 @@ export function PanelRecetaOrden({
       { idOrden, ...(cuerpo === undefined ? {} : { cuerpo }) },
       {
         onSuccess: (r) => {
+          /*
+           * ⭐⭐⭐ 0.085 — **LA DÉCIMA MUTACIÓN, A MANO** (remate del reviewer).
+           *
+           * 🔴 Es la única de las diez que {@link recordandoElAviso} **no puede** envolver: devuelve
+           * `TraerDelModeloResultado`, no `RecetaOrden`. Y la ironía es exacta: el envoltorio nació
+           * para que *"la número trece no se olvide"*… y la que se quedó fuera fue **la décima**.
+           *
+           * No pierde ningún aviso —traer del modelo sólo CREA renglones, nunca llama a
+           * `tocoRenglon`—, pero sin esta línea **no APAGA el eco anterior**: editabas una tela ya
+           * comprada, salía el bloque rojo, pulsabas «Traer del modelo» y el bloque **seguía ahí**,
+           * hablando de una acción que ya no era la última. Eso es el *gritar en falso* que este
+           * módulo dice que enseña a la gente a ignorar los avisos.
+           */
+          alResponder(r.receta);
           if (r.traidos.length > 0) {
             toast.success(
               `Se trajeron ${r.traidos.length} del modelo: ${r.traidos.map((t) => t.material).join(', ')}. ` +
@@ -286,6 +402,17 @@ export function PanelRecetaOrden({
         />
       ) : null}
 
+      {/* ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — "ACABAS DE CAMBIAR ALGO QUE YA ESTÁ COMPRADO". */}
+      <AvisoCambioSobreLoComprado
+        aviso={avisoYaComprado}
+        ocs={d.ocsComprometidas}
+        alVerCompras={
+          puedeVerCompras
+            ? () => void navigate('/compras/por-orden', { state: { idOrden } })
+            : undefined
+        }
+      />
+
       <CabeceraReceta
         receta={d}
         editable={editable}
@@ -319,6 +446,7 @@ export function PanelRecetaOrden({
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
+        alResponder={alResponder}
         alLiberarRenglon={(id) => liberarRenglon('tela', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'tela', id, nombre });
@@ -348,6 +476,7 @@ export function PanelRecetaOrden({
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
+        alResponder={alResponder}
         alLiberarRenglon={(id) => liberarRenglon('avio', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'avio', id, nombre });
@@ -377,6 +506,7 @@ export function PanelRecetaOrden({
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
+        alResponder={alResponder}
         alLiberarRenglon={(id) => liberarRenglon('arte', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'arte', id, nombre });
@@ -417,6 +547,32 @@ export function PanelRecetaOrden({
               no se tocan, y cortar y producir siguen sin bloquearse.
             </DialogDescription>
           </DialogHeader>
+          {/* ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **EL AVISO LLEGA ANTES DE CONFIRMAR.**
+              Hasta la 0.084 aquí no se decía una palabra de las órdenes de compra: quien congelaba
+              la compra de una orden entera no sabía si había dinero comprometido hasta toparse con
+              ello. El texto lo redacta el SERVIDOR (A1) y nombra folio y estado, porque de eso
+              depende el camino: una autorizada se des-autoriza (con el permiso de Dirección), una
+              recibida NO. Precedente §Post-F9.145(a): *el aviso llega antes*. */}
+          {d.avisoCompraComprometida === null ? null : (
+            <div
+              className="space-y-2 rounded-lg border border-warn/50 bg-warn/5 p-3"
+              data-testid="abrir-receta-compra-comprometida"
+            >
+              <p className="flex items-center gap-1.5 text-sm font-medium text-warn">
+                <AlertTriangle className="size-4" aria-hidden />
+                Esta orden ya tiene compra comprometida
+              </p>
+              <p className="text-xs">{d.avisoCompraComprometida}</p>
+              <ChipsOcComprometidas
+                ocs={d.ocsComprometidas}
+                {...(puedeVerCompras
+                  ? {
+                      alVer: () => void navigate('/compras/por-orden', { state: { idOrden } }),
+                    }
+                  : {})}
+              />
+            </div>
+          )}
           <Field>
             <FieldLabel htmlFor="motivo-abrir-receta">Motivo (obligatorio)</FieldLabel>
             <Input
@@ -756,6 +912,56 @@ function LlamadoTraerDelModelo({
  * fue justo lo que la escondió.
  */
 /**
+ * ⭐⭐⭐ **"YA ESTÁ COMPRADO, Y ACABAS DE CAMBIARLO"** (0.085, §Post-F9.173(a)).
+ *
+ * DANIEL, textual: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede
+ * cancelar la OC interna, o que **el comprador sepa que cambió**, para hacer lo que tenga que hacer.
+ * **No se puede cancelar la OC en automático… eso hay que negociarlo con el proveedor.**"*
+ *
+ * 🔴 **POR QUÉ ES UN BLOQUE Y NO UN TOAST.** Un toast se va en cuatro segundos, y esto no es un
+ * "guardado ✓": es *"acabas de descuadrar una orden de compra que ya está con el proveedor"*.
+ *
+ * ⚠️ **Y por qué el texto llega por `aviso` y no de `receta.avisoCambioSobreLoComprado`**: leerlo de
+ * la receta era el defecto que tumbó la primera versión —la invalidación de `['ordenes']` casa por
+ * prefijo con la query de la receta, la re-pide, y una LECTURA devuelve `null` por diseño, así que
+ * el bloque parpadeaba y se borraba solo—. Ahora vive en el estado del panel, alimentado por
+ * `recordandoElAviso`, y se apaga con la primera respuesta que no traiga aviso. Lo fija
+ * `PanelRecetaOrden.avisoComprado.test.tsx`, que corre con hooks y `QueryClient` de verdad.
+ *
+ * 🔴 **Y NO BLOQUEA NADA.** Daniel pidió *avisar*, no impedir: cambiarle el precio o el consumo a un
+ * material ya comprado es legítimo. Lo que no puede pasar es que ocurra en silencio.
+ *
+ * A1: el texto viene REDACTADO del servidor (nombra material, folio y estado, y dice a quién
+ * pedirle qué). Aquí no se arma la frase, no se resuelve el plural y no se decide el camino.
+ */
+function AvisoCambioSobreLoComprado({
+  aviso,
+  ocs,
+  alVerCompras,
+}: {
+  aviso: string | null;
+  ocs: RecetaOrden['ocsComprometidas'];
+  /** Sólo se pasa con `compras.ver`: un enlace que da 403 es peor que no tenerlo. */
+  alVerCompras?: (() => void) | undefined;
+}): React.JSX.Element | null {
+  if (aviso === null || aviso === '') return null;
+  return (
+    <div
+      className="space-y-2 rounded-lg border border-destructive/50 bg-destructive/5 p-3"
+      data-testid="receta-aviso-ya-comprado"
+      role="alert"
+    >
+      <p className="flex items-center gap-1.5 text-sm font-medium text-destructive">
+        <AlertTriangle className="size-4" aria-hidden />
+        Cambiaste algo que YA ESTÁ COMPRADO
+      </p>
+      <p className="text-xs">{aviso}</p>
+      <ChipsOcComprometidas ocs={ocs} {...(alVerCompras ? { alVer: alVerCompras } : {})} />
+    </div>
+  );
+}
+
+/**
  * ⭐ **AVISO DE CURVA DISTINTA** (V1-E3r, §Post-F9.81): la curva del modelo y las tallas de esta
  * orden no coinciden.
  *
@@ -854,6 +1060,7 @@ function ChipsRenglon({
   excluido,
   cambios,
   liberadoEn,
+  ocsComprometidas,
 }: {
   estado: string;
   agregadoAMano: boolean;
@@ -861,6 +1068,12 @@ function ChipsRenglon({
   cambios: readonly string[];
   /** V1-E3h: la firma es de ESTE renglón. `null` = no se compra todavía. */
   liberadoEn: string | null;
+  /**
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)): las OC ya comprometidas que compraron ESTE material. Se pinta
+   * SIEMPRE que las haya —no sólo tras un cambio—: quien va a tocar el renglón tiene que verlo
+   * ANTES, no enterarse después. El ARTE no lo lleva (ninguna línea de OC puede apuntar a un arte).
+   */
+  ocsComprometidas?: RecetaOrden['ocsComprometidas'];
 }): React.JSX.Element {
   return (
     <span className="flex flex-wrap items-center gap-1">
@@ -902,6 +1115,16 @@ function ChipsRenglon({
           El modelo cambió
         </Badge>
       ) : null}
+      {/* ⭐⭐⭐ 0.085: «Comprado · OC 12 · Autorizada». Va AL FINAL de los chips del renglón: no es
+          un estado de la receta, es un hecho de AFUERA que condiciona lo que se puede hacer con él.
+
+          🔴 **SÍ se pinta en la LÁPIDA, al revés que la firma** (hallazgo del reviewer). La firma se
+          calla ahí porque un material excluido no se compra; esto no es una firma: es que **existe
+          una OC viva contra un material que esta orden dice que NO lleva**. Nada impide que Compras
+          capture esa línea a mano, y quien vaya a REVIVIR la lápida —lo que le reescribe consumo,
+          precio y amarre— tiene que ver la compra ANTES, no enterarse después. Callarlo en el único
+          renglón donde el dato es una contradicción sería callarlo justo donde más grita. */}
+      <ChipsOcComprometidas ocs={ocsComprometidas ?? []} />
     </span>
   );
 }
@@ -1511,6 +1734,7 @@ function SeccionTelas({
   alRestaurar,
   alAgregar,
   alLiberarRenglon,
+  alResponder,
 }: {
   receta: RecetaOrden;
   idOrden: number;
@@ -1520,8 +1744,10 @@ function SeccionTelas({
   alRestaurar: (id: number) => void;
   alAgregar: (idTela: number, consumo: number) => void;
   alLiberarRenglon: (id: number) => void;
+  /** ⭐ 0.085: cada respuesta reporta su aviso de «ya está comprado» al panel. */
+  alResponder: ReportarReceta;
 }): React.JSX.Element {
-  const editar = useEditarRenglonReceta();
+  const editar = recordandoElAviso(useEditarRenglonReceta(), alResponder);
   return (
     <Seccion
       titulo="Telas"
@@ -1573,6 +1799,7 @@ function SeccionTelas({
                   excluido={t.excluido}
                   cambios={t.cambios}
                   liberadoEn={t.liberadoEn}
+                  ocsComprometidas={t.ocsComprometidas}
                 />
               </TablaDensaCelda>
               <TablaDensaCelda numerica>
@@ -1636,6 +1863,7 @@ function SeccionAvios({
   alRestaurar,
   alAgregar,
   alLiberarRenglon,
+  alResponder,
 }: {
   receta: RecetaOrden;
   idOrden: number;
@@ -1645,10 +1873,12 @@ function SeccionAvios({
   alRestaurar: (id: number) => void;
   alAgregar: (idAvio: number, consumo: number) => void;
   alLiberarRenglon: (id: number) => void;
+  /** ⭐ 0.085: cada respuesta reporta su aviso de «ya está comprado» al panel. */
+  alResponder: ReportarReceta;
 }): React.JSX.Element {
-  const editar = useEditarRenglonReceta();
+  const editar = recordandoElAviso(useEditarRenglonReceta(), alResponder);
   // ⭐⭐⭐ V1-E8h (§Post-F9.130) — el botón «Corregir» de la contradicción heredada.
-  const corregir = useCorregirCapturaAvio();
+  const corregir = recordandoElAviso(useCorregirCapturaAvio(), alResponder);
   return (
     <Seccion
       titulo="Avíos"
@@ -1723,6 +1953,7 @@ function SeccionAvios({
                   excluido={a.excluido}
                   cambios={a.cambios}
                   liberadoEn={a.liberadoEn}
+                  ocsComprometidas={a.ocsComprometidas}
                 />
                 {/* ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN, EN LA FILA · ⭐⭐⭐ V1-E8h — CON SU REMEDIO.
                     El botón va donde se lee el aviso, no en un menú aparte: ése era el defecto.
@@ -1808,6 +2039,7 @@ function SeccionArtes({
   alQuitar,
   alRestaurar,
   alLiberarRenglon,
+  alResponder,
 }: {
   receta: RecetaOrden;
   idOrden: number;
@@ -1816,8 +2048,10 @@ function SeccionArtes({
   alQuitar: (id: number, nombre: string) => void;
   alRestaurar: (id: number) => void;
   alLiberarRenglon: (id: number) => void;
+  /** ⭐ 0.085: cada respuesta reporta su aviso de «ya está comprado» al panel. */
+  alResponder: ReportarReceta;
 }): React.JSX.Element {
-  const editar = useEditarRenglonReceta();
+  const editar = recordandoElAviso(useEditarRenglonReceta(), alResponder);
   return (
     <Seccion titulo="Arte" testid="receta-seccion-artes" vacio={receta.artes.length === 0}>
       <TablaDensa>

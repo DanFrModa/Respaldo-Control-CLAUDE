@@ -620,12 +620,14 @@ export async function registrarRespaldoPeriodico(
     // la MISMA ventana que usa el barrido de huérfanas, para que los dos números no puedan volver a
     // contradecirse.
     //
-    // NO se pone `singletonKey`: en una cola con la política por defecto (`standard`) pg-boss
-    // GUARDA esa clave pero no restringe nada —los índices únicos sobre (name, singleton_key) sólo
-    // existen para las políticas `short`/`singleton`/`stately`/`exclusive`/`key_strict_fifo`—, así
-    // que sería un cinturón que no sujeta y un comentario en el que alguien se apoyaría dentro de
-    // dos años. Quien de verdad cierra el solape es `expireInSeconds` + la guarda de antigüedad del
-    // barrido, y ambos están probados.
+    // NO se pone `singletonKey`: esta cola declara `standard` en `POLITICA_POR_COLA` (a propósito),
+    // y ahí pg-boss GUARDA esa clave pero no restringe nada —los índices únicos sobre
+    // (name, singleton_key) sólo existen para las políticas
+    // `short`/`singleton`/`stately`/`exclusive`/`key_strict_fifo`—, así que sería un cinturón que no
+    // sujeta y un comentario en el que alguien se apoyaría dentro de dos años. Quien de verdad cierra
+    // el solape aquí es `expireInSeconds` + la guarda de antigüedad del barrido, y ambos están
+    // probados. (Las colas que SÍ se serializan por clave —el CPM de la RC y el refresco de KPIs—
+    // declaran `stately`; ver `jobs/index.ts`.)
     await boss.schedule(COLAS_JOBS.respaldoBd, config.cron, null, {
       expireInSeconds: ventanaCorridaMinutos() * 60,
       retryLimit: 2,

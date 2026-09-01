@@ -13117,12 +13117,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 500
+              "maximum": 100
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 500)."
+            "description": "Renglones por página (máx 100)."
           },
           {
             "schema": {
@@ -13204,6 +13204,35 @@
                             "type": "boolean",
                             "description": "Falso si está desactivado (borrado suave)."
                           },
+                          "fusionadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Id del color canónico que lo absorbió."
+                                  },
+                                  "nombre": {
+                                    "type": "string",
+                                    "description": "Nombre del color canónico que lo absorbió."
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "nombre"
+                                ],
+                                "additionalProperties": false,
+                                "description": "El color canónico que absorbió a éste en una fusión."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -13243,6 +13272,7 @@
                           "id",
                           "nombre",
                           "activo",
+                          "fusionadoEn",
                           "creadoEn",
                           "creadoPorId",
                           "modificadoEn",
@@ -13490,6 +13520,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -13529,6 +13588,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -13734,6 +13794,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -13773,6 +13862,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -13996,6 +14086,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -14035,6 +14154,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -14238,6 +14358,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -14277,6 +14426,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -14504,6 +14654,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -14543,6 +14722,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -56832,6 +57012,17 @@
                             "type": "boolean",
                             "description": "true si el color no existe en el catálogo (se creará al confirmar)."
                           },
+                          "colorFusionadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color CANÓNICO al que la fusión va a redirigir el color del papel al confirmar, o null si no hay desvío (lo normal)."
+                          },
                           "tallasNuevas": {
                             "type": "array",
                             "items": {
@@ -56853,9 +57044,10 @@
                                     "parseo",
                                     "liga-inactiva",
                                     "sobrepedido",
-                                    "duplicado"
+                                    "duplicado",
+                                    "color-fusionado"
                                   ],
-                                  "description": "Qué validación falló (incluye \"liga-inactiva\", \"sobrepedido\": packs que no cuadran / proporción no entera, y \"duplicado\": esa OC del cliente ya se importó)."
+                                  "description": "Qué validación falló (incluye \"liga-inactiva\", \"sobrepedido\": packs que no cuadran / proporción no entera, \"duplicado\": esa OC del cliente ya se importó, y \"color-fusionado\": el color del papel lo absorbió una fusión y la OP va a nacer en el canónico)."
                                 },
                                 "mensaje": {
                                   "type": "string",
@@ -56927,6 +57119,7 @@
                           "codigoModeloSugerido",
                           "descripcionModeloSugerido",
                           "colorNuevo",
+                          "colorFusionadoEn",
                           "tallasNuevas",
                           "advertencias",
                           "yaImportado"
@@ -67338,6 +67531,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -67575,6 +67835,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -67600,7 +67905,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -67914,6 +68220,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -67948,7 +68299,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -68293,6 +68645,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -68884,6 +69239,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -69121,6 +69543,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -69146,7 +69613,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -69460,6 +69928,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -69494,7 +70007,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -69839,6 +70353,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -70337,6 +70854,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -70574,6 +71158,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -70599,7 +71228,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -70913,6 +71543,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -70947,7 +71622,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -71292,6 +71968,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -71649,6 +72328,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -71886,6 +72632,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -71911,7 +72702,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -72225,6 +73017,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -72259,7 +73096,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -72604,6 +73442,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -72945,6 +73786,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -73182,6 +74090,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -73207,7 +74160,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -73521,6 +74475,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -73555,7 +74554,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -73900,6 +74900,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -74228,6 +75231,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -74465,6 +75535,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -74490,7 +75605,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -74804,6 +75920,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -74838,7 +75999,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -75183,6 +76345,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -75499,6 +76664,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -75736,6 +76968,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -75761,7 +77038,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -76075,6 +77353,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -76109,7 +77432,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -76454,6 +77778,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -76816,6 +78143,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -77053,6 +78447,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -77078,7 +78517,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -77392,6 +78832,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -77426,7 +78911,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -77771,6 +79257,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -78110,6 +79599,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -78347,6 +79903,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -78372,7 +79973,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -78686,6 +80288,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -78720,7 +80367,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -79065,6 +80713,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -79381,6 +81032,73 @@
                       ],
                       "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                     },
+                    "ocsComprometidas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC (para poder llevar a ella)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "`numCompra`: el folio con el que se nombra la OC."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "borrador",
+                              "pendiente_autorizacion",
+                              "autorizada",
+                              "recibida_parcial",
+                              "recibida_total",
+                              "cancelada"
+                            ],
+                            "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                          },
+                          "recibida": {
+                            "type": "boolean",
+                            "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "folio",
+                          "estatus",
+                          "recibida"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                      },
+                      "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                    },
+                    "avisoCompraComprometida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                    },
+                    "avisoCambioSobreLoComprado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -79618,6 +81336,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -79643,7 +81406,8 @@
                           "proveedorAmarrado",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela de la receta congelada de una orden."
@@ -79957,6 +81721,51 @@
                           "precioModeloDeCompra": {
                             "type": "boolean",
                             "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                           }
                         },
                         "required": [
@@ -79991,7 +81800,8 @@
                           "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
-                          "precioModeloDeCompra"
+                          "precioModeloDeCompra",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío de la receta congelada de una orden."
@@ -80336,6 +82146,9 @@
                     "abiertaPor",
                     "abiertaMotivo",
                     "avisoCurva",
+                    "ocsComprometidas",
+                    "avisoCompraComprometida",
+                    "avisoCambioSobreLoComprado",
                     "resumen",
                     "telas",
                     "avios",
@@ -80738,6 +82551,73 @@
                           ],
                           "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                         },
+                        "ocsComprometidas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idOrdenCompra": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la OC (para poder llevar a ella)."
+                              },
+                              "folio": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "`numCompra`: el folio con el que se nombra la OC."
+                              },
+                              "estatus": {
+                                "type": "string",
+                                "enum": [
+                                  "borrador",
+                                  "pendiente_autorizacion",
+                                  "autorizada",
+                                  "recibida_parcial",
+                                  "recibida_total",
+                                  "cancelada"
+                                ],
+                                "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                              },
+                              "recibida": {
+                                "type": "boolean",
+                                "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                              }
+                            },
+                            "required": [
+                              "idOrdenCompra",
+                              "folio",
+                              "estatus",
+                              "recibida"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                          },
+                          "description": "OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado."
+                        },
+                        "avisoCompraComprometida": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra comprometida. NUNCA bloquea: reabrir sigue siendo legítimo."
+                        },
+                        "avisoCambioSobreLoComprado": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a))."
+                        },
                         "resumen": {
                           "type": "object",
                           "properties": {
@@ -80975,6 +82855,51 @@
                               "precioModeloDeCompra": {
                                 "type": "boolean",
                                 "description": "¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo."
+                              },
+                              "ocsComprometidas": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "idOrdenCompra": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Id de la OC (para poder llevar a ella)."
+                                    },
+                                    "folio": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "`numCompra`: el folio con el que se nombra la OC."
+                                    },
+                                    "estatus": {
+                                      "type": "string",
+                                      "enum": [
+                                        "borrador",
+                                        "pendiente_autorizacion",
+                                        "autorizada",
+                                        "recibida_parcial",
+                                        "recibida_total",
+                                        "cancelada"
+                                      ],
+                                      "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                    },
+                                    "recibida": {
+                                      "type": "boolean",
+                                      "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                    }
+                                  },
+                                  "required": [
+                                    "idOrdenCompra",
+                                    "folio",
+                                    "estatus",
+                                    "recibida"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                                },
+                                "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                               }
                             },
                             "required": [
@@ -81000,7 +82925,8 @@
                               "proveedorAmarrado",
                               "consumoModelo",
                               "precioModelo",
-                              "precioModeloDeCompra"
+                              "precioModeloDeCompra",
+                              "ocsComprometidas"
                             ],
                             "additionalProperties": false,
                             "description": "Renglón de tela de la receta congelada de una orden."
@@ -81314,6 +83240,51 @@
                               "precioModeloDeCompra": {
                                 "type": "boolean",
                                 "description": "¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela)."
+                              },
+                              "ocsComprometidas": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "idOrdenCompra": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Id de la OC (para poder llevar a ella)."
+                                    },
+                                    "folio": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "`numCompra`: el folio con el que se nombra la OC."
+                                    },
+                                    "estatus": {
+                                      "type": "string",
+                                      "enum": [
+                                        "borrador",
+                                        "pendiente_autorizacion",
+                                        "autorizada",
+                                        "recibida_parcial",
+                                        "recibida_total",
+                                        "cancelada"
+                                      ],
+                                      "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                    },
+                                    "recibida": {
+                                      "type": "boolean",
+                                      "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                    }
+                                  },
+                                  "required": [
+                                    "idOrdenCompra",
+                                    "folio",
+                                    "estatus",
+                                    "recibida"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                                },
+                                "description": "⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ninguna). Es el dato que convierte \"cambió algo\" en \"cambió algo que ya está comprado\"."
                               }
                             },
                             "required": [
@@ -81348,7 +83319,8 @@
                               "tieneTallas",
                               "consumoModelo",
                               "precioModelo",
-                              "precioModeloDeCompra"
+                              "precioModeloDeCompra",
+                              "ocsComprometidas"
                             ],
                             "additionalProperties": false,
                             "description": "Renglón de avío de la receta congelada de una orden."
@@ -81693,6 +83665,9 @@
                         "abiertaPor",
                         "abiertaMotivo",
                         "avisoCurva",
+                        "ocsComprometidas",
+                        "avisoCompraComprometida",
+                        "avisoCambioSobreLoComprado",
                         "resumen",
                         "telas",
                         "avios",
@@ -82073,6 +84048,51 @@
                               }
                             ],
                             "description": "Por qué se reabrió, o null."
+                          },
+                          "ocsComprometidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la OC (para poder llevar a ella)."
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "`numCompra`: el folio con el que se nombra la OC."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "borrador",
+                                    "pendiente_autorizacion",
+                                    "autorizada",
+                                    "recibida_parcial",
+                                    "recibida_total",
+                                    "cancelada"
+                                  ],
+                                  "description": "Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, `recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista."
+                                },
+                                "recibida": {
+                                  "type": "boolean",
+                                  "description": "⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "folio",
+                                "estatus",
+                                "recibida"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una orden de compra que ya comprometió la compra frente al proveedor."
+                            },
+                            "description": "⭐ 0.085: las OC YA COMPROMETIDAS (autorizada / recibida) de esta orden, con folio y estado. Vacío = no hay nada negociado con un proveedor todavía."
                           }
                         },
                         "required": [
@@ -82088,7 +84108,8 @@
                           "porLiberar",
                           "conOrdenCompra",
                           "abiertaEn",
-                          "abiertaMotivo"
+                          "abiertaMotivo",
+                          "ocsComprometidas"
                         ],
                         "additionalProperties": false,
                         "description": "Una orden con receta pendiente de liberar o ABIERTA para corregirse (§Post-F9.72/165)."
@@ -201537,7 +203558,7 @@
                   "properties": {
                     "encolado": {
                       "type": "boolean",
-                      "description": "true si se encoló el refresco (false si el motor está inactivo)."
+                      "description": "true si este disparo creó un job de refresco. false NO es un error: ocurre si el motor de jobs está inactivo, y también —lo normal— si ya había un refresco esperando y éste se unió a él (se dedupó). En ambos casos el refresco llega igual; sólo no lo encoló esta llamada."
                     }
                   },
                   "required": [

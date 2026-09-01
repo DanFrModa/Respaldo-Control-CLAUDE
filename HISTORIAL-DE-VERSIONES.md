@@ -71,6 +71,164 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.077 · 1-sep-2026 · **en prueba** — Si ya se compró, **el sistema te lo dice** — y se entera el comprador
+
+### Qué se puede hacer ahora que antes no
+
+**Enterarte de que estás tocando algo que ya se compró, en el momento de tocarlo.** Si cambias el consumo,
+el precio o el proveedor de una tela o un avío que **ya tiene orden de compra en firme**, la pantalla te lo
+dice: **qué OC es, en qué estado está**, y qué se puede hacer.
+
+Y **al reabrir una receta**, el aviso sale **dentro del cuadro, antes de confirmar** — no después.
+
+⭐ **Y le llega al comprador**, que es quien tiene que hacer algo: la bandeja «Recetas por liberar» ahora
+trae una columna **«Ya comprado»** con el folio y el estado. Hasta hoy sólo se enteraba **chocando** al
+intentar gastar — y si ya había comprado, **nunca volvía a intentarlo**, así que no se enteraba nunca.
+
+> **El aviso es lo que permite alcanzar a negociar.** Es exactamente lo que pediste.
+
+### Qué cambió y puede sorprender
+
+- **El sistema NUNCA cancela nada solo.** Como dijiste: *«eso hay que negociarlo con el proveedor»*. El
+  aviso **nombra la OC** y te lleva a verla; des-autorizarla sigue siendo una decisión, y de Dirección.
+- **Una OC en borrador NO avisa**, a propósito: todavía no hay nadie con quien negociar.
+- **Sobre una OC ya recibida no hay «des-autorizar» para nadie** — el material ya entró al almacén. Ahí el
+  camino es devolución o ajuste, y el aviso lo dice.
+- **Un renglón que quitaste de la receta pero que tiene compra viva ahora se marca.** Ahí el dato no es un
+  detalle: es **una contradicción**, y quien vaya a revivirlo tiene que verla antes.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **El sistema no puede saber si ya se PAGÓ.** Ninguna cuenta por pagar está ligada a una orden de
+  compra, así que lo más lejos que llega el aviso es *«ya se recibió»*. Conviene saberlo para no esperar de
+  él más de lo que puede.
+- Sin cambios de permisos ni de datos: el despliegue no necesita nada especial.
+
+---
+
+## 0.076 · 1-sep-2026 · **en prueba** — La ruta crítica ya **no se recalcula dos veces a la vez**, ni pierde un cambio a medio camino (cambio interno)
+
+> 📌 **No cambia nada que puedas ver.** Es una protección que el sistema **decía tener y no tenía**.
+
+### Qué se arregló
+
+Cuando pasan varias cosas seguidas sobre la misma orden —se corta, se recibe, se entrega— la ruta crítica
+se recalcula. El código **afirmaba por escrito** que esos recálculos no se pisan entre sí: que si ya hay uno
+en marcha, el siguiente se junta con él.
+
+🔴 **No era cierto.** Alguien lo comprobó ejecutándolo: se lanzaban **los tres**. La protección estaba
+escrita en el comentario y **no existía en el sistema**.
+
+Ahora existe de verdad: **uno se calcula y a lo sumo uno espera**, y el que espera **vuelve a leer todo**
+cuando le toca, así que **no se pierde ningún cambio** que haya ocurrido mientras tanto.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **La protección que cumplía la promesa al pie de la letra habría PERDIDO CAMBIOS.** Se midieron las
+  cinco opciones posibles: la que decía exactamente lo que prometía el comentario **descarta** el cambio que
+  llega mientras se está recalculando — y la ruta se quedaría con fechas viejas hasta el siguiente
+  movimiento, que puede tardar días. **Se prefirió cambiar la frase a que el sistema pierda información por
+  respetarla.**
+- **Y no bastaba con declararla:** resulta que ese ajuste **no se puede cambiar en caliente** — el sistema
+  lo aceptaba **en silencio sin aplicarlo**. Sin descubrir eso, la versión habría sido puro papel.
+
+### Qué cambió y puede sorprender
+
+- **Al primer arranque saldrán dos mensajes en rojo** que dicen que dos colas «se recrean». **Son
+  esperados** y ocurren **una sola vez**; a partir del siguiente arranque, ninguno.
+- Si pulsas **«Refrescar KPIs» dos veces seguidas**, la segunda te dirá que no encoló nada. **No es un
+  error**: se juntó con la primera, y el refresco llega igual.
+
+### Qué sigue pendiente o roto
+
+- **Nada de esta pieza.** Sin permisos, sin datos, sin migración: el despliegue no necesita nada especial.
+
+---
+
+## 0.075 · 1-sep-2026 · **en prueba** — Al juntar dos departamentos repetidos, **la búsqueda entiende los dos nombres**
+
+> 📌 Entra **después** de la 0.074 (el color fusionado). Es la que pediste el 31-ago: *«está bien la 3»*.
+
+### Qué se puede hacer ahora que antes no
+
+**Buscar una orden por el nombre nuevo del departamento, aunque la orden diga el viejo.** Si juntaste
+«2-HOMBRE» dentro de «Caballeros», buscar «Caballeros» ahora **también encuentra** las órdenes que dicen
+«2-HOMBRE». Y al revés: si tienes el papel viejo en la mano y buscas por el nombre viejo, **también las
+encuentra**.
+
+⭐ **Y tu papel no se toca.** El texto que venía en la OC del cliente **se queda exactamente como lo
+mandó**. El sistema entiende los dos nombres **porque sabe que uno se fusionó en el otro**, no porque le
+haya cambiado el documento. Era la razón de elegir este camino: reescribirlo habría roto la única prueba
+de qué pediste.
+
+### Qué cambió y puede sorprender
+
+- **Buscar un departamento fusionado ahora trae MÁS órdenes que antes.** Es lo que se quería, pero conviene
+  saberlo: aparecen también las que se capturaron con el nombre viejo.
+- **Funciona en cadena.** Si «A» se fue a «B» y «B» se fue a «C», buscar cualquiera de los tres encuentra
+  las órdenes de los tres. Y **no se aplana**: sigue constando que a «A» se lo llevó «B», no «C».
+- **Las fusiones que hiciste ANTES de esta versión no dejaron rastro** y se quedan así, a propósito. Para
+  ésas la búsqueda se comporta como hasta ahora. De aquí en adelante, todas lo dejan.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **La mitad que se olvida es la de vuelta.** Cubrir sólo un sentido —buscar el nombre nuevo y encontrar
+  el viejo— habría pasado todas las pruebas en verde y fallado **justo en el caso que originó tu decisión**:
+  quien tiene el papel viejo busca por el nombre viejo.
+- 🔴 **Una red interna se había aflojado.** El sistema tiene una prueba que impide olvidarse de algo al
+  fusionar. Al añadir el dato nuevo se puso roja, y la primera versión la calmó **de una forma que la
+  desactivaba**: quedó comprobado que se podía **dejar de mover a las compradoras** —que quedarían colgando
+  de un departamento borrado— **sin que nada se pusiera rojo**. Corregido.
+
+### Qué sigue pendiente o roto
+
+- **Nada de esta pieza.** Sin cambios de permisos ni de pantallas: el despliegue no necesita nada especial.
+## 0.074 · 1-sep-2026 · **en prueba** — Cuando un color se fusionó, **la orden ya te lo dice antes de confirmar**
+
+### Qué se puede hacer ahora que antes no
+
+**Ver a dónde se fue un color** que juntaste con otro. En el catálogo, el color absorbido ya no aparece
+como un inactivo cualquiera: dice **«fusionado en Blanco Óptico»**, con el nombre del que se quedó.
+
+Y lo que más importa: **al importar la OC de un cliente, la vista previa te avisa del desvío antes de que
+confirmes.** Si el papel dice «Blanco» y ese color se fusionó, la previa lo marca y te dice en qué color va
+a nacer realmente la orden.
+
+### 🔴 Por qué esto valía una versión: el precio
+
+Hasta hoy, ese desvío pasaba **en silencio**. La orden nacía en otro color y **nadie se enteraba** — el
+único rastro quedaba en la bitácora, que nadie mira.
+
+Y no es cosmético: **el precio de la tela se busca por el NOMBRE del color.** Si la orden nace en un color
+distinto del que dice el papel, el precio puede salir de **otro renglón, con otro importe**. El síntoma que
+verías: *un precosto que no cuadra con la OC que tienes en la mano, y nada en pantalla que lo explique.*
+
+### Qué cambió y puede sorprender
+
+- **El color apagado a mano NO lleva ese aviso**, y es correcto: al confirmar se reactiva **el mismo**
+  color, con el mismo nombre y el mismo precio. **No hay desvío que avisar.** El aviso es sólo para la
+  fusión, que sí te cambia de color.
+- **El color fusionado sale con dos marcas** (inactivo + fusionado en), y sólo se ve activando «incluir
+  inactivos» en el catálogo.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **El arreglo obvio habría mentido con confianza.** Si sólo se hubiera mirado «¿a dónde apunta este
+  color?» una sola vez, en una cadena de tres fusiones seguidas la previa te habría dicho **el color de en
+  medio** — no el que la orden va a usar de verdad. **Y eso es peor que no avisar nada**: te daría un dato
+  falso con toda seguridad.
+- **Un caso raro que sí puede pasar**: si dos colores se fusionaron **en círculo**, la vista previa ahora
+  falla con un error que **nombra el color** y dice cómo romper el círculo — en vez de enseñarte un color
+  equivocado.
+
+### Qué sigue pendiente o roto
+
+- **Un renglón sin color** (cuando el papel no trae color) sigue sin pasar por este aviso. Es un caso muy
+  estrecho y queda anotado; taparlo obliga a decidir antes qué debe enseñar la pantalla ahí.
+- El despliegue **no necesita nada especial**: sin cambios de permisos ni de datos.
+
+---
+
 ## 0.073 · 1-sep-2026 · **en prueba** — Ahora sí dice **quién** hizo cada cosa, en vez de un número raro
 
 ### Qué se puede hacer ahora que antes no

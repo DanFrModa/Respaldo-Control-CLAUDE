@@ -51,6 +51,10 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
     abiertaEn: null,
     abiertaPor: null,
     abiertaMotivo: null,
+    // ⭐⭐⭐ 0.085 (§Post-F9.173(a)): por default esta orden NO tiene compra comprometida.
+    ocsComprometidas: [],
+    avisoCompraComprometida: null,
+    avisoCambioSobreLoComprado: null,
     resumen: {
       sinRevisar: 1,
       revisados: 0,
@@ -85,6 +89,7 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
         consumoModelo: 1.5,
         precioModelo: 50,
         precioModeloDeCompra: false,
+        ocsComprometidas: [],
       },
     ],
     avios: [],

@@ -221,9 +221,10 @@ export const esquemaAdvertenciaPdf = z
         'liga-inactiva',
         'sobrepedido',
         'duplicado',
+        'color-fusionado',
       ])
       .describe(
-        'Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, y "duplicado": esa OC del cliente ya se importó).',
+        'Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, "duplicado": esa OC del cliente ya se importó, y "color-fusionado": el color del papel lo absorbió una fusión y la OP va a nacer en el canónico).',
       ),
     mensaje: z.string().describe('Mensaje legible para la vista previa.'),
   })
@@ -310,6 +311,17 @@ export const esquemaRenglonPdfPreview = z
     colorNuevo: z
       .boolean()
       .describe('true si el color no existe en el catálogo (se creará al confirmar).'),
+    /**
+     * 🔴 El color del papel EXISTE, pero una fusión se lo llevó: la OP va a nacer en OTRO color, con
+     * OTRO nombre — y la cadena de precio casa por NOMBRE, así que el precosto puede salir distinto
+     * al del papel del cliente. Antes esto sólo constaba en la bitácora, DESPUÉS de confirmar.
+     */
+    colorFusionadoEn: z
+      .string()
+      .nullable()
+      .describe(
+        'Nombre del color CANÓNICO al que la fusión va a redirigir el color del papel al confirmar, o null si no hay desvío (lo normal).',
+      ),
     tallasNuevas: z
       .array(z.string())
       .describe('Tallas del PDF que no existen en el catálogo (se crearán al confirmar).'),

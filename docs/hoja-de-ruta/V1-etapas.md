@@ -1218,6 +1218,380 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9i · ⭐ SI YA SE COMPRÓ, AVISA — Y EL AVISO LLEGA AL COMPRADOR (1-sep-2026, versión **0.077**) — ✅ HECHA
+
+**La petición de Daniel (§Post-F9.173(a)), textual:**
+
+> *«Si ya está comprado, **solo avisa** que ya está comprado para ver si se puede cancelar la OC interna, o
+> que **el comprador sepa que cambió**, para hacer lo que tenga que hacer. **No se puede cancelar la OC en
+> automático… eso hay que negociarlo con el proveedor.»***
+
+**Confirma y corrige** lo que la 0.067 construyó: reabrir **no revierte nada** —el sistema no puede deshacer
+un compromiso con un tercero, *cancelar se negocia, no se ejecuta*— **pero el sistema se quedaba CALLADO**.
+
+### 🔴 El encargo del lead apuntaba al sitio equivocado
+
+Lo iba a colgar de **«reabrir la receta»**. **El caso de Daniel no pasa por ahí:** cambiar el **consumo, el
+precio o el amarre** de un material ya comprado **no lo bloquea nada y no lo avisa nadie**. Lo que sí frena
+(`exigirNoSacarLoComprado`) es **sólo cuando el cambio SACA el material**.
+
+⇒ **Si el aviso se hubiera colgado sólo de reabrir, la versión sale muda justo donde duele.**
+
+Y el encargo mandaba **llevar a `desautorizarOC`** — **falso para el destinatario que Daniel nombró**: ese
+permiso está cortado a Dirección ⇒ **403 en la cara del comprador**, lo que §Post-F9.145(f) prohíbe con esas
+palabras. Se pinta **la OC misma**, que él sí ve, y se **nombra a quién pedírselo**.
+
+### ⭐ Casi todo ya existía — la etapa fueron TRES huecos, no una construcción
+
+La bandeja persistente ya listaba **las reabiertas y las que tienen un renglón desfirmado**; el comprador ya
+tenía permiso para verla. Le faltaba **la columna de OC comprometidas**.
+
+⭐ **Y el cambio de mayor alcance lo encontró el coder, no el encargo:** `exigirNoSacarLoComprado` **ya
+tenía, literalmente, la consulta que hacía falta**. Dejarla duplicada habría dado un sistema que **bloquea
+por un criterio y avisa por otro** el día que uno cambie. La fusionó, **con los dos mensajes del 409 byte
+por byte iguales** — verificado por el reviewer punto por punto contra `HEAD`.
+
+⚠️ **Y de ahí sale una nota que va en la doc del módulo:** es la primera vez que esa guarda depende de un
+**invariante de dominio** (el XOR tela/avío) **y no del `where`** — **no hay `CHECK` en base**. El día que
+alguien agregue un tercer escritor de `OrdenCompraLinea` que ponga `idTela` **y** `idAvio`, **el bloqueo se
+apaga en silencio**. Queda escrito en los dos sitios, nombrando a los dos escritores actuales.
+
+### 🔴 El bloqueante: el aviso **se borraba solo**, y ninguna prueba podía verlo
+
+`trasMutar` pone la receta en caché **y acto seguido** invalida `['ordenes']` — que es **prefijo** de
+`['ordenes','receta',id]` ⇒ **casa por prefijo**, la receta está activa, se re-pide, y esa lectura devuelve
+`avisoCambioSobreLoComprado: null` **por diseño**.
+
+**Medido con el `QueryClient` real**, no deducido:
+```
+× el bloque NO se borra cuando la invalidación re-pide la receta
+  Unable to find an element by: [data-testid="receta-aviso-ya-comprado"]
+```
+⇒ **no es que parpadeara: no llegaba a asentarse.**
+
+⚠️ **Por qué ninguna prueba lo vio:** todas mockean la query entera ⇒ **el camino mutación→caché→refetch no
+se ejercita nunca**. El `it` que decía cubrirlo **no cambiaba nada**: renderizaba una receta con el campo ya
+puesto. *El nombre prometía el flujo; el cuerpo comprobaba el pintado.* Se reescribieron para **provocar**
+la mutación, y por eso **ahora también caen**.
+
+### ⭐⭐ El envoltorio — y la ironía que lo cerró
+
+El arreglo obvio era cablear las ~12 llamadas una por una. **No se hizo, y la razón vale como regla:**
+*«significa que la número trece se olvide, que es literalmente el defecto que esta etapa vino a cerrar»*.
+Se envolvió **el hook**, punto único por donde pasan todas.
+
+> 🔴 **Y el reviewer contó: son DIEZ, y se envolvieron NUEVE.**
+> **«La número trece no se olvidó: se olvidó la décima.»**
+
+`useTraerDelModelo` **no perdía ningún aviso** (sólo crea) **pero no APAGABA el eco anterior**: editabas una
+tela comprada → salía el aviso → «Traer del modelo» → **el aviso seguía ahí**, hablando de una acción que ya
+no era la última. **Es el «gritar en falso» que este módulo lleva dos versiones combatiendo.**
+
+⭐ **Y el arreglo no fue sólo la línea: se le puso LÍMITE a la promesa.** La nota decía que el olvido era
+imposible **a secas**; ahora dice **qué garantiza** (`tsc` acota la forma ⇒ imposible **en las que caben**),
+**nombra la excepción**, y advierte que otra mutación de forma distinta **tiene que reportar a mano**.
+
+### La lápida: la prueba estaba INVERTIDA
+
+Existía un `it('en una LÁPIDA no se pinta')`. **El caso correcto es el contrario:** ahí el dato **no es una
+firma, es una CONTRADICCIÓN** —hay una OC viva contra un material que la orden dice que no lleva— y **quien
+va a revivirlo tiene que verla antes**. Se invirtió, con el porqué.
+
+⭐ **Y no rompe el caso legítimo POR CONSTRUCCIÓN**: `ChipsOcComprometidas` devuelve `null` con lista vacía,
+así que **una lápida sin compra no pinta nada sin necesitar un `if` que alguien pueda borrar**.
+
+### Lo demás que se cerró
+
+- **`agregarRenglonReceta` NO sólo crea**: revivir una lápida **actualiza** consumo, precio y amarre ⇒ era un
+  disparador real que el aviso dejaba fuera. Cubierto en **las dos ramas**, con su int por cada una — porque
+  **quitar sólo el de la tela sobrevivía todo**: *un fixture que sólo alcanza mientras nadie ejercite el caso
+  de al lado es una prueba que caduca sin avisar*.
+- **`recibida` VIAJA del dominio** (`algunaRecibida`): se acabó la segunda implementación de la regla en el
+  frontend.
+- ⚠️ **Techo honesto:** el sistema **no puede saber si se pagó** — ningún modelo de CxP liga a una OC. El
+  aviso llega hasta *«ya se recibió»*, y sobre una OC recibida **no hay des-autorizar para nadie**.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,425** · frontend **1,912** en **204** archivos.
+**Contrato: cero drift y SÓLO SALIDAS**, verificado a máquina sobre las **613** operaciones (0 nuevas, 0
+borradas, 0 con entrada cambiada). **Sin migración · sin permisos · sin seed · sin backfill** —todo se
+deriva **en vivo** de `OrdenCompraLinea`, y una int fija que **des-autorizada la OC el aviso se calla solo**.
+
+**Revisión independiente: tres rondas.** El reviewer corrió **mutaciones propias** —incluidas dos sobre **el
+envoltorio**, no sobre el arreglo— y verificó la fusión **línea por línea**.
+
+📌 **Superviviente declarada:** quitar los `tocoRenglon` del revivir **sobrevive las unitarias** — es
+cableado contra la BD, lo matan las int nuevas en CI.
+
+---
+
+## V1-E9h · ⭐ LA DEFENSA QUE NO DEFENDÍA: `singletonKey` (1-sep-2026, versión **0.076**) — ✅ HECHA
+
+**El comentario de `comun/jobs/index.ts` AFIRMABA** que *«pg-boss garantiza que, para un `singletonKey`
+dado, a lo sumo UN job está en `created`/`active`; un segundo `send` se descarta»*. **Falso**: los índices
+únicos sólo existen para colas **con política**, y el archivo las creaba **todas sin `policy`**.
+
+> ⇒ **La defensa anti-duplicado de la Ruta Crítica era decorativa, y su comentario la declaraba viva.** Es
+> la peor combinación: quien leía el código **creía estar protegido**.
+
+### Se midieron las CINCO políticas ejecutándolas, no suponiéndolas por el nombre
+
+Con `pglite` (Postgres **en proceso**, sin Docker). La que corresponde **literalmente** a la promesa vieja
+es **`exclusive`** — ⭐ **y por eso NO se eligió**: con `exclusive`, un evento que llega **mientras se está
+recalculando** se **pierde**, y la ruta queda con fechas viejas hasta el siguiente evento, que puede tardar
+días. Verificado que **no hay red debajo**: el barrido de riesgo recalcula el **semáforo**, no el CPM.
+
+⇒ **Se eligió `stately`** (≤1 corriendo **+** ≤1 esperando) **y se reescribió el comentario para que
+describa `stately`**. *Se prefirió cambiar la frase a que el sistema pierda datos por respetarla.*
+
+**Las dos dudas, medidas:** `stately` **no acumula** (cota dura de 2 por clave) y el que espera **no arranca
+con datos viejos** (el payload es mínimo a propósito y el handler relee **después** de que el activo terminó).
+
+### 🔴 EL HALLAZGO QUE CAMBIÓ LA ETAPA: la política no se puede cambiar en caliente
+
+- `createQueue` sobre una cola que ya existe hace **`ON CONFLICT DO NOTHING`: la ignora en silencio**.
+- `updateQueue` **lanza** *«queue policy cannot be changed after creation»*.
+- Única vía: `deleteQueue` + `createQueue` — que **borra los jobs encolados y, por FK en cascada, el
+  `schedule`**.
+
+⇒ **Declarar la política y nada más habría sido código muerto en `prueba`: el mismo defecto una vuelta más
+arriba.** Por eso nació la **conciliación al arranque**, que **nunca lanza** (un tropiezo no puede dejar al
+sistema sin motor) y **verifica después** — necesario porque `deleteQueue` **se traga sus propios errores**.
+
+### 🔴 Y la etapa contra las mentiras en prosa **introdujo una**, en el contrato público
+
+`contrato/esquemas/indicadores.ts` decía *«`false` si el motor está inactivo»* — **cierto hasta ayer**:
+bajo `standard`, `send` **nunca** devolvía `null`. **Con `stately` deja de serlo**: el 2.º clic en
+«Refrescar KPIs» **también** da `false`. Y **viajaba a `openapi.json` ×2 y a `esquema.gen.ts`**.
+
+⇒ La descripción ahora nombra **las dos** causas, aclara que **`false` no es error**, y —esto es lo que
+impide que envejezca mal— **fecha el cambio**: *«hasta que la cola declaró política, (2) no podía ocurrir»*.
+
+### ⭐⭐ El guardián de prosa: se creía imposible, y no lo era
+
+El coder sostuvo que *«ningún gate detecta una mentira en prosa»*. **Falso en este repo**: hay una familia
+de guardianes que **leen el código real**. El reviewer escribió la prueba de concepto y la corrió en las dos
+direcciones; el coder la mejoró **anclando al bloque que promete, no al archivo** —porque en un archivo la
+promesa vivía en el JSDoc de una función— con `expect(posAncla).toBeGreaterThan(0)` para que **renombrar la
+función falle ruidoso en vez de dejar de vigilar**.
+
+⭐ **Y lo extendió al CONTRATO**, exigiendo `/dedup/i` en vez de `` `stately` ``: *el contrato habla el
+idioma del negocio; pedirle vocabulario de pg-boss lo habría vuelto frágil sin ganar nada.*
+
+**Atacado siete veces** (mover el texto a un `//`, renombrar la función, borrar la mención, revertir el
+`.describe()`, colar un `eslint-disable`…): **las siete caen**.
+
+> **La asimetría que lo justifica, en palabras del reviewer:** *«construyó una prueba para que la LIBRERÍA
+> no invalide la promesa en silencio, y dejó sin guarda que la invalide una PERSONA. El riesgo humano es el
+> que de hecho ocurrió.»*
+
+### ⭐ La conducta que vale más que el arreglo: dos argumentos rechazados por no reproducirse
+
+1. **El reviewer aportó** que `exclusive` *«no sólo perdería eventos: perdería reintentos»*. **El coder lo
+   midió, le salió distinto, y se negó a escribirlo:** *«prefiero no escribir en el ADR un argumento que no
+   reproduzco»*.
+2. **El reviewer lo verificó y se dio la razón a él**, encontrando que estaba **doblemente equivocado**: su
+   evidencia vivía en un camino de código **que sólo corre en CockroachDB** —muerto en este sistema— y ese
+   mismo comentario **lista `stately` PRIMERO**, así que nunca diferenció una política de la otra.
+
+> **Un ADR es un registro de razones; una razón que nadie reproduce es la semilla del próximo comentario
+> falso.** Meterlo habría hecho que la etapa contra las mentiras en prosa **cometiera una en su propio ADR**.
+
+### Lo que el barrido encontró de más
+
+- **La misma frase falsa vivía en `cpm-job.ts` y `kpis.ts`**; dos más eran imprecisas.
+- ⭐ **`respaldo-bd.ts` YA decía la verdad** — *«alguien lo sabía y lo dejó escrito a dos archivos de
+  distancia de la frase falsa»*. Es el mejor argumento de por qué la prosa necesita guarda.
+- **`ADR-0012` seguía con la frase original**, y hoy es falsa **al revés**: describía `exclusive`, **justo
+  lo que se decidió no hacer**. Corregido con un recuadro que lo dice.
+- 🔴 **Y una tercera frase falsa suya que nadie había visto**: decía que a las colas de cron las protege un
+  índice que en realidad se aplica a **otra cola interna**, no a la nuestra.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,421** · frontend los cuatro. **Contrato en sync.**
+**Sin migración de Prisma** (los índices son del esquema de pg-boss) · **sin permisos · sin seed** ⇒ **no
+requiere `SEED_ON_START`**.
+
+⚠️ **Para el deploy:** al **primer** arranque en `prueba` el log dirá **dos veces «se RECREA»**
+(`rc-recalcular-ruta` y `kpi-refrescar`) **en ROJO**, porque salen por `registrarError`. **Son esperadas y
+ocurren una sola vez**; en los arranques siguientes, ninguna.
+
+📌 **Deuda menor anotada:** el anclaje del guardián se puede evadir con un **bloque señuelo** que contenga
+los cuatro tokens. **No se cierra a propósito**: no se escribe por accidente, la variante realista —un
+comentario inocuo arriba— **sí cae en rojo**, y cerrarlo exige una lista negra que rompe la forma positiva.
+
+---
+
+## V1-E9g · LA BÚSQUEDA ENTIENDE LOS DOS NOMBRES (1-sep-2026, versión **0.075**) — ✅ HECHA
+
+**La decisión de Daniel (§Post-F9.172(a)):** *«Está bien la 3.»*
+
+> **El texto capturado del documento del cliente NO se reescribe NUNCA.** Buscar «Caballeros» encuentra
+> las órdenes que dicen «2-HOMBRE» **porque el sistema sabe que uno se fusionó en el otro** — no porque le
+> haya cambiado el papel al cliente.
+
+Se descartó reescribir porque **rompería la única prueba de qué pidió el cliente** — lo mismo que
+`Cotizacion.nombreDepartamento` se congela a propósito para no hacer.
+
+### 🔑 Ni la búsqueda ni la fusión estaban mal escritas
+
+El importador escribe la División **dos veces**: al catálogo **con FK**, y como **texto crudo** en
+`OrdenReferencia.valor`. Fusionar mueve el catálogo; **la orden sigue diciendo el nombre viejo** y el
+`contains` no lo alcanza. Faltaban **el rastro y el puente**.
+
+**Llevó MIGRACIÓN por una asimetría real:** `Color` tiene `idFusionadoEn` con FK reflexiva e índice;
+**`ClienteDepartamento` sólo tenía `activo`** — su rastro vivía **únicamente en la bitácora**.
+
+### 🔴 El encargo del lead estaba mal en DOS cosas
+
+1. Decía **«tres consumidores»** de `armarBusqueda`. **Son CINCO** (+ tablero WIP y lista de costos).
+2. Decía *«se arregla en un solo sitio y los tres quedan cubiertos»*. **FALSO: son DOS embudos.** El Centro
+   de Órdenes **no comparte** `armarBusqueda` — tiene su propia `busquedaCentro`, a propósito sin nombre de
+   cliente. ⭐ Verificado por mutación: quitar el sinónimo **sólo del Centro** mata **exactamente 2 pruebas,
+   las suyas**, y las 21 restantes siguen verdes. *Con una prueba compartida eso habría pasado en verde.*
+
+### ⭐⭐ EL INCIDENTE DE LA RED — la lección reutilizable de esta etapa
+
+Añadir la relación reflexiva **puso roja** la prueba-red que exige igualdad exacta con el esquema. La
+primera versión la calmó **declarando una exclusión y exportándola desde producción**, y la prueba la
+importaba.
+
+🔴 **El reviewer demostró que eso la DESACTIVA**, con un mutante que **sobrevive**: sacó `contactos` del
+repunte —o sea, **la fusión deja de arrastrar los contactos y la compradora queda colgando de un
+departamento absorbido**, el estado prohibido exacto— y lo declaró excluido. **6 pruebas en verde.**
+
+**La causa:** en colores la lista equivalente es una `const` **privada del archivo de prueba** ⇒ ampliarla
+**exige editar la prueba**, un acto visible en el diff. Exportada desde producción, **la aserción se deriva
+del módulo que debe vigilar** y el escape es *una palabra en el archivo que el desarrollador ya tiene
+abierto*. La cabecera afirmaba seguir el precedente de colores — **y no lo seguía**.
+
+⭐ **El arreglo fue MÁS ALLÁ de lo que el reviewer pidió, y él lo verificó y retiró su propia propuesta.**
+En vez de mover la lista a la prueba (opción del reviewer), el coder la **eliminó** y puso el nombre como
+**literal dentro de la aserción** — argumentando que mover la lista *«sólo mueve la puerta de archivo:
+ampliarla sigue siendo agregar una palabra a una lista»*. El reviewer lo probó: con su propia opción, el
+escape barato **seguía funcionando**; con el literal hay que **editar dos aserciones distintas y escribir
+el nombre de la relación dos veces**. Retiró su propuesta.
+
+> **La lección: una excepción que produce un símbolo configurable es una excepción que se puede ampliar en
+> silencio.**
+
+📌 **Y una corrección al acta, del propio reviewer:** el coder sostuvo que las dos aserciones no son
+redundantes. **Media verdad, medida**: la segunda caza *«sobra una entrada»*, que la primera no ve ✔; pero
+*«dejó de repuntarse»* **lo cazan las dos**. Lo que la primera aporta en exclusiva **no es cobertura: es el
+mensaje de fallo** —nombra al culpable en vez de dar dos listas de distinto largo—. Legítimo y barato, pero
+**no debe documentarse como no-redundancia de cobertura**.
+
+### La trampa central: EL SINÓNIMO RESUELVE EN LOS DOS SENTIDOS
+
+Buscar el **destino** debe encontrar el **origen** **y al revés** — quien tiene el papel viejo busca por el
+nombre viejo. ⭐ **Verificado con conjuntos de fallo DISJUNTOS:** quitar la pata que baja mata **14** pruebas,
+todas de un sentido; quitar la que sube mata **9**, todas del otro. **Ninguna prueba las mezcla.**
+
+**La cadena** (A→B→C) se recorre entera y **no se aplana**: repuntarla reescribiría un hecho histórico
+(«a A se lo llevó B» pasaría a decir «C»).
+
+### Lo que también encontró
+
+- **La fusión sólo escribía el rastro `if (origen.activo)`** ⇒ un departamento **apagado a mano y luego
+  fusionado se quedaba sin rastro**. Corregido.
+- ⚠️ **Una trampa de fixture que le mordió a él:** su primera cadena usaba «DAMA»→«MUJER»→«Damas» y la
+  prueba medía **el filtro de redundancia en vez de los saltos**, porque «Damas» *contiene* «DAMA». La
+  cadena nueva usa nombres **ajenos entre sí**.
+- 🔴 **La igualdad insensible NUNCA se ejercía contra Postgres**: las tres pruebas sembraban el texto con
+  **la misma grafía** que el catálogo — y **la premisa de la etapa es justamente que se escriben distinto**.
+  Ahora la orden dice `'2-hombre'` y el catálogo `'2-HOMBRE'`, verificado que **ningún otro camino** puede
+  encontrar esa orden. **Y el control cambió también**, porque con otra grafía **no controlaba nada**: entre
+  el positivo y el control debe moverse **una sola variable, la fusión**.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,419** · frontend los cuatro. **Contrato: cero
+drift** — el rastro **no se expone**, igual que en colores ⇒ **el frontend no se toca**. **Sin permisos ·
+sin seed** ⇒ **no requiere `SEED_ON_START`**. **Migración byte a byte** idéntica a `prisma migrate diff`.
+
+**Mutaciones: 17 del coder + 13 del reviewer.** Rendimiento verificado: **1 viaje** sin coincidencia, **≤3**
+con 40 absorbidos (por nivel, **nunca por fila**), **0** con texto vacío.
+
+📌 **FK en `Restrict`.** `SetNull` **destruiría el rastro en silencio** —el dato que esta etapa vino a
+crear— y en un sistema donde nada se borra, un borrado físico debe ser **ruidoso**. Si algún día hiciera
+falta borrar clientes, lo correcto sería **`NoAction`** (Postgres difiere la comprobación al final de la
+sentencia), **nunca `SetNull`**.
+## V1-E9f · ⭐ EL COLOR FUSIONADO SE VE, Y AVISA ANTES DE CONFIRMAR (1-sep-2026, versión **0.074**) — ✅ HECHA
+
+**La pieza que podía mandar un precio equivocado al cliente, y que el plan no tenía.**
+
+### El defecto, y por qué llegaba hasta el precio
+
+`catalogoColoresPorNombre` no filtraba por `activo` ni miraba el rastro de fusión ⇒ un color **absorbido**
+contaba como *«ya existe»*, la previa del PDF **ni advertía ni marcaba**, y la OP **nacía en otro color, en
+silencio**. Y la cadena de precio **casa POR NOMBRE** (`costos/resolucion-precios.ts:170-172`) ⇒ podía caer
+en **otro `TelaColor` con otro precio**. Lo que veía Daniel: **un precosto que no cuadra con el papel del
+cliente, sin nada en pantalla que lo explique** — el único registro era la bitácora.
+
+### 🔴 El encargo del lead se quedaba corto, y el reviewer lo demostró mejor que nadie
+
+El encargo pedía **añadir `activo`/`idFusionadoEn` al `select`**. **No basta, por dos razones
+independientes:**
+
+1. **El nombre del canónico no puede salir de una consulta por nombre** — por definición se llama distinto
+   al color del papel: ése *es* el punto de una fusión.
+2. ⭐ **Un salto no es la cadena.** El reviewer sondeó `A→B→C→D`: el código entregado resuelve a **D**; una
+   lectura de `idFusionadoEn` a un salto habría dicho **«B»** — *la previa nombrando con confianza un color
+   que el confirm NO va a usar*. **Eso es PEOR que no avisar.**
+
+⇒ Se resolvió **llamando a `colorCanonico`, la misma función que usa el confirm**, en vez de re-deducir su
+regla de parada. Razón del coder, que vale como regla: ***«un segundo recorrido “equivalente” es exactamente
+como nacen las ramas gemelas»***. Verificado: **dos** call sites contra **una** implementación.
+
+### El rastro, en los SEIS productores — y por qué no es celo
+
+`INCLUIR_FUSIONADO_EN` se aplicó a los **seis** productores de color, no sólo a las lecturas: *«si un
+productor no lo trajera habría que rellenarlo con `null` en la ruta, y ese `null` sería mentira justo en el
+caso que la etapa vino a hacer visible»*. ⭐ **Y el tipo lo hace cumplir:** quitar el `include` de
+`listarColores` **muere en `tsc`** con *«Property 'fusionadoEn' is missing»*. Un productor nuevo lo
+descubre **al compilar, no en producción**.
+
+### 🔴 La rama gemela: inactivo ≠ fusionado
+
+Un color puede estar **apagado a mano sin haberse fusionado**. Cubiertos **los dos**, en las tres capas, y
+ninguno tapa al otro — en pantalla **conviven**: el fusionado lleva **dos** marcas, el apagado una.
+
+**Y no avisar del inactivo puro es correcto, comprobado en el código:** `colorCanonico` para sin rastro ⇒
+mismo id; el confirm lo **reactiva y devuelve ese mismo id** ⇒ **misma clave de precio**. No hay desvío que
+avisar.
+
+### Lo que el encargo tampoco decía
+
+- **El desempate de mayúsculas pasó a ser carga de la previa.** `resolverOCrearColor` elige con
+  `orderBy: {id:'asc'}` entre variantes («Blanco»/«BLANCO»), y **desde V1-E8s esa elección decide entre
+  redirigir y reusar**. A la consulta vieja le daba igual —sólo preguntaba «¿existe?»—; **a la nueva no**.
+- **`aColorSalida` no tenía NINGUNA prueba**: no existía test de ruta para `/api/colores`, y por eso la
+  mutación de la ruta sobrevivía los ocho gates. Nació `colores.int.test.ts`.
+
+### Decisiones de diseño, con su razón
+
+- **Un anillo de fusiones tumba la previa entera** con `ErrorConflicto`, **a propósito**: el confirm truena
+  igual con ese papel, el error nombra el color y dice cómo romperlo, y **preserva la invariante de la
+  etapa — previa y confirm nunca dicen cosas distintas**. Verificado que **termina** (corta a 20 saltos) y
+  que el dominio **no puede fabricar un anillo**: la fusión limpia el rastro del destino.
+- **La previa hace N+1 consultas cortas** (una por nombre distinto + saltos). Deliberado: **compartir
+  `colorCanonico` con el confirm vale más** que ahorrar consultas en una pantalla que trae un puñado de PDFs.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,362** · frontend `typecheck` (`tsc -b`)/`lint`/
+`format:check` · **1,867**. Contrato regenerado, **cero drift** (verificado determinista). **Sin migración ·
+sin permisos · sin seed** ⇒ **no requiere `SEED_ON_START`**.
+
+**Mutaciones: 15 del coder + 11 del reviewer.** Dos declaradas supervivientes de las unitarias —la ruta con
+`fusionadoEn: null` y la previa que no empuja el aviso— **y el reviewer verificó línea por línea que sus
+pruebas de integración las matan**: no quedan cableados sueltos. ⚠️ **La trampa del fixture NO mordió**: las
+pruebas del caso grave **fusionan de verdad**, no simulan con `activo: false`.
+
+---
+
 ## V1-E9e · LOS NOMBRES, EN VEZ DE LOS IDS (1-sep-2026, versión **0.073**) — ✅ HECHA
 
 **Cinco pantallas pintaban el id crudo de un usuario donde va su nombre**, y **tres se montan en el mismo

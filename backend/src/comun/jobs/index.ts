@@ -6,15 +6,34 @@
  * Decisiones de diseño (ADR-0012):
  *  • Una sola instancia de pg-boss para TODA la app, sobre el MISMO Postgres (`DATABASE_URL`) —
  *    no se introduce otro broker; misma decisión que la cola de eventos (ADR-0011).
- *  • SERIALIZACIÓN POR ORDEN vía `singletonKey`: dos jobs del MISMO recurso (p. ej. recalcular la
- *    RC de la orden 42) NO se procesan a la vez ni se acumulan en cola. pg-boss garantiza que, para
- *    un `singletonKey` dado, a lo sumo UN job está en estado `created`/`active`; un segundo `send`
- *    con la misma clave mientras hay uno pendiente se descarta (dedup). Así, varios eventos seguidos
- *    sobre la misma orden colapsan en un único recálculo (el último gana) en vez de pisarse.
+ *  • SERIALIZACIÓN POR ORDEN vía `singletonKey` — Y LA POLÍTICA DE LA COLA, QUE ES LO QUE LA HACE
+ *    REAL. ⚠️ `singletonKey` POR SÍ SOLO NO RESTRINGE NADA: en una cola con la política por defecto
+ *    (`standard`) pg-boss GUARDA la clave y acepta todos los `send` que le manden — los índices
+ *    únicos sobre `(name, singleton_key)` sólo existen para las políticas `short` / `singleton` /
+ *    `stately` / `exclusive` / `key_strict_fifo`. Por eso cada cola DECLARA su política en
+ *    {@link POLITICA_POR_COLA} y `encolarJob` sólo acepta —por tipo— las colas que declaran una que
+ *    de verdad serializa. Las que se usan con `singletonKey` van en **`stately`**: pg-boss permite a
+ *    lo sumo UN job por ESTADO y clave entre `created`/`retry`/`active` (índice `job_i3`), o sea
+ *    ≤1 corriendo + ≤1 esperando. Consecuencias exactas, medidas contra pg-boss 12.20:
+ *      – varios disparos seguidos sobre la misma orden mientras NADA corre → colapsan en UNO solo
+ *        (el 2º y el 3er `send` devuelven `null`);
+ *      – un disparo que llega MIENTRAS se recalcula esa orden → SÍ se encola y corre DESPUÉS, así
+ *        que el cambio que lo provocó nunca se pierde (el handler relee la BD, gana el último);
+ *      – órdenes distintas no se estorban (claves distintas).
+ *    NO se usa `exclusive` —que sería «≤1 job entre `created`/`retry`/`active`, punto»— justamente
+ *    porque descartaría ese disparo que llega con un recálculo ya activo: el evento se perdería y la
+ *    ruta quedaría con fechas viejas hasta el siguiente evento.
+ *  • LA POLÍTICA NO SE PUEDE CAMBIAR EN CALIENTE (pg-boss 12): `createQueue` sobre una cola que ya
+ *    existe hace `ON CONFLICT DO NOTHING` —ignora la opción EN SILENCIO— y `updateQueue` lanza
+ *    «queue policy cannot be changed after creation». La única vía es borrar y recrear la cola, y eso
+ *    tira los jobs que tuviera encolados. Lo hace {@link conciliarPoliticasColas} al arrancar, sólo
+ *    cuando lo guardado NO coincide con lo declarado, y dejándolo dicho en el log.
  *  • GUARDA POR ENTORNO: el worker arranca SOLO si `JOBS_ACTIVOS` no está en "false". En tests/CI se
- *    deja INACTIVO (no hay pg-boss vivo) — lo testeable sin BD es la CONSTRUCCIÓN de la singletonKey
- *    y la serialización; el transporte real se prueba en integración/Railway. Con el motor inactivo,
- *    `encolarJob` es un no-op silencioso que devuelve `null` (nadie se rompe).
+ *    deja INACTIVO (no hay pg-boss vivo). Sin BD son testeables la CONSTRUCCIÓN de la singletonKey,
+ *    la POLÍTICA que declara cada cola (y que pg-boss la respalde con su índice único, leyéndolo de
+ *    `getConstructionPlans()`) y la conciliación; lo que NO —que dos `send` con la misma clave den id
+ *    y `null`— se prueba en integración/Railway. Con el motor inactivo, `encolarJob` es un no-op
+ *    silencioso que devuelve `null` (nadie se rompe).
  *
  * En E3 el handler del CPM NO se implementa (es E4): aquí se registra el NOMBRE de la cola y se deja
  * que `generarRutaOrden` ENCOLE el recálculo. El worker que consume esa cola lo monta E4.
@@ -57,6 +76,63 @@ export const COLAS_JOBS = {
 export type NombreColaJob = (typeof COLAS_JOBS)[keyof typeof COLAS_JOBS];
 
 /**
+ * Políticas de cola que admite pg-boss 12 (el mismo juego que exporta como `policies`). Sólo
+ * `standard` NO restringe nada; las otras cinco crean índices únicos sobre `(name, singleton_key)`.
+ */
+export type PoliticaCola =
+  | 'standard'
+  | 'short'
+  | 'singleton'
+  | 'stately'
+  | 'exclusive'
+  | 'key_strict_fifo';
+
+/**
+ * POLÍTICA DECLARADA DE CADA COLA — la pieza que hace REAL la serialización por `singletonKey`.
+ * Es exhaustiva sobre {@link COLAS_JOBS} a propósito (`Record<NombreColaJob, …>`): una cola nueva
+ * DE ESTE MOTOR no compila hasta que su autor decida, a la vista, si serializa o no. (Ojo con el
+ * alcance: `comun/cola-eventos.ts` crea su propia cola `eventos-dominio` sobre OTRA instancia de
+ * pg-boss y NO pasa por aquí. No usa `singletonKey`, así que hoy no le falta nada; pero esta tabla
+ * no la cubre, y si algún día se le pusiera clave habría que darle política a mano.)
+ *
+ *  • `stately` en las colas que se encolan con `encolarJob` (o sea, con `singletonKey`): ≤1 job por
+ *    estado y clave entre `created`/`retry`/`active` → ≤1 corriendo + ≤1 esperando. Ver la cabecera.
+ *  • `standard` en las colas que NO usan `singletonKey` y viven de un `schedule` (cron). Ahí la
+ *    protección contra duplicados NO es la política de ESTA cola, y conviene saber dónde está de
+ *    verdad: el timekeeper de pg-boss no manda el cron directo, lo mete primero en su cola INTERNA
+ *    `__pgboss__send-it` con `singletonKey` + `singletonSeconds: 60`, y ahí sí lo dedupa el índice
+ *    de throttle `job_i4` (que actúa con cualquier política). El job que acaba llegando a NUESTRA
+ *    cola sale de ese despacho y viaja SIN `singletonKey`. Para el respaldo, además, quien cierra el
+ *    solape es `expireInSeconds` + la guarda de antigüedad de su barrido (razonado en
+ *    `respaldo-bd.ts`, donde se programa).
+ *
+ * ⚠️ CONSECUENCIA EN `kpi-refrescar`, la única cola `stately` que ADEMÁS tiene cron: como los envíos
+ * del cron llegan sin `singletonKey`, comparten entre ellos la clave vacía y `stately` LOS DEDUPA
+ * TAMBIÉN — si un refresco sigue esperando, el siguiente tic del cron no encola otro. Es deseable
+ * (antes se apilaban) pero no es lo que sugiere la frase «la política aplica a las colas que se
+ * encolan con singletonKey»: aquí aplica a las dos vías. Las dos claves —la vacía del cron y
+ * `kpi-refrescar:0` del botón— son DISTINTAS, así que no se estorban entre sí.
+ *
+ * ⚠️ Cambiar un valor de aquí NO basta si la cola YA existe en la base: pg-boss no deja cambiar la
+ * política en caliente. Lo resuelve {@link conciliarPoliticasColas} al arrancar (recrea la cola).
+ */
+export const POLITICA_POR_COLA = {
+  [COLAS_JOBS.recalcularRutaOrden]: 'stately',
+  [COLAS_JOBS.refrescarKpis]: 'stately',
+  [COLAS_JOBS.barridoRiesgoRc]: 'standard',
+  [COLAS_JOBS.respaldoBd]: 'standard',
+} as const satisfies Record<NombreColaJob, PoliticaCola>;
+
+/**
+ * Colas que SÍ serializan por `singletonKey` — las únicas que {@link encolarJob} acepta. Sale de
+ * {@link POLITICA_POR_COLA}, no de una lista tecleada aparte: si alguien pone una de estas colas en
+ * `standard`, sus llamadas a `encolarJob` DEJAN DE COMPILAR en vez de volverse decorativas.
+ */
+export type ColaSerializada = {
+  [K in NombreColaJob]: (typeof POLITICA_POR_COLA)[K] extends 'standard' ? never : K;
+}[NombreColaJob];
+
+/**
  * Opciones por cola aplicadas al crearla. El default de `expireInSeconds` de pg-boss son 15 minutos:
  * pasado ese rato marca el job como expirado y lo REINTENTA **sin detener al que sigue corriendo**.
  * Para un respaldo de una base grande eso significa dos corridas solapadas; por eso su cola declara
@@ -76,6 +152,91 @@ const OPCIONES_POR_COLA: Partial<Record<NombreColaJob, { expireInSeconds: number
   [COLAS_JOBS.respaldoBd]: { expireInSeconds: ventanaCorridaMinutos() * 60 },
 };
 
+/**
+ * Opciones COMPLETAS con las que se crea una cola: su política declarada ({@link POLITICA_POR_COLA})
+ * más los extras de {@link OPCIONES_POR_COLA}. Punto ÚNICO — lo usan tanto la creación inicial como
+ * la recreación de {@link conciliarPoliticasColas}, para que las dos no puedan divergir.
+ */
+export function opcionesDeCola(cola: NombreColaJob): {
+  policy: PoliticaCola;
+  expireInSeconds?: number;
+} {
+  return { policy: POLITICA_POR_COLA[cola], ...OPCIONES_POR_COLA[cola] };
+}
+
+/**
+ * Lo MÍNIMO de pg-boss que necesita {@link conciliarPoliticasColas}. Existe para poder probar la
+ * conciliación SIN base de datos (una instancia de `PgBoss` lo cumple tal cual).
+ */
+export interface MotorColas {
+  createQueue(
+    nombre: string,
+    opciones?: { policy?: string; expireInSeconds?: number },
+  ): Promise<void>;
+  getQueue(nombre: string): Promise<{ policy?: string } | null>;
+  deleteQueue(nombre: string): Promise<void>;
+}
+
+/**
+ * Deja cada cola con la POLÍTICA que declara {@link POLITICA_POR_COLA}, incluso si ya existía en la
+ * base creada con otra. Es imprescindible: `createQueue` sobre una cola existente ignora la opción
+ * EN SILENCIO (`ON CONFLICT DO NOTHING`) y `updateQueue` lanza a propósito, así que sin esto un
+ * cambio de política sería código muerto en cualquier base que ya haya arrancado — exactamente el
+ * defecto que este arreglo vino a cerrar, una vuelta más arriba.
+ *
+ * ⚠️ Recrear la cola BORRA los jobs que tuviera encolados (y su `schedule`, por FK en cascada). Se
+ * asume a conciencia: (1) sólo pasa cuando lo guardado NO coincide con lo declarado, o sea UNA vez
+ * por cambio de política y nunca más; (2) los jobs de estas colas son recálculos idempotentes que se
+ * vuelven a disparar solos con el siguiente evento —no son el hecho de negocio, que ya está
+ * comiteado—; y (3) el `schedule` lo re-registra el arranque justo después (`servidor.ts` programa
+ * cron y handlers DESPUÉS de `iniciarMotorJobs`).
+ *
+ * NUNCA lanza: cada cola va en su propio try/catch. Si tumbara a `iniciarMotorJobs`, un tropiezo de
+ * conciliación dejaría al sistema SIN motor de jobs — mucho peor que la política mal puesta.
+ *
+ * @param motor          instancia de pg-boss ya arrancada.
+ * @param registrarError hook para logear; se usa también para lo que SÍ pasó (recrear una cola es un
+ *                       hecho operativo que debe verse en el log, no un silencio).
+ */
+export async function conciliarPoliticasColas(
+  motor: MotorColas,
+  registrarError: (mensaje: string, error: unknown) => void,
+): Promise<void> {
+  for (const cola of Object.values(COLAS_JOBS)) {
+    const esperada: PoliticaCola = POLITICA_POR_COLA[cola];
+    try {
+      const guardada = (await motor.getQueue(cola))?.policy;
+      if (guardada === esperada) {
+        continue; // ya coincide (caso normal: base nueva, o arranques posteriores al cambio).
+      }
+      registrarError(
+        `Motor de jobs: la cola "${cola}" está guardada con política "${guardada ?? '(ninguna)'}" ` +
+          `y debe ser "${esperada}". pg-boss no permite cambiarla en caliente, así que se RECREA: ` +
+          'los jobs que tuviera encolados se PIERDEN (son recálculos idempotentes; el siguiente ' +
+          'evento los vuelve a disparar).',
+        undefined,
+      );
+      await motor.deleteQueue(cola);
+      await motor.createQueue(cola, opcionesDeCola(cola));
+      const verificada = (await motor.getQueue(cola))?.policy;
+      if (verificada !== esperada) {
+        registrarError(
+          `Motor de jobs: la cola "${cola}" SIGUE con política "${verificada ?? '(ninguna)'}" tras ` +
+            'recrearla. La serialización por singletonKey NO está activa en esa cola: varios ' +
+            'disparos sobre el mismo recurso se encolarán por separado.',
+          undefined,
+        );
+      }
+    } catch (error) {
+      registrarError(
+        `Motor de jobs: no se pudo conciliar la política de la cola "${cola}" (se sigue con las ` +
+          'demás; la serialización de ESA cola puede no estar activa).',
+        error,
+      );
+    }
+  }
+}
+
 /** Carga del job de recálculo de la RC de una orden (lo mínimo: el consumidor relee la BD, E4). */
 export interface PayloadRecalcularRuta {
   /** Orden cuya ruta hay que (re)calcular. */
@@ -89,8 +250,9 @@ export interface PayloadRecalcularRuta {
 /**
  * Construye la `singletonKey` de SERIALIZACIÓN para un recurso dado. PURO (sin pg-boss): por eso es
  * testeable sin BD. La clave combina la cola y el id del recurso: dos jobs de la MISMA cola sobre el
- * MISMO recurso comparten clave → pg-boss los serializa/dedup. Recursos distintos (otra orden) o
- * colas distintas NO se bloquean entre sí.
+ * MISMO recurso comparten clave; recursos distintos (otra orden) o colas distintas NO. ⚠️ La clave
+ * SOLA no serializa nada — quien lo hace es la política de la cola ({@link POLITICA_POR_COLA}); esto
+ * sólo la alimenta.
  *
  * @param cola      nombre de la cola del job.
  * @param idRecurso identificador del recurso a serializar (p. ej. la orden).
@@ -152,14 +314,16 @@ export async function iniciarMotorJobs(
     });
     await instancia.start();
     for (const cola of Object.values(COLAS_JOBS)) {
-      // Opciones POR COLA (heredadas por sus jobs salvo que el productor las pise). Hoy sólo el
-      // respaldo necesita una: su corrida puede durar horas y el default de pg-boss (15 min de
-      // `expireInSeconds`) la daría por expirada y la reintentaría ENCIMA de la que sigue viva.
-      const opciones = OPCIONES_POR_COLA[cola];
-      await (opciones === undefined
-        ? instancia.createQueue(cola)
-        : instancia.createQueue(cola, opciones));
+      // Opciones POR COLA: su POLÍTICA (lo que hace real la serialización por `singletonKey`) más
+      // los extras que declare. Hoy sólo el respaldo necesita un extra: su corrida puede durar horas
+      // y el default de pg-boss (15 min de `expireInSeconds`) la daría por expirada y la reintentaría
+      // ENCIMA de la que sigue viva.
+      await instancia.createQueue(cola, opcionesDeCola(cola));
     }
+    // Y AQUÍ ESTÁ EL PUNTO FINO: la línea de arriba NO cambia la política de una cola que ya existía
+    // —`createQueue` la ignora en silencio—, así que sin esto el arreglo sería decorativo en toda
+    // base ya arrancada (Railway `prueba` incluido). Nunca lanza.
+    await conciliarPoliticasColas(instancia, registrarError);
     boss = instancia;
   } catch (error) {
     registrarError('No se pudo iniciar el motor de jobs (la app sigue):', error);
@@ -177,19 +341,25 @@ export async function detenerMotorJobs(): Promise<void> {
 }
 
 /**
- * ENCOLA un job en una cola, SERIALIZADO por su recurso (`singletonKey`): si ya hay un job pendiente
- * para el mismo recurso en esa cola, pg-boss lo DESCARTA (dedup) — varios disparos seguidos colapsan
- * en uno. NO-OP si el motor está inactivo/sin arrancar (devuelve `null`): el llamador NO debe esperar
- * a este resultado para responder al usuario (la captura nunca bloquea por el job, §11).
+ * ENCOLA un job SERIALIZADO por su recurso (`singletonKey`). Sólo acepta —por tipo— colas de
+ * {@link ColaSerializada}, es decir las que declaran una política que de verdad serializa: en una
+ * cola `standard` la clave se guardaría sin restringir nada y esto sería un cinturón que no sujeta.
  *
- * @param cola       cola destino.
+ * Con la política `stately` que declaran hoy: si ya hay un job ESPERANDO para el mismo recurso, el
+ * `send` se DESCARTA y devuelve `null` (los disparos seguidos colapsan en uno); si el que hay está
+ * CORRIENDO, el nuevo SÍ se encola y corre después (el cambio que lo provocó no se pierde).
+ *
+ * NO-OP si el motor está inactivo/sin arrancar (devuelve `null`): el llamador NO debe esperar a este
+ * resultado para responder al usuario (la captura nunca bloquea por el job, §11).
+ *
+ * @param cola       cola destino (debe declarar una política que serialice).
  * @param idRecurso  id del recurso a serializar (alimenta la `singletonKey`).
  * @param payload    carga del job (lo mínimo; el handler relee la BD).
  * @param opciones   reintentos/retención passthrough a pg-boss (defaults sensatos abajo).
  * @returns el id del job encolado, `null` si se dedupó o si el motor está inactivo.
  */
 export async function encolarJob<T extends object>(
-  cola: NombreColaJob,
+  cola: ColaSerializada,
   idRecurso: number,
   payload: T,
   opciones?: { reintentos?: number; reintentoEsperaSeg?: number; retenerSeg?: number },
@@ -207,10 +377,12 @@ export async function encolarJob<T extends object>(
 }
 
 /**
- * Registra un HANDLER (worker) que procesa los jobs de una cola UNO A LA VEZ (`localConcurrency: 1`
- * + `batchSize: 1`, coherente con la serialización por orden). NO-OP si el motor está inactivo. El
- * handler debe ser idempotente (un mismo recálculo se puede repetir tras un reintento). Lo usará E4
- * para montar el worker del CPM.
+ * Registra un HANDLER (worker) que procesa los jobs de una cola UNO A LA VEZ **en ESTE proceso**
+ * (`localConcurrency: 1` + `batchSize: 1`). Ojo con el alcance: eso es una config LOCAL, no una
+ * garantía del motor — si algún día corrieran dos instancias del backend, cada una tendría su
+ * worker. Lo que sí vale entre instancias es la política de la cola: con `stately`, la base impide
+ * que dos jobs del MISMO recurso estén activos a la vez, corran donde corran. NO-OP si el motor está
+ * inactivo. El handler debe ser idempotente (un mismo recálculo se puede repetir tras un reintento).
  *
  * @param cola     cola a consumir.
  * @param manejar  función que procesa un job (su `data` es el payload encolado).

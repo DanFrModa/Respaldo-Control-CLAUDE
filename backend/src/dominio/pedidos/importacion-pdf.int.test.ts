@@ -980,6 +980,81 @@ describe('idempotencia de catálogos', () => {
       }),
     ).toBe(0);
   });
+
+  it('🔴🔴 la VISTA PREVIA avisa del desvío por fusión ANTES de confirmar (de ahí sale el precio)', async () => {
+    // Mismo mundo que la prueba del confirm, pero mirando la PREVIA: el papel dice "BLANCO" y ese
+    // color ya no existe por su cuenta. Hasta esta etapa la previa lo daba por bueno en silencio —
+    // no lo marcaba ni lo advertía— y el desvío sólo constaba en la bitácora, DESPUÉS de confirmar.
+    // Como el precio de la tela casa por NOMBRE de color, el precosto podía salir de otro renglón.
+    const absorbido = await crearColor(sesionColores(), { nombre: 'Blanco' }, bd());
+    const canonico = await crearColor(sesionColores(), { nombre: 'Blanco Optico' }, bd());
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: canonico.id, origenes: [absorbido.id] },
+      bd(),
+    );
+
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    const renglon = previa.renglones[0]!;
+    // 1) Se MARCA, con el nombre del color en el que de verdad va a nacer la OP.
+    expect(renglon.colorFusionadoEn).toBe('Blanco Optico');
+    // 2) Y se ADVIERTE, nombrando los dos colores y por qué importa.
+    const aviso = renglon.advertencias.find((a) => a.tipo === 'color-fusionado');
+    expect(aviso?.mensaje).toContain('Blanco Optico');
+    expect(aviso?.mensaje).toContain('POR NOMBRE');
+    // 3) NO es un color "nuevo": existe, sólo que se lo llevaron. Confundirlos diría al usuario que
+    //    se va a crear un color que no se va a crear.
+    expect(renglon.colorNuevo).toBe(false);
+    // 4) La previa sólo LEE: no reactiva, no crea, no desfusiona nada. Las tres se comprueban —
+    //    `activo` no cubre la tercera: `actualizarColor` DESAMARRA el rastro al reactivar, así que
+    //    un `idFusionadoEn` borrado con el color aún apagado sería una fusión deshecha a medias que
+    //    esta prueba no vería si sólo mirara `activo`.
+    const trasLaPrevia = await cliente.color.findUniqueOrThrow({ where: { id: absorbido.id } });
+    expect(trasLaPrevia.activo).toBe(false);
+    expect(trasLaPrevia.idFusionadoEn).toBe(canonico.id);
+    expect(await cliente.color.count()).toBe(2);
+  });
+
+  it('⚠️ la RAMA GEMELA en la previa: un color apagado A MANO no dispara el aviso de fusión', async () => {
+    // Apagado sin rastro de fusión: al confirmar se REACTIVA y la OP se queda en ÉL — mismo id,
+    // mismo nombre, mismo precio. No hay desvío que avisar, y si esta prueba no existiera bastaría
+    // con marcar "todo color inactivo" para que la de arriba pasara por la razón equivocada.
+    const apagado = await cliente.color.create({ data: { nombre: 'Blanco', activo: false } });
+
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    const renglon = previa.renglones[0]!;
+    expect(renglon.colorFusionadoEn).toBeNull();
+    expect(renglon.advertencias.some((a) => a.tipo === 'color-fusionado')).toBe(false);
+    expect(renglon.colorNuevo).toBe(false);
+    expect((await cliente.color.findUniqueOrThrow({ where: { id: apagado.id } })).activo).toBe(
+      false,
+    );
+  });
+
+  it('un color que NO existe sigue saliendo como nuevo, sin aviso de fusión', async () => {
+    // El tercer estado, para que "nuevo" y "fusionado" no se confundan entre sí: el catálogo está
+    // vacío de "Blanco", así que se va a CREAR y no hay ningún desvío.
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    const renglon = previa.renglones[0]!;
+    expect(renglon.colorNuevo).toBe(true);
+    expect(renglon.colorFusionadoEn).toBeNull();
+    expect(renglon.advertencias.some((a) => a.tipo === 'color-fusionado')).toBe(false);
+  });
 });
 
 describe('RBAC', () => {
