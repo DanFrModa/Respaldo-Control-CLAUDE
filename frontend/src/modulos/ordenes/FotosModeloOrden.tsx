@@ -1,4 +1,4 @@
-import { Loader2Icon, PlusIcon, StarIcon, Trash2Icon } from 'lucide-react';
+import { EyeIcon, EyeOffIcon, Loader2Icon, PlusIcon, StarIcon, Trash2Icon } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -7,6 +7,11 @@ import {
   useQuitarAdjuntoOrden,
   useSubirAdjuntoOrden,
 } from '@/api/adjuntos-orden';
+import {
+  useFotosOcultasOrden,
+  useMostrarFotoModeloOrden,
+  useOcultarFotoModeloOrden,
+} from '@/api/fotos-ocultas-orden';
 import { useFotosModelo } from '@/api/modelos';
 import { VisorImagen } from '@/componentes/VisorImagen';
 import { cn } from '@/lib/utils';
@@ -23,9 +28,17 @@ interface FotoTira {
   origen: 'modelo' | 'orden';
   /** `idArchivo` del adjunto (solo las de la ORDEN se pueden quitar desde aquí). */
   idArchivo?: string;
+  /** `ModeloFoto.id` (solo las del MODELO): la identidad con la que esta OP la oculta/recupera. */
+  idModeloFoto?: number;
   nombreArchivo: string;
   /** ¿Es la foto PRINCIPAL del modelo (la primera de su galería)? Lleva distintivo y va al frente. */
   principal?: boolean;
+  /**
+   * ⭐ §Post-F9.169(b): esta OP QUITÓ esta foto heredada del modelo. **No está borrada** — sigue en la
+   * galería del modelo y en las demás órdenes; sólo esta OP dejó de enseñarla. Se pinta apagada (y
+   * con el botón de traerla de vuelta) para quien administra, y no se pinta para los demás.
+   */
+  oculta?: boolean;
 }
 
 /**
@@ -34,14 +47,28 @@ interface FotoTira {
  * `useAdjuntosOrden`, filtradas por `tipoMime` de imagen). Al hacer clic en una se abre GRANDE en un
  * visor NAVEGABLE (anterior/siguiente entre todas). Con `ordenes.administrar` aparece un tile "+"
  * para SUBIR una foto a la orden (presigned a R2, sin backend nuevo) y un botón para QUITAR las que
- * se subieron a la orden (nunca las del modelo). Compacto: solo miniaturas + visor.
+ * se subieron a la orden. Compacto: solo miniaturas + visor.
+ *
+ * ⭐ §Post-F9.169(b) — DANIEL: *"La foto debería de ser **de la OP no del desarrollo**. Si el
+ * desarrollo tiene fotos está bien que podamos **heredarlas**, pero también la opción de **quitarlas
+ * de la OP**"*. Con `ordenes.administrar` cada foto HEREDADA del modelo lleva su botón de QUITARLA
+ * de esta OP:
+ *
+ *  • **Quitar no borra (D3).** La foto sigue en la galería del modelo, sigue siendo su principal si
+ *    lo era, **otra orden del mismo modelo la sigue viendo** y **R2 no se toca**. Lo único que se
+ *    guarda es una marca por *(orden, foto)* (`api/fotos-ocultas-orden`).
+ *  • **Y es reversible:** para quien administra, la foto quitada se sigue viendo APAGADA con su
+ *    botón de traerla de vuelta — una foto que desaparece sin retorno sería una trampa. Para quien
+ *    solo mira, simplemente no está.
  *
  * La FOTO PRINCIPAL del modelo (la primera de su galería, jul-2026 a petición de Daniel) abre la
- * tira y lleva una estrella. Marcarla/cambiarla se hace en la ficha del modelo, no aquí.
+ * tira y lleva una estrella. Marcarla/cambiarla se hace en la ficha del modelo, no aquí. ⚠️ Ser
+ * principal NO es un puesto que se transfiera: si la principal se quita de esta OP, la segunda foto
+ * **no hereda** la estrella (mismo criterio que el impreso).
  *
  * `idOrden`/`puedeAdministrar` son opcionales: sin `idOrden` (p. ej. desde el diálogo de captura) se
- * comporta como antes, solo con las fotos del modelo. Si no hay ninguna foto y no se puede
- * administrar, no pinta nada.
+ * comporta como antes, solo con las fotos del modelo y sin nada de la orden. Si no hay ninguna foto
+ * y no se puede administrar, no pinta nada.
  */
 export function FotosModeloOrden({
   idModelo,
@@ -56,25 +83,38 @@ export function FotosModeloOrden({
 }): React.JSX.Element | null {
   const fotosModelo = useFotosModelo(idModelo);
   const adjuntos = useAdjuntosOrden(idOrden);
+  const fotosOcultas = useFotosOcultasOrden(idOrden);
   const subir = useSubirAdjuntoOrden();
   const quitar = useQuitarAdjuntoOrden();
+  const ocultarDeLaOrden = useOcultarFotoModeloOrden();
+  const mostrarEnLaOrden = useMostrarFotoModeloOrden();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Índice de la foto abierta en el visor (null = cerrado).
   const [indiceVisor, setIndiceVisor] = useState<number | null>(null);
 
+  // Todo lo que MUTA la orden pide las dos cosas: el permiso y saber de qué orden hablamos.
   const puedeSubir = puedeAdministrar && idOrden !== undefined;
 
   // Tira COMBINADA: primero las fotos del modelo (la PRINCIPAL al frente: el API las devuelve
   // ordenadas y la principal es la primera), luego las imágenes subidas a la orden.
   const fotos = useMemo<FotoTira[]>(() => {
-    const delModelo: FotoTira[] = (fotosModelo.data ?? []).map((f, indice) => ({
-      clave: `modelo-${f.idFoto}`,
-      url: f.urlDescarga,
-      origen: 'modelo',
-      nombreArchivo: `${codigoModelo}.jpg`,
-      ...(indice === 0 ? { principal: true } : {}),
-    }));
+    const ocultas = new Set((fotosOcultas.data ?? []).map((f) => f.idModeloFoto));
+    const delModelo: FotoTira[] = (fotosModelo.data ?? [])
+      .map((f, indice) => ({
+        clave: `modelo-${f.idFoto}`,
+        url: f.urlDescarga,
+        origen: 'modelo' as const,
+        idModeloFoto: f.idFoto,
+        nombreArchivo: `${codigoModelo}.jpg`,
+        // ⚠️ La ESTRELLA se decide sobre la galería COMPLETA (antes de descartar las quitadas): ser
+        // principal es una decisión sobre una foto concreta, no un puesto que la siguiente herede.
+        ...(indice === 0 ? { principal: true } : {}),
+        ...(ocultas.has(f.idFoto) ? { oculta: true } : {}),
+      }))
+      // Quien administra SÍ ve las quitadas (apagadas, para poder traerlas de vuelta); quien solo
+      // mira, no: para él esta OP simplemente no lleva esa foto.
+      .filter((f) => f.oculta !== true || puedeSubir);
     const deLaOrden: FotoTira[] = (adjuntos.data ?? [])
       .filter((a) => a.tipoMime.startsWith('image/'))
       .map((a) => ({
@@ -85,7 +125,7 @@ export function FotosModeloOrden({
         nombreArchivo: a.nombreOriginal,
       }));
     return [...delModelo, ...deLaOrden];
-  }, [fotosModelo.data, adjuntos.data, codigoModelo]);
+  }, [fotosModelo.data, adjuntos.data, fotosOcultas.data, codigoModelo, puedeSubir]);
 
   // Si no hay ninguna foto y ni siquiera se puede subir, no se pinta nada (sin hueco).
   if (fotos.length === 0 && !puedeSubir) {
@@ -129,14 +169,50 @@ export function FotosModeloOrden({
     );
   }
 
+  /**
+   * Quita de ESTA orden una foto HEREDADA del modelo (§Post-F9.169(b)). NO la borra: el backend sólo
+   * guarda una marca por *(orden, foto)* — la del modelo queda intacta y las demás órdenes la
+   * siguen viendo. Por eso el aviso dice "quitada de esta orden", no "eliminada".
+   */
+  function alOcultarDelModelo(foto: FotoTira): void {
+    if (idOrden === undefined || foto.idModeloFoto === undefined) {
+      return;
+    }
+    ocultarDeLaOrden.mutate(
+      { idOrden, idModeloFoto: foto.idModeloFoto },
+      {
+        onSuccess: () => toast.success('Foto quitada de esta orden (sigue en el modelo).'),
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  /** Trae de vuelta a esta orden una foto del modelo que se había quitado (la vuelta atrás). */
+  function alMostrarDelModelo(foto: FotoTira): void {
+    if (idOrden === undefined || foto.idModeloFoto === undefined) {
+      return;
+    }
+    mostrarEnLaOrden.mutate(
+      { idOrden, idModeloFoto: foto.idModeloFoto },
+      {
+        onSuccess: () => toast.success('Foto de vuelta en esta orden.'),
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
   const fotoVisor = indiceVisor !== null ? fotos[indiceVisor] : undefined;
   const subiendo = subir.isPending;
+  const moviendoFotoDelModelo = ocultarDeLaOrden.isPending || mostrarEnLaOrden.isPending;
 
   return (
     <>
       <div className="flex flex-wrap gap-2" data-testid="fotos-modelo-orden">
         {fotos.map((foto, indice) => (
-          <div key={foto.clave} className="group relative size-16 shrink-0">
+          <div
+            key={foto.clave}
+            className={cn('group relative size-16 shrink-0', foto.oculta === true && 'opacity-50')}
+          >
             <button
               type="button"
               className="size-full overflow-hidden rounded-lg border bg-muted transition-opacity hover:opacity-80"
@@ -148,11 +224,13 @@ export function FotosModeloOrden({
               <img
                 src={foto.url}
                 alt={
-                  foto.principal === true
-                    ? `Foto principal de ${codigoModelo}`
-                    : `Foto de ${codigoModelo}`
+                  foto.oculta === true
+                    ? `Foto de ${codigoModelo} quitada de esta orden`
+                    : foto.principal === true
+                      ? `Foto principal de ${codigoModelo}`
+                      : `Foto de ${codigoModelo}`
                 }
-                className="size-full object-cover"
+                className={cn('size-full object-cover', foto.oculta === true && 'grayscale')}
               />
             </button>
             {/* Distintivo de la foto PRINCIPAL del modelo (la primera de su galería). En la tira
@@ -167,7 +245,19 @@ export function FotosModeloOrden({
                 <span className="sr-only">Foto principal del modelo</span>
               </span>
             ) : null}
-            {/* Solo las fotos SUBIDAS a la orden se pueden quitar desde aquí (las del modelo no). */}
+            {/* Distintivo de la foto QUITADA de esta OP (§Post-F9.169(b)): sigue en el modelo, esta
+                orden no la enseña. Va a la derecha para no pelearse con la estrella de la principal
+                (una principal quitada lleva las dos marcas a la vez). */}
+            {foto.oculta === true ? (
+              <span
+                className="pointer-events-none absolute right-0 bottom-0 flex items-center gap-0.5 rounded-tl-md rounded-br-lg bg-muted-foreground/90 px-1 text-[9px] font-semibold text-background"
+                data-testid="foto-modelo-orden-oculta"
+              >
+                <EyeOffIcon className="size-2.5" aria-hidden />
+                <span className="sr-only">Foto quitada de esta orden</span>
+              </span>
+            ) : null}
+            {/* Las fotos SUBIDAS a la orden se BORRAN de verdad (son de la orden y viven en R2). */}
             {puedeAdministrar && foto.origen === 'orden' ? (
               <button
                 type="button"
@@ -179,6 +269,35 @@ export function FotosModeloOrden({
               >
                 <Trash2Icon className="size-3" aria-hidden />
               </button>
+            ) : null}
+            {/* ⭐ Las HEREDADAS del modelo no se borran: se QUITAN de esta OP, y se pueden traer de
+                vuelta (§Post-F9.169(b), D3). Dos botones, uno por estado — nunca los dos. */}
+            {puedeSubir && foto.origen === 'modelo' ? (
+              foto.oculta === true ? (
+                <button
+                  type="button"
+                  className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border bg-card text-primary shadow-sm disabled:opacity-50"
+                  disabled={moviendoFotoDelModelo}
+                  onClick={() => alMostrarDelModelo(foto)}
+                  title="Traerla de vuelta a esta orden"
+                  aria-label="Traer la foto de vuelta a esta orden"
+                  data-testid="mostrar-foto-modelo-orden"
+                >
+                  <EyeIcon className="size-3" aria-hidden />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="absolute -top-1.5 -right-1.5 hidden size-5 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-sm group-hover:flex disabled:opacity-50"
+                  disabled={moviendoFotoDelModelo}
+                  onClick={() => alOcultarDelModelo(foto)}
+                  title="Quitarla de esta orden (sigue en el modelo)"
+                  aria-label="Quitar la foto del modelo de esta orden"
+                  data-testid="ocultar-foto-modelo-orden"
+                >
+                  <EyeOffIcon className="size-3" aria-hidden />
+                </button>
+              )
             ) : null}
           </div>
         ))}

@@ -1218,6 +1218,102 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9n · ⭐ LA FOTO ES DE LA OP: quitar una heredada del modelo (1-sep-2026, versión **0.082**) — ✅ HECHA
+
+Fila **0.079**, **mitad de la PRENDA**. Daniel (§Post-F9.177): *«un modelo de desarrollo que se va a usar
+para **4 órdenes diferentes** no puede usar la misma foto… **la OP es de donde cuelgan las fotos**»*.
+
+### 🔴 LA MEDICIÓN QUE CAMBIÓ LA ETAPA: la decisión que la sostenía tenía una LÍNEA FALSA, y Daniel tenía razón
+
+§Post-F9.169(b) había registrado *«Meter FOTOS directo a la OP → ❌ NO existe»*. **Falso para la prenda:**
+`FotosModeloOrden.tsx` (F2-E3 + ajuste jul-2026 **a petición del propio Daniel**) ya combinaba las fotos
+del modelo con las **subidas a la orden**, dejaba **subir** y **quitar las subidas**.
+
+⭐ **Él había dicho «eso me parece que ya existe» y TENÍA RAZÓN; la medición que lo desmintió era la
+equivocada.** ⇒ la etapa pasó de *«construir todo»* a **la media frase que de verdad faltaba**: quitar de
+la OP una **heredada**. *(La línea falsa quedó corregida en `DECISIONES.md`, sin borrarla.)*
+
+### El diseño: por qué NO se copió `OrdenArte.excluido`
+
+`OrdenArte.excluido` funciona porque la orden **congela una copia** del renglón ⇒ ya hay fila propia donde
+cabe la bandera. **Las fotos no se copian a propósito**: viven en R2 y *el repo no clona objetos de R2 por
+orden*. Copiar `modelo_foto` a cada orden sólo para poder apagar una fila duplicaría el catálogo de
+imágenes de todas las OP.
+
+⇒ **el mismo concepto en la única forma que admite un dato que no se copia**: marca por
+presencia/ausencia en `OrdenFotoOculta(idOrden, idModeloFoto)`. **Sin fila = se ve** (el comportamiento de
+siempre y el de todo lo capturado, REGLA 0-B). Migración **100 % aditiva**, verificada por el reviewer
+**carácter por carácter** contra `prisma migrate diff`. **Sin permisos ni seed.**
+
+**FK `Cascade` hacia `ModeloFoto`, contra la costumbre RESTRICT de la casa y a propósito:** esconder una
+foto en una OP **no puede secuestrar el catálogo del modelo**.
+
+### ⭐ La ASIMETRÍA DELIBERADA entre las ramas gemelas — y la lección de su ARGUMENTO
+
+`ocultar` exige que la foto sea de las que la OP enseña; **`mostrar` NO**. En este repo la regla es que *la
+simetría no se hereda*, y aquí el coder se apartó **a propósito y con razón**: levantar una marca **sólo
+puede dejar de esconder**, así que un guard ahí sólo rechazaría un no-op.
+
+🔴 **Pero su PRIMERA justificación era falsa, y el reviewer la midió:** decía que la marca quedaría
+*«irrecuperable para siempre»*. No: el guard evalúa **el mismo predicado** con el que la lectura decide
+qué pinta (`fotos-ocultas-orden.ts:96-100` vs `fotos-modelo.ts:247-251`) ⇒ **una marca EFECTIVA siempre
+sería borrable**; sólo se atasca mientras es **INERTE**, y vuelve a ser borrable en cuanto volvería a
+esconder algo.
+⇒ Reescrita en **tres** sitios (docstring, encabezado de pruebas y **el nombre de la prueba**).
+📌 **Decisión correcta, argumento falso: se corrige el argumento.** Un comentario-razón falso **envenena al
+siguiente que lo lea**, y aquí eso ya ha costado rondas enteras.
+
+### Las superficies — la segunda la encontró el coder, la tercera el reviewer
+
+1. **La tira de la pantalla** (Centro de Órdenes).
+2. ⭐ **El IMPRESO** (`impresos/impreso-orden.ts`): imprime las fotos del modelo. *Si la pantalla oculta y
+   el papel imprime, es «añadí lo nuevo y dejé lo viejo debajo».* Filtrado **antes de descargar** (la
+   prueba asevera que ni se gasta la descarga).
+3. 🔴 **`DialogoOrden.tsx:443` — el BLOQUEANTE**: la foto oculta **reaparecía un clic después**, en el
+   diálogo «Modificar» de **la misma orden**. Y **la razón declarada para no cablearlo era medible y
+   falsa**: pasar `idOrden` **no** encendería el tile de subir, porque `puedeAdministrar` no se pasa ahí.
+   Lo único que cambiaba era duplicar unas imágenes **que el diálogo ya listaba abajo**.
+
+**Enumeración del reviewer, no `grep`:** las otras lecturas de fotos del modelo son la galería (agnóstica
+de orden), `urlFotoPrincipal` del catálogo y `pedidos.ts:407` — **fuera de alcance de acuerdo**: un pedido
+no es una OP.
+
+### Dos casos que sólo aparecen cruzando esta etapa con la 0.078
+
+- **Fotos heredadas del PADRE por color**: un hijo sin fotos propias enseña las de su desarrollo
+  (`idModeloDeLasFotos`). ⚠️ Un guard ingenuo (`idModelo === orden.idModelo`) habría dado **un 404 absurdo
+  justo en el caso que Daniel describe**. El guard aplica la misma resolución que la lectura, con **las
+  dos ramas** probadas.
+- **La estrella de la principal no se transfiere**: si se oculta la principal, la orden se queda sin
+  principal en vez de ascender una que nadie eligió. Coherente en **las dos** superficies.
+
+### ⭐ La prueba que no puede pasar por construcción
+
+El doble de `useFotosOcultasOrden` **respeta el `enabled` real** (sin `idOrden` devuelve vacío). El
+reviewer lo atacó por el camino duro: cambió el doble para que **ignorara** `idOrden` **y** rompió el
+cableado a la vez ⇒ **23/23 en verde con el defecto dentro**. *Que respete el `enabled` es literalmente lo
+único que la convierte en prueba.*
+
+### Verificación
+
+**23 mutaciones lanzadas, 23 muertas, cero supervivientes**, cada inyección verificada por `grep` antes de
+correr y el árbol restaurado por hash. D3 probado **en negativo**: el módulo **no acepta `ServicioArchivos`
+en ninguna firma** —lo sostiene el compilador— y el doble hace **ilegales** `modeloFoto.delete/update` y
+`archivo.delete/update`.
+
+**Gates:** backend **2,604** · frontend **1,952** · typecheck ×2 · lint ×2 · format ×2 · **cero drift**.
+
+### ⏳ Residuo declarado y aceptado
+
+En «Modificar», las imágenes adjuntas de la orden salen **también** como miniatura. Se rechazó el prop de
+opt-out con razón medida: habría hecho que **la misma tira significara cosas distintas según quién la
+llame** — cambiar *«la foto se ve distinta según dónde mires»* por *«la tira contiene cosas distintas
+según dónde mires»* es peor negocio. Es duplicación **de presentación** (la lista de abajo son filas con
+descarga y papelera, no miniaturas), separada por varias secciones, y **una sola petición extra** porque
+TanStack deduplica la clave.
+
+---
+
 ## V1-E9m · LOS ARCHIVOS QUE SE ACUMULAN SIN QUE NADIE LOS VEA (1-sep-2026, versión **0.081**) — ✅ HECHA
 
 Fila **0.081(a)**. Borrar una foto o un adjunto eliminaba la fila **pero no el objeto en Cloudflare R2**

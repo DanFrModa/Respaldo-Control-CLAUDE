@@ -38,10 +38,37 @@ vi.mock('@/api/ordenes', () => ({
 const CAMPO_REF = { id: 1, etiqueta: 'Orden de compra', tipo: 'TEXTO', activo: true, orden: 0 };
 
 // Catálogos/selectores de los paneles del detalle: inertes.
+/** Fotos del MODELO que ve la tira del detalle (controlable por prueba). */
+const useFotosModelo = vi.fn<() => { data: { idFoto: number; urlDescarga: string }[] }>(() => ({
+  data: [],
+}));
 vi.mock('@/api/modelos', () => ({
   useFichaModelo: () => ({ data: { idCurvaTalla: null }, isPending: false, isError: false }),
-  useFotosModelo: () => ({ data: [], isPending: false, isError: false }),
+  useFotosModelo: () => ({ ...useFotosModelo(), isPending: false, isError: false }),
 }));
+/**
+ * ⭐ §Post-F9.169(b) — fotos del modelo QUITADAS de esta OP.
+ *
+ * ⚠️ El doble RESPETA el `enabled` del hook real: sin `idOrden` no hay orden por la que preguntar,
+ * así que devuelve la lista VACÍA. Es lo que impide que la prueba de abajo pase por construcción: si
+ * alguien le quitara el `idOrden={orden.id}` a la tira —el defecto que esta ronda vino a cerrar— el
+ * doble devolvería vacío igual que el hook real y la prueba se pondría ROJA.
+ */
+const fotosOcultasDeLaOrden = vi.fn<() => { idModeloFoto: number; ocultadaEn: string }[]>(() => []);
+vi.mock('@/api/fotos-ocultas-orden', () => ({
+  useFotosOcultasOrden: (idOrden: number | undefined) => ({
+    data: idOrden === undefined ? [] : fotosOcultasDeLaOrden(),
+  }),
+  useOcultarFotoModeloOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useMostrarFotoModeloOrden: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+// Los dos dobles de la TIRA DE FOTOS vuelven a su valor neutro antes de CADA prueba del archivo. Va
+// a nivel de ARCHIVO —no dentro de un `describe`— para que ningún escenario se filtre al siguiente.
+beforeEach(() => {
+  useFotosModelo.mockReturnValue({ data: [] });
+  fotosOcultasDeLaOrden.mockReturnValue([]);
+});
 vi.mock('@/api/colores', () => ({
   useColores: () => ({ data: { datos: [] }, isPending: false }),
   // El alta de color al vuelo de la matriz (§Post-F9.11) usa este hook; aquí no se ejercita.
@@ -180,6 +207,64 @@ describe('<DialogoOrden>', () => {
     expect(screen.getByTestId('dialogo-orden')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Orden 101/ })).toBeInTheDocument();
     expect(screen.getByTestId('detalle-orden')).toBeInTheDocument();
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 §Post-F9.169(b) — LA FOTO QUITADA DE LA OP NO PUEDE REAPARECER AQUÍ.
+  // Este diálogo es el «Modificar» de la MISMA orden del Centro de Órdenes. Sin `idOrden` en la
+  // tira, `useFotosOcultasOrden` iba deshabilitado, la lista de quitadas llegaba vacía y la foto
+  // volvía a verse un clic después — sin que el usuario pudiera saber por qué.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  it('🔴 NO enseña la foto del modelo que ESTA orden quitó', () => {
+    useFotosModelo.mockReturnValue({
+      data: [
+        { idFoto: 1, urlDescarga: 'https://ej.test/m1.jpg' },
+        { idFoto: 2, urlDescarga: 'https://ej.test/m2.jpg' },
+      ],
+    });
+    fotosOcultasDeLaOrden.mockReturnValue([
+      { idModeloFoto: 1, ocultadaEn: '2026-09-01T00:00:00Z' },
+    ]);
+
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
+
+    const miniaturas = screen.getAllByTestId('foto-modelo-orden');
+    expect(miniaturas).toHaveLength(1);
+    expect(within(miniaturas[0] as HTMLElement).getByRole('img')).toHaveAttribute(
+      'src',
+      'https://ej.test/m2.jpg',
+    );
+  });
+
+  it('y sigue enseñando las que la orden NO quitó (las dos, si no quitó ninguna)', () => {
+    // La rama gemela: sin esta, un filtro que se comiera TODAS las fotos también pasaría la de
+    // arriba. Aquí la lista de quitadas está vacía y tienen que salir las dos.
+    useFotosModelo.mockReturnValue({
+      data: [
+        { idFoto: 1, urlDescarga: 'https://ej.test/m1.jpg' },
+        { idFoto: 2, urlDescarga: 'https://ej.test/m2.jpg' },
+      ],
+    });
+
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
+
+    expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(2);
+  });
+
+  it('las fotos aquí SÓLO SE MIRAN: ni se quitan, ni se suben, ni se borran', () => {
+    // No se pasa `puedeAdministrar` a propósito (se administran en el Centro de Órdenes), así que
+    // ningún botón de la tira se enciende ni con los permisos completos.
+    useFotosModelo.mockReturnValue({
+      data: [{ idFoto: 1, urlDescarga: 'https://ej.test/m1.jpg' }],
+    });
+
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
+
+    expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(1);
+    expect(screen.queryByTestId('ocultar-foto-modelo-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mostrar-foto-modelo-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('subir-foto-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('quitar-foto-orden')).not.toBeInTheDocument();
   });
 
   it('oculta las acciones de escritura para quien solo puede ver', () => {

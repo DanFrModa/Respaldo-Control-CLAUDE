@@ -2538,6 +2538,10 @@ model ModeloFoto {
   modelo  Modelo  @relation(fields: [idModelo], references: [id], onDelete: Cascade)
   archivo Archivo @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
 
+  /// Órdenes que decidieron NO enseñar esta foto (§Post-F9.169(b)). Cascade desde el lado de la
+  /// exclusión: si la foto se va del catálogo, la marca que la escondía deja de significar algo.
+  ocultaEnOrdenes OrdenFotoOculta[]
+
   creadoEn    DateTime @default(now()) @map("creado_en")
   creadoPorId String?  @map("creado_por_id")
 
@@ -3293,6 +3297,9 @@ model Orden {
   desarrolloOrden      DesarrolloOrden?
   /// Adjuntos de apoyo (Excel/PDF/imágenes) de esta orden en R2 (F8-E6, R6). Cascade: son de la orden.
   archivos             OrdenArchivo[]
+  /// ⭐ Fotos HEREDADAS del modelo que ESTA orden decidió NO enseñar (§Post-F9.169(b)). Cascade:
+  /// la decisión es de la orden y muere con ella.
+  fotosOcultas         OrdenFotoOculta[]
   /// Historial INMUTABLE de cambios de precio maquila/aplicación (rediseño R2, §4.4.3). Cascade.
   precioEventos        OrdenPrecioEvento[]
   /// Hitos capturados a mano de esta orden (post-F9): revisión OP, fit, tono, avíos, empaque, arte.
@@ -3333,6 +3340,50 @@ model OrdenArchivo {
   @@unique([idArchivo])
   @@index([idOrden])
   @@map("orden_archivo")
+}
+
+/// ⭐ FOTO del modelo que ESTA orden decidió NO enseñar (§Post-F9.169(b), DANIEL: *"la foto debería
+/// de ser de la OP no del desarrollo. Si el desarrollo tiene fotos está bien que podamos heredarlas,
+/// pero también la opción de quitarlas de la OP"*).
+///
+/// 🔴 **OCULTAR NO ES BORRAR (D3).** La foto del modelo NO se toca: sigue en su galería, sigue
+/// siendo la principal si lo era, y **otra orden del mismo modelo la sigue viendo**. Lo único que
+/// existe es esta MARCA por *(orden, foto)*: la ausencia de fila es «se ve», que es como se comporta
+/// el 100 % de lo que ya está capturado (REGLA 0-B: sin backfill, `NULL`/vacío es la respuesta
+/// correcta para todo lo anterior). Y **nunca toca R2**: no hay `Archivo` que borrar aquí.
+///
+/// ⚠️ **Por qué NO se copió el patrón `OrdenArte.excluido`** (que es el que esta casa usa para lo
+/// mismo con los artes): allá la orden CONGELA una copia del renglón del modelo (`OrdenArte` nace de
+/// `ModeloArte`), así que la bandera cabe en la fila que la orden ya tiene. Las fotos **no se
+/// congelan por orden a propósito** —viven en R2 y el repo no clona objetos de R2 por orden
+/// (`OrdenArte`: *"la foto NO se copia… la traza `idModeloArte` la alcanza mientras exista"*)—, así
+/// que no hay fila propia donde poner la bandera. La marca por ausencia/presencia es el MISMO
+/// concepto (lápida reversible, decisión de la orden, la del modelo intacta) en la única forma que
+/// admite un dato que no se copia.
+///
+/// `onDelete`:
+///  • Cascade hacia `Orden`: la decisión es de la orden.
+///  • Cascade hacia `ModeloFoto` (y NO Restrict, que es el default de esta casa para catálogos en
+///    uso): esconder una foto en una orden **no puede secuestrar el catálogo del modelo**. Si el
+///    dueño del modelo borra la foto, la marca que la escondía se va con ella — nunca al revés.
+model OrdenFotoOculta {
+  id      Int   @id @default(autoincrement())
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  /// La foto del MODELO que esta orden no enseña. Puede ser del modelo de la orden o —cuando es un
+  /// hijo por color sin fotos propias— del modelo de DESARROLLO del que las hereda
+  /// (`idModeloDeLasFotos`): se oculta lo que la orden REALMENTE está enseñando.
+  idModeloFoto Int        @map("id_modelo_foto")
+  modeloFoto   ModeloFoto @relation(fields: [idModeloFoto], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idOrden, idModeloFoto])
+  @@index([idOrden])
+  @@index([idModeloFoto])
+  @@map("orden_foto_oculta")
 }
 
 /// Qué precio de la orden cambió un evento: maquila (costura) o aplicación (estampado/bordado).

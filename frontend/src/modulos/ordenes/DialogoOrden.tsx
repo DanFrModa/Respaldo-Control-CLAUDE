@@ -440,7 +440,19 @@ function DetalleOrden({
           </p>
         ) : null}
 
-        <FotosModeloOrden idModelo={orden.idModelo} codigoModelo={orden.codigoModelo} />
+        {/* ⭐ §Post-F9.169(b) — la tira lleva `idOrden` PARA QUE ESTE DIÁLOGO RESPETE LO QUE LA OP
+            QUITÓ. Sin él, `useFotosOcultasOrden` iba `enabled:false` y la foto ocultada en el Centro
+            de Órdenes REAPARECÍA aquí, en la MISMA orden, un clic después — y el usuario no tenía
+            forma de saber por qué.
+
+            ⚠️ NO se pasa `puedeAdministrar` (default `false`) y es a propósito: aquí las fotos sólo
+            se MIRAN. Quitarlas de la OP y traerlas de vuelta se hace en el Centro de Órdenes, así
+            que ni el tile «+», ni la papelera, ni los botones de quitar/traer se encienden. */}
+        <FotosModeloOrden
+          idModelo={orden.idModelo}
+          codigoModelo={orden.codigoModelo}
+          idOrden={orden.id}
+        />
 
         {/* Ruta Crítica (F5-E5): consultar / programar la ruta de ESTA orden. La acción real la
             re-verifica el backend (A1); aquí solo se muestran los accesos según permiso. */}

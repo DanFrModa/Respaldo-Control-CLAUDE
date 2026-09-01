@@ -3,20 +3,25 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { OrdenAdjunto } from '@/api/adjuntos-orden';
+import type { OrdenFotoOculta } from '@/api/fotos-ocultas-orden';
 import type { ModeloFoto } from '@/api/modelos';
 import { renderConProveedores } from '@/pruebas/utilidades';
 
 import { FotosModeloOrden } from './FotosModeloOrden';
 
 /**
- * Pruebas de `<FotosModeloOrden>` (ajuste jul-2026): una TIRA de MINIATURAS que COMBINA fotos del
- * modelo + imágenes subidas a la orden; clic abre el visor NAVEGABLE; con permiso se puede
- * subir/quitar fotos de la orden. La capa de datos va simulada (sin red).
+ * Pruebas de `<FotosModeloOrden>` (ajuste jul-2026 + §Post-F9.169(b)): una TIRA de MINIATURAS que
+ * COMBINA fotos del modelo + imágenes subidas a la orden; clic abre el visor NAVEGABLE; con permiso
+ * se puede subir/quitar fotos de la orden y **QUITAR de esta OP las heredadas del modelo** (sin
+ * borrarlas del modelo, y con vuelta atrás). La capa de datos va simulada (sin red).
  */
 const useFotosModelo = vi.fn<() => { data: ModeloFoto[] | undefined }>();
 const useAdjuntosOrden = vi.fn<() => { data: OrdenAdjunto[] | undefined }>();
+const useFotosOcultasOrden = vi.fn<() => { data: OrdenFotoOculta[] | undefined }>();
 const subirMutate = vi.fn();
 const quitarMutate = vi.fn();
+const ocultarMutate = vi.fn();
+const mostrarMutate = vi.fn();
 
 vi.mock('@/api/modelos', () => ({
   useFotosModelo: () => useFotosModelo(),
@@ -25,6 +30,11 @@ vi.mock('@/api/adjuntos-orden', () => ({
   useAdjuntosOrden: () => useAdjuntosOrden(),
   useSubirAdjuntoOrden: () => ({ mutate: subirMutate, isPending: false }),
   useQuitarAdjuntoOrden: () => ({ mutate: quitarMutate, isPending: false }),
+}));
+vi.mock('@/api/fotos-ocultas-orden', () => ({
+  useFotosOcultasOrden: () => useFotosOcultasOrden(),
+  useOcultarFotoModeloOrden: () => ({ mutate: ocultarMutate, isPending: false }),
+  useMostrarFotoModeloOrden: () => ({ mutate: mostrarMutate, isPending: false }),
 }));
 
 function fotoModelo(idFoto: number, url: string): ModeloFoto {
@@ -57,10 +67,16 @@ describe('<FotosModeloOrden>', () => {
   beforeEach(() => {
     useFotosModelo.mockReset();
     useAdjuntosOrden.mockReset();
+    useFotosOcultasOrden.mockReset();
     subirMutate.mockReset();
     quitarMutate.mockReset();
+    ocultarMutate.mockReset();
+    mostrarMutate.mockReset();
     useFotosModelo.mockReturnValue({ data: [] });
     useAdjuntosOrden.mockReturnValue({ data: [] });
+    // Por omisión la OP no quitó ninguna foto del modelo: el caso normal, y el que describen todas
+    // las expectativas históricas de este archivo.
+    useFotosOcultasOrden.mockReturnValue({ data: [] });
   });
 
   it('no pinta nada sin fotos y sin permiso', () => {
@@ -137,7 +153,7 @@ describe('<FotosModeloOrden>', () => {
     expect(subirMutate.mock.calls[0]?.[0]).toEqual({ idOrden: 42, archivo });
   });
 
-  it('permite QUITAR una imagen de la orden, pero NO las del modelo', async () => {
+  it('el BORRADO (papelera) es solo para las imágenes de la orden, nunca para las del modelo', async () => {
     const usuario = userEvent.setup();
     useFotosModelo.mockReturnValue({ data: [fotoModelo(1, 'https://ej.test/m1.jpg')] });
     useAdjuntosOrden.mockReturnValue({
@@ -147,8 +163,10 @@ describe('<FotosModeloOrden>', () => {
       <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={42} puedeAdministrar />,
     );
 
-    // Solo hay UN botón de quitar (el de la imagen de la orden; la del modelo no lo tiene).
+    // Solo hay UNA papelera (la de la imagen de la orden). La del modelo lleva otro botón, el de
+    // QUITARLA de esta OP (§Post-F9.169(b)) — que no borra nada.
     expect(screen.getAllByTestId('quitar-foto-orden')).toHaveLength(1);
+    expect(screen.getAllByTestId('ocultar-foto-modelo-orden')).toHaveLength(1);
     await usuario.click(screen.getByTestId('quitar-foto-orden'));
     expect(quitarMutate).toHaveBeenCalledTimes(1);
     expect(quitarMutate.mock.calls[0]?.[0]).toEqual({ idOrden: 42, idArchivo: 'img1' });
@@ -195,5 +213,139 @@ describe('<FotosModeloOrden>', () => {
     );
     expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(1);
     expect(screen.queryByTestId('foto-modelo-orden-principal')).not.toBeInTheDocument();
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ⭐ §Post-F9.169(b) — QUITAR de la OP una foto HEREDADA del modelo (sin borrarla del modelo)
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  describe('quitar de la OP una foto heredada del modelo', () => {
+    /** Las dos fotos del modelo + una imagen subida a la orden: el escenario completo. */
+    function conDosFotosDelModelo(): void {
+      useFotosModelo.mockReturnValue({
+        data: [fotoModelo(1, 'https://ej.test/m1.jpg'), fotoModelo(2, 'https://ej.test/m2.jpg')],
+      });
+    }
+
+    it('quien SOLO MIRA no ve la foto que esta OP quitó (ni en la tira ni en el visor)', () => {
+      conDosFotosDelModelo();
+      useFotosOcultasOrden.mockReturnValue({
+        data: [{ idModeloFoto: 1, ocultadaEn: '2026-09-01T00:00:00Z' }],
+      });
+      renderConProveedores(
+        <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={9} puedeAdministrar={false} />,
+      );
+
+      const miniaturas = screen.getAllByTestId('foto-modelo-orden');
+      expect(miniaturas).toHaveLength(1);
+      // La que queda es la SEGUNDA (la quitada no se coló apagada ni de ninguna otra forma).
+      expect(screen.getByRole('img', { name: 'Foto de 501' })).toHaveAttribute(
+        'src',
+        'https://ej.test/m2.jpg',
+      );
+      expect(screen.queryByTestId('foto-modelo-orden-oculta')).not.toBeInTheDocument();
+    });
+
+    it('quien ADMINISTRA la sigue viendo APAGADA, con su botón de traerla de vuelta', () => {
+      conDosFotosDelModelo();
+      useFotosOcultasOrden.mockReturnValue({
+        data: [{ idModeloFoto: 1, ocultadaEn: '2026-09-01T00:00:00Z' }],
+      });
+      renderConProveedores(
+        <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={9} puedeAdministrar />,
+      );
+
+      // Las DOS siguen en la tira, y solo una lleva el distintivo de "quitada de esta orden".
+      expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(2);
+      expect(screen.getAllByTestId('foto-modelo-orden-oculta')).toHaveLength(1);
+      // Reversible: la quitada ofrece VOLVER, y ya no ofrece quitarse otra vez.
+      expect(screen.getAllByTestId('mostrar-foto-modelo-orden')).toHaveLength(1);
+      // La otra (viva) sí ofrece quitarse: hay exactamente UN botón de quitar, no dos.
+      expect(screen.getAllByTestId('ocultar-foto-modelo-orden')).toHaveLength(1);
+      // Y el texto accesible dice cuál es cuál (no solo un icono apagado).
+      expect(screen.getByAltText('Foto de 501 quitada de esta orden')).toBeInTheDocument();
+    });
+
+    it('quitarla llama a la mutación con {idOrden, idModeloFoto} y NO borra nada (no toca R2)', async () => {
+      const usuario = userEvent.setup();
+      useFotosModelo.mockReturnValue({ data: [fotoModelo(7, 'https://ej.test/m7.jpg')] });
+      renderConProveedores(
+        <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={42} puedeAdministrar />,
+      );
+
+      await usuario.click(screen.getByTestId('ocultar-foto-modelo-orden'));
+
+      expect(ocultarMutate).toHaveBeenCalledTimes(1);
+      expect(ocultarMutate.mock.calls[0]?.[0]).toEqual({ idOrden: 42, idModeloFoto: 7 });
+      // ⭐ LO QUE **NO** PASA: no se borró ningún archivo de la orden (esa es la vía que sí toca R2)
+      // ni se llamó a la vuelta atrás. Quitar de la OP es SOLO poner la marca.
+      expect(quitarMutate).not.toHaveBeenCalled();
+      expect(mostrarMutate).not.toHaveBeenCalled();
+    });
+
+    it('traerla de vuelta llama a la OTRA mutación (la rama gemela, con su propio botón)', async () => {
+      const usuario = userEvent.setup();
+      useFotosModelo.mockReturnValue({ data: [fotoModelo(7, 'https://ej.test/m7.jpg')] });
+      useFotosOcultasOrden.mockReturnValue({
+        data: [{ idModeloFoto: 7, ocultadaEn: '2026-09-01T00:00:00Z' }],
+      });
+      renderConProveedores(
+        <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={42} puedeAdministrar />,
+      );
+
+      await usuario.click(screen.getByTestId('mostrar-foto-modelo-orden'));
+
+      expect(mostrarMutate).toHaveBeenCalledTimes(1);
+      expect(mostrarMutate.mock.calls[0]?.[0]).toEqual({ idOrden: 42, idModeloFoto: 7 });
+      expect(ocultarMutate).not.toHaveBeenCalled();
+      expect(quitarMutate).not.toHaveBeenCalled();
+    });
+
+    it('SER PRINCIPAL NO SE TRANSFIERE: si se quita la principal, la segunda NO hereda la estrella', () => {
+      conDosFotosDelModelo();
+      useFotosOcultasOrden.mockReturnValue({
+        data: [{ idModeloFoto: 1, ocultadaEn: '2026-09-01T00:00:00Z' }],
+      });
+      renderConProveedores(
+        <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={9} puedeAdministrar={false} />,
+      );
+
+      // La única que queda es la segunda, y NO lleva estrella: esta OP se queda sin principal.
+      expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(1);
+      expect(screen.queryByTestId('foto-modelo-orden-principal')).not.toBeInTheDocument();
+      expect(screen.queryByAltText('Foto principal de 501')).not.toBeInTheDocument();
+    });
+
+    it('una principal quitada conserva SU estrella para quien administra (no se le quita al modelo)', () => {
+      conDosFotosDelModelo();
+      useFotosOcultasOrden.mockReturnValue({
+        data: [{ idModeloFoto: 1, ocultadaEn: '2026-09-01T00:00:00Z' }],
+      });
+      renderConProveedores(
+        <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={9} puedeAdministrar />,
+      );
+
+      // Sigue siendo la principal DEL MODELO (quitarla de la OP no la desmarca, D3): lleva las dos
+      // marcas a la vez, estrella y "quitada", en la MISMA miniatura.
+      const distintivo = screen.getByTestId('foto-modelo-orden-principal');
+      const marcaOculta = screen.getByTestId('foto-modelo-orden-oculta');
+      expect(distintivo.parentElement).toBe(marcaOculta.parentElement);
+    });
+
+    it('sin idOrden (captura) no se puede quitar nada de la OP, ni con permiso', () => {
+      conDosFotosDelModelo();
+      renderConProveedores(<FotosModeloOrden idModelo={1} codigoModelo="501" puedeAdministrar />);
+
+      expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(2);
+      expect(screen.queryByTestId('ocultar-foto-modelo-orden')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('mostrar-foto-modelo-orden')).not.toBeInTheDocument();
+    });
+
+    it('sin permiso NO aparece el botón de quitar la foto del modelo', () => {
+      conDosFotosDelModelo();
+      renderConProveedores(
+        <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={9} puedeAdministrar={false} />,
+      );
+      expect(screen.queryByTestId('ocultar-foto-modelo-orden')).not.toBeInTheDocument();
+    });
   });
 });
