@@ -11667,3 +11667,49 @@ natural (`Orden.findFirst({ where: { idPedidoLinea } })` + `pg_advisory_xact_loc
   **E3**, que la necesita como llave. **Fecha:** 2026-08-31.
 
 ---
+
+#### (Post-F9.173) — ⭐ SI YA SE COMPRÓ, EL SISTEMA **AVISA**; CANCELAR SE NEGOCIA · y los parámetros de calidad esperan a las CALIFICACIONES (DANIEL, 1-sep-2026)
+
+### (a) 🔴 CORRIGE lo que la 0.067 construyó: falta el AVISO
+
+**Daniel, textual:**
+
+> *«Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede cancelar la OC interna,
+> o que **el comprador sepa que cambió**, para hacer lo que tenga que hacer. **No se puede cancelar la OC
+> en automático… eso hay que negociarlo con el proveedor.**»*
+
+**Qué confirma y qué corrige.** La mitad construida está bien: **reabrir la receta NO revierte nada** —la
+OC autorizada sigue en pie— porque **el sistema no puede deshacer un compromiso con un tercero**. Eso era
+el default y él lo ratifica con la razón de fondo: *cancelar se negocia, no se ejecuta*.
+
+🔴 **Lo que FALTA, y es lo que él pidió: el sistema hoy se queda CALLADO.** Reabrir una receta con compra
+detrás no avisa a nadie. El comprador **se entera cuando se entera**, y para entonces la tela puede venir
+en camino. ⇒ **El aviso no es cosmético: es el que permite que alguien alcance a negociar.**
+
+**Lo que hay que construir** (queda como **0.085**):
+1. **Al reabrir una receta, decir que ya hay compra**, con qué se compró y en qué OC — para que se vea si
+   la OC interna se puede cancelar.
+2. **Que le llegue al COMPRADOR**, que es quien tiene que hacer algo — no sólo a quien reabre.
+3. ⛔ **NUNCA cancelar la OC en automático.** Si acaso, **llevar** a `desautorizarOC`, que ya existe y ya
+   es del dueño. *(Mismo patrón que §Post-F9.145: el aviso que pide un acto tiene que llevar a hacerlo.)*
+
+### (b) ⏳ Los parámetros de aceptación: NO se fijan ahora
+
+**Daniel, textual:**
+
+> *«En alguna conversación hablamos de que hay que **fijar un parámetro de aceptación de faltantes y
+> segundas**. Aún no fijamos los parámetros… **lo haremos cuando hagamos las calificaciones de
+> maquileros**.»*
+
+⇒ **La pregunta O3 de V1-E8k queda CONTESTADA por reencuadre, no por defecto.** Se preguntaba si el KPI de
+calidad debía contar las incompletas. **La respuesta es que esa pregunta no se decide sola**: pertenece a
+una pieza mayor —**las calificaciones de maquileros**— donde se fijan **los parámetros de aceptación de
+faltantes Y de segundas**, juntos. Decidir sólo lo de las incompletas sería fijar medio criterio.
+
+⇒ **NO se le vuelve a preguntar** hasta que esa pieza arranque, y entonces se le pregunta **entera**. Queda
+como **0.086**.
+
+- **Aplica en:** (a) **0.085** — corrige y completa lo de la 0.067. (b) **0.086** — y **cierra O3**.
+  **Fecha:** 2026-09-01.
+
+---
