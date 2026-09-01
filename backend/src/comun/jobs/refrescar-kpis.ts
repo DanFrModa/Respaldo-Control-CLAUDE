@@ -84,7 +84,9 @@ export async function registrarRefrescoKpis(
     await boss.work(COLAS_JOBS.refrescarKpis, { localConcurrency: 1, batchSize: 1 }, async () => {
       await refrescarKpis();
     });
-    // schedule (cron) recurrente; pg-boss dedup por cola+cron.
+    // schedule (cron) recurrente. pg-boss lo guarda con clave (cola, key) y `key` va vacía aquí:
+    // re-programar en cada arranque REEMPLAZA el schedule anterior (upsert), no lo duplica ni deja
+    // dos crons vivos para esta cola. Cambiar `KPIS_CRON` y reiniciar basta para que aplique.
     await boss.schedule(COLAS_JOBS.refrescarKpis, CRON_REFRESCO);
   } catch (error) {
     registrarError('No se pudo programar el refresco de KPIs (la app sigue):', error);

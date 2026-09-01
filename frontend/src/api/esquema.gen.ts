@@ -82688,7 +82688,7 @@ export interface paths {
           };
           content: {
             'application/json': {
-              /** @description true si se encoló el refresco (false si el motor está inactivo). */
+              /** @description true si este disparo creó un job de refresco. false NO es un error: ocurre si el motor de jobs está inactivo, y también —lo normal— si ya había un refresco esperando y éste se unió a él (se dedupó). En ambos casos el refresco llega igual; sólo no lo encoló esta llamada. */
               encolado: boolean;
             };
           };

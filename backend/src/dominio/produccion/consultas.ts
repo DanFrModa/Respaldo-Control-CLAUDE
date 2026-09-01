@@ -16,7 +16,7 @@
  *
  * Reuso (sin duplicar): la búsqueda combinada (folio si es entero + código de modelo + nombre de
  * cliente + valor de `OrdenReferencia`, D7) y el filtro por año son los MISMOS de `ordenes.ts`
- * (`armarBusqueda`, `rangoAnio`), reexportados desde allí.
+ * (`armarBusquedaConSinonimos`, `rangoAnio`), reexportados desde allí.
  */
 import { z } from 'zod';
 
@@ -50,7 +50,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { armarBusqueda, rangoAnio } from './ordenes.js';
+import { armarBusquedaConSinonimos, rangoAnio } from './ordenes.js';
 
 // ── Constantes del semáforo de antigüedad (regla `EsUrgente` del viejo) ──────────────
 
@@ -220,7 +220,7 @@ export async function consultarOrdenes(
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(filtros.anio === undefined ? {} : { fecha: rangoAnio(filtros.anio) }),
-    ...armarBusqueda(filtros.busqueda),
+    ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
   };
 
   const cliente = clienteLectura(bd);
@@ -471,7 +471,8 @@ export const LIMITE_BUSCADOR_ORDENES = 20;
 /**
  * BUSCADOR GLOBAL de órdenes para el layout: localiza por folio interno, código de modelo o
  * CUALQUIER valor de `OrdenReferencia` (D7) o nombre de cliente — la MISMA búsqueda combinada del
- * listado (`armarBusqueda`), pero con proyección LIGERA (`{ id, folio, codigoModelo, cliente }`) y
+ * listado (`armarBusquedaConSinonimos`, sinónimos de departamento incluidos), pero con proyección
+ * LIGERA (`{ id, folio, codigoModelo, cliente }`) y
  * tope de {@link LIMITE_BUSCADOR_ORDENES} hits. Filtra por empresa activa (A9). Excluye canceladas
  * (no se navega a algo cancelado desde el buscador rápido; la consulta sí las puede mostrar).
  */
@@ -486,7 +487,7 @@ export async function buscarOrdenesGlobal(
   const where: Prisma.OrdenWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
     estado: { not: 'cancelada' },
-    ...armarBusqueda(q),
+    ...(await armarBusquedaConSinonimos(q, bd)),
   };
 
   const cliente = clienteLectura(bd);

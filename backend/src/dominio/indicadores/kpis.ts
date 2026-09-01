@@ -549,9 +549,15 @@ export async function kpisWip(
 
 /**
  * ENCOLA el refresco de las vistas de KPIs (on-demand) y REGRESA de inmediato: la consulta/captura
- * NUNCA espera el recálculo (plan §11). Serializado por `singletonKey` (idRecurso fijo 0 = global):
- * varios disparos seguidos colapsan en uno. NO-OP si el motor de jobs está inactivo (devuelve
- * `encolado:false`). `indicadores.ver`.
+ * NUNCA espera el recálculo (plan §11). Serializado por `singletonKey` (idRecurso fijo 0 = global)
+ * SOBRE una cola con política `stately` —la clave sola no restringiría nada—: varios disparos
+ * seguidos colapsan en uno.
+ *
+ * ⚠️ POR ESO `encolado:false` TIENE DOS CAUSAS, no una: (1) el motor de jobs está inactivo, y
+ * (2) —la habitual— ya había un refresco ESPERANDO y este disparo se dedupó. Hasta que la cola
+ * declaró política, (2) no podía ocurrir y `false` significaba sólo (1); quien lea `false` como
+ * "no se va a refrescar" se equivoca en el caso (2), donde el refresco sí llega. Dos clics
+ * seguidos en «Refrescar» caen justo ahí. `indicadores.ver`.
  */
 export async function encolarRefrescoKpis(sesion: SesionUsuario): Promise<RefrescoEncolado> {
   verificarPermiso(sesion, 'indicadores.ver');

@@ -1218,6 +1218,198 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9h · ⭐ LA DEFENSA QUE NO DEFENDÍA: `singletonKey` (1-sep-2026, versión **0.076**) — ✅ HECHA
+
+**El comentario de `comun/jobs/index.ts` AFIRMABA** que *«pg-boss garantiza que, para un `singletonKey`
+dado, a lo sumo UN job está en `created`/`active`; un segundo `send` se descarta»*. **Falso**: los índices
+únicos sólo existen para colas **con política**, y el archivo las creaba **todas sin `policy`**.
+
+> ⇒ **La defensa anti-duplicado de la Ruta Crítica era decorativa, y su comentario la declaraba viva.** Es
+> la peor combinación: quien leía el código **creía estar protegido**.
+
+### Se midieron las CINCO políticas ejecutándolas, no suponiéndolas por el nombre
+
+Con `pglite` (Postgres **en proceso**, sin Docker). La que corresponde **literalmente** a la promesa vieja
+es **`exclusive`** — ⭐ **y por eso NO se eligió**: con `exclusive`, un evento que llega **mientras se está
+recalculando** se **pierde**, y la ruta queda con fechas viejas hasta el siguiente evento, que puede tardar
+días. Verificado que **no hay red debajo**: el barrido de riesgo recalcula el **semáforo**, no el CPM.
+
+⇒ **Se eligió `stately`** (≤1 corriendo **+** ≤1 esperando) **y se reescribió el comentario para que
+describa `stately`**. *Se prefirió cambiar la frase a que el sistema pierda datos por respetarla.*
+
+**Las dos dudas, medidas:** `stately` **no acumula** (cota dura de 2 por clave) y el que espera **no arranca
+con datos viejos** (el payload es mínimo a propósito y el handler relee **después** de que el activo terminó).
+
+### 🔴 EL HALLAZGO QUE CAMBIÓ LA ETAPA: la política no se puede cambiar en caliente
+
+- `createQueue` sobre una cola que ya existe hace **`ON CONFLICT DO NOTHING`: la ignora en silencio**.
+- `updateQueue` **lanza** *«queue policy cannot be changed after creation»*.
+- Única vía: `deleteQueue` + `createQueue` — que **borra los jobs encolados y, por FK en cascada, el
+  `schedule`**.
+
+⇒ **Declarar la política y nada más habría sido código muerto en `prueba`: el mismo defecto una vuelta más
+arriba.** Por eso nació la **conciliación al arranque**, que **nunca lanza** (un tropiezo no puede dejar al
+sistema sin motor) y **verifica después** — necesario porque `deleteQueue` **se traga sus propios errores**.
+
+### 🔴 Y la etapa contra las mentiras en prosa **introdujo una**, en el contrato público
+
+`contrato/esquemas/indicadores.ts` decía *«`false` si el motor está inactivo»* — **cierto hasta ayer**:
+bajo `standard`, `send` **nunca** devolvía `null`. **Con `stately` deja de serlo**: el 2.º clic en
+«Refrescar KPIs» **también** da `false`. Y **viajaba a `openapi.json` ×2 y a `esquema.gen.ts`**.
+
+⇒ La descripción ahora nombra **las dos** causas, aclara que **`false` no es error**, y —esto es lo que
+impide que envejezca mal— **fecha el cambio**: *«hasta que la cola declaró política, (2) no podía ocurrir»*.
+
+### ⭐⭐ El guardián de prosa: se creía imposible, y no lo era
+
+El coder sostuvo que *«ningún gate detecta una mentira en prosa»*. **Falso en este repo**: hay una familia
+de guardianes que **leen el código real**. El reviewer escribió la prueba de concepto y la corrió en las dos
+direcciones; el coder la mejoró **anclando al bloque que promete, no al archivo** —porque en un archivo la
+promesa vivía en el JSDoc de una función— con `expect(posAncla).toBeGreaterThan(0)` para que **renombrar la
+función falle ruidoso en vez de dejar de vigilar**.
+
+⭐ **Y lo extendió al CONTRATO**, exigiendo `/dedup/i` en vez de `` `stately` ``: *el contrato habla el
+idioma del negocio; pedirle vocabulario de pg-boss lo habría vuelto frágil sin ganar nada.*
+
+**Atacado siete veces** (mover el texto a un `//`, renombrar la función, borrar la mención, revertir el
+`.describe()`, colar un `eslint-disable`…): **las siete caen**.
+
+> **La asimetría que lo justifica, en palabras del reviewer:** *«construyó una prueba para que la LIBRERÍA
+> no invalide la promesa en silencio, y dejó sin guarda que la invalide una PERSONA. El riesgo humano es el
+> que de hecho ocurrió.»*
+
+### ⭐ La conducta que vale más que el arreglo: dos argumentos rechazados por no reproducirse
+
+1. **El reviewer aportó** que `exclusive` *«no sólo perdería eventos: perdería reintentos»*. **El coder lo
+   midió, le salió distinto, y se negó a escribirlo:** *«prefiero no escribir en el ADR un argumento que no
+   reproduzco»*.
+2. **El reviewer lo verificó y se dio la razón a él**, encontrando que estaba **doblemente equivocado**: su
+   evidencia vivía en un camino de código **que sólo corre en CockroachDB** —muerto en este sistema— y ese
+   mismo comentario **lista `stately` PRIMERO**, así que nunca diferenció una política de la otra.
+
+> **Un ADR es un registro de razones; una razón que nadie reproduce es la semilla del próximo comentario
+> falso.** Meterlo habría hecho que la etapa contra las mentiras en prosa **cometiera una en su propio ADR**.
+
+### Lo que el barrido encontró de más
+
+- **La misma frase falsa vivía en `cpm-job.ts` y `kpis.ts`**; dos más eran imprecisas.
+- ⭐ **`respaldo-bd.ts` YA decía la verdad** — *«alguien lo sabía y lo dejó escrito a dos archivos de
+  distancia de la frase falsa»*. Es el mejor argumento de por qué la prosa necesita guarda.
+- **`ADR-0012` seguía con la frase original**, y hoy es falsa **al revés**: describía `exclusive`, **justo
+  lo que se decidió no hacer**. Corregido con un recuadro que lo dice.
+- 🔴 **Y una tercera frase falsa suya que nadie había visto**: decía que a las colas de cron las protege un
+  índice que en realidad se aplica a **otra cola interna**, no a la nuestra.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,421** · frontend los cuatro. **Contrato en sync.**
+**Sin migración de Prisma** (los índices son del esquema de pg-boss) · **sin permisos · sin seed** ⇒ **no
+requiere `SEED_ON_START`**.
+
+⚠️ **Para el deploy:** al **primer** arranque en `prueba` el log dirá **dos veces «se RECREA»**
+(`rc-recalcular-ruta` y `kpi-refrescar`) **en ROJO**, porque salen por `registrarError`. **Son esperadas y
+ocurren una sola vez**; en los arranques siguientes, ninguna.
+
+📌 **Deuda menor anotada:** el anclaje del guardián se puede evadir con un **bloque señuelo** que contenga
+los cuatro tokens. **No se cierra a propósito**: no se escribe por accidente, la variante realista —un
+comentario inocuo arriba— **sí cae en rojo**, y cerrarlo exige una lista negra que rompe la forma positiva.
+
+---
+
+## V1-E9g · LA BÚSQUEDA ENTIENDE LOS DOS NOMBRES (1-sep-2026, versión **0.075**) — ✅ HECHA
+
+**La decisión de Daniel (§Post-F9.172(a)):** *«Está bien la 3.»*
+
+> **El texto capturado del documento del cliente NO se reescribe NUNCA.** Buscar «Caballeros» encuentra
+> las órdenes que dicen «2-HOMBRE» **porque el sistema sabe que uno se fusionó en el otro** — no porque le
+> haya cambiado el papel al cliente.
+
+Se descartó reescribir porque **rompería la única prueba de qué pidió el cliente** — lo mismo que
+`Cotizacion.nombreDepartamento` se congela a propósito para no hacer.
+
+### 🔑 Ni la búsqueda ni la fusión estaban mal escritas
+
+El importador escribe la División **dos veces**: al catálogo **con FK**, y como **texto crudo** en
+`OrdenReferencia.valor`. Fusionar mueve el catálogo; **la orden sigue diciendo el nombre viejo** y el
+`contains` no lo alcanza. Faltaban **el rastro y el puente**.
+
+**Llevó MIGRACIÓN por una asimetría real:** `Color` tiene `idFusionadoEn` con FK reflexiva e índice;
+**`ClienteDepartamento` sólo tenía `activo`** — su rastro vivía **únicamente en la bitácora**.
+
+### 🔴 El encargo del lead estaba mal en DOS cosas
+
+1. Decía **«tres consumidores»** de `armarBusqueda`. **Son CINCO** (+ tablero WIP y lista de costos).
+2. Decía *«se arregla en un solo sitio y los tres quedan cubiertos»*. **FALSO: son DOS embudos.** El Centro
+   de Órdenes **no comparte** `armarBusqueda` — tiene su propia `busquedaCentro`, a propósito sin nombre de
+   cliente. ⭐ Verificado por mutación: quitar el sinónimo **sólo del Centro** mata **exactamente 2 pruebas,
+   las suyas**, y las 21 restantes siguen verdes. *Con una prueba compartida eso habría pasado en verde.*
+
+### ⭐⭐ EL INCIDENTE DE LA RED — la lección reutilizable de esta etapa
+
+Añadir la relación reflexiva **puso roja** la prueba-red que exige igualdad exacta con el esquema. La
+primera versión la calmó **declarando una exclusión y exportándola desde producción**, y la prueba la
+importaba.
+
+🔴 **El reviewer demostró que eso la DESACTIVA**, con un mutante que **sobrevive**: sacó `contactos` del
+repunte —o sea, **la fusión deja de arrastrar los contactos y la compradora queda colgando de un
+departamento absorbido**, el estado prohibido exacto— y lo declaró excluido. **6 pruebas en verde.**
+
+**La causa:** en colores la lista equivalente es una `const` **privada del archivo de prueba** ⇒ ampliarla
+**exige editar la prueba**, un acto visible en el diff. Exportada desde producción, **la aserción se deriva
+del módulo que debe vigilar** y el escape es *una palabra en el archivo que el desarrollador ya tiene
+abierto*. La cabecera afirmaba seguir el precedente de colores — **y no lo seguía**.
+
+⭐ **El arreglo fue MÁS ALLÁ de lo que el reviewer pidió, y él lo verificó y retiró su propia propuesta.**
+En vez de mover la lista a la prueba (opción del reviewer), el coder la **eliminó** y puso el nombre como
+**literal dentro de la aserción** — argumentando que mover la lista *«sólo mueve la puerta de archivo:
+ampliarla sigue siendo agregar una palabra a una lista»*. El reviewer lo probó: con su propia opción, el
+escape barato **seguía funcionando**; con el literal hay que **editar dos aserciones distintas y escribir
+el nombre de la relación dos veces**. Retiró su propuesta.
+
+> **La lección: una excepción que produce un símbolo configurable es una excepción que se puede ampliar en
+> silencio.**
+
+📌 **Y una corrección al acta, del propio reviewer:** el coder sostuvo que las dos aserciones no son
+redundantes. **Media verdad, medida**: la segunda caza *«sobra una entrada»*, que la primera no ve ✔; pero
+*«dejó de repuntarse»* **lo cazan las dos**. Lo que la primera aporta en exclusiva **no es cobertura: es el
+mensaje de fallo** —nombra al culpable en vez de dar dos listas de distinto largo—. Legítimo y barato, pero
+**no debe documentarse como no-redundancia de cobertura**.
+
+### La trampa central: EL SINÓNIMO RESUELVE EN LOS DOS SENTIDOS
+
+Buscar el **destino** debe encontrar el **origen** **y al revés** — quien tiene el papel viejo busca por el
+nombre viejo. ⭐ **Verificado con conjuntos de fallo DISJUNTOS:** quitar la pata que baja mata **14** pruebas,
+todas de un sentido; quitar la que sube mata **9**, todas del otro. **Ninguna prueba las mezcla.**
+
+**La cadena** (A→B→C) se recorre entera y **no se aplana**: repuntarla reescribiría un hecho histórico
+(«a A se lo llevó B» pasaría a decir «C»).
+
+### Lo que también encontró
+
+- **La fusión sólo escribía el rastro `if (origen.activo)`** ⇒ un departamento **apagado a mano y luego
+  fusionado se quedaba sin rastro**. Corregido.
+- ⚠️ **Una trampa de fixture que le mordió a él:** su primera cadena usaba «DAMA»→«MUJER»→«Damas» y la
+  prueba medía **el filtro de redundancia en vez de los saltos**, porque «Damas» *contiene* «DAMA». La
+  cadena nueva usa nombres **ajenos entre sí**.
+- 🔴 **La igualdad insensible NUNCA se ejercía contra Postgres**: las tres pruebas sembraban el texto con
+  **la misma grafía** que el catálogo — y **la premisa de la etapa es justamente que se escriben distinto**.
+  Ahora la orden dice `'2-hombre'` y el catálogo `'2-HOMBRE'`, verificado que **ningún otro camino** puede
+  encontrar esa orden. **Y el control cambió también**, porque con otra grafía **no controlaba nada**: entre
+  el positivo y el control debe moverse **una sola variable, la fusión**.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,419** · frontend los cuatro. **Contrato: cero
+drift** — el rastro **no se expone**, igual que en colores ⇒ **el frontend no se toca**. **Sin permisos ·
+sin seed** ⇒ **no requiere `SEED_ON_START`**. **Migración byte a byte** idéntica a `prisma migrate diff`.
+
+**Mutaciones: 17 del coder + 13 del reviewer.** Rendimiento verificado: **1 viaje** sin coincidencia, **≤3**
+con 40 absorbidos (por nivel, **nunca por fila**), **0** con texto vacío.
+
+📌 **FK en `Restrict`.** `SetNull` **destruiría el rastro en silencio** —el dato que esta etapa vino a
+crear— y en un sistema donde nada se borra, un borrado físico debe ser **ruidoso**. Si algún día hiciera
+falta borrar clientes, lo correcto sería **`NoAction`** (Postgres difiere la comprobación al final de la
+sentencia), **nunca `SetNull`**.
 ## V1-E9f · ⭐ EL COLOR FUSIONADO SE VE, Y AVISA ANTES DE CONFIRMAR (1-sep-2026, versión **0.074**) — ✅ HECHA
 
 **La pieza que podía mandar un precio equivocado al cliente, y que el plan no tenía.**

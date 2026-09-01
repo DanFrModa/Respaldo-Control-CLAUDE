@@ -110,7 +110,9 @@ export async function registrarBarridoRiesgoRc(
     await boss.work(COLAS_JOBS.barridoRiesgoRc, { localConcurrency: 1, batchSize: 1 }, async () => {
       await barrerRiesgoRc();
     });
-    // schedule (cron) recurrente; pg-boss dedup por cola+cron.
+    // schedule (cron) recurrente. pg-boss lo guarda con clave (cola, key) y `key` va vacía aquí:
+    // re-programar en cada arranque REEMPLAZA el schedule anterior (upsert), no lo duplica ni deja
+    // dos crons vivos para esta cola. Cambiar `RC_RIESGO_CRON` y reiniciar basta para que aplique.
     await boss.schedule(COLAS_JOBS.barridoRiesgoRc, CRON_BARRIDO);
   } catch (error) {
     registrarError('No se pudo programar el barrido de riesgo de la RC (la app sigue):', error);
