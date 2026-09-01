@@ -71,6 +71,54 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.078 · 1-sep-2026 · **en prueba** — ⭐⭐ Cada **color** tiene su propio modelo y su propio número, con **una sola receta**
+
+### Qué se puede hacer ahora que antes no
+
+**Sacar a producción cuatro órdenes de cuatro colores del mismo modelo y que salgan cuatro modelos, con
+cuatro números de cinco dígitos — compartiendo una sola receta.** Hasta ayer las cuatro salían con **un
+solo número** y el sistema no tenía forma de distinguirlas: era exactamente lo que reportaste.
+
+El número lo estrena **la generación de la OP**. En el toast se ve cuál fue, y el renglón del pedido del
+mes muestra ahora **«Nº de producción (por color)»** con los números de los modelos que nacieron de él —
+uno por cada OP.
+
+⭐ **Y si ese color ya tenía modelo, se reusa el suyo.** Es tu regla, literal: *«se reúsa cuando sea el
+mismo modelo»*. Da igual que sea un resurtido de la misma OC o una OC nueva de meses después: **la misma
+prenda del mismo color tiene UN número, para siempre**. Cuando eso pasa, el sistema lo dice en vez de
+inventarte un número nuevo.
+
+**La receta sigue siendo una sola, la del desarrollo.** Corregirla se corrige para los cuatro colores;
+eso es lo que ya hacía la versión anterior y aquí no cambia.
+
+### Qué cambió y puede sorprender
+
+- **El modelo de desarrollo ya no se transforma: se queda.** Antes, sacar a producción convertía el
+  desarrollo en el modelo de producción y el desarrollo desaparecía. Ahora el desarrollo **permanece** y
+  de él van naciendo los hijos, uno por color. Su código de desarrollo se sigue pudiendo buscar.
+- **Si capturas un número a mano y ese color ya tenía modelo, el número que capturaste NO se usa** — y el
+  sistema te lo avisa con esas palabras. El número es del modelo, no de la orden.
+- **Un modelo de un color que descontinuaste no se puede esquivar sacando otro.** Hay que reactivarlo
+  desde su ficha. Si se pudiera rodear, la misma prenda acabaría con dos números, que es justo lo que
+  esta versión vino a impedir.
+- **Un color que ya bautizó modelos ya no se puede fusionar con otro.** Fusionarlo dejaría al sistema sin
+  poder reconocer ese color en la siguiente OC, y estrenaría número para una prenda que ya lo tiene.
+- **Lo viejo se queda como está.** Los casi 5,000 modelos que vienen de Access y todo lo capturado a mano
+  **no tienen color de nacimiento, y está bien**: no nacieron de un color. Nada se rellenó ni se tocó.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **El botón «Pasar a producción» del catálogo sigue haciendo lo viejo**, y hay que decirlo claro: si
+  lo pulsas **antes** de que el modelo tenga sus OC, le pone **UN número a todos los colores** y **no hay
+  vuelta atrás**. El camino bueno es **generar la OP**. El botón ahora avisa en ámbar antes del clic, pero
+  el aviso es lo único que hay: **falta que decidas si el botón se retira** (ya no habría razón de asignar
+  el número a mano) o se queda como está.
+- ⏳ **La ficha del modelo sí se copia al nacer cada color, y desde ese momento puede irse separando** —
+  la receta no, ésa se comparte. Está numerado y espera tu respuesta.
+- Sin permisos nuevos y sin datos que sembrar: el despliegue no necesita nada especial.
+
+---
+
 ## 0.077 · 1-sep-2026 · **en prueba** — Si ya se compró, **el sistema te lo dice** — y se entera el comprador
 
 ### Qué se puede hacer ahora que antes no

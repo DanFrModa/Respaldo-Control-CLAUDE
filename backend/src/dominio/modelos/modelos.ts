@@ -983,7 +983,7 @@ export interface ModeloPromovido extends ResultadoPromocion {
  * atrás"*). Es lo único que hay entre el usuario y el bug: si alguien ordena ese diálogo y se lleva
  * el aviso, el clic vuelve a ser silencioso.
  *
- * ⚠️ **Decisión pendiente de Daniel** (la plantea V1-E3, no la resuelve): ¿el botón se **retira**
+ * ⚠️ **Decisión pendiente de Daniel — §Post-F9.175** (la plantea V1-E3, no la resuelve): ¿el botón se **retira**
  * del catálogo —porque desde V1-E8j «todo modelo nace en desarrollo» y desde V1-E3 el número se lo
  * da su OP, así que ya no habría razón de asignarlo a mano— o **se queda**? Mientras no se conteste
  * queda **con esa única guarda, la prueba del residuo y el aviso**.

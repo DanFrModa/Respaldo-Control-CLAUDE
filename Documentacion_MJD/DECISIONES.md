@@ -11670,6 +11670,23 @@ ES la llave de idempotencia** que hoy **no existe** y sin la cual **un doble cli
 
 📌 **No bloquea nada salvo E3.** Si Daniel no precisa el borde, se construye **(B)**.
 
+> ### ✅ CONSTRUIDO — el borde se cerró en **(B)** (1-sep-2026, versión **0.078**, ficha `V1-E9j`)
+>
+> El default se confirmó **con su propia frase**, no por comodidad: con (A), una OC nueva del mismo color
+> **estrenaría otro número** ⇒ la misma prenda con **dos números de catálogo**, que es lo contrario de
+> *«se reúsa cuando sea el mismo modelo»*. La llave `(idModeloDesarrollo, idColor)` quedó como índice
+> único **y**, tal como se anticipó aquí, **es la idempotencia que nunca existió**.
+>
+> 🔑 **Y lo anticipado sobre el dato se sostuvo entero:** `Modelo.idColor` es **identidad, no operación**
+> — nadie lo lee para decidir qué cortar; lo que se produce lo sigue mandando la OP (`OrdenLinea`).
+> Anulable y **sin backfill** (REGLA 0-B): los ~4,987 migrados y todo lo capturado a mano **no nacieron de
+> un color**, y `NULL` es la respuesta correcta, no un hueco.
+>
+> ⚠️ **Una consecuencia que no estaba prevista aquí y sí hubo que resolver:** un color que ya bautizó
+> modelos **ya no se puede fusionar con otro**. Absorberlo dejaría a la llave sin poder reconocer ese
+> color en la siguiente OC, y estrenaría número para una prenda que ya lo tiene ⇒ la relación entra en
+> `REFERENCIAS_QUE_BLOQUEAN_FUSION`.
+
 📌 **Y esto no es sólo una etiqueta: hoy NO HAY LLAVE DE IDEMPOTENCIA.** Medido: el freno actual es un
 **efecto de borde** —la primera llamada deja el modelo en `origen:'produccion'`, así que la segunda entra
 por el `else` y hereda—. Con E3 el padre se queda en `desarrollo` **para siempre**, así que *cada* llamada
@@ -11769,5 +11786,55 @@ aprobó dos veces**: §Post-F9.135 p.4 (*«se debe de poder hacer, **pero advirt
 📌 **NO bloquea nada.** E3 entra sin esto; se construye después, en la **0.087**.
 
 - **Aplica en:** **0.087**. **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.175) — ⏳ PENDIENTE DE DANIEL: ¿el botón «Pasar a producción» se RETIRA? (planteada el 1-sep-2026 por E3)
+
+### El residuo, medido — no un riesgo teórico
+
+Desde la **0.078**, el camino normal de entrar a producción es **generar la OP**: nace un modelo de
+producción **por color** y el desarrollo **permanece**. El botón «Pasar a producción» del catálogo hace lo
+**contrario**: **transforma** el modelo de desarrollo en el de producción, con **UN solo número**, y **no
+hay vuelta atrás** — desde ahí sus OP salen todas por la rama `heredado`.
+
+`promoverAProduccionNucleo` rechaza **UN solo caso**: un desarrollo **con hijos**. ⇒
+
+```
+desarrollo SIN HIJOS todavía  →  se promueve sin una queja  →  sus 4 OC de 4 colores
+                                                                salen con UN número
+```
+
+🔴 **Tenga o no ficha de Desarrollo.** Es **el bug original de Daniel, al pie de la letra**, sólo que
+alcanzable por otra puerta y **sin vuelta atrás**.
+
+### Por qué NO se cerró con una guarda, aunque se probó
+
+Se construyó una segunda guarda —rechazar el que tuviera **ficha de Desarrollo**— y **se retiró**: rompía
+un camino existente y probado (`crearDesarrolloConModeloNuevo` → promover, cubierto por
+`nomenclatura.int.test.ts`). ⇒ **no era una valla contra un descuido: era retirar una capacidad.** Y una
+capacidad no se retira desde el código.
+
+### Las dos salidas
+
+| | Qué pasa | A favor |
+|---|---|---|
+| **(a) Se RETIRA el botón** | asignar el nº de producción a mano deja de existir | Desde **V1-E8j** *«todo modelo nace en desarrollo»* y desde la **0.078** el nº se lo da su OP ⇒ **ya no hay razón para asignarlo a mano** |
+| **(b) Se QUEDA como está** | sigue disponible, con su aviso | Puede haber un caso de captura que no pasa por OP y que el sistema no conoce |
+
+⭐ **DEFAULT PROPUESTO: (b), se queda** — pero **sólo porque retirar una capacidad sin que el dueño lo pida
+es exactamente lo que E3 se negó a hacer**, no porque el residuo sea aceptable. Mientras tanto queda con
+**su única guarda, la prueba `RESIDUO MEDIDO` y el aviso ámbar antes del clic**.
+
+⚠️ **Lo que hay entre el usuario y el bug es UNA sola cosa: el aviso.** Si alguien reordena ese diálogo y
+se lleva el aviso por delante, el clic vuelve a ser silencioso. Por eso el aviso quedó **con tres
+aserciones propias** (que dice *un número a todo el modelo* · que el camino bueno es **la OP** · que *no
+hay vuelta atrás*), y reponer la guarda retirada **pone roja** la prueba del residuo — de modo que
+reponerla sea **un acto visible y deliberado, no un silencio**.
+
+📌 **NO bloquea nada.** El sistema opera igual con cualquiera de las dos respuestas.
+
+- **Aplica en:** el catálogo de modelos (`pasarModeloAProduccion` + `DialogoPasarAProduccion`).
+  **Fecha:** 2026-09-01.
 
 ---
