@@ -71,6 +71,52 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.074 · 1-sep-2026 · **en prueba** — Cuando un color se fusionó, **la orden ya te lo dice antes de confirmar**
+
+### Qué se puede hacer ahora que antes no
+
+**Ver a dónde se fue un color** que juntaste con otro. En el catálogo, el color absorbido ya no aparece
+como un inactivo cualquiera: dice **«fusionado en Blanco Óptico»**, con el nombre del que se quedó.
+
+Y lo que más importa: **al importar la OC de un cliente, la vista previa te avisa del desvío antes de que
+confirmes.** Si el papel dice «Blanco» y ese color se fusionó, la previa lo marca y te dice en qué color va
+a nacer realmente la orden.
+
+### 🔴 Por qué esto valía una versión: el precio
+
+Hasta hoy, ese desvío pasaba **en silencio**. La orden nacía en otro color y **nadie se enteraba** — el
+único rastro quedaba en la bitácora, que nadie mira.
+
+Y no es cosmético: **el precio de la tela se busca por el NOMBRE del color.** Si la orden nace en un color
+distinto del que dice el papel, el precio puede salir de **otro renglón, con otro importe**. El síntoma que
+verías: *un precosto que no cuadra con la OC que tienes en la mano, y nada en pantalla que lo explique.*
+
+### Qué cambió y puede sorprender
+
+- **El color apagado a mano NO lleva ese aviso**, y es correcto: al confirmar se reactiva **el mismo**
+  color, con el mismo nombre y el mismo precio. **No hay desvío que avisar.** El aviso es sólo para la
+  fusión, que sí te cambia de color.
+- **El color fusionado sale con dos marcas** (inactivo + fusionado en), y sólo se ve activando «incluir
+  inactivos» en el catálogo.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **El arreglo obvio habría mentido con confianza.** Si sólo se hubiera mirado «¿a dónde apunta este
+  color?» una sola vez, en una cadena de tres fusiones seguidas la previa te habría dicho **el color de en
+  medio** — no el que la orden va a usar de verdad. **Y eso es peor que no avisar nada**: te daría un dato
+  falso con toda seguridad.
+- **Un caso raro que sí puede pasar**: si dos colores se fusionaron **en círculo**, la vista previa ahora
+  falla con un error que **nombra el color** y dice cómo romper el círculo — en vez de enseñarte un color
+  equivocado.
+
+### Qué sigue pendiente o roto
+
+- **Un renglón sin color** (cuando el papel no trae color) sigue sin pasar por este aviso. Es un caso muy
+  estrecho y queda anotado; taparlo obliga a decidir antes qué debe enseñar la pantalla ahí.
+- El despliegue **no necesita nada especial**: sin cambios de permisos ni de datos.
+
+---
+
 ## 0.073 · 1-sep-2026 · **en prueba** — Ahora sí dice **quién** hizo cada cosa, en vez de un número raro
 
 ### Qué se puede hacer ahora que antes no
