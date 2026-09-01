@@ -1312,6 +1312,77 @@ con 40 absorbidos (por nivel, **nunca por fila**), **0** con texto vacío.
 crear— y en un sistema donde nada se borra, un borrado físico debe ser **ruidoso**. Si algún día hiciera
 falta borrar clientes, lo correcto sería **`NoAction`** (Postgres difiere la comprobación al final de la
 sentencia), **nunca `SetNull`**.
+## V1-E9f · ⭐ EL COLOR FUSIONADO SE VE, Y AVISA ANTES DE CONFIRMAR (1-sep-2026, versión **0.074**) — ✅ HECHA
+
+**La pieza que podía mandar un precio equivocado al cliente, y que el plan no tenía.**
+
+### El defecto, y por qué llegaba hasta el precio
+
+`catalogoColoresPorNombre` no filtraba por `activo` ni miraba el rastro de fusión ⇒ un color **absorbido**
+contaba como *«ya existe»*, la previa del PDF **ni advertía ni marcaba**, y la OP **nacía en otro color, en
+silencio**. Y la cadena de precio **casa POR NOMBRE** (`costos/resolucion-precios.ts:170-172`) ⇒ podía caer
+en **otro `TelaColor` con otro precio**. Lo que veía Daniel: **un precosto que no cuadra con el papel del
+cliente, sin nada en pantalla que lo explique** — el único registro era la bitácora.
+
+### 🔴 El encargo del lead se quedaba corto, y el reviewer lo demostró mejor que nadie
+
+El encargo pedía **añadir `activo`/`idFusionadoEn` al `select`**. **No basta, por dos razones
+independientes:**
+
+1. **El nombre del canónico no puede salir de una consulta por nombre** — por definición se llama distinto
+   al color del papel: ése *es* el punto de una fusión.
+2. ⭐ **Un salto no es la cadena.** El reviewer sondeó `A→B→C→D`: el código entregado resuelve a **D**; una
+   lectura de `idFusionadoEn` a un salto habría dicho **«B»** — *la previa nombrando con confianza un color
+   que el confirm NO va a usar*. **Eso es PEOR que no avisar.**
+
+⇒ Se resolvió **llamando a `colorCanonico`, la misma función que usa el confirm**, en vez de re-deducir su
+regla de parada. Razón del coder, que vale como regla: ***«un segundo recorrido “equivalente” es exactamente
+como nacen las ramas gemelas»***. Verificado: **dos** call sites contra **una** implementación.
+
+### El rastro, en los SEIS productores — y por qué no es celo
+
+`INCLUIR_FUSIONADO_EN` se aplicó a los **seis** productores de color, no sólo a las lecturas: *«si un
+productor no lo trajera habría que rellenarlo con `null` en la ruta, y ese `null` sería mentira justo en el
+caso que la etapa vino a hacer visible»*. ⭐ **Y el tipo lo hace cumplir:** quitar el `include` de
+`listarColores` **muere en `tsc`** con *«Property 'fusionadoEn' is missing»*. Un productor nuevo lo
+descubre **al compilar, no en producción**.
+
+### 🔴 La rama gemela: inactivo ≠ fusionado
+
+Un color puede estar **apagado a mano sin haberse fusionado**. Cubiertos **los dos**, en las tres capas, y
+ninguno tapa al otro — en pantalla **conviven**: el fusionado lleva **dos** marcas, el apagado una.
+
+**Y no avisar del inactivo puro es correcto, comprobado en el código:** `colorCanonico` para sin rastro ⇒
+mismo id; el confirm lo **reactiva y devuelve ese mismo id** ⇒ **misma clave de precio**. No hay desvío que
+avisar.
+
+### Lo que el encargo tampoco decía
+
+- **El desempate de mayúsculas pasó a ser carga de la previa.** `resolverOCrearColor` elige con
+  `orderBy: {id:'asc'}` entre variantes («Blanco»/«BLANCO»), y **desde V1-E8s esa elección decide entre
+  redirigir y reusar**. A la consulta vieja le daba igual —sólo preguntaba «¿existe?»—; **a la nueva no**.
+- **`aColorSalida` no tenía NINGUNA prueba**: no existía test de ruta para `/api/colores`, y por eso la
+  mutación de la ruta sobrevivía los ocho gates. Nació `colores.int.test.ts`.
+
+### Decisiones de diseño, con su razón
+
+- **Un anillo de fusiones tumba la previa entera** con `ErrorConflicto`, **a propósito**: el confirm truena
+  igual con ese papel, el error nombra el color y dice cómo romperlo, y **preserva la invariante de la
+  etapa — previa y confirm nunca dicen cosas distintas**. Verificado que **termina** (corta a 20 saltos) y
+  que el dominio **no puede fabricar un anillo**: la fusión limpia el rastro del destino.
+- **La previa hace N+1 consultas cortas** (una por nombre distinto + saltos). Deliberado: **compartir
+  `colorCanonico` con el confirm vale más** que ahorrar consultas en una pantalla que trae un puñado de PDFs.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,362** · frontend `typecheck` (`tsc -b`)/`lint`/
+`format:check` · **1,867**. Contrato regenerado, **cero drift** (verificado determinista). **Sin migración ·
+sin permisos · sin seed** ⇒ **no requiere `SEED_ON_START`**.
+
+**Mutaciones: 15 del coder + 11 del reviewer.** Dos declaradas supervivientes de las unitarias —la ruta con
+`fusionadoEn: null` y la previa que no empuja el aviso— **y el reviewer verificó línea por línea que sus
+pruebas de integración las matan**: no quedan cableados sueltos. ⚠️ **La trampa del fixture NO mordió**: las
+pruebas del caso grave **fusionan de verdad**, no simulan con `activo: false`.
 
 ---
 

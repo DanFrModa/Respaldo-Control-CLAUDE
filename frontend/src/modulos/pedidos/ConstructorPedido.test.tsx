@@ -86,6 +86,7 @@ const RENGLON: AnalizarPdf['renglones'][number] = {
   codigoModeloSugerido: null,
   descripcionModeloSugerido: null,
   colorNuevo: true,
+  colorFusionadoEn: null,
   tallasNuevas: [],
   advertencias: [],
   yaImportado: null,
