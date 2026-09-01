@@ -71,6 +71,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.075 · 1-sep-2026 · **en prueba** — Al juntar dos departamentos repetidos, **la búsqueda entiende los dos nombres**
+
+> 📌 Entra **después** de la 0.074 (el color fusionado). Es la que pediste el 31-ago: *«está bien la 3»*.
+
+### Qué se puede hacer ahora que antes no
+
+**Buscar una orden por el nombre nuevo del departamento, aunque la orden diga el viejo.** Si juntaste
+«2-HOMBRE» dentro de «Caballeros», buscar «Caballeros» ahora **también encuentra** las órdenes que dicen
+«2-HOMBRE». Y al revés: si tienes el papel viejo en la mano y buscas por el nombre viejo, **también las
+encuentra**.
+
+⭐ **Y tu papel no se toca.** El texto que venía en la OC del cliente **se queda exactamente como lo
+mandó**. El sistema entiende los dos nombres **porque sabe que uno se fusionó en el otro**, no porque le
+haya cambiado el documento. Era la razón de elegir este camino: reescribirlo habría roto la única prueba
+de qué pediste.
+
+### Qué cambió y puede sorprender
+
+- **Buscar un departamento fusionado ahora trae MÁS órdenes que antes.** Es lo que se quería, pero conviene
+  saberlo: aparecen también las que se capturaron con el nombre viejo.
+- **Funciona en cadena.** Si «A» se fue a «B» y «B» se fue a «C», buscar cualquiera de los tres encuentra
+  las órdenes de los tres. Y **no se aplana**: sigue constando que a «A» se lo llevó «B», no «C».
+- **Las fusiones que hiciste ANTES de esta versión no dejaron rastro** y se quedan así, a propósito. Para
+  ésas la búsqueda se comporta como hasta ahora. De aquí en adelante, todas lo dejan.
+
+### Qué se evitó, y conviene saberlo
+
+- 🔴 **La mitad que se olvida es la de vuelta.** Cubrir sólo un sentido —buscar el nombre nuevo y encontrar
+  el viejo— habría pasado todas las pruebas en verde y fallado **justo en el caso que originó tu decisión**:
+  quien tiene el papel viejo busca por el nombre viejo.
+- 🔴 **Una red interna se había aflojado.** El sistema tiene una prueba que impide olvidarse de algo al
+  fusionar. Al añadir el dato nuevo se puso roja, y la primera versión la calmó **de una forma que la
+  desactivaba**: quedó comprobado que se podía **dejar de mover a las compradoras** —que quedarían colgando
+  de un departamento borrado— **sin que nada se pusiera rojo**. Corregido.
+
+### Qué sigue pendiente o roto
+
+- **Nada de esta pieza.** Sin cambios de permisos ni de pantallas: el despliegue no necesita nada especial.
+
+---
+
 ## 0.073 · 1-sep-2026 · **en prueba** — Ahora sí dice **quién** hizo cada cosa, en vez de un número raro
 
 ### Qué se puede hacer ahora que antes no
