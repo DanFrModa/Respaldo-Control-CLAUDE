@@ -24,7 +24,7 @@ import {
   esquemaColorEditar,
   esquemaColorFusionar,
 } from '../../contrato/index.js';
-import type { Color, Prisma } from '../../datos/index.js';
+import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -71,6 +71,20 @@ export const esquemaListarColores = esquemaPaginacion.extend({
 export type ParametrosListarColores = z.input<typeof esquemaListarColores>;
 
 /**
+ * ⭐ Lo que TODA salida de color arrastra además de sus columnas: **a dónde se fue si una fusión se
+ * lo llevó**, con el NOMBRE del canónico.
+ *
+ * Va en un `include` COMPARTIDO por todos los productores (crear, actualizar, obtener, listar,
+ * fusionar) y no sólo en las lecturas a propósito: el contrato declara el campo en UNA sola forma de
+ * salida, así que un productor que no lo trajera tendría que rellenarlo con `null` — y ese `null`
+ * sería MENTIRA justo en el caso que esta etapa vino a hacer visible.
+ */
+const INCLUIR_FUSIONADO_EN = { fusionadoEn: { select: { id: true, nombre: true } } } as const;
+
+/** Un color con el rastro de la fusión que se lo llevó (null si no se lo llevó nadie). */
+export type ColorConFusion = Prisma.ColorGetPayload<{ include: typeof INCLUIR_FUSIONADO_EN }>;
+
+/**
  * Normalización LIGERA del nombre de color (F1-E1): recorta extremos y colapsa
  * cualquier secuencia de espacios internos a uno solo. NO toca mayúsculas/acentos ni
  * fusiona variantes (eso es F1-E6). El Zod compartido ya recortó; esto añade el
@@ -106,8 +120,8 @@ async function exigirNombreLibre(tx: Tx, nombre: string, idActual?: number): Pro
 }
 
 /** Busca un color por id o lanza `ErrorNoEncontrado`. */
-async function exigirColor(tx: Tx, id: number): Promise<Color> {
-  const color = await tx.color.findUnique({ where: { id } });
+async function exigirColor(tx: Tx, id: number): Promise<ColorConFusion> {
+  const color = await tx.color.findUnique({ where: { id }, include: INCLUIR_FUSIONADO_EN });
   if (color === null) {
     throw new ErrorNoEncontrado('Color', id);
   }
@@ -123,7 +137,7 @@ export async function crearColor(
   sesion: SesionUsuario,
   entrada: EntradaCrearColor,
   bd?: ContextoBd,
-): Promise<Color> {
+): Promise<ColorConFusion> {
   verificarPermiso(sesion, 'colores.administrar');
   const datos = validarEntrada(esquemaColorCrear, entrada);
   const nombre = normalizarNombreColor(datos.nombre);
@@ -132,7 +146,10 @@ export async function crearColor(
     return await enTransaccion(async (tx) => {
       await exigirNombreLibre(tx, nombre);
 
-      const color = await tx.color.create({ data: { nombre, ...datosCreacion(sesion) } });
+      const color = await tx.color.create({
+        data: { nombre, ...datosCreacion(sesion) },
+        include: INCLUIR_FUSIONADO_EN,
+      });
 
       await registrarBitacora(tx, sesion, {
         entidad: 'Color',
@@ -160,7 +177,7 @@ export async function actualizarColor(
   sesion: SesionUsuario,
   entrada: EntradaActualizarColor,
   bd?: ContextoBd,
-): Promise<Color> {
+): Promise<ColorConFusion> {
   verificarPermiso(sesion, 'colores.administrar');
   const datos = validarEntrada(esquemaColorEditar, entrada);
   const nombreNuevo = datos.nombre === undefined ? undefined : normalizarNombreColor(datos.nombre);
@@ -200,7 +217,11 @@ export async function actualizarColor(
         cambios.fusionadoEn = { disconnect: true };
       }
 
-      const color = await tx.color.update({ where: { id: datos.id }, data: cambios });
+      const color = await tx.color.update({
+        where: { id: datos.id },
+        data: cambios,
+        include: INCLUIR_FUSIONADO_EN,
+      });
 
       if (cambiaNombre || reactiva) {
         await registrarBitacora(tx, sesion, {
@@ -241,7 +262,7 @@ export async function desactivarColor(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<Color> {
+): Promise<ColorConFusion> {
   verificarPermiso(sesion, 'colores.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirColor(tx, id);
@@ -257,7 +278,7 @@ export async function reactivarColor(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<Color> {
+): Promise<ColorConFusion> {
   verificarPermiso(sesion, 'colores.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirColor(tx, id);
@@ -361,7 +382,7 @@ export async function fusionarColores(
   sesion: SesionUsuario,
   entrada: EntradaFusionarColores,
   bd?: ContextoBd,
-): Promise<Color> {
+): Promise<ColorConFusion> {
   verificarPermiso(sesion, 'colores.administrar');
   const datos = validarEntrada(esquemaColorFusionar, entrada);
 
@@ -421,6 +442,7 @@ export async function fusionarColores(
     const destinoActualizado = await tx.color.update({
       where: { id: datos.idDestino },
       data: { activo: true, fusionadoEn: { disconnect: true }, ...datosModificacion(sesion) },
+      include: INCLUIR_FUSIONADO_EN,
     });
 
     await registrarBitacora(tx, sesion, {
@@ -477,8 +499,15 @@ export interface ColorCanonico {
  *
  * Es un ayudante INTERNO de la misma transacción (no verifica permiso): quien lo llama ya pasó su
  * propio gate — `fusionarColores` por `colores.administrar`, el importador por `ordenes.administrar`.
+ *
+ * Pide `Pick<Tx, 'color'>` y no el `Tx` entero porque es lo ÚNICO que toca: así lo puede llamar
+ * también una LECTURA suelta (la vista previa del importador, que no abre transacción) y se puede
+ * probar contra un catálogo falso en memoria, sin Postgres.
  */
-export async function colorCanonico(tx: Tx, idColor: number): Promise<ColorCanonico> {
+export async function colorCanonico(
+  tx: Pick<Tx, 'color'>,
+  idColor: number,
+): Promise<ColorCanonico> {
   const seleccion = { id: true, nombre: true, activo: true, idFusionadoEn: true } as const;
   const primero = await tx.color.findUnique({ where: { id: idColor }, select: seleccion });
   if (primero === null) {
@@ -512,9 +541,12 @@ export async function obtenerColor(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<Color> {
+): Promise<ColorConFusion> {
   verificarPermiso(sesion, 'colores.ver');
-  const color = await clienteLectura(bd).color.findUnique({ where: { id } });
+  const color = await clienteLectura(bd).color.findUnique({
+    where: { id },
+    include: INCLUIR_FUSIONADO_EN,
+  });
   if (color === null) {
     throw new ErrorNoEncontrado('Color', id);
   }
@@ -529,7 +561,7 @@ export async function listarColores(
   sesion: SesionUsuario,
   parametros: ParametrosListarColores = {},
   bd?: ContextoBd,
-): Promise<Pagina<Color>> {
+): Promise<Pagina<ColorConFusion>> {
   verificarPermiso(sesion, 'colores.ver');
   const filtros = validarEntrada(esquemaListarColores, parametros);
 
@@ -545,6 +577,7 @@ export async function listarColores(
     cliente.color.count({ where }),
     cliente.color.findMany({
       where,
+      include: INCLUIR_FUSIONADO_EN,
       orderBy: { [filtros.ordenarPor]: filtros.direccion },
       ...rangoPrisma(filtros),
     }),
