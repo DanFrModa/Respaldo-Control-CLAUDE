@@ -148,6 +148,7 @@ const RENGLON: AnalizarPdf['renglones'][number] = {
   codigoModeloSugerido: 'DEV-1',
   descripcionModeloSugerido: 'Playera',
   colorNuevo: true,
+  colorFusionadoEn: null,
   tallasNuevas: ['5-6'],
   advertencias: [],
   yaImportado: null,
@@ -471,6 +472,58 @@ describe('ImportadorPedidoPdf — OC ya importada (V1-E4)', () => {
     await irAVistaPrevia();
 
     expect(screen.queryByText(/ya importada · OP/i)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 🔴🔴 El color del papel lo absorbió una FUSIÓN: la OP va a nacer en OTRO color, con OTRO nombre —
+ * y la cadena de precio casa POR NOMBRE, así que el precosto puede salir de otro renglón. Antes la
+ * previa no lo marcaba ni lo advertía y el desvío sólo constaba en la bitácora, DESPUÉS de
+ * confirmar: lo que se veía era un precio que no cuadraba con el papel del cliente, sin explicación.
+ */
+describe('ImportadorPedidoPdf — color desviado por una fusión', () => {
+  beforeEach(() => {
+    analizarMock.mockReset();
+    confirmarMock.mockReset();
+    toastErrorMock.mockReset();
+    plantillaMock.mockReset();
+    plantillaMock.mockReturnValue({ data: undefined, isFetching: false });
+  });
+
+  it('marca junto al color a dónde va a ir de verdad, y pinta el aviso', async () => {
+    await irAVistaPrevia({
+      ...PREVIEW,
+      renglones: [
+        {
+          ...RENGLON,
+          colorNuevo: false,
+          colorFusionadoEn: 'Blanco Optico',
+          advertencias: [
+            {
+              tipo: 'color-fusionado' as const,
+              mensaje:
+                'El color "BLANCO" del papel lo absorbió una fusión: la OP va a nacer en "Blanco Optico".',
+            },
+          ],
+        },
+      ],
+    });
+
+    // La marca va PEGADA al color, que es la línea que deja de ser cierta.
+    expect(await screen.findByTestId('importador-pdf-color-fusionado-0')).toHaveTextContent(
+      'Blanco Optico',
+    );
+    const avisos = screen.getByTestId('importador-pdf-advertencias');
+    expect(avisos).toHaveTextContent(/absorbió una fusión/i);
+  });
+
+  it('⚠️ sin desvío NO aparece la marca (el color del papel es el que queda)', async () => {
+    // `RENGLON` trae `colorFusionadoEn: null` — el caso normal. Si la marca se pintara por
+    // costumbre (o atada a `colorNuevo`, que aquí sí es true), esta prueba se cae.
+    await irAVistaPrevia();
+
+    expect(screen.queryByTestId('importador-pdf-color-fusionado-0')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Blanco Optico/)).not.toBeInTheDocument();
   });
 });
 

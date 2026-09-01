@@ -59,6 +59,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { colorCanonico, normalizarNombreColor } from '../catalogos/colores.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
+import { claveColor, marcarColorDelPapel, resolverColoresDelPapel } from './color-del-papel.js';
 import { fusionarPacksEnUnaCorrida } from './fusion-packs-cya.js';
 import { guardarPlantilla, leerCamposVariablesJson } from './importacion.js';
 import {
@@ -547,9 +548,21 @@ async function leerConfigPlantillaPdf(
 // ── Operación: analizar / vista previa ───────────────────────────────────────
 
 /**
- * Analiza los PDFs del cliente y arma la VISTA PREVIA (un renglón por PDF): campos parseados, liga de
- * modelo SUGERIDA (aprendida), qué color/tallas NO existen aún (se crearán) y las advertencias de
- * cuadre. Sólo LEE. Requiere `pedidos.administrar`; los importes van gated por `pedidos.importes`.
+ * Analiza los PDFs del cliente y arma la VISTA PREVIA (un renglón por PDF). Sólo LEE. Requiere
+ * `pedidos.administrar`; los importes van gated por `pedidos.importes`.
+ *
+ * Cada renglón lleva: los campos parseados del papel; la liga de modelo SUGERIDA (aprendida, y sólo
+ * si el modelo sigue activo); la propuesta de SOBRE-PEDIDO por packs con el % adicional; si esa OC
+ * del cliente YA parió su OP (V1-E4, que además no se re-importa); y **qué le va a pasar al color y
+ * a las tallas del papel al confirmar**.
+ *
+ * 🔴 Lo del color es más que "existe / no existe". Son TRES respuestas distintas y la previa las
+ * distingue (`color-del-papel.ts`), porque confundir dos cualesquiera miente:
+ *   • no existe            → `colorNuevo`: se va a crear con el nombre del papel;
+ *   • existe               → nada que decir (aunque esté apagado a mano: se reactiva y ahí se queda);
+ *   • lo absorbió una FUSIÓN → `colorFusionadoEn` + advertencia `color-fusionado`: la OP nace en
+ *     OTRO color, con OTRO nombre — y como el precio casa POR NOMBRE, el precosto puede no cuadrar
+ *     con el papel del cliente. Antes esto sólo constaba en la bitácora, DESPUÉS de confirmar.
  */
 export async function analizarImportacionPdf(
   sesion: SesionUsuario,
@@ -575,7 +588,10 @@ export async function analizarImportacionPdf(
     if (p.parseado.colorGenerico !== '') nombresColor.add(p.parseado.colorGenerico);
     for (const t of p.parseado.tallas) etiquetasTalla.add(t.talla);
   }
-  const coloresExistentes = await catalogoColoresPorNombre(cliente, [...nombresColor]);
+  // ⭐ No basta con saber si el color EXISTE: hay que saber si una fusión lo va a DESVIAR a otro
+  // color (y a otro precio) al confirmar. Lo resuelve `color-del-papel.ts` con la misma caminata
+  // que usa el confirm.
+  const coloresDelPapel = await resolverColoresDelPapel(cliente, [...nombresColor]);
   const tallasExistentes = await catalogoTallasPorEtiqueta(cliente, [...etiquetasTalla]);
 
   // Defensa V1-E4 (punto 1): ¿alguno de estos papeles YA parió su OP? Se resuelve ANTES de armar
@@ -617,9 +633,16 @@ export async function analizarImportacionPdf(
     if (duplicado !== null) {
       advertencias.push({ tipo: 'duplicado', mensaje: mensajeDuplicado(duplicado, r.numeroOrden) });
     }
-    const colorNuevo =
-      r.colorGenerico !== '' &&
-      !coloresExistentes.has(normalizarNombreColor(r.colorGenerico).toLowerCase());
+    // 🔴 El desvío por fusión se DICE aquí, en la previa, y no sólo en la bitácora de después de
+    // confirmar: cambia el nombre del color de la OP y con él el precio que se le casa (casa por
+    // NOMBRE). Marca, campo y aviso los decide `marcarColorDelPapel`, en un solo sitio.
+    const marcaColor = marcarColorDelPapel(
+      r.colorGenerico,
+      coloresDelPapel.get(claveColor(r.colorGenerico)),
+    );
+    if (marcaColor.advertencia !== null) {
+      advertencias.push(marcaColor.advertencia);
+    }
     const tallasNuevas = r.tallas
       .map((t) => t.talla)
       .filter((etq) => !tallasExistentes.has(etq.trim().toLowerCase()));
@@ -657,7 +680,8 @@ export async function analizarImportacionPdf(
       idModeloSugerido: sugerida?.idModelo ?? null,
       codigoModeloSugerido: sugerida?.codigo ?? null,
       descripcionModeloSugerido: sugerida?.descripcion ?? null,
-      colorNuevo,
+      colorNuevo: marcaColor.colorNuevo,
+      colorFusionadoEn: marcaColor.colorFusionadoEn,
       tallasNuevas: [...new Set(tallasNuevas)],
       advertencias,
       yaImportado:
@@ -713,23 +737,11 @@ function renglonError(nombreArchivo: string, error: string): RenglonPdfPreview {
     codigoModeloSugerido: null,
     descripcionModeloSugerido: null,
     colorNuevo: false,
+    colorFusionadoEn: null,
     tallasNuevas: [],
     advertencias: [{ tipo: 'parseo', mensaje: error }],
     yaImportado: null,
   };
-}
-
-/** Set de nombres de color existentes (normalizados) del subconjunto dado. */
-async function catalogoColoresPorNombre(
-  bd: ReturnType<typeof clienteLectura>,
-  nombres: string[],
-): Promise<Set<string>> {
-  if (nombres.length === 0) return new Set();
-  const colores = await bd.color.findMany({
-    where: { nombre: { in: nombres.map((n) => normalizarNombreColor(n)), mode: 'insensitive' } },
-    select: { nombre: true },
-  });
-  return new Set(colores.map((c) => normalizarNombreColor(c.nombre).toLowerCase()));
 }
 
 /** Set de etiquetas de talla existentes (minúsculas) del subconjunto dado. */

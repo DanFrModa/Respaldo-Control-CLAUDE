@@ -17,7 +17,6 @@ import {
   esquemaColorSalida,
   esquemaErrorApi,
 } from '../../contrato/index.js';
-import type { Color } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
@@ -27,14 +26,24 @@ import {
   fusionarColores,
   listarColores,
   obtenerColor,
+  type ColorConFusion,
 } from '../../dominio/catalogos/colores.js';
 
-/** Proyecta el modelo Prisma `Color` a la forma JSON del contrato (fechas ISO). */
-function aColorSalida(color: Color): z.infer<typeof esquemaColorSalida> {
+/**
+ * Proyecta el modelo Prisma `Color` a la forma JSON del contrato (fechas ISO).
+ *
+ * ⭐ Incluye `fusionadoEn`: **a dónde se fue el color si una fusión se lo llevó**. El rastro ya vivía
+ * en la base (`Color.idFusionadoEn`), pero esta proyección lo dejaba fuera — así que la pantalla de
+ * Colores pintaba un color ABSORBIDO igual que uno que su dueño apagó a mano, y no había forma de
+ * contestar "¿y «Blanco» a dónde se fue?" sin abrir la bitácora. El tipo lo trae el dominio (que lo
+ * pide con `include` en TODOS sus productores), no se rellena con `null` aquí.
+ */
+function aColorSalida(color: ColorConFusion): z.infer<typeof esquemaColorSalida> {
   return {
     id: color.id,
     nombre: color.nombre,
     activo: color.activo,
+    fusionadoEn: color.fusionadoEn,
     creadoEn: color.creadoEn.toISOString(),
     creadoPorId: color.creadoPorId,
     modificadoEn: color.modificadoEn.toISOString(),

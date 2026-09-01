@@ -31,12 +31,18 @@ vi.mock('@/api/colores', () => ({
   useFusionarColores: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
-/** Color de ejemplo. */
-function color(id: number, nombre: string, activo = true): Color {
+/** Color de ejemplo. `fusionadoEn` = el canónico que se lo llevó (null = no se lo llevó nadie). */
+function color(
+  id: number,
+  nombre: string,
+  activo = true,
+  fusionadoEn: Color['fusionadoEn'] = null,
+): Color {
   return {
     id,
     nombre,
     activo,
+    fusionadoEn,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
     modificadoEn: '2026-01-01T00:00:00.000Z',
@@ -79,6 +85,33 @@ describe('<ColoresPagina>', () => {
     expect(screen.getAllByTestId('fila-color')).toHaveLength(2);
     expect(screen.getByText('Rojo')).toBeInTheDocument();
     expect(screen.getByText('Azul')).toBeInTheDocument();
+  });
+
+  it('⭐ dice A DÓNDE SE FUE un color que una fusión se llevó (con el nombre del canónico)', () => {
+    // Antes esto no se veía en NINGUNA pantalla: el rastro vivía en la base y en la bitácora, y la
+    // tabla pintaba el color absorbido como un inactivo cualquiera. Quien buscaba "Blanco" y lo
+    // encontraba apagado no tenía forma de saber que ahora se llama "Blanco Óptico".
+    useColores.mockReturnValue(
+      consultaConDatos([color(1, 'Blanco', false, { id: 2, nombre: 'Blanco Óptico' })]),
+    );
+    renderConProveedores(<ColoresPagina />, {
+      sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
+    });
+
+    expect(screen.getByTestId('color-fusionado-1')).toHaveTextContent('fusionado en Blanco Óptico');
+  });
+
+  it('⚠️ la RAMA GEMELA: un color apagado A MANO no dice que lo fusionaron', () => {
+    // Mismo chip gris "Inactivo" que el de arriba, pero a éste NO se lo llevó nadie: su dueño lo
+    // apagó. Sin esta prueba, marcar "todo inactivo" como fusionado pasaría desapercibido.
+    useColores.mockReturnValue(consultaConDatos([color(1, 'Blanco', false)]));
+    renderConProveedores(<ColoresPagina />, {
+      sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
+    });
+
+    expect(screen.getByText('Blanco')).toBeInTheDocument();
+    expect(screen.queryByTestId('color-fusionado-1')).not.toBeInTheDocument();
+    expect(screen.queryByText(/fusionado en/)).not.toBeInTheDocument();
   });
 
   it('muestra el estado vacio cuando no hay resultados', () => {

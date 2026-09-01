@@ -958,6 +958,15 @@ function FilaPdf({
           <span className="text-muted-foreground">
             Color <b>{tituloColor(r.colorGenerico)}</b>
             {r.colorNuevo ? <span className="text-warn"> (nuevo)</span> : null}
+            {/* 🔴 El color del papel lo absorbió una FUSIÓN: la OP va a nacer en OTRO color. Se
+                marca aquí, junto al nombre, además del aviso de abajo — porque lo que cambia es
+                justo lo que esta línea afirma, y con ello el precio (casa por NOMBRE de color). */}
+            {r.colorFusionadoEn !== null ? (
+              <span className="text-warn" data-testid={`importador-pdf-color-fusionado-${indice}`}>
+                {' '}
+                → <b>{tituloColor(r.colorFusionadoEn)}</b>
+              </span>
+            ) : null}
           </span>
         ) : null}
         {r.tallasNuevas.length > 0 ? (
