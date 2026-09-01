@@ -83,12 +83,19 @@ function arte(over: Partial<Arte> = {}): Arte {
 /** El arte que YA tiene el modelo (para el aviso de descripción repetida). */
 let artesDelModelo: Arte[] = [];
 
+/** V1-E9b: con qué `idModelo` se piden y se suben las FOTOS del arte (ver la prueba del final). */
+const fotosArteArgs = vi.fn();
+const subirFotoMutate = vi.fn();
+
 vi.mock('@/api/artes', () => ({
   useCrearArte: () => ({ mutate: crearMutate, isPending: false }),
   useActualizarArte: () => ({ mutate: vi.fn(), isPending: false }),
   useArtesModelo: () => ({ data: { datos: artesDelModelo }, isPending: false, isError: false }),
-  useFotosArte: () => ({ data: { datos: [] }, isPending: false, isError: false }),
-  useSubirFotoArte: () => ({ mutate: vi.fn(), isPending: false }),
+  useFotosArte: (idModelo: number | undefined, idArte: number | undefined) => {
+    fotosArteArgs(idModelo, idArte);
+    return { data: { datos: [] }, isPending: false, isError: false };
+  },
+  useSubirFotoArte: () => ({ mutate: subirFotoMutate, isPending: false }),
   useQuitarFotoArte: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -118,6 +125,8 @@ function pintar(conArte?: Arte): void {
 describe('<DialogoArte> — la captura del arte (V1-E3f)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
+    fotosArteArgs.mockReset();
+    subirFotoMutate.mockReset();
     artesDelModelo = [];
   });
 
@@ -245,5 +254,36 @@ describe('<DialogoArte> — la captura del arte (V1-E3f)', () => {
     pintar(elEditado);
 
     expect(screen.queryByTestId('arte-descripcion-repetida')).not.toBeInTheDocument();
+  });
+
+  // ── ⭐⭐ V1-E9b pieza B — LAS FOTOS VAN AL MODELO DE **LA PANTALLA** ──────────────────────────
+  //
+  // 🔴 `FotosArte` llamaba a subir/quitar/listar con `arte.idModelo`. En la ficha de un modelo HIJO
+  // del linaje 1:N el arte viene INJERTADO del desarrollo, así que ese campo es el **padre**:
+  // los endpoints habrían recibido el id del padre, `exigirRecetaPropia` NO habría disparado (el
+  // padre sí es dueño de su receta) y se habría escrito la receta del desarrollo desde la pantalla
+  // de un solo color. El bloqueo del servidor está bien; lo que fallaba era el id que le llegaba.
+  //
+  // Por eso el fixture pone A PROPÓSITO los dos ids distintos: el renglón dice 99 (el padre) y la
+  // pantalla es el 3. Si alguien vuelve a `arte.idModelo`, estas dos aserciones se ponen rojas.
+  describe('las fotos usan el idModelo de la PANTALLA, no el del renglón de arte', () => {
+    const arteInjertado = (): Arte => arte({ id: 77, idModelo: 99 });
+
+    it('las LISTA con el modelo de la pantalla', () => {
+      pintar(arteInjertado());
+      expect(fotosArteArgs).toHaveBeenCalledWith(3, 77);
+      expect(fotosArteArgs).not.toHaveBeenCalledWith(99, 77);
+    });
+
+    it('🔴 y las SUBE con el modelo de la pantalla (la que de verdad escribe)', async () => {
+      const usuario = userEvent.setup();
+      pintar(arteInjertado());
+      await usuario.upload(
+        screen.getByTestId('archivo-foto-arte'),
+        new File(['x'], 'logo.png', { type: 'image/png' }),
+      );
+      expect(subirFotoMutate).toHaveBeenCalledTimes(1);
+      expect(subirFotoMutate.mock.calls[0]?.[0]).toMatchObject({ idModelo: 3, idArte: 77 });
+    });
   });
 });

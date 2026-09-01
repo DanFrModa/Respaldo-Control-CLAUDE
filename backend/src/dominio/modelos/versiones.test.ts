@@ -108,6 +108,11 @@ function padreFalso(extra: Record<string, unknown> = {}): Record<string, unknown
     codigoDesarrollo: 'CYA-26-71-001',
     versionDesarrollo: null,
     activo: true,
+    // ⭐ V1-E9b pieza B — el linaje 1:N tiene que venir EXPLÍCITO, aunque sea `null`. La guarda
+    // `exigirRecetaPropia`/`padre.idModeloDesarrollo !== null` falla CERRADA a propósito: lo que no
+    // se sabe, no abre. Un fake al que le falte la columna se comporta como un hijo — y eso es lo
+    // correcto, porque en producción esa columna SIEMPRE viene.
+    idModeloDesarrollo: null,
     descripcion: 'Sudadera con cierre',
     composicion: '80% algodón',
     maquilaBase: 35,
@@ -455,6 +460,25 @@ describe('mintearVersionDeModelo — la receta se COPIA, no se referencia', () =
 });
 
 describe('mintearVersionDeModelo — lo que rechaza', () => {
+  it('⭐⭐ V1-E9b — rechaza un HIJO del linaje 1:N, con SU PROPIO mensaje', async () => {
+    // Hasta la pieza B esto lo cerraba de refilón la guarda de `codigoDesarrollo === null` (un hijo
+    // nace sin nº de desarrollo). Dos invariantes en el mismo `if`: el día que Daniel decida
+    // versionar modelos de producción, esa guarda se afloja por una razón que no tiene nada que ver
+    // con el 1:N y la versión de un hijo nacería con una receta que no es la suya.
+    //
+    // 🔑 Por eso el padre de esta prueba SÍ tiene `codigoDesarrollo`: si el rechazo viniera de la
+    // guarda vieja, aquí no habría rechazo ninguno y la prueba se pondría roja.
+    const { tx, llamadas } = txRegistrador({ padre: padreFalso({ idModeloDesarrollo: 3 }) });
+
+    const error = await mintearVersionDeModelo(tx, SESION, 7).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as Error).message).toMatch(/COMPARTE su receta/);
+    // Y NO es el mensaje de la otra guarda: son dos invariantes distintas, con dos salidas.
+    expect((error as Error).message).not.toMatch(/número de DESARROLLO/);
+    // No deja nada a medias: ni siquiera pide el lock.
+    expect(llamadas.map((l) => l.metodo)).toEqual(['modelo.findUnique']);
+  });
+
   it('⭐ rechaza un modelo SIN código de desarrollo (los migrados de producción)', async () => {
     const { tx, llamadas } = txRegistrador({ padre: padreFalso({ codigoDesarrollo: null }) });
 

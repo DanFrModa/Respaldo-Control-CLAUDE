@@ -382,7 +382,9 @@ export function DialogoArte({
             ) : (
               <Field>
                 <FieldLabel>Fotos</FieldLabel>
-                <FotosArte arte={arte} deshabilitado={guardando} />
+                {/* ⭐ V1-E9b: el `idModelo` es el de LA PANTALLA, no el del renglón de arte — en
+                    un modelo hijo del 1:N el renglón viene injertado del padre. Ver `FotosArte`. */}
+                <FotosArte arte={arte} idModelo={idModelo} deshabilitado={guardando} />
               </Field>
             )}
           </FieldGroup>

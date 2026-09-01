@@ -47,7 +47,7 @@ import { clienteLectura, enTransaccion } from '../../comun/transaccion.js';
 import { leerAviosBom, type ModeloAvioDetalle } from './bom-modelo.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { exigirModelo } from './modelos.js';
-import { resolverIdRecetaDeModelo } from './receta-compartida.js';
+import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
 
 /**
  * Cliente de LECTURA: la sugerencia es un GET y puede correr fuera de transacción, así que sus
@@ -210,6 +210,12 @@ export async function aceptarAviosFavoritos(
   verificarPermiso(sesion, 'modelos.administrar');
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐⭐ V1-E9b pieza B — ERA LA PEOR DE LAS TRECE PUERTAS, y la creó la pieza A: calculaba los
+    // faltantes contra la receta del PADRE (`idsAviosDelBom` resuelve), los creaba en el HIJO y
+    // devolvía la del padre —sin ellos—. O sea *«se agregaron 5»* y no aparecía ninguno; y al
+    // reintentar, la llave `(idModelo, idAvio)` del hijo daba un 409 falso y PERMANENTE. La receta
+    // del hijo es de solo lectura: aquí no se escribe nada.
+    await exigirRecetaPropia(tx, idModelo);
     const [filas, puestos] = await Promise.all([
       leerFavoritosDelCatalogo(tx),
       idsAviosDelBom(tx, idModelo),

@@ -42,6 +42,8 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 import { Prisma } from '../../datos/index.js';
 
+import { resolverIdRecetaDeModelo } from './receta-compartida.js';
+
 /** Los tres estados de la firma (espejo del enum `EstadoRevisionModelo` de Prisma). */
 export type EstadoRevision = 'pendiente' | 'aprobada' | 'rechazada';
 
@@ -628,6 +630,24 @@ export async function invalidarRevisionSiAprobada(
  * bitácora— y no la mitad de un `data` que arma otro. Pasa una vez cada tantas ediciones (sólo
  * cuando la versión estaba aprobada) y compra que la invalidación se pueda leer, probar y llamar
  * suelta sin depender de quién la envuelva.
+ *
+ * ⭐⭐ **V1-E9b pieza B — LA ÚNICA ESCRITURA DE LA RECETA COMPARTIDA QUE *SÍ* RESUELVE.** A las
+ * trece puertas que mueven la receta se les prohibió resolver: hacerlo reescribiría la receta del
+ * desarrollo y la de los hermanos desde el hijo de un solo color (`exigirRecetaPropia`,
+ * `receta-compartida.ts`). Ésta es la excepción, y la razón es que **no escribe la receta: escribe
+ * que la receta cambió**, y ese hecho es del modelo DUEÑO de la receta.
+ *
+ * 🔴 **Qué pasa si se sella en el hijo.** El único lector de la marca es
+ * `avisoDeCostoViejo` (`../desarrollo/costo-viejo.ts`), y llega por el PADRE: el renglón de la
+ * lista de precios cuelga de un `Desarrollo`, y `listas-precios.ts` lee
+ * `linea.desarrollo.modelo.recetaTocadaEn`. Con la marca en el hijo, el aviso *«la receta cambió
+ * después de congelarse el costo»* **nunca sale** y la cotización sigue con el precio viejo, **sin
+ * alarma** — que es exactamente el defecto silencioso que V1-E8d vino a matar.
+ *
+ * ⚠️ Y la INVALIDACIÓN de la firma viaja con ella, a propósito: la revisión aprueba **la receta**,
+ * así que si la receta cambia, la firma que cae es la de su dueño. Hoy resolver es la identidad en
+ * el 100 % de las llamadas (los escritores bloquean antes de llegar aquí), así que esto **no cambia
+ * ninguna conducta de hoy**: es la red para la puerta de mañana.
  */
 export async function tocarModeloPorCambioDeReceta(
   tx: Tx,
@@ -635,9 +655,10 @@ export async function tocarModeloPorCambioDeReceta(
   idModelo: number,
   cambio: CambioDeReceta,
 ): Promise<void> {
-  await invalidarRevisionSiAprobada(tx, sesion, idModelo, cambio);
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
+  await invalidarRevisionSiAprobada(tx, sesion, idReceta, cambio);
   await tx.modelo.update({
-    where: { id: idModelo },
+    where: { id: idReceta },
     data: {
       // ⭐ V1-E8d (§Post-F9.127) — LA MARCA DE AGUA DE LA RECETA. Este es el ÚNICO lugar del
       // sistema que escribe estas dos columnas, y es lo que las hace creíbles: `modificadoEn` (que
