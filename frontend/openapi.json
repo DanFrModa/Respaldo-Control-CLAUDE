@@ -13204,6 +13204,35 @@
                             "type": "boolean",
                             "description": "Falso si está desactivado (borrado suave)."
                           },
+                          "fusionadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Id del color canónico que lo absorbió."
+                                  },
+                                  "nombre": {
+                                    "type": "string",
+                                    "description": "Nombre del color canónico que lo absorbió."
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "nombre"
+                                ],
+                                "additionalProperties": false,
+                                "description": "El color canónico que absorbió a éste en una fusión."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -13243,6 +13272,7 @@
                           "id",
                           "nombre",
                           "activo",
+                          "fusionadoEn",
                           "creadoEn",
                           "creadoPorId",
                           "modificadoEn",
@@ -13490,6 +13520,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -13529,6 +13588,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -13734,6 +13794,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -13773,6 +13862,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -13996,6 +14086,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -14035,6 +14154,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -14238,6 +14358,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -14277,6 +14426,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -14504,6 +14654,35 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "fusionadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del color canónico que lo absorbió."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del color canónico que lo absorbió."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El color canónico que absorbió a éste en una fusión."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -14543,6 +14722,7 @@
                     "id",
                     "nombre",
                     "activo",
+                    "fusionadoEn",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -56779,6 +56959,17 @@
                             "type": "boolean",
                             "description": "true si el color no existe en el catálogo (se creará al confirmar)."
                           },
+                          "colorFusionadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color CANÓNICO al que la fusión va a redirigir el color del papel al confirmar, o null si no hay desvío (lo normal)."
+                          },
                           "tallasNuevas": {
                             "type": "array",
                             "items": {
@@ -56800,9 +56991,10 @@
                                     "parseo",
                                     "liga-inactiva",
                                     "sobrepedido",
-                                    "duplicado"
+                                    "duplicado",
+                                    "color-fusionado"
                                   ],
-                                  "description": "Qué validación falló (incluye \"liga-inactiva\", \"sobrepedido\": packs que no cuadran / proporción no entera, y \"duplicado\": esa OC del cliente ya se importó)."
+                                  "description": "Qué validación falló (incluye \"liga-inactiva\", \"sobrepedido\": packs que no cuadran / proporción no entera, \"duplicado\": esa OC del cliente ya se importó, y \"color-fusionado\": el color del papel lo absorbió una fusión y la OP va a nacer en el canónico)."
                                 },
                                 "mensaje": {
                                   "type": "string",
@@ -56874,6 +57066,7 @@
                           "codigoModeloSugerido",
                           "descripcionModeloSugerido",
                           "colorNuevo",
+                          "colorFusionadoEn",
                           "tallasNuevas",
                           "advertencias",
                           "yaImportado"

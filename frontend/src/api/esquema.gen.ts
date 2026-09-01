@@ -5546,6 +5546,13 @@ export interface paths {
                 nombre: string;
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
+                /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+                fusionadoEn: {
+                  /** @description Id del color canónico que lo absorbió. */
+                  id: number;
+                  /** @description Nombre del color canónico que lo absorbió. */
+                  nombre: string;
+                } | null;
                 /**
                  * Format: date-time
                  * @description Fecha de alta (ISO 8601).
@@ -5684,6 +5691,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -5822,6 +5836,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -5949,6 +5970,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -6083,6 +6111,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -6226,6 +6261,13 @@ export interface paths {
               nombre: string;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null). */
+              fusionadoEn: {
+                /** @description Id del color canónico que lo absorbió. */
+                id: number;
+                /** @description Nombre del color canónico que lo absorbió. */
+                nombre: string;
+              } | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -23736,12 +23778,14 @@ export interface paths {
                 descripcionModeloSugerido: string | null;
                 /** @description true si el color no existe en el catálogo (se creará al confirmar). */
                 colorNuevo: boolean;
+                /** @description Nombre del color CANÓNICO al que la fusión va a redirigir el color del papel al confirmar, o null si no hay desvío (lo normal). */
+                colorFusionadoEn: string | null;
                 /** @description Tallas del PDF que no existen en el catálogo (se crearán al confirmar). */
                 tallasNuevas: string[];
                 /** @description Advertencias de validación (no bloquean). */
                 advertencias: {
                   /**
-                   * @description Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, y "duplicado": esa OC del cliente ya se importó).
+                   * @description Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, "duplicado": esa OC del cliente ya se importó, y "color-fusionado": el color del papel lo absorbió una fusión y la OP va a nacer en el canónico).
                    * @enum {string}
                    */
                   tipo:
@@ -23751,7 +23795,8 @@ export interface paths {
                     | 'parseo'
                     | 'liga-inactiva'
                     | 'sobrepedido'
-                    | 'duplicado';
+                    | 'duplicado'
+                    | 'color-fusionado';
                   /** @description Mensaje legible para la vista previa. */
                   mensaje: string;
                 }[];

@@ -29,6 +29,7 @@ function color(id: number, nombre: string): Color {
     id,
     nombre,
     activo: true,
+    fusionadoEn: null,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
     modificadoEn: '2026-01-01T00:00:00.000Z',
