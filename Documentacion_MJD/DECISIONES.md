@@ -752,7 +752,11 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 - **Aplica en:** rama `claude/cambios-prueba-xv95r8`. Migración `20260730120000_unidad_tela` (automática). SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-07-30.
 
-#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ MITAD CONSTRUIDA, MITAD ABIERTA
+#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ MITAD CONSTRUIDA, MITAD ABIERTA ⇒ **ES LA 0.085… no: ES LA 0.084**
+
+> 📌 **No espera nada de Daniel: es TRABAJO, y ya tiene número (0.084, asignado el 1-sep).** Estuvo
+> **cuatro semanas sin número** —lo encontró el repaso que él mismo pidió— y por eso este encabezado
+> lleva ⏳: marca **pendiente de construir**, no pendiente de respuesta.
 
 > ⚖️ **AJUSTE (28-ago-2026) — el bullet de «Migración» de abajo (*partir los colores ya creados en
 > color + pack*) queda SIN EFECTO para lo capturado en `prueba`:** *«Lo viejo ahorita es irrelevante»*
@@ -9646,9 +9650,20 @@ uno de los dos:
 *(Dos momentos, dos renglones.)* ⇒ **es exactamente el principio de arriba:** *mientras está desandado,
 se congela lo que dependa de ello*.
 
-#### ⏳ EL CASO DE BORDE — con default propuesto, SIN contestar
+#### ✅ EL CASO DE BORDE — CONTESTADO POR DANIEL (1-sep-2026, §Post-F9.173(a))
 
-**¿Qué pasa con lo que YA se compró antes de abrir?** Dicho a Daniel, **todavía sin respuesta suya**:
+> ⚠️ **Este encabezado decía «SIN contestar» una hora después de que Daniel lo contestara** — es la
+> octava marca de esta clase corregida en 24 h, y la más reciente de todas. **El patrón no falla:** la
+> respuesta se registra en una entrada nueva (§Post-F9.173) y **el sitio viejo nadie lo vuelve a mirar**.
+>
+> ### ✅ Daniel, textual: *«Si ya está comprado, **solo avisa** que ya está comprado… **no se puede
+> cancelar la OC en automático, eso hay que negociarlo con el proveedor**.»*
+>
+> ⇒ **El default de abajo se CONFIRMA** —abrir frena lo nuevo, no revierte lo hecho— **y se le añade lo
+> que faltaba: el AVISO**, que hoy no existe. Detalle y alcance medido en **§Post-F9.173(a)**; se
+> construye en la **0.085**.
+
+**¿Qué pasa con lo que YA se compró antes de abrir?** Lo que se le dijo, y su respuesta lo confirmó:
 
 > **Default propuesto: lo ya comprado NO se deshace solo.** La OC autorizada sigue en pie; para
 > desandarla está **`desautorizarOC`**, que ya existe y ya es del dueño. ⇒ **abrir frena lo nuevo, no
