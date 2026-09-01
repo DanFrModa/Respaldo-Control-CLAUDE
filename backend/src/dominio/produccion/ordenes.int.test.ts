@@ -20,6 +20,7 @@ import {
   limpiarBaseDatos,
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { fusionarDepartamentosCliente } from '../catalogos/cliente-departamentos.js';
 import { crearArte } from '../modelos/arte-modelo.js';
 import { reemplazarAviosBom } from '../modelos/bom-modelo.js';
 import { actualizarModelo } from '../modelos/modelos.js';
@@ -729,6 +730,113 @@ describe('Órdenes (F2-E2) — búsqueda combinada (folio/modelo/cliente/referen
     expect(porModelo.datos.some((o) => o.id === orden.id)).toBe(true);
     const porFolio = await listarOrdenes(s, { busqueda: String(orden.folio) }, bd());
     expect(porFolio.datos.some((o) => o.id === orden.id)).toBe(true);
+  });
+});
+
+/**
+ * ⭐⭐ LA BÚSQUEDA ENTIENDE LOS DOS NOMBRES (§Post-F9.172(a)) — contra Postgres de verdad.
+ *
+ * Es el cierre del defecto medido: el importador escribe la División DOS veces —al catálogo con FK y
+ * como TEXTO CRUDO en `OrdenReferencia.valor`— y fusionar «2-HOMBRE» en «Caballeros» sólo movía el
+ * catálogo. Aquí se reproduce tal cual: una orden cuya referencia dice «2-HOMBRE», una fusión de
+ * verdad (por el dominio, no sembrada a mano) y la búsqueda por el nombre bueno.
+ *
+ * 🔴 Los DOS sentidos van en pruebas SEPARADAS: cubrir uno y no el otro pasaría en verde y fallaría
+ * justo con quien tiene el papel viejo en la mano.
+ */
+describe('Órdenes — búsqueda por el SINÓNIMO del departamento fusionado (§Post-F9.172(a))', () => {
+  const sesionFusion = () =>
+    sesionDePrueba({
+      idEmpresaActiva: empresa.id,
+      permisos: ['ordenes.ver', 'ordenes.administrar', 'clientes.ver', 'clientes.administrar'],
+    });
+
+  /** Deja una orden cuya referencia dice `valorReferencia`, y devuelve su id. */
+  async function ordenConReferencia(valorReferencia: string): Promise<number> {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await guardarReferenciasOrden(
+      s,
+      orden.id,
+      { referencias: [{ idClienteCampo: campoCliente.id, valor: valorReferencia }] },
+      bd(),
+    );
+    return orden.id;
+  }
+
+  /** Fusiona de verdad «2-HOMBRE» dentro de «Caballeros» y devuelve los dos ids. */
+  async function fusionarHombreEnCaballeros(): Promise<{ destino: number; origen: number }> {
+    const destino = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: 'Caballeros' },
+    });
+    const origen = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: '2-HOMBRE' },
+    });
+    await fusionarDepartamentosCliente(
+      sesionFusion(),
+      clienteNegocio.id,
+      { idDestino: destino.id, origenes: [origen.id] },
+      bd(),
+    );
+    // El fixture NO miente: después de la fusión el absorbido tiene rastro de verdad.
+    const absorbido = await cliente.clienteDepartamento.findUniqueOrThrow({
+      where: { id: origen.id },
+    });
+    expect(absorbido.idFusionadoEn).toBe(destino.id);
+    return { destino: destino.id, origen: origen.id };
+  }
+
+  it('DESTINO → ORIGEN: buscar «Caballeros» encuentra la orden que dice «2-hombre»', async () => {
+    // 🔴 LA GRAFÍA ES DISTINTA A PROPÓSITO: la orden dice «2-hombre» y el catálogo «2-HOMBRE».
+    // Es la PREMISA de la etapa —el texto de la OC y el nombre del catálogo se escriben distinto— y
+    // es lo ÚNICO que ejercita de verdad el `mode: 'insensitive'` del `equals` CONTRA POSTGRES:
+    // las unit fijan la FORMA de la cláusula, no su semántica en la base. Con las dos grafías
+    // iguales, un `equals` sensible a mayúsculas pasaría esta prueba en verde.
+    const idOrden = await ordenConReferencia('2-hombre');
+    await fusionarHombreEnCaballeros();
+    const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: 'Caballeros' }, bd());
+    expect(pagina.datos.some((o) => o.id === idOrden)).toBe(true);
+  });
+
+  it('ORIGEN → DESTINO: buscar «2-HOMBRE» encuentra la orden que dice «Caballeros»', async () => {
+    const idOrden = await ordenConReferencia('Caballeros');
+    await fusionarHombreEnCaballeros();
+    const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: '2-HOMBRE' }, bd());
+    expect(pagina.datos.some((o) => o.id === idOrden)).toBe(true);
+  });
+
+  it('⭐ SIN fusionar, la misma búsqueda NO la encuentra (es la fusión la que la trae, no el texto)', async () => {
+    // Misma grafía «2-hombre» que el caso de arriba: si el control usara otra, no controlaría nada.
+    const idOrden = await ordenConReferencia('2-hombre');
+    await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: 'Caballeros' },
+    });
+    await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: '2-HOMBRE' },
+    });
+    const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: 'Caballeros' }, bd());
+    expect(pagina.datos.some((o) => o.id === idOrden)).toBe(false);
+  });
+
+  it('la CADENA de dos saltos también se entiende (A→B→C, buscando por la punta)', async () => {
+    const idOrden = await ordenConReferencia('2-HOMBRE');
+    const { destino, origen } = await fusionarHombreEnCaballeros();
+    // Segundo salto: «Caballeros» se va dentro de «VARONIL».
+    const final = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: 'VARONIL' },
+    });
+    await fusionarDepartamentosCliente(
+      sesionFusion(),
+      clienteNegocio.id,
+      { idDestino: final.id, origenes: [destino] },
+      bd(),
+    );
+    // La cadena NO se aplana: «2-HOMBRE» sigue apuntando a «Caballeros», que ahora apunta a «VARONIL».
+    const eslabon = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: origen } });
+    expect(eslabon.idFusionadoEn).toBe(destino);
+
+    const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: 'VARONIL' }, bd());
+    expect(pagina.datos.some((o) => o.id === idOrden)).toBe(true);
   });
 });
 

@@ -7305,6 +7305,26 @@ model ClienteDepartamento {
   /// compradora de NIÑOS). SetNull — el contacto sobrevive a su departamento. La FUSIÓN la repunta.
   contactos     ClienteContacto[]
 
+  /// ⭐⭐ «LOS DOS NOMBRES» (§Post-F9.172(a)): el departamento CANÓNICO que se llevó a ÉSTE en una
+  /// fusión. Nulo = a este departamento nunca lo absorbieron. Es el MISMO rastro que
+  /// `Color.idFusionadoEn`, y existe por una razón distinta: el texto que el cliente escribió en su
+  /// OC («2-HOMBRE») viaja a la orden como REFERENCIA de texto (`OrdenReferencia.valor`, D7) y **no
+  /// se reescribe NUNCA** — es la única prueba de qué pidió el cliente. Sin esta columna, fusionar
+  /// «2-HOMBRE» en «Caballeros» mueve el catálogo y deja la orden diciendo «2-HOMBRE»: buscar
+  /// «Caballeros» no la encuentra. Con ella la búsqueda resuelve el SINÓNIMO (ver
+  /// `cliente-departamentos-sinonimos.ts`) sin tocar el papel del cliente.
+  ///
+  /// `fusionarDepartamentosCliente` lo sella al apagar cada absorbido y lo LIMPIA en el canónico (al
+  /// canónico no lo absorbe nadie); reactivar a mano un departamento también lo limpia (deshace la
+  /// fusión). Esas dos reglas juntas son las que impiden que el DOMINIO cierre un círculo.
+  ///
+  /// ⚠️ NACE VACÍA Y NO SE RELLENA (REGLA 0-B): las fusiones anteriores a esta columna se quedan sin
+  /// rastro a propósito. No hay backfill desde la bitácora — el sistema mira hacia adelante.
+  idFusionadoEn Int?                  @map("id_fusionado_en")
+  fusionadoEn   ClienteDepartamento?  @relation("DepartamentoFusion", fields: [idFusionadoEn], references: [id], onDelete: Restrict)
+  /// Departamentos que ÉSTE absorbió. No bloquea nada: es la contabilidad de la propia fusión.
+  absorbidos    ClienteDepartamento[] @relation("DepartamentoFusion")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -7312,6 +7332,7 @@ model ClienteDepartamento {
 
   @@unique([idCliente, nombre])
   @@index([idCliente])
+  @@index([idFusionadoEn])
   @@map("cliente_departamento")
 }
 

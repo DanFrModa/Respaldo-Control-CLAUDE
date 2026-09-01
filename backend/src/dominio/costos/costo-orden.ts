@@ -42,7 +42,7 @@ import { verificarPermiso, tienePermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { armarBusqueda } from '../produccion/ordenes.js';
+import { armarBusquedaConSinonimos } from '../produccion/ordenes.js';
 
 import {
   cantidadDeBase,
@@ -459,7 +459,7 @@ export async function listarCostos(
     orden: {
       ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
       ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
-      ...armarBusqueda(filtros.busqueda),
+      ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
     },
   };
 
