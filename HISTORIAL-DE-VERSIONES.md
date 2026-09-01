@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.077 · 1-sep-2026 · **en prueba** — Si ya se compró, **el sistema te lo dice** — y se entera el comprador
+
+### Qué se puede hacer ahora que antes no
+
+**Enterarte de que estás tocando algo que ya se compró, en el momento de tocarlo.** Si cambias el consumo,
+el precio o el proveedor de una tela o un avío que **ya tiene orden de compra en firme**, la pantalla te lo
+dice: **qué OC es, en qué estado está**, y qué se puede hacer.
+
+Y **al reabrir una receta**, el aviso sale **dentro del cuadro, antes de confirmar** — no después.
+
+⭐ **Y le llega al comprador**, que es quien tiene que hacer algo: la bandeja «Recetas por liberar» ahora
+trae una columna **«Ya comprado»** con el folio y el estado. Hasta hoy sólo se enteraba **chocando** al
+intentar gastar — y si ya había comprado, **nunca volvía a intentarlo**, así que no se enteraba nunca.
+
+> **El aviso es lo que permite alcanzar a negociar.** Es exactamente lo que pediste.
+
+### Qué cambió y puede sorprender
+
+- **El sistema NUNCA cancela nada solo.** Como dijiste: *«eso hay que negociarlo con el proveedor»*. El
+  aviso **nombra la OC** y te lleva a verla; des-autorizarla sigue siendo una decisión, y de Dirección.
+- **Una OC en borrador NO avisa**, a propósito: todavía no hay nadie con quien negociar.
+- **Sobre una OC ya recibida no hay «des-autorizar» para nadie** — el material ya entró al almacén. Ahí el
+  camino es devolución o ajuste, y el aviso lo dice.
+- **Un renglón que quitaste de la receta pero que tiene compra viva ahora se marca.** Ahí el dato no es un
+  detalle: es **una contradicción**, y quien vaya a revivirlo tiene que verla antes.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **El sistema no puede saber si ya se PAGÓ.** Ninguna cuenta por pagar está ligada a una orden de
+  compra, así que lo más lejos que llega el aviso es *«ya se recibió»*. Conviene saberlo para no esperar de
+  él más de lo que puede.
+- Sin cambios de permisos ni de datos: el despliegue no necesita nada especial.
+
+---
+
 ## 0.076 · 1-sep-2026 · **en prueba** — La ruta crítica ya **no se recalcula dos veces a la vez**, ni pierde un cambio a medio camino (cambio interno)
 
 > 📌 **No cambia nada que puedas ver.** Es una protección que el sistema **decía tener y no tenía**.

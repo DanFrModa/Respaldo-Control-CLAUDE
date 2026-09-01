@@ -23,6 +23,7 @@ import {
   laCulpaEsDeLaNormalizacion,
   magnitudDelAvisoDeCaptura,
   medidasResultantes,
+  renglonesTocadosYaComprados,
   requeridoDelRenglon,
   sacaDeLaCompra,
   type RenglonParaMagnitud,
@@ -55,6 +56,8 @@ function tela(over: Partial<RecetaOrdenTela> = {}): RecetaOrdenTela {
     consumoModelo: 1.5,
     precioModelo: 30,
     precioModeloDeCompra: false,
+    // ⭐ 0.085: por default este material NO está comprado (el caso normal).
+    ocsComprometidas: [],
     ...over,
   };
 }
@@ -94,6 +97,8 @@ function avio(over: Partial<RecetaOrdenAvio> = {}): RecetaOrdenAvio {
     consumoModelo: 1,
     precioModelo: 0.85,
     precioModeloDeCompra: false,
+    // ⭐ 0.085: por default este material NO está comprado (el caso normal).
+    ocsComprometidas: [],
     ...over,
   };
 }
@@ -694,5 +699,69 @@ describe('exigirCompraNoCongelada — la puerta del candado (V1-E8z)', () => {
     const sinMotivo = { ...abierta, recetaAbiertaMotivo: null };
     expect(() => exigirCompraNoCongelada(sinMotivo)).toThrow(/CONGELADA/);
     expect(() => exigirCompraNoCongelada(sinMotivo)).not.toThrow(/Motivo/);
+  });
+});
+
+/**
+ * ⭐⭐⭐ **0.085 (§Post-F9.173(a)) — DE LO QUE ACABA DE CAMBIAR, ¿QUÉ YA ESTABA COMPRADO?**
+ *
+ * Es el filtro que decide si el aviso sale o no, y por eso se prueba solo: si dijera que sí de más,
+ * cada edición de la receta gritaría *"¡ya está comprado!"* y el aviso se volvería ruido; si dijera
+ * que no de más, volvería el silencio que la etapa vino a romper.
+ */
+describe('⭐ renglonesTocadosYaComprados — el filtro del aviso', () => {
+  const OC = { idOrdenCompra: 100, folio: 12, estatus: 'autorizada' as const, recibida: false };
+  const receta = {
+    telas: [
+      tela({ id: 1, idTela: 10, nombre: 'Jersey', ocsComprometidas: [OC] }),
+      // ⚠️ La tela SIN comprar existe a propósito: sin ella, quitar el filtro de "ya comprado" en
+      // la rama de TELA no ponía roja ninguna prueba (mutación superviviente medida el 1-sep-2026).
+      tela({ id: 4, idTela: 11, nombre: 'Felpa' }),
+    ],
+    avios: [
+      avio({ id: 2, idAvio: 20, clave: 'J01', descripcion: 'Jareta', ocsComprometidas: [OC] }),
+      avio({ id: 3, idAvio: 21, clave: 'B01', descripcion: 'Botón' }),
+    ],
+  };
+
+  it('un renglón tocado que SÍ está comprado sale, con el nombre con el que se le llama', () => {
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'tela', idRenglon: 1 }])).toEqual([
+      { material: 'Jersey', ocs: [OC] },
+    ]);
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'avio', idRenglon: 2 }])).toEqual([
+      { material: 'J01 — Jareta', ocs: [OC] },
+    ]);
+  });
+
+  it('🔴 un renglón tocado que NO está comprado NO sale (si no, el aviso sería ruido de fondo)', () => {
+    // Las DOS ramas, tela y avío: cada una tiene su `find` y su filtro, y una puede perderlo sola.
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'avio', idRenglon: 3 }])).toEqual([]);
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'tela', idRenglon: 4 }])).toEqual([]);
+  });
+
+  it('no se cuela un renglón que NADIE tocó, aunque esté comprado', () => {
+    // Rojo si alguien "simplifica" leyendo toda la receta en vez de la lista de tocados: entonces
+    // cambiar el botón avisaría sobre la jareta, que nadie movió.
+    expect(renglonesTocadosYaComprados(receta, [])).toEqual([]);
+  });
+
+  it('el mismo renglón tocado dos veces se nombra UNA', () => {
+    expect(
+      renglonesTocadosYaComprados(receta, [
+        { tipo: 'tela', idRenglon: 1 },
+        { tipo: 'tela', idRenglon: 1 },
+      ]),
+    ).toHaveLength(1);
+  });
+
+  it('un ARTE nunca sale: ninguna línea de OC puede apuntar a un arte', () => {
+    // 🔴 El id es el de un renglón de AVÍO **comprado**, y ahí está toda la prueba: los ids son por
+    // tabla, así que un arte 2 y un avío 2 conviven. Con un id que no choca con nada, tratar al
+    // arte como avío pasaba verde por accidente (mutación superviviente medida el 1-sep-2026).
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'arte', idRenglon: 2 }])).toEqual([]);
+  });
+
+  it('un renglón que ya no está en la receta (borrado) no rompe nada', () => {
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'avio', idRenglon: 999 }])).toEqual([]);
   });
 });

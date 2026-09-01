@@ -1218,6 +1218,114 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9i · ⭐ SI YA SE COMPRÓ, AVISA — Y EL AVISO LLEGA AL COMPRADOR (1-sep-2026, versión **0.077**) — ✅ HECHA
+
+**La petición de Daniel (§Post-F9.173(a)), textual:**
+
+> *«Si ya está comprado, **solo avisa** que ya está comprado para ver si se puede cancelar la OC interna, o
+> que **el comprador sepa que cambió**, para hacer lo que tenga que hacer. **No se puede cancelar la OC en
+> automático… eso hay que negociarlo con el proveedor.»***
+
+**Confirma y corrige** lo que la 0.067 construyó: reabrir **no revierte nada** —el sistema no puede deshacer
+un compromiso con un tercero, *cancelar se negocia, no se ejecuta*— **pero el sistema se quedaba CALLADO**.
+
+### 🔴 El encargo del lead apuntaba al sitio equivocado
+
+Lo iba a colgar de **«reabrir la receta»**. **El caso de Daniel no pasa por ahí:** cambiar el **consumo, el
+precio o el amarre** de un material ya comprado **no lo bloquea nada y no lo avisa nadie**. Lo que sí frena
+(`exigirNoSacarLoComprado`) es **sólo cuando el cambio SACA el material**.
+
+⇒ **Si el aviso se hubiera colgado sólo de reabrir, la versión sale muda justo donde duele.**
+
+Y el encargo mandaba **llevar a `desautorizarOC`** — **falso para el destinatario que Daniel nombró**: ese
+permiso está cortado a Dirección ⇒ **403 en la cara del comprador**, lo que §Post-F9.145(f) prohíbe con esas
+palabras. Se pinta **la OC misma**, que él sí ve, y se **nombra a quién pedírselo**.
+
+### ⭐ Casi todo ya existía — la etapa fueron TRES huecos, no una construcción
+
+La bandeja persistente ya listaba **las reabiertas y las que tienen un renglón desfirmado**; el comprador ya
+tenía permiso para verla. Le faltaba **la columna de OC comprometidas**.
+
+⭐ **Y el cambio de mayor alcance lo encontró el coder, no el encargo:** `exigirNoSacarLoComprado` **ya
+tenía, literalmente, la consulta que hacía falta**. Dejarla duplicada habría dado un sistema que **bloquea
+por un criterio y avisa por otro** el día que uno cambie. La fusionó, **con los dos mensajes del 409 byte
+por byte iguales** — verificado por el reviewer punto por punto contra `HEAD`.
+
+⚠️ **Y de ahí sale una nota que va en la doc del módulo:** es la primera vez que esa guarda depende de un
+**invariante de dominio** (el XOR tela/avío) **y no del `where`** — **no hay `CHECK` en base**. El día que
+alguien agregue un tercer escritor de `OrdenCompraLinea` que ponga `idTela` **y** `idAvio`, **el bloqueo se
+apaga en silencio**. Queda escrito en los dos sitios, nombrando a los dos escritores actuales.
+
+### 🔴 El bloqueante: el aviso **se borraba solo**, y ninguna prueba podía verlo
+
+`trasMutar` pone la receta en caché **y acto seguido** invalida `['ordenes']` — que es **prefijo** de
+`['ordenes','receta',id]` ⇒ **casa por prefijo**, la receta está activa, se re-pide, y esa lectura devuelve
+`avisoCambioSobreLoComprado: null` **por diseño**.
+
+**Medido con el `QueryClient` real**, no deducido:
+```
+× el bloque NO se borra cuando la invalidación re-pide la receta
+  Unable to find an element by: [data-testid="receta-aviso-ya-comprado"]
+```
+⇒ **no es que parpadeara: no llegaba a asentarse.**
+
+⚠️ **Por qué ninguna prueba lo vio:** todas mockean la query entera ⇒ **el camino mutación→caché→refetch no
+se ejercita nunca**. El `it` que decía cubrirlo **no cambiaba nada**: renderizaba una receta con el campo ya
+puesto. *El nombre prometía el flujo; el cuerpo comprobaba el pintado.* Se reescribieron para **provocar**
+la mutación, y por eso **ahora también caen**.
+
+### ⭐⭐ El envoltorio — y la ironía que lo cerró
+
+El arreglo obvio era cablear las ~12 llamadas una por una. **No se hizo, y la razón vale como regla:**
+*«significa que la número trece se olvide, que es literalmente el defecto que esta etapa vino a cerrar»*.
+Se envolvió **el hook**, punto único por donde pasan todas.
+
+> 🔴 **Y el reviewer contó: son DIEZ, y se envolvieron NUEVE.**
+> **«La número trece no se olvidó: se olvidó la décima.»**
+
+`useTraerDelModelo` **no perdía ningún aviso** (sólo crea) **pero no APAGABA el eco anterior**: editabas una
+tela comprada → salía el aviso → «Traer del modelo» → **el aviso seguía ahí**, hablando de una acción que ya
+no era la última. **Es el «gritar en falso» que este módulo lleva dos versiones combatiendo.**
+
+⭐ **Y el arreglo no fue sólo la línea: se le puso LÍMITE a la promesa.** La nota decía que el olvido era
+imposible **a secas**; ahora dice **qué garantiza** (`tsc` acota la forma ⇒ imposible **en las que caben**),
+**nombra la excepción**, y advierte que otra mutación de forma distinta **tiene que reportar a mano**.
+
+### La lápida: la prueba estaba INVERTIDA
+
+Existía un `it('en una LÁPIDA no se pinta')`. **El caso correcto es el contrario:** ahí el dato **no es una
+firma, es una CONTRADICCIÓN** —hay una OC viva contra un material que la orden dice que no lleva— y **quien
+va a revivirlo tiene que verla antes**. Se invirtió, con el porqué.
+
+⭐ **Y no rompe el caso legítimo POR CONSTRUCCIÓN**: `ChipsOcComprometidas` devuelve `null` con lista vacía,
+así que **una lápida sin compra no pinta nada sin necesitar un `if` que alguien pueda borrar**.
+
+### Lo demás que se cerró
+
+- **`agregarRenglonReceta` NO sólo crea**: revivir una lápida **actualiza** consumo, precio y amarre ⇒ era un
+  disparador real que el aviso dejaba fuera. Cubierto en **las dos ramas**, con su int por cada una — porque
+  **quitar sólo el de la tela sobrevivía todo**: *un fixture que sólo alcanza mientras nadie ejercite el caso
+  de al lado es una prueba que caduca sin avisar*.
+- **`recibida` VIAJA del dominio** (`algunaRecibida`): se acabó la segunda implementación de la regla en el
+  frontend.
+- ⚠️ **Techo honesto:** el sistema **no puede saber si se pagó** — ningún modelo de CxP liga a una OC. El
+  aviso llega hasta *«ya se recibió»*, y sobre una OC recibida **no hay des-autorizar para nadie**.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,425** · frontend **1,912** en **204** archivos.
+**Contrato: cero drift y SÓLO SALIDAS**, verificado a máquina sobre las **613** operaciones (0 nuevas, 0
+borradas, 0 con entrada cambiada). **Sin migración · sin permisos · sin seed · sin backfill** —todo se
+deriva **en vivo** de `OrdenCompraLinea`, y una int fija que **des-autorizada la OC el aviso se calla solo**.
+
+**Revisión independiente: tres rondas.** El reviewer corrió **mutaciones propias** —incluidas dos sobre **el
+envoltorio**, no sobre el arreglo— y verificó la fusión **línea por línea**.
+
+📌 **Superviviente declarada:** quitar los `tocoRenglon` del revivir **sobrevive las unitarias** — es
+cableado contra la BD, lo matan las int nuevas en CI.
+
+---
+
 ## V1-E9h · ⭐ LA DEFENSA QUE NO DEFENDÍA: `singletonKey` (1-sep-2026, versión **0.076**) — ✅ HECHA
 
 **El comentario de `comun/jobs/index.ts` AFIRMABA** que *«pg-boss garantiza que, para un `singletonKey`

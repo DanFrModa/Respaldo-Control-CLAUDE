@@ -3357,6 +3357,301 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
     );
     expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(true);
   });
+
+  // ── ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — SI YA SE COMPRÓ, AVISA ───────────────────────────────────
+  //
+  // DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede cancelar
+  // la OC interna, o que **el comprador sepa que cambió**… **No se puede cancelar la OC en
+  // automático… eso hay que negociarlo con el proveedor.**"*
+  //
+  // 🔴 EL HUECO, y por qué no lo tapaba nada de lo de arriba: la guarda de §Post-F9.79 frena cuando
+  // el cambio SACA el material. **Cambiarle el precio, el consumo o el amarre a un material ya
+  // comprado no lo frena nada —ni debe—, y hasta la 0.084 tampoco lo avisaba nadie.** Se le caía la
+  // firma y ahí terminaba todo. Estas pruebas fijan las dos mitades: que AVISA, y que **NO bloquea**.
+
+  /** El folio (`numCompra`) de una OC, que es como se la nombra en el aviso. */
+  async function folioDe(idOc: number): Promise<number> {
+    return Number((await cliente.ordenCompra.findUniqueOrThrow({ where: { id: idOc } })).numCompra);
+  }
+
+  it('⭐⭐⭐ cambiar el PRECIO de un material ya comprado AVISA — y NO bloquea', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    const folio = await folioDe(idOc);
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    // 1) NO bloqueó: el cambio se guardó (Daniel pidió que AVISE, no que impida).
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.precio).toBe(11);
+    // 2) Y avisó, nombrando el material, el folio y el camino que sí existe.
+    const aviso = r.avisoCambioSobreLoComprado;
+    expect(aviso).not.toBeNull();
+    expect(aviso).toContain('JAR-01');
+    expect(aviso).toContain(`#${String(folio)} (autorizada)`);
+    expect(aviso).toContain('negociarlo con el proveedor');
+    // 3) §Post-F9.145(f): no manda a nadie a un botón que le va a dar 403 sin decírselo.
+    expect(aviso).toContain('pídeselo a quien lo tenga');
+  });
+
+  it('⭐ EL GEMELO: con la OC en BORRADOR no avisa nada (no hay con quién negociar)', async () => {
+    // 🔴 La trampa de fixture que esta pareja existe para no caer: si la OC de la prueba de arriba
+    // naciera en `borrador`, el caso "comprometida" NUNCA se ejercitaría y las dos pasarían verdes
+    // sin que el criterio estuviera bien. Aquí se siembra el estado REAL de cada rama.
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    await ocDe(ordenA, { idAvio: avioJareta.id }); // se queda en BORRADOR: NO se autoriza
+    const idRenglon = await renglonJareta(ordenA);
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.ocsComprometidas).toEqual([]);
+    expect(r.ocsComprometidas).toEqual([]);
+    expect(r.avisoCompraComprometida).toBeNull();
+  });
+
+  it('⭐ EL OTRO GEMELO: si la OC ya se RECIBIÓ, el aviso cambia de camino', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    await cliente.ordenCompra.update({
+      where: { id: idOc },
+      data: { estatus: 'recibida_parcial' },
+    });
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    expect(r.avisoCambioSobreLoComprado).toContain('ya se RECIBIÓ');
+    expect(r.avisoCambioSobreLoComprado).toContain('devolución o un ajuste');
+    // Sobre una OC recibida des-autorizar NO existe para nadie: mandar ahí sería mandar a rebotar.
+    expect(r.avisoCambioSobreLoComprado).not.toContain('perfil de Dirección');
+  });
+
+  it('el renglón lleva SUS OC comprometidas, con folio y estado (la fila lo dice sola)', async () => {
+    const { idOc } = await jaretaComprada(ordenA);
+    const folio = await folioDe(idOc);
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.ocsComprometidas).toEqual([
+      { idOrdenCompra: idOc, folio, estatus: 'autorizada', recibida: false },
+    ]);
+    // Y va POR MATERIAL: el botón, que nadie compró, no hereda la OC de la jareta.
+    expect(r.avios.find((a) => a.idAvio === avioBoton.id)?.ocsComprometidas).toEqual([]);
+    expect(r.telas[0]?.ocsComprometidas).toEqual([]);
+  });
+
+  it('⭐ tocar OTRO renglón (el que NO está comprado) no levanta el aviso', async () => {
+    await jaretaComprada(ordenA);
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const idBoton = r0.avios.find((a) => a.idAvio === avioBoton.id)?.id ?? 0;
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idBoton, { precio: 2 }, bd());
+    // Rojo si el aviso se calculara sobre la orden entera en vez de sobre lo TOCADO: entonces
+    // cambiarle el precio al botón gritaría sobre la jareta, que nadie movió.
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+  });
+
+  it('el cambio sobre lo comprado queda en la BITÁCORA (A7/D3: el toast se lo lleva el viento)', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    const folio = await folioDe(idOc);
+    await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    const rastro = await cliente.bitacora.findFirst({
+      where: {
+        entidad: 'RecetaOrden',
+        idEntidad: String(ordenA),
+        datos: { path: ['accion'], equals: 'cambio-sobre-material-ya-comprado' },
+      },
+      orderBy: { id: 'desc' },
+    });
+    expect(rastro).not.toBeNull();
+    expect(rastro?.datos).toMatchObject({
+      renglones: [{ material: 'JAR-01 — Jareta', ocs: [{ folio, estatus: 'autorizada' }] }],
+    });
+  });
+
+  it('una LECTURA nunca resucita el aviso del cambio, pero sí trae el de la orden', async () => {
+    const { idRenglon } = await jaretaComprada(ordenA);
+    await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    // El eco es de LA MUTACIÓN: recargar la pantalla no puede repetir un aviso de algo ya pasado.
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+    // Pero el estado de la orden sí sigue ahí: es lo que se pinta ANTES de reabrir (hueco 2).
+    expect(r.ocsComprometidas).toHaveLength(1);
+    expect(r.avisoCompraComprometida).toContain('NO las cancela');
+  });
+
+  it('⭐ des-autorizada la OC, el aviso se CALLA solo (en vivo, nunca un snapshot)', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    await desautorizarOC(
+      sesionCompras(['compras.desautorizar']),
+      idOc,
+      { motivo: 'se renegoció' },
+      bd(),
+    );
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+    // Rojo si el aviso se hubiera guardado el día del cambio: seguiría gritando sobre una OC muerta.
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+    expect(r.ocsComprometidas).toEqual([]);
+  });
+
+  it('⭐⭐⭐ LA BANDEJA lleva las OC comprometidas al COMPRADOR (folio + estado)', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    const folio = await folioDe(idOc);
+    // El cambio que desfirma el renglón: así es como esta orden vuelve a la bandeja.
+    await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
+    const fila = pagina.datos.find((f) => f.idOrden === ordenA)!;
+    expect(fila.ocsComprometidas).toEqual([
+      { idOrdenCompra: idOc, folio, estatus: 'autorizada', recibida: false },
+    ]);
+    // La orden que no tiene compra comprometida sale con la lista vacía, no ausente.
+    expect(pagina.datos.find((f) => f.idOrden === ordenB)?.ocsComprometidas).toEqual([]);
+  });
+
+  /**
+   * ⭐⭐⭐ **REVIVIR UNA LÁPIDA NO ES CREAR: ES CAMBIARLE EL CONTENIDO A UN RENGLÓN QUE YA EXISTE**
+   * (hallazgo del reviewer de la 0.085).
+   *
+   * 🔴 El camino, entero y real: se EXCLUYE un material (legal: todavía no hay OC) → **Compras
+   * captura a mano una línea de OC** contra ese (orden, material) y la autoriza —nada lo impide,
+   * porque la puerta de compra sólo frena lo que está PENDIENTE de firma, y una lápida no lo
+   * está— → alguien REVIVE el renglón, lo que le **reescribe consumo, precio y amarre**. Hasta la
+   * primera versión de esta etapa eso pasaba **en silencio**: `agregarRenglonReceta` no declaraba
+   * `tocoRenglon`, así que ni revocaba firma ni avisaba.
+   */
+  async function jaretaExcluidaYComprada(idOrden: number): Promise<number> {
+    await marcarRecetaRevisada(sesion(), idOrden, bd());
+    await liberarTodo(idOrden);
+    // Se saca de la receta ANTES de que exista la OC: en ese momento es perfectamente legal.
+    await quitarRenglonReceta(
+      sesion(),
+      idOrden,
+      'avio',
+      await renglonJareta(idOrden),
+      { motivo: 'el cliente la negoció fuera' },
+      bd(),
+    );
+    // Y AHORA Compras la compra igual, a mano. La lápida no está pendiente de firma, así que la
+    // puerta de compra no la frena.
+    const idOc = await ocDe(idOrden, { idAvio: avioJareta.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    return idOc;
+  }
+
+  it('⭐⭐⭐ REVIVIR una lápida cuyo material YA ESTÁ COMPRADO avisa (no pasa en silencio)', async () => {
+    const idOc = await jaretaExcluidaYComprada(ordenA);
+    const folio = await folioDe(idOc);
+
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'avio', idAvio: avioJareta.id, consumoPorPrenda: 4 },
+      bd(),
+    );
+
+    // Revivió (no bloquea: el material VUELVE a la compra, no sale de ella)…
+    const revivida = r.avios.find((a) => a.idAvio === avioJareta.id)!;
+    expect(revivida.excluido).toBe(false);
+    expect(revivida.consumoPorPrenda).toBe(4);
+    // …y AVISA, nombrando la OC que acaba de quedar descuadrada.
+    expect(r.avisoCambioSobreLoComprado).toContain('JAR-01');
+    expect(r.avisoCambioSobreLoComprado).toContain(`#${String(folio)} (autorizada)`);
+    // Y su firma se cayó, que es lo que lo devuelve a la bandeja del comprador.
+    expect(revivida.liberadoEn).toBeNull();
+  });
+
+  it('⭐⭐ …y lo MISMO por la rama de la TELA, que es la OTRA mitad del arreglo', async () => {
+    /*
+     * 🔴 EXISTE PORQUE LA COBERTURA ESTABA A MEDIAS, y lo midió el reviewer: quitar sólo el
+     * `tocoRenglon` de la rama de la TELA sobrevivía a las 2 425 unit **y a las de integración**,
+     * porque ninguna de las ~20 pruebas de `agregarRenglonReceta` del archivo combinaba revivir una
+     * TELA con una OC comprometida. Son dos ramas distintas del mismo `if`, con su propio `update`
+     * cada una: probar sólo el avío deja la otra libre de caer.
+     *
+     * Es la regla que esta misma etapa escribió al reforzar M8: un fixture que sólo alcanza
+     * mientras nadie ejercite el caso de al lado es una prueba que caduca sin avisar.
+     */
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const tela = r0.telas.find((t) => t.idTela === telaJersey.id)!;
+    await quitarRenglonReceta(sesion(), ordenA, 'tela', tela.id, { motivo: 'se cambió' }, bd());
+    // Compras la compra igual, a mano: la lápida no está pendiente de firma y nada la frena.
+    const idOc = await ocDe(ordenA, { idTela: telaJersey.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    const folio = await folioDe(idOc);
+
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'tela', idTela: telaJersey.id, consumoPorPrenda: 9 },
+      bd(),
+    );
+
+    const revivida = r.telas.find((t) => t.idTela === telaJersey.id)!;
+    expect(revivida.excluido).toBe(false);
+    expect(revivida.consumoPorPrenda).toBe(9);
+    // 🔴 LA aserción que mata la mutación: sin `ctx.tocoRenglon('tela', …)` esto es `null`.
+    expect(r.avisoCambioSobreLoComprado).toContain('Jersey');
+    expect(r.avisoCambioSobreLoComprado).toContain(`#${String(folio)} (autorizada)`);
+  });
+
+  it('⭐ EL GEMELO: revivir una lápida con la OC en BORRADOR no avisa nada', async () => {
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    await quitarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      await renglonJareta(ordenA),
+      { motivo: 'fuera' },
+      bd(),
+    );
+    await ocDe(ordenA, { idAvio: avioJareta.id }); // se queda en BORRADOR: NO se autoriza
+
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'avio', idAvio: avioJareta.id, consumoPorPrenda: 4 },
+      bd(),
+    );
+
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(false);
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+  });
+
+  it('⭐ y la LÁPIDA comprada se ve como tal ANTES de revivirla (el chip sale de este dato)', async () => {
+    await jaretaExcluidaYComprada(ordenA);
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const lapida = r.avios.find((a) => a.idAvio === avioJareta.id)!;
+
+    // 🔴 Excluida Y comprada a la vez: es la contradicción que la pantalla tiene que enseñar antes
+    // de que alguien la reviva. Si `armarReceta` se saltara las lápidas, el chip no existiría.
+    expect(lapida.excluido).toBe(true);
+    expect(lapida.ocsComprometidas).toHaveLength(1);
+    expect(lapida.ocsComprometidas[0]).toMatchObject({ estatus: 'autorizada', recibida: false });
+  });
+
+  it('⭐ LA BANDEJA distingue: un BORRADOR marca «ya frena compras» pero NO es compra comprometida', async () => {
+    // 🔴 La pareja que separa las dos preguntas, y la razón de no copiar el `<> cancelada`:
+    //  • `conOrdenCompra` = *"¿hay alguien esperando esta firma?"* → un borrador SÍ cuenta.
+    //  • `ocsComprometidas` = *"¿hay que negociar con un proveedor?"* → un borrador NO cuenta.
+    // Si las dos leyeran el mismo criterio, esta prueba no podría existir.
+    //
+    // ⚠️ Se firma SÓLO la tela y la OC se le hace a ELLA: así la orden sigue teniendo los dos avíos
+    // pendientes (y por eso sigue saliendo en la bandeja) con una OC viva encima. Firmarlo todo la
+    // sacaría de la bandeja y la prueba no podría mirar ninguna fila.
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA, 'telas');
+    await ocDe(ordenA, { idTela: telaJersey.id }); // se queda en BORRADOR: NO se autoriza
+
+    const fila = (await consultarRecetasPorLiberar(sesion(), {}, bd())).datos.find(
+      (f) => f.idOrden === ordenA,
+    )!;
+    expect(fila.conOrdenCompra).toBe(true);
+    expect(fila.ocsComprometidas).toEqual([]);
+  });
 });
 
 // ── ⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a) + §Post-F9.165) ────────────────────────

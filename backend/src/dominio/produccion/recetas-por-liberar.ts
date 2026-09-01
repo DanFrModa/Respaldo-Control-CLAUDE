@@ -42,6 +42,10 @@ import { esquemaRecetasPorLiberarDominio } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+// ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — la MISMA lectura de "qué ya está comprado en firme" que usan la
+// receta y la guarda de §Post-F9.79. La bandeja NO la vuelve a escribir: el criterio de comprometido
+// tiene un solo dueño.
+import { comprasComprometidasPorOrden } from '../compras/aviso-ya-comprado.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
@@ -189,6 +193,33 @@ export async function consultarRecetasPorLiberar(
   ]);
 
   const total = Number(conteo[0]?.total ?? 0n);
+
+  /*
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **LA COLUMNA POR LA QUE EL AVISO ALCANZA AL COMPRADOR.**
+   *
+   * DANIEL: *"que **el comprador sepa que cambió**, para hacer lo que tenga que hacer"*. El 409 de
+   * la puerta de compra no puede alcanzarlo: sólo lo lee quien INTENTA gastar, y quien ya compró no
+   * va a volver a intentarlo. Esta bandeja sí lo alcanza —la abre con `desarrollo.ver`, que ya
+   * tiene— y ya lista solas las órdenes que le importan: las reabiertas y las que tienen un renglón
+   * desfirmado, que es justo como queda un material al que le cambiaron consumo, precio o amarre.
+   *
+   * ⚠️ **Una consulta APARTE y sobre los ids DE ESTA PÁGINA**, no un `EXISTS` dentro del SQL de
+   * arriba: hacen falta el FOLIO y el ESTADO de cada OC (una autorizada se puede des-autorizar; una
+   * recibida NO), y eso no es un booleano. Son ≤100 órdenes por página, así que es un `IN` acotado,
+   * no un N+1.
+   *
+   * ⚠️⚠️ **NO usa el `<> 'cancelada'` de `conOrdenCompra`, que está tres líneas más arriba.** Aquella
+   * marca responde *"¿hay alguien esperando esta firma?"* —y ahí un borrador cuenta, porque alguien
+   * ya se sentó a escribirlo—. Ésta responde *"¿hay que negociar con un proveedor?"*, y un borrador
+   * se corrige o se borra sin llamarle a nadie: avisar sobre él sería gritar en falso, y un aviso
+   * que grita en falso se aprende a ignorar.
+   */
+  const comprometidas = await comprasComprometidasPorOrden(
+    sesion.idEmpresaActiva,
+    filas.map((r) => r.idOrden),
+    bd,
+  );
+
   const datos: RecetaPorLiberar[] = filas.map((r) => {
     const telas = Number(r.telas);
     const avios = Number(r.avios);
@@ -207,6 +238,7 @@ export async function consultarRecetasPorLiberar(
       conOrdenCompra: r.conOrdenCompra,
       abiertaEn: r.abiertaEn === null ? null : r.abiertaEn.toISOString(),
       abiertaMotivo: r.abiertaMotivo,
+      ocsComprometidas: comprometidas.get(r.idOrden)?.ocs ?? [],
     };
   });
 
