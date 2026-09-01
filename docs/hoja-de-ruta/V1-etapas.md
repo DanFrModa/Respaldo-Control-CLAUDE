@@ -1218,6 +1218,104 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9h · ⭐ LA DEFENSA QUE NO DEFENDÍA: `singletonKey` (1-sep-2026, versión **0.076**) — ✅ HECHA
+
+**El comentario de `comun/jobs/index.ts` AFIRMABA** que *«pg-boss garantiza que, para un `singletonKey`
+dado, a lo sumo UN job está en `created`/`active`; un segundo `send` se descarta»*. **Falso**: los índices
+únicos sólo existen para colas **con política**, y el archivo las creaba **todas sin `policy`**.
+
+> ⇒ **La defensa anti-duplicado de la Ruta Crítica era decorativa, y su comentario la declaraba viva.** Es
+> la peor combinación: quien leía el código **creía estar protegido**.
+
+### Se midieron las CINCO políticas ejecutándolas, no suponiéndolas por el nombre
+
+Con `pglite` (Postgres **en proceso**, sin Docker). La que corresponde **literalmente** a la promesa vieja
+es **`exclusive`** — ⭐ **y por eso NO se eligió**: con `exclusive`, un evento que llega **mientras se está
+recalculando** se **pierde**, y la ruta queda con fechas viejas hasta el siguiente evento, que puede tardar
+días. Verificado que **no hay red debajo**: el barrido de riesgo recalcula el **semáforo**, no el CPM.
+
+⇒ **Se eligió `stately`** (≤1 corriendo **+** ≤1 esperando) **y se reescribió el comentario para que
+describa `stately`**. *Se prefirió cambiar la frase a que el sistema pierda datos por respetarla.*
+
+**Las dos dudas, medidas:** `stately` **no acumula** (cota dura de 2 por clave) y el que espera **no arranca
+con datos viejos** (el payload es mínimo a propósito y el handler relee **después** de que el activo terminó).
+
+### 🔴 EL HALLAZGO QUE CAMBIÓ LA ETAPA: la política no se puede cambiar en caliente
+
+- `createQueue` sobre una cola que ya existe hace **`ON CONFLICT DO NOTHING`: la ignora en silencio**.
+- `updateQueue` **lanza** *«queue policy cannot be changed after creation»*.
+- Única vía: `deleteQueue` + `createQueue` — que **borra los jobs encolados y, por FK en cascada, el
+  `schedule`**.
+
+⇒ **Declarar la política y nada más habría sido código muerto en `prueba`: el mismo defecto una vuelta más
+arriba.** Por eso nació la **conciliación al arranque**, que **nunca lanza** (un tropiezo no puede dejar al
+sistema sin motor) y **verifica después** — necesario porque `deleteQueue` **se traga sus propios errores**.
+
+### 🔴 Y la etapa contra las mentiras en prosa **introdujo una**, en el contrato público
+
+`contrato/esquemas/indicadores.ts` decía *«`false` si el motor está inactivo»* — **cierto hasta ayer**:
+bajo `standard`, `send` **nunca** devolvía `null`. **Con `stately` deja de serlo**: el 2.º clic en
+«Refrescar KPIs» **también** da `false`. Y **viajaba a `openapi.json` ×2 y a `esquema.gen.ts`**.
+
+⇒ La descripción ahora nombra **las dos** causas, aclara que **`false` no es error**, y —esto es lo que
+impide que envejezca mal— **fecha el cambio**: *«hasta que la cola declaró política, (2) no podía ocurrir»*.
+
+### ⭐⭐ El guardián de prosa: se creía imposible, y no lo era
+
+El coder sostuvo que *«ningún gate detecta una mentira en prosa»*. **Falso en este repo**: hay una familia
+de guardianes que **leen el código real**. El reviewer escribió la prueba de concepto y la corrió en las dos
+direcciones; el coder la mejoró **anclando al bloque que promete, no al archivo** —porque en un archivo la
+promesa vivía en el JSDoc de una función— con `expect(posAncla).toBeGreaterThan(0)` para que **renombrar la
+función falle ruidoso en vez de dejar de vigilar**.
+
+⭐ **Y lo extendió al CONTRATO**, exigiendo `/dedup/i` en vez de `` `stately` ``: *el contrato habla el
+idioma del negocio; pedirle vocabulario de pg-boss lo habría vuelto frágil sin ganar nada.*
+
+**Atacado siete veces** (mover el texto a un `//`, renombrar la función, borrar la mención, revertir el
+`.describe()`, colar un `eslint-disable`…): **las siete caen**.
+
+> **La asimetría que lo justifica, en palabras del reviewer:** *«construyó una prueba para que la LIBRERÍA
+> no invalide la promesa en silencio, y dejó sin guarda que la invalide una PERSONA. El riesgo humano es el
+> que de hecho ocurrió.»*
+
+### ⭐ La conducta que vale más que el arreglo: dos argumentos rechazados por no reproducirse
+
+1. **El reviewer aportó** que `exclusive` *«no sólo perdería eventos: perdería reintentos»*. **El coder lo
+   midió, le salió distinto, y se negó a escribirlo:** *«prefiero no escribir en el ADR un argumento que no
+   reproduzco»*.
+2. **El reviewer lo verificó y se dio la razón a él**, encontrando que estaba **doblemente equivocado**: su
+   evidencia vivía en un camino de código **que sólo corre en CockroachDB** —muerto en este sistema— y ese
+   mismo comentario **lista `stately` PRIMERO**, así que nunca diferenció una política de la otra.
+
+> **Un ADR es un registro de razones; una razón que nadie reproduce es la semilla del próximo comentario
+> falso.** Meterlo habría hecho que la etapa contra las mentiras en prosa **cometiera una en su propio ADR**.
+
+### Lo que el barrido encontró de más
+
+- **La misma frase falsa vivía en `cpm-job.ts` y `kpis.ts`**; dos más eran imprecisas.
+- ⭐ **`respaldo-bd.ts` YA decía la verdad** — *«alguien lo sabía y lo dejó escrito a dos archivos de
+  distancia de la frase falsa»*. Es el mejor argumento de por qué la prosa necesita guarda.
+- **`ADR-0012` seguía con la frase original**, y hoy es falsa **al revés**: describía `exclusive`, **justo
+  lo que se decidió no hacer**. Corregido con un recuadro que lo dice.
+- 🔴 **Y una tercera frase falsa suya que nadie había visto**: decía que a las colas de cron las protege un
+  índice que en realidad se aplica a **otra cola interna**, no a la nuestra.
+
+### Cierre
+
+**Gates:** backend `typecheck`/`lint`/`format:check` · **2,421** · frontend los cuatro. **Contrato en sync.**
+**Sin migración de Prisma** (los índices son del esquema de pg-boss) · **sin permisos · sin seed** ⇒ **no
+requiere `SEED_ON_START`**.
+
+⚠️ **Para el deploy:** al **primer** arranque en `prueba` el log dirá **dos veces «se RECREA»**
+(`rc-recalcular-ruta` y `kpi-refrescar`) **en ROJO**, porque salen por `registrarError`. **Son esperadas y
+ocurren una sola vez**; en los arranques siguientes, ninguna.
+
+📌 **Deuda menor anotada:** el anclaje del guardián se puede evadir con un **bloque señuelo** que contenga
+los cuatro tokens. **No se cierra a propósito**: no se escribe por accidente, la variante realista —un
+comentario inocuo arriba— **sí cae en rojo**, y cerrarlo exige una lista negra que rompe la forma positiva.
+
+---
+
 ## V1-E9g · LA BÚSQUEDA ENTIENDE LOS DOS NOMBRES (1-sep-2026, versión **0.075**) — ✅ HECHA
 
 **La decisión de Daniel (§Post-F9.172(a)):** *«Está bien la 3.»*
