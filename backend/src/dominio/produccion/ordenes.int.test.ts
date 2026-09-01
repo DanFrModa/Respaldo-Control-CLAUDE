@@ -782,6 +782,101 @@ describe('Órdenes (F2-E2) — comentarios inmutables (ComentaOrd)', () => {
     expect(conDos.comentarios[0]?.comentario).toBe('El estampado lleva puff');
     expect(conDos.comentarios[0]?.idUsuario).toBe(s.id);
   });
+
+  /**
+   * ⭐ V1 «los nombres, en vez de los ids» — el panel de comentarios pintaba el id crudo porque el
+   * contrato NO mandaba el nombre. `OrdenComentario.idUsuario` no tiene FK física (es un log
+   * inmutable), así que el nombre no llega solo: lo resuelve el servidor. Mismo patrón que ya usaba
+   * `NegociacionEvento` (V1-E8q).
+   */
+  it('🔴 cada comentario sale con el NOMBRE de quien lo escribió (resuelto en el servidor)', async () => {
+    const autor = await cliente.usuario.create({
+      data: {
+        username: 'dmasri-comentarios',
+        nombre: 'Daniel Masri',
+        email: 'dmasri-comentarios@control.local',
+      },
+    });
+    const s = sesion([...PERM_TODOS]);
+    const sesionAutor = { ...s, id: autor.id };
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await agregarComentarioOrden(
+      sesionAutor,
+      orden.id,
+      { comentario: 'Adelantar la entrega' },
+      bd(),
+    );
+
+    const conNombre = await obtenerOrden(s, orden.id, bd());
+    expect(conNombre.comentarios[0]?.idUsuario).toBe(autor.id);
+    expect(conNombre.comentarios[0]?.nombreUsuario).toBe('Daniel Masri');
+  });
+
+  /**
+   * 🔴 D3 — un autor que ya no resuelve deja el nombre en `null` y el comentario SE SIGUE LEYENDO.
+   * Dar de baja a alguien no borra lo que escribió. (`sesion()` usa el id 'usuario-prueba', que no
+   * existe como fila en la BD: es justo el caso del id sin usuario.)
+   */
+  it('un autor desconocido deja el nombre en null pero NO pierde el comentario', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await agregarComentarioOrden(s, orden.id, { comentario: 'sin autor resoluble' }, bd());
+
+    const leida = await obtenerOrden(s, orden.id, bd());
+    expect(leida.comentarios[0]?.nombreUsuario).toBeNull();
+    expect(leida.comentarios[0]?.comentario).toBe('sin autor resoluble');
+  });
+
+  /**
+   * El LISTADO también trae el nombre, y lo resuelve para la PÁGINA COMPLETA de una sola consulta:
+   * `aOrdenSalida` es síncrona a propósito para que no se pueda colar un N+1 por renglón.
+   *
+   * 🔴 Por eso hay DOS órdenes con autores DISTINTOS y se asevera sobre la que NO va primera. El
+   * orden por defecto es `folio desc`, así que una sola orden cae SIEMPRE en el renglón 0 y un
+   * `datos.slice(0, 1).flatMap(...)` —resolver sólo el primer renglón— pasaría en verde. Con la
+   * segunda orden abajo, esa mutación muere.
+   */
+  it('el listado resuelve la PÁGINA COMPLETA, no sólo el primer renglón', async () => {
+    const gabriel = await cliente.usuario.create({
+      data: {
+        username: 'gabriel-listado',
+        nombre: 'Gabriel Núñez',
+        email: 'gabriel-listado@control.local',
+      },
+    });
+    const ana = await cliente.usuario.create({
+      data: { username: 'ana-listado', nombre: 'Ana Ruiz', email: 'ana-listado@control.local' },
+    });
+    const s = sesion([...PERM_TODOS]);
+
+    // La PRIMERA que se crea lleva el folio menor ⇒ con `folio desc` queda ABAJO. Es sobre ésa
+    // sobre la que se asevera.
+    const vieja = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await agregarComentarioOrden(
+      { ...s, id: gabriel.id },
+      vieja.id,
+      { comentario: 'la de abajo' },
+      bd(),
+    );
+    const nueva = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await agregarComentarioOrden(
+      { ...s, id: ana.id },
+      nueva.id,
+      { comentario: 'la de arriba' },
+      bd(),
+    );
+
+    const pagina = await listarOrdenes(s, {}, bd());
+    const posVieja = pagina.datos.findIndex((o) => o.id === vieja.id);
+    const posNueva = pagina.datos.findIndex((o) => o.id === nueva.id);
+    // Guardia de la propia prueba: si `vieja` cayera primera, el `slice(0, 1)` sobreviviría y esta
+    // prueba no estaría probando lo que su nombre dice.
+    expect(posNueva).toBeLessThan(posVieja);
+    expect(posVieja).toBeGreaterThan(0);
+
+    expect(pagina.datos[posNueva]?.comentarios[0]?.nombreUsuario).toBe('Ana Ruiz');
+    expect(pagina.datos[posVieja]?.comentarios[0]?.nombreUsuario).toBe('Gabriel Núñez');
+  });
 });
 
 describe('Órdenes (F2-E2) — bitácora (A7)', () => {

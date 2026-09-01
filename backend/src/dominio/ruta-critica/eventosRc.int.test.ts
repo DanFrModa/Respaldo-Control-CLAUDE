@@ -22,7 +22,7 @@ import { autorizarOC, cancelarOC, crearOC, desautorizarOC } from '../compras/ord
 import { cancelarNotaSalida, confirmarNotaSalida, crearNotaSalida } from '../notas/notas-salida.js';
 import { capturarResultado, crearAuditoria } from '../calidad/auditorias.js';
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
-import { cancelarHito, registrarHito } from './hitosOrden.js';
+import { cancelarHito, listarHitosOrden, registrarHito } from './hitosOrden.js';
 import { procesarEventoAutoAvance } from './autoAvance.js';
 
 /**
@@ -345,5 +345,45 @@ describe('hitos de la orden (post-F9)', () => {
     await expect(registrarHito(sesion(), idOrden, { tipo: 'fit' }, bd())).rejects.toBeInstanceOf(
       ErrorConflicto,
     );
+  });
+
+  /**
+   * ⭐ V1 «los nombres, en vez de los ids» — `listarHitosOrden` resuelve `nombreRegistradoPor` en el
+   * servidor (`HitoOrden.registradoPorId` no tiene FK física, es un registro inmutable).
+   *
+   * 🔴 Por qué esta prueba tiene que existir y ser de INTEGRACIÓN: si el servidor devolviera `null`
+   * aquí, la pantalla NO cae al id — pinta «Usuario dado de baja» en TODOS los renglones, o sea
+   * dejaría por escrito que a una persona la dieron de baja cuando ahí sigue. Las pruebas de
+   * frontend no pueden verlo porque mockean el API.
+   */
+  it('🔴 cada hito sale con el NOMBRE de quien lo registró (resuelto en el servidor)', async () => {
+    const autor = await cliente.usuario.create({
+      data: {
+        username: 'gabriel-hitos',
+        nombre: 'Gabriel Núñez',
+        email: 'gabriel-hitos@control.local',
+      },
+    });
+    const sesionAutor = { ...sesion(), id: autor.id };
+    await registrarHito(sesionAutor, idOrden, { tipo: 'empaque', fecha: '2026-06-20' }, bd());
+
+    const hitos = await listarHitosOrden(sesion(), idOrden, bd());
+    const empaque = hitos.find((h) => h.tipo === 'empaque');
+    expect(empaque?.registradoPorId).toBe(autor.id);
+    expect(empaque?.nombreRegistradoPor).toBe('Gabriel Núñez');
+  });
+
+  /**
+   * 🔴 D3 — un id que ya no resuelve deja el nombre en `null` y el hito SE SIGUE VIENDO.
+   * (`sesion()` usa el id 'usuario-prueba', que no existe como fila en la BD.)
+   */
+  it('un autor desconocido deja el nombre en null pero NO pierde el hito', async () => {
+    await registrarHito(sesion(), idOrden, { tipo: 'tonoTela', fecha: '2026-06-21' }, bd());
+
+    const hitos = await listarHitosOrden(sesion(), idOrden, bd());
+    const tono = hitos.find((h) => h.tipo === 'tonoTela');
+    expect(tono).toBeDefined();
+    expect(tono?.nombreRegistradoPor).toBeNull();
+    expect(tono?.fecha).toBe('2026-06-21');
   });
 });

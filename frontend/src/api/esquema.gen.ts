@@ -22660,6 +22660,8 @@ export interface paths {
                   id: number;
                   /** @description Usuario que lo escribió, o null. */
                   idUsuario: string | null;
+                  /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                  nombreUsuario: string | null;
                   /** @description Texto del comentario. */
                   comentario: string;
                   /**
@@ -24228,6 +24230,8 @@ export interface paths {
                   id: number;
                   /** @description Usuario que lo escribió, o null. */
                   idUsuario: string | null;
+                  /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                  nombreUsuario: string | null;
                   /** @description Texto del comentario. */
                   comentario: string;
                   /**
@@ -24531,6 +24535,8 @@ export interface paths {
                 id: number;
                 /** @description Usuario que lo escribió, o null. */
                 idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
                 /** @description Texto del comentario. */
                 comentario: string;
                 /**
@@ -24794,6 +24800,8 @@ export interface paths {
                 id: number;
                 /** @description Usuario que lo escribió, o null. */
                 idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
                 /** @description Texto del comentario. */
                 comentario: string;
                 /**
@@ -25074,6 +25082,8 @@ export interface paths {
                 id: number;
                 /** @description Usuario que lo escribió, o null. */
                 idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
                 /** @description Texto del comentario. */
                 comentario: string;
                 /**
@@ -25358,6 +25368,8 @@ export interface paths {
                 id: number;
                 /** @description Usuario que lo escribió, o null. */
                 idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
                 /** @description Texto del comentario. */
                 comentario: string;
                 /**
@@ -25631,6 +25643,8 @@ export interface paths {
                 id: number;
                 /** @description Usuario que lo escribió, o null. */
                 idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
                 /** @description Texto del comentario. */
                 comentario: string;
                 /**
@@ -25903,6 +25917,8 @@ export interface paths {
                 id: number;
                 /** @description Usuario que lo escribió, o null. */
                 idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
                 /** @description Texto del comentario. */
                 comentario: string;
                 /**
@@ -26179,6 +26195,8 @@ export interface paths {
                 id: number;
                 /** @description Usuario que lo escribió, o null. */
                 idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
                 /** @description Texto del comentario. */
                 comentario: string;
                 /**
@@ -27122,6 +27140,8 @@ export interface paths {
                 id: number;
                 /** @description Usuario que lo escribió, o null. */
                 idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
                 /** @description Texto del comentario. */
                 comentario: string;
                 /**
@@ -31716,6 +31736,8 @@ export interface paths {
                 urlDescarga: string;
                 /** @description Quién subió el archivo, o null. */
                 subidoPorId: string | null;
+                /** @description Nombre de quien lo subió; null si el id no resuelve (el adjunto se sigue viendo). */
+                nombreSubidoPor: string | null;
                 /**
                  * Format: date-time
                  * @description Fecha en que se adjuntó (ISO 8601).
@@ -69535,6 +69557,8 @@ export interface paths {
               tipo: 'revisionOp' | 'fit' | 'tonoTela' | 'avios' | 'empaque' | 'arte';
               /** @description Usuario que registró el hito (o null). */
               registradoPorId: string | null;
+              /** @description Nombre de quien lo registró; null si el id no resuelve (el hito se sigue viendo). */
+              nombreRegistradoPor: string | null;
               /**
                * Format: date
                * @description Fecha física del hito (YYYY-MM-DD).
@@ -69678,6 +69702,8 @@ export interface paths {
               tipo: 'revisionOp' | 'fit' | 'tonoTela' | 'avios' | 'empaque' | 'arte';
               /** @description Usuario que registró el hito (o null). */
               registradoPorId: string | null;
+              /** @description Nombre de quien lo registró; null si el id no resuelve (el hito se sigue viendo). */
+              nombreRegistradoPor: string | null;
               /**
                * Format: date
                * @description Fecha física del hito (YYYY-MM-DD).
@@ -69829,6 +69855,8 @@ export interface paths {
               tipo: 'revisionOp' | 'fit' | 'tonoTela' | 'avios' | 'empaque' | 'arte';
               /** @description Usuario que registró el hito (o null). */
               registradoPorId: string | null;
+              /** @description Nombre de quien lo registró; null si el id no resuelve (el hito se sigue viendo). */
+              nombreRegistradoPor: string | null;
               /**
                * Format: date
                * @description Fecha física del hito (YYYY-MM-DD).
@@ -90400,6 +90428,8 @@ export interface paths {
                 apagadoEn: string | null;
                 /** @description Quién lo apagó, o null. */
                 apagadoPorId: string | null;
+                /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+                nombreApagadoPor: string | null;
                 /** @description Motivo por el que se apagó, o null. */
                 motivoApagado: string | null;
                 /**
@@ -90623,6 +90653,8 @@ export interface paths {
                 apagadoEn: string | null;
                 /** @description Quién lo apagó, o null. */
                 apagadoPorId: string | null;
+                /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+                nombreApagadoPor: string | null;
                 /** @description Motivo por el que se apagó, o null. */
                 motivoApagado: string | null;
                 /**
@@ -90851,6 +90883,8 @@ export interface paths {
                 apagadoEn: string | null;
                 /** @description Quién lo apagó, o null. */
                 apagadoPorId: string | null;
+                /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+                nombreApagadoPor: string | null;
                 /** @description Motivo por el que se apagó, o null. */
                 motivoApagado: string | null;
                 /**
@@ -91072,6 +91106,8 @@ export interface paths {
                 apagadoEn: string | null;
                 /** @description Quién lo apagó, o null. */
                 apagadoPorId: string | null;
+                /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+                nombreApagadoPor: string | null;
                 /** @description Motivo por el que se apagó, o null. */
                 motivoApagado: string | null;
                 /**
@@ -91297,6 +91333,8 @@ export interface paths {
                 apagadoEn: string | null;
                 /** @description Quién lo apagó, o null. */
                 apagadoPorId: string | null;
+                /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+                nombreApagadoPor: string | null;
                 /** @description Motivo por el que se apagó, o null. */
                 motivoApagado: string | null;
                 /**
@@ -91478,6 +91516,8 @@ export interface paths {
               apagadoEn: string | null;
               /** @description Quién lo apagó, o null. */
               apagadoPorId: string | null;
+              /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+              nombreApagadoPor: string | null;
               /** @description Motivo por el que se apagó, o null. */
               motivoApagado: string | null;
               /**
@@ -91666,6 +91706,8 @@ export interface paths {
               apagadoEn: string | null;
               /** @description Quién lo apagó, o null. */
               apagadoPorId: string | null;
+              /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+              nombreApagadoPor: string | null;
               /** @description Motivo por el que se apagó, o null. */
               motivoApagado: string | null;
               /**
@@ -91833,6 +91875,8 @@ export interface paths {
               apagadoEn: string | null;
               /** @description Quién lo apagó, o null. */
               apagadoPorId: string | null;
+              /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+              nombreApagadoPor: string | null;
               /** @description Motivo por el que se apagó, o null. */
               motivoApagado: string | null;
               /**
@@ -92001,6 +92045,8 @@ export interface paths {
               apagadoEn: string | null;
               /** @description Quién lo apagó, o null. */
               apagadoPorId: string | null;
+              /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+              nombreApagadoPor: string | null;
               /** @description Motivo por el que se apagó, o null. */
               motivoApagado: string | null;
               /**
@@ -92173,6 +92219,8 @@ export interface paths {
               apagadoEn: string | null;
               /** @description Quién lo apagó, o null. */
               apagadoPorId: string | null;
+              /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+              nombreApagadoPor: string | null;
               /** @description Motivo por el que se apagó, o null. */
               motivoApagado: string | null;
               /**
@@ -92342,6 +92390,8 @@ export interface paths {
               apagadoEn: string | null;
               /** @description Quién lo apagó, o null. */
               apagadoPorId: string | null;
+              /** @description Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo). */
+              nombreApagadoPor: string | null;
               /** @description Motivo por el que se apagó, o null. */
               motivoApagado: string | null;
               /**
@@ -94331,6 +94381,8 @@ export interface paths {
                 urlDescarga: string;
                 /** @description Quién subió el archivo, o null. */
                 subidoPorId: string | null;
+                /** @description Nombre de quien lo subió; null si el id no resuelve (el adjunto se sigue viendo). */
+                nombreSubidoPor: string | null;
                 /**
                  * Format: date-time
                  * @description Fecha en que se adjuntó (ISO 8601).

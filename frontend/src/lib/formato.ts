@@ -111,6 +111,43 @@ export function autorDeEvento(evento: {
   registradoPorId: string | null;
   nombreRegistradoPor: string | null;
 }): string {
-  if (evento.registradoPorId === null) return 'Sistema';
-  return evento.nombreRegistradoPor ?? 'Usuario dado de baja';
+  return nombreDeAutor(evento.registradoPorId, evento.nombreRegistradoPor) ?? 'Sistema';
+}
+
+/**
+ * ⭐ V1 «los nombres, en vez de los ids» — el MISMO criterio de {@link autorDeEvento}, pero suelto,
+ * para las tablas cuyo par de campos NO se llama `registradoPorId`/`nombreRegistradoPor`:
+ * `OrdenComentario` (`idUsuario`), `HitoOrden` (`registradoPorId`), `Archivo` (`subidoPorId`, en
+ * adjuntos de orden y de desarrollo) y `Desarrollo` (`apagadoPorId`). Cinco pantallas pintaban ahí
+ * el **id crudo** (`cm3x9k2q0000abcd1234`); tres de ellas en el MISMO diálogo de orden.
+ *
+ * Devuelve:
+ *  • `null` cuando NO hay id — «no lo hizo nadie». Se devuelve `null` en vez de `'Sistema'` para que
+ *    cada pantalla conserve lo que ya hacía en ese caso: el panel de comentarios dice «Sistema»,
+ *    mientras los adjuntos/hitos/desarrollos simplemente OMITEN el « · por …». Colapsarlo aquí
+ *    cambiaría cinco pantallas de golpe por un detalle que no es el de esta etapa.
+ *  • el nombre, cuando resuelve.
+ *  • `'Usuario dado de baja'` cuando hay id pero no nombre. 🔴 Nunca el id crudo: lo escribió una
+ *    PERSONA, y un cuid no nombra a nadie. Ojo — la baja es borrado SUAVE, así que el nombre de un
+ *    usuario inactivo SÍ resuelve y se sigue pintando (D3); este caso es el del id sin fila.
+ *
+ * ⚠️ El renglón se ve SIEMPRE, resuelva o no: dar de baja a alguien no borra lo que escribió.
+ *
+ * ## 🔴 La ÚNICA excepción, y por qué: la BITÁCORA
+ *
+ * `administracion/BitacoraPagina.tsx` usa `nombreUsuario ?? idUsuario ?? '(sistema)'` — o sea,
+ * cuando el nombre no resuelve **sí cae al id crudo**, en vez de decir «Usuario dado de baja». NO es
+ * un descuido y NO debe «arreglarse» para igualarlo:
+ *
+ *  • La bitácora es la pantalla de AUDITORÍA, y `idUsuario` es su **clave de filtro** (tiene un campo
+ *    «Id de usuario» a un centímetro). El id ahí es dato operable, no ruido.
+ *  • Un id que ya no resuelve es justo lo que un auditor necesita VER: es la última evidencia de
+ *    quién actuó. Sustituirlo por «Usuario dado de baja» **destruiría información forense**.
+ *
+ * En las pantallas OPERATIVAS (las de esta función) manda lo contrario: nadie filtra por cuid, y un
+ * cuid no nombra a nadie. Ambas reglas son deliberadas; esto es lo que dice cuál gobierna dónde.
+ */
+export function nombreDeAutor(id: string | null, nombre: string | null): string | null {
+  if (id === null) return null;
+  return nombre ?? 'Usuario dado de baja';
 }

@@ -61,6 +61,11 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
+import {
+  nombreDeUsuario,
+  nombresDeUsuarios,
+  type ClienteUsuarios,
+} from '../../comun/nombres-usuario.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { num, numOrNull, redondear2, redondear4 } from '../costos/decimales.js';
 import {
@@ -97,27 +102,19 @@ type EventoConVersiones = Prisma.NegociacionEventoGetPayload<{ include: typeof i
 /**
  * Resuelve, de UNA consulta, el nombre de los autores de un lote de eventos (V1-E8q, §Post-F9.141).
  *
- * `NegociacionEvento.registradoPorId` NO tiene FK física al usuario —es un log INMUTABLE, igual que
- * `OrdenComentario`—, así que el nombre no viaja por `include`: hay que ir por él. Se hace en el
- * servidor y en bloque (nunca N+1, nunca desde el cliente, que no tiene de dónde sacarlo). Es el
- * mismo patrón que ya usa la bitácora (`admin/bitacora.ts`).
- *
- * Un autor que ya no existe devuelve `undefined` → el evento sale con `nombreRegistradoPor: null` y
- * el hilo se sigue leyendo completo: dar de baja a un usuario NO puede borrar la historia (D3).
+ * Hoy es un envoltorio delgado sobre {@link nombresDeUsuarios} (`comun/nombres-usuario.ts`), que es
+ * el sitio canónico: el bloque estaba copiado aquí y en la bitácora, y las cinco pantallas que
+ * pintaban el id crudo lo habrían copiado cinco veces más. Se conserva el nombre porque expresa el
+ * concepto del módulo («los autores del hilo») y lo usan `negociacion` y `liga-orden`.
  */
 export async function nombresDeAutores(
-  cliente: Pick<Tx, 'usuario'>,
+  cliente: ClienteUsuarios,
   eventos: readonly { registradoPorId: string | null }[],
-): Promise<Map<string, string>> {
-  const ids = [
-    ...new Set(eventos.map((e) => e.registradoPorId).filter((id): id is string => id !== null)),
-  ];
-  if (ids.length === 0) return new Map();
-  const usuarios = await cliente.usuario.findMany({
-    where: { id: { in: ids } },
-    select: { id: true, nombre: true },
-  });
-  return new Map(usuarios.map((u) => [u.id, u.nombre]));
+): Promise<ReadonlyMap<string, string>> {
+  return nombresDeUsuarios(
+    cliente,
+    eventos.map((e) => e.registradoPorId),
+  );
 }
 
 /** Proyecta un evento a la salida del contrato (importes en null sin `consultas.ver-importes`). */
@@ -137,8 +134,7 @@ export function aEventoSalida(
     precioNuevo: verImportes ? numOrNull(evento.precioNuevo) : null,
     acuerdo: evento.acuerdo,
     registradoPorId: evento.registradoPorId,
-    nombreRegistradoPor:
-      evento.registradoPorId === null ? null : (nombrePorId.get(evento.registradoPorId) ?? null),
+    nombreRegistradoPor: nombreDeUsuario(nombrePorId, evento.registradoPorId),
     registradoEn: evento.registradoEn.toISOString(),
     // ⭐ V1-E8w — lo que Daniel llamó *"la información que vendí"*. `precioUnit`/`importe` son
     // dinero ⇒ tras la reja de importes; `consumo` no lo es (mismo criterio que el precosto), y sin

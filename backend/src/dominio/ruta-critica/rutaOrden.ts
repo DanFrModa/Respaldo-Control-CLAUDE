@@ -27,6 +27,7 @@ import type { Prisma } from '../../datos/index.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { COLAS_JOBS, encolarJob, type PayloadRecalcularRuta } from '../../comun/jobs/index.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
   clienteLectura,
@@ -274,7 +275,10 @@ export async function obtenerRutaOrden(
     include: INCLUDE_RUTA,
     orderBy: { secuencia: 'asc' },
   });
-  const nombres = await nombresCapturadores(cliente, filas);
+  const nombres = await nombresDeUsuarios(
+    cliente,
+    filas.map((f) => f.capturadoPorId),
+  );
   const rolesSesion = await idsRolesDeSesion(cliente, sesion);
   const motivoSinRuta = filas.length === 0 ? await motivoRcAutomatica(cliente, idOrden) : null;
   return armarDto(orden, filas, nombres, rolesSesion, motivoSinRuta);
@@ -648,7 +652,10 @@ export async function generarRutaOrden(
       include: INCLUDE_RUTA,
       orderBy: { secuencia: 'asc' },
     });
-    const nombres = await nombresCapturadores(tx, filas);
+    const nombres = await nombresDeUsuarios(
+      tx,
+      filas.map((f) => f.capturadoPorId),
+    );
     const rolesSesion = await idsRolesDeSesion(tx, sesion);
     const dto = armarDto(orden2, filas, nombres, rolesSesion);
     dto.advertencias = advertencias;
@@ -853,7 +860,10 @@ export async function ajustarRutaOrden(
       include: INCLUDE_RUTA,
       orderBy: { secuencia: 'asc' },
     });
-    const nombres = await nombresCapturadores(tx, filas);
+    const nombres = await nombresDeUsuarios(
+      tx,
+      filas.map((f) => f.capturadoPorId),
+    );
     const rolesSesion = await idsRolesDeSesion(tx, sesion);
     return { dto: armarDto(orden2, filas, nombres, rolesSesion), idEmpresa: orden.idEmpresa };
   }, bd);
@@ -1045,25 +1055,6 @@ async function cargarAristasRuta(
 }
 
 /**
- * Resuelve el nombre de cada `capturadoPorId` presente en los renglones, en UN solo viaje a la BD.
- * Devuelve el mapa `idUsuario -> nombre` (las ids sin usuario quedan fuera → se proyectan a null).
- */
-async function nombresCapturadores(
-  cliente: ReturnType<typeof clienteLectura>,
-  filas: RutaConRelaciones[],
-): Promise<Map<string, string>> {
-  const ids = [
-    ...new Set(filas.map((f) => f.capturadoPorId).filter((x): x is string => x !== null)),
-  ];
-  if (ids.length === 0) return new Map();
-  const usuarios = await cliente.usuario.findMany({
-    where: { id: { in: ids } },
-    select: { id: true, nombre: true },
-  });
-  return new Map(usuarios.map((u) => [u.id, u.nombre]));
-}
-
-/**
  * Proyecta orden + renglones al DTO de dominio. `nombresPorId` resuelve `capturadoPorNombre`
  * (F5-E5); `rolesSesion` deriva `esResponsableActual` (badge "tú", R4); `motivoSinRuta` viene de
  * bitácora cuando la orden no tiene ruta (R4).
@@ -1083,7 +1074,7 @@ function armarDto(
     modelo: { secuenciaEstampado: 'antes' | 'despues' | 'flexible' };
   },
   filas: RutaConRelaciones[],
-  nombresPorId: ReadonlyMap<string, string> = new Map(),
+  nombresPorId: ReadonlyMap<string, string>,
   rolesSesion: 'admin' | ReadonlySet<number> = new Set<number>(),
   motivoSinRuta: string | null = null,
 ): RutaOrdenDto {
@@ -1149,8 +1140,7 @@ function armarDto(
       diasRestantes: diasRestantesProceso(f.fechaPlaneadaVigente, hoy),
       estado: f.estado,
       capturadoPorId: f.capturadoPorId,
-      capturadoPorNombre:
-        f.capturadoPorId === null ? null : (nombresPorId.get(f.capturadoPorId) ?? null),
+      capturadoPorNombre: nombreDeUsuario(nombresPorId, f.capturadoPorId),
       capturadoEn: f.capturadoEn,
       origenCaptura: f.origenCaptura,
       parcialEnCurso: f.parcialEnCurso,
