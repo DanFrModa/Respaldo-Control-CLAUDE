@@ -1174,6 +1174,22 @@ export {
   type OrdenFotosOcultasLista,
 } from './esquemas/foto-oculta-orden.js';
 
+// ── Fotos del ARTE por ORDEN: heredar, ocultar y agregar (§Post-F9.177) ──
+export {
+  esquemaOrdenArteFotoOcultar,
+  esquemaOrdenArteFotoCrear,
+  esquemaOrdenArteFotoSubida,
+  esquemaOrdenArteFotoSalida,
+  esquemaOrdenArteConFotos,
+  esquemaOrdenArtesConFotosLista,
+  type DatosOrdenArteFotoOcultar,
+  type DatosOrdenArteFotoCrear,
+  type OrdenArteFotoSubida,
+  type OrdenArteFotoSalida,
+  type OrdenArteConFotos,
+  type OrdenArtesConFotosLista,
+} from './esquemas/foto-arte-orden.js';
+
 // ── Adjuntos / tech pack del desarrollo (rediseño R5, B16) ──
 export {
   esquemaDesarrolloAdjuntoCrear,

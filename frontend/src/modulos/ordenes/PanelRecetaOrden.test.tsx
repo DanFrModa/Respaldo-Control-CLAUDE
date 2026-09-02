@@ -2,7 +2,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ClavePermiso, RecetaOrden } from '@/api/tipos';
+import type { OrdenArteConFotos } from '@/api/fotos-arte-orden';
+import type { ClavePermiso, RecetaOrden, RecetaOrdenArte } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { PanelRecetaOrden } from './PanelRecetaOrden';
@@ -39,6 +40,31 @@ const catalogoMedidas = vi.fn<
 
 vi.mock('@/api/medidas-avio', () => ({
   useMedidasAvio: () => catalogoMedidas(),
+}));
+
+/*
+ * ⭐ §Post-F9.177 — LAS FOTOS DEL ARTE SON DE LA OP: el CABLEADO de la tira a la sección de Arte.
+ *
+ * 🔴 Este doble NO fabrica los datos: los devuelve **sólo para el `idOrden` que el cableado le
+ * pasa**. Si la pantalla consultara con otro id —o no consultara— el mapa no casa y todas las
+ * aserciones de abajo se caen. Es la lección de la 0.082: un doble que responde lo mismo pase lo que
+ * pase deja la prueba en verde CON el defecto dentro, y entonces no es una prueba.
+ */
+const fotosArtePorOrden = new Map<number, OrdenArteConFotos[]>();
+const useFotosArteOrdenMock = vi.fn((idOrden: number | undefined) => ({
+  data: idOrden === undefined ? undefined : fotosArtePorOrden.get(idOrden),
+}));
+const ocultarFotoArteMock = vi.fn();
+const mostrarFotoArteMock = vi.fn();
+const subirFotoArteMock = vi.fn();
+const quitarFotoArteMock = vi.fn();
+
+vi.mock('@/api/fotos-arte-orden', () => ({
+  useFotosArteOrden: (id: unknown) => useFotosArteOrdenMock(id as number | undefined),
+  useOcultarFotoArteOrden: () => ({ mutate: ocultarFotoArteMock, isPending: false }),
+  useMostrarFotoArteOrden: () => ({ mutate: mostrarFotoArteMock, isPending: false }),
+  useSubirFotoArteOrden: () => ({ mutate: subirFotoArteMock, isPending: false }),
+  useQuitarFotoArteOrden: () => ({ mutate: quitarFotoArteMock, isPending: false }),
 }));
 
 vi.mock('@/api/receta-orden', () => ({
@@ -1718,5 +1744,190 @@ describe('⭐⭐⭐ 0.085 — «ya está comprado» en la receta (§Post-F9.173(
     // ⛔ Y lo que NUNCA se le ofrece: des-autorizar la OC (es de Dirección; sería un 403 en la cara).
     expect(bloque).not.toHaveTextContent(/Des-?autorizar la/i);
     expect(within(bloque).getByTestId('oc-comprometida-12').closest('button')).not.toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐ §Post-F9.177 — **EL CABLEADO de las fotos del arte a su ÚNICA pantalla.**
+ *
+ * 🔴 Existe por un hallazgo de revisión: la tira estaba construida y probada por dentro
+ * (`FotosArteOrden.test.tsx`), pero **el elemento que la monta en la sección de Arte no lo tocaba ni
+ * una prueba**. Borrándolo entero, la suite del frontend seguía **verde de punta a punta** — y con
+ * ella el argumento de que un renglón EXCLUIDO no necesita guarda en el servidor *porque la pantalla
+ * no ofrece el botón*. ⭐ **Un control compensatorio sin prueba no es un control.**
+ *
+ * Lo que se fija aquí es exactamente lo que se caía en silencio:
+ *  • que la tira **se monta**, una por renglón de arte;
+ *  • que cada una recibe **el arte de SU renglón**, no el del vecino ni `undefined`;
+ *  • que el renglón **EXCLUIDO no ofrece los botones** (la mitad de pantalla del residuo del
+ *    servidor), y el vivo sí;
+ *  • y que la consulta sale con **el `idOrden` de la pantalla** — lo que hace honesto al doble.
+ */
+describe('PanelRecetaOrden · el cableado de las fotos del arte (§Post-F9.177)', () => {
+  /** Un renglón de arte de la receta de la OP, con lo mínimo que la sección pinta. */
+  function arteReceta(over: Partial<RecetaOrdenArte> & { id: number }): RecetaOrdenArte {
+    return {
+      tipo: 'arte',
+      estado: 'sin_revisar',
+      agregadoAMano: false,
+      excluido: false,
+      notas: null,
+      liberadoEn: null,
+      liberadoPor: null,
+      enElModelo: true,
+      cambios: [],
+      idModeloArte: 500,
+      descripcion: 'Arte',
+      posicion: null,
+      puntadas: null,
+      idTipoArte: 1,
+      tipoArte: 'Bordado',
+      codigoTipoArte: 'bordado',
+      usaPuntadas: true,
+      precio: 12,
+      idProveedor: null,
+      proveedor: null,
+      precioModelo: 12,
+      precioModeloDeCompra: false,
+      ...over,
+    };
+  }
+
+  /** Una foto HEREDADA del arte del modelo, tal como la devuelve el servidor. */
+  function fotoHeredada(
+    idModeloArteFoto: number,
+    nombre: string,
+  ): OrdenArteConFotos['fotos'][number] {
+    return {
+      origen: 'modelo',
+      idModeloArteFoto,
+      idFoto: null,
+      urlDescarga: `https://ej.test/${nombre}`,
+      nombreOriginal: nombre,
+      oculta: false,
+      principal: idModeloArteFoto % 10 === 0,
+    };
+  }
+
+  /** La fila `<tr>` de la tabla de Arte cuya descripción es la dada. */
+  function filaDe(descripcion: string): HTMLElement {
+    const celda = screen.getByText(descripcion);
+    const fila = celda.closest('tr');
+    expect(fila, `no se encontró la fila del arte "${descripcion}"`).not.toBeNull();
+    return fila as HTMLElement;
+  }
+
+  /** Receta con DOS artes: uno vivo («Logo pecho») y uno EXCLUIDO («Etiqueta vieja»). */
+  const VIVO = 30;
+  const EXCLUIDO = 31;
+  function recetaConDosArtes(): RecetaOrden {
+    return recetaDePrueba({
+      artes: [
+        arteReceta({ id: VIVO, descripcion: 'Logo pecho', idModeloArte: 500 }),
+        arteReceta({
+          id: EXCLUIDO,
+          descripcion: 'Etiqueta vieja',
+          idModeloArte: 501,
+          excluido: true,
+        }),
+      ],
+    });
+  }
+
+  beforeEach(() => {
+    useFotosArteOrdenMock.mockClear();
+    ocultarFotoArteMock.mockReset();
+    fotosArtePorOrden.clear();
+    // ⚠️ La clave es 50 porque es el `idOrden` con el que `render()` monta el panel. Si el cableado
+    // consultara con otro, el doble devuelve `undefined` y todo lo de abajo se cae.
+    fotosArtePorOrden.set(50, [
+      {
+        idOrdenArte: VIVO,
+        descripcion: 'Logo pecho',
+        agregadoAMano: false,
+        // DOS fotos: el conteo es lo que delata un arte cruzado con el del vecino.
+        fotos: [fotoHeredada(100, 'pecho-a.jpg'), fotoHeredada(101, 'pecho-b.jpg')],
+      },
+      {
+        idOrdenArte: EXCLUIDO,
+        descripcion: 'Etiqueta vieja',
+        agregadoAMano: false,
+        fotos: [fotoHeredada(200, 'etiqueta.jpg')],
+      },
+    ]);
+  });
+
+  it('🔴 monta la tira en CADA renglón de arte, con las fotos de SU renglón', () => {
+    render(recetaConDosArtes());
+
+    // La tira existe en las dos filas (si el elemento se borrara, esto es lo primero que revienta).
+    expect(screen.getAllByTestId('fotos-arte-orden')).toHaveLength(2);
+
+    // Y cada una trae LO SUYO: dos fotos el vivo, una el excluido. Un `arte={undefined}` daría cero
+    // en las dos; un arte cruzado daría los conteos al revés.
+    expect(within(filaDe('Logo pecho')).getAllByTestId('foto-arte-orden')).toHaveLength(2);
+    expect(within(filaDe('Etiqueta vieja')).getAllByTestId('foto-arte-orden')).toHaveLength(1);
+    // El `alt` amarra la foto a SU arte por nombre, no sólo por conteo.
+    expect(within(filaDe('Etiqueta vieja')).getByAltText(/Etiqueta vieja/)).toBeInTheDocument();
+  });
+
+  it('🔴 el renglón EXCLUIDO no ofrece NINGÚN botón; el vivo los ofrece todos', () => {
+    render(recetaConDosArtes());
+
+    const vivo = within(filaDe('Logo pecho'));
+    expect(vivo.getAllByTestId('ocultar-foto-arte-orden')).toHaveLength(2);
+    expect(vivo.getByTestId('subir-foto-arte-orden')).toBeInTheDocument();
+
+    // ⭐ Ésta es la mitad de pantalla del residuo declarado en el servidor («un renglón excluido se
+    // deja tocar por la API porque la pantalla no ofrece el botón»). Sin esta aserción, aquella
+    // permisividad se apoyaría en algo que nadie vigila.
+    const excluido = within(filaDe('Etiqueta vieja'));
+    expect(excluido.getByTestId('foto-arte-orden')).toBeInTheDocument();
+    expect(excluido.queryByTestId('ocultar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(excluido.queryByTestId('mostrar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(excluido.queryByTestId('quitar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(excluido.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+
+  it('sin `desarrollo.administrar` ninguna fila ofrece botones (la tira se sigue viendo)', () => {
+    render(recetaConDosArtes(), false, ['ordenes.ver']);
+
+    expect(screen.getAllByTestId('fotos-arte-orden')).toHaveLength(2);
+    expect(screen.getAllByTestId('foto-arte-orden')).toHaveLength(3);
+    expect(screen.queryByTestId('ocultar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+
+  it('el botón de la fila viva quita la foto de ESE renglón (llega hasta la mutación)', async () => {
+    const usuario = userEvent.setup();
+    render(recetaConDosArtes());
+
+    const botones = within(filaDe('Logo pecho')).getAllByTestId('ocultar-foto-arte-orden');
+    await usuario.click(botones[0] as HTMLElement);
+
+    expect(ocultarFotoArteMock).toHaveBeenCalledTimes(1);
+    expect(ocultarFotoArteMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      idOrdenArte: VIVO,
+      idModeloArteFoto: 100,
+    });
+  });
+
+  it('⭐ la consulta sale con el `idOrden` de la pantalla (lo que hace honesto al doble)', () => {
+    render(recetaConDosArtes());
+    expect(useFotosArteOrdenMock).toHaveBeenCalledWith(50);
+    // Y una sola consulta para TODOS los renglones, no una por fila.
+    expect(new Set(useFotosArteOrdenMock.mock.calls.map((c) => c[0]))).toEqual(new Set([50]));
+  });
+
+  it('mientras la consulta no responde, la sección de Arte se pinta igual (sin miniaturas)', () => {
+    fotosArtePorOrden.clear();
+    render(recetaConDosArtes());
+
+    expect(screen.getByTestId('receta-seccion-artes')).toBeInTheDocument();
+    expect(screen.getByText('Logo pecho')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('foto-arte-orden')).toHaveLength(0);
+    // Sin renglón resuelto tampoco se ofrece subir: no se sabría a qué arte colgarla.
+    expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
   });
 });

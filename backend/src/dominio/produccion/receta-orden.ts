@@ -950,8 +950,12 @@ export function resumirReceta(
  * desde la bandeja o desde la pantalla propia). Mismo patrón que las lecturas compartidas del
  * inventario cíclico (`exigirAlgunPermisoCiclico`): las MUTACIONES siguen exigiendo su permiso fino
  * con `verificarPermiso` — aquí no se afloja ninguna.
+ *
+ * Se EXPORTA para que las FOTOS DEL ARTE de la OP (`fotos-arte-orden.ts`, §Post-F9.177) apliquen
+ * exactamente la misma regla de lectura: son parte de la receta, y dos copias de este predicado se
+ * separarían en cuanto una de las dos cambiara.
  */
-function exigirVerLaReceta(sesion: SesionUsuario): void {
+export function exigirVerLaReceta(sesion: SesionUsuario): void {
   if (!tienePermiso(sesion, 'ordenes.ver') && !tienePermiso(sesion, 'desarrollo.ver')) {
     throw new ErrorPermiso(undefined, 'desarrollo.ver');
   }

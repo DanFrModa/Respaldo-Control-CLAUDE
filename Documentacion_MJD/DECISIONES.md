@@ -11909,7 +11909,7 @@ que ya existía era el mecanismo de la **prenda**, y él estaba enunciando el **
 | **PRENDA — heredar del modelo** | ✅ existe desde F2-E3 (ajuste jul-2026 **a petición suya**) |
 | **PRENDA — subir fotos propias a la OP** | ✅ existe (adjuntos de orden, presigned a R2) |
 | **PRENDA — quitar de la OP una heredada** | ✅ **construido el 1-sep** (versión **0.082**) — era la media frase que faltaba |
-| **ARTE — cualquier foto en la OP** | ❌ **NO EXISTE NADA**: `OrdenArte` no tiene campo de fotos, ningún endpoint las expone, ninguna pantalla las pinta ⇒ fila **0.093** |
+| **ARTE — cualquier foto en la OP** | ✅ **CONSTRUIDO el 1-sep (versión 0.083)** — heredar, quitar de la OP y subir propias, **y el arte AGREGADO A MANO por fin puede llevar foto** (antes imposible). El impreso de la OP respeta lo apagado y por fin saca el arte a mano. *(Antes de esa versión: no existía nada.)* ⏳ **Lo que queda: la «Ficha de arte» del estampador sigue sin imagen** ⇒ fila **0.094**, con default *sí* |
 
 🔴 **Agravante medido:** un arte **agregado a mano** en la OP (`idModeloArte = NULL`) **hoy no puede tener
 foto en absoluto** — no es que herede una que no quiere: **no hay dónde ponerla**.
@@ -11924,6 +11924,10 @@ cuatro veces. *(Si algún día quiere que la OP nazca en blanco, es cambiar el d
 📌 **Y la invariante que no se mueve (D3): OCULTAR NO ES BORRAR.** La galería del modelo no se toca nunca,
 R2 no se toca nunca, y **lo que una OP oculta las demás lo siguen viendo**.
 
-- **Aplica en:** la prenda → versión **0.082**. El **ARTE** → fila **0.093**. **Fecha:** 2026-09-01.
+> ✅ **LAS DOS MITADES ENTREGADAS EL MISMO DÍA:** la **prenda** en la **0.082** y el **arte** en la **0.083**. ⭐ Y en el arte el coder **corrigió el encargo del lead**: las fotos del arte de la OP las gobierna **`desarrollo.administrar`** —el permiso con el que Daniel dijo *«nadie va a tener permiso de modificar la OP más que yo»*— y no `ordenes.*`, que habría pintado el botón y devuelto **403**.
+>
+> ⏳ **Único cabo, numerado y esperando a Daniel (fila 0.094):** la **«Ficha de arte» que va al estampador** no imprime ninguna imagen, ni antes ni ahora. **Si la OP manda sobre la foto del arte, ése es el papel que el proveedor tiene en la mano.** Default: **sí debe llevarla**; barata, porque la 0.083 ya resuelve cuál foto manda.
+
+- **Aplica en:** la prenda → versión **0.082**. El **ARTE** → versión **0.083**. El impreso del estampador → fila **0.094**. **Fecha:** 2026-09-01.
 
 ---

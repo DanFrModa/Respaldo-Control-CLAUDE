@@ -87,6 +87,10 @@ import { listarAdjuntos, type AdjuntoOrdenConUrl } from '../adjuntos-orden.js';
 // propio: la impresión ya está autorizada por `ordenes.ver` y qué fotos lleva la OP es parte del
 // documento de la orden (mismo criterio que `leerFotosModelo`).
 import { leerIdsFotosOcultasOrden } from '../fotos-ocultas-orden.js';
+// ⭐ §Post-F9.177 — LAS FOTOS DEL ARTE SON DE LA OP: qué fotos heredadas apagó cada renglón y qué
+// fotos subió ESTA orden. Lectura de BAJO NIVEL, sin permiso propio: la impresión ya está
+// autorizada y qué arte lleva la OP es parte del documento de la orden.
+import { leerArteOrdenParaImpreso, type ArteOrdenFotosImpreso } from '../fotos-arte-orden.js';
 import { obtenerOrden } from '../ordenes.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin red ni BD) ──────────────────────────────────
@@ -304,6 +308,12 @@ export interface DepsImpreso {
    * `ModeloFoto`; vacío = la OP enseña todas (el caso normal y el de todo lo ya capturado).
    */
   leerIdsFotosOcultas?: typeof leerIdsFotosOcultasOrden;
+  /**
+   * ARTE de la orden con sus decisiones sobre fotos (§Post-F9.177): qué heredadas apagó cada
+   * renglón y qué fotos subió la OP. Vacío = ninguna decisión, y entonces el papel se comporta
+   * EXACTAMENTE como antes (el caso de todo lo ya capturado, REGLA 0-B).
+   */
+  leerArteOrdenFotos?: typeof leerArteOrdenParaImpreso;
   listarAdjuntos?: typeof listarAdjuntos;
   leerTelasCompradas?: LeerTelasCompradas;
 }
@@ -369,6 +379,7 @@ export async function armarDatosImpresoOrden(
   const leerRecetaImpreso = deps.leerRecetaParaImpreso ?? leerRecetaParaImpreso;
   const leerFotos = deps.leerFotosModelo ?? leerFotosModelo;
   const leerOcultas = deps.leerIdsFotosOcultas ?? leerIdsFotosOcultasOrden;
+  const leerArteFotos = deps.leerArteOrdenFotos ?? leerArteOrdenParaImpreso;
   const listarAdjuntosOrden = deps.listarAdjuntos ?? listarAdjuntos;
   const leerTelasOc = deps.leerTelasCompradas ?? leerTelasCompradasOrden;
 
@@ -430,18 +441,80 @@ export async function armarDatosImpresoOrden(
   const idsArteOrden = new Set(
     receta.artes.flatMap((a) => (a.idModeloArte === null ? [] : [a.idModeloArte])),
   );
-  const artesBom = porRondas(
-    bom.artes
-      .filter((a) => idsArteOrden.has(a.id))
-      .map((a, i) =>
-        a.fotos.map((foto, j) => ({
-          titulo: a.descripcion,
-          key: foto.key,
-          // Solo la PRIMERA foto del PRIMER arte es la principal (la que nunca se recorta).
-          principal: i === 0 && j === 0,
-        })),
-      ),
+
+  /*
+   * ⭐⭐ §Post-F9.177 — LO QUE **ESTA OP** DECIDIÓ SOBRE LAS FOTOS DEL ARTE, en su papel.
+   *
+   * Daniel: *"la OP es de donde cuelgan las fotos directamente, no del desarrollo… y aplica para
+   * fotos de la prenda pero también del arte"*. Si la pantalla deja de enseñar una foto y el
+   * impreso la sigue imprimiendo, es *"añadí lo nuevo y dejé lo viejo debajo"* — el mismo defecto
+   * que la 0.082 tuvo que cerrar aquí para la prenda.
+   *
+   * Dos cosas, y ninguna toca el arte del modelo (D3): las heredadas que este renglón APAGÓ no se
+   * imprimen (otra orden del mismo modelo las sigue imprimiendo), y las que ESTA OP subió sí.
+   *
+   * BEST-EFFORT como todo lo demás del bloque de imágenes: si la lectura truena, el papel sale con
+   * el arte del modelo tal cual —el comportamiento de antes de esta etapa—, nunca truncado.
+   */
+  let decisionesArte: ArteOrdenFotosImpreso[] = [];
+  try {
+    decisionesArte = await leerArteFotos(cliente, id);
+  } catch (error) {
+    console.warn(
+      `No se pudieron leer las decisiones de foto del arte de la orden ${String(id)} para su impreso.`,
+      error,
+    );
+  }
+  const decisionPorArteModelo = new Map(
+    decisionesArte.flatMap((d) => (d.idModeloArte === null ? [] : [[d.idModeloArte, d] as const])),
   );
+
+  const artesBom = porRondas([
+    ...bom.artes
+      .filter((a) => idsArteOrden.has(a.id))
+      .map((a, i) => {
+        const decision = decisionPorArteModelo.get(a.id);
+        const apagadas = new Set(decision?.ocultas ?? []);
+        return [
+          // ⚠️ La marca de PRINCIPAL se pone ANTES de descartar las apagadas, y por eso una foto
+          // apagada se lleva la estrella consigo: ser principal es una decisión sobre una foto
+          // concreta, no un puesto que la siguiente herede (mismo criterio que la prenda arriba y
+          // que el arte principal sin foto). Si esta OP apagó la primera foto del primer arte, este
+          // papel sale SIN principal — y el tope de la rejilla se comporta como siempre.
+          //
+          // ⚠️⚠️ **`principal` NO significa aquí lo mismo que en la pantalla** (§Post-F9.177). En el
+          // papel la lleva UNA sola imagen de todo el bloque —la primerísima del PRIMER arte— y es
+          // una GARANTÍA: `recortarArtes` la antepone y el tope jamás la deja fuera. En la tira de
+          // la receta (`listarFotosArteOrden`) hay una por ARTE y es sólo un distintivo. Ninguna de
+          // las dos se hereda del modelo: el arte del modelo no tiene foto principal.
+          ...a.fotos
+            .map((foto, j) => ({
+              titulo: a.descripcion,
+              key: foto.key,
+              // Solo la PRIMERA foto del PRIMER arte es la principal (la que nunca se recorta).
+              principal: i === 0 && j === 0,
+              apagada: apagadas.has(foto.idFoto),
+            }))
+            .filter((foto) => !foto.apagada)
+            .map(({ titulo, key, principal }) => ({ titulo, key, principal })),
+          // Las que subió ESTA OP van detrás de las heredadas de su mismo arte, y NUNCA son la
+          // principal (esa la elige el dueño del modelo en su ficha, no la orden).
+          ...(decision?.propias ?? []).map((foto) => ({
+            titulo: a.descripcion,
+            key: foto.key,
+            principal: false,
+          })),
+        ];
+      }),
+    // ⭐ El arte AGREGADO A MANO (`idModeloArte` null) no está en el BOM del modelo, así que hasta
+    // hoy NO PODÍA salir en el papel con imagen: no había de quién heredarla ni dónde subírsela.
+    // Va al final, después de los artes del modelo, para no desplazar al principal de su sitio.
+    ...decisionesArte
+      .filter((d) => d.idModeloArte === null)
+      .map((d) =>
+        d.propias.map((foto) => ({ titulo: d.descripcion, key: foto.key, principal: false })),
+      ),
+  ]);
   const presignados = await Promise.allSettled(
     artesBom.map(async (arte) => ({
       titulo: arte.titulo,

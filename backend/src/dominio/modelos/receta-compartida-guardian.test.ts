@@ -118,6 +118,17 @@ const EXCEPCIONES: Record<string, string> = {
   'migracion/loaders/fotos-modelos.ts':
     'Cargador del ETL de fotos del arte, sobre los mismos modelos migrados (`idModeloDesarrollo = ' +
     'NULL`) ⇒ resolver = identidad. Misma razón que `bom-modelos.ts`.',
+  // ⭐ §Post-F9.177 — y su argumento NO se queda en prosa: lo EJECUTA la prueba de más abajo
+  // («las fotos del arte por OP…»), que es la lección que dejó `versiones.ts`.
+  'src/dominio/produccion/fotos-arte-orden.ts':
+    'Las fotos del arte POR OP nunca parten de un modelo: la pertenencia se comprueba contra ' +
+    '`OrdenArte.idModeloArte`, la traza que la receta CONGELÓ, y ésa ya viene resuelta por linaje ' +
+    '(sus CUATRO escritores —copiar la receta al crear la orden, agregar un renglón, «traer del ' +
+    'modelo» y RESTAURAR un renglón— la sacan de `leerArtesModelo`, que resuelve por dentro). ' +
+    'Volver a ' +
+    'resolver aquí no sería una red: sería CONTRADECIR el dato congelado — si el linaje del modelo ' +
+    'cambiara después, la traza seguiría señalando el arte que la OP enseña y un guard re-resuelto ' +
+    'daría 404 sobre esa misma foto, que es justo el defecto que la prenda tuvo que esquivar.',
 };
 
 /** Carpetas que no son código de negocio (generado por Prisma, ayudas de prueba). */
@@ -245,6 +256,77 @@ describe('El guardián de las lecturas de receta (V1-E9b)', () => {
     expect(bom.slice(bom.indexOf('export async function leerMedidasAvioBom'))).toMatch(
       /resolverIdRecetaDeModelo\(tx, idModelo\)/,
     );
+  });
+
+  it('⭐ §Post-F9.177 — las fotos del arte por OP: la excepción, EJECUTADA (no en prosa)', () => {
+    // La lección de `versiones.ts` vive arriba: una excepción vale lo que vale su argumento, y un
+    // argumento en prosa no lo ejecuta nadie. Éstas son las tres patas de aquél, comprobadas.
+    const archivo = 'src/dominio/produccion/fotos-arte-orden.ts';
+    const fuente = codigo.get(archivo) ?? '';
+    // La excepción sigue haciendo falta (si dejara de leer la receta, hay que borrarla).
+    expect(lectores).toContain(archivo);
+
+    // 1️⃣ NO HAY POR DÓNDE RESOLVER: el archivo no nombra ni una vez un id de MODELO.
+    //    ⚠️ El ancla `(?![A-Za-z])` es lo que hace que la regla se pueda escribir: `idModeloArte` y
+    //    `idModeloArteFoto` —que el archivo usa a cada línea— llevan `idModelo` como SUBCADENA, así
+    //    que sin ella esto estaría rojo SIEMPRE y acabaría borrado o aflojado. Con ella dice
+    //    exactamente lo que quiere decir: aquí no entra un id de MODELO.
+    expect(fuente).not.toMatch(/\bidModelo(?![A-Za-z])/);
+    //    Y su única tabla de receta es `ModeloArteFoto`, filtrada SIEMPRE por la traza.
+    expect(fuente).toMatch(
+      /where: \{ id: idModeloArteFoto, idModeloArte: renglon\.idModeloArte \}/,
+    );
+    expect(fuente).toMatch(/where: \{ idModeloArte: \{ in: idsArte \} \}/);
+    //    (`.modeloArte.` con punto NO casa `.modeloArteFoto.`: la otra subcadena, también anclada.)
+    expect(fuente).not.toMatch(/\.(?:modeloTela|modeloAvio|modeloAvioTalla|modeloArte)\./);
+
+    // 2️⃣ LA TRAZA QUE SE COMPRUEBA VIENE RESUELTA: la canónica que la alimenta resuelve por dentro
+    //    (mismo candado que `leerMedidasAvioBom` más abajo).
+    const arteModelo = codigo.get('src/dominio/modelos/arte-modelo.ts') ?? '';
+    const desde = arteModelo.indexOf('export async function leerArtesModelo');
+    expect(desde).toBeGreaterThan(-1);
+    // ⚠️ La ventana se CIERRA en el siguiente bloque de documentación (= la siguiente función). Sin
+    // cerrarla, el `slice` arrastraría el resto del archivo —donde otras funciones también llaman al
+    // resolver— y la aserción pasaría con `leerArtesModelo` ya sin resolver: verde con el defecto
+    // dentro, que es exactamente lo que esta prueba existe para impedir.
+    const cuerpo = arteModelo.slice(desde, arteModelo.indexOf('\n/**', desde));
+    expect(cuerpo).toMatch(/resolverIdRecetaDeModelo\(tx, idModelo\)/);
+    expect(cuerpo.length).toBeLessThan(1500);
+
+    // 3️⃣ Y NADIE MÁS ESCRIBE `OrdenArte`: si alguien abre un escritor nuevo, aterriza AQUÍ y tiene
+    //    que decir de dónde saca la traza — que es lo único que sostiene los puntos 1 y 2.
+    const ESCRIBE_ORDEN_ARTE = /\.ordenArte\.(?:create|createMany|update|updateMany|upsert)\s*\(/;
+    const PUEDEN_ESCRIBIR: Record<string, string> = {
+      'src/dominio/produccion/receta-orden.ts':
+        'Los CUATRO sitios que escriben la traza —copiar la receta al crear la orden, agregar un ' +
+        'renglón, «traer del modelo» y RESTAURAR un renglón— sacan el id de `leerArtesModelo`, que ' +
+        'resuelve el linaje. (Eran «tres» en la primera cuenta: `restaurarRenglonReceta` faltaba. ' +
+        'La conclusión no cambia —también lee por la canónica— pero la enumeración sí, y es la que ' +
+        'sostiene esta excepción.)',
+      'src/dominio/produccion/migracion.ts':
+        'Sólo firma renglones ya existentes por `idOrden` (`liberadoEn`): no toca la traza.',
+    };
+    const escritores = fuentes.filter((f) => ESCRIBE_ORDEN_ARTE.test(codigo.get(f) ?? ''));
+    expect(escritores.filter((f) => !(f in PUEDEN_ESCRIBIR))).toEqual([]);
+    expect(escritores).toEqual(expect.arrayContaining(Object.keys(PUEDEN_ESCRIBIR)));
+    // El de la receta importa la canónica…
+    const receta = codigo.get('src/dominio/produccion/receta-orden.ts') ?? '';
+    expect(receta).toMatch(/import \{ leerArtesModelo \} from '\.\.\/modelos\/arte-modelo\.js';/);
+    // …y los CUATRO escritores que la razón enumera siguen existiendo con ese nombre. La cuenta
+    // empezó siendo «tres» (faltaba `restaurarRenglonReceta`) y es la que sostiene la excepción: si
+    // alguien renombra o borra uno, aterriza aquí en vez de dejar la razón hablando de fantasmas.
+    for (const escritor of [
+      'copiarRecetaDelModelo',
+      'agregarRenglonReceta',
+      'traerDelModelo',
+      'restaurarRenglonReceta',
+    ]) {
+      expect(receta, `el escritor "${escritor}" ya no existe: corrige la razón`).toMatch(
+        new RegExp(`function ${escritor}\\b`),
+      );
+    }
+    // …y el del ETL, tal como dice su razón, ni menciona la traza.
+    expect(codigo.get('src/dominio/produccion/migracion.ts') ?? '').not.toMatch(/idModeloArte/);
   });
 
   it('🔴 quien trae la receta por `include` TIENE que injertarla, no sólo importar el resolver', () => {

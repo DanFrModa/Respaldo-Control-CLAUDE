@@ -1218,6 +1218,99 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9o · ⭐⭐ LAS FOTOS DEL ARTE SON DE LA OP (1-sep-2026, versión **0.083**) — ✅ HECHA
+
+Fila **0.093**. Daniel (§Post-F9.177): *«aplica para fotos de la prenda **pero también del arte**»*. La
+prenda salió en la 0.082; aquí **no había nada que arreglar: había que construirlo entero** —`OrdenArte`
+no tenía fotos, ningún endpoint las exponía, ninguna pantalla las pintaba— y un arte **agregado a mano**
+no podía llevar foto **en absoluto**.
+
+### 🔴 El coder CORRIGIÓ EL ENCARGO en permisos, y tenía razón
+
+El lead dijo *«reusa `ordenes.ver`/`ordenes.administrar`»*. **Falso para esta pantalla:** la receta de la OP
+la gobierna **`desarrollo.administrar`** desde §Post-F9.72 (*«nadie va a tener permiso de modificar la OP
+más que yo»*), con lectura `ordenes.ver` **O** `desarrollo.ver` (`exigirVerLaReceta`, V1-E3j).
+⇒ con `ordenes.administrar`, **`RecetaOrdenPagina.tsx:45` pintaría el botón y el servidor devolvería 403**
+a quien sí puede cambiarle a ese mismo renglón la descripción, el precio y el proveedor. *«No es teórico,
+es aritmética de esa línea»* (reviewer). **Sin permisos nuevos**, `seed.ts` intacto.
+
+### La decisión de diseño: (B) heredar, contra la corazonada del lead
+
+`OrdenArte` **congela** el resto de sus campos, así que (A) congelar las fotos *sonaba* coherente — era la
+inclinación del lead. **Se cae al medir, y las tres razones son del código:**
+
+1. 🔴 **Congelar deshacía la 0.081.** `borrarArchivoSiQuedoHuerfano` cuenta **sólo `modeloArteFoto`**; unas
+   filas congeladas compartiendo `idArchivo` —que es **lo que ya hace `copiarArte`**— se irían **por
+   CASCADE con su objeto de R2**. Y enseñarle esa cuenta la tabla de la OP **deshace el arreglo de hace
+   unas horas**.
+2. **`copiarRecetaDelModelo` sólo corre al crear la orden** ⇒ sin backfill (REGLA 0-B), **todas las órdenes
+   existentes se quedarían sin fotos de arte en su impreso**, que **hoy sí las llevan**. *REGLA 0-B no es
+   permiso para romper lo que funciona.*
+3. **`calcularDesalineacion` nunca compara fotos** ⇒ una foto ganada después no llegaría y nadie se
+   enteraría.
+⭐ **Y una cuarta que añadió el reviewer:** congelar dejaría el arte con precio y fotos congelados
+**mientras la prenda hereda** ⇒ **dos modelos mentales para la misma frase de Daniel**.
+
+⭐ **Heredar sale MÁS BARATO aquí que en la prenda:** `OrdenArte.idModeloArte` **ya viene resuelto por
+linaje** (sus **cuatro** escritores lo sacan de `leerArtesModelo`, que resuelve por dentro) ⇒ el guard no
+repite `idModeloDeLasFotos` y **el 404 absurdo de la 0.078 no puede ocurrir**.
+
+**Dos tablas** (espejo de la prenda): `OrdenArteFotoOculta` (marca reversible) y `OrdenArteFoto` (las
+propias — **lo único que le da foto al arte a mano**). Migración **100 % aditiva**, verificada por el
+reviewer **carácter por carácter** contra `migrate diff`: 11 sentencias, ni un `ALTER` sobre nada existente.
+
+### 🔴 EL RECHAZO: el cableado a su ÚNICA pantalla no tenía NI UNA prueba
+
+El reviewer borró el `<FotosArteOrden>` entero ⇒ **1 967/1 967 en verde**. Y dos mutaciones más finas
+también sobrevivían: un renglón **excluido ofreciendo los botones**, y la tira **siempre vacía**.
+
+⭐⭐ **Y lo que lo volvió bloqueante:** el residuo declarado *«el excluido se deja tocar por la API porque
+la pantalla esconde el botón»* apoyaba una permisividad **deliberada** del servidor en un comportamiento de
+pantalla **que ninguna prueba protegía**.
+> **Un control compensatorio sin prueba no es un control.**
+
+**El cierre:** 6 pruebas sobre una receta con **dos** renglones (uno vivo, uno excluido), **sin doblar
+`FotosArteOrden`** (DOM real). ⭐ **El doble es honesto por construcción**: devuelve datos **sólo para el
+`idOrden` que el cableado le pasa**.
+
+**Y el reviewer lo demostró en dos pasos, que es la parte que vale:**
+- cableado roto **+ doble honesto** → **5 fallos** (caen las 4 aserciones de DOM **además** de la del id);
+- cableado roto **+ doble deshonesto** (ignorando el argumento) → **1 solo fallo**: las 4 de DOM **verdes
+  con el defecto dentro**.
+⇒ *la honestidad del doble es lo que las hace reales*. Y queda **red doble**: aun con el doble corrompido,
+la aserción del `idOrden` lo caza.
+
+### 🔴 `armarAvisos` era un FANTASMA — y la corrección se volvió permanente
+
+La tercera justificación citaba una función **inexistente**; la real es `calcularDesalineacion`. El fondo
+era cierto, pero el identificador estaba escrito **hasta en el SQL de la migración** — y **el lead lo
+propagó** al encargo del reviewer.
+⭐ **No se arregló sólo donde estaba:** el guardián ahora **comprueba que los cuatro escritores sigan
+existiendo con ese nombre**, así que un renombre aterriza ahí *«en vez de dejar la razón hablando de
+fantasmas otra vez»*. El reviewer renombró los cuatro, uno por uno: **los cuatro lo ponen en rojo**; añadió
+un escritor nuevo fuera del allowlist: **rojo**; quitó el resolver: **rojo**.
+
+### Verificación
+
+**61 mutaciones del coder + 19 del reviewer.** ⭐ **Cinco de las suyas sobrevivieron primero y cada una
+destapó un hueco real** — la mejor, **F06**: su prueba de *«rechaza un PDF»* **no probaba nada**, porque
+`userEvent.upload` respeta el `accept="image/*"` y **descartaba el archivo antes de tocar el componente**
+⇒ **verde con la guarda borrada**. Corregida con `applyAccept: false`.
+
+**Gates:** backend **2 656** · frontend **1 973** · typecheck ×2 · lint ×2 · format ×2 · **cero drift**.
+⚠️ El coder declaró que su primera corrida murió con **exit 143 (`Terminated`)** compitiendo con la otra
+suite y **no la contó como pase**: re-corrió **de uno en uno**. *Criterio correcto — un `Terminated` no es
+un verde* (deuda **0.092**).
+
+### ⏳ Residuo con número: la «Ficha de arte» del estampador
+
+`impreso-envio-maquila.ts` **no imprime ni una imagen**, ni antes ni después de esta etapa (verificado
+enumerando: `impreso-orden.ts` es el **único** archivo de `dominio/` que usa `Image`). 🔴 **Si la OP manda
+sobre la foto del arte, ése es el papel que el proveedor tiene en la mano.** ⇒ fila **0.094**, **pendiente
+de Daniel** con default *sí*, y **barata**: esta etapa ya resuelve **cuál** foto manda en cada OP.
+
+---
+
 ## V1-E9n · ⭐ LA FOTO ES DE LA OP: quitar una heredada del modelo (1-sep-2026, versión **0.082**) — ✅ HECHA
 
 Fila **0.079**, **mitad de la PRENDA**. Daniel (§Post-F9.177): *«un modelo de desarrollo que se va a usar
