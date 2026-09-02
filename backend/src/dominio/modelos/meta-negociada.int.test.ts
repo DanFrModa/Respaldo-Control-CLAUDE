@@ -64,6 +64,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
+  nFixture = 0;
   empresa = await crearEmpresaPrueba(cliente, 'FR Moda SA de CV');
   const usuario = await cliente.usuario.create({
     data: {
@@ -75,6 +76,30 @@ beforeEach(async () => {
   });
   idUsuario = usuario.id;
 });
+
+/**
+ * ⭐ **EL CLIENTE POR DEFECTO DE UNA MESA — derivado del MODELO, y esto NO es cosmética.**
+ *
+ * 🔴 `Cliente.nombre` es `@unique`. Con un literal fijo, dos mesas dentro de UNA MISMA prueba
+ * reventaban con *«duplicate key value violates unique constraint "clientes_nombre_key"»* — y el
+ * `beforeEach` no lo tapaba, porque el choque no era ENTRE pruebas sino DENTRO de una. Lo cazó el
+ * CI (0.084) en las tres pruebas que arman dos promesas para comparar cartera.
+ *
+ * Se deriva del `idModelo` —y no de un contador— a propósito: así la ASERCIÓN puede pedir el mismo
+ * nombre con esta misma función y **no puede desincronizarse del fixture**.
+ *
+ * ⚠️ **Y sigue conteniendo «C&A»** porque hay pruebas que buscan por cliente; el sufijo sólo lo
+ * hace único.
+ */
+function clienteDeLaMesa(idModelo: number): string {
+  return `C&A México ${String(idModelo)}`;
+}
+
+/**
+ * Contador por prueba, para los fixtures cuya unicidad NO tiene por qué ser legible desde una
+ * aserción. Se reinicia en el `beforeEach`, junto con la base.
+ */
+let nFixture = 0;
 
 /** El modelo RAÍZ que se llevó a la mesa (el PADRE de la versión que nace después). */
 async function crearPadre(codigo: string): Promise<{ id: number }> {
@@ -111,6 +136,31 @@ async function crearVersion(codigo: string, idPadre: number, version = 1): Promi
  *
  * ⚠️ El expediente cuelga del **padre** a propósito: es el modelo que estaba en la mesa. La versión
  * todavía no existía. Es exactamente el caso que el join tiene que resolver.
+ *
+ * ── 🔒 EL CONTRATO DE UNICIDAD DE ESTE FIXTURE (cicatriz del CI de la 0.084) ───────────────────
+ *
+ * Cada cosa que crea cae sobre una columna ÚNICA, y todas se derivan de algo que ya es único **por
+ * construcción**, no de un literal ni de un número escogido a mano:
+ *
+ *  • `Cliente.nombre` ← {@link clienteDeLaMesa}`(idModelo)`. Era el defecto: un literal fijo
+ *    reventaba a la SEGUNDA llamada dentro de una misma prueba.
+ *  • `ClienteDepartamento(idCliente, nombre)` ← el cliente es nuevo en cada llamada.
+ *  • `EstadoLista.codigo` ← el **id del desarrollo**, que la BD acaba de asignar. Antes colgaba del
+ *    `folio`, que se elegía a mano: unicidad por suerte, no por construcción.
+ *  • `Proyecto(idEmpresa, folio)` y `ListaPrecios(idEmpresa, folio)` ← el `folio`, que por defecto
+ *    arranca en `10_000 + idModelo` para que **no pueda coincidir** con los folios pequeños que
+ *    algunas pruebas pasan a mano.
+ *  • `Desarrollo(idProyecto, idModelo)`, `Precosto(idDesarrollo, version)` y
+ *    `ListaPreciosLinea(idDesarrollo)` ← el proyecto y el desarrollo son nuevos en cada llamada.
+ *
+ * ⚠️ **El `folio` explícito de algunas pruebas ya NO es necesario para evitar choques** (lo era como
+ * cinturón cuando la unicidad se cuidaba a mano); se conserva donde está porque no estorba, pero una
+ * prueba nueva **no tiene que inventarse uno**.
+ *
+ * ⚠️ **Lo único que sigue exigiendo cuidado: `nombreCliente` EXPLÍCITO tiene que ser distinto dentro
+ * de una misma prueba.** Se deja con `create` —que revienta ruidosamente— y no con `upsert`, porque
+ * hoy ninguna prueba necesita dos mesas del MISMO cliente, y un `upsert` silencioso escondería que
+ * dos expedientes que se creían distintos son el mismo.
  */
 async function negociarModelo(
   idModelo: number,
@@ -121,10 +171,12 @@ async function negociarModelo(
     folio?: number;
   } = {},
 ): Promise<{ idDesarrollo: number; idEvento: number | null }> {
-  const folio = opciones.folio ?? 100 + idModelo;
+  // 10_000 + idModelo: así el default NUNCA coincide con los folios pequeños que algunas pruebas
+  // pasan a mano (555…607), que era el otro sitio donde la unicidad dependía de la suerte.
+  const folio = opciones.folio ?? 10_000 + idModelo;
   const idEmpresa = opciones.idEmpresa ?? empresa.id;
   const c = await cliente.cliente.create({
-    data: { nombre: opciones.nombreCliente ?? 'C&A México' },
+    data: { nombre: opciones.nombreCliente ?? clienteDeLaMesa(idModelo) },
   });
   const depto = await cliente.clienteDepartamento.create({
     data: { idCliente: c.id, nombre: 'Caballero' },
@@ -150,7 +202,8 @@ async function negociarModelo(
   }
 
   const estado = await cliente.estadoLista.create({
-    data: { codigo: `abierta-${String(folio)}`, nombre: 'Abierta', orden: 1 },
+    // Del id del DESARROLLO —único por construcción— y no del folio, que se elige a mano.
+    data: { codigo: `abierta-${String(desarrollo.id)}`, nombre: 'Abierta', orden: 1 },
   });
   const lista = await cliente.listaPrecios.create({
     data: {
@@ -197,18 +250,27 @@ async function negociarModelo(
   return { idDesarrollo: desarrollo.id, idEvento: evento.id };
 }
 
-/** Un PEDIDO vivo del cliente esperando esta versión: el dinero ya comprometido. */
+/**
+ * Un PEDIDO vivo del cliente esperando esta versión: el dinero ya comprometido.
+ *
+ * ⚠️ **El nombre del cliente y el folio salen del CONTADOR, no del modelo** — misma cicatriz que
+ * {@link negociarModelo}, cazada en el barrido. Derivarlos de `idModelo`(+`piezas`) aguantaba sólo
+ * mientras ninguna prueba pidiera DOS pedidos del mismo modelo: el segundo habría chocado a la vez
+ * contra `clientes_nombre_key` y contra `pedidos_id_empresa_folio_key`. Hoy ninguna lo hace; con el
+ * contador, la que lo haga mañana tampoco se rompe.
+ */
 async function crearPedido(
   idModelo: number,
   piezas: number,
   idEmpresa = empresa.id,
 ): Promise<void> {
+  const n = ++nFixture;
   const c = await cliente.cliente.create({
-    data: { nombre: `Cliente del pedido ${String(idModelo)}-${String(piezas)}` },
+    data: { nombre: `Cliente del pedido ${String(idModelo)} (${String(n)})` },
   });
   const pedido = await cliente.pedido.create({
     data: {
-      folio: BigInt(9000 + idModelo),
+      folio: BigInt(9000 + n),
       idEmpresa,
       idCliente: c.id,
       fechaDe: new Date('2026-11-01T00:00:00.000Z'),
@@ -274,7 +336,7 @@ describe('⭐⭐ (a) de la VERSIÓN a la META: el join que sostiene la etapa', (
       // La meta que hay que salir a conseguir, a la vista de quien la va a cuadrar.
       costoPrometido: 43,
       // ⭐ Y el CLIENTE, que antes de esta etapa salía vacío en todas las filas por el mismo motivo.
-      cliente: 'C&A México',
+      cliente: clienteDeLaMesa(padre.id),
       proyecto: 'Otoño-Invierno 26',
     });
   });
@@ -373,7 +435,7 @@ describe('⭐⭐ (a) de la VERSIÓN a la META: el join que sostiene la etapa', (
       codigo: 'CYA-26-71-007-02',
       codigoPadre: 'CYA-26-71-007-01',
       costoPrometido: 43,
-      cliente: 'C&A México',
+      cliente: clienteDeLaMesa(raiz.id),
     });
     // Y el hijo de en medio, que tampoco tiene expediente propio, la encuentra igual.
     expect(pagina.datos.find((d) => d.idModelo === v1.id)?.costoPrometido).toBe(43);
@@ -584,12 +646,24 @@ describe('🔴 (b) el SEGUNDO FINAL: sale de la cola aprobada Y con el incumplim
 /** Deja una versión firmada con el desenlace que se le diga, y devuelve su id. */
 async function versionIncumplida(
   codigo: string,
-  opciones: { prometido: number; conseguido: number; piezas?: number; folio?: number },
+  opciones: {
+    prometido: number;
+    conseguido: number;
+    piezas?: number;
+    folio?: number;
+    /**
+     * Cliente de la mesa. Sólo hace falta cuando la prueba ASEVERA el nombre o BUSCA por él: el
+     * default ya es único por modelo ({@link clienteDeLaMesa}), y el padre lo crea esta función,
+     * así que desde fuera no se puede nombrar.
+     */
+    nombreCliente?: string;
+  },
 ): Promise<number> {
   const padre = await crearPadre(codigo);
   await negociarModelo(padre.id, {
     costoEstimado: opciones.prometido,
     ...(opciones.folio === undefined ? {} : { folio: opciones.folio }),
+    ...(opciones.nombreCliente === undefined ? {} : { nombreCliente: opciones.nombreCliente }),
   });
   const v = await crearVersion(`${codigo}-01`, padre.id);
   if (opciones.piezas !== undefined) {
@@ -616,6 +690,9 @@ describe('⭐⭐ (d) «Promesas incumplidas»: la lista del DUEÑO', () => {
       prometido: 43,
       conseguido: 45,
       piezas: 12_000,
+      // Explícito porque la aserción lo nombra: el padre lo crea el helper y no se puede alcanzar
+      // desde aquí para pedírselo a `clienteDeLaMesa`.
+      nombreCliente: 'C&A México',
     });
 
     const lista = await consultarPromesasIncumplidas(sesion(), {}, bd());
@@ -702,9 +779,28 @@ describe('⭐⭐ (d) «Promesas incumplidas»: la lista del DUEÑO', () => {
     expect(lista.impactoTotal).toBe(0);
   });
 
-  it('busca por código de la versión, del padre y por cliente', async () => {
-    await versionIncumplida('CYA-26-71-037', { prometido: 43, conseguido: 45, folio: 606 });
-    await versionIncumplida('LIV-26-71-038', { prometido: 43, conseguido: 45, folio: 607 });
+  /**
+   * ⚠️ **Esta prueba pedía DOS clientes con el MISMO nombre, que la BD no permite** (`Cliente.nombre`
+   * es `@unique`): de ahí salía el `duplicate key` que cazó el CI. Al arreglarla se vio que su
+   * aserción de cliente además **no discriminaba**: pedía `total = 2` sobre una cartera de 2, así
+   * que un filtro que devolviera TODO también la habría pasado.
+   *
+   * ⇒ Ahora cada modelo lleva **su** cliente —el `LIV-…` es de Liverpool, que es lo que su código
+   * decía desde el principio— y se exige que buscar por uno traiga **sólo el suyo**.
+   */
+  it('busca por código de la versión, del padre y por cliente — y el cliente DISCRIMINA', async () => {
+    await versionIncumplida('CYA-26-71-037', {
+      prometido: 43,
+      conseguido: 45,
+      folio: 606,
+      nombreCliente: 'C&A México',
+    });
+    await versionIncumplida('LIV-26-71-038', {
+      prometido: 43,
+      conseguido: 45,
+      folio: 607,
+      nombreCliente: 'Liverpool',
+    });
 
     const porVersion = await consultarPromesasIncumplidas(
       sesion(),
@@ -720,8 +816,21 @@ describe('⭐⭐ (d) «Promesas incumplidas»: la lista del DUEÑO', () => {
     );
     expect(porPadre.datos.map((d) => d.codigo)).toEqual(['CYA-26-71-037-01']);
 
+    // 🔴 Buscar por CLIENTE trae sólo el de ese cliente, no la cartera entera. Y va con su pareja:
+    // si el filtro por cliente se cayera, las dos darían 2 en vez de 1 cada una.
+    // (Ojo: «C&A» no es subcadena de «CYA-26-71-037», así que esto sólo puede venir del cliente.)
     const porCliente = await consultarPromesasIncumplidas(sesion(), { busqueda: 'C&A' }, bd());
-    expect(porCliente.total).toBe(2);
+    expect(porCliente.datos.map((d) => d.codigo)).toEqual(['CYA-26-71-037-01']);
+
+    const porOtroCliente = await consultarPromesasIncumplidas(
+      sesion(),
+      { busqueda: 'Liverpool' },
+      bd(),
+    );
+    expect(porOtroCliente.datos.map((d) => d.codigo)).toEqual(['LIV-26-71-038-01']);
+
+    // Y sin filtro están las dos: lo de arriba es un filtro de verdad, no una cartera vacía.
+    expect((await consultarPromesasIncumplidas(sesion(), {}, bd())).total).toBe(2);
   });
 });
 
@@ -840,7 +949,7 @@ describe('🔴 la META es dinero: la bandeja la oculta a quien no ve importes', 
       idModelo: v.id,
       codigo: 'CYA-26-71-061-01',
       codigoPadre: 'CYA-26-71-061',
-      cliente: 'C&A México',
+      cliente: clienteDeLaMesa(padre.id),
       conPedido: true,
       piezasPedidas: 800,
     });
