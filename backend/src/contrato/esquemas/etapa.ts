@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPackEntrada, esquemaPackSalida } from './pack.js';
+
 /**
  * Esquemas Zod de las ETAPAS de producción (F3-E2: corte + envío a maquila unificado; doc
  * 03-Produccion Pasos 3 y 4 + flujo paralelo de estampado, Observación 4). UNA sola definición de
@@ -26,12 +28,23 @@ const esquemaEtapaTalla = z.object({
     .min(0, { error: 'La cantidad no puede ser negativa' }),
 });
 
-/** Un renglón de la matriz de la etapa: un color con sus cantidades por talla (D4). */
+/**
+ * Un renglón de la matriz de la etapa: un color × su PACK, con sus cantidades por talla (D4).
+ *
+ * ⭐ El PACK (§Post-F9.10) es OBLIGATORIO en corte y en entrega a maquila **cuando la orden maneja
+ * packs** — *«cada tendido es de un pack»* — y tiene que ser uno de los packs de la orden. En una
+ * orden SIN packs el campo se omite (o va vacío) y todo se comporta igual que siempre; mandarlo en
+ * ese caso es un error de captura y el dominio lo rechaza, no lo ignora.
+ */
 const esquemaEtapaLinea = z.object({
   idColor: z
     .number({ error: 'El id del color es obligatorio' })
     .int({ error: 'El id del color debe ser entero' })
     .positive({ error: 'El id del color debe ser positivo' }),
+  pack: esquemaPackEntrada.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la ' +
+      'orden maneja packs; ausente o vacío en las órdenes que no los manejan.',
+  ),
   tallas: z
     .array(esquemaEtapaTalla)
     .min(1, { error: 'Cada color necesita al menos una talla' })
@@ -167,6 +180,9 @@ const esquemaEtapaTallaSalida = z.object({
 const esquemaEtapaLineaSalida = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack.',
+  ),
   tallas: z.array(esquemaEtapaTallaSalida).describe('Cantidades por talla.'),
   totalPiezas: z.number().int().describe('Total del renglón (derivado por suma).'),
 });
@@ -266,10 +282,16 @@ export type EtapasOrdenQuery = z.infer<typeof esquemaEtapasOrdenQuery>;
 
 // ── Pendientes por orden (derivados, sin acumuladores) ──────────────────────────────────────────
 
-/** Pendiente de UNA celda color×talla, para una etapa concreta. */
+/**
+ * Pendiente de UNA celda color×talla×PACK, para una etapa concreta. El pack entra en la LLAVE de la
+ * celda (§Post-F9.10): sin él, la pantalla ofrecería un tope agregado por color que el servidor
+ * rechaza pack por pack al enviar (sobre-envío ESTRICTO, decisión (g)). En una orden sin packs va
+ * vacío y la celda es la de siempre.
+ */
 const esquemaPendienteCelda = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe('PACK de la celda. CADENA VACÍA = la orden no maneja packs.'),
   idTalla: z.number().int().describe('Id de la talla.'),
   etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
   cantidad: z.number().int().describe('Cantidad pendiente (puede ser negativa por sobre-corte).'),
@@ -326,10 +348,11 @@ export const MOTIVOS_SUGERENCIA = [
   'todo-enviado',
 ] as const;
 
-/** Una celda color×talla que la captura puede precargar (siempre positiva). */
+/** Una celda color×talla×PACK que la captura puede precargar (siempre positiva). */
 const esquemaCeldaSugerida = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe('PACK de la celda. CADENA VACÍA = la orden no maneja packs.'),
   idTalla: z.number().int().describe('Id de la talla.'),
   etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
   cantidad: z.number().int().positive().describe('Cantidad sugerida para esta celda (> 0).'),

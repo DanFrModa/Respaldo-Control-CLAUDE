@@ -383,3 +383,121 @@ describe('Seguimiento del pedido derivado e historial (F3-E5)', () => {
     expect(canceladaEnLista?.motivoCancelacion).toBe('duplicada');
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ LA ENTREGA A CLIENTE **NO** MANEJA PACKS (§Post-F9.10)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 DANIEL marcó la frontera: el pack viaja en el corte y en la entrega a maquila, es opcional al
+// recibir, y en «arte · entrega a cliente · inventario PT» **no aplica: ahí ya es sólo color**.
+// Estas pruebas fijan esa frontera con hechos: una orden fabricada por tendidos se entrega por
+// COLOR, sin que nadie tenga que decir de qué pack salió cada prenda.
+describe('Entrega a cliente de una orden CON packs (§Post-F9.10)', () => {
+  /** Orden con dos tendidos del mismo Rojo (pack A: CH 5, pack B: CH 5), ya en inventario. */
+  async function ordenConPacksEnInventario(): Promise<number> {
+    const pedido = await cliente.pedido.create({
+      data: { folio: 90n, idEmpresa: empresa.id, idCliente: clienteNegocioId },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: 10, precio: 10 },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 90n,
+        idEmpresa: empresa.id,
+        idPedidoLinea: linea.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        lineas: {
+          create: [
+            {
+              idColor: colorRojo.id,
+              pack: 'A',
+              tallas: { create: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+            },
+            {
+              idColor: colorRojo.id,
+              pack: 'B',
+              tallas: { create: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+            },
+          ],
+        },
+      },
+    });
+    const lineasPorPack = [
+      { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+    ];
+    await registrarCorte(
+      sesion(),
+      { idOrden: orden.id, idCortador: cortador.id, fecha: '2026-06-18', lineas: lineasPorPack },
+      bd(),
+    );
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden: orden.id,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        lineas: lineasPorPack,
+      },
+      bd(),
+    );
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden: orden.id,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almacen.id,
+        lineas: lineasPorPack,
+      },
+      bd(),
+    );
+    return orden.id;
+  }
+
+  it('se entrega por COLOR, sumando los dos tendidos, y baja la existencia', async () => {
+    const id = await ordenConPacksEnInventario();
+    const antes = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(antes.totalExistencia).toBe(10);
+
+    // La captura NO lleva pack: la entrega no lo pide y la orden se cubre entera con un renglón.
+    const entrega = await registrarEntregaCliente(
+      sesion(),
+      {
+        idOrden: id,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    expect(entrega.totalPiezas).toBe(10);
+
+    const despues = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(despues.totalExistencia).toBe(0);
+  });
+
+  it('la talla se valida contra el COLOR (unión de sus tendidos), no contra un pack', async () => {
+    // Si la pertenencia se hubiera validado por renglón (color × pack), la entrega de una orden con
+    // packs no habría podido nombrar ninguna celda: no sabe de qué tendido salió la prenda.
+    const id = await ordenConPacksEnInventario();
+    await expect(
+      registrarEntregaCliente(
+        sesion(),
+        {
+          idOrden: id,
+          idAlmacen: almacen.id,
+          fecha: '2026-06-21',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 3 }] }],
+        },
+        bd(),
+      ),
+    ).resolves.toBeTruthy();
+  });
+});

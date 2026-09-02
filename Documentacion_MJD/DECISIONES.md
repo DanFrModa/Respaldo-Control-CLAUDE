@@ -752,7 +752,7 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 - **Aplica en:** rama `claude/cambios-prueba-xv95r8`. Migración `20260730120000_unidad_tela` (automática). SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-07-30.
 
-#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ MITAD CONSTRUIDA, MITAD ABIERTA ⇒ **ES LA 0.085… no: ES LA 0.084**
+#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — 🔶 **DOS TERCIOS CONSTRUIDOS** ⇒ el importador fue la **0.058/V1-E8g**, el campo propio la **0.087**, y las pantallas + el cableado del importador son la **0.095**
 
 > 📌 **No espera nada de Daniel: es TRABAJO, y ya tiene número (0.084, asignado el 1-sep).** Estuvo
 > **cuatro semanas sin número** —lo encontró el repaso que él mismo pidió— y por eso este encabezado
@@ -7008,13 +7008,15 @@ fragmentado en miles de colores escritos de diferente manera"*).
   una FK nueva al color y no la agregan. *(Se enumeraron estas referencias tres veces —el código
   original miraba 1, la primera redacción de esta decisión dijo 1, una revisión dijo 6— y las tres se
   enumeraron mal. De ahí la red.)* Deuda actualizada en `HOJA-DE-RUTA.md` §4.
-- **El pack todavía no viaja al corte ni a la maquila.** §Post-F9.10 pide que el pack se vuelva **campo
-  propio** y acompañe al corte y al envío a maquila (obligatorio ahí, opcional al recibir). Eso **no está
-  construido**. Consecuencia honesta de hoy: como antes el pack venía disfrazado de color, la matriz de la
-  orden *de hecho* permitía cortar por pack; ahora ya no. Daniel pidió el cambio sabiendo el orden de las
-  cosas (*"me parece bien terminar con las telas y luego retomas esto"*), y el dato del pack sigue
-  guardado en `Orden.packsCliente` para cuando se construya el campo. §Post-F9.10 **sigue abierta**: esta
-  etapa entrega sólo su primera mitad (el importador deja de componer el color con la letra).
+- **El pack todavía no viaja al corte ni a la maquila.** ⚠️ **YA NO: construido el 2-sep-2026 en la versión
+  0.087** (ficha `V1-E9s`) — el pack es **campo propio** de `OrdenLinea` y `EtapaMovimientoDet` y acompaña al
+  corte y al envío, opcional al recibir. *(Se conserva el párrafo porque su relato sigue siendo cierto para
+  el momento en que se escribió: como antes el pack venía disfrazado de color, la matriz de la orden* de
+  hecho *permitía cortar por pack; entre esta etapa y la 0.087 ya no. Daniel pidió el cambio sabiendo el
+  orden de las cosas —*"me parece bien terminar con las telas y luego retomas esto"*— y el dato siguió
+  guardado en `Orden.packsCliente` hasta que el campo existió.)* ⏳ **Lo que sigue abierto es la 0.095**: las
+  matrices de captura y **el cableado del importador**, que hoy sigue fusionando ⇒ **ninguna orden nacida de
+  un PDF de C&A tiene packs todavía**.
 - **El importador de EXCEL no se tocó**: nunca usó letras de pack.
 
 ### Detalles que se resolvieron al construir
@@ -11663,8 +11665,10 @@ modelos de catálogo** y su existencia repartida entre dos renglones de inventar
 
 **Medido el 31-ago:** el **modelo hijo NO guarda el color**. Sus campos propios son `numeroProduccion` e
 `idModeloDesarrollo` (`schema.prisma:2241` y `:2309`); **no hay columna de color**, porque Daniel decidió
-que ***«el color va en la OP»***. El color vive en `OrdenLinea`, con `@@unique([idOrden, idColor])`
-(`schema.prisma:3349`). ⇒ **el sistema no le puede preguntar a la fila del modelo «¿de qué color eres?»**,
+que ***«el color va en la OP»***. El color vive en `OrdenLinea` — con `@@unique([idOrden, idColor])` cuando se
+escribió esto; **desde la 0.087 la llave es `@@unique([idOrden, idColor, pack])`** (`schema.prisma:3536`),
+porque el pack se volvió campo propio. *(El argumento de abajo no cambia: sigue sin haber columna de color
+en el modelo hijo.)* ⇒ **el sistema no le puede preguntar a la fila del modelo «¿de qué color eres?»**,
 así que *«el mismo modelo»* hay que traducirlo a una llave, y hay dos candidatas:
 
 | | qué reusa | qué pasa con una **OC NUEVA del mismo color** |
@@ -11965,5 +11969,35 @@ calificaciones de maquileros, cuando Daniel fije los parámetros de aceptación 
 **0.086**).
 
 - **Aplica en:** versión **0.084**, ficha `V1-E9p`. **Fecha:** 2026-09-02.
+
+---
+
+#### (Post-F9.179) — ⏳ PENDIENTE DE DANIEL: las **tres reglas del pack** que decidió el equipo (2-sep-2026, versión **0.087**)
+
+> 📌 **No frenan nada** (REGLA 0): están construidas con su default y **Daniel sólo confirma o ajusta**. Si
+> cambia alguna, es un cambio chico y localizado — las tres viven en una función pura y su guarda.
+
+Al construir §Post-F9.10 (el pack como campo propio) hicieron falta tres reglas que **Daniel nunca enunció**.
+Se tomaron con default y se declaran aquí para que no pasen por decisión suya sin serlo.
+
+**(a) Una orden es CON packs o SIN packs, nunca mezclada.** *Default tomado: sí.*
+**Por qué:** si un color trae tendidos «A» y «B» y otro no trae etiqueta, el saldo del segundo vive en un
+bucket vacío `''` que se ve y se cuadra distinto de los demás; permitirlo obligaría a explicar dos
+aritméticas en la misma pantalla.
+⚠️ **El filo que hay que preguntarle:** en una OP multicolor donde el **negro** llega en dos tendidos y el
+**blanco** en uno solo, la regla obliga a **inventarle una etiqueta al blanco**. El importador de C&A no lo
+sufre (una OC = un color), **pero la captura manual sí**.
+
+**(b) El pack de un renglón con producción viva NO se cambia.** *Default tomado: sí, y es el más firme.*
+**Por qué:** es la traducción de **D3** a este campo. El cortado queda llaveado con el pack viejo y el envío
+busca el nuevo ⇒ **esas piezas cortadas no se podrían enviar nunca**, con un error que además culparía al
+usuario. 🔴 Se rechazó una primera versión porque **fallaba en silencio por dos puertas** (borrar y recrear,
+y `copiarDetalleOrden`); hoy compara **por color**, no por identidad de fila. Un color quitado entero o uno
+nuevo **sí** pasan.
+
+**(c) La etiqueta del pack mide como máximo 12 caracteres.** *Default tomado: 12.*
+**Por qué:** cubre de sobra lo que C&A manda («A», «B», «PACK 1»). Es el más inocuo de los tres.
+
+- **Aplica en:** versión **0.087**, ficha `V1-E9s`. **Fecha:** 2026-09-02.
 
 ---

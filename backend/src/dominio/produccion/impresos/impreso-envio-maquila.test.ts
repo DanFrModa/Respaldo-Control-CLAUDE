@@ -18,6 +18,7 @@ describe('armarTablaEtapa (F3-E2)', () => {
       {
         idColor: 1,
         color: 'Rojo',
+        pack: '',
         totalPiezas: 30,
         tallas: [
           { idTalla: 1, etiquetaTalla: 'CH', cantidad: 10 },
@@ -27,6 +28,7 @@ describe('armarTablaEtapa (F3-E2)', () => {
       {
         idColor: 2,
         color: 'Azul',
+        pack: '',
         totalPiezas: 5,
         tallas: [{ idTalla: 2, etiquetaTalla: 'M', cantidad: 5 }],
       },

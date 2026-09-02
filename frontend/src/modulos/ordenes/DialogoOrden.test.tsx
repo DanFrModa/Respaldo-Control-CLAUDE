@@ -407,6 +407,8 @@ describe('<DialogoOrden> — guardado ÚNICO (Daniel 24-jul-2026)', () => {
             idColor: 2,
             color: 'Rojo',
             pantone: null,
+            // Renglón SIN pack: la orden no se fabrica por tendidos (§Post-F9.10).
+            pack: '',
             totalPiezas: 10,
             tallas: [{ idTalla: 1, etiquetaTalla: 'CH', cantidad: 10 }],
           },

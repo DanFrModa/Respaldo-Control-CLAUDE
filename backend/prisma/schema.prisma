@@ -3509,6 +3509,23 @@ model OrdenLinea {
   /// PREFILLEA cuando la OC lo trae. Texto libre (formato del cliente, p. ej. "11-0601 TCX").
   pantone String?
 
+  /// ⭐ PACK / TENDIDO de este renglón (§Post-F9.10, decisión de Daniel del 6-ago-2026). C&A pide
+  /// VARIOS TENDIDOS en una misma OP: el pack A con corrida 1-2-2-1 (CH-M-G-EG), el pack B con
+  /// 1-1-1-2… Antes eso se resolvía metiendo la letra DENTRO del nombre del color («Negro A»,
+  /// «Negro B»), que fragmentaba el catálogo — DANIEL: *«me gusta que exista un solo Negro y no
+  /// esté fragmentado en miles de colores escritos de diferente manera»*. Desde §Post-F9.10 el pack
+  /// es CAMPO PROPIO y el renglón de la matriz es COLOR × PACK.
+  ///
+  /// 🔑 CADENA VACÍA = la orden NO maneja packs — el caso normal, y el de TODO lo capturado antes de
+  /// esta etapa. **NO es nullable a propósito**: con NULL, Postgres considera DISTINTOS dos
+  /// `(orden, color, NULL)` y el `@@unique` de abajo dejaría de impedir dos renglones del mismo
+  /// color — exactamente la garantía que este campo no debe debilitar (Prisma 7.8 no soporta
+  /// `nullsNotDistinct`, verificado con `prisma validate`). Con `''` la unicidad sigue siendo real y
+  /// las claves de agregación no tienen que arbitrar entre NULL / undefined / `''`.
+  ///
+  /// Una orden es «con packs» o «sin packs», nunca mezclada (lo valida `dominio/produccion/ordenes.ts`).
+  pack String @default("")
+
   tallas OrdenLineaTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
@@ -3516,7 +3533,7 @@ model OrdenLinea {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  @@unique([idOrden, idColor])
+  @@unique([idOrden, idColor, pack])
   @@index([idOrden])
   @@index([idColor])
   @@map("orden_linea")
@@ -4298,12 +4315,25 @@ model EtapaMovimientoDet {
   /// no se pueden devolver más piezas de las que salieron del taller.
   cantidadIncompletas Int? @map("cantidad_incompletas")
 
+  /// ⭐ PACK / TENDIDO de esta celda (§Post-F9.10). El pack VIAJA con la pieza: se declara en el
+  /// CORTE (cada tendido es de un pack) y en la ENTREGA A MAQUILA, y es OPCIONAL al RECIBIR —
+  /// DANIEL: *«que sea opcional al recibir»*, porque el maquilero puede devolver los packs
+  /// separados o revueltos. En la ENTREGA A CLIENTE y en el kardex de PT no aplica: ahí ya es sólo
+  /// color.
+  ///
+  /// 🔑 CADENA VACÍA (nunca NULL — mismo motivo que en `OrdenLinea.pack`: la unicidad de abajo
+  /// dejaría de valer) significa dos cosas según la ORDEN, y por eso se lee siempre junto a ella:
+  ///   • orden SIN packs  → «no aplica» (todo el histórico y el flujo de siempre);
+  ///   • orden CON packs  → sólo puede pasar en un RECIBO: «el maquilero los devolvió revueltos».
+  ///     Ese recibo consume del saldo AGREGADO de todos los packs (ver `dominio/produccion/recibos.ts`).
+  pack String @default("")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  @@unique([idEtapaMov, idColor, idTalla])
+  @@unique([idEtapaMov, idColor, idTalla, pack])
   @@index([idEtapaMov])
   @@index([idColor])
   @@index([idTalla])

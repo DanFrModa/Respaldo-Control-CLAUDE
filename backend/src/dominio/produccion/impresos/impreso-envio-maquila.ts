@@ -78,6 +78,16 @@ export interface DatosImpresoEnvio {
 }
 
 /**
+ * Etiqueta de la fila de la matriz: el color y, cuando la orden se fabrica por packs (§Post-F9.10),
+ * SU TENDIDO. El pack tiene que salir en el papel: es lo que el cortador y el maquilero usan para
+ * saber qué corrida están manejando, y sin él dos filas del mismo color se leerían como un error de
+ * captura. En una orden sin packs es cadena vacía y la fila se imprime exactamente igual que antes.
+ */
+function etiquetaColorPack(color: string, pack: string): string {
+  return pack.trim() === '' ? color : `${color}  ·  PACK ${pack.trim()}`;
+}
+
+/**
  * Proyecta la matriz de la etapa (colores con sus tallas) a la tabla color×talla del impreso:
  * columnas = unión ordenada de tallas (preservando orden de aparición), filas = colores, con
  * totales por fila, por columna y total general. Misma forma que `armarTabla` de `impreso-orden`.
@@ -106,7 +116,7 @@ export function armarTablaEtapa(
       totalesColumna[i] = (totalesColumna[i] ?? 0) + cantidad;
     });
     totalPiezas += totalFila;
-    return { color: linea.color, cantidades, totalFila };
+    return { color: etiquetaColorPack(linea.color, linea.pack), cantidades, totalFila };
   });
 
   return { tallas, renglones, totalesColumna, totalPiezas };
