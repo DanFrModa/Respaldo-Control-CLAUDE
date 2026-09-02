@@ -153,7 +153,11 @@ function bdParaQuitarArte(opciones: {
   // sirven con un mismo objeto: lleva `id`, `folio` y `modelo` con la forma de
   // `SELECT_LINAJE_RECETA`, así que vale para los dos `select`. `idModeloDesarrollo: null` = «la
   // receta es la mía» ⇒ el linaje es el propio modelo, que es el caso de esta orden.
-  const ordenDelLinaje = { id: ID_ORDEN, folio: orden.folio, modelo: { id: 7, idModeloDesarrollo: null } };
+  const ordenDelLinaje = {
+    id: ID_ORDEN,
+    folio: orden.folio,
+    modelo: { id: 7, idModeloDesarrollo: null },
+  };
 
   const tx = {
     orden: {
