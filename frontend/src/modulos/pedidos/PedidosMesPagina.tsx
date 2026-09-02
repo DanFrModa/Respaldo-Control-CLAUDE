@@ -35,6 +35,7 @@ import { AdjuntosPedido } from './AdjuntosPedido';
 import { ConstructorPedido } from './ConstructorPedido';
 import { ImportadorPedido } from './ImportadorPedido';
 import { ImportadorPedidoPdf } from './ImportadorPedidoPdf';
+import { numerosDeProduccion } from './numeros-produccion';
 import { PanelGenerarOP } from './PanelGenerarOP';
 
 /**
@@ -106,25 +107,6 @@ function vigencia(fila: Pick<PedidoMesFila, 'fechaDe' | 'fechaHasta'>): string {
   if (de === null && hasta === null) return '—';
   if (de !== null && hasta !== null) return `${de} → ${hasta}`;
   return de ?? hasta ?? '—';
-}
-
-/**
- * ⭐⭐ V1-E3 (§Post-F9.172(b)) — el texto de los nº de producción de un renglón, o `''` si no hay
- * ninguno que enseñar.
- *
- * 🔴 **Sin esto la pantalla de Pedidos enseñaría el código de desarrollo para siempre.** Desde
- * V1-E3 el desarrollo del renglón **ya no se promueve**: nacen modelos de producción POR COLOR y el
- * número vive en el modelo de cada OP (`numerosProduccion`, agregado en el servidor). Se cae a
- * `numeroProduccion` —el del modelo del renglón— para el caso LEGADO: un renglón que ya apuntaba a
- * un modelo de producción y todavía no tiene ninguna OP.
- */
-function numerosDeProduccion(
-  renglon: Pick<PedidoMesRenglon, 'numerosProduccion' | 'numeroProduccion'>,
-): string {
-  if (renglon.numerosProduccion.length > 0) {
-    return renglon.numerosProduccion.join(' · #');
-  }
-  return renglon.numeroProduccion === null ? '' : String(renglon.numeroProduccion);
 }
 
 /** Lee `state.abrirConstructor` del deep-link ("Nueva orden" de Órdenes/Inicio abre AQUÍ). */
