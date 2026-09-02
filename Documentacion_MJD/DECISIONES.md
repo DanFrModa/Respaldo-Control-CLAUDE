@@ -11967,3 +11967,123 @@ calificaciones de maquileros, cuando Daniel fije los parámetros de aceptación 
 - **Aplica en:** versión **0.084**, ficha `V1-E9p`. **Fecha:** 2026-09-02.
 
 ---
+
+#### (Post-F9.180) — ✅ CERRADA (DANIEL, 2-sep-2026): el aviso de la OP que se desvía **arranca MUDO sobre lo migrado**
+
+Al construir la Pieza 1 de §Post-F9.156 apareció una decisión que **nadie había planteado** y que **tiene
+consecuencia el día del arranque**.
+
+**El problema, medido.** La comparación es **por mayoría**, y **una orden entregada hace años sigue contando**
+—el sistema **no tiene estado de «cerrada»**— ⇒ N órdenes viejas contra 1 nueva **señalaban a la nueva y
+correcta**. 🔴 **Eso invertía el aviso.**
+
+**Lo que se hizo:** las recetas escritas por un **backfill** (distinguibles porque **quedaron firmadas sin
+autor**) **no votan**.
+
+**⚠️ LO QUE CUESTA, medido y dicho entero.** Sobre una familia venida de Access el aviso **no habla** — y eso
+**incluye el caso que originó la pieza** (*«no hubo cierre de ese tono y se compró otro tipo de cierre sólo
+para la café»*): si las cuatro hermanas vienen migradas, **no hay aviso**, y **en el Centro de Órdenes la fila
+sale limpia**. La otra comparación **tampoco lo dice**: calla a propósito lo agregado a mano.
+
+⭐ **La mitigación, que es lo que lo hace un buen trato:** **el silencio no es permanente** — la orden **vuelve
+al grupo en cuanto una persona firma su receta**. **Calla el pasado, no el futuro.**
+
+**Por qué no hay tercera vía.** Se estudió que el histórico **sirviera de referencia sin votar**: **no sirve**
+— el caso bueno y el malo son **indistinguibles para la regla de la mayoría** (una minoría decidida frente a
+una mayoría migrada).
+
+> ✅ **RESPUESTA DE DANIEL, textual:** *«Como dijimos. La información que no se genera en este sistema, puede
+> no tener todas las cosas que tiene este sistema. Va a migrar la información que hay. **Lo que no haya no
+> importa.** Asumo que las órdenes viejas no tengan todas las funciones que las nuevas generadas en este
+> sistema.»*
+
+⇒ Encuadrado por él en **REGLA 0-B**: el histórico llega con huecos **a propósito**, y una función que sólo
+aplique a lo que se capture desde hoy **está bien**.
+
+- **Aplica en:** versión **0.090**, ficha `V1-E9v`. **Fecha:** 2026-09-02.
+
+---
+
+#### (Post-F9.181) — ✅ RESPUESTAS DE DANIEL del 2-sep-2026 (tarde): cinco filas cerradas o reencuadradas
+
+Cinco decisiones de una misma conversación. **Con ellas no queda ninguna pregunta abierta que frene
+desarrollo.** *(Las tres reglas del pack, §Post-F9.179, quedaron confirmadas en la misma conversación —ver
+allí la respuesta textual.)*
+
+**(a) 0.061(c) · «El costo se congela al cerrar la orden»** — respuesta a la pregunta que **él mismo levantó**
+el 30-ago (*«¿en qué momento se define que ya se cerró el costo? ¿O va cambiando?»*).
+⚠️ **MEDIDO, y hay que saberlo antes de construir: «cerrar la orden» NO EXISTE HOY.** `EstadoOrden` es
+`capturada | completa | cancelada`, **no hay «cerrada»**, y 🔴 **`completa` NO significa «terminada»**: el
+propio esquema la define como **completitud de CAPTURA** (tallas + receta liberada + arte). **El nombre invita
+al error.**
+⚠️ **Y el candidato automático NO sirve — lo desmiente la propia decisión (a) de §Post-F9.154:** como los
+**faltantes** se le cobran al maquilero y las **incompletas** salen como merma, **no vuelven** ⇒ una orden que
+perdió piezas **nunca llega al 100 % entregado** y **su costo no se congelaría jamás**.
+⇒ **Propuesta: construir el acto de CERRAR la orden** (explícito, auditado A7, con permiso, reversible sólo
+por reapertura auditada D3). **Esto agranda la 0.061**: ya no son «un código de catálogo y una rama».
+
+**(b) 0.086 · el parámetro de aceptación** — *«podríamos dejar **2 %** como máximo entre segundas y faltantes.
+Pero creo que debería de ser una tela variable puesta en algún lugar de la configuración… **modificable en el
+tiempo**»* ⇒ **parámetro configurable, default 2 %.** ⏳ Dos precisiones menores con default: **¿2 % sumando
+segundas + faltantes o cada uno?** *(default: sumados)* y **¿global o por maquilero?** *(default: global)*.
+📌 **Medir antes de construir** si hoy se capturan las dos cifras por separado.
+
+**(c) 0.094 · la ficha del estampador** — *«si lleva foto la ficha de estampado»* ⇒ **sí lleva foto.**
+
+**(d) 0.087 · ⏸️ APARCADA, con un reencuadre que no se puede perder** — *«…la composición de la tela real se
+va a definir con la compra de la tela… entonces **la OP debe definir llevar 50-50. Como se hizo la compra.**
+Pero la verdad es algo poco relevante. **No quiero perder tiempo en esto. Ya quiero sacar la primer
+versión.**»*
+⭐ **Su reencuadre vale más que las dos opciones que se le propusieron** (compartir vs. avisar): para la
+composición **la verdad no está ni en el padre ni en el hijo — está en LA COMPRA**. ⇒ De los **12** campos de
+ficha heredados (`modelos.ts:139`; ⚠️ la fila 0.087 decía **9**, y son **12** — le faltaban `descripcion` e
+`idMaquileroCotizado`), **la composición no debería heredarse y congelarse, sino DERIVARSE de la tela
+comprada**; los otros 11 sí son ficha de diseño y ahí la pregunta original sigue en pie.
+**Coste de aparcarla, dicho:** un hijo **nacido antes** de editar el padre **se lleva el texto viejo al papel
+del cliente**. Daniel lo califica de *«poco relevante»*.
+
+**(e) 0.088 · ✅ CERRADA EN CERO** — *«Ok. Déjalo.»* ⇒ opción **(b)**: el botón **se queda con lo que hoy
+tiene**, y **no se construye nada**. **Lo que queda siendo verdad:** el botón **sigue pudiendo transformar un
+desarrollo SIN HIJOS**, con un número para todos los colores y sin vuelta atrás; **entre el usuario y eso hay
+una sola cosa: el aviso ámbar, que ya existe**. No queda desprotegido: queda **protegido por un aviso y por
+nada más**, y así lo aprobó el dueño. ⚠️ **No se añade una segunda guarda**: ya se probó y **retiraba una
+capacidad**, no protegía de un descuido.
+
+- **Aplica en:** versión **0.090** (registro). **Fecha:** 2026-09-02.
+
+---
+
+#### (Post-F9.182) — 🔍 DANIEL PIDE REVISAR **INVENTARIOS** y **FINANZAS**: dos módulos completos que nunca ha mirado (2-sep-2026)
+
+> **Daniel, textual:** *«Recuerda que aún falta inventarios y finanzas. **Ya quiero entrarle a eso**.»*
+
+**El hueco es del MAPA, no del código, y es exactamente lo que la regla «nada pendiente existe sin número»
+vino a impedir:** son **dos módulos construidos y desplegados** —Inventarios entre junio y julio, **Finanzas
+completa el 10-jul-2026 (F9, 6/6)**— y **el dueño del negocio nunca los ha revisado**. Hasta hoy **ninguna fila
+los representaba**.
+
+⇒ **Se numeran: 0.096 (Inventarios) y 0.097 (Finanzas)**, uno cada uno porque son **temas distintos** (la
+regla permite agrupar acciones del mismo tema, no fundir dos).
+
+### ⚠️ Qué NO son estas filas
+**No son funciones a construir.** Son **la verificación del dueño**. Lo que salga de cada repaso **nace con su
+propio número** — igual que pasó el 13-ago-2026, cuando el repaso de Daniel produjo
+`docs/DIAGNOSTICO-FLUJO-COMPLETO.md`, nueve decisiones y **el track V1 entero**.
+
+### El método, fijado por ese precedente
+**Antes de que él entre**, una **pasada medida** de cada módulo, escrita **en lenguaje de negocio y para que
+la lea él**: qué se puede hacer hoy y quién puede hacerlo · **dónde está flojo** (pantallas a medias, límites
+que el código declara y nadie ha leído) · **qué hacía el Access viejo que aquí no esté**
+(`Documentacion_MJD/04-Inventarios.md` para el primero) · y las preguntas **con el caso concreto que las
+origina y un default propuesto**.
+📌 **El objetivo es que Daniel JUZGUE, no que DESCUBRA.**
+
+### Pendientes operativos ya conocidos que hay que poner delante de él en la 0.097
+1. **El ETL de saldos de apertura de Finanzas está LISTO y NO CORRIDO** — espera **su corte de SINUBE** (D15c).
+2. Falta **capturar el RFC de FR Moda** en Administración › Empresas (sin él no se rechaza un CFDI de receptor
+   ajeno).
+3. El menú de Finanzas **exige `SEED_ON_START=true`** por los permisos de F9.
+
+- **Aplica en:** filas **0.096** y **0.097**. **Fecha:** 2026-09-02.
+
+---

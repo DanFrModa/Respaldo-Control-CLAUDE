@@ -991,6 +991,16 @@ export type CambioReceta = RecetaOrden['desalineacion']['cambios'][number];
  * dato en los tres sitios, así que se nombra una sola vez.
  */
 export type OcComprometida = RecetaOrden['ocsComprometidas'][number];
+/**
+ * ⭐⭐ fila 0.068 (a) — cómo va una OP frente a sus **OP HERMANAS** (las del mismo linaje de modelo).
+ *
+ * 🔴 **No es `desalineacion`**: aquélla compara la receta congelada contra la del MODELO (vertical);
+ * ésta, contra la de sus hermanas (horizontal). Viaja en la receta de la OP **y** en cada fila del
+ * Centro de Órdenes — es el MISMO objeto en los dos sitios, así que se nombra una sola vez.
+ */
+export type FrenteAlGrupo = RecetaOrden['frenteAlGrupo'];
+/** Un material en el que esta OP no coincide con sus hermanas. */
+export type DiferenciaConHermanas = FrenteAlGrupo['diferencias'][number];
 /** Estado de revisión de un renglón (sin revisar / revisado / ajustado). */
 export type EstadoRenglonReceta = RecetaOrdenTela['estado'];
 /** Sección de la receta a la que pertenece un renglón. */

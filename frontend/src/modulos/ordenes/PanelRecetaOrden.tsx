@@ -78,6 +78,7 @@ import { ChipsOcComprometidas } from '@/modulos/ordenes-compra/piezas';
 import { DialogoDesautorizarOc } from '@/modulos/ordenes-compra/DialogoDesautorizarOc';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoHermanas } from './AvisoHermanas';
 import { FotosArteOrden } from './FotosArteOrden';
 import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './receta-piezas';
 
@@ -469,6 +470,12 @@ export function PanelRecetaOrden({
       <AvisoCurvaDistinta aviso={d.avisoCurva} />
 
       <AvisosDesalineacion receta={d} omitirFaltantes={conLlamado} />
+
+      {/* ⭐⭐ fila 0.068 (a) — LA OTRA comparación, y va justo debajo de la de arriba a propósito:
+          son perpendiculares y hay que poder distinguirlas de un vistazo. `AvisosDesalineacion`
+          dice *"el MODELO se movió"* (vertical, ámbar/rojo: algo que revisar); ésta dice *"esta OP
+          no lleva lo mismo que sus hermanas"* (horizontal, azul: informativo y legítimo). */}
+      <AvisoHermanas frenteAlGrupo={d.frenteAlGrupo} />
 
       <SeccionTelas
         receta={d}

@@ -137,6 +137,11 @@ import {
   ocsDeMaterial,
   type RenglonYaComprado,
 } from '../compras/aviso-ya-comprado.js';
+// ⭐⭐ fila 0.068 (a) — la comparación HORIZONTAL (esta OP contra sus HERMANAS del mismo linaje).
+// Vive en su propio módulo y NO aquí: es otra pregunta que la desalineación de este archivo (que es
+// la VERTICAL, contra la receta del modelo) y mezclarlas es como se apagaría el aviso justo en el
+// caso que lo justifica — ver el encabezado de `hermanas-de-la-op.ts`.
+import { frenteAlGrupoDeOrdenes, sinHermanas } from './hermanas-de-la-op.js';
 import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-avios.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
 import { num, redondear2 } from '../costos/decimales.js';
@@ -1003,6 +1008,7 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     piezas,
     piezasPorTalla,
     comprometidas,
+    frenteAlGrupo,
   ] = await Promise.all([
     tx.ordenTela.findMany({
       where: { idOrden: orden.id },
@@ -1063,6 +1069,25 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
      * la pregunta es otra: *"¿hay que negociar con un proveedor?"*.
      */
     comprasComprometidasDeUnaOrden(orden.idEmpresa, orden.id, { tx }),
+    /*
+     * ⭐⭐ fila 0.068 (a) — **CÓMO VA ESTA OP FRENTE A SUS HERMANAS** (§Post-F9.146 pregunta 4).
+     *
+     * DANIEL: *"Normalmente todas las OP deben de ir iguales… se debe de poder hacer, **pero
+     * advirtiendo de la diferencia**"*.
+     *
+     * 🔴 **No confundir con `desalineacion`, que se arma más abajo en esta misma función.** Aquélla compara
+     * esta receta congelada contra la del MODELO (vertical); ésta, contra la de sus **OP hermanas**
+     * del mismo linaje (horizontal). Dos hermanas pueden estar las dos alineadas con el padre y aun
+     * así diferir entre ellas — y al revés. Ninguna implica la otra.
+     *
+     * Va en la MISMA lectura, y no en una llamada aparte, por la misma razón que `ocsComprometidas`:
+     * después de tocar un renglón el aviso tiene que refrescarse solo (cambiar un consumo es
+     * exactamente lo que puede desviar la OP del grupo), y una segunda petición obligaría a la
+     * pantalla a cruzar dos respuestas. Son CINCO consultas fijas y sólo sobre ESTE linaje —pero
+     * ⚠️ corren **dentro de la transacción** cuando quien llama es una mutación (`enRecetaEditable`),
+     * y su volumen crece con el nº de OP no canceladas del modelo.
+     */
+    frenteAlGrupoDeOrdenes(tx, [orden.id], orden.idEmpresa),
   ]);
 
   // El nombre del proveedor amarrado del AVÍO se resuelve contra el `idAvioProveedor` de LA ORDEN
@@ -1331,6 +1356,11 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     avios,
     artes,
     desalineacion,
+    // ⭐⭐ fila 0.068 (a) — la comparación HORIZONTAL (contra las OP hermanas), ya redactada por el
+    // servidor. `sinHermanas()` cuando la orden no está en el mapa: sólo puede pasar si está
+    // CANCELADA (una cancelada no es del grupo ni recibe aviso), y ahí lo honesto es no decir nada
+    // en vez de inventar un grupo. Es INFORMATIVO: no toca `puedeComprar` ni ninguna guarda.
+    frenteAlGrupo: frenteAlGrupo.get(orden.id) ?? sinHermanas(),
   };
 }
 

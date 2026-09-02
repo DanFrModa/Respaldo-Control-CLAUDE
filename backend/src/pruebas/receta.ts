@@ -25,6 +25,21 @@ export interface OpcionesSembrarReceta {
    * se compra de aquí en adelante. Un test de la puerta pasa `false`.
    */
   liberada?: boolean;
+  /**
+   * ⭐⭐ QUIÉN firma la receta. Default: un id de PRUEBA, o sea **una persona**.
+   *
+   * 🔴 **Antes firmaba con `liberadoPorId: null`, y eso es una TRAMPA ARMADA.** Esa combinación
+   * —`liberadoEn` sellado + autor NULL— es exactamente la marca con la que
+   * `dominio/produccion/hermanas-de-la-op.ts` reconoce *«esta receta la escribió un backfill, no una
+   * persona»* y **la aparta de la comparación entre OP hermanas**. Un fixture que la reprodujera
+   * dejaría a sus órdenes fuera del grupo: la primera prueba que sembrara dos hermanas con este
+   * helper y esperara un aviso obtendría **SILENCIO**, y parecería que el módulo está roto.
+   *
+   * Como este helper simula **el alta normal** (lo dice su encabezado), lo honesto es que firme
+   * como firma una persona. Un test que quiera de verdad el estado «la firmó la migración» pasa
+   * `liberadoPorId: null` a propósito — y entonces sabe lo que está pidiendo.
+   */
+  liberadoPorId?: string | null;
 }
 
 /**
@@ -38,6 +53,10 @@ export async function sembrarRecetaDeOrden(
   opciones: OpcionesSembrarReceta = {},
 ): Promise<void> {
   const liberada = opciones.liberada ?? true;
+  // Ver `OpcionesSembrarReceta.liberadoPorId`: firmar con NULL apartaría a la orden de la
+  // comparación entre hermanas, que NO es lo que un fixture del alta normal quiere decir.
+  const liberadoPorId =
+    opciones.liberadoPorId === undefined ? 'usr-pruebas' : opciones.liberadoPorId;
 
   const yaTiene = await cliente.ordenTela.count({ where: { idOrden } });
   const yaAvios = await cliente.ordenAvio.count({ where: { idOrden } });
@@ -123,10 +142,11 @@ export async function sembrarRecetaDeOrden(
     // `ordenes-compra.int.test.ts`. Un fixture que inventa un estado imposible no simplifica: miente.
     //
     // Se firma con la MISMA fecha en los renglones y en la orden —igual que el backfill de
-    // `20260819120000_receta_liberada_por_renglon` y que `crearOrdenMigrada`—, y `liberado_por_id`
-    // queda NULL, que es como se lee *"la firmó la migración, no una persona"*.
+    // `20260819120000_receta_liberada_por_renglon` y que `crearOrdenMigrada`—, pero con un AUTOR
+    // (ver `OpcionesSembrarReceta.liberadoPorId`): `liberado_por_id` en NULL significa *"la firmó
+    // un backfill"*, y `hermanas-de-la-op.ts` aparta esas órdenes de la comparación.
     const firmadaEn = new Date();
-    const firma = { liberadoEn: firmadaEn, liberadoPorId: null };
+    const firma = { liberadoEn: firmadaEn, liberadoPorId };
     await Promise.all([
       cliente.ordenTela.updateMany({ where: { idOrden }, data: firma }),
       cliente.ordenAvio.updateMany({ where: { idOrden }, data: firma }),
@@ -134,7 +154,7 @@ export async function sembrarRecetaDeOrden(
     ]);
     await cliente.orden.update({
       where: { id: idOrden },
-      data: { recetaLiberadaEn: firmadaEn, recetaLiberadaPorId: null },
+      data: { recetaLiberadaEn: firmadaEn, recetaLiberadaPorId: liberadoPorId },
     });
   }
 }

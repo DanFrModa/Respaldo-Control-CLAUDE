@@ -28031,6 +28031,36 @@ export interface paths {
                   detalle: string;
                 }[];
               };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
+              };
             };
           };
         };
@@ -28519,6 +28549,36 @@ export interface paths {
                   detalle: string;
                 }[];
               };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
+              };
             };
           };
         };
@@ -28970,6 +29030,36 @@ export interface paths {
                   /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
                   detalle: string;
                 }[];
+              };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
               };
             };
           };
@@ -29427,6 +29517,36 @@ export interface paths {
                   detalle: string;
                 }[];
               };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
+              };
             };
           };
         };
@@ -29866,6 +29986,36 @@ export interface paths {
                   /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
                   detalle: string;
                 }[];
+              };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
               };
             };
           };
@@ -30312,6 +30462,36 @@ export interface paths {
                   detalle: string;
                 }[];
               };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
+              };
             };
           };
         };
@@ -30751,6 +30931,36 @@ export interface paths {
                   /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
                   detalle: string;
                 }[];
+              };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
               };
             };
           };
@@ -31207,6 +31417,36 @@ export interface paths {
                   detalle: string;
                 }[];
               };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
+              };
             };
           };
         };
@@ -31655,6 +31895,36 @@ export interface paths {
                   detalle: string;
                 }[];
               };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
+              };
             };
           };
         };
@@ -32094,6 +32364,36 @@ export interface paths {
                   /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
                   detalle: string;
                 }[];
+              };
+              /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+              frenteAlGrupo: {
+                /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                hermanas: number;
+                /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                foliosHermanas: number[];
+                /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                fueraDeLaComparacion: number;
+                /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                diferencias: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                  material: string;
+                  /**
+                   * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                   * @enum {string}
+                   */
+                  que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                  /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                  detalle: string;
+                }[];
+                /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                aviso: string | null;
+                /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                notaFueraDeLaComparacion: string | null;
               };
             };
           };
@@ -32559,6 +32859,36 @@ export interface paths {
                     /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
                     detalle: string;
                   }[];
+                };
+                /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+                frenteAlGrupo: {
+                  /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                  hermanas: number;
+                  /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                  foliosHermanas: number[];
+                  /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                  fueraDeLaComparacion: number;
+                  /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                  diferencias: {
+                    /**
+                     * @description Sección de la receta a la que pertenece el renglón.
+                     * @enum {string}
+                     */
+                    tipo: 'tela' | 'avio' | 'arte';
+                    /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                    material: string;
+                    /**
+                     * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                     * @enum {string}
+                     */
+                    que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                    /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                    detalle: string;
+                  }[];
+                  /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                  aviso: string | null;
+                  /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                  notaFueraDeLaComparacion: string | null;
                 };
               };
               /** @description Lo que sí entró a la receta (SIN LIBERAR: pasa por la misma firma). */
@@ -34795,6 +35125,36 @@ export interface paths {
                 cliente: string;
                 /** @description Requisitos que le faltan a la orden para estar COMPLETA (vacío si ya lo está o si está cancelada). Transparencia del estado: la UI lo muestra como "Falta: …". */
                 faltantes: ('tallas' | 'receta' | 'arte')[];
+                /** @description Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada. */
+                frenteAlGrupo: {
+                  /** @description Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué. */
+                  hermanas: number;
+                  /** @description Folios de esas hermanas, para reconocerlas (recortado a las primeras). */
+                  foliosHermanas: number[];
+                  /** @description Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría. */
+                  fueraDeLaComparacion: number;
+                  /** @description Qué lleva distinto. Vacío = va igual que sus hermanas. */
+                  diferencias: {
+                    /**
+                     * @description Sección de la receta a la que pertenece el renglón.
+                     * @enum {string}
+                     */
+                    tipo: 'tela' | 'avio' | 'arte';
+                    /** @description Cómo se llama el material, para nombrarlo en el aviso ("BOT-01 — Botón nácar"). */
+                    material: string;
+                    /**
+                     * @description Qué tiene distinto esta OP respecto de sus hermanas.
+                     * @enum {string}
+                     */
+                    que: 'solo-esta' | 'no-la-lleva' | 'cantidad';
+                    /** @description La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual. */
+                    detalle: string;
+                  }[];
+                  /** @description Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas). */
+                  aviso: string | null;
+                  /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
+                  notaFueraDeLaComparacion: string | null;
+                };
               }[];
               /** @description Total de órdenes que cumplen el filtro. */
               total: number;

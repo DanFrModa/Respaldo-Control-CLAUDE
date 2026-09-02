@@ -1218,6 +1218,101 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9v · ⭐ EL AVISO DE LA OP QUE SE DESVÍA DEL GRUPO (2-sep-2026, versión **0.090**) — ✅ CIERRA LA FILA 0.068
+
+**Qué entregó.** La mitad (a) de la fila 0.068: que el sistema **sepa y diga** que una OP ya no va igual que
+sus hermanas — *«advirtiendo de la diferencia»*, §Post-F9.156 Pieza 1. Con la (b) ya entregada en la 0.085,
+**la fila 0.068 queda cerrada**.
+
+### 🔴 Lo que la medición desmintió, y salvó la etapa
+
+1. **Existía una función que «servía» — y copiarla habría APAGADO el aviso justo en el caso de Daniel.**
+   `calcularDesalineacion` compara la copia congelada contra el BOM **del modelo**, **por fila**, y su regla
+   `desviadoAProposito` **silencia** lo *ajustado / agregado a mano / excluido*. ⇒ **El cierre café
+   (`agregadoAMano`) y la jareta (`excluido`) habrían caído los dos en ese silencio.** Módulo aparte, cero
+   reutilización de esa regla, verificado por el reviewer siguiendo la cadena causal completa.
+2. **«Hermana» = LINAJE**, no el pedido — lo apoya Daniel (*«Me dan 4 pedidos diferentes, uno por color»*).
+   Reusa el predicado que ya existía ⇒ **no hay una cuarta copia**.
+3. 🔴🔴 **La afirmación que el coder marcó como «lo que salva el aviso» era FALSA.** Dijo que el ETL no
+   escribe las recetas congeladas; **sí las escribe** — **por el dominio, no por el nombre de la tabla**, así
+   que el `grep` no lo vio. **~1 346 de las ~3 900 órdenes migradas SÍ tienen receta.** Y ya había una prueba
+   que lo decía en el título.
+
+### ⭐⭐ El defecto grande: el arreglo INVERTÍA el aviso, y luego lo APAGABA
+
+Como **no existe estado de «cerrada»** (`capturada | completa | cancelada`), **una OP entregada en 2019 vota
+para siempre** ⇒ N históricas contra 1 nueva **señalaban a la nueva y correcta**. Se acotó: **las recetas
+escritas por un backfill no votan**.
+
+🔴 **Pero el reviewer midió el riesgo simétrico y era peor**: sobre una familia migrada, **el caso del cierre
+café se quedaba MUDO** —y en el Centro la fila salía limpia—, con **la otra comparación también callada**.
+Se estudió separar «vota» de «sirve de referencia» y **no sirve**: los dos casos son indistinguibles **para
+la regla de la mayoría**. Se tomó el recorte **declarado entero**, con su coste escrito en cuatro sitios y
+**fijado en pruebas** (*«si esto se pone rojo, no es una regresión: es que alguien cambió la decisión»*).
+
+⭐ **La mitigación es lo que lo hace un buen trato, y es exacta**: la orden **vuelve al grupo en cuanto una
+persona firma su receta** ⇒ **calla el pasado, no el futuro**.
+
+### 🔴 SEIS RONDAS DE REVISIÓN — y el patrón que enseñan
+
+| Ronda | Hallazgo |
+|---|---|
+| 1 | La premisa del ETL era falsa ⇒ el aviso se **invertía**; y la intersección de tallas **apagaba** la comparación de toda la familia |
+| 2 | El recorte **acotaba de más**: apagaba el caso estrella. Y el aviso por talla era **ilegible**: *«esta OP lleva 1 por talla · la otra lleva 1 por talla»* |
+| 3 | **Quitar un renglón (la jareta) NO devolvía la OP al grupo** — y el módulo tenía un test llamado «la jareta» que **pasaba sólo porque su familia no era migrada** |
+| 4 | La tabla de actos **no estaba completa**, y lo que faltaba **escribía las mismas tablas desde otro módulo**; y la prueba que fijaba el hallazgo **pasaba por construcción** |
+| 5 | Una aserción con **el valor equivocado** ⇒ CI en rojo *(primera ronda cuyo hallazgo CI habría cazado solo)* |
+| 6 | **Nada.** *«Ahora sí estamos en el fondo.»* |
+
+📌 **El patrón, y la regla que sale:** en cuatro de las seis, **el arreglo era correcto y lo falso era la
+JUSTIFICACIÓN añadida** ⇒ *una excepción contada a medias es una afirmación nueva, y hay que medirla como
+tal*. Y las dos últimas afinaron el método: **enumera por la TABLA que se toca, no por el módulo que crees su
+dueño**, y **cuando midas una propiedad nueva, aplícala a TODO EL ARCHIVO —y a los vecinos— antes de escribir
+la corrección**.
+
+### ⭐ El método funcionó, y se puede medir cuándo
+
+- **Ronda 4:** buscar el contraejemplo **antes** de escribir la frase encontró **dos cuadrantes** que el
+  reviewer no vio en tres rondas *(«marcar todo revisado» y «reabrir la receta» parecen trabajar la familia y
+  **no devuelven la orden**)*. **Primera vez que la corrección llega antes que la revisión.**
+- **Ronda 5:** el coder **desmintió la corrección que le propuso el lead** — midió que la cantidad sugerida
+  **no discrimina nunca, por construcción**, y que seguirla habría cambiado una prueba vacía por otra **y
+  dejado una aserción falsa en CI**.
+- **Ronda 6:** el barrido extendido **a los archivos vecinos** encontró un tercer caso **sin que nadie se lo
+  señalara**, y el reviewer cerró con *«el barrido llega antes que el revisor y no deja residuo»*.
+
+### Cómo quedó
+
+**Embudo** `dominio/produccion/hermanas-de-la-op.ts`: núcleo **puro** + cargador en **5 consultas fijas**, sea
+1 orden o 100. Compara **conjunto de materiales + cantidad congelada** a **4 decimales = la escala exacta de
+la columna** (no una tolerancia); **precio NO**, **color de la tela NO**. **Las tres gemelas** (tela, avío,
+arte — éste sólo presencia). Superficies: banner en la receta, chip en el cajón y en el Centro **en tabla y
+en tarjeta móvil**, tono **`info`, no `warn`**.
+
+### 🔴 Un defecto que el coder cazó en su propio trabajo
+
+`AvisoHermanas` desreferenciaba sin guarda mientras su gemela sí guardaba ⇒ con una respuesta **cacheada de
+antes del despliegue**, `TypeError` y **se cae la pantalla de la receta entera**.
+
+### Residuos declarados
+
+- **La defensa de la regla vive ENTERA en el job de integración**: la mutación «apagar el campo» **sobrevive
+  en unit**.
+- La bandeja «Recetas por liberar» y el **impreso PDF** no llevan el aviso.
+- **Una medida editada en una talla que sólo una OP pide no se detecta** (es diferencia del pedido).
+- **Rendimiento sin medir**: hasta 100 linajes por página, y las 5 consultas corren **dentro de la
+  transacción de escritura** de cada mutación de receta.
+
+### Despliegue
+
+**Sin migración, sin permisos, sin seed** ⇒ **NO requiere `SEED_ON_START`**.
+
+### Gates
+
+backend **205 archivos / 2 765 pruebas** · frontend **206 / 2 017** · typecheck ×2 · lint ×2 · format ×2 ·
+contrato **sin deriva byte a byte**. Corridos por el coder **y repetidos por el reviewer**, con cifras
+coincidentes.
+
 ## V1-E9q · EL AVISO LLEVA AL BOTÓN — a quien puede usarlo (2-sep-2026, versión **0.085**) — 🔶 MITAD (b) DE LA FILA 0.068
 
 Fila **0.068**, **sólo su mitad (b)**. §Post-F9.145: *el aviso que pide un acto, lleva a hacerlo*. Y el

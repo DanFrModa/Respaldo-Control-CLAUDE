@@ -11,11 +11,18 @@
  * ⚠️ La DESALINEACIÓN contra el BOM del modelo se calcula **AL VUELO**, sin evento, sin outbox y sin
  * estado acumulado (§Post-F9.43(d)): la receta está congelada y el BOM está vivo, así que la
  * diferencia sale de compararlos cuando alguien abre la pantalla.
+ *
+ * ⭐⭐ Y desde la fila 0.068 (a) la salida trae **una segunda comparación, perpendicular a aquélla**:
+ * `frenteAlGrupo` (contrato en `hermanas-op.ts`), que dice si esta OP lleva lo mismo que sus **OP
+ * HERMANAS** del mismo linaje de modelo. `desalineacion` mira al PADRE; `frenteAlGrupo`, a los
+ * HERMANOS. No se implican y no se sustituyen.
  */
 import { z } from 'zod';
 
 import { esquemaEstatusOrdenCompra } from './compra.js';
+import { esquemaFrenteAlGrupo } from './hermanas-op.js';
 import { esquemaEstadoOrden } from './orden.js';
+import { esquemaTipoRenglonReceta } from './renglon-receta.js';
 
 // ── Vocabulario ────────────────────────────────────────────────────────────────
 
@@ -31,13 +38,11 @@ export const esquemaEstadoRenglonReceta = z
 /** Clave del estado de un renglón de la receta. */
 export type EstadoRenglonRecetaClave = z.infer<typeof esquemaEstadoRenglonReceta>;
 
-/** Qué clase de renglón es (las tres secciones de la receta). */
-export const esquemaTipoRenglonReceta = z
-  .enum(['tela', 'avio', 'arte'])
-  .describe('Sección de la receta a la que pertenece el renglón.');
-
-/** Clave del tipo de renglón. */
-export type TipoRenglonRecetaClave = z.infer<typeof esquemaTipoRenglonReceta>;
+// ⚠️ El enum de las tres secciones se MUDÓ a `renglon-receta.ts` (fila 0.068 (a)): lo necesitan
+// también los esquemas de la comparación horizontal (`hermanas-op.ts`), y este archivo importa los
+// SUYOS — dejarlo aquí haría un ciclo que revienta al construir los esquemas de Zod. Se re-exporta
+// para que nada de lo que ya lo importaba de aquí tenga que cambiar.
+export { esquemaTipoRenglonReceta, type TipoRenglonRecetaClave } from './renglon-receta.js';
 
 /**
  * QUÉ cambió respecto de lo congelado en la orden (§Post-F9.43(d): el aviso tiene que decir *qué*
@@ -560,6 +565,23 @@ export const esquemaRecetaOrden = z
     avios: z.array(esquemaRecetaOrdenAvio),
     artes: z.array(esquemaRecetaOrdenArte),
     desalineacion: esquemaDesalineacionReceta,
+    /*
+     * ⭐⭐ fila 0.068 (a) (§Post-F9.146 pregunta 4) — **CÓMO VA ESTA OP FRENTE A SUS HERMANAS.**
+     *
+     * DANIEL: *"Normalmente todas las OP deben de ir iguales. Puede pasar que una OP del grupo se le
+     * cambie algún avío (por ejemplo, no hubo cierre de ese tono y se compró otro tipo de cierre
+     * sólo para la café)… **se debe de poder hacer, pero advirtiendo de la diferencia**"*.
+     *
+     * 🔴 **Es PERPENDICULAR a `desalineacion`, el campo de arriba, y confundirlos es el error fácil:**
+     * aquél compara esta receta congelada contra la del **MODELO** (vertical, padre ↔ hijo, a lo
+     * largo del tiempo); éste, contra la de sus **OP HERMANAS** del mismo linaje (horizontal, en el
+     * mismo momento). Dos hermanas pueden estar las dos perfectamente alineadas con el padre y aun
+     * así diferir entre ellas — ninguna de las dos preguntas implica la otra.
+     *
+     * INFORMATIVO: no bloquea nada, no toca `puedeComprar` y no entra en ninguna guarda. Se calcula
+     * al vuelo en cada lectura y **nunca se guarda**.
+     */
+    frenteAlGrupo: esquemaFrenteAlGrupo,
   })
   .describe('Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43).');
 

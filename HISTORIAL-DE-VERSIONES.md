@@ -71,6 +71,44 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.090 · 2-sep-2026 · **en prueba** — ⭐ El sistema **avisa cuando una OP ya no va igual que sus hermanas**
+
+### Qué se puede hacer ahora que antes no
+
+**Ver, de un vistazo, que una orden se salió del grupo.** Es el remate que pediste con estas palabras:
+*«no hubo cierre de ese tono y se compró otro tipo de cierre sólo para la café»* — la diferencia **es
+legítima**, pero hasta hoy **era invisible**.
+
+Ahora, cuando las OP de un mismo modelo no llevan lo mismo:
+- en la **receta de la OP** sale un aviso que dice **exactamente qué material difiere** y qué llevan las
+  demás («esta OP lleva 1 por talla (M 6 · CH 5) · las otras llevan 1 por talla (M 3 · CH 2)»);
+- en el **Centro de Órdenes** —la única pantalla que enseña juntas las OP de un modelo— la fila lleva su
+  marca, en la tabla **y** en la tarjeta del celular.
+
+**Manda la mayoría:** si tres van igual y una se salió, **se señala la que se salió**. Y si el grupo se
+parte por la mitad (dos y dos), **no hay norma y se avisa a todas** — callar ahí escondería que el grupo
+está dividido.
+
+### Qué cambió y puede sorprender
+
+- **Es un aviso, no un bloqueo.** No impide guardar nada. La diferencia es legítima; lo que faltaba era
+  saberla.
+- **Compara lo que se lleva, no lo que cuesta.** Entran los materiales y las cantidades; **el precio no**
+  —se negocia por proveedor y por momento, y cambiaría el aviso a cada rato— **ni el color de la tela**,
+  que es de cada orden por diseño.
+- ⚠️ **Sobre las familias que vienen de Access, el aviso arranca MUDO** — y es tu decisión, la de hoy:
+  *«las órdenes viejas no tienen todas las funciones que las nuevas»*. **Pero no es para siempre:** esa
+  orden **vuelve al grupo en cuanto alguien libera su receta** en el sistema nuevo. **Calla el pasado, no
+  el futuro.** Mientras tanto, el detalle de la receta te dice **cuántas quedaron fuera**.
+
+### Qué sigue pendiente o roto
+
+- **Sólo se ve en dos sitios**: la receta de la OP y el Centro de Órdenes. La bandeja de recetas por
+  liberar y el impreso de la orden **no lo llevan**.
+- **Una medida cambiada en una talla que sólo una OP pide no se detecta** — eso es diferencia del pedido,
+  no de la receta.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.085 · 2-sep-2026 · **en prueba** — ⭐ El aviso de «ya está comprado» ahora **lleva al botón**, a quien puede usarlo
 
 ### Qué se puede hacer ahora que antes no
