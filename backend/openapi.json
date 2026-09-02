@@ -88545,7 +88545,7 @@
     },
     "/api/ordenes/incompletas": {
       "get": {
-        "summary": "Listar órdenes incompletas (capturadas sin matriz) con semáforo de antigüedad",
+        "summary": "Listar órdenes incompletas (les falta tallas, receta liberada o arte) con semáforo de antigüedad",
         "tags": [
           "ordenes"
         ],
@@ -88749,7 +88749,7 @@
                           "semaforo"
                         ],
                         "additionalProperties": false,
-                        "description": "Orden incompleta (capturada sin matriz) con su antigüedad y semáforo."
+                        "description": "Orden incompleta (`capturada`: le falta tallas, receta liberada o arte) con su antigüedad y semáforo. NO significa \"sin matriz\": una incompleta puede tenerla."
                       },
                       "description": "Órdenes incompletas de la página."
                     },
@@ -147423,7 +147423,17 @@
                           },
                           "recibido": {
                             "type": "number",
-                            "description": "Σ piezas recibidas (recibos vivos del periodo)."
+                            "description": "Σ piezas BUENAS recibidas (recibos vivos del periodo)."
+                          },
+                          "incompletas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Σ prendas INCOMPLETAS que el maquilero entregó en los recibos del grupo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `recibido`: no se producen ni se pagan, así que no generan cargo y no pueden descuadrar la conciliación."
+                          },
+                          "soloIncompletas": {
+                            "type": "boolean",
+                            "description": "¿Todos los recibos VIVOS de este grupo trajeron SÓLO prendas incompletas? Es lo que explica un renglón con `recibido` 0: esas prendas no se pagan, así que esos recibos NO generaron cargo. NO afirma que el renglón cuadre: `cargado` incluye también los cargos validados que no cuelgan de un recibo (histórico o manual), y uno de ésos puede dejar `faltantePorCargar` negativo. Derivado en el servidor (A1) de `recibido === 0 && incompletas > 0`; la pantalla sólo lo pinta."
                           },
                           "cargado": {
                             "type": "number",
@@ -147454,6 +147464,8 @@
                           "idTipoProceso",
                           "tipoProceso",
                           "recibido",
+                          "incompletas",
+                          "soloIncompletas",
                           "cargado",
                           "faltantePorCargar",
                           "cortado",
@@ -147541,6 +147553,11 @@
                         "recibido": {
                           "type": "number"
                         },
+                        "incompletas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "cargado": {
                           "type": "number"
                         },
@@ -147555,6 +147572,7 @@
                       },
                       "required": [
                         "recibido",
+                        "incompletas",
                         "cargado",
                         "faltantePorCargar",
                         "numCargosSinRecibo"

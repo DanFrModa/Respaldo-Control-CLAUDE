@@ -1218,6 +1218,97 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9t · LOS DOS CABOS QUE SE PODÍAN HACER YA — y la fila que hubo que reescribir (2-sep-2026, versión **0.088**) — 🔶 O2 y O4 DE LA FILA 0.082
+
+**Qué entregó.** Dos de los cuatro cabos de las prendas incompletas. Pero lo primero que hizo esta etapa fue
+**medir la fila 0.082 contra el código, y la fila salió mal escrita en sus cuatro cabos**.
+
+### 🔴 Lo que la medición desmintió, antes de escribir una línea
+
+- **O1 no era un cabo: era un duplicado de la fila 0.061, decidido al revés.** La fila decía *«darle salida
+  automática SÍ SERÍA INVENTAR UNA MERMA»* citando §Post-F9.61 — y §Post-F9.154(a) (30-ago) dice lo contrario:
+  **la incompleta sale de tránsito como merma automática, auditada y reversible**. ⚠️ **Y §Post-F9.154 nació
+  justo de descubrir que esa cita decía lo contrario** ⇒ **la fila repetía el error que ya se había corregido
+  una vez**. Se **borra** de la 0.082.
+- **O2 estaba al revés.** El renglón «en ceros» **no es ruido**: `recibido === 0` **⟺** todos los recibos del
+  grupo trajeron **sólo incompletas** (`recibos.ts:227` descarta la celda vacía, `:257-262` rechaza el recibo
+  sin celdas) ⇒ **es la única huella de esa entrega en la conciliación**, que es literalmente lo que Daniel
+  pidió ver. Y **el filtro que la fila quería construir ya existía**.
+- **O4 tampoco era un choque de nombres.** Enumerado: los dos conceptos **nunca comparten pantalla** y los
+  textos ya van calificados. Lo que estaba mal era **la descripción**.
+- **O5 sí era cierto**, pero con un matiz que cambia su valor: **el sesgo está SÓLO en las pruebas**.
+
+### ⭐ La corrección que el coder me hizo a mí, y tenía razón
+
+Yo le dije que `recibido === 0` **equivale** a «puras incompletas». Él midió que **eso vale sólo para lo que
+crea el dominio**: `cantidadIncompletas` es `Int?` y **lo migrado trae la columna en NULL** (el propio `///`
+del esquema lo dice: *«NULL en corte/envío/entrega y en TODO lo migrado»*). ⇒ la marca correcta es
+**`recibido === 0 && incompletas > 0`**, con su caso HISTÓRICO en la prueba. Es la pregunta de REGLA 0-B
+—*«¿funciona bien cuando el dato NO está?»*— contestada bien.
+
+### La prueba que no existía
+
+`dominio/esma/conciliacion.ts` **no tenía archivo de prueba**; lo único que lo rozaba nunca veía una
+incompleta. Ahora tiene el suyo, con **cuatro grupos** para que no pase por construcción: MEZCLADO · PURAS
+INCOMPLETAS · LIMPIO · HISTÓRICO (fila insertada a mano con la columna NULL). El reviewer verificó que
+**discriminan de verdad**: cada forma equivocada de escribir la condición muere en un grupo distinto.
+⚠️ **Escrita a ciegas** (integración, sin Docker aquí): **su primera corrida real es CI.**
+
+### 🔴 Tres rechazos, y los tres por lo mismo
+
+**Ronda 1** — el barrido dejó **5 sitios vivos**, uno **en el archivo que el propio coder editó**, 850 líneas
+más abajo, y con **una segunda falsedad peor**: *«una orden que nace ya con matriz nace COMPLETA sola»*, cuando
+**ninguna orden puede nacer completa por esa vía** (la receta se copia **sin firma**). Los otros: el README del
+script que sí editó, la **documentación viva del módulo** (con la firma de la función ya desactualizada), una
+**instrucción operativa de F10**, y un TSDoc que decía *«tiene que nombrar la causa REAL»* y nombraba un motivo
+que ya no existe.
+
+**Ronda 2** — ⚠️ **la trampa anunciada**: corrigió la frase falsa **con otra falsa**. Escribió *«NINGUNA orden
+puede nacer completa»* y existe una segunda vía viva, `crearOrdenMigrada`, que inserta con el estado explícito
+de Access. **Su propio archivo lo contradecía 76 líneas arriba.** Y la promesa a acotar vivía en **siete
+sitios, no seis**: el que quedaba era **la gemela literal de uno que él sí arregló**.
+
+**Ronda 3** — otra vez, ahora en **el remate añadido**: *«la orden del ETL nace completa Y cumpliendo la
+regla»*. 🔴 Falso para **2 de cada 3**: el sellado es condicional, y **2 577 órdenes del viejo tienen modelo sin
+BOM** ⇒ nacen `completa` **con la receta sin liberar**. Y la frase **se contradecía sola**: si el histórico ya
+cumpliera la regla, `realinear-estado-ordenes.ts` **no tendría nada que degradar**.
+
+📌 **La lección, porque el patrón fue idéntico las tres veces: el arreglo era correcto y lo que falló fue la
+JUSTIFICACIÓN añadida.** ⇒ *cuando se mide una condición, se escribe entera; **una excepción contada a medias
+es una afirmación nueva** y hay que medirla como tal.*
+
+### Lo que el reviewer verificó, no creyó
+
+Regeneró el contrato y comparó **md5 byte a byte** (`OK ×3`), leyó el diff con `-U0` para confirmar que **la
+composición es exactamente la esperada y no hay nada de más**, enumeró **todos los escritores de `Orden`** para
+descartar una tercera vía (dos funciones, cero `INSERT` en migraciones, cero `$executeRaw`), y **repitió el
+barrido de reincidencia con sus propias variantes**.
+
+### La migración que NO se toca, y son DOS
+
+`20260726120000_modelo_lleva_arte:6` y `20260726130000_recalculo_estado_ordenes:18` llevan la frase vieja.
+**Intocables**: Prisma guarda el checksum y `migrate deploy` —que corre el entrypoint **en cada arranque**—
+falla en duro si el archivo cambia ⇒ corregir ese comentario **tumbaría el despliegue de `prueba` y el de
+producción**. La segunda además **se auto-declara congelada** en su línea 36.
+
+### Residuos declarados
+
+- ⚠️ **La defensa de `soloIncompletas` vive ENTERA en el job de integración.** Si alguien la rompe, **en local
+  no muere ninguna aserción**: el test de pantalla mockea el hook y defiende el **pintado**, no la derivación.
+- El renglón de **totales** habla de todas las filas mientras la tabla muestra el subconjunto filtrado en
+  cliente. **Preexistente**; `incompletas` sólo se suma al patrón que ya había.
+- **O5 espera** a que baje la versión que toca `recibos.int.test.ts`.
+
+### Despliegue
+
+**Sin migración, sin permisos, sin seed** ⇒ **NO requiere `SEED_ON_START`**.
+
+### Gates
+
+backend **204 archivos / 2 713 pruebas** · frontend **206 / 2 005** · typecheck ×2 · lint ×2 (0 errores) ·
+format ×2 · contrato regenerado **sin deriva**. ⚠️ Los cuatro largos **el coder no pudo terminarlos** (la caja
+saturada le dio 31 min de reloj por 1:52 de CPU): **los corrió el reviewer**, y los cuatro en verde.
+
 ## V1-E9s · ⭐ EL PACK, COMO CAMPO PROPIO — la mitad de abajo (2-sep-2026, versión **0.087**) — 🔶 MITAD DE LA FILA 0.084
 
 **Qué entregó.** El pack deja de vivir dentro del nombre del color («Negro A») y pasa a ser **campo propio**
@@ -5996,9 +6087,8 @@ Ninguna es un defecto de esta etapa; se escriben para que no se descubran solas 
   primeras vs. segundas y las incompletas no son ninguna de las dos. Puede ser lo que Daniel quiere
   (no son un defecto de calidad, son piezas que faltaron) o puede ser justo lo que quiere medir.
   **No se decidió: hay que preguntárselo.**
-- **O4 · Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (órdenes capturadas sin
-  matriz, F2-E4), que es **otro concepto**. Hoy no se cruzan en ninguna pantalla, pero conviene
-  saberlo antes de nombrar algo nuevo «incompletas».
+- **O4 · Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (⚠️ **aquí se escribió «órdenes capturadas sin matriz» y es FALSO** — significa *«le falta un requisito»*, y una incompleta **puede** tener matriz; F2-E4), que es **otro concepto**. Hoy no se cruzan en ninguna pantalla, pero conviene
+  saberlo antes de nombrar algo nuevo «incompletas». ✅ **CERRADO midiéndolo el 2-sep-2026 (v0.088): NO hay choque** —los dos conceptos nunca comparten pantalla y los textos ya van calificados—; **lo que sí estaba mal era la descripción**, y se corrigió en 22 sitios.
 - **O5 · Sesgo del acumulado en las pruebas** — `incompletasDeMaquilero`,
   `recibosSemanalesPorMaquilero` y `aCargoSalida` se ejercitan con **un solo recibo y una sola
   celda**. Suman bien por construcción, pero es el MISMO sesgo que dejó viva la mutación que EXCEDE.

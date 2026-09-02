@@ -3111,9 +3111,13 @@ model PedidoRealLinea {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Estado de la orden de producción (F2-E2). NO editable por el usuario: lo DERIVAN los
-/// servicios. `capturada` = recién abierta sin matriz; `completa` = ya tiene su matriz de
-/// colores/tallas (paridad con `Ordenes.FechaDet` del viejo, que se sellaba al meter el
-/// primer renglón del detalle); `cancelada` = cancelación suave (`Ordenes.OrdCancelada`).
+/// servicios con la regla ÚNICA de `dominio/produccion/requisitos-orden.ts`.
+/// `capturada` = le falta al menos un requisito; `completa` = los cumple todos —tallas (matriz)
+/// + receta de la OP liberada, y arte si el modelo lo lleva—; `cancelada` = cancelación suave
+/// (`Ordenes.OrdCancelada`).
+/// ⚠️ `capturada` NO significa "sin matriz" (26-jul-2026): una orden con su matriz completa sigue
+/// `capturada` mientras le falte la receta o el arte. Lo que sí es paridad con `Ordenes.FechaDet`
+/// del viejo es la columna `fechaCompletada`, no este estado.
 enum EstadoOrden {
   capturada
   completa
@@ -3207,7 +3211,7 @@ model Orden {
   pagadaForzada Boolean? @map("pagada_forzada")
 
   /// Estado AUTOMÁTICO (no editable): capturada/completa/cancelada (ver enum `EstadoOrden`). Lo
-  /// decide `dominio/produccion/requisitos-orden.ts` (tallas + avíos, y arte si aplica).
+  /// decide `dominio/produccion/requisitos-orden.ts` (tallas + receta liberada, y arte si aplica).
   estado          EstadoOrden @default(capturada)
   /// Fecha en que la orden quedó COMPLETA por PRIMERA vez (paridad con `Ordenes.FechaDet` del
   /// viejo). Es un SELLO HISTÓRICO independiente del estado actual: se pone una sola vez, NO se

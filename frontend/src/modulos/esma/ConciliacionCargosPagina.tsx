@@ -24,10 +24,39 @@ function fmt(n: number): string {
 }
 
 /**
+ * Marca DISCRETA del renglón cuyos recibos trajeron sólo prendas incompletas (`soloIncompletas`,
+ * derivado en el servidor). `outline` a propósito: no es un error ni un pendiente, es la razón por
+ * la que ese grupo no generó cargo. El `title` lleva la explicación completa sin ocupar la fila, y
+ * dice LO MISMO que el `.describe()` del contrato — ni una palabra de más.
+ */
+function MarcaSoloIncompletas(): React.JSX.Element {
+  return (
+    <Badge
+      variant="outline"
+      className="font-normal text-muted-foreground"
+      title="Todos los recibos vivos de este grupo trajeron solo prendas incompletas: no se producen ni se pagan, así que esos recibos no generaron cargo a EsMa."
+      data-testid="conc-solo-incompletas"
+    >
+      Solo incompletas
+    </Badge>
+  );
+}
+
+/**
  * CONCILIACIÓN DE CARGOS EsMa (F6-E4): cuadra por orden+maquilero+proceso lo RECIBIDO de maquila vs
  * lo YA CARGADO a EsMa, resaltando lo que FALTA por cargar; abajo, los cargos sin recibo ligado.
  * Filtros al servidor (rango de fechas + maquilero) y un filtro local "solo con faltante". RESPONSIVE:
  * tabla en escritorio, tarjetas en móvil.
+ *
+ * ⭐ PRENDAS INCOMPLETAS (V1-E8k, §Post-F9.136). Un grupo cuyos recibos vivos trajeron SÓLO prendas
+ * incompletas llega con `recibido` 0 (no se pagan → esos recibos no generaron cargo) y aun así
+ * conserva su renglón: es la única huella que esa entrega deja aquí, así que NO se esconde ni por
+ * default ni con un filtro nuevo (quien no lo quiera ver ya tiene "Solo con faltante por cargar").
+ * Para que no se lea como una fila de ceros sin sentido, se pinta la columna «Incompletas» y una
+ * marca DISCRETA —no una alarma: esto no es un error—. Las dos cosas las manda el servidor
+ * (`incompletas`, `soloIncompletas`): aquí no se deduce la regla (A1).
+ * ⚠️ La marca NO promete que el renglón cuadre: un cargo validado sin recibo (histórico o manual)
+ * del mismo grupo entra en `cargado` y puede dejar «Falta por cargar» en negativo.
  *
  * `esma.ver-pagos` gobierna la lectura de cuenta (el backend re-verifica, A1). Solo maneja CANTIDADES
  * (no importes), así que no aplica el ocultamiento por `consultas.ver-importes`.
@@ -140,7 +169,8 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
             <p className="text-sm text-muted-foreground" data-testid="conc-totales">
               Recibido <strong>{fmt(datos.totales.recibido)}</strong> · cargado{' '}
               <strong>{fmt(datos.totales.cargado)}</strong> · falta por cargar{' '}
-              <strong>{fmt(datos.totales.faltantePorCargar)}</strong> · cargos sin recibo{' '}
+              <strong>{fmt(datos.totales.faltantePorCargar)}</strong> · incompletas{' '}
+              <strong>{fmt(datos.totales.incompletas)}</strong> · cargos sin recibo{' '}
               <strong>{fmt(datos.totales.numCargosSinRecibo)}</strong>.
             </p>
           ) : null}
@@ -169,7 +199,9 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Recibido {fmt(f.recibido)} · cargado {fmt(f.cargado)}
+                        {f.incompletas > 0 ? <> · incompletas {fmt(f.incompletas)}</> : null}
                       </p>
+                      {f.soloIncompletas ? <MarcaSoloIncompletas /> : null}
                     </CardContent>
                   </Card>
                 ))}
@@ -188,6 +220,7 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                       <TablaDensaHead>Proceso</TablaDensaHead>
                       <TablaDensaHead numerica>Cortado</TablaDensaHead>
                       <TablaDensaHead numerica>Recibido</TablaDensaHead>
+                      <TablaDensaHead numerica>Incompletas</TablaDensaHead>
                       <TablaDensaHead numerica>Entregado</TablaDensaHead>
                       <TablaDensaHead numerica>Ya cargado</TablaDensaHead>
                       <TablaDensaHead numerica>Falta por cargar</TablaDensaHead>
@@ -201,9 +234,23 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                       >
                         <TablaDensaCelda>#{f.folioOrden}</TablaDensaCelda>
                         <TablaDensaCelda className="font-medium">{f.maquilero}</TablaDensaCelda>
-                        <TablaDensaCelda>{f.tipoProceso}</TablaDensaCelda>
+                        <TablaDensaCelda>
+                          {f.tipoProceso}
+                          {f.soloIncompletas ? (
+                            <span className="ml-2 align-middle">
+                              <MarcaSoloIncompletas />
+                            </span>
+                          ) : null}
+                        </TablaDensaCelda>
                         <TablaDensaCelda numerica>{fmt(f.cortado)}</TablaDensaCelda>
                         <TablaDensaCelda numerica>{fmt(f.recibido)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {f.incompletas === 0 ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            fmt(f.incompletas)
+                          )}
+                        </TablaDensaCelda>
                         <TablaDensaCelda numerica>{fmt(f.entregado)}</TablaDensaCelda>
                         <TablaDensaCelda numerica>{fmt(f.cargado)}</TablaDensaCelda>
                         <TablaDensaCelda numerica>

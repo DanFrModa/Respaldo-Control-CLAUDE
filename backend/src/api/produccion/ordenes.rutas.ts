@@ -174,7 +174,8 @@ export const rutasOrdenes: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
   });
 
-  // Guardar la MATRIZ (colores × tallas). El dominio recalcula el estado (tallas + avíos).
+  // Guardar la MATRIZ (colores × tallas). El dominio recalcula el estado con la regla completa
+  // (tallas + receta liberada, y arte si aplica): guardar la matriz no basta para completarla.
   app.route({
     method: 'PUT',
     url: '/ordenes/:id/matriz',
