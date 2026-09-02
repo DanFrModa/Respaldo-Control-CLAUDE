@@ -2,9 +2,15 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { QueryClient } from '@tanstack/react-query';
+
 import type { OrdenArteConFotos } from '@/api/fotos-arte-orden';
 import type { ClavePermiso, RecetaOrden, RecetaOrdenArte } from '@/api/tipos';
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import {
+  crearQueryClientDePrueba,
+  estadoSesionDePrueba,
+  renderConProveedores,
+} from '@/pruebas/utilidades';
 
 import { PanelRecetaOrden } from './PanelRecetaOrden';
 
@@ -67,7 +73,21 @@ vi.mock('@/api/fotos-arte-orden', () => ({
   useQuitarFotoArteOrden: () => ({ mutate: quitarFotoArteMock, isPending: false }),
 }));
 
+/**
+ * ⭐ fila 0.068 — el aviso de «ya está comprado» LLEVA al diálogo de des-autorizar, que es EL MISMO de la
+ * pantalla de Compras. Se le pone doble a su mutación para poder demostrar lo que más importa aquí:
+ * que **abrir el diálogo no des-autoriza nada**, y que sólo se manda tras motivo + confirmación.
+ */
+const desautorizarMutateMock = vi.fn();
+
+vi.mock('@/api/ordenes-compra', () => ({
+  useDesautorizarOc: () => ({ mutate: desautorizarMutateMock, isPending: false }),
+}));
+
 vi.mock('@/api/receta-orden', () => ({
+  // ⭐ fila 0.068: la clave de la query, que el panel necesita para RE-LEER la receta cuando una OC se
+  // des-autoriza (el chip «Comprado · OC 12» vive ahí, no en el árbol de Órdenes de compra).
+  CLAVE_RECETA_ORDEN: ['ordenes', 'receta'],
   useRecetaOrden: (id: unknown) => useRecetaOrdenMock(id) as unknown,
   useMarcarRecetaRevisada: () => ({ mutate: marcarMutateMock, isPending: false }),
   useLiberarReceta: () => ({ mutate: liberarMutateMock, isPending: false }),
@@ -227,10 +247,13 @@ function render(
   // ⚠️ Tipado como `ClavePermiso[]`: un `as never` apagaba la comprobación de que el permiso
   // EXISTE, que es justo lo que hace útil a esta lista (un typo pasaría verde sin permisos).
   permisos: ClavePermiso[] = ['ordenes.ver', 'desarrollo.administrar'],
+  // ⭐ fila 0.068: se puede inyectar el cliente para ESPIAR la invalidación de la receta.
+  queryClient?: QueryClient,
 ): void {
   useRecetaOrdenMock.mockReturnValue({ data: receta, isPending: false, isError: false });
   renderConProveedores(<PanelRecetaOrden idOrden={50} puedeAdministrar={puedeAdministrar} />, {
     sesion: estadoSesionDePrueba(permisos),
+    ...(queryClient === undefined ? {} : { queryClient }),
   });
 }
 
@@ -1741,9 +1764,161 @@ describe('⭐⭐⭐ 0.085 — «ya está comprado» en la receta (§Post-F9.173(
     );
 
     const bloque = screen.getByTestId('receta-aviso-ya-comprado');
-    // ⛔ Y lo que NUNCA se le ofrece: des-autorizar la OC (es de Dirección; sería un 403 en la cara).
+    // ⛔ Y lo que a ÉL no se le ofrece: des-autorizar la OC (fila 0.068: es de Dirección, y esta
+    // sesión no tiene `compras.desautorizar`; pintárselo sería pintarle un 403).
     expect(bloque).not.toHaveTextContent(/Des-?autorizar la/i);
     expect(within(bloque).getByTestId('oc-comprometida-12').closest('button')).not.toBeNull();
+  });
+
+  /**
+   * ⭐⭐⭐ **fila 0.068 — EL AVISO QUE PIDE UN ACTO, LLEVA A HACERLO** (§Post-F9.145 sobre el aviso de
+   * §Post-F9.173(a)).
+   *
+   * Hasta la 0.085 el bloque decía *"des-autorizarla es del perfil de Dirección"* **también a la
+   * Dirección**, que se quedaba leyendo la instrucción de un acto que sí podía hacer, sin puerta.
+   * §Post-F9.68 tiene las dos mitades: esconder lo que no se puede usar **y enseñar lo que sí**.
+   *
+   * 🔴 Lo que estas pruebas clavan, en este orden de importancia:
+   *  1. **LLEVAR NO ES HACER**: el clic ABRE un diálogo y no manda nada. DANIEL: *«no se puede
+   *     cancelar la OC en automático: eso hay que negociarlo con el proveedor»*.
+   *  2. **la pareja**: con la llave se pinta, **sin la llave NO** — y el chip sigue informando.
+   *  3. **la OC RECIBIDA no se le ofrece a NADIE**, Dirección incluida: el servidor la rechaza, así
+   *     que ofrecerla sería mandar a alguien a rebotar.
+   *  4. **el cableado es real**: el diálogo se abre con el `idOrdenCompra` (900) y se NOMBRA con el
+   *     `folio` (12). Son dos números distintos a propósito: confundirlos pone esto rojo.
+   */
+  describe('⭐⭐⭐ fila 0.068 — y el aviso LLEVA a des-autorizar la OC (sólo a quien puede)', () => {
+    /** Una sesión de Dirección: la única que tiene la llave de des-firmar una compra. */
+    const DIRECCION: ClavePermiso[] = [
+      'ordenes.ver',
+      'desarrollo.administrar',
+      'compras.ver',
+      'compras.desautorizar',
+    ];
+    /** El comprador: ve las compras, pero NO puede des-autorizar. */
+    const COMPRADOR: ClavePermiso[] = ['ordenes.ver', 'desarrollo.administrar', 'compras.ver'];
+    /** Otra OC de la misma orden, ya RECIBIDA: ahí no hay des-autorizar para nadie. */
+    const OC_RECIBIDA = {
+      idOrdenCompra: 901,
+      folio: 15,
+      estatus: 'recibida_total' as const,
+      recibida: true,
+    };
+
+    /** Igual que en las pruebas de arriba: el aviso NO se pinta hasta que algo lo provoca. */
+    async function conElAvisoEncendido(
+      usuario: ReturnType<typeof userEvent.setup>,
+      receta: RecetaOrden,
+      permisos: ClavePermiso[],
+    ): Promise<HTMLElement> {
+      render(receta, true, permisos);
+      await editarElPrecioDeLaTela(usuario, {
+        ...receta,
+        avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR,
+      });
+      return screen.getByTestId('receta-aviso-ya-comprado');
+    }
+
+    /** La receta con las OC que se le indiquen, tanto en la orden como en su tela. */
+    function conEstasOcs(ocs: RecetaOrden['ocsComprometidas']): RecetaOrden {
+      return conTelaComprada({ ocsComprometidas: ocs }, { ocsComprometidas: ocs });
+    }
+
+    it('⭐⭐ CON la llave el aviso ofrece la puerta — y ABRIRLA no des-autoriza NADA', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(usuario, conTelaComprada(), DIRECCION);
+
+      await usuario.click(within(bloque).getByTestId('desautorizar-oc-12'));
+
+      // 🔴 EL CORAZÓN DE LA ETAPA: el clic abrió una decisión, no la tomó.
+      expect(desautorizarMutateMock).not.toHaveBeenCalled();
+      expect(screen.getByTestId('confirmar-desautorizar-oc')).toBeDisabled();
+      // Y el diálogo habla de la OC elegida por su FOLIO (12), no por su id (900).
+      expect(screen.getByRole('dialog')).toHaveTextContent('Des-autorizar orden de compra 12');
+    });
+
+    it('⭐⭐ sólo se des-autoriza cuando una PERSONA escribe el motivo y confirma', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(usuario, conTelaComprada(), DIRECCION);
+      await usuario.click(within(bloque).getByTestId('desautorizar-oc-12'));
+
+      await usuario.type(
+        screen.getByTestId('oc-motivo-desautorizar'),
+        '  el cliente cambió la tela  ',
+      );
+      await usuario.click(screen.getByTestId('confirmar-desautorizar-oc'));
+
+      // 🔴 `id` es el de la OC y NO su folio: los dos son números, y confundirlos es el error fácil.
+      expect(desautorizarMutateMock).toHaveBeenCalledWith(
+        { id: OC_AUTORIZADA.idOrdenCompra, cuerpo: { motivo: 'el cliente cambió la tela' } },
+        expect.anything(),
+      );
+      expect(OC_AUTORIZADA.idOrdenCompra).not.toBe(OC_AUTORIZADA.folio);
+    });
+
+    it('🔴 EL GEMELO: SIN la llave la puerta NO se pinta, y el chip sigue informando', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(usuario, conTelaComprada(), COMPRADOR);
+
+      expect(within(bloque).queryByTestId('desautorizar-oc-12')).toBeNull();
+      expect(screen.queryByTestId('receta-aviso-desautorizar')).toBeNull();
+      // Se esconde el ACTO, no el HECHO: el comprador tiene que seguir enterándose.
+      expect(within(bloque).getByTestId('oc-comprometida-12')).toBeInTheDocument();
+    });
+
+    it('🔴🔴 sobre una OC ya RECIBIDA no se ofrece NI A DIRECCIÓN (el servidor la rechaza)', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(usuario, conEstasOcs([OC_RECIBIDA]), DIRECCION);
+
+      expect(within(bloque).getByTestId('oc-comprometida-15')).toBeInTheDocument();
+      expect(within(bloque).queryByTestId('desautorizar-oc-15')).toBeNull();
+      expect(screen.queryByTestId('receta-aviso-desautorizar')).toBeNull();
+    });
+
+    it('⭐⭐ y al des-autorizar RE-LEE la receta: el chip no se puede quedar mintiendo', async () => {
+      /*
+       * 🔴 `useDesautorizarOc` invalida `['ordenes-compra']`, y «Comprado · OC 12 · Autorizada» NO
+       * vive ahí: sale de `ocsComprometidas`, dentro de la receta. Sin la re-lectura el chip —y su
+       * botón— sobrevivirían a la des-autorización, y el segundo clic se estrellaría contra el 409
+       * del servidor («no está autorizada»). Es decir: la pantalla mandaría a rebotar a la única
+       * persona que sí puede hacer esto, que es justo lo que §Post-F9.145(f) prohíbe.
+       */
+      const usuario = userEvent.setup();
+      const cliente = crearQueryClientDePrueba();
+      const espia = vi.spyOn(cliente, 'invalidateQueries');
+      // El doble contesta que la mutación SALIÓ BIEN: sin eso no hay nada que refrescar.
+      desautorizarMutateMock.mockImplementation(
+        (_vars: unknown, opciones?: { onSuccess?: () => void }) => {
+          opciones?.onSuccess?.();
+        },
+      );
+
+      render(conTelaComprada(), true, DIRECCION, cliente);
+      await editarElPrecioDeLaTela(usuario, {
+        ...conTelaComprada(),
+        avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR,
+      });
+      await usuario.click(
+        within(screen.getByTestId('receta-aviso-ya-comprado')).getByTestId('desautorizar-oc-12'),
+      );
+      await usuario.type(screen.getByTestId('oc-motivo-desautorizar'), 'me equivoqué de tela');
+      await usuario.click(screen.getByTestId('confirmar-desautorizar-oc'));
+
+      // La receta DE ESTA ORDEN (id 50), no `['ordenes']` entero ni la de la orden de al lado.
+      expect(espia).toHaveBeenCalledWith({ queryKey: ['ordenes', 'receta', 50] });
+    });
+
+    it('⭐ con las dos a la vez, la puerta es SÓLO la de la autorizada', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(
+        usuario,
+        conEstasOcs([OC_AUTORIZADA, OC_RECIBIDA]),
+        DIRECCION,
+      );
+
+      expect(within(bloque).getByTestId('desautorizar-oc-12')).toBeInTheDocument();
+      expect(within(bloque).queryByTestId('desautorizar-oc-15')).toBeNull();
+    });
   });
 });
 

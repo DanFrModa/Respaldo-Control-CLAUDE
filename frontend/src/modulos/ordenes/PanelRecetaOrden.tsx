@@ -11,12 +11,14 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import {
+  CLAVE_RECETA_ORDEN,
   useAbrirReceta,
   useAgregarRenglonReceta,
   useCerrarReceta,
@@ -34,6 +36,7 @@ import { useMedidasAvio as useMedidasDelCatalogo } from '@/api/medidas-avio';
 import type { ErrorDeApi } from '@/api/errores';
 import type {
   CambioReceta,
+  OcComprometida,
   RecetaOrden,
   RecetaOrdenArte,
   RecetaOrdenAvio,
@@ -70,6 +73,9 @@ import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
 // Órdenes de Compra —junto a la ÚNICA traducción de los estatus de OC— para que la receta y la
 // bandeja «Recetas por liberar» lo lean idéntico.
 import { ChipsOcComprometidas } from '@/modulos/ordenes-compra/piezas';
+// ⭐ fila 0.068: el aviso LLEVA a des-autorizar, y lleva al MISMO diálogo de la pantalla de Compras — no
+// a una segunda versión del acto (que es como acaban divergiendo dos caminos para lo mismo).
+import { DialogoDesautorizarOc } from '@/modulos/ordenes-compra/DialogoDesautorizarOc';
 import { useSesion } from '@/sesion/useSesion';
 
 import { FotosArteOrden } from './FotosArteOrden';
@@ -203,11 +209,26 @@ export function PanelRecetaOrden({
    * ese permiso los chips siguen informando, pero no se pinta un enlace que acabaría en un 403
    * (§Post-F9.68: esconder lo que no se puede usar; §Post-F9.145(f): no mandar a nadie a rebotar).
    *
-   * ⛔ Lo que NO se pinta nunca es «des-autorizar la OC»: eso exige `compras.desautorizar`, que el
-   * seed corta a Administrador y Dirección. El texto del servidor ya dice a quién pedírselo.
+   * ⭐⭐⭐ fila 0.068 — **Y LA SEGUNDA PUERTA: DES-AUTORIZAR LA OC, PARA QUIEN SÍ PUEDE.**
+   *
+   * Hasta la 0.085 aquí decía que «des-autorizar» no se pintaba **nunca**, y la razón era buena…
+   * pero sólo para quien NO tiene el permiso. Para Administrador y Dirección —a quienes el seed sí
+   * les da `compras.desautorizar`— la misma §Post-F9.68 dice lo contrario: **enseñar lo que sí se
+   * puede usar**. El aviso pedía un acto y no llevaba a hacerlo, que es justo lo que §Post-F9.145
+   * prohíbe. Se resuelve con la MISMA forma que `compras.ver` dos líneas arriba: se pinta sólo con
+   * el permiso, y a quien no lo tiene le sigue hablando el texto del servidor, que ya dice a quién
+   * pedírselo.
+   *
+   * 🔴 **LLEVAR NO ES HACER.** El botón abre el diálogo de siempre ({@link DialogoDesautorizarOc}),
+   * que exige MOTIVO escrito y una confirmación explícita: nada se des-autoriza solo. Y ni siquiera
+   * eso cancela la compra — DANIEL: *«no se puede cancelar la OC en automático: eso hay que
+   * negociarlo con el proveedor»*. Lo único automático aquí es llegar a la decisión, no tomarla.
    */
   const { tienePermiso } = useSesion();
   const puedeVerCompras = tienePermiso('compras.ver');
+  // ⭐ fila 0.068: la llave PROPIA de des-firmar una compra (V1-E3y/§Post-F9.79). Esconderlo sin ella NO
+  // es la defensa —el servidor re-valida permiso y estatus (A1/A4)—: es no ofrecer un 403.
+  const puedeDesautorizarOc = tienePermiso('compras.desautorizar');
   const receta = useRecetaOrden(idOrden);
   /*
    * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **EL AVISO VIVE AQUÍ, NO EN LA CACHÉ DE LA QUERY.**
@@ -229,13 +250,18 @@ export function PanelRecetaOrden({
    * vino a cerrar.
    */
   const [avisoYaComprado, setAvisoYaComprado] = useState<string | null>(null);
+  /** ⭐ fila 0.068: la OC que el aviso llevó a des-autorizar. `null` = el diálogo está cerrado. */
+  const [ocADesautorizar, setOcADesautorizar] = useState<OcComprometida | null>(null);
+  const clienteQuery = useQueryClient();
   /** Cada respuesta de mutación PISA el eco anterior: `null` incluido, para que no se quede pegado. */
   const alResponder = (r: RecetaOrden): void => {
     setAvisoYaComprado(r.avisoCambioSobreLoComprado);
   };
-  // Cambiar de orden sin desmontar el panel no puede arrastrar el aviso de la anterior.
+  // Cambiar de orden sin desmontar el panel no puede arrastrar el aviso de la anterior — ni el
+  // diálogo de des-autorizar que ese aviso hubiera abierto sobre una OC de la orden anterior.
   useEffect(() => {
     setAvisoYaComprado(null);
+    setOcADesautorizar(null);
   }, [idOrden]);
 
   const marcar = recordandoElAviso(useMarcarRecetaRevisada(), alResponder);
@@ -413,6 +439,7 @@ export function PanelRecetaOrden({
             ? () => void navigate('/compras/por-orden', { state: { idOrden } })
             : undefined
         }
+        {...(puedeDesautorizarOc ? { alDesautorizar: setOcADesautorizar } : {})}
       />
 
       <CabeceraReceta
@@ -656,6 +683,34 @@ export function PanelRecetaOrden({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ⭐⭐⭐ fila 0.068 — A DONDE LLEVA EL AVISO: el diálogo de des-autorizar, EL MISMO de Compras.
+          Sólo se monta con `compras.desautorizar`: sin la llave no existe ni el botón que lo abre
+          ni el diálogo detrás, así que no hay forma de llegar a él por accidente. */}
+      {puedeDesautorizarOc ? (
+        <DialogoDesautorizarOc
+          abierto={ocADesautorizar !== null}
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setOcADesautorizar(null);
+          }}
+          oc={
+            ocADesautorizar === null
+              ? undefined
+              : { id: ocADesautorizar.idOrdenCompra, numCompra: ocADesautorizar.folio }
+          }
+          alDesautorizada={() => {
+            /*
+             * 🔴 **RE-LEER LA RECETA, o el chip se queda mintiendo.** `useDesautorizarOc` invalida
+             * el árbol `['ordenes-compra']`, y «Comprado · OC 12 · Autorizada» no vive ahí: sale de
+             * `ocsComprometidas`, dentro de la receta (`['ordenes','receta',id]`). Sin esta línea,
+             * quien acaba de quitarle la firma a la OC seguiría viendo el chip —y su botón—, y el
+             * segundo clic se estrellaría contra el 409 del servidor («no está autorizada»). Se
+             * invalida ESTA receta y no `['ordenes']` entero: es lo único que cambió aquí.
+             */
+            void clienteQuery.invalidateQueries({ queryKey: [...CLAVE_RECETA_ORDEN, idOrden] });
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -935,18 +990,76 @@ function LlamadoTraerDelModelo({
  *
  * A1: el texto viene REDACTADO del servidor (nombra material, folio y estado, y dice a quién
  * pedirle qué). Aquí no se arma la frase, no se resuelve el plural y no se decide el camino.
+ *
+ * ⭐⭐⭐ **fila 0.068 — Y AHORA LLEVA A HACERLO** (§Post-F9.145: *el aviso que pide un acto, lleva a
+ * hacerlo*). A quien tiene `compras.desautorizar` se le pinta, por cada OC todavía `autorizada`, el
+ * botón que abre {@link DialogoDesautorizarOc}. **Abrir un diálogo no es des-autorizar**: sigue
+ * haciendo falta que una persona escriba el motivo y confirme, y ni así se cancela nada con el
+ * proveedor. A quien no tiene la llave no le cambia nada: el texto del servidor ya le dice a quién
+ * pedírselo.
+ *
+ * ⚠️ **El texto es un ECO congelado; los chips y los botones son EL AHORA.** Ya era así antes de
+ * esta etapa (la frase viene del estado del panel, los chips de la receta), y por eso al des-autorizar
+ * una OC su chip y su botón desaparecen mientras la frase sigue contando lo que pasó — que es lo que
+ * describe: lo que acabas de hacer, no cómo quedó el mundo.
  */
 function AvisoCambioSobreLoComprado({
   aviso,
   ocs,
   alVerCompras,
+  alDesautorizar,
 }: {
   aviso: string | null;
   ocs: RecetaOrden['ocsComprometidas'];
   /** Sólo se pasa con `compras.ver`: un enlace que da 403 es peor que no tenerlo. */
   alVerCompras?: (() => void) | undefined;
+  /**
+   * ⭐ fila 0.068 — Sólo se pasa con `compras.desautorizar` (Administrador y Dirección). Abre el
+   * diálogo; **no des-autoriza nada**.
+   */
+  alDesautorizar?: ((oc: OcComprometida) => void) | undefined;
 }): React.JSX.Element | null {
   if (aviso === null || aviso === '') return null;
+  /*
+   * ⭐⭐ fila 0.068 — **A CUÁLES SE LES PUEDE OFRECER, Y POR QUÉ ESTA CONDICIÓN Y NO OTRA.**
+   *
+   * `estatus === 'autorizada'` es LA MISMA condición con la que la pantalla de Órdenes de compra
+   * pinta su botón (`OrdenesCompraPagina`: `puedeDesautorizar && seleccion.estatus === 'autorizada'`)
+   * — una sola regla escrita una sola manera, en vez de dos primos que un día se separan.
+   *
+   * 🔴 **Y con eso la OC RECIBIDA queda fuera para TODO EL MUNDO, Dirección incluida**, que es la
+   * mitad que de verdad importa: `desautorizarOC` la rechaza con un 409 (*"ya tiene material
+   * RECIBIDO… el camino es una devolución o un ajuste"*, DANIEL 20-ago: *"una vez recibido no se
+   * puede desautorizar"*). No hace falta preguntar por `recibida` para excluirla: una
+   * `recibida_parcial`/`recibida_total` **no es** `autorizada`. *(Eso sí está clavado por pruebas:
+   * dejar pasar la recibida las pone rojas.)*
+   *
+   * ⚠️ **Y AHORA LA PARTE HONESTA: preferir `=== 'autorizada'` sobre `!o.recibida` es un ARGUMENTO
+   * DE DISEÑO, no una propiedad demostrada.** Hoy las dos escrituras se comportan IGUAL, porque
+   * `ESTATUS_OC_COMPROMETIDA` sólo tiene esos tres estatus — así que **ninguna prueba las
+   * distingue**: cambiar una por la otra deja la suite entera en verde. El argumento es que ésta
+   * falla CERRADA si mañana naciera un cuarto estatus comprometido (no ofrecería el botón hasta que
+   * alguien lo decida) mientras `!o.recibida` lo ofrecería sola; y que es LA MISMA expresión que ya
+   * usa Órdenes de compra. Buenas razones, pero razones — no un hecho que la suite defienda.
+   *
+   * ⚠️ `o.recibida` sigue siendo del servidor y sigue decidiendo el TEXTO del chip: aquí no se
+   * re-implementa `algunaRecibida`, se pregunta por un hecho distinto (¿hay firma que quitar?).
+   *
+   * ⚠️⚠️ **RESIDUO DECLARADO — LA PUERTA ES MÁS ANCHA QUE EL AVISO, y hay que saberlo.** `ocs` es
+   * `d.ocsComprometidas`, que el servidor arma como *lo comprometido de TODA la orden*
+   * (`dominio/produccion/receta-orden.ts`), mientras el TEXTO del aviso nombra sólo las OC **del
+   * material que se acaba de tocar**. Con la OC#12 (tela) y la OC#33 (avíos) las dos autorizadas,
+   * cambiar **la tela** ofrece des-autorizar **las dos**.
+   *
+   * Se deja así **a propósito**: los botones acompañan a los CHIPS, y los chips ya pintan toda la
+   * orden desde la 0.085 — estrecharlos sólo aquí haría que el botón y el chip de al lado contaran
+   * cosas distintas dentro del mismo bloque. Estrecharlo DE VERDAD pide que el servidor devuelva las
+   * OC *del cambio*, o sea tocar el contrato: fuera del alcance de un cambio sólo-frontend. Y el
+   * riesgo está acotado por el diseño de la etapa: **ninguna de las dos se des-autoriza sin que una
+   * persona la elija por su folio, escriba el motivo y confirme.**
+   */
+  const desautorizables =
+    alDesautorizar === undefined ? [] : ocs.filter((o) => o.estatus === 'autorizada');
   return (
     <div
       className="space-y-2 rounded-lg border border-destructive/50 bg-destructive/5 p-3"
@@ -959,6 +1072,29 @@ function AvisoCambioSobreLoComprado({
       </p>
       <p className="text-xs">{aviso}</p>
       <ChipsOcComprometidas ocs={ocs} {...(alVerCompras ? { alVer: alVerCompras } : {})} />
+      {desautorizables.length === 0 || alDesautorizar === undefined ? null : (
+        <div className="space-y-1" data-testid="receta-aviso-desautorizar">
+          <div className="flex flex-wrap items-center gap-2">
+            {desautorizables.map((o) => (
+              <Button
+                key={o.idOrdenCompra}
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => alDesautorizar(o)}
+                data-testid={`desautorizar-oc-${String(o.folio)}`}
+              >
+                <Undo2 aria-hidden /> Des-autorizar la OC {o.folio}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Des-autorizar sólo le quita la firma <strong>en el sistema</strong> y devuelve la orden
+            de compra a borrador, con su motivo en la bitácora.{' '}
+            <strong>No la cancela con el proveedor</strong>: eso se negocia con él.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

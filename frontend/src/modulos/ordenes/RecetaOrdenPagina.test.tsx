@@ -13,6 +13,8 @@ import { RecetaOrdenPagina } from './RecetaOrdenPagina';
 const useRecetaOrdenMock = vi.fn<(id: number | undefined) => unknown>();
 
 vi.mock('@/api/receta-orden', () => ({
+  // ⭐ fila 0.068: `PanelRecetaOrden` la usa para re-leer la receta al des-autorizar una OC.
+  CLAVE_RECETA_ORDEN: ['ordenes', 'receta'],
   useRecetaOrden: (id: number | undefined) => useRecetaOrdenMock(id),
   useMarcarRecetaRevisada: () => ({ mutate: vi.fn(), isPending: false }),
   useLiberarReceta: () => ({ mutate: vi.fn(), isPending: false }),

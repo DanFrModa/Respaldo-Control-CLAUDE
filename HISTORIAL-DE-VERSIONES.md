@@ -71,6 +71,44 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.085 · 2-sep-2026 · **en prueba** — ⭐ El aviso de «ya está comprado» ahora **lleva al botón**, a quien puede usarlo
+
+### Qué se puede hacer ahora que antes no
+
+**Des-autorizar la OC desde el propio aviso**, sin ir a buscarla.
+
+Cuando cambias la receta de una orden y ese material **ya se compró**, el sistema te avisa desde la 0.077.
+Pero el botón para des-autorizar la orden de compra **no se le pintaba a nadie** — ni a ti, que eres de los
+dos perfiles que sí pueden usarlo.
+
+La razón escrita era correcta **a medias**: enseñárselo a quien no tiene el permiso sería mandarlo a un
+rechazo. Cierto para los demás. Pero **la misma regla dice también «enseña lo que sí se puede usar»**, y a
+ti te estaba escondiendo un botón que tú mismo pediste tener.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **LLEVAR NO ES HACER.** El aviso **jamás** des-autoriza solo. El botón **abre el diálogo de siempre**,
+  el de la pantalla de Compras: exige **motivo escrito** y confirmación, y dice ahí mismo que
+  des-autorizar *«no la cancela con el proveedor: eso se negocia con él»*. Tal como pediste.
+- **Sólo lo ven Administración y Dirección.** A los demás no les cambia nada: siguen viendo el aviso con el
+  folio y a quién pedírselo. **Se esconde el acto, no el hecho.**
+- **Sobre una OC ya recibida no aparece para nadie**, ni para ti: ahí el material ya entró al almacén y el
+  camino es devolución o ajuste.
+- ⚠️ **El bloque ofrece des-autorizar TODAS las órdenes de compra comprometidas de esa OP**, no sólo las
+  del material que acabas de tocar. Si una orden tiene una OC de tela y otra de avíos y cambias la tela,
+  verás las dos. Es heredado de cómo se pintan los avisos; **queda anotado** y nada se des-autoriza sin
+  que elijas el folio, escribas el motivo y confirmes.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **La otra mitad de esta fila sigue sin construirse**: el aviso del **avío distinto entre OP hermanas**.
+  Por eso la fila queda **a medias**, no cerrada.
+- **La bandeja del comprador sigue sin ese botón, a propósito**: ahí no hay un aviso, hay una columna
+  informativa; la puerta permanente de Dirección es Órdenes de compra.
+- Sin permisos nuevos, sin migración, sin datos que sembrar: el despliegue no necesita nada especial.
+
+---
+
 ## 0.084 · 2-sep-2026 · **en prueba** — ⭐⭐ La bandeja ya pregunta **«¿se logró lo prometido?»**, no «¿ya capturaste?»
 
 ### Qué se puede hacer ahora que antes no
