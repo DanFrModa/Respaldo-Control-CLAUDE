@@ -102,7 +102,13 @@ import type {
   DatosOrdenReferenciaEntrada,
   OrdenSalida,
 } from '../../contrato/esquemas/orden.js';
-import type { Orden, OrdenLinea, OrdenLineaTalla, Prisma } from '../../datos/index.js';
+import type {
+  Orden,
+  OrdenLinea,
+  OrdenLineaTalla,
+  OrigenModelo,
+  Prisma,
+} from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -264,7 +270,10 @@ interface OrigenPedidoLinea {
  *  • que el renglón exista,
  *  • que su pedido sea de la EMPRESA ACTIVA (A9),
  *  • que el pedido NO esté cancelado (`pedCancelado`) ni marcado `noProducir`,
- *  • que el modelo del renglón siga ACTIVO (no producir un modelo descontinuado).
+ *  • que el modelo del renglón siga ACTIVO (no producir un modelo descontinuado),
+ *  • 🔴 que el modelo que va a QUEDAR en la orden NO sea de `origen = 'desarrollo'` (fila 0.090,
+ *    cierra §Post-F9.34): un desarrollo no se produce, se le genera la OP —y ahí nace su modelo de
+ *    producción por color. Ver la guarda, abajo, para quién la cruza y quién no.
  * Devuelve el modelo/cliente/empresa para sellarlos en la orden.
  *
  * ⭐⭐ V1-E3 — `idModeloDeLaOrden` (opcional): el modelo que de verdad va a llevar la orden cuando
@@ -289,7 +298,7 @@ async function resolverOrigenPedido(
     where: { id: idPedidoLinea },
     select: {
       idModelo: true,
-      modelo: { select: { activo: true, codigo: true, composicion: true } },
+      modelo: { select: { activo: true, codigo: true, composicion: true, origen: true } },
       pedido: {
         select: {
           idEmpresa: true,
@@ -332,6 +341,31 @@ async function resolverOrigenPedido(
       ? { id: linea.idModelo, ...linea.modelo }
       : await exigirModeloProducible(tx, idModeloDeLaOrden);
 
+  // 🔴🔴 V1-E3 (§Post-F9.34, cerrada en la fila 0.090) — **UNA OP NUNCA LLEVA UN MODELO DE
+  // DESARROLLO.** La guarda mira el modelo que se va a SELLAR en la orden, no la puerta por la que
+  // se entró, porque lo que hay que prohibir es el resultado: un desarrollo produciéndose.
+  //
+  // Quién la cruza y quién no, medido:
+  //  • `salidaAProduccion` — NUNCA la toca: `resolverModeloDeLaOp` le entrega o un modelo de
+  //    producción heredado (renglón legado) o el hijo por color que acaba de nacer/reusar, y los
+  //    dos son `origen = 'produccion'` por construcción.
+  //  • `POST /api/ordenes` — la cruza justo en el caso que era el agujero: renglón que apunta a un
+  //    desarrollo, sin `idModeloDeLaOrden`. Por esa puerta nacía una OP de un modelo que sigue en
+  //    `origen = 'desarrollo'`, sin `numeroProduccion` y —desde V1-E3— sin ningún modelo por color.
+  //    Su caso LEGADO (renglón que ya apunta a producción) sigue funcionando igual: no se retira
+  //    ninguna capacidad, se cierra una que producía una OP inválida.
+  //
+  // FALLA CERRADO y manda a la puerta buena: el número de 5 dígitos es del MODELO, y quien lo hace
+  // nacer es la salida a producción. Crear la orden aquí y "arreglar el modelo después" no existe.
+  if (modeloDeLaOrden.origen === 'desarrollo') {
+    throw new ErrorConflicto(
+      `El modelo "${modeloDeLaOrden.codigo}" es de desarrollo: no se le puede crear una orden por ` +
+        `captura directa. Genera la OP desde el renglón del pedido ("Generar OP", ` +
+        `POST /api/pedidos/lineas/{idLinea}/salida-produccion): ahí nace el modelo de producción ` +
+        `del color con su número de 5 dígitos, que es el que lleva la orden.`,
+    );
+  }
+
   return {
     idModelo: modeloDeLaOrden.id,
     idCliente: linea.pedido.idCliente,
@@ -349,10 +383,16 @@ async function resolverOrigenPedido(
 async function exigirModeloProducible(
   tx: Tx,
   idModelo: number,
-): Promise<{ id: number; activo: boolean; codigo: string; composicion: string | null }> {
+): Promise<{
+  id: number;
+  activo: boolean;
+  codigo: string;
+  composicion: string | null;
+  origen: OrigenModelo;
+}> {
   const modelo = await tx.modelo.findUnique({
     where: { id: idModelo },
-    select: { id: true, activo: true, codigo: true, composicion: true },
+    select: { id: true, activo: true, codigo: true, composicion: true, origen: true },
   });
   if (modelo === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
@@ -770,6 +810,10 @@ export interface OpcionesAltaOrden {
  * ⭐⭐ V1-E3 — `opciones.idModeloDeLaOrden` ({@link OpcionesAltaOrden}) sella la orden con OTRO
  * modelo que el del renglón: el hijo de producción por color que hace nacer `salidaAProduccion`.
  * NO viaja por el contrato REST a propósito (ver el tipo). Sin él, todo sigue exactamente igual.
+ *
+ * 🔴 Y por eso mismo el alta por CAPTURA (la ruta `POST /api/ordenes`, que no pasa ese modelo)
+ * rechaza los renglones de DESARROLLO: sin el hijo por color, su OP nacería de un modelo que no
+ * está en producción y sin nº de 5 dígitos. La guarda vive en `resolverOrigenPedido`.
  */
 export async function crearOrden(
   sesion: SesionUsuario,

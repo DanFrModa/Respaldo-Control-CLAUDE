@@ -228,6 +228,94 @@ describe('Órdenes (F2-E2) — alta desde pedido + autorrelleno (A2, A9)', () =>
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 
+  /**
+   * 🔴🔴 **EL ALTA POR CAPTURA SE SALTABA LA ENTRADA A PRODUCCIÓN ENTERA** (§Post-F9.34, cerrada en
+   * la fila 0.090). `POST /api/ordenes` es el único llamador de `crearOrden` que NO pasa
+   * `idModeloDeLaOrden`: por esa puerta nacía una OP de un modelo que sigue en
+   * `origen = 'desarrollo'`, sin `numeroProduccion` y —desde V1-E3— sin ningún modelo por color.
+   *
+   * Las cuatro pruebas van juntas a propósito: sin la del renglón LEGADO y la del hijo por color,
+   * "arreglarlo" cerrando el alta entera pasaría en verde.
+   */
+  describe('🔴🔴 una OP nunca lleva un modelo de DESARROLLO (fila 0.090)', () => {
+    /** Un desarrollo (lo que apunta el renglón desde V1-E3) y su hijo de producción por color. */
+    async function desarrolloYSuHijo(): Promise<{ desarrollo: Modelo; hijo: Modelo }> {
+      const desarrollo = await cliente.modelo.create({
+        data: {
+          codigo: 'CYA-26-71-030',
+          codigoDesarrollo: 'CYA-26-71-030',
+          origen: 'desarrollo',
+          llevaArte: false,
+        },
+      });
+      const hijo = await cliente.modelo.create({
+        data: {
+          codigo: '71030',
+          origen: 'produccion',
+          numeroProduccion: 71_030,
+          idModeloDesarrollo: desarrollo.id,
+          llevaArte: false,
+        },
+      });
+      return { desarrollo, hijo };
+    }
+
+    it('🔴 el alta por CAPTURA de un renglón de desarrollo se RECHAZA, y nada persiste', async () => {
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, desarrollo.id);
+
+      const error = await crearOrden(s, { idPedidoLinea: renglon.id }, bd()).catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(ErrorConflicto);
+      // ANCLADO a la puerta buena: el mensaje tiene que MANDAR a generar la OP, no solo negarse.
+      expect((error as Error).message).toContain('CYA-26-71-030');
+      expect((error as Error).message).toContain('salida-produccion');
+      expect(await cliente.orden.count({ where: { idPedidoLinea: renglon.id } })).toBe(0);
+    });
+
+    it('🔴 LA GEMELA — el renglón LEGADO (modelo ya de producción) SIGUE creando su orden', async () => {
+      // Control negativo obligado: la fila 0.090 cierra un agujero, NO retira el endpoint. Los
+      // ~4,987 modelos migrados del Access están en `origen = 'produccion'` y su alta por captura
+      // tiene que seguir funcionando igual que antes.
+      const s = sesion([...PERM_TODOS]);
+      const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+
+      expect(orden.idModelo).toBe(modelo.id);
+      expect(await cliente.orden.count({ where: { idPedidoLinea: lineaPedido.id } })).toBe(1);
+    });
+
+    it('⭐⭐ con el HIJO por color (lo que pasa `salidaAProduccion`) SÍ se crea, sellada con él', async () => {
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo, hijo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, desarrollo.id);
+
+      const orden = await crearOrden(s, { idPedidoLinea: renglon.id }, bd(), {
+        idModeloDeLaOrden: hijo.id,
+      });
+
+      // La OP lleva el HIJO; el renglón se queda con su desarrollo (de ahí salen receta y precio).
+      expect(orden.idModelo).toBe(hijo.id);
+      const linea = await cliente.pedidoLinea.findUniqueOrThrow({ where: { id: renglon.id } });
+      expect(linea.idModelo).toBe(desarrollo.id);
+    });
+
+    it('⭐ la guarda mira el modelo que QUEDA en la orden, no la puerta: un desarrollo por `idModeloDeLaOrden` también se rechaza', async () => {
+      // El renglón apunta a un modelo de PRODUCCIÓN vivo; lo que se intenta sellar en la OP es un
+      // desarrollo. Si la guarda se hubiera escrito sobre el modelo del RENGLÓN, esto pasaría.
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+
+      await expect(
+        crearOrden(s, { idPedidoLinea: renglon.id }, bd(), { idModeloDeLaOrden: desarrollo.id }),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+      expect(await cliente.orden.count({ where: { idPedidoLinea: renglon.id } })).toBe(0);
+    });
+  });
+
   it('un renglón de pedido de OTRA empresa no existe para esta sesión (A9)', async () => {
     const s = sesion([...PERM_TODOS]);
     const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa');

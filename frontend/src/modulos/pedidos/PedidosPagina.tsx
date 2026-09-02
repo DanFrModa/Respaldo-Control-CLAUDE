@@ -32,6 +32,7 @@ import { DialogoCancelarPedido } from './DialogoCancelarPedido';
 import { DialogoCopiarPedido } from './DialogoCopiarPedido';
 import { DialogoPedido } from './DialogoPedido';
 import { PanelPedidosReales } from './PanelPedidosReales';
+import { numerosDeProduccion } from './numeros-produccion';
 
 /** Renglones por página del listado. */
 const POR_PAGINA = 10;
@@ -306,6 +307,21 @@ function DetallePedido({
                   <TableRow key={l.id} data-testid="renglon-pedido">
                     <TableCell>
                       <span className="font-medium">{l.codigoModelo}</span>
+                      {/* ⭐⭐ V1-E3 (fila 0.089): los nº de producción de los MODELOS que
+                          nacieron de este renglón, uno por color/OP. Hasta V1-E3 el nº de 5
+                          dígitos salía aquí POR ACCIDENTE —`codigoModelo` *era* el de producción
+                          porque generar la OP transformaba el modelo—; hoy el desarrollo NO se
+                          transforma, así que sin esta línea el detalle enseñaría el código de
+                          desarrollo y ningún número, mientras la vista del MES sí los trae. */}
+                      {numerosDeProduccion(l) !== '' ? (
+                        <span
+                          className="num ml-2 text-[10.5px] text-faint"
+                          title="Nº interno de producción del modelo de cada OP (uno por color)"
+                          data-testid="renglon-numeros-produccion"
+                        >
+                          prod. #{numerosDeProduccion(l)}
+                        </span>
+                      ) : null}
                       {l.descripcionModelo ? (
                         <span className="block text-xs text-muted-foreground">
                           {l.descripcionModelo}

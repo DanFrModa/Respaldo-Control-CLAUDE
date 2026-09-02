@@ -50,6 +50,10 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import {
+  filtroOrdenesVivasDeLineas,
+  numerosProduccionPorLinea,
+} from './ordenes-vivas-del-renglon.js';
 
 /** Clave de la secuencia de folios de pedidos (A3 — por empresa). */
 export const CLAVE_SECUENCIA_PEDIDO = 'pedido';
@@ -86,6 +90,19 @@ type PedidoConDetalle = Pedido & {
     modelo: { codigo: string; descripcion: string | null; numeroProduccion: number | null };
     urlFotoModelo?: string | null;
   })[];
+};
+
+/**
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)) — el pedido YA con los nº de producción por color de cada renglón.
+ *
+ * 🔴 **Es un tipo aparte, y a propósito.** `numerosProduccion` es OBLIGATORIO aquí (no opcional
+ * como `urlFotoModelo`), así que `aPedidoSalida` sólo acepta lo que pasó por
+ * {@link adjuntarNumerosProduccion}: si mañana alguien agrega una tercera puerta de lectura y se
+ * olvida de agregar los números, **no compila**, en vez de devolver un array vacío que se lee
+ * exactamente igual que "este renglón todavía no tiene OP".
+ */
+type PedidoConNumeros = Omit<PedidoConDetalle, 'lineas'> & {
+  lineas: (PedidoConDetalle['lineas'][number] & { numerosProduccion: number[] })[];
 };
 
 /** `include` estándar para traer el cliente y los renglones (con su modelo, ordenados por id). */
@@ -329,7 +346,7 @@ async function sincronizarLineas(
  * doc 02 §3 — el JSON NO trae los importes si no tiene permiso). Las fechas date-only salen
  * como `YYYY-MM-DD`.
  */
-function aPedidoSalida(pedido: PedidoConDetalle, puedeVerImportes: boolean): PedidoSalida {
+function aPedidoSalida(pedido: PedidoConNumeros, puedeVerImportes: boolean): PedidoSalida {
   let totalPiezas = 0;
   let totalImporte = 0;
   const lineas: PedidoLineaSalida[] = pedido.lineas.map((l) => {
@@ -350,6 +367,9 @@ function aPedidoSalida(pedido: PedidoConDetalle, puedeVerImportes: boolean): Ped
       cantFaltanteV1: l.cantFaltanteV1,
       idDesarrollo: l.idDesarrollo,
       numeroProduccion: l.modelo.numeroProduccion,
+      // V1-E3: los nº de los modelos POR COLOR de las OPs del renglón. `numeroProduccion` (el del
+      // modelo del RENGLÓN) se queda: sigue siendo el dato bueno del legado del Access.
+      numerosProduccion: l.numerosProduccion,
     };
   });
 
@@ -441,6 +461,48 @@ async function adjuntarFotosModelo(
       urlFotoModelo: urlPorModelo.get(l.idModelo) ?? null,
     })),
   };
+}
+
+/**
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)) — **los nº de producción que el detalle del pedido no podía enseñar.**
+ *
+ * 🔴 Hasta V1-E3 el renglón enseñaba el nº de 5 dígitos POR ACCIDENTE: pintaba `codigoModelo`, y ese
+ * código *era* el de producción porque generar la OP **transformaba** el modelo del renglón. Desde
+ * V1-E3 el desarrollo ya no se transforma —nacen modelos de producción POR COLOR— así que
+ * `Modelo.numeroProduccion` del renglón es `null` **para siempre** y el detalle se quedó sin ningún
+ * número que enseñar, mientras la vista del MES sí los traía. Esto cierra esa asimetría con
+ * EXACTAMENTE la misma regla que `consulta-mes.ts`: los números de los modelos de las OPs VIVAS del
+ * renglón, sin repetir y en orden ascendente.
+ *
+ * Va **en el servidor** y **por lote**: UNA consulta para todos los renglones de la página (nunca
+ * una por pedido), igual que el agregado de la consulta por mes.
+ *
+ * 🔑 **La regla NO vive aquí**: qué OP cuenta y qué número aporta lo deciden
+ * {@link filtroOrdenesVivasDeLineas} y {@link numerosProduccionPorLinea}, compartidos con la
+ * consulta por MES para que las dos pantallas no puedan contestar distinto. Lo de esta función es
+ * sólo el ACARREO: pedir el lote y colgar el resultado de cada renglón.
+ */
+async function adjuntarNumerosProduccion(
+  cliente: ReturnType<typeof clienteLectura>,
+  pedidos: PedidoConDetalle[],
+): Promise<PedidoConNumeros[]> {
+  const idsLinea = pedidos.flatMap((p) => p.lineas.map((l) => l.id));
+  const ordenesVivas =
+    idsLinea.length === 0
+      ? []
+      : await cliente.orden.findMany({
+          where: filtroOrdenesVivasDeLineas(idsLinea),
+          select: { idPedidoLinea: true, modelo: { select: { numeroProduccion: true } } },
+        });
+  const numerosPorLinea = numerosProduccionPorLinea(ordenesVivas);
+
+  return pedidos.map((pedido) => ({
+    ...pedido,
+    lineas: pedido.lineas.map((linea) => ({
+      ...linea,
+      numerosProduccion: numerosPorLinea.get(linea.id) ?? [],
+    })),
+  }));
 }
 
 // ── Operaciones ───────────────────────────────────────────────────────────────────
@@ -799,7 +861,8 @@ export async function obtenerPedido(
     throw new ErrorNoEncontrado('Pedido', id);
   }
   const conFotos = await adjuntarFotosModelo(cliente, pedido, archivos);
-  return aPedidoSalida(conFotos, tienePermiso(sesion, 'pedidos.importes'));
+  const conNumeros = (await adjuntarNumerosProduccion(cliente, [conFotos]))[0]!;
+  return aPedidoSalida(conNumeros, tienePermiso(sesion, 'pedidos.importes'));
 }
 
 /**
@@ -844,7 +907,9 @@ export async function listarPedidos(
   ]);
 
   const conFotos = await Promise.all(datos.map((p) => adjuntarFotosModelo(cliente, p, archivos)));
-  const salida = conFotos.map((p) => aPedidoSalida(p, puedeVerImportes));
+  // V1-E3: los nº por color de TODA la página en UNA consulta (nunca una por pedido).
+  const conNumeros = await adjuntarNumerosProduccion(cliente, conFotos);
+  const salida = conNumeros.map((p) => aPedidoSalida(p, puedeVerImportes));
   return armarPagina(salida, total, filtros);
 }
 
