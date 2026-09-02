@@ -1590,3 +1590,343 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     expect(repetido.totalPiezas).toBe(10);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ EL PACK / TENDIDO EN EL RECIBO (§Post-F9.10) — la convivencia CON pack / SIN pack
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 DANIEL: *«Creo que sí es importante que viaje el pack al menos en el corte, entrega a maquila…
+// y que sea **opcional al recibir**.»* Y, con eso, la parte difícil que él mismo resolvió:
+//
+//   *«Con el recibo opcional, el saldo «recibido ≤ enviado» no puede llevarse sólo por pack. Un
+//   recibo SIN pack consume del saldo agregado de todos los packs de esa orden y proceso; uno CON
+//   pack, del suyo. Hay que definir (y **probar**) que las dos formas convivan sin permitir recibir
+//   de más en total.»*
+//
+// La aritmética se prueba pura en `packs.test.ts`; aquí se prueba CONTRA POSTGRES, que es donde
+// viven el lock, las cancelaciones, el filtro por maquilero y la persistencia de la columna.
+describe('Recibo por PACK (§Post-F9.10)', () => {
+  /** Orden con DOS tendidos del MISMO color: pack A (CH 5) y pack B (CH 5). */
+  async function crearOrdenConPacks(): Promise<number> {
+    const pedido = await cliente.pedido.create({
+      data: { folio: 90n, idEmpresa: empresa.id, idCliente: clienteNegocioId },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: 10, precio: 10 },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 90n,
+        idEmpresa: empresa.id,
+        idPedidoLinea: linea.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        lineas: {
+          create: [
+            {
+              idColor: colorRojo.id,
+              pack: 'A',
+              tallas: { create: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+            },
+            {
+              idColor: colorRojo.id,
+              pack: 'B',
+              tallas: { create: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+            },
+          ],
+        },
+      },
+    });
+    return orden.id;
+  }
+
+  /** Corta y envía a costura los 5 de cada pack (el punto de partida de casi todo). */
+  async function cortarYEnviarLosDosPacks(idOrdenPacks: number): Promise<void> {
+    await registrarCorte(
+      sesion(),
+      {
+        idOrden: idOrdenPacks,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [
+          { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+          { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+        ],
+      },
+      bd(),
+    );
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden: idOrdenPacks,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        precioPactado: 8,
+        lineas: [
+          { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+          { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+        ],
+      },
+      bd(),
+    );
+  }
+
+  /** Un recibo de costura de `cantidad` piezas de Rojo/CH, con o sin pack. */
+  const recibir = async (
+    idOrdenPacks: number,
+    pack: string | undefined,
+    cantidad: number,
+    fecha = '2026-06-20',
+  ) =>
+    registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden: idOrdenPacks,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha,
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            ...(pack === undefined ? {} : { pack }),
+            tallas: [{ idTalla: tallaCH.id, cantidad }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+  it('CON pack: el saldo se lleva por tendido — no se recibe de A lo que se envió de B', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+
+    // 10 enviadas en total (5 + 5). Pedir 10 CON pack A cuadra en el agregado y NO en el pack.
+    await expect(recibir(id, 'A', 10)).rejects.toThrow(ErrorConflicto);
+    await expect(recibir(id, 'A', 10)).rejects.toThrow(/pack "A"/);
+
+    // Los 5 de A sí caben, y el detalle guarda su pack.
+    const recibo = await recibir(id, 'A', 5);
+    expect(recibo.totalPiezas).toBe(5);
+    expect(recibo.lineas).toHaveLength(1);
+    expect(recibo.lineas[0]?.pack).toBe('A');
+
+    // Y A queda cerrado: ni una más de ESE pack…
+    await expect(recibir(id, 'A', 1, '2026-06-21')).rejects.toThrow(/pack "A"/);
+    // …aunque B siga entero.
+    const deB = await recibir(id, 'B', 5, '2026-06-21');
+    expect(deB.lineas[0]?.pack).toBe('B');
+  });
+
+  it('SIN pack: consume del saldo AGREGADO de todos los packs (los devolvió revueltos)', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+
+    // 10 sin pack = todo lo enviado, aunque NINGÚN pack tenga 10 por sí solo.
+    const recibo = await recibir(id, undefined, 10);
+    expect(recibo.totalPiezas).toBe(10);
+    expect(recibo.lineas[0]?.pack).toBe('');
+
+    // Y ya no queda nada: el agregado está en cero.
+    await expect(recibir(id, undefined, 1, '2026-06-21')).rejects.toThrow(ErrorConflicto);
+  });
+
+  it('SIN pack tampoco puede pasarse del agregado', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+    await expect(recibir(id, undefined, 11)).rejects.toThrow(/quedan 10 enviada/);
+  });
+
+  it('⭐ LAS DOS FORMAS JUNTAS no dejan recibir de más EN TOTAL (pack + pack, luego sin pack)', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+
+    await recibir(id, 'A', 5, '2026-06-20');
+    await recibir(id, 'B', 5, '2026-06-21');
+
+    // Los dos tendidos están cerrados ⇒ un recibo SIN pack no puede colarse. Sin la condición
+    // AGREGADA, este renglón no dispararía ninguna guarda (no declara pack) y pasarían 5 de más.
+    await expect(recibir(id, undefined, 5, '2026-06-22')).rejects.toThrow(ErrorConflicto);
+    await expect(recibir(id, undefined, 1, '2026-06-22')).rejects.toThrow(/quedan 0 enviada/);
+  });
+
+  it('⭐ …y al revés: lo devuelto SIN pack le baja el saldo a un recibo CON pack', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+
+    // Devolvió las 10 revueltas. El saldo POR PACK de A sigue diciendo 5 (nadie le imputó nada),
+    // pero el agregado está en 0 y es el que manda.
+    await recibir(id, undefined, 10);
+    await expect(recibir(id, 'A', 1, '2026-06-21')).rejects.toThrow(ErrorConflicto);
+  });
+
+  it('⭐ en UNA MISMA captura, los renglones de la misma celda se topan JUNTOS', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+
+    // 5 de A + 5 de B + 1 sin pack = 11 sobre 10 enviadas. Cada renglón cabe por su lado; el
+    // conjunto no. Topar renglón por renglón (como antes de §Post-F9.10, cuando una celda no podía
+    // repetirse en una captura) habría dejado pasar las 11.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden: id,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-20',
+          precioPactado: 8,
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [
+            { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+            { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+            { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorConflicto);
+
+    // Nada quedó a medias (A2): la orden sigue sin un solo recibo.
+    expect(
+      await cliente.etapaMovimiento.count({ where: { idOrden: id, tipo: 'recibo_maquila' } }),
+    ).toBe(0);
+
+    // Y la MISMA captura sin el renglón de sobra sí cabe entera, en los dos tendidos.
+    const bueno = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden: id,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+          { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+        ],
+      },
+      bd(),
+    );
+    expect(bueno.totalPiezas).toBe(10);
+    // Dos renglones del MISMO color, uno por tendido: es justo lo que esta etapa vino a permitir.
+    expect(bueno.lineas.map((l) => l.pack).sort()).toEqual(['A', 'B']);
+    expect(new Set(bueno.lineas.map((l) => l.idColor)).size).toBe(1);
+  });
+
+  it('🔴 el INVENTARIO no maneja packs: los dos tendidos entran al kardex como UN solo renglón', async () => {
+    // §Post-F9.10 — *«Arte · entrega a cliente · inventario PT: no aplica, ahí ya es sólo color»*.
+    // Un recibo con pack A (5 CH) y pack B (5 CH) mete 10 CH al almacén, en UN movimiento con UN
+    // renglón. Sin plegar el pack, el kardex habría recibido dos renglones de la MISMA llave
+    // (mismo modelo/color/talla/orden): la existencia habría cuadrado igual —es Σ de movimientos
+    // (D3)— pero el movimiento quedaría partido en dos y el lock del artículo tomado dos veces.
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden: id,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+          { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+        ],
+      },
+      bd(),
+    );
+    expect(recibo.totalPiezas).toBe(10);
+
+    const movimientos = await cliente.movimiento.findMany({
+      where: { origenTipo: 'recibo-maquila', origenId: String(recibo.id) },
+      include: { detallesPt: true },
+    });
+    expect(movimientos).toHaveLength(1);
+    expect(movimientos[0]?.detallesPt).toHaveLength(1);
+    expect(movimientos[0]?.detallesPt[0]?.cantidad).toBe(10);
+
+    // Y la existencia dice 10 en primeras, como cualquier recibo de 10.
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    const enPrimeras = existencias.filas.filter((f) => f.idAlmacen === almPrimeras.id);
+    expect(enPrimeras.reduce((sum, f) => sum + f.existencia, 0)).toBe(10);
+  });
+
+  it('cancelar un recibo CON pack le devuelve su saldo a ESE tendido', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+    const recibo = await recibir(id, 'A', 5);
+    await expect(recibir(id, 'A', 1, '2026-06-21')).rejects.toThrow(ErrorConflicto);
+
+    await cancelarReciboMaquila(sesion(), recibo.id, { motivo: 'error de captura' }, bd());
+    const otraVez = await recibir(id, 'A', 5, '2026-06-22');
+    expect(otraVez.totalPiezas).toBe(5);
+  });
+
+  it('rechaza un pack que la orden no tiene, y dice cuáles sí', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+    await expect(recibir(id, 'Z', 1)).rejects.toThrow(/"A", "B"/);
+  });
+
+  it('el desglose por recibir se parte por tendido, y el bucket sin pack sale NEGATIVO al revolverlos', async () => {
+    const id = await crearOrdenConPacks();
+    await cortarYEnviarLosDosPacks(id);
+    await recibir(id, undefined, 4);
+
+    const pend = await pendientesPorRecibir(sesion(), id, bd());
+    const costura = pend.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
+    // Los dos tendidos siguen enteros (nadie les imputó nada) y lo devuelto revuelto vive en su
+    // propio renglón, en negativo: así Σ celdas = totalPendiente y el desglose no contradice al total.
+    const porPack = new Map(costura?.celdas.map((c) => [c.pack, c.cantidad]));
+    expect(porPack.get('A')).toBe(5);
+    expect(porPack.get('B')).toBe(5);
+    expect(porPack.get('')).toBe(-4);
+    // …y ese renglón se rotula con el color REAL, no con el respaldo defensivo «Color 7»: es una
+    // fila que el operador va a ver.
+    const sinPack = costura?.celdas.find((c) => c.pack === '');
+    expect(sinPack?.color).toBe('Rojo');
+    expect(sinPack?.etiquetaTalla).toBe('CH');
+    expect(costura?.totalPendiente).toBe(6);
+    expect((costura?.celdas ?? []).reduce((s, c) => s + c.cantidad, 0)).toBe(
+      costura?.totalPendiente,
+    );
+  });
+
+  it('🔴 una orden SIN packs se comporta EXACTAMENTE igual que antes: el pack sobra y se rechaza', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    // Mandar un pack a una orden que no los maneja es un error de captura, no un dato que se ignore.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [
+            { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/no se fabrica por packs/);
+
+    // Y sin pack, todo sigue igual: se recibe lo enviado y ni una pieza más.
+    const recibo = await recibir(idOrden, undefined, 10);
+    expect(recibo.totalPiezas).toBe(10);
+    expect(recibo.lineas[0]?.pack).toBe('');
+    await expect(recibir(idOrden, undefined, 1, '2026-06-21')).rejects.toThrow(ErrorConflicto);
+  });
+});

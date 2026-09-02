@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPackEntrada, esquemaPackSalida } from './pack.js';
+
 /**
  * Esquemas Zod del RECIBO de maquila (F3-E4; doc 03-Produccion Paso 5 "Recibo" + flujo paralelo de
  * estampado). UNA sola definición de reglas para UI y servidor (alimenta el OpenAPI). El recibo es
@@ -62,12 +64,30 @@ const esquemaReciboTalla = z.object({
     ),
 });
 
-/** Un renglón de la matriz del recibo: un color con sus cantidades por talla (D4). */
+/**
+ * Un renglón de la matriz del recibo: un color × su PACK, con sus cantidades por talla (D4).
+ *
+ * ⭐ AQUÍ EL PACK ES **OPCIONAL**, y es una decisión de negocio de Daniel, no una holgura técnica:
+ * *«que sea **opcional al recibir**»* — el maquilero puede devolver los packs separados (y entonces
+ * se captura cada uno con su letra) o revueltos (y entonces se captura sin pack, en un solo
+ * renglón). Las dos formas conviven en la misma orden, y hasta en la misma captura.
+ *
+ * 🔴 LO QUE ESO OBLIGA (y es la parte difícil de §Post-F9.10): el saldo «recibido ≤ enviado» NO
+ * puede llevarse sólo por pack. Un renglón SIN pack consume del saldo AGREGADO de todos los packs
+ * de esa orden+proceso+maquilero; uno CON pack consume además del suyo. El dominio topa las DOS
+ * cosas a la vez para que las dos formas no dejen recibir de más EN TOTAL — ver
+ * `dominio/produccion/recibos.ts`.
+ */
 const esquemaReciboLinea = z.object({
   idColor: z
     .number({ error: 'El id del color es obligatorio' })
     .int({ error: 'El id del color debe ser entero' })
     .positive({ error: 'El id del color debe ser positivo' }),
+  pack: esquemaPackEntrada.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10). OPCIONAL SIEMPRE: vacío = «el maquilero los ' +
+      'devolvió revueltos», y ese renglón consume del saldo agregado de todos los packs. Con pack, ' +
+      'consume además del saldo de ese pack. En una orden sin packs va vacío.',
+  ),
   tallas: z
     .array(esquemaReciboTalla)
     .min(1, { error: 'Cada color necesita al menos una talla' })
@@ -178,6 +198,9 @@ const esquemaReciboTallaSalida = z.object({
 const esquemaReciboLineaSalida = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = se recibió sin distinguir pack.',
+  ),
   tallas: z.array(esquemaReciboTallaSalida).describe('Cantidades por talla (con calidad).'),
   totalPiezas: z.number().int().describe('Total del renglón (derivado por suma).'),
   totalIncompletas: z
@@ -248,10 +271,20 @@ export type ReciboSalida = z.infer<typeof esquemaReciboSalida>;
 
 // ── Pendientes por recibir (derivados: enviado − recibido − incompletas, por orden+proceso) ──────
 
-/** Pendiente de UNA celda color×talla. */
+/**
+ * Pendiente de UNA celda color×talla×PACK.
+ *
+ * ⚠️ Con packs, la celda de `pack` VACÍO puede salir NEGATIVA, y no es un defecto: es lo que el
+ * maquilero ya devolvió SIN decir de qué pack era (§Post-F9.10). Se muestra tal cual para que
+ * `Σ celdas = totalPendiente` siga siendo cierto — esconderla haría que el desglose contradijera al
+ * total, que es justo lo que el drill-down no puede hacer.
+ */
 const esquemaPendienteRecibirCelda = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe(
+    'PACK de la celda. CADENA VACÍA = sin pack (en una orden con packs, lo devuelto revuelto).',
+  ),
   idTalla: z.number().int().describe('Id de la talla.'),
   etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
   cantidad: z

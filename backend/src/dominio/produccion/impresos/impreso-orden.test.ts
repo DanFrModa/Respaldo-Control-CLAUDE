@@ -105,6 +105,7 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
   const tabla = armarTabla([
     {
       color: 'Rojo',
+      pack: '',
       tallas: [
         { etiquetaTalla: 'CH', cantidad: 3 },
         { etiquetaTalla: 'M', cantidad: 5 },
@@ -112,6 +113,7 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
     },
     {
       color: 'Azul',
+      pack: '',
       tallas: [
         { etiquetaTalla: 'M', cantidad: 2 },
         { etiquetaTalla: 'G', cantidad: 4 },
@@ -171,6 +173,7 @@ function ordenDensa(artes: number): DatosImpresoOrden {
   const tabla = armarTabla(
     Array.from({ length: 4 }, (_, c) => ({
       color: `Color ${String(c)}`,
+      pack: '',
       tallas: ['XS', 'S', 'M', 'L', 'XL'].map((etiquetaTalla, t) => ({
         etiquetaTalla,
         cantidad: 10 + t,
@@ -192,6 +195,7 @@ describe('armarTabla', () => {
     const tabla = armarTabla([
       {
         color: 'Rojo',
+        pack: '',
         tallas: [
           { etiquetaTalla: 'CH', cantidad: 3 },
           { etiquetaTalla: 'M', cantidad: 5 },
@@ -199,6 +203,7 @@ describe('armarTabla', () => {
       },
       {
         color: 'Azul',
+        pack: '',
         tallas: [
           { etiquetaTalla: 'M', cantidad: 2 },
           { etiquetaTalla: 'G', cantidad: 4 },
@@ -233,10 +238,29 @@ describe('armarTabla', () => {
     expect(sumaColumnas).toBe(tabla.totalPiezas);
   });
 
+  it('⭐ el PACK sale en el renglón del papel, y sin packs la fila se imprime igual que antes', () => {
+    // §Post-F9.10 — el cortador y el maquilero necesitan ver de qué TENDIDO es cada corrida; dos
+    // filas del mismo color sin distintivo se leerían como un error de captura.
+    const tabla = armarTabla([
+      { color: 'Negro', pack: 'A', tallas: [{ etiquetaTalla: 'CH', cantidad: 5 }] },
+      { color: 'Negro', pack: 'B', tallas: [{ etiquetaTalla: 'CH', cantidad: 3 }] },
+      { color: 'Rojo', pack: '', tallas: [{ etiquetaTalla: 'CH', cantidad: 2 }] },
+    ]);
+    expect(tabla.renglones[0]?.color).toBe('Negro  ·  PACK A');
+    expect(tabla.renglones[1]?.color).toBe('Negro  ·  PACK B');
+    // Sin pack: exactamente el nombre del color, sin adornos.
+    expect(tabla.renglones[2]?.color).toBe('Rojo');
+  });
+
   it('lleva el pantone de cada color a su renglón (petición Daniel)', () => {
     const tabla = armarTabla([
-      { color: 'Blanco', pantone: '11-0601 TCX', tallas: [{ etiquetaTalla: 'M', cantidad: 2 }] },
-      { color: 'Rojo', tallas: [{ etiquetaTalla: 'M', cantidad: 3 }] },
+      {
+        color: 'Blanco',
+        pack: '',
+        pantone: '11-0601 TCX',
+        tallas: [{ etiquetaTalla: 'M', cantidad: 2 }],
+      },
+      { color: 'Rojo', pack: '', tallas: [{ etiquetaTalla: 'M', cantidad: 3 }] },
     ]);
     expect(tabla.renglones[0]?.pantone).toBe('11-0601 TCX');
     // Sin pantone (no lo mandó la matriz) → null.
@@ -247,6 +271,7 @@ describe('armarTabla', () => {
     const tallas = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
     const lineas = Array.from({ length: 12 }, (_, c) => ({
       color: `Color ${c}`,
+      pack: '',
       tallas: tallas.map((etiquetaTalla, t) => ({ etiquetaTalla, cantidad: c * 10 + t })),
     }));
     const tabla = armarTabla(lineas);
@@ -487,6 +512,7 @@ describe('armarDatosImpresoOrden', () => {
       lineas: [
         {
           color: 'Rojo',
+          pack: '',
           tallas: [
             { etiquetaTalla: 'CH', cantidad: 2 },
             { etiquetaTalla: 'M', cantidad: 3 },

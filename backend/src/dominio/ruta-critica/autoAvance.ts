@@ -131,27 +131,42 @@ export interface ResultadoCompletitud {
  *    celdas pedidas con cantidad 0 se consideran cubiertas (no exigen avance). Si NO hay nada pedido
  *    (orden sin matriz), NO se considera completo (no hay nada que cubrir → evita falsos positivos).
  *  • `hayAvance` = pasó al menos 1 pieza por alguna celda.
+ *
+ * 🔴 LAS DOS LISTAS SE AGREGAN, no sólo la de `pasado` (§Post-F9.10). Desde que el PACK es campo
+ * propio, la matriz de una OP de C&A trae VARIOS renglones del mismo color —uno por tendido—, así
+ * que `pedido` puede repetir la misma celda color×talla. Comparando renglón por renglón contra el
+ * total realmente pasado, cada tendido se daba por cubierto con las piezas del otro: 100 CH del pack
+ * A + 50 CH del pack B se habrían declarado COMPLETAS con 100 cortadas. Sin packs no hay duplicados
+ * y agregar es un no-op, así que esto no cambia ni un caso viejo.
+ *
+ * 🔑 Y se compara PLEGANDO el pack a propósito: la RC pregunta *«¿ya se cortó / entregó la orden?»*,
+ * que es una pregunta del total. El saldo tendido por tendido es asunto del guardado de la etapa
+ * (`etapas.ts`/`recibos.ts`), donde sí se topa por pack.
  */
 export function calcularCompletitud(
   pedido: readonly CeldaCantidad[],
   pasado: readonly CeldaCantidad[],
 ): ResultadoCompletitud {
-  const mapaPasado = new Map<string, number>();
-  for (const c of pasado) {
-    mapaPasado.set(
-      claveCelda(c.idColor, c.idTalla),
-      (mapaPasado.get(claveCelda(c.idColor, c.idTalla)) ?? 0) + c.cantidad,
-    );
-  }
+  const agregar = (celdas: readonly CeldaCantidad[]): Map<string, number> => {
+    const mapa = new Map<string, number>();
+    for (const c of celdas) {
+      const clave = claveCelda(c.idColor, c.idTalla);
+      mapa.set(clave, (mapa.get(clave) ?? 0) + c.cantidad);
+    }
+    return mapa;
+  };
+
+  const mapaPasado = agregar(pasado);
   const hayAvance = [...mapaPasado.values()].some((v) => v > 0);
 
-  const celdasConCantidad = pedido.filter((c) => c.cantidad > 0);
+  const mapaPedido = agregar(pedido);
+  const celdasConCantidad = [...mapaPedido].filter(([, cantidad]) => cantidad > 0);
   if (celdasConCantidad.length === 0) {
     // Orden sin nada pedido (>0): no hay nada que cubrir → no se auto-completa por evento.
     return { completo: false, hayAvance };
   }
   const completo = celdasConCantidad.every(
-    (c) => (mapaPasado.get(claveCelda(c.idColor, c.idTalla)) ?? 0) >= c.cantidad,
+    ([clave, cantidad]) => (mapaPasado.get(clave) ?? 0) >= cantidad,
   );
   return { completo, hayAvance };
 }
