@@ -706,7 +706,11 @@ describe('⭐ subir una foto PROPIA — lo único que le da imagen al arte agreg
 });
 
 describe('⭐ quitar una foto PROPIA — ésta sí borra, y sólo ésta', () => {
-  it('borra el Archivo, deja bitácora y borra el objeto de R2 tras el commit', async () => {
+  // ⚠️ El «tras el commit» NO se afirma aquí y no se podía: con `bd = { tx }`, `enTransaccion`
+  // toma el atajo `fn(bd.tx)` y NO HAY COMMIT que observar — medido: mover el borrado de R2
+  // dentro de la transacción deja este archivo entero en verde (44/44). Esa invariante vive en
+  // `fotos-arte-orden-r2.test.ts`, con el guardián compartido de la 0.081(a).
+  it('borra el Archivo, deja bitácora y borra el objeto de R2', async () => {
     const { bd, archivoDelete, bitacoraCreate } = bdFalsa({
       fotosPropias: [{ id: 900, idOrdenArte: 10, orden: 0, idArchivo: 'arch-1' }],
     });

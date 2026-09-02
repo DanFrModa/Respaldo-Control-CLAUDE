@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integracion": "vitest run --project integracion",
+    "gates": "tsx scripts/gates.ts",
     "openapi": "tsx scripts/generar-openapi.ts",
     "etl:catalogos": "tsx migracion/etl-catalogos.ts",
     "etl:modelos": "tsx migracion/etl-modelos.ts",

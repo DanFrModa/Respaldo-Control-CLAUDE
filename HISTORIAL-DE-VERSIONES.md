@@ -71,6 +71,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.089 · 2-sep-2026 · **en prueba** — 🔴 Una fuga que creíamos dormida **estaba despierta**: borrar un arte de la OP dejaba su foto pagándose en la nube
+
+### Qué se puede hacer ahora que antes no
+
+**Nada nuevo en pantalla.** Esta versión no agrega funciones: **tapa una fuga real y pone tres vigilantes** donde
+antes sólo había advertencias escritas en un documento que nadie está obligado a leer.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **La fuga estaba VIVA, no dormida.** El plan decía, con esas palabras, *«hoy NO ocurre»*. Y ocurría:
+  **quitar un renglón de arte agregado a mano en la receta de una OP** borraba ese arte y, por arrastre, su
+  marca de foto — **dejando el archivo vivo y su objeto pagándose en la nube para siempre**. Y era el peor caso
+  posible: un arte metido a mano **sólo puede tener fotos propias**, así que se iban todas.
+- ⭐ **Por qué el plan no lo vio, que es lo que más importa:** su lista de «qué borrados vigilar» era **correcta
+  y no servía**. El borrado que fugaba es de una tabla **que nació dos semanas después de escribirse la lista**.
+  Por eso el vigilante nuevo **no lleva lista escrita a mano: la calcula del modelo de datos**, y el día que
+  alguien añada otro puente **la prueba se pone roja sola y le explica la trampa**.
+- **Y no eran siete puentes: son ocho, más tres campos** que corren el mismo riesgo y que el plan ni mencionaba.
+- 🧹 **Segundo vigilante: el techo de memoria.** Estaba escrito desde agosto que *«cuando 6 GB no alcancen hay
+  que atacar la causa, no volver a subir el número»*. Ahora **subirlo pone la prueba en rojo** y el mensaje
+  nombra las tres curas reales. ⚠️ Y el techo **no vivía en un sitio: vive en cuatro** — el propio archivo de
+  CI ya avisaba de eso y nadie lo había leído.
+- 🧹 **Tercer vigilante, y el que más nos ha costado: un `Killed` ya no se puede leer como aprobado.** Se
+  estrenó en vivo: mientras se probaba, la máquina se quedó sin memoria de verdad y el kernel mató una
+  validación. El script imprimió *«MUERTO POR EL OOM-KILLER — la corrida NO VALE y NO es un pase»* y
+  **se negó a decir que estaba verde**.
+
+### Qué sigue pendiente o roto
+
+- **Cuatro puertas a la nube siguen sin ese vigilante** (las de adjuntos). Es deuda vieja y ahora está
+  **declarada dentro del propio código**, no en una nota suelta.
+- **El vigilante de borrados es por archivo, no por función**: hoy no hay hueco, pero **una tercera puerta
+  dentro de un archivo que ya tiene dos pasaría inadvertida**. También queda dicho ahí mismo.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
 ## 0.088 · 2-sep-2026 · **en prueba** — El renglón en ceros de la conciliación **ya dice por qué existe**, y el menú deja de mentir
 
 ### Qué se puede hacer ahora que antes no

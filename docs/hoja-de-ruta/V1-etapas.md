@@ -1218,6 +1218,122 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9u · LOS DOS GUARDIANES — y la fuga que el plan daba por dormida (2-sep-2026, versión **0.089**) — ✅ FILAS 0.091 y 0.092
+
+**Qué entregó.** Las dos filas eran **advertencias que vivían en una fila del plan y que nadie está obligado a
+leer**. El encargo era convertirlas en **guardianes que se disparen solos** — o medir que no se puede y decirlo.
+Salieron **tres**, y de paso **una fuga real tapada**.
+
+### 🔴 La fila 0.091 mentía en su afirmación central
+
+Decía **«✅ Hoy NO ocurre»** y **«los siete puentes»**. Las dos falsas:
+
+- `receta-orden.ts:2641` (`quitarRenglonReceta`, rama del **arte agregado a mano**) hacía
+  `tx.ordenArte.delete(...)` ⇒ cascada a `OrdenArteFoto` ⇒ **la fila `Archivo` queda viva y su objeto de R2
+  pagándose para siempre**. Peor caso posible: un arte a mano (`idModeloArte` NULL) **sólo puede llevar foto
+  por `OrdenArteFoto`** ⇒ **se iban todas sus fotos**.
+- ⭐ **Por qué la fila no lo vio:** su lista (`modelo/orden/pedido/desarrollo/proveedor/entradaTela`) era
+  **correcta y no servía** — el borrado es de `ordenArte`, **un padre que nació con la v0.083**, dos semanas
+  después de escribirse la fila.
+- **Números reales** (sonda sobre `schema.prisma`: 166 modelos, 328 FKs, confirmados por el reviewer con sonda
+  propia): **11 FKs** hacia `Archivo` = **8 puentes** (el octavo es `OrdenArteFoto`) **+ 3 campos del dueño**
+  (`Empresa.archivoLogo`, `EntradaTela.archivoCfdi`, `MovimientoTercero.archivoCfdi`) que **corren el mismo
+  riesgo y la fila no menciona**. Cierre de ancestros ⇒ **19 modelos vigilables**.
+
+**El arreglo:** `liberarFotosPropiasDeArteOrden` libera los `Archivo` dentro de la transacción y **suelta las
+keys de R2 DESPUÉS del commit**; la bitácora guarda **los nombres** (D3, no un conteo). El reviewer confirmó la
+cascada **en el DDL real**, no sólo en el esquema.
+
+### Los tres guardianes, y por qué la superficie se CALCULA
+
+1. **`archivos-huerfanos.test.ts`** — inventario que debe coincidir **exactamente** con el esquema, y una
+   superficie de hard-delete **calculada del esquema con cierre de ancestros**, no listada a mano. Así **el
+   noveno puente no puede pasar callado**.
+2. **`techo-de-memoria.test.ts`** — ⚠️ el techo **no está en un sitio: está en CUATRO** (`ci.yml` ×3 +
+   `backend/Dockerfile` inline), y **`ci.yml:313-320` ya avisaba** de que el techo del workflow no cruza al
+   `docker build` (*«hubo cuarta vez el mismo día»*) ⇒ **un guardián de un solo sitio habría sido la rama
+   gemela literal**. Cubre **las dos grafías** que Node acepta y **sólo prohíbe SUBIR**.
+3. **`gates.ts` + `gates-locales.test.ts`** — pre-vuelo serializado que traduce `137`/`134` y **sólo imprime la
+   frase de verde si pasó todo**.
+
+### ⭐ El pre-vuelo se validó SOLO, contra el fallo que venía a atrapar
+
+Durante las pruebas la caja se quedó sin memoria **de verdad** y el kernel mató un gate. Salió:
+*«✗ backend: lint — MUERTO POR EL OOM-KILLER DEL KERNEL (137/SIGKILL) — la corrida NO VALE y NO es un pase»*,
+**sin frase de verde**. Un control compensatorio validado en vivo y sin buscarlo.
+
+### 🔴 Dos rechazos, los dos por el defecto que la etapa venía a matar
+
+**C1 · El guardián que decía «el CI corre TODOS estos gates» no lo comprobaba para 2 de los 8.** Se apoyaba en
+`run: npm run test` y el CI los corre como **`run: npm test`**; la única línea del workflow con esa cadena era
+**la del e2e**, o sea **justo el gate que el propio archivo declara prohibido**. El reviewer lo probó en las dos
+direcciones: la mutación que cambia los dos comandos de prueba por un `echo` dejaba **10/10 en verde con el CI
+sin correr ni una prueba**.
+⭐ **Y al arreglarlo el coder se cazó un SEGUNDO defecto propio**: su red de seguridad era `size > 8` y —con
+**16 líneas `run: npm …` que colapsan a 9 comandos**— la mutación se ponía roja **por el conteo, no por la
+invariante**. *«Un guardián que se dispara por la razón equivocada es el mismo defecto con otra ropa.»* Cambiada
+por un ancla que **no solapa con ningún gate**.
+🔴 **N1 · Y todavía mentía en el mensaje.** El reviewer mutó el ancla (`npm ci` **con banderas**): fallaba, sí,
+pero acusando al regex ⇒ *quien lo viera en rojo iría a depurar lo que sí funciona*. Separadas las dos
+afirmaciones.
+
+**C3 · La correspondencia «puerta a R2 ↔ prueba de commit» era una lista a mano — y ya había envejecido una
+vez.** Probado: **con la fuga reintroducida, el guardián de hard-delete sigue 8/8 en verde**; quien la mata es
+la prueba de commit. Y `fotos-arte-orden.ts` fue puerta **desde la 0.083 sin guardián**, descubierto a mano.
+Ahora se **escanea**: cada módulo-puerta debe estar importado por algún `*-r2.test.ts`, **detectando las dos
+formas de importación** (tres de los siete usan la dinámica). ⭐ Medido: **12 puertas, no 11** — la que faltaba
+es `respaldo-bd.ts`, **exenta con razón** (el reviewer la verificó por tres patas: no crea fila `Archivo`, no
+vive dentro de ninguna transacción, y su invariante real ya tiene prueba).
+🔴 **N2 · El guardián es por MÓDULO, no por PUERTA, y no lo decía**: **15 sitios en 12 módulos**. Hoy sin
+hueco, pero **una tercera puerta en uno de los que ya tienen dos pasaría inadvertida** ⇒ escrito en el docblock,
+y cerrada la otra mitad: **importar no basta, hay que INVOCAR el guardián**.
+
+### Lo que el reviewer añadió y el coder no había hecho
+
+Cuatro mutaciones propias, todas muertas: **ofuscar el import** (especificador calculado) · **que la puerta
+exenta deje de ser puerta** (⇒ *«el registro de exentas tampoco se puede pudrir»*) · **el ancla con banderas** ·
+y un **techo con guiones bajos en `railway.json`**. Y en la de romper el parser, que sobrevivía en 2 de 8,
+demostró con **control negativo** que esas dos **no son vacuas**: rompiendo la otra pieza mueren **8 de 8**.
+
+### La ronda que yo pedí: la puerta gemela
+
+`quitarFotoArteOrden` **YA liberaba bien** — *«no había defecto que arreglar: había una invariante sin
+vigilancia»*. Su prueba nueva lo blinda, y el dato que la hace valiosa: con el borrado movido **dentro** de la
+transacción, **la suite que ya cubría esa puerta se queda 44/44 EN VERDE**. Era completamente ciega.
+⭐ Y **el título de esa suite mentía**: prometía *«borra el objeto de R2 **tras el commit**»* sobre un montaje
+que **no hace commit**. Corregido.
+
+### Y una prueba que ejercitaba la fuga leyéndose como limpia
+
+`fotos-arte-orden.int.test.ts` borraba la orden, comprobaba que las marcas desaparecían… y **nunca miraba si el
+`Archivo` sobrevivía**. Ahora lo afirma, **con el comentario de que eso está LATENTE y de que el día que
+alguien construya «eliminar orden» esa aserción tiene que darse la vuelta**.
+
+### Residuos declarados (dentro del código, no en una nota suelta)
+
+- **Los cuatro `adjuntos-*` siguen sin guardián de commit** — deuda de la 0.081(a), y ahora se sabe **por
+  medición** que su suite tampoco los ve.
+- El guardián de hard-delete es **de texto**: no ve `$executeRaw` (hoy 0), despacho por variable, borrados
+  anidados (hoy 0) ni el SQL de migraciones. **Lo que lo salva de envejecer es que la superficie sale del
+  esquema.**
+- **No escanea `scripts/` ni `migracion/`** (3 hard-deletes de demo y 0, respectivamente; cubiertos por REGLA
+  0-B). ⚠️ *Si mañana un ETL borra una `Orden` con adjuntos, no lo ve.*
+- El pre-vuelo **puede quedarse corto** sin que nadie se entere: su guardián impide que prometa **de más**, no
+  que se quede corto. **Deliberado: el CI es el único juez.**
+- La invariante que autoriza el borrado a ciegas —que ningún `ModeloArteFoto` apunte a un `Archivo` subido en
+  una OP— **sigue siendo sólo prosa**; heredada de la 0.083.
+
+### Despliegue
+
+**Sin migración** (el cambio en `schema.prisma` son comentarios `///`; `prisma validate` EXIT=0), **sin
+permisos, sin seed** ⇒ **NO requiere `SEED_ON_START`**.
+
+### Gates
+
+`format:check` **0** · `typecheck` **0** · `lint` **0** · `test:unit` **0** — **209 archivos / 2 743 pruebas**.
+Frontend sin tocar; contrato intacto. ⚠️ **El `lint` costó cuatro intentos entre los dos** (`137` del
+OOM-killer, `134` de V8, uno abandonado) **y ninguno se reportó como pase**; el verde salió con la caja libre y
+con el techo del CI. **Es la fila 0.092 ocurriendo en vivo mientras se revisaba la fila 0.092.**
 ## V1-E9t · LOS DOS CABOS QUE SE PODÍAN HACER YA — y la fila que hubo que reescribir (2-sep-2026, versión **0.088**) — 🔶 O2 y O4 DE LA FILA 0.082
 
 **Qué entregó.** Dos de los cuatro cabos de las prendas incompletas. Pero lo primero que hizo esta etapa fue
