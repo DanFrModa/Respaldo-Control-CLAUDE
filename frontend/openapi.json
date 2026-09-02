@@ -69887,6 +69887,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -69913,7 +70014,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -71595,6 +71697,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -71621,7 +71824,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -73210,6 +73414,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -73236,7 +73541,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -74684,6 +74990,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -74710,7 +75117,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -76142,6 +76550,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -76168,7 +76677,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -77587,6 +78097,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -77613,7 +78224,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -79020,6 +79632,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -79046,7 +79759,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -80499,6 +81213,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -80525,7 +81340,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -81955,6 +82771,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -81981,7 +82898,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -83388,6 +84306,107 @@
                       ],
                       "additionalProperties": false,
                       "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                    },
+                    "frenteAlGrupo": {
+                      "type": "object",
+                      "properties": {
+                        "hermanas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                        },
+                        "foliosHermanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                        },
+                        "fueraDeLaComparacion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                        },
+                        "diferencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tipo": {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio",
+                                  "arte"
+                                ],
+                                "description": "Sección de la receta a la que pertenece el renglón."
+                              },
+                              "material": {
+                                "type": "string",
+                                "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                              },
+                              "que": {
+                                "type": "string",
+                                "enum": [
+                                  "solo-esta",
+                                  "no-la-lleva",
+                                  "cantidad"
+                                ],
+                                "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                              }
+                            },
+                            "required": [
+                              "tipo",
+                              "material",
+                              "que",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                          },
+                          "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                        },
+                        "aviso": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                        },
+                        "notaFueraDeLaComparacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                        }
+                      },
+                      "required": [
+                        "hermanas",
+                        "foliosHermanas",
+                        "fueraDeLaComparacion",
+                        "diferencias",
+                        "aviso",
+                        "notaFueraDeLaComparacion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                     }
                   },
                   "required": [
@@ -83414,7 +84433,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "desalineacion"
+                    "desalineacion",
+                    "frenteAlGrupo"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -84907,6 +85927,107 @@
                           ],
                           "additionalProperties": false,
                           "description": "Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo."
+                        },
+                        "frenteAlGrupo": {
+                          "type": "object",
+                          "properties": {
+                            "hermanas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                            },
+                            "foliosHermanas": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                            },
+                            "fueraDeLaComparacion": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                            },
+                            "diferencias": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "tipo": {
+                                    "type": "string",
+                                    "enum": [
+                                      "tela",
+                                      "avio",
+                                      "arte"
+                                    ],
+                                    "description": "Sección de la receta a la que pertenece el renglón."
+                                  },
+                                  "material": {
+                                    "type": "string",
+                                    "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                                  },
+                                  "que": {
+                                    "type": "string",
+                                    "enum": [
+                                      "solo-esta",
+                                      "no-la-lleva",
+                                      "cantidad"
+                                    ],
+                                    "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                                  },
+                                  "detalle": {
+                                    "type": "string",
+                                    "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                                  }
+                                },
+                                "required": [
+                                  "tipo",
+                                  "material",
+                                  "que",
+                                  "detalle"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                              },
+                              "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                            },
+                            "aviso": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                            },
+                            "notaFueraDeLaComparacion": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                            }
+                          },
+                          "required": [
+                            "hermanas",
+                            "foliosHermanas",
+                            "fueraDeLaComparacion",
+                            "diferencias",
+                            "aviso",
+                            "notaFueraDeLaComparacion"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                         }
                       },
                       "required": [
@@ -84933,7 +86054,8 @@
                         "telas",
                         "avios",
                         "artes",
-                        "desalineacion"
+                        "desalineacion",
+                        "frenteAlGrupo"
                       ],
                       "additionalProperties": false,
                       "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -89522,6 +90644,107 @@
                               ]
                             },
                             "description": "Requisitos que le faltan a la orden para estar COMPLETA (vacío si ya lo está o si está cancelada). Transparencia del estado: la UI lo muestra como \"Falta: …\"."
+                          },
+                          "frenteAlGrupo": {
+                            "type": "object",
+                            "properties": {
+                              "hermanas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Cuántas OP hermanas COMPARABLES tiene su grupo: no canceladas, de esta empresa, CON receta congelada y con esa receta **decidida por una persona** (las escritas por un backfill NO cuentan: ver `fueraDeLaComparacion`). `0` = no hay con quién compararse, y entonces `aviso` es siempre null — mira `notaFueraDeLaComparacion` para saber por qué."
+                              },
+                              "foliosHermanas": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "description": "Folios de esas hermanas, para reconocerlas (recortado a las primeras)."
+                              },
+                              "fueraDeLaComparacion": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Cuántas OTRAS OP del linaje se dejaron FUERA de la comparación, por cualquiera de las dos razones: no tienen ni una fila de receta congelada, o su receta la escribió la MIGRACIÓN y nadie la ha tocado (si votara, el histórico señalaría a la OP nueva). Se publica para que la exclusión no falle en silencio: sin este número, un grupo entero podría quedarse sin comparar y nadie lo sabría."
+                              },
+                              "diferencias": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "tipo": {
+                                      "type": "string",
+                                      "enum": [
+                                        "tela",
+                                        "avio",
+                                        "arte"
+                                      ],
+                                      "description": "Sección de la receta a la que pertenece el renglón."
+                                    },
+                                    "material": {
+                                      "type": "string",
+                                      "description": "Cómo se llama el material, para nombrarlo en el aviso (\"BOT-01 — Botón nácar\")."
+                                    },
+                                    "que": {
+                                      "type": "string",
+                                      "enum": [
+                                        "solo-esta",
+                                        "no-la-lleva",
+                                        "cantidad"
+                                      ],
+                                      "description": "Qué tiene distinto esta OP respecto de sus hermanas."
+                                    },
+                                    "detalle": {
+                                      "type": "string",
+                                      "description": "La frase completa, YA REDACTADA por el servidor (A1): dice qué lleva esta OP, qué llevan las otras y con qué folios. La pantalla la pinta tal cual."
+                                    }
+                                  },
+                                  "required": [
+                                    "tipo",
+                                    "material",
+                                    "que",
+                                    "detalle"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Un material en el que esta OP no coincide con sus OP hermanas."
+                                },
+                                "description": "Qué lleva distinto. Vacío = va igual que sus hermanas."
+                              },
+                              "aviso": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Resumen de UNA línea ya redactado por el servidor, nombrando los materiales que difieren y **con cuántas hermanas difiere de verdad** (con 3-2, una minoritaria difiere de 3, no de sus 4 hermanas). `null` = no hay nada que avisar (va igual, o no tiene hermanas)."
+                              },
+                              "notaFueraDeLaComparacion": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina."
+                              }
+                            },
+                            "required": [
+                              "hermanas",
+                              "foliosHermanas",
+                              "fueraDeLaComparacion",
+                              "diferencias",
+                              "aviso",
+                              "notaFueraDeLaComparacion"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
                           }
                         },
                         "required": [
@@ -89549,7 +90772,8 @@
                           "mesEntrega",
                           "idCliente",
                           "cliente",
-                          "faltantes"
+                          "faltantes",
+                          "frenteAlGrupo"
                         ],
                         "additionalProperties": false,
                         "description": "Fila del centro de comando de órdenes (13 columnas del proto, agregadas en servidor)."

@@ -98,6 +98,14 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
     artes: [],
     avisoCurva: null,
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
+    frenteAlGrupo: {
+      hermanas: 0,
+      foliosHermanas: [],
+      fueraDeLaComparacion: 0,
+      diferencias: [],
+      aviso: null,
+      notaFueraDeLaComparacion: null,
+    },
     ...over,
   };
 }

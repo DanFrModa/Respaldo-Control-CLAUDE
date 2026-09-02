@@ -57,6 +57,14 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
     artes: [],
     avisoCurva: null,
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
+    frenteAlGrupo: {
+      hermanas: 0,
+      foliosHermanas: [],
+      fueraDeLaComparacion: 0,
+      diferencias: [],
+      aviso: null,
+      notaFueraDeLaComparacion: null,
+    },
     ...over,
   };
 }
@@ -243,5 +251,79 @@ describe('<ResumenRecetaOrden> (V1-E3j)', () => {
       }),
     );
     expect(screen.getByTestId('receta-resumen-conteo')).toHaveTextContent('sin materiales todavía');
+  });
+});
+
+/**
+ * ⭐⭐ fila 0.068 (a) — el aviso también se asoma en el CAJÓN de la OP, que es desde donde se abre.
+ * Es el mismo componente que pinta el Centro: una sola copia del texto para las tres superficies.
+ */
+describe('<ResumenRecetaOrden> — esta OP no va igual que sus hermanas', () => {
+  it('asoma el aviso con su detalle en el title', () => {
+    render(
+      receta({
+        frenteAlGrupo: {
+          hermanas: 2,
+          foliosHermanas: [5001, 5002],
+          fueraDeLaComparacion: 0,
+          notaFueraDeLaComparacion: null,
+          diferencias: [
+            {
+              tipo: 'avio',
+              material: 'CIE-02 — Cierre café',
+              que: 'solo-esta',
+              detalle: '«CIE-02 — Cierre café»: esta OP lleva 1 · OP 5001, 5002 no lo llevan.',
+            },
+          ],
+          aviso: 'Esta OP no va igual que sus 2 hermanas: «CIE-02 — Cierre café».',
+        },
+      }),
+    );
+    const chip = screen.getByTestId('chip-hermanas');
+    expect(chip).toHaveTextContent('Esta OP no va igual que sus 2 hermanas');
+    expect(chip.getAttribute('title')).toContain('OP 5001, 5002 no lo llevan');
+  });
+
+  it('🔴 CONTROL NEGATIVO: si va igual que sus hermanas no pinta nada', () => {
+    render(receta());
+    expect(screen.queryByTestId('chip-hermanas')).toBeNull();
+  });
+
+  it('🔴 el chip lleva en su `title` las hermanas APARTADAS, no sólo las diferencias', () => {
+    // Sin esto, quien lee el chip en una lista creería que se comparó contra la familia entera.
+    render(
+      receta({
+        frenteAlGrupo: {
+          hermanas: 1,
+          foliosHermanas: [5001],
+          fueraDeLaComparacion: 2,
+          diferencias: [
+            {
+              tipo: 'tela',
+              material: 'Jersey',
+              que: 'cantidad',
+              detalle: '«Jersey»: esta OP lleva 2 · OP 5001 lleva 1.5.',
+            },
+          ],
+          aviso: 'Esta OP no va igual que su hermana: «Jersey».',
+          notaFueraDeLaComparacion:
+            '2 OP del modelo quedaron fuera de la comparación (son histórico migrado, o no tienen receta capturada).',
+        },
+      }),
+    );
+    const chip = screen.getByTestId('chip-hermanas');
+    expect(chip.getAttribute('title')).toContain('«Jersey»: esta OP lleva 2');
+    expect(chip.getAttribute('title')).toContain('2 OP del modelo quedaron fuera');
+  });
+
+  it('🔴 una respuesta VIEJA (sin el campo) no tumba el resumen — la GEMELA del banner', () => {
+    // Mismo caso que en `PanelRecetaOrden.test.tsx`: el caché de TanStack Query puede servir una
+    // receta guardada ANTES de esta etapa. Las dos superficies guardan igual, y las dos lo prueban:
+    // que sólo una lo hiciera es exactamente cómo se cuela un defecto en la mitad de la pantalla.
+    const { frenteAlGrupo: _omitido, ...vieja } = receta();
+    render(vieja as RecetaOrden);
+    expect(screen.queryByTestId('chip-hermanas')).toBeNull();
+    // Y el resumen SIGUE EN PIE.
+    expect(screen.getByTestId('receta-resumen')).toBeInTheDocument();
   });
 });

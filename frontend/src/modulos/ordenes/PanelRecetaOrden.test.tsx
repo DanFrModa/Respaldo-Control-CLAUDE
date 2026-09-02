@@ -236,6 +236,14 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
     artes: [],
     avisoCurva: null,
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
+    frenteAlGrupo: {
+      hermanas: 0,
+      foliosHermanas: [],
+      fueraDeLaComparacion: 0,
+      diferencias: [],
+      aviso: null,
+      notaFueraDeLaComparacion: null,
+    },
     ...over,
   };
 }
@@ -2104,5 +2112,147 @@ describe('PanelRecetaOrden · el cableado de las fotos del arte (§Post-F9.177)'
     expect(screen.queryAllByTestId('foto-arte-orden')).toHaveLength(0);
     // Sin renglón resuelto tampoco se ofrece subir: no se sabría a qué arte colgarla.
     expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐⭐ fila 0.068 (a) — **EL AVISO DE LA OP QUE SE DESVÍA DEL GRUPO, EN LA ORDEN.**
+ *
+ * DANIEL: *«Puede pasar que una OP del grupo se le cambie algún avío… se debe de poder hacer, **pero
+ * advirtiendo de la diferencia**»*. Aquí se fija que el aviso APAREZCA con su detalle, que NO se
+ * confunda con la desalineación contra el modelo, y que **no bloquee nada**.
+ */
+describe('<PanelRecetaOrden> — esta OP no va igual que sus hermanas', () => {
+  /** El caso de Daniel: sólo la café lleva ese cierre. */
+  function desviada(): RecetaOrden {
+    return recetaDePrueba({
+      frenteAlGrupo: {
+        hermanas: 2,
+        foliosHermanas: [5001, 5002],
+        fueraDeLaComparacion: 0,
+        notaFueraDeLaComparacion: null,
+        diferencias: [
+          {
+            tipo: 'avio',
+            material: 'CIE-02 — Cierre café',
+            que: 'solo-esta',
+            detalle: '«CIE-02 — Cierre café»: esta OP lleva 1 · OP 5001, 5002 no lo llevan.',
+          },
+        ],
+        aviso: 'Esta OP no va igual que sus 2 hermanas: «CIE-02 — Cierre café».',
+      },
+    });
+  }
+
+  it('enseña el aviso con el DETALLE del servidor (qué lleva esta OP y qué las otras)', () => {
+    render(desviada());
+    const aviso = screen.getByTestId('receta-aviso-hermanas');
+    expect(aviso).toHaveTextContent('«CIE-02 — Cierre café»: esta OP lleva 1');
+    expect(aviso).toHaveTextContent('OP 5001, 5002 no lo llevan');
+    // Y dice con todas las letras que NO es un error (Daniel: la diferencia es legítima).
+    expect(aviso).toHaveTextContent(/no bloquea nada/i);
+  });
+
+  it('🔴 CONTROL NEGATIVO: sin diferencias con las hermanas NO se pinta nada', () => {
+    render(recetaDePrueba());
+    expect(screen.queryByTestId('receta-aviso-hermanas')).toBeNull();
+  });
+
+  it('🔴 es OTRO aviso que la desalineación contra el modelo: pueden salir los dos, o uno solo', () => {
+    // Sólo horizontal: la receta está alineada con el modelo y aun así difiere de sus hermanas.
+    render(desviada());
+    expect(screen.getByTestId('receta-aviso-hermanas')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-desalineacion')).toBeNull();
+  });
+
+  it('🔴 una respuesta VIEJA (sin el campo) no tumba la pantalla — sólo no pinta el aviso', () => {
+    /*
+     * Este caso NO es teórico: lo cazó la corrida completa de la suite. Entre el despliegue y el
+     * refresco, el caché de TanStack Query puede servir una receta guardada ANTES de esta etapa, sin
+     * `frenteAlGrupo`. La primera versión del componente lo desreferenciaba a pelo y se caía con
+     * `TypeError: Cannot read properties of undefined (reading 'aviso')`, tumbando la pantalla de la
+     * receta ENTERA. El `as` es a propósito: el contrato promete el campo y el tipo no deja
+     * expresar la respuesta vieja, que es justo la que llega en el navegador.
+     */
+    const { frenteAlGrupo: _omitido, ...vieja } = recetaDePrueba();
+    render(vieja as RecetaOrden);
+    expect(screen.queryByTestId('receta-aviso-hermanas')).toBeNull();
+    // Y la pantalla SIGUE EN PIE (si se cayera, esto no existiría).
+    expect(screen.getByTestId('receta-sin-liberar')).toBeInTheDocument();
+  });
+
+  it('🔴🔴 SIN diferencias pero CON hermanas apartadas, lo DICE igual (el caso silencioso)', () => {
+    /*
+     * El defecto que esto cierra: el componente devolvía `null` en cuanto `aviso` era null, así que
+     * la nota de las apartadas era **inalcanzable justo cuando hacía falta**. Y con el histórico
+     * real —el ETL SÍ escribe recetas congeladas, y ésas no votan— éste es el caso COMÚN: sin la
+     * nota, «va igual que sus hermanas» se leería como el visto bueno de una familia que ni entró.
+     */
+    render(
+      recetaDePrueba({
+        frenteAlGrupo: {
+          hermanas: 1,
+          foliosHermanas: [5001],
+          fueraDeLaComparacion: 3,
+          diferencias: [],
+          aviso: null,
+          notaFueraDeLaComparacion:
+            '3 OP del modelo quedaron fuera de la comparación (son histórico migrado, o no tienen receta capturada).',
+        },
+      }),
+    );
+    expect(screen.queryByTestId('receta-aviso-hermanas')).toBeNull();
+    expect(screen.getByTestId('receta-hermanas-fuera')).toHaveTextContent(
+      '3 OP del modelo quedaron fuera de la comparación',
+    );
+  });
+
+  it('🔴 CONTROL NEGATIVO: sin diferencias y sin apartadas no se pinta NADA', () => {
+    render(recetaDePrueba());
+    expect(screen.queryByTestId('receta-aviso-hermanas')).toBeNull();
+    expect(screen.queryByTestId('receta-hermanas-fuera')).toBeNull();
+  });
+
+  it('la nota la redacta el SERVIDOR: la pantalla no conjuga (aquí llega en singular)', () => {
+    render(
+      recetaDePrueba({
+        frenteAlGrupo: {
+          hermanas: 1,
+          foliosHermanas: [5001],
+          fueraDeLaComparacion: 1,
+          diferencias: [],
+          aviso: null,
+          notaFueraDeLaComparacion:
+            '1 OP del modelo quedó fuera de la comparación (es histórico migrado, o no tiene receta capturada).',
+        },
+      }),
+    );
+    expect(screen.getByTestId('receta-hermanas-fuera')).toHaveTextContent('1 OP del modelo quedó');
+  });
+
+  it('cuando quedan hermanas fuera por no tener receta capturada, lo DICE (no las esconde)', () => {
+    render(
+      recetaDePrueba({
+        frenteAlGrupo: {
+          hermanas: 1,
+          foliosHermanas: [5001],
+          fueraDeLaComparacion: 2,
+          notaFueraDeLaComparacion:
+            '2 OP del modelo quedaron fuera de la comparación (son histórico migrado, o no tienen receta capturada).',
+          diferencias: [
+            {
+              tipo: 'tela',
+              material: 'Jersey',
+              que: 'cantidad',
+              detalle: '«Jersey»: esta OP lleva 2 · OP 5001 lleva 1.5.',
+            },
+          ],
+          aviso: 'Esta OP no va igual que su hermana: «Jersey».',
+        },
+      }),
+    );
+    expect(screen.getByTestId('receta-aviso-hermanas')).toHaveTextContent(
+      '2 OP del modelo quedaron fuera de la comparación',
+    );
   });
 });

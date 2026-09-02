@@ -938,6 +938,18 @@ export {
   type TipoRenglonRecetaClave,
 } from './esquemas/receta-orden.js';
 
+// ── El AVISO de la OP que se desvía del grupo (fila 0.068 (a), §Post-F9.146 pregunta 4) ──
+// Comparación HORIZONTAL (una OP contra sus HERMANAS del mismo linaje). NO es `DesalineacionReceta`,
+// que es la VERTICAL (la orden contra la receta del modelo): ver el encabezado del archivo.
+export {
+  esquemaDiferenciaConHermanas,
+  esquemaFrenteAlGrupo,
+  esquemaTipoDiferenciaHermanas,
+  type DiferenciaConHermanas,
+  type FrenteAlGrupo,
+  type TipoDiferenciaHermanas,
+} from './esquemas/hermanas-op.js';
+
 // ── Producción / WIP + kardex (Módulo 4/6, F3-E1; doc 03-Produccion / 04-Inventarios) ──
 export {
   esquemaTipoProcesoCrear,

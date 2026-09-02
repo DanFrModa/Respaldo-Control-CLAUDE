@@ -82,8 +82,16 @@ const LEE_ANIDADO = new RegExp(
 const LEE_RECETA = (codigo: string): boolean =>
   LEE_DIRECTO.test(codigo) || LEE_ANIDADO.test(codigo);
 
-/** ¿El archivo IMPORTA el resolver de la receta compartida? */
-const CONOCE_EL_RESOLVER = /from '(?:\.{1,2}\/)+(?:modelos\/)?receta-compartida\.js'/;
+/**
+ * ¿El archivo IMPORTA el resolver de la receta compartida?
+ *
+ * ⚠️ El camino se acepta ENTERO a propósito (`[^']*`) y no con la forma «`../` + `modelos/`» que
+ * tenía antes: esa forma sólo describía a los vecinos de `src/dominio/` y dejaba fuera a cualquier
+ * lector que viviera más lejos —el sembrador de fixtures lo importa como
+ * `'../dominio/modelos/receta-compartida.js'`—, con lo que la regla lo habría marcado de olvidado
+ * teniendo el resolver a la vista. Lo que se quiere comprobar es que el módulo entra, no por dónde.
+ */
+const CONOCE_EL_RESOLVER = /from '[^']*\/receta-compartida\.js'/;
 
 /**
  * Los archivos a los que el resolver NO les aplica, cada uno con su razón. Añadir uno aquí es una
@@ -198,6 +206,44 @@ describe('El guardián de las lecturas de receta (V1-E9b)', () => {
       (f) => !(f in EXCEPCIONES) && !CONOCE_EL_RESOLVER.test(codigo.get(f) ?? ''),
     );
     expect(olvidados).toEqual([]);
+  });
+
+  it('🔴 y las AYUDAS DE PRUEBA que leen la receta también conocen el resolver', () => {
+    /*
+     * ⭐ EL HUECO POR EL QUE SE COLÓ EL DEFECTO DE `sembrarRecetaDeOrden`.
+     *
+     * `src/pruebas/` está —con razón— fuera del barrido de arriba: no es código de negocio y no
+     * viaja a producción. Pero `src/pruebas/receta.ts` **imita al alta** (copia el BOM del modelo a
+     * la receta congelada de la orden) y leía el BOM con el `idModelo` PELADO: con un hijo por
+     * color de V1-E9a copiaba **cero renglones sin decir nada**, y sus órdenes salían del grupo de
+     * hermanas como si fueran histórico del Access. Un fixture roto no rompe producción — rompe la
+     * PRUEBA que vigila producción, y encima calla, que es peor.
+     *
+     * Los helpers no cargan con las reglas de negocio de arriba (`PUEDEN`, `PUEDEN_ESCRIBIR`, las
+     * excepciones): sólo con ésta, que es la que aquí importa — **si lees la receta, resuelve el
+     * linaje**.
+     */
+    const CARPETA = 'src/pruebas';
+    const ayudas = (function listar(carpeta: string, acumulado: string[] = []): string[] {
+      for (const entrada of readdirSync(path.join(RAIZ_BACKEND, carpeta))) {
+        const relativa = `${carpeta}/${entrada}`;
+        if (statSync(path.join(RAIZ_BACKEND, relativa)).isDirectory()) listar(relativa, acumulado);
+        else if (entrada.endsWith('.ts')) acumulado.push(relativa);
+      }
+      return acumulado;
+    })(CARPETA);
+
+    // La misma defensa contra el fallo silencioso que arriba: si la ruta se rompiera, la lista
+    // quedaría vacía y esta prueba pasaría sin mirar nada.
+    expect(ayudas).toContain('src/pruebas/receta.ts');
+
+    const fuenteDe = new Map(
+      ayudas.map((f) => [f, readFileSync(path.join(RAIZ_BACKEND, f), 'utf8')] as const),
+    );
+    const leen = ayudas.filter((f) => LEE_RECETA(fuenteDe.get(f) ?? ''));
+    // El sembrador de fixtures LEE la receta (si dejara de hacerlo, esta regla sobra).
+    expect(leen).toContain('src/pruebas/receta.ts');
+    expect(leen.filter((f) => !CONOCE_EL_RESOLVER.test(fuenteDe.get(f) ?? ''))).toEqual([]);
   });
 
   it('⭐⭐ `versiones.ts` YA NO es excepción: conoce el resolver de verdad', () => {

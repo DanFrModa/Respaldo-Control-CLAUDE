@@ -105,6 +105,37 @@ function fila(id: number, folio: number): OrdenCentro {
     estado: 'capturada',
     // Regla del estado automático (V1-E3d): a esta orden le falta LIBERAR su receta.
     faltantes: ['receta'],
+    // ⭐⭐ fila 0.068 (a): por omisión, la OP va igual que sus hermanas (o no tiene ninguna).
+    frenteAlGrupo: {
+      hermanas: 0,
+      foliosHermanas: [],
+      fueraDeLaComparacion: 0,
+      diferencias: [],
+      aviso: null,
+      notaFueraDeLaComparacion: null,
+    },
+  } as unknown as OrdenCentro;
+}
+
+/** Una OP que NO va igual que sus hermanas, con el aviso ya redactado por el servidor. */
+function filaDesviada(id: number, folio: number): OrdenCentro {
+  return {
+    ...fila(id, folio),
+    frenteAlGrupo: {
+      hermanas: 2,
+      foliosHermanas: [5001, 5002],
+      fueraDeLaComparacion: 0,
+      notaFueraDeLaComparacion: null,
+      diferencias: [
+        {
+          tipo: 'avio',
+          material: 'CIE-02 — Cierre café',
+          que: 'solo-esta',
+          detalle: '«CIE-02 — Cierre café»: esta OP lleva 1 · OP 5001, 5002 no lo llevan.',
+        },
+      ],
+      aviso: 'Esta OP no va igual que sus 2 hermanas: «CIE-02 — Cierre café».',
+    },
   } as unknown as OrdenCentro;
 }
 
@@ -535,5 +566,111 @@ describe('<CentroOrdenesPagina>', () => {
       expect(screen.queryByTestId('mosaico-rc')).toBeNull();
       expect(screen.queryByTestId('mosaico-modelo')).toBeNull();
     });
+  });
+});
+
+/**
+ * ⭐⭐ fila 0.068 (a) — **EL AVISO DE LA OP QUE SE DESVÍA DEL GRUPO, EN LA FAMILIA.**
+ *
+ * El Centro es la única pantalla que enseña juntas todas las OP de un modelo, así que es donde se
+ * reconoce a la que se salió del grupo. La pantalla **no compara nada**: pinta lo que el servidor
+ * ya redactó.
+ */
+describe('<CentroOrdenesPagina> — la OP que no va igual que sus hermanas', () => {
+  beforeEach(() => {
+    useOrdenesCentro.mockReset();
+    useFotosModelo.mockReset();
+    useFotosModelo.mockReturnValue({ data: [] });
+    useOrden.mockReset();
+    useOrden.mockImplementation(() => detalleResuelto(ordenDetalle()));
+  });
+
+  /**
+   * 🔴🔴 **LAS DOS SUPERFICIES SE COMPRUEBAN POR SEPARADO, y no es paranoia.** El Centro pinta cada
+   * orden DOS veces —una fila de tabla (escritorio) y una tarjeta (móvil)—, y las dos llevan el
+   * chip. Medido con mutación: un `getAllByTestId` genérico **sobrevive a que se borre cualquiera
+   * de las dos**, porque la otra basta para satisfacerlo. Media pantalla se quedaría sin el aviso y
+   * la prueba seguiría verde. Por eso se busca DENTRO de cada contenedor.
+   */
+  function chipDeLaTabla(): HTMLElement | null {
+    const fila = screen.getAllByRole('row').find((r) => r.textContent?.includes('102') === true);
+    return fila === undefined ? null : within(fila).queryByTestId('chip-hermanas');
+  }
+  function chipDeLaTarjeta(): HTMLElement | null {
+    const tarjeta = screen
+      .getAllByTestId('centro-tarjeta')
+      .find((t) => t.textContent?.includes('102') === true);
+    return tarjeta === undefined ? null : within(tarjeta).queryByTestId('chip-hermanas');
+  }
+
+  it('pinta el aviso del servidor TAL CUAL, en la TABLA y en la TARJETA móvil', () => {
+    useOrdenesCentro.mockReturnValue(conFilas([filaDesviada(2, 102)]));
+    renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+
+    const texto = 'Esta OP no va igual que sus 2 hermanas: «CIE-02 — Cierre café».';
+    const enTabla = chipDeLaTabla();
+    const enTarjeta = chipDeLaTarjeta();
+    expect(enTabla).not.toBeNull();
+    expect(enTarjeta).not.toBeNull();
+    expect(enTabla).toHaveTextContent(texto);
+    expect(enTarjeta).toHaveTextContent(texto);
+    // El detalle (qué lleva cada una) viaja en el title, para no ir a comparar a mano.
+    expect(enTabla?.getAttribute('title')).toContain('OP 5001, 5002 no lo llevan');
+    expect(enTarjeta?.getAttribute('title')).toContain('OP 5001, 5002 no lo llevan');
+  });
+
+  it('🔴 CONTROL NEGATIVO: una OP que va igual NO pinta chip en ninguna de las dos', () => {
+    useOrdenesCentro.mockReturnValue(conFilas([fila(2, 102)]));
+    renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+
+    expect(chipDeLaTabla()).toBeNull();
+    expect(chipDeLaTarjeta()).toBeNull();
+    expect(screen.queryByTestId('chip-hermanas')).not.toBeInTheDocument();
+  });
+
+  it('⚠️ EL LÍMITE: si la familia quedó fuera, la fila del Centro sale LIMPIA (sólo lo dice la receta)', () => {
+    /*
+     * 🔴 Fija un límite conocido, no una victoria. Cuando toda la familia es histórico de un
+     * backfill, no hay grupo y no hay aviso ⇒ el chip no aparece y **el Centro no dice nada**: la
+     * nota de «quedaron fuera» sólo la enseña el banner de la receta de la OP. Está declarado en el
+     * encabezado de `hermanas-de-la-op.ts` y en el contrato.
+     *
+     * Se deja así a propósito: poner un chip en cada fila con historia migrada llenaría la pantalla
+     * principal de ruido el día del arranque, que es cuando TODAS lo son.
+     */
+    useOrdenesCentro.mockReturnValue(
+      conFilas([
+        {
+          ...fila(2, 102),
+          frenteAlGrupo: {
+            hermanas: 0,
+            foliosHermanas: [],
+            fueraDeLaComparacion: 3,
+            diferencias: [],
+            aviso: null,
+            notaFueraDeLaComparacion:
+              '3 OP del modelo quedaron fuera de la comparación (son histórico migrado, o no tienen receta capturada).',
+          },
+        },
+      ]),
+    );
+    renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+    expect(screen.queryByTestId('chip-hermanas')).not.toBeInTheDocument();
+  });
+
+  it('🔴 el chip va en la fila de SU orden, no en la de la vecina', () => {
+    // El fallo que caza: pintar el aviso a partir del índice del lote en vez de la fila.
+    useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101), filaDesviada(2, 102)]));
+    renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+
+    // La 102 lo lleva en sus dos superficies...
+    expect(chipDeLaTabla()).not.toBeNull();
+    expect(chipDeLaTarjeta()).not.toBeNull();
+    // ...y la 101, en ninguna.
+    for (const chip of screen.getAllByTestId('chip-hermanas')) {
+      const contenedor = chip.closest('tr') ?? chip.closest('[data-testid="centro-tarjeta"]');
+      expect(contenedor?.textContent).toContain('102');
+      expect(contenedor?.textContent).not.toContain('101');
+    }
   });
 });
