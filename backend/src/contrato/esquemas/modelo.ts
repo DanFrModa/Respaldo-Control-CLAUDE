@@ -250,6 +250,55 @@ export const esquemaEstadoRevisionModelo = z
 export type EstadoRevisionModeloClave = z.infer<typeof esquemaEstadoRevisionModelo>;
 
 /**
+ * ⭐⭐ V1-E9p (§Post-F9.144(b)) — **EN QUÉ TERMINÓ LA PROMESA de la mesa.** Daniel: *«todo eso se
+ * intentará hacer así, pero **no es seguro que se consiga**»*. Un estimado de negociación no es un
+ * dato pendiente de captura: es una **promesa pendiente de cumplimiento**, con DOS finales.
+ *
+ * ⚠️ **Es un EJE APARTE de {@link esquemaEstadoRevisionModelo}**, no un cuarto valor suyo: aquél
+ * contesta *«¿alguien miró la receta?»* (trámite), éste *«¿se logró el costo que se vendió?»*
+ * (dinero). Una versión puede estar `aprobada` **y** `no_lograda`. `null` = nadie lo declaró.
+ */
+export const esquemaResultadoMetaNegociada = z
+  .enum(['lograda', 'no_lograda'])
+  .describe('Desenlace de la promesa de la mesa: se consiguió lo prometido, o no se consiguió.');
+
+/** Clave del desenlace de la promesa. */
+export type ResultadoMetaNegociadaClave = z.infer<typeof esquemaResultadoMetaNegociada>;
+
+/**
+ * ⭐ Las CUATRO columnas del desenlace tal como SALEN, en un solo sitio para que la ficha del modelo
+ * y la salida de la firma no puedan describir el mismo hecho con dos formas distintas.
+ *
+ * ⚠️ **`metaResultado` en `null` NO es «se cumplió»: es «nadie lo declaró»** — el estado del 100 %
+ * de lo firmado antes de esta etapa y de quien firma sin contestar la pregunta (REGLA 0-B). Quien
+ * pinte esto tiene que distinguir las tres cosas; enseñar el `null` como «sí» convertiría otra vez
+ * un incumplimiento en un silencio, que es justo lo que la etapa vino a matar.
+ */
+const CAMPOS_DESENLACE_META = {
+  metaResultado: esquemaResultadoMetaNegociada
+    .nullable()
+    .describe(
+      'Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido).',
+    ),
+  metaCostoPrometido: z
+    .number()
+    .nullable()
+    .describe(
+      'La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada.',
+    ),
+  metaCostoConseguido: z
+    .number()
+    .nullable()
+    .describe('Lo que SÍ se consiguió (costo por prenda), o null.'),
+  metaNota: z
+    .string()
+    .nullable()
+    .describe(
+      'Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió.',
+    ),
+} as const;
+
+/**
  * ORIGEN del modelo (§Post-F9.34, V1-E3n): en qué catálogo vive y de qué serie salió su número.
  * Ver `Modelo.origen` en el esquema Prisma.
  */
@@ -673,6 +722,10 @@ export const esquemaModeloSalida = z
       .describe(
         'Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada.',
       ),
+    // ⭐⭐ V1-E9p (§Post-F9.144(b)) — EL DESENLACE DE LA PROMESA, el otro eje. Va pegado a la
+    // revisión porque se escribe con ella (y se BORRA con el rechazo y con la invalidación: un
+    // desenlace medido sobre una receta que ya cambió sería una tupla mentirosa).
+    ...CAMPOS_DESENLACE_META,
     descripcion: z.string().nullable().describe('Descripción, o null.'),
     composicion: z
       .string()
@@ -928,6 +981,49 @@ export type DatosModeloVersion = z.infer<typeof esquemaModeloVersionCuerpo>;
 
 // ── ⭐ V1-E7d (§Post-F9.110): la REVISIÓN antes de mandar a producir ─────────────
 
+/**
+ * ⭐⭐ V1-E9p (§Post-F9.144(b)) — **EL DESENLACE DE LA PROMESA**, que se declara al firmar.
+ *
+ * La pregunta que la bandeja tenía que empezar a hacer: **«¿se logró lo prometido — sí o no?»**, en
+ * vez de *«¿ya capturaste?»*. Si se responde `lograda: false`, hacen falta las dos cosas que
+ * convierten el «no» en información: **cuánto se consiguió** (sin número no hay brecha) y **por
+ * qué** (sin explicación, un costo peor no le dice nada a quien ya vendió con el anterior). El
+ * dominio las vuelve a exigir (A1).
+ *
+ * ⚠️ **TODO el bloque es OPCIONAL**: firmar sin contestar la pregunta funciona exactamente como
+ * antes de esta etapa. *Avisar no es bloquear* (§Post-F9.64).
+ *
+ * ⚠️ **La META no se manda**: el costo con el que se cerró la mesa ya está guardado
+ * (`NegociacionEvento.costoEstimado`) y lo resuelve el servidor. Aceptarlo del cliente permitiría
+ * declarar una brecha contra un número inventado.
+ */
+export const esquemaDesenlaceMetaNegociada = z
+  .object({
+    lograda: z
+      .boolean()
+      .describe('true = se consiguió lo prometido (o mejor); false = NO se consiguió.'),
+    costoConseguido: z
+      .number({ error: 'El costo conseguido debe ser un número' })
+      .min(0, { error: 'El costo conseguido no puede ser negativo' })
+      .max(9_999_999_999, { error: 'El costo conseguido es demasiado grande' })
+      .optional()
+      .describe(
+        'Costo por prenda que SÍ se consiguió. OBLIGATORIO cuando no se logró: sin él no hay brecha que enseñar.',
+      ),
+    nota: z
+      .string()
+      .trim()
+      .max(500, { error: 'La nota no puede tener más de 500 caracteres' })
+      .optional()
+      .describe(
+        'Por qué no se consiguió (OBLIGATORIO cuando no se logró) u observación de lo que sí se logró.',
+      ),
+  })
+  .describe('Desenlace de la promesa de la mesa, declarado al firmar la revisión.');
+
+/** Desenlace declarado de la promesa. */
+export type DatosDesenlaceMetaNegociada = z.infer<typeof esquemaDesenlaceMetaNegociada>;
+
 /** Cuerpo de «aprobar revisión»: la nota es opcional (la firma es lo que importa). */
 export const esquemaRevisionAprobarCuerpo = z
   .object({
@@ -937,6 +1033,14 @@ export const esquemaRevisionAprobarCuerpo = z
       .max(500, { error: 'La nota no puede tener más de 500 caracteres' })
       .optional()
       .describe('Nota opcional del aprobador; queda como observación del acto.'),
+    // ⭐⭐ V1-E9p — el SEGUNDO FINAL. Ver `esquemaDesenlaceMetaNegociada`. Omitirlo deja la firma
+    // exactamente como era antes de esta etapa (y BORRA cualquier desenlace anterior: el acto nuevo
+    // sustituye al anterior COMPLETO, la misma regla de las cuatro columnas de la revisión).
+    meta: esquemaDesenlaceMetaNegociada
+      .optional()
+      .describe(
+        'Desenlace de la promesa de la mesa. Omitir = no se declara (conducta de siempre).',
+      ),
   })
   .describe('Cuerpo de la acción «aprobar la revisión» de una versión de modelo.');
 
@@ -976,6 +1080,7 @@ export const esquemaRevisionModeloSalida = z
       .describe(
         'Motivo del rechazo, nota de la aprobación, o el porqué de la invalidación automática.',
       ),
+    ...CAMPOS_DESENLACE_META,
   })
   .describe('Estado de la revisión de la receta de una versión de modelo.');
 
@@ -1276,6 +1381,12 @@ export const esquemaRecetaPorRevisar = z
       .describe(
         '⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión, así que hay piezas comprometidas esperando detrás de esta receta sin revisar — por eso esta fila va primero en la cola. No es lo mismo que una versión recién negociada a la que nadie le pide nada. ⚠️ Decía «su OP no puede nacer hasta que la receta se revise»: fue verdad hasta V1-E9c (§Post-F9.169), que disolvió la compuerta. La OP nace igual, y esta revisión no condiciona ni producir ni comprar: lo que gobierna la compra es OTRA firma, la liberación POR RENGLÓN de la receta de la ORDEN.',
       ),
+    costoPrometido: z
+      .number()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E9p (§Post-F9.144(b)) — LO QUE SE PROMETIÓ EN LA MESA: la suma de los costos estimados con los que se cerró la negociación (`NegociacionEvento.costoEstimado`). Es la META que quien cuadre esta receta tiene que salir a conseguir, y sin verla no puede contestar «¿se logró?» al firmar. ⚠️ Es DINERO y va tras la reja de `consultas.ver-importes`: al que no lo tiene le llega en null (ocultación en el SERVIDOR, igual que el `costoEstimado` del historial de negociación) — ve la fila, no el importe. Null también cuando esta versión no viene de una negociación registrada; entonces se comporta como siempre.',
+      ),
   })
   .describe('Una versión que espera revisión de receta (§Post-F9.140).');
 
@@ -1335,3 +1446,131 @@ export const esquemaRecetasPorRevisarPagina = z
 
 /** Página de la bandeja «Recetas por revisar». */
 export type RecetasPorRevisarPagina = z.infer<typeof esquemaRecetasPorRevisarPagina>;
+
+// ══ ⭐⭐ V1-E9p — «PROMESAS INCUMPLIDAS» (§Post-F9.144(b), DANIEL) ═══════════════════════════════
+//
+// La lista del DUEÑO. La decisión lo dice con esas palabras: la brecha *«le importa AL DUEÑO, que ya
+// le dio ese precio al cliente»*, no a quien despacha la cola. La bandeja «Recetas por revisar»
+// contesta *«¿ya lo cuadraste?»* y por diseño se VACÍA al firmar; esto contesta lo otro —*«¿se
+// logró?»*— y por diseño **se queda**, porque un margen que se perdió no deja de haberse perdido
+// porque alguien firme.
+
+/** Una promesa de mesa que NO se cumplió, con su brecha y lo que cuesta. */
+export const esquemaPromesaIncumplida = z
+  .object({
+    idModelo: z.number().int().describe('Id de la VERSIÓN cuya promesa no se cumplió.'),
+    codigo: z.string().describe('Código de la versión (ej. `CYA-26-71-001-01`).'),
+    descripcion: z.string().nullable().describe('Descripción de la versión, o null.'),
+    codigoPadre: z.string().nullable().describe('Código del modelo del que nació, o null.'),
+    versionDesarrollo: z.number().int().nullable().describe('Nº del sufijo de versión, o null.'),
+    cliente: z.string().nullable().describe('Cliente al que se le vendió con ese costo, o null.'),
+    proyecto: z.string().nullable().describe('Proyecto de la negociación, o null.'),
+    costoPrometido: z
+      .number()
+      .nullable()
+      .describe(
+        'La META congelada al firmar: el costo con el que se cerró la mesa. Null si no se encontró.',
+      ),
+    costoConseguido: z.number().nullable().describe('Lo que SÍ se consiguió (costo por prenda).'),
+    brecha: z
+      .number()
+      .nullable()
+      .describe(
+        '⭐ `conseguido − prometido`. POSITIVO = se consiguió PEOR de lo prometido (la prenda cuesta más que el costo con el que se vendió). Null cuando falta alguno de los dos números: sin los dos no hay brecha, y un 0 diría «se cumplió exacto» justo cuando no se sabe.',
+      ),
+    piezasPedidas: z
+      .number()
+      .int()
+      .describe(
+        'Piezas de pedido vivas que dependen de esta versión (0 si ninguna). Agregado por el SERVIDOR.',
+      ),
+    impacto: z
+      .number()
+      .nullable()
+      .describe(
+        '⭐⭐ `brecha × piezasPedidas`: lo que la promesa incumplida cuesta EN DINERO. Es lo que traduce «$2 de más por prenda» a «$24,000 de margen que ya no está». Null si no hay brecha; 0 si hay brecha pero todavía nadie ha pedido la prenda.',
+      ),
+    nota: z.string().nullable().describe('Por qué no se consiguió, en palabras de quien lo buscó.'),
+    revisadoPor: z
+      .string()
+      .nullable()
+      .describe('Quién firmó la revisión donde se declaró, o null.'),
+    revisadoEn: z.string().nullable().describe('Fecha/hora ISO-8601 de esa firma, o null.'),
+  })
+  .describe('Una promesa de negociación que no se cumplió (§Post-F9.144(b)).');
+
+/** Fila de «Promesas incumplidas». */
+export type PromesaIncumplida = z.infer<typeof esquemaPromesaIncumplida>;
+
+/** Filtros de «Promesas incumplidas» (querystring): paginación + búsqueda. */
+export const esquemaPromesasIncumplidasQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página (tope 100).'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Código de la versión, código del padre o cliente (contiene).'),
+  })
+  .describe('Filtros de «Promesas incumplidas».');
+
+/**
+ * Filtros **en su forma NATIVA** (números ya resueltos) — lo que recibe el dominio. Mismo reparto
+ * que la bandeja «Recetas por revisar»: sin él, re-validar la salida de la ruta con el esquema de la
+ * URL tira un 400 espurio (cicatriz del hotfix F2, PR #56).
+ */
+export const esquemaPromesasIncumplidasDominio = z.object({
+  pagina: z.number().int().min(1).default(1),
+  porPagina: z.number().int().min(1).max(100).default(20),
+  busqueda: z.string().trim().max(200).optional(),
+});
+
+/** Filtros de «Promesas incumplidas» (forma nativa, no la de la URL). */
+export type FiltrosPromesasIncumplidas = z.input<typeof esquemaPromesasIncumplidasDominio>;
+
+/** Respuesta paginada de «Promesas incumplidas», con el total de la CARTERA (no el de la página). */
+export const esquemaPromesasIncumplidasPagina = z
+  .object({
+    datos: z.array(esquemaPromesaIncumplida),
+    total: z.number().int(),
+    impactoTotal: z
+      .number()
+      .describe(
+        '⭐ La suma del impacto de TODAS las promesas incumplidas que cumplen el filtro — no las de esta página. Se agrega en el SERVIDOR: sumarlo en el cliente daría un número distinto en cada página, y éste es justo el número que el dueño mira primero.',
+      ),
+    pagina: z.number().int(),
+    porPagina: z.number().int(),
+    totalPaginas: z.number().int(),
+  })
+  .describe('Página de «Promesas incumplidas».');
+
+/** Página de «Promesas incumplidas». */
+export type PromesasIncumplidasPagina = z.infer<typeof esquemaPromesasIncumplidasPagina>;
+
+/**
+ * ⭐ V1-E9p — LA META de una versión, para que quien va a firmar pueda contestar *«¿se logró lo
+ * prometido?»* **viendo contra qué**. Se resuelve EN VIVO (`GET /api/modelos/:id/meta-prometida`):
+ * la columna congelada del modelo sólo existe después de declarar un desenlace, o sea nunca en la
+ * primera firma, que es justo cuando se hace la pregunta.
+ */
+export const esquemaMetaPrometida = z
+  .object({
+    costoPrometido: z
+      .number()
+      .nullable()
+      .describe(
+        'Suma de los costos estimados con los que se cerró la mesa (`NegociacionEvento.costoEstimado`), o null si esta versión no viene de una negociación registrada.',
+      ),
+  })
+  .describe('La meta con la que se vendió una versión negociada.');
+
+/** La meta de una versión (respuesta de `GET /api/modelos/:id/meta-prometida`). */
+export type MetaPrometidaSalida = z.infer<typeof esquemaMetaPrometida>;

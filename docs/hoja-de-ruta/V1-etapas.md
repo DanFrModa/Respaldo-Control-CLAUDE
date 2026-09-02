@@ -1218,6 +1218,105 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9p · ⭐⭐ «¿SE LOGRÓ LO PROMETIDO?» — el segundo final que la bandeja no tenía (2-sep-2026, versión **0.084**) — ✅ HECHA
+
+Fila **0.075**. §Post-F9.144(b), el reencuadre de Daniel: *«un estimado no es un dato pendiente de captura,
+es una PROMESA pendiente de cumplimiento»* — *«todo eso se intentará hacer así, pero **no es seguro que se
+consiga**»*.
+
+🔴 **El estado prohibido, textual:** *«Desarrollo cuadra la receta con la maquila que sí consiguió, el
+renglón se va como resuelto, y **nadie se entera de que el margen que Daniel vendió ya no existe**»*.
+**Un cuadre que sólo puede terminar en «listo» convierte un incumplimiento en un silencio.**
+
+### Lo que abarató la etapa: la meta YA estaba guardada
+
+`NegociacionEvento.costoEstimado` (V1-E8w) es *«la SUMA de los costos estimados con los que se cerró la
+mesa»*, con desglose ⇒ **no hubo que capturar nada nuevo**. El trabajo era **comparar** y **enseñar la
+brecha**.
+
+### El segundo final: un EJE APARTE, no un cuarto estado
+
+Enum `ResultadoMetaNegociada { lograda, no_lograda }` + **4** columnas en `Modelo` ⇒ una versión puede salir
+**`aprobada` Y `no_lograda` a la vez**.
+
+**Por qué NO `rechazada`:** significa *«la receta está MAL, corrígela»* y devuelve el renglón a la cola. «No
+se consiguió» es lo contrario: la receta está **sana y firmada**; falló el **costo**. Reusarla habría (a)
+mandado a corregir una receta buena, (b) dejado el renglón dando vueltas y (c) **tapado el hecho económico
+con una etiqueta de trámite** — el silencio que la etapa vino a romper.
+
+**«NO FIRMA, LLEVA» intacto** (§Post-F9.140 p.4): el desenlace es **opcional**, la bandeja sigue de solo
+lectura, nada bloquea. Es §Post-F9.64: *avisar no es bloquear*.
+
+**Las ramas gemelas son CUATRO y están cubiertas:** aprobar **escribe**; **rechazar**, **invalidación
+automática** y una **firma muda** lo **BORRAN** (*«un desenlace medido sobre una receta que ya cambió es una
+tupla mentirosa»*), y las cuatro llevan el anterior íntegro a la bitácora (D3). **No hay quinta puerta**:
+`tocarModeloPorCambioDeReceta` es el embudo y ya lo amarran tres guardianes.
+
+### 🔴 Un defecto EN VIVO que la etapa destapó: «Cliente» salía SIEMPRE vacío
+
+El `LATERAL` anclaba en `d.id_modelo = m.id` (el expediente **propio** de la versión) y
+`crearVersionDeModelo`/`mintearVersionDeModelo` **no crean expediente** — su propio docstring lo admitía
+(*«puede no haberlo»*) **sin sacar la consecuencia**. Es el mismo eslabón que hacía falta para la meta, así
+que se arregló de paso.
+
+### 🔴 DOS RECHAZOS
+
+**D1 — la columna «Prometido» enseñaba dinero a quien el sistema decidió que no ve dinero.**
+`recetas-por-revisar.ts:152` verificaba **sólo `modelos.ver`**, que **no se resta en ningún escalón** de
+`seed.ts` ⇒ **Ventas, Logística, Asistente y Secretarial** veían el costo con el que se cerró la mesa.
+**No era un juicio de diseño: era el mismo dato con dos rejas distintas** — `negociacion.ts:142` publica esa
+columna idéntica tras `verImportes`, y el patrón se repite en otros cuatro módulos. ⭐ **Y la ironía mide la
+severidad:** el coder dedicó **siete renglones** a razonar quién tiene `modelos.ver` para el menú **mientras
+mandaba el importe por el endpoint de al lado**.
+⇒ Arreglo de 3 líneas, **con su PAREJA**: *«…pero la FILA se sigue viendo entera»*. El reviewer aplicó **el
+arreglo fácil y equivocado** (esconder la fila) y **caen las dos**. Se tapa el **precio**, no el **trabajo**.
+
+**D2 — el join subía UN nivel, y el linaje es una CADENA.** `versiones.ts:356` escribe el padre
+**inmediato**, y ninguna de las tres guardas impide versionar una versión ⇒ para un `-02` el expediente está
+en la **raíz** y el `LATERAL` no engancha.
+🔴 **Y la consecuencia era PEOR que el defecto original:** la fila **sí aparecía** en «Promesas
+incumplidas», con brecha `—`, impacto `—` y **0** al total. *Daniel vería «conseguí 45» contra un guion:
+sabría que algo se incumplió y no cuánto — **silencio parcial, en la pantalla que existe para romper el
+silencio**.* Y el disparador es **la segunda ronda de negociación**, lo normal.
+⇒ Ancla en **ANCESTROS** (`WITH RECURSIVE`), con su **pareja**: *el expediente propio del nieto GANA sobre
+el de la raíz* — sin ella, *«sube siempre a la raíz»* pasaría y **perdería la negociación más específica**.
+
+### ⚠️ El hallazgo técnico, y la lección de honestidad que dejó
+
+**PostgreSQL no admite referencias `LATERAL` dentro de un `WITH`** ⇒ el `WITH RECURSIVE` dentro del
+`LATERAL` **no compila**. El cierre transitivo va **no correlado** (`CTE_LINAJE_DE_VERSIONES`) y las **5**
+consultas lo referencian. **El acoplamiento falla RUIDOSO**: olvidar la CTE da *«relation "linaje" does not
+exist»* — verificado que **no existe ninguna relación real con ese nombre** entre las 209 tablas, así que no
+puede resolverse por accidente.
+
+⭐⭐ **Y aquí la lección:** el coder declaró una mutación superviviente (M18) argumentando que *«no es
+realista porque produce SQL inválido»*. **El reviewer construyó la variante VÁLIDA** —`WHERE l."nivel" < 100
+AND false`— que deja intacto el texto, las dos ramas y la auto-referencia: **suite unitario en VERDE con la
+recursión enteramente neutrada**.
+⇒ **Lo que salva a la CTE no es que las mutaciones den SQL inválido: es la suite de INTEGRACIÓN.**
+📌 La nota se reescribió **en tres capas** —la CTE, el guardián unitario (renombrado *«guardián de TEXTO»*)
+y el archivo de integración con un **«NO SE RETIRAN»** y el escenario de qué pasa si alguien las borra
+*«porque ya hay un guardián»*. **La nota anterior invitaba justo al recorte que la rompería.**
+
+### Verificación
+
+**21 mutaciones del coder + 13 del reviewer.** Trampa evitada a propósito: **`'no_lograda'` CONTIENE
+`'lograda'`** ⇒ todas las aserciones son `toBe`, nunca `toContain` (invertir el ternario mata 4). Los dobles
+**truenan** si la SQL no lleva el id del modelo, el de la empresa y el trozo del linaje.
+
+**Gates:** backend **2 657 / 203** · frontend **1 974 / 205** · typecheck ×2 · lint ×2 · format ×2 · **cero
+drift**. Migración **aditiva** (enum + 4 columnas nullable + 2 CHECK que ninguna fila existente puede violar
++ índice parcial), **sin backfill**, **`seed.ts` intacto** ⇒ no requiere `SEED_ON_START`.
+
+### ⏳ Residuos declarados
+
+El **menú** lleva `consultas.ver-importes` **a secas** porque `esModuloVisible` filtra con `.some()`
+(bastaría uno) — listar las dos se la enseñaría a Ventas con un 403 detrás; el conjunto resultante es
+exacto. · `dineroEsperando` **se movió** a `meta-negociada.ts` (dejarlo creaba un ciclo de imports). · Un
+warning nuevo de `react-refresh` (24 → 25), **gemelo exacto** del que ya tenía su pantalla hermana.
+
+---
+
 ## V1-E9o · ⭐⭐ LAS FOTOS DEL ARTE SON DE LA OP (1-sep-2026, versión **0.083**) — ✅ HECHA
 
 Fila **0.093**. Daniel (§Post-F9.177): *«aplica para fotos de la prenda **pero también del arte**»*. La

@@ -30,7 +30,11 @@ import {
   ErrorValidacion,
 } from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
+import { Prisma } from '../../datos/index.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+
+/** La SQL cruda que reciben los dobles de `$queryRaw` (alias para no repetir el namespace). */
+type PrismaSql = Prisma.Sql;
 
 import {
   aprobarRevisionModelo,
@@ -207,12 +211,49 @@ function filaFalsa(extra: Record<string, unknown> = {}): Record<string, unknown>
     revisadoEn: null,
     revisionNota: null,
     revisadoPor: null,
+    // ⭐⭐ V1-E9p — el DESENLACE de la promesa. En null = nadie lo declaró, que es el estado del
+    // 100 % de lo firmado antes de esa etapa.
+    metaResultado: null,
+    metaCostoPrometido: null,
+    metaCostoConseguido: null,
+    metaNota: null,
     ...extra,
   };
 }
 
+/**
+ * ⭐⭐ V1-E9p — LA META que la mesa dejó guardada, tal como la devolvería `resolverCostoPrometido`.
+ *
+ * El doble **no puede pasar por construcción**: exige que la SQL que recibe lleve de verdad el id
+ * del modelo, el de la empresa, el ancla en los ANCESTROS del linaje y la CTE que la alimenta (que
+ * es de donde sale la meta por el camino normal, porque el expediente vive en la raíz). Si alguien
+ * desconecta el cableado, esto truena en vez de devolver un número cómodo.
+ */
+function queryRawDeLaMeta(costoPrometido: number | null, idModelo: number) {
+  return (sql: PrismaSql): Promise<{ costoPrometido: Prisma.Decimal | null }[]> => {
+    if (!sql.values.includes(idModelo)) {
+      throw new Error('la consulta de la meta no lleva el id del modelo');
+    }
+    if (!sql.values.includes(SESION.idEmpresaActiva)) {
+      throw new Error('la consulta de la meta no lleva el id de la empresa (A9)');
+    }
+    if (!sql.text.includes('d."id_modelo" = ln."id_ancestro"')) {
+      throw new Error('la consulta de la meta no se ancla en los ancestros del linaje');
+    }
+    if (!sql.text.includes('WITH RECURSIVE "linaje"')) {
+      throw new Error('la consulta de la meta no lleva la CTE del linaje');
+    }
+    return Promise.resolve(
+      costoPrometido === null ? [] : [{ costoPrometido: new Prisma.Decimal(costoPrometido) }],
+    );
+  };
+}
+
 /** `tx` de mentiras que REGISTRA cada llamada y devuelve el fixture que le toca. */
-function txRegistrador(fila: Record<string, unknown> | null = filaFalsa()): {
+function txRegistrador(
+  fila: Record<string, unknown> | null = filaFalsa(),
+  costoPrometido: number | null = null,
+): {
   tx: Tx;
   llamadas: Llamada[];
 } {
@@ -221,6 +262,8 @@ function txRegistrador(fila: Record<string, unknown> | null = filaFalsa()): {
     llamadas.push({ metodo, args });
     return Promise.resolve(resultado);
   };
+  const idFila = (fila?.id ?? 42) as number;
+  const consultarMeta = queryRawDeLaMeta(costoPrometido, idFila);
   const tx = {
     modelo: {
       findUnique: (args: unknown) => reg('modelo.findUnique', args, fila),
@@ -229,6 +272,10 @@ function txRegistrador(fila: Record<string, unknown> | null = filaFalsa()): {
       deleteMany: (args: unknown) => reg('modelo.deleteMany', args, { count: 0 }),
     },
     bitacora: { create: (args: unknown) => reg('bitacora.create', args, {}) },
+    $queryRaw: (sql: PrismaSql) => {
+      llamadas.push({ metodo: '$queryRaw', args: sql });
+      return consultarMeta(sql);
+    },
   };
   return { tx: tx as unknown as Tx, llamadas };
 }
@@ -520,7 +567,10 @@ function proyectar(
  * con ella: leer por id con `select` y actualizar por id fusionando el `data`. Devuelve también
  * las filas vivas, para poder mirar cómo quedó cada una al final del ciclo.
  */
-function baseFalsa(filasIniciales: Record<string, unknown>[]): {
+function baseFalsa(
+  filasIniciales: Record<string, unknown>[],
+  costoPrometido: number | null = null,
+): {
   tx: Tx;
   llamadas: Llamada[];
   fila: (id: number) => Record<string, unknown>;
@@ -555,6 +605,12 @@ function baseFalsa(filasIniciales: Record<string, unknown>[]): {
         llamadas.push({ metodo: 'bitacora.create', args });
         return Promise.resolve({});
       },
+    },
+    // ⭐⭐ V1-E9p — la META de la mesa. Mismo doble anti-trampa que arriba: si la consulta no lleva
+    // el id del modelo, el de la empresa y el trozo del padre, truena en vez de devolver un número.
+    $queryRaw: (sql: PrismaSql) => {
+      llamadas.push({ metodo: '$queryRaw', args: sql });
+      return queryRawDeLaMeta(costoPrometido, ID_VERSION)(sql);
     },
   };
 
@@ -851,5 +907,278 @@ describe.each<[CambioDeReceta, string]>([
 
     // El testigo migrado no se movió en todo el ciclo.
     expect(fila(ID_MIGRADO).revisionEstado).toBeNull();
+  });
+});
+
+// ── 4. ⭐⭐ V1-E9p: EL SEGUNDO FINAL — «¿se logró lo prometido?» (§Post-F9.144(b)) ──────────────
+//
+// Daniel re-encuadró el problema: *«todo eso se intentará hacer así, pero **no es seguro que se
+// consiga**»*. Un estimado de mesa es una PROMESA, y su desenlace tiene DOS finales. Lo que estas
+// pruebas cementan es, sobre todo, **lo que NO cambia**: sin desenlace declarado, la firma se
+// comporta EXACTAMENTE como antes de esta etapa; y declarar «no se consiguió» **no rechaza ni
+// bloquea nada**.
+
+/** Las cuatro columnas del desenlace, tal como quedaron escritas en el `update`. */
+function desenlaceDelUpdate(llamadas: Llamada[]): Record<string, unknown> {
+  const data = datosDelUpdate(llamadas);
+  return {
+    metaResultado: data.metaResultado,
+    metaCostoPrometido: data.metaCostoPrometido,
+    metaCostoConseguido: data.metaCostoConseguido,
+    metaNota: data.metaNota,
+  };
+}
+
+/** Un `Decimal` escrito en la fila, leído como número (o null). */
+function decimalEscrito(valor: unknown): number | null {
+  return valor == null ? null : (valor as Prisma.Decimal).toNumber();
+}
+
+describe('aprobarRevisionModelo — el DESENLACE de la promesa', () => {
+  it('⭐⭐ «NO se consiguió» se guarda con la META CONGELADA de la mesa, y NO es un rechazo', async () => {
+    const { tx, llamadas } = txRegistrador(filaFalsa(), 43);
+    const salida = await aprobarRevisionModelo(
+      SESION,
+      42,
+      {
+        meta: {
+          lograda: false,
+          costoConseguido: 45,
+          nota: 'ninguna maquila bajó de $18 con la jareta nueva',
+        },
+      },
+      { tx },
+    );
+
+    const data = datosDelUpdate(llamadas);
+    // 🔴 LA aserción de la etapa: la revisión queda APROBADA (la receta está bien y sale de la
+    // cola) y a la vez consta que la promesa NO se cumplió. Si alguien "resolviera" esto marcando
+    // `rechazada`, la versión volvería a la cola a corregir una receta que no tiene nada malo.
+    expect(data.revisionEstado).toBe('aprobada');
+    // `toBe` y no `toContain`: 'no_lograda' CONTIENE 'lograda' — una aserción por subcadena pasaría
+    // con la lógica invertida.
+    expect(data.metaResultado).toBe('no_lograda');
+    expect(decimalEscrito(data.metaCostoPrometido)).toBe(43);
+    expect(decimalEscrito(data.metaCostoConseguido)).toBe(45);
+    expect(data.metaNota).toBe('ninguna maquila bajó de $18 con la jareta nueva');
+
+    expect(salida.revisionEstado).toBe('aprobada');
+    expect(salida.metaResultado).toBe('no_lograda');
+    expect(salida.metaCostoPrometido).toBe(43);
+    expect(salida.metaCostoConseguido).toBe(45);
+  });
+
+  it('⭐ «sí se consiguió» se guarda igual de explícito (el «sí» también es una respuesta)', async () => {
+    const { tx, llamadas } = txRegistrador(filaFalsa(), 43);
+    await aprobarRevisionModelo(SESION, 42, { meta: { lograda: true } }, { tx });
+
+    const data = datosDelUpdate(llamadas);
+    expect(data.metaResultado).toBe('lograda');
+    expect(decimalEscrito(data.metaCostoPrometido)).toBe(43);
+  });
+
+  /**
+   * 🔴 EL MODO DE FALLO REALISTA de esta etapa: *«añadí lo nuevo y dejé lo viejo debajo»*. Una firma
+   * sin desenlace tiene que comportarse **exactamente** como antes de V1-E9p — y ni siquiera ir a
+   * preguntar la meta, que sería trabajo y una consulta de más por cada firma normal.
+   */
+  it('⭐⭐ SIN desenlace declarado: la firma es la de siempre, y NO consulta la meta', async () => {
+    const { tx, llamadas } = txRegistrador(filaFalsa(), 43);
+    const salida = await aprobarRevisionModelo(
+      SESION,
+      42,
+      { nota: 'la revisé con Daniel' },
+      { tx },
+    );
+
+    const data = datosDelUpdate(llamadas);
+    expect(data.revisionEstado).toBe('aprobada');
+    expect(data.revisionNota).toBe('la revisé con Daniel');
+    expect(desenlaceDelUpdate(llamadas)).toEqual({
+      metaResultado: null,
+      metaCostoPrometido: null,
+      metaCostoConseguido: null,
+      metaNota: null,
+    });
+    expect(salida.metaResultado).toBeNull();
+    // Ni una consulta de la meta: contestar la pregunta es opcional, y no contestarla no cuesta.
+    expect(llamadas.filter((l) => l.metodo === '$queryRaw')).toEqual([]);
+  });
+
+  it('⭐ una firma MUDA BORRA el desenlace anterior: el acto nuevo sustituye al anterior COMPLETO', async () => {
+    // Sin esto, una segunda firma sin contestar dejaría viva la brecha de la primera — colgada de
+    // un acto que no la declaró. Es la misma regla de la tupla mentirosa que gobierna la revisión.
+    const { tx, llamadas } = txRegistrador(
+      filaFalsa({
+        revisionEstado: 'rechazada',
+        metaResultado: 'no_lograda',
+        metaCostoPrometido: new Prisma.Decimal(43),
+        metaCostoConseguido: new Prisma.Decimal(45),
+        metaNota: 'no se consiguió la maquila',
+      }),
+      43,
+    );
+    await aprobarRevisionModelo(SESION, 42, {}, { tx });
+
+    expect(desenlaceDelUpdate(llamadas)).toEqual({
+      metaResultado: null,
+      metaCostoPrometido: null,
+      metaCostoConseguido: null,
+      metaNota: null,
+    });
+    // Y lo que se borró queda en la bitácora (D3): la secuencia no se pierde.
+    expect(datosDeLaBitacora(llamadas)).toMatchObject({
+      metaResultadoAnterior: 'no_lograda',
+      metaCostoPrometidoAnterior: 43,
+      metaCostoConseguidoAnterior: 45,
+      metaNotaAnterior: 'no se consiguió la maquila',
+    });
+  });
+
+  it('⭐ SIN mesa registrada se declara igual, con la meta en null (REGLA 0-B)', async () => {
+    // La versión no vino de una negociación guardada. Bloquear el desenlace aquí devolvería el
+    // incumplimiento al silencio, que es justo lo que la etapa vino a matar.
+    const { tx, llamadas } = txRegistrador(filaFalsa(), null);
+    await aprobarRevisionModelo(
+      SESION,
+      42,
+      { meta: { lograda: false, costoConseguido: 45, nota: 'la tela no existe en ese gramaje' } },
+      { tx },
+    );
+
+    const data = datosDelUpdate(llamadas);
+    expect(data.metaResultado).toBe('no_lograda');
+    expect(data.metaCostoPrometido).toBeNull();
+    expect(decimalEscrito(data.metaCostoConseguido)).toBe(45);
+  });
+
+  it('un «no» incompleto se rechaza ANTES de escribir nada (nada a medias, A2)', async () => {
+    const { tx, llamadas } = txRegistrador(filaFalsa(), 43);
+    await expect(
+      aprobarRevisionModelo(SESION, 42, { meta: { lograda: false, nota: 'no se pudo' } }, { tx }),
+    ).rejects.toThrow(ErrorValidacion);
+    expect(llamadas.filter((l) => l.metodo === 'modelo.update')).toEqual([]);
+    expect(llamadas.filter((l) => l.metodo === 'bitacora.create')).toEqual([]);
+  });
+
+  it('deja el desenlace declarado en la bitácora, junto al acto', async () => {
+    const { tx, llamadas } = txRegistrador(filaFalsa(), 43);
+    await aprobarRevisionModelo(
+      SESION,
+      42,
+      { meta: { lograda: false, costoConseguido: 45, nota: 'no bajó la maquila' } },
+      { tx },
+    );
+    expect(datosDeLaBitacora(llamadas)).toMatchObject({
+      operacion: 'aprobar-revision',
+      metaResultado: 'no_lograda',
+      metaCostoPrometido: 43,
+      metaCostoConseguido: 45,
+    });
+  });
+});
+
+describe('rechazarRevisionModelo — la RAMA GEMELA: también borra el desenlace', () => {
+  /**
+   * 🔴 **La rama gemela es el defecto característico de este repo**, y aquí las ramas son TRES
+   * (aprobar / rechazar / invalidar). Rechazar dice *«corrige esta receta»*: dejar viva una brecha
+   * medida sobre la receta anterior le enseñaría al dueño un incumplimiento de algo que ya se va a
+   * cambiar — y sobre una versión que además vuelve a la cola.
+   */
+  it('⭐⭐ borra las CUATRO columnas del desenlace y se las lleva a la bitácora', async () => {
+    const { tx, llamadas } = txRegistrador(
+      filaFalsa({
+        revisionEstado: 'aprobada',
+        metaResultado: 'no_lograda',
+        metaCostoPrometido: new Prisma.Decimal(43),
+        metaCostoConseguido: new Prisma.Decimal(45),
+        metaNota: 'no bajó la maquila',
+      }),
+    );
+    const salida = await rechazarRevisionModelo(SESION, 42, { motivo: 'falta el forro' }, { tx });
+
+    const data = datosDelUpdate(llamadas);
+    expect(data.revisionEstado).toBe('rechazada');
+    expect(desenlaceDelUpdate(llamadas)).toEqual({
+      metaResultado: null,
+      metaCostoPrometido: null,
+      metaCostoConseguido: null,
+      metaNota: null,
+    });
+    // La salida tiene que decir lo MISMO que la fila: si se re-armara aparte, la pantalla podría
+    // enseñar un desenlace que ya no existe.
+    expect(salida.metaResultado).toBeNull();
+    expect(salida.metaCostoConseguido).toBeNull();
+
+    expect(datosDeLaBitacora(llamadas)).toMatchObject({
+      operacion: 'rechazar-revision',
+      metaResultadoAnterior: 'no_lograda',
+      metaCostoPrometidoAnterior: 43,
+      metaCostoConseguidoAnterior: 45,
+    });
+  });
+
+  it('y rechazar NO acepta declarar un desenlace: el «no se consiguió» va con la firma', async () => {
+    // Asimetría DELIBERADA, y su argumento tiene que ser cierto: el desenlace habla de una receta
+    // ya cuadrada. Un rechazo dice que todavía no lo está, así que no hay nada que declarar.
+    const { tx, llamadas } = txRegistrador();
+    await rechazarRevisionModelo(SESION, 42, { motivo: 'falta el forro' }, { tx });
+    expect(llamadas.filter((l) => l.metodo === '$queryRaw')).toEqual([]);
+  });
+});
+
+describe('invalidarRevisionSiAprobada — la TERCERA rama: el desenlace se cae con la firma', () => {
+  it('⭐⭐ CICLO COMPLETO: firmo con brecha → cambian la tela → se cae la firma Y la brecha', async () => {
+    const { tx, llamadas, fila } = baseFalsa([versionAprobada(), modeloMigrado()], 43);
+
+    // 1) La firma declara que NO se consiguió lo prometido (prometí 43, conseguí 45).
+    //    Se parte de `pendiente` porque aprobar dos veces es conflicto.
+    Object.assign(fila(ID_VERSION), { revisionEstado: 'pendiente' });
+    await aprobarRevisionModelo(
+      SESION,
+      ID_VERSION,
+      { meta: { lograda: false, costoConseguido: 45, nota: 'no bajó la maquila' } },
+      { tx },
+    );
+    expect(fila(ID_VERSION).metaResultado).toBe('no_lograda');
+
+    // 2) Alguien le mueve la TELA a la receta ya firmada.
+    await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_VERSION, 'telas');
+
+    // 3) La firma se cayó… y la brecha con ella: medía una receta que ya no existe, y la versión
+    //    vuelve a estar `pendiente` — o sea, NADIE la ha revisado.
+    const despues = fila(ID_VERSION);
+    expect(despues.revisionEstado).toBe('pendiente');
+    expect(despues.metaResultado).toBeNull();
+    expect(despues.metaCostoPrometido).toBeNull();
+    expect(despues.metaCostoConseguido).toBeNull();
+    expect(despues.metaNota).toBeNull();
+    // Y el predicado la devuelve a la bandeja, como siempre.
+    expect(revisionSinAprobar(comoLaVeElPredicado(despues))).toBe(true);
+
+    // El testigo no se movió: el doble respetó el `where` (si lo ignorara, esto lo delata).
+    expect(fila(ID_MIGRADO).revisionEstado).toBeNull();
+
+    // Lo que se borró quedó en la bitácora de la invalidación (D3).
+    expect(datosDeLaBitacora(llamadas)).toMatchObject({
+      operacion: 'invalidar-revision',
+      metaResultadoAnterior: 'no_lograda',
+      metaCostoPrometidoAnterior: 43,
+      metaCostoConseguidoAnterior: 45,
+    });
+  });
+
+  it('⭐ y NO toca el desenlace de una versión que no estaba aprobada (no hay firma que caer)', async () => {
+    // Sin esta pareja, «borra siempre» pasaría la prueba de arriba con una regla distinta: la
+    // invalidación sólo actúa sobre una firma viva, y no puede pisar nada más.
+    const { tx, fila } = baseFalsa([
+      versionAprobada({ revisionEstado: 'rechazada', revisionNota: 'falta el forro' }),
+      modeloMigrado(),
+    ]);
+    const tumbo = await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_VERSION, 'telas');
+
+    expect(tumbo).toBe(false);
+    expect(fila(ID_VERSION).revisionEstado).toBe('rechazada');
+    expect(fila(ID_VERSION).revisionNota).toBe('falta el forro');
   });
 });

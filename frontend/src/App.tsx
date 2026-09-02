@@ -71,6 +71,7 @@ import { TraspasoMaterialesPagina } from '@/modulos/inventarios/TraspasoMaterial
 import { TraspasosPtPagina } from '@/modulos/inventarios/TraspasosPtPagina';
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
+import { PromesasIncumplidasPagina } from '@/modulos/modelos/PromesasIncumplidasPagina';
 import { RecetasPorRevisarPagina } from '@/modulos/modelos/RecetasPorRevisarPagina';
 import { BandejaAutorizacionPagina } from '@/modulos/ordenes-compra/BandejaAutorizacionPagina';
 import { ComprasPorOrdenPagina } from '@/modulos/ordenes-compra/ComprasPorOrdenPagina';
@@ -187,6 +188,8 @@ const router = createBrowserRouter([
           // ⭐⭐ V1-E8r (§Post-F9.140) — la COLA de la revisión de receta. Sólo lectura: lleva a
           // `/modelos` (deep-link por `state`), que es donde se firma viendo.
           { path: 'modelos/recetas-por-revisar', element: <RecetasPorRevisarPagina /> },
+          // ⭐⭐ V1-E9p (§Post-F9.144(b)) — la lista del DUEÑO: lo que se vendió y no se consiguió.
+          { path: 'modelos/promesas-incumplidas', element: <PromesasIncumplidasPagina /> },
           // Pedidos por mes (rediseño R3, §4.1): la pantalla nueva con el constructor y "Generar
           // OP"; la edición fina F2 (renglones/reales/copiar) se conserva en /pedidos/administrar.
           { path: 'pedidos', element: <PedidosMesPagina /> },

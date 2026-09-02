@@ -261,6 +261,29 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             icono: 'lista-tareas',
             permisos: ['modelos.ver'],
           },
+          // ⭐⭐ V1-E9p (§Post-F9.144(b)) — LA OTRA MITAD de la pregunta. La bandeja de arriba
+          // contesta *"¿ya lo cuadraste?"* y se VACÍA al firmar; ésta contesta *"¿se logró lo que se
+          // prometió?"* y se QUEDA, porque un margen que se perdió no deja de haberse perdido
+          // porque alguien firme. Daniel: *"todo eso se intentará hacer así, pero no es seguro que
+          // se consiga"*. Le importa AL DUEÑO, que ya le dio ese precio al cliente.
+          //
+          // ⚠️ **El gate es `consultas.ver-importes` A SECAS, y NO la pareja con `modelos.ver`,
+          // aunque el endpoint exija las dos.** `esModuloVisible` filtra con `.some()` (basta UNO),
+          // así que listar las dos se la enseñaría a todo el que tiene `modelos.ver` —Ventas,
+          // Logística, Asistente…— y al entrar recibirían un 403: un ENLACE MUERTO, justo lo que el
+          // criterio de §Post-F9.68 evita. Con la restrictiva sola el conjunto es EXACTO:
+          // `consultas.ver-importes` lo tienen Administrador, AdministracionDireccion, Directivo y
+          // Gerencial (se corta en Ventas, `prisma/seed.ts`), y los cuatro tienen `modelos.ver`.
+          // Sin permisos nuevos.
+          {
+            clave: 'promesas-incumplidas',
+            titulo: 'Promesas incumplidas',
+            descripcion:
+              'Lo que se vendió con un costo estimado en la negociación y al final no se consiguió, con la brecha y el margen comprometido',
+            ruta: '/modelos/promesas-incumplidas',
+            icono: 'lista-tareas',
+            permisos: ['consultas.ver-importes'],
+          },
           // ⭐ V1-E3h (§Post-F9.72) — LA BANDEJA de Desarrollo. Daniel: *"está buenísima"*. Sin
           // ella, para saber qué le falta firmar habría que abrir orden por orden: nadie lo hace,
           // así que solo se libera lo que alguien viene a reclamar — y lo que no se reclama se
@@ -1476,6 +1499,7 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         hijos: [
           'modelos',
           'recetas-por-revisar',
+          'promesas-incumplidas',
           'recetas-por-liberar',
           'desarrollo',
           'listas-precios',

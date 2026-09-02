@@ -13654,6 +13654,14 @@ export interface paths {
                 revisadoEn: string | null;
                 /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
                 revisionNota: string | null;
+                /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+                metaResultado: ('lograda' | 'no_lograda') | null;
+                /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+                metaCostoPrometido: number | null;
+                /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+                metaCostoConseguido: number | null;
+                /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+                metaNota: string | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13885,6 +13893,14 @@ export interface paths {
               revisadoEn: string | null;
               /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
+              /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+              metaResultado: ('lograda' | 'no_lograda') | null;
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              metaCostoPrometido: number | null;
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              metaCostoConseguido: number | null;
+              /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+              metaNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14099,6 +14115,14 @@ export interface paths {
               revisadoEn: string | null;
               /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
+              /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+              metaResultado: ('lograda' | 'no_lograda') | null;
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              metaCostoPrometido: number | null;
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              metaCostoConseguido: number | null;
+              /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+              metaNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14447,6 +14471,14 @@ export interface paths {
               revisadoEn: string | null;
               /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
+              /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+              metaResultado: ('lograda' | 'no_lograda') | null;
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              metaCostoPrometido: number | null;
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              metaCostoConseguido: number | null;
+              /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+              metaNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14674,6 +14706,14 @@ export interface paths {
               revisadoEn: string | null;
               /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
+              /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+              metaResultado: ('lograda' | 'no_lograda') | null;
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              metaCostoPrometido: number | null;
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              metaCostoConseguido: number | null;
+              /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+              metaNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -15314,6 +15354,14 @@ export interface paths {
                 revisadoEn: string | null;
                 /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
                 revisionNota: string | null;
+                /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+                metaResultado: ('lograda' | 'no_lograda') | null;
+                /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+                metaCostoPrometido: number | null;
+                /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+                metaCostoConseguido: number | null;
+                /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+                metaNota: string | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -15548,6 +15596,14 @@ export interface paths {
               revisadoEn: string | null;
               /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
+              /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+              metaResultado: ('lograda' | 'no_lograda') | null;
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              metaCostoPrometido: number | null;
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              metaCostoConseguido: number | null;
+              /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+              metaNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -15731,6 +15787,15 @@ export interface paths {
           'application/json': {
             /** @description Nota opcional del aprobador; queda como observación del acto. */
             nota?: string;
+            /** @description Desenlace de la promesa de la mesa. Omitir = no se declara (conducta de siempre). */
+            meta?: {
+              /** @description true = se consiguió lo prometido (o mejor); false = NO se consiguió. */
+              lograda: boolean;
+              /** @description Costo por prenda que SÍ se consiguió. OBLIGATORIO cuando no se logró: sin él no hay brecha que enseñar. */
+              costoConseguido?: number;
+              /** @description Por qué no se consiguió (OBLIGATORIO cuando no se logró) u observación de lo que sí se logró. */
+              nota?: string;
+            };
           };
         };
       };
@@ -15756,6 +15821,14 @@ export interface paths {
               revisadoEn: string | null;
               /** @description Motivo del rechazo, nota de la aprobación, o el porqué de la invalidación automática. */
               revisionNota: string | null;
+              /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+              metaResultado: ('lograda' | 'no_lograda') | null;
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              metaCostoPrometido: number | null;
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              metaCostoConseguido: number | null;
+              /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+              metaNota: string | null;
             };
           };
         };
@@ -15901,6 +15974,14 @@ export interface paths {
               revisadoEn: string | null;
               /** @description Motivo del rechazo, nota de la aprobación, o el porqué de la invalidación automática. */
               revisionNota: string | null;
+              /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
+              metaResultado: ('lograda' | 'no_lograda') | null;
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              metaCostoPrometido: number | null;
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              metaCostoConseguido: number | null;
+              /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
+              metaNota: string | null;
             };
           };
         };
@@ -16058,8 +16139,300 @@ export interface paths {
                 piezasPedidas: number;
                 /** @description ⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión, así que hay piezas comprometidas esperando detrás de esta receta sin revisar — por eso esta fila va primero en la cola. No es lo mismo que una versión recién negociada a la que nadie le pide nada. ⚠️ Decía «su OP no puede nacer hasta que la receta se revise»: fue verdad hasta V1-E9c (§Post-F9.169), que disolvió la compuerta. La OP nace igual, y esta revisión no condiciona ni producir ni comprar: lo que gobierna la compra es OTRA firma, la liberación POR RENGLÓN de la receta de la ORDEN. */
                 conPedido: boolean;
+                /** @description ⭐⭐ V1-E9p (§Post-F9.144(b)) — LO QUE SE PROMETIÓ EN LA MESA: la suma de los costos estimados con los que se cerró la negociación (`NegociacionEvento.costoEstimado`). Es la META que quien cuadre esta receta tiene que salir a conseguir, y sin verla no puede contestar «¿se logró?» al firmar. ⚠️ Es DINERO y va tras la reja de `consultas.ver-importes`: al que no lo tiene le llega en null (ocultación en el SERVIDOR, igual que el `costoEstimado` del historial de negociación) — ve la fila, no el importe. Null también cuando esta versión no viene de una negociación registrada; entonces se comporta como siempre. */
+                costoPrometido: number | null;
               }[];
               total: number;
+              pagina: number;
+              porPagina: number;
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/meta-prometida': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * La META con la que se vendió esta versión (el costo con el que se cerró la mesa)
+     * @description Resuelve EN VIVO el `costoEstimado` del último cierre de mesa de la negociación de la que salió esta versión — la del expediente propio si lo tiene, si no la del modelo PADRE (la mesa pasó antes de que la versión existiera). Null si no viene de una negociación registrada.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description La meta con la que se vendió una versión negociada. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Suma de los costos estimados con los que se cerró la mesa (`NegociacionEvento.costoEstimado`), o null si esta versión no viene de una negociación registrada. */
+              costoPrometido: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/promesas-incumplidas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * «Promesas incumplidas»: lo que se negoció y NO se consiguió, con su brecha
+     * @description Las VERSIONES cuya revisión se firmó declarando que NO se consiguió el costo prometido en la mesa, con la brecha por prenda (conseguido − prometido) y el IMPACTO en dinero (brecha × piezas ya pedidas), ordenadas por lo que más cuesta. El `impactoTotal` es el de toda la cartera, no el de la página: lo agrega el servidor.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (tope 100). */
+          porPagina?: number;
+          /** @description Código de la versión, código del padre o cliente (contiene). */
+          busqueda?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de «Promesas incumplidas». */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                /** @description Id de la VERSIÓN cuya promesa no se cumplió. */
+                idModelo: number;
+                /** @description Código de la versión (ej. `CYA-26-71-001-01`). */
+                codigo: string;
+                /** @description Descripción de la versión, o null. */
+                descripcion: string | null;
+                /** @description Código del modelo del que nació, o null. */
+                codigoPadre: string | null;
+                /** @description Nº del sufijo de versión, o null. */
+                versionDesarrollo: number | null;
+                /** @description Cliente al que se le vendió con ese costo, o null. */
+                cliente: string | null;
+                /** @description Proyecto de la negociación, o null. */
+                proyecto: string | null;
+                /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null si no se encontró. */
+                costoPrometido: number | null;
+                /** @description Lo que SÍ se consiguió (costo por prenda). */
+                costoConseguido: number | null;
+                /** @description ⭐ `conseguido − prometido`. POSITIVO = se consiguió PEOR de lo prometido (la prenda cuesta más que el costo con el que se vendió). Null cuando falta alguno de los dos números: sin los dos no hay brecha, y un 0 diría «se cumplió exacto» justo cuando no se sabe. */
+                brecha: number | null;
+                /** @description Piezas de pedido vivas que dependen de esta versión (0 si ninguna). Agregado por el SERVIDOR. */
+                piezasPedidas: number;
+                /** @description ⭐⭐ `brecha × piezasPedidas`: lo que la promesa incumplida cuesta EN DINERO. Es lo que traduce «$2 de más por prenda» a «$24,000 de margen que ya no está». Null si no hay brecha; 0 si hay brecha pero todavía nadie ha pedido la prenda. */
+                impacto: number | null;
+                /** @description Por qué no se consiguió, en palabras de quien lo buscó. */
+                nota: string | null;
+                /** @description Quién firmó la revisión donde se declaró, o null. */
+                revisadoPor: string | null;
+                /** @description Fecha/hora ISO-8601 de esa firma, o null. */
+                revisadoEn: string | null;
+              }[];
+              total: number;
+              /** @description ⭐ La suma del impacto de TODAS las promesas incumplidas que cumplen el filtro — no las de esta página. Se agrega en el SERVIDOR: sumarlo en el cliente daría un número distinto en cada página, y éste es justo el número que el dueño mira primero. */
+              impactoTotal: number;
               pagina: number;
               porPagina: number;
               totalPaginas: number;

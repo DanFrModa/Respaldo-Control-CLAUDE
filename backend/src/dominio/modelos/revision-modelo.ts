@@ -56,6 +56,13 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 import { Prisma } from '../../datos/index.js';
 
+import {
+  columnasDelDesenlace,
+  DESENLACE_BORRADO,
+  resolverCostoPrometido,
+  type ColumnasDelDesenlace,
+  type DesenlaceDeLaMeta,
+} from './meta-negociada.js';
 import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 
 /** Los tres estados de la firma (espejo del enum `EstadoRevisionModelo` de Prisma). */
@@ -232,6 +239,11 @@ export interface RevisionModeloSalida {
   /** ISO-8601, o null. */
   revisadoEn: string | null;
   revisionNota: string | null;
+  // ⭐⭐ V1-E9p — el DESENLACE de la promesa, que viaja con el acto (ver `meta-negociada.ts`).
+  metaResultado: 'lograda' | 'no_lograda' | null;
+  metaCostoPrometido: number | null;
+  metaCostoConseguido: number | null;
+  metaNota: string | null;
 }
 
 /**
@@ -250,6 +262,13 @@ const SELECT_REVISION = {
   revisionEstado: true,
   revisadoEn: true,
   revisionNota: true,
+  // ⭐⭐ V1-E9p — el desenlace ANTERIOR. Se lee para poder llevárselo ÍNTEGRO a la bitácora antes
+  // de que el acto nuevo lo sustituya: la fila sólo guarda el último acto (D3), así que sin esto
+  // no habría forma de contestar después «¿con qué brecha se había firmado?».
+  metaResultado: true,
+  metaCostoPrometido: true,
+  metaCostoConseguido: true,
+  metaNota: true,
 } as const;
 
 /**
@@ -282,6 +301,10 @@ async function exigirVersionRevisable(
   revisionEstado: EstadoRevision | null;
   revisionNota: string | null;
   revisadoEn: Date | null;
+  metaResultado: 'lograda' | 'no_lograda' | null;
+  metaCostoPrometido: Prisma.Decimal | null;
+  metaCostoConseguido: Prisma.Decimal | null;
+  metaNota: string | null;
 }> {
   const modelo = await tx.modelo.findUnique({ where: { id: idModelo }, select: SELECT_REVISION });
   if (modelo === null) {
@@ -302,13 +325,20 @@ async function exigirVersionRevisable(
   return modelo;
 }
 
-/** Arma la salida de la firma con lo que quedó escrito. */
+/**
+ * Arma la salida de la firma con lo que quedó escrito.
+ *
+ * ⚠️ El desenlace se pasa **desde las mismas columnas que se escribieron**, no se re-arma: si la
+ * salida lo reconstruyera por su cuenta, la pantalla podría enseñar un desenlace que la fila no
+ * tiene (el caso típico: el rechazo, que lo BORRA).
+ */
 function aSalida(
   base: { id: number; codigo: string },
   estado: EstadoRevision,
   sesion: SesionUsuario,
   cuando: Date,
   nota: string | null,
+  desenlace: ColumnasDelDesenlace,
 ): RevisionModeloSalida {
   return {
     idModelo: base.id,
@@ -318,13 +348,54 @@ function aSalida(
     revisadoPor: sesion.nombre,
     revisadoEn: cuando.toISOString(),
     revisionNota: nota,
+    metaResultado: desenlace.metaResultado,
+    metaCostoPrometido:
+      desenlace.metaCostoPrometido === null ? null : desenlace.metaCostoPrometido.toNumber(),
+    metaCostoConseguido:
+      desenlace.metaCostoConseguido === null ? null : desenlace.metaCostoConseguido.toNumber(),
+    metaNota: desenlace.metaNota,
   };
+}
+
+/**
+ * El desenlace ANTERIOR, tal como viaja a la BITÁCORA. Va en las tres puertas —aprobar, rechazar e
+ * invalidar— porque las tres lo sustituyen, y la fila sólo guarda el último acto (D3).
+ */
+function desenlaceAnteriorParaBitacora(modelo: {
+  metaResultado: 'lograda' | 'no_lograda' | null;
+  metaCostoPrometido: Prisma.Decimal | null;
+  metaCostoConseguido: Prisma.Decimal | null;
+  metaNota: string | null;
+}): Record<string, string | number | null> {
+  return {
+    metaResultadoAnterior: modelo.metaResultado ?? null,
+    metaCostoPrometidoAnterior: aNumeroONull(modelo.metaCostoPrometido),
+    metaCostoConseguidoAnterior: aNumeroONull(modelo.metaCostoConseguido),
+    metaNotaAnterior: modelo.metaNota ?? null,
+  };
+}
+
+/**
+ * `Decimal` → número, tolerando el `undefined`.
+ *
+ * ⚠️ **El `== null` es deliberado y es la misma lección de {@link esVersionDeModelo}:** esto lee una
+ * fila que llega de un `select`, y una fila a la que le FALTE la clave trae `undefined`, no `null`.
+ * Con `=== null` reventaría con un `TypeError` a mitad de la bitácora —el renglón que existe
+ * precisamente para no perder lo que se sustituye—, y TypeScript no lo alcanza.
+ */
+function aNumeroONull(valor: Prisma.Decimal | null | undefined): number | null {
+  return valor == null ? null : valor.toNumber();
 }
 
 /** Lo que se puede acompañar a la aprobación. */
 export interface DatosAprobarRevision {
   /** Nota opcional del aprobador (queda como observación del acto). */
   nota?: string | undefined;
+  /**
+   * ⭐⭐ V1-E9p (§Post-F9.144(b)) — **EL DESENLACE DE LA PROMESA**: `¿se logró lo prometido?`.
+   * OPCIONAL: omitirlo firma exactamente como antes de esta etapa. Ver `meta-negociada.ts`.
+   */
+  meta?: DesenlaceDeLaMeta | undefined;
 }
 
 /**
@@ -357,6 +428,18 @@ export async function aprobarRevisionModelo(
       throw new ErrorConflicto(`La receta del modelo "${modelo.codigo}" ya está aprobada.`);
     }
 
+    // ⭐⭐ V1-E9p — EL SEGUNDO FINAL. Si se contestó la pregunta, la META se resuelve AQUÍ y se
+    // CONGELA con el acto (nunca se lee en vivo después: ver `metaCostoPrometido` en el esquema).
+    // Si no se contestó, se escribe el desenlace BORRADO — el acto nuevo sustituye al anterior
+    // COMPLETO, así que una firma muda no puede dejar viva la brecha de la firma anterior.
+    const desenlace: ColumnasDelDesenlace =
+      datos.meta === undefined
+        ? DESENLACE_BORRADO
+        : columnasDelDesenlace(
+            datos.meta,
+            await resolverCostoPrometido(tx, idModelo, sesion.idEmpresaActiva),
+          );
+
     const cuando = new Date();
     await tx.modelo.update({
       where: { id: idModelo },
@@ -366,6 +449,7 @@ export async function aprobarRevisionModelo(
         idRevisadoPor: sesion.id,
         revisadoEn: cuando,
         revisionNota: nota,
+        ...desenlace,
         ...datosModificacion(sesion),
       },
     });
@@ -388,10 +472,18 @@ export async function aprobarRevisionModelo(
         // única forma de distinguir después las dos cosas: la fila sólo guarda el último acto.
         origenAlFirmar: modelo.origen,
         nota,
+        // ⭐⭐ V1-E9p — el desenlace que se DECLARÓ y el que se sustituye.
+        metaResultado: desenlace.metaResultado,
+        metaCostoPrometido:
+          desenlace.metaCostoPrometido === null ? null : desenlace.metaCostoPrometido.toNumber(),
+        metaCostoConseguido:
+          desenlace.metaCostoConseguido === null ? null : desenlace.metaCostoConseguido.toNumber(),
+        metaNota: desenlace.metaNota,
+        ...desenlaceAnteriorParaBitacora(modelo),
       },
     });
 
-    return aSalida(modelo, 'aprobada', sesion, cuando, nota);
+    return aSalida(modelo, 'aprobada', sesion, cuando, nota, desenlace);
   }, bd);
 }
 
@@ -442,6 +534,11 @@ export async function rechazarRevisionModelo(
         idRevisadoPor: sesion.id,
         revisadoEn: cuando,
         revisionNota: motivo,
+        // ⭐⭐ V1-E9p — EL DESENLACE SE BORRA, y no es un detalle. Rechazar dice *«esta receta hay
+        // que corregirla»*; dejar viva la brecha declarada sobre la receta ANTERIOR le enseñaría al
+        // dueño un incumplimiento medido contra algo que ya se va a cambiar. Lo anterior no se
+        // pierde: viaja entero a la bitácora, aquí abajo (D3).
+        ...DESENLACE_BORRADO,
         ...datosModificacion(sesion),
       },
     });
@@ -459,10 +556,11 @@ export async function rechazarRevisionModelo(
         notaAnterior: modelo.revisionNota,
         origenAlFirmar: modelo.origen,
         motivo,
+        ...desenlaceAnteriorParaBitacora(modelo),
       },
     });
 
-    return aSalida(modelo, 'rechazada', sesion, cuando, motivo);
+    return aSalida(modelo, 'rechazada', sesion, cuando, motivo, DESENLACE_BORRADO);
   }, bd);
 }
 
@@ -566,6 +664,11 @@ export async function invalidarRevisionSiAprobada(
       idRevisadoPor: true,
       revisadoEn: true,
       revisionNota: true,
+      // ⭐⭐ V1-E9p — el desenlace que se va a caer con la firma, para llevárselo a la bitácora.
+      metaResultado: true,
+      metaCostoPrometido: true,
+      metaCostoConseguido: true,
+      metaNota: true,
     },
   });
 
@@ -592,6 +695,12 @@ export async function invalidarRevisionSiAprobada(
       idRevisadoPor: null,
       revisadoEn: null,
       revisionNota: nota,
+      // ⭐⭐ V1-E9p — Y EL DESENLACE SE CAE CON LA FIRMA, por la MISMA razón y no por una parecida:
+      // *«prometí $43, conseguí $45»* es una medición sobre la receta que se acaba de mover. Si se
+      // quedara, la lista del dueño enseñaría una brecha de una receta que ya no existe, colgada
+      // además de una versión que vuelve a estar `pendiente` — o sea, que **nadie** ha revisado.
+      // Es la misma regla de la tupla mentirosa que gobierna las cuatro columnas de arriba.
+      ...DESENLACE_BORRADO,
       ...datosModificacion(sesion),
     },
   });
@@ -611,6 +720,7 @@ export async function invalidarRevisionSiAprobada(
       aprobadaEn: modelo.revisadoEn === null ? null : modelo.revisadoEn.toISOString(),
       notaAnterior: modelo.revisionNota,
       nota,
+      ...desenlaceAnteriorParaBitacora(modelo),
     },
   });
 

@@ -67,6 +67,9 @@ vi.mock('@/api/modelos', () => ({
   // ⭐ V1-E7d — las dos firmas de la REVISIÓN (§Post-F9.110).
   useAprobarRevisionModelo: () => ({ mutate: aprobarRevisionMutate, isPending: false }),
   useRechazarRevisionModelo: () => ({ mutate: rechazarRevisionMutate, isPending: false }),
+  // ⭐ V1-E9p — la META en vivo que el diálogo de revisión pide para poder preguntar «¿se logró lo
+  // prometido?». Aquí no se ejercita (tiene su propio archivo de pruebas): basta con que exista.
+  useMetaPrometida: () => ({ data: undefined }),
   useGeneros: () => ({ data: [], isPending: false }),
   usePropuestaProduccion: () => ({ data: undefined, isPending: false, isError: false }),
   usePasarAProduccion: () => ({ mutate: vi.fn(), isPending: false }),
@@ -130,6 +133,11 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     revisadoPor: null,
     revisadoEn: null,
     revisionNota: null,
+    // ⭐⭐ V1-E9p — el DESENLACE de la promesa: null = nadie lo declaró (conducta de siempre).
+    metaResultado: null,
+    metaCostoPrometido: null,
+    metaCostoConseguido: null,
+    metaNota: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,
