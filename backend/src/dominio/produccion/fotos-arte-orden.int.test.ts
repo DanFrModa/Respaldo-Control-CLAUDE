@@ -530,7 +530,21 @@ describe('Fotos del arte de la OP — los Cascade', () => {
     expect(await cliente.ordenArteFotoOculta.count()).toBe(0);
   });
 
-  it('borrar la orden se lleva sus marcas y sus fotos propias; el arte del modelo sigue', async () => {
+  /**
+   * ⚠️ **ESTA PRUEBA ESTABA EJERCITANDO LA FUGA DE LA FILA 0.091 Y LEYÉNDOSE COMO LIMPIA.**
+   *
+   * Comprobaba que al borrar la orden desaparecen los `OrdenArteFoto` — y desaparecen, por CASCADE
+   * `Orden → OrdenArte → OrdenArteFoto` — pero **nunca miraba el `Archivo`**. Y el `Archivo`
+   * SOBREVIVE, con su objeto en R2 pagándose para siempre: la cascada se lleva el puente por el lado
+   * del PADRE, y el embudo de la 0.081(a) no lo atrapa porque cuelga de `archivo.delete`.
+   *
+   * Ahora la prueba lo AFIRMA. No es que esté bien: es que hoy **nadie borra una `Orden` en
+   * producción** (lo vigila `comun/archivos-huerfanos.test.ts`), así que la trampa está LATENTE y
+   * este `orden.delete` es de la propia prueba. 🔴 **El día que alguien construya «eliminar orden»,
+   * esta aserción tiene que darse la vuelta** —el `Archivo` deberá haber muerto y su key haberse
+   * soltado tras el commit— y ese día esta prueba roja será el aviso, no una sorpresa.
+   */
+  it('borrar la orden se lleva sus marcas y sus fotos propias — pero el `Archivo` SOBREVIVE (0.091)', async () => {
     const { idArte, fotos } = await crearArteModelo(modelo.id, 'Logo pecho', ['a.jpg']);
     const idOrden = await crearOrdenDePrueba(empresa.id);
     const idRenglon = await renglonDe(idOrden, idArte);
@@ -543,7 +557,7 @@ describe('Fotos del arte de la OP — los Cascade', () => {
       { idModeloArteFoto: fotos[0]?.idFoto as number },
       bd(),
     );
-    await solicitarSubidaFotoArteOrden(
+    const propia = await solicitarSubidaFotoArteOrden(
       sesion([...PERM_TODOS]),
       idOrden,
       idRenglon,
@@ -558,6 +572,16 @@ describe('Fotos del arte de la OP — los Cascade', () => {
     expect(await cliente.ordenArteFoto.count()).toBe(0);
     // Nunca fue suya para llevársela.
     expect(await cliente.modeloArteFoto.count({ where: { idModeloArte: idArte } })).toBe(1);
+
+    // 🔴 LA ASERCIÓN QUE FALTABA (fila 0.091). El renglón puente murió por CASCADE, pero su
+    // `Archivo` —y el objeto de R2 detrás— siguen VIVOS y ya sin dueño: nadie los puede ver ni
+    // volver a alcanzar desde la aplicación. Se afirma para que el huérfano quede MEDIDO en vez de
+    // tapado por un `count() === 0` que sólo miraba el puente.
+    expect(
+      await cliente.archivo.findUnique({ where: { id: propia.idArchivo } }),
+      'si esto pasa a ser null, alguien enseñó a la cascada a soltar el `Archivo`: dale la vuelta ' +
+        'a la prueba y comprueba también que la key se borró de R2 TRAS el commit',
+    ).not.toBeNull();
   });
 
   it('la LLAVE ÚNICA de `idArchivo` impide que dos renglones compartan una foto propia', async () => {

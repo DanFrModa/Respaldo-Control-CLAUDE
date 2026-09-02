@@ -89,6 +89,7 @@ import {
 } from '../../contrato/index.js';
 import { EstadoRenglonReceta, Prisma } from '../../datos/index.js';
 
+import { eliminarObjetosBestEffort, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import {
   ErrorConflicto,
@@ -2549,6 +2550,56 @@ export async function corregirCapturaAvio(
   );
 }
 
+/** Una foto PROPIA de un renglón de arte de la OP que se acaba de liberar (fila 0.091). */
+export interface FotoPropiaLiberada {
+  /** Key del objeto en R2, a soltar DESPUÉS del commit. */
+  key: string;
+  /** Nombre con el que se subió, para que la bitácora diga QUÉ se fue (D3). */
+  nombreOriginal: string;
+}
+
+/**
+ * ⭐⭐ FILA **0.091** — suelta las fotos PROPIAS de un renglón de arte de la OP **antes** de borrar
+ * el renglón, y devuelve las keys de R2 que quedaron libres.
+ *
+ * 🔴 **La trampa que tapa.** `OrdenArteFoto` cae en `onDelete: Cascade` hacia `OrdenArte`: borrar
+ * el renglón se lleva el puente **por el lado del padre** y deja la fila `Archivo` viva y su objeto
+ * en Cloudflare R2 **pagándose para siempre**, sin que nadie pueda verlo. El embudo de la 0.081(a)
+ * no lo atrapa porque cuelga de `archivo.delete`, no de la cascada.
+ *
+ * Se borra el **`Archivo`** (y la Cascade se lleva el `OrdenArteFoto`), que es el mismo trato que
+ * le da `quitarFotoArteOrden` en `fotos-arte-orden.ts`: un solo paso, sin huérfano posible entre
+ * dos borrados. Y se puede borrar a ciegas —sin la cuenta de `borrarArchivoSiQuedoHuerfano` que sí
+ * necesita el arte del MODELO— porque `OrdenArteFoto` lleva `@@unique([idArchivo])`: la foto NACIÓ
+ * en esta OP y no la comparte nadie.
+ *
+ * ⚠️ **Sólo toca las PROPIAS.** Las heredadas del arte del modelo no viven aquí (son
+ * `ModeloArteFoto`), así que ni se leen ni se tocan: D3, la galería del modelo queda intacta y las
+ * demás órdenes las siguen viendo.
+ *
+ * ⚠️ Vive en ESTE módulo y no en `fotos-arte-orden.ts` —su casa temática— porque aquél ya importa
+ * `exigirVerLaReceta` de aquí: ponerlo allá cerraría un ciclo de importación entre los dos.
+ *
+ * @returns una foto por cada `Archivo` borrado: su `key` para soltarla de R2 con
+ *   `eliminarObjetosBestEffort` **después** del commit, y su `nombreOriginal` para la bitácora
+ *   (D3: lo que se fue queda dicho con su nombre, no con un conteo).
+ */
+export async function liberarFotosPropiasDeArteOrden(
+  tx: Tx,
+  idOrdenArte: number,
+): Promise<FotoPropiaLiberada[]> {
+  const fotos = await tx.ordenArteFoto.findMany({
+    where: { idOrdenArte },
+    select: { idArchivo: true, archivo: { select: { key: true, nombreOriginal: true } } },
+  });
+  if (fotos.length === 0) return [];
+  await tx.archivo.deleteMany({ where: { id: { in: fotos.map((f) => f.idArchivo) } } });
+  return fotos.map((f) => ({
+    key: f.archivo.key,
+    nombreOriginal: f.archivo.nombreOriginal,
+  }));
+}
+
 /**
  * QUITA un renglón de la receta de ESTA orden (`desarrollo.administrar`) — el caso de la jareta.
  *
@@ -2558,6 +2609,12 @@ export async function corregirCapturaAvio(
  *    agregó X"* — un aviso FALSO, y encima justo en el caso que la etapa vino a habilitar.
  *  • Un renglón AGREGADO A MANO se borra de verdad: no vino del modelo, no hay nada que recordar
  *    frente a él. Su copia ÍNTEGRA (no un conteo) queda en la bitácora, D3.
+ *
+ * ⚠️ **Y si ese renglón es de ARTE, se lleva sus FOTOS PROPIAS** — las que la OP subió, la única
+ * imagen que un arte agregado a mano puede tener. Sus `Archivo` se borran dentro de la transacción
+ * y los OBJETOS de R2, TRAS el commit y en modo best-effort (fila 0.091 + 0.081a). Por eso hay que
+ * llamarla SIEMPRE A NIVEL SUPERIOR, sin un `bd.tx` ya abierto: anidada, un rollback del llamador
+ * dejaría el objeto borrado y el registro vivo — ver {@link eliminarObjetosBestEffort}.
  */
 export async function quitarRenglonReceta(
   sesion: SesionUsuario,
@@ -2566,9 +2623,17 @@ export async function quitarRenglonReceta(
   idRenglon: number,
   cuerpo: DatosRecetaQuitar = {},
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<RecetaOrden> {
   const datos = validarEntrada(esquemaRecetaQuitarCuerpo, cuerpo);
-  return enRecetaEditable(
+  /**
+   * Las keys de R2 que la transacción liberó de verdad (fila 0.091). Se llena DENTRO y se vacía
+   * FUERA: el bucket se toca **después** del commit (0.081a). Si `enRecetaEditable` revienta, la
+   * excepción sube y la línea de abajo no se alcanza — el objeto se queda en R2 junto a su fila,
+   * que es el lado seguro del error.
+   */
+  const keysR2: string[] = [];
+  const receta = await enRecetaEditable(
     sesion,
     idOrden,
     bd,
@@ -2638,8 +2703,22 @@ export async function quitarRenglonReceta(
       // D3: copia ÍNTEGRA con el MISMO helper del revivir.
       const copia = { tipo, idRenglon, ...fotoArte(fila), motivo: datos.motivo ?? null };
       if (fila.agregadoAMano) {
+        // ⭐ FILA 0.091 — soltar las fotos PROPIAS **antes** de borrar el renglón. La Cascade
+        // `OrdenArte → OrdenArteFoto` se lleva el puente y dejaría la fila `Archivo` viva con su
+        // objeto de R2 pagándose para siempre. Y es justo ESTE renglón —el agregado a mano— aquel
+        // cuyas fotos son todas propias: no hereda ninguna (`idModeloArte` NULL).
+        const fotosPropias = await liberarFotosPropiasDeArteOrden(tx, fila.id);
+        keysR2.push(...fotosPropias.map((f) => f.key));
         await tx.ordenArte.delete({ where: { id: fila.id } });
-        await bitacoraReceta(tx, sesion, orden.id, 'CANCELAR', { ...copia, borrado: true });
+        await bitacoraReceta(tx, sesion, orden.id, 'CANCELAR', {
+          ...copia,
+          borrado: true,
+          // D3: las fotos que la OP había subido a este renglón se van con él y no vuelven; que el
+          // rastro diga CUÁLES eran. Vacío = no tenía ninguna propia.
+          ...(fotosPropias.length === 0
+            ? {}
+            : { fotosPropiasBorradas: fotosPropias.map((f) => f.nombreOriginal) }),
+        });
       } else {
         await tx.ordenArte.update({ where: { id: fila.id }, data: marca });
         await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', { ...copia, excluido: true });
@@ -2651,6 +2730,17 @@ export async function quitarRenglonReceta(
     // lo que se acaba de excluir (ver `enRecetaEditable`).
     { cambiaElContenido: true },
   );
+
+  // FUERA de la transacción, siempre (0.081a): `DeleteObject` no participa del commit, así que
+  // dispararlo dentro dejaría el objeto borrado y su fila viva si el llamador revirtiera. Modo
+  // best-effort: un R2 caído no puede tumbar una operación que la base ya cerró.
+  await eliminarObjetosBestEffort(
+    archivos,
+    keysR2,
+    `las fotos propias del arte ${String(idRenglon)} de la orden ${String(idOrden)}`,
+  );
+
+  return receta;
 }
 
 /**

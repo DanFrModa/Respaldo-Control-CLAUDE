@@ -3972,6 +3972,12 @@ model OrdenArte {
 ///
 /// `onDelete`: Cascade hacia `OrdenArte` (la foto es del renglón) y Cascade hacia `Archivo` (borrar
 /// el registro se lleva el renglón; el objeto de R2 se borra tras el commit, best-effort — 0.081a).
+///
+/// ⚠️ **Y AL REVÉS TAMBIÉN CUENTA (fila 0.091):** borrar el `OrdenArte` se lleva esta fila por
+/// CASCADE y dejaría el `Archivo` vivo con su objeto en R2 pagándose para siempre. Pasa de verdad:
+/// `receta-orden.ts` borra en duro el arte AGREGADO A MANO. Por eso ese camino llama antes a
+/// `liberarFotosPropiasDeArteOrden`, y por eso el inventario de puentes lo vigila una prueba
+/// (`comun/archivos-huerfanos.test.ts`) en vez de una lista escrita a mano.
 model OrdenArteFoto {
   id          Int    @id @default(autoincrement())
   idOrdenArte Int    @map("id_orden_arte")
