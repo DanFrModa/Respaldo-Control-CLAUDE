@@ -594,6 +594,15 @@ describe('🔴 el SEMBRADOR de fixtures no puede armar la trampa de la marca', (
    * habría parecido que el módulo está roto justo sobre la única defensa pre-CI que tiene.
    *
    * El helper simula el ALTA NORMAL, así que ahora firma como una persona. Esta prueba lo fija.
+   *
+   * 🔴 **Y DESTAPÓ UNA SEGUNDA TRAMPA, en el mismo helper y de la misma familia.** Esta prueba
+   * siembra sobre los HIJOS POR COLOR, cuya receta vive en el modelo de DESARROLLO (V1-E9b): el
+   * helper leía el BOM con el `idModelo` pelado —sin resolver el linaje, como sí lo resuelve
+   * `copiarRecetaDelModelo`— y copiaba **cero renglones en silencio**. Una orden sin ni una fila
+   * congelada no queda «apartada por la firma»: queda apartada por **no tener receta**, igual que el
+   * histórico del Access. Los dos caminos dan el MISMO síntoma (`hermanas: 0`), y por eso el CONTROL
+   * de abajo pasaba por la razón equivocada. Hoy el helper resuelve el linaje y **lanza** si no
+   * sembró nada, así que los dos casos ya no se pueden confundir.
    */
   it('dos hermanas sembradas con el helper SÍ se comparan (no salen apartadas)', async () => {
     const a = await cliente.orden.create({
@@ -605,8 +614,15 @@ describe('🔴 el SEMBRADOR de fixtures no puede armar la trampa de la marca', (
     await sembrarRecetaDeOrden(cliente, a.id, idHijoRojo);
     await sembrarRecetaDeOrden(cliente, b.id, idHijoCafe);
 
+    // 🔑 Que el helper SÍ sembró es lo que separa este mundo del CONTROL de abajo: sin esto, las
+    //    dos pruebas describirían el mismo estado (dos órdenes vacías) y la pareja no mediría nada.
+    expect(await cliente.ordenTela.count({ where: { idOrden: a.id } })).toBeGreaterThan(0);
+    expect(await cliente.ordenAvio.count({ where: { idOrden: b.id } })).toBeGreaterThan(0);
+
     const r = await frenteAlGrupoDeOrdenes(cliente, [a.id, b.id], empresa.id);
     // Lo que fallaba: `hermanas: 0` y `fueraDeLaComparacion: 1` en las dos.
+    // ⚠️ `hermanas` de A mide la membresía de **B** (excluye a la propia orden), así que hacen falta
+    //    las dos aserciones para decir que las DOS entraron.
     expect(r.get(a.id)?.hermanas).toBe(1);
     expect(r.get(b.id)?.hermanas).toBe(1);
     expect(r.get(a.id)?.fueraDeLaComparacion).toBe(0);
@@ -622,6 +638,13 @@ describe('🔴 el SEMBRADOR de fixtures no puede armar la trampa de la marca', (
     });
     await sembrarRecetaDeOrden(cliente, a.id, idHijoRojo, { liberadoPorId: null });
     await sembrarRecetaDeOrden(cliente, b.id, idHijoCafe, { liberadoPorId: null });
+
+    // 🔴 LA PATA QUE FALTABA: quedan apartadas por la FIRMA, no por estar vacías. Sin comprobar que
+    //    la receta existe, este CONTROL pasaba también con dos órdenes SIN receta —que es como
+    //    estaban de verdad— y su «resultado contrario» no era contrario a nada.
+    const firmaA = await cliente.ordenTela.findFirstOrThrow({ where: { idOrden: a.id } });
+    expect(firmaA.liberadoEn).not.toBeNull();
+    expect(firmaA.liberadoPorId).toBeNull();
 
     const r = await frenteAlGrupoDeOrdenes(cliente, [a.id, b.id], empresa.id);
     expect(r.get(a.id)?.hermanas).toBe(0);

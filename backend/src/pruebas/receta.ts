@@ -9,6 +9,12 @@
  * Este helper hace lo mismo que hace el alta, para que el fixture siga describiendo lo que quiere
  * describir.
  *
+ * ⭐ **«Lo mismo que hace el alta» incluye RESOLVER EL LINAJE** (V1-E9b): la receta de un modelo de
+ * producción derivado vive en su modelo de DESARROLLO, y `copiarRecetaDelModelo` la busca ahí con
+ * `resolverIdRecetaDeModelo`. Este helper leía el BOM con el `idModelo` pelado, así que con un hijo
+ * por color copiaba **cero renglones sin decir nada**; abajo se resuelve igual que el alta, y si aun
+ * así no hay nada que sembrar, el helper **lanza** en vez de dejar una orden falsamente vacía.
+ *
  * ⚠️ **El precio se deja en NULL a propósito**, igual que el backfill de la migración
  * `20260815140000_receta_en_la_orden`: significa *"esta orden no congeló precio"* y hace que el
  * costeo caiga al catálogo, exactamente como antes de la etapa. Así los fixtures y las
@@ -16,6 +22,8 @@
  * él mismo (`opciones.precio` o un update directo).
  */
 import type { PrismaClient } from '../datos/index.js';
+
+import { resolverIdRecetaDeModelo } from '../dominio/modelos/receta-compartida.js';
 
 /** Opciones de la siembra. */
 export interface OpcionesSembrarReceta {
@@ -58,15 +66,24 @@ export async function sembrarRecetaDeOrden(
   const liberadoPorId =
     opciones.liberadoPorId === undefined ? 'usr-pruebas' : opciones.liberadoPorId;
 
+  // ⭐⭐ V1-E9b — **LA RECETA COMPARTIDA, también aquí.** El alta de verdad
+  // (`copiarRecetaDelModelo`, `receta-orden.ts`) resuelve el linaje con `resolverIdRecetaDeModelo`
+  // ANTES de leer el BOM: un modelo de PRODUCCIÓN derivado (V1-E9a) no tiene receta propia, la
+  // **comparte** con su modelo de desarrollo. Este helper lo leía con el `idModelo` pelado, así que
+  // sembrar la receta de un hijo por color copiaba **CERO renglones, en silencio** — y una orden sin
+  // ni una fila congelada es, para `hermanas-de-la-op.ts`, una orden **sin receta**: queda fuera de
+  // la comparación igual que el histórico del Access. Ahí murió la prueba de las dos hermanas.
+  const idReceta = await resolverIdRecetaDeModelo(cliente, idModelo);
+
   const yaTiene = await cliente.ordenTela.count({ where: { idOrden } });
   const yaAvios = await cliente.ordenAvio.count({ where: { idOrden } });
   const yaArtes = await cliente.ordenArte.count({ where: { idOrden } });
   if (yaTiene + yaAvios + yaArtes === 0) {
     const [telas, avios, artes, medidas] = await Promise.all([
-      cliente.modeloTela.findMany({ where: { idModelo } }),
-      cliente.modeloAvio.findMany({ where: { idModelo } }),
-      cliente.modeloArte.findMany({ where: { idModelo } }),
-      cliente.modeloAvioTalla.findMany({ where: { idModelo } }),
+      cliente.modeloTela.findMany({ where: { idModelo: idReceta } }),
+      cliente.modeloAvio.findMany({ where: { idModelo: idReceta } }),
+      cliente.modeloArte.findMany({ where: { idModelo: idReceta } }),
+      cliente.modeloAvioTalla.findMany({ where: { idModelo: idReceta } }),
     ]);
 
     if (telas.length > 0) {
@@ -126,13 +143,39 @@ export async function sembrarRecetaDeOrden(
     }
   }
 
-  // Se libera SOLO si de verdad hay receta: liberar una vacía es lo que rechaza `liberarReceta` (y
-  // desde la corrección del reviewer, también el backfill y el ETL). Un helper que lo hiciera
-  // igual estaría sembrando un estado que el sistema no produce.
-  const renglones =
-    (await cliente.ordenTela.count({ where: { idOrden, excluido: false } })) +
-    (await cliente.ordenAvio.count({ where: { idOrden, excluido: false } })) +
-    (await cliente.ordenArte.count({ where: { idOrden, excluido: false } }));
+  const [telasOrden, aviosOrden, artesOrden] = await Promise.all([
+    cliente.ordenTela.findMany({ where: { idOrden }, select: { excluido: true } }),
+    cliente.ordenAvio.findMany({ where: { idOrden }, select: { excluido: true } }),
+    cliente.ordenArte.findMany({ where: { idOrden }, select: { excluido: true } }),
+  ]);
+  const congelados = [...telasOrden, ...aviosOrden, ...artesOrden];
+
+  /*
+   * 🔴 **UN FIXTURE QUE NO SIEMBRA NADA MIENTE EN SILENCIO** — y es exactamente la clase de trampa
+   * que este archivo existe para desarmar (ver `OpcionesSembrarReceta.liberadoPorId`).
+   *
+   * Sin este grito, sembrar sobre un modelo cuyo BOM está vacío —o cuya receta vive en OTRO modelo,
+   * el caso del hijo por color de V1-E9b— dejaba la orden **sin una sola fila congelada**, que para
+   * medio dominio (el MRP, la habilitación, el costeo, y sobre todo `hermanas-de-la-op.ts`) no es
+   * «una receta vacía»: es **una orden que nunca tuvo receta**, o sea histórico del Access. La
+   * prueba de al lado se creía apartada por la FIRMA cuando en realidad no había nada que firmar.
+   *
+   * El fixture no puede corregir eso por su cuenta —no sabe qué quería sembrar el test—, así que
+   * lo dice en la cara en vez de dejar pasar un escenario que no existe.
+   */
+  if (congelados.length === 0) {
+    throw new Error(
+      `sembrarRecetaDeOrden: el modelo ${String(idModelo)} (receta ${String(idReceta)}) no tiene ` +
+        `BOM, así que la orden ${String(idOrden)} se quedó SIN receta congelada — que para el ` +
+        'dominio es "esta orden nunca tuvo receta", no "su receta está vacía". Siembra el BOM del ' +
+        'modelo (o del modelo de DESARROLLO, si es un hijo por color) ANTES de llamar al helper.',
+    );
+  }
+
+  // Se libera SOLO si de verdad hay renglones VIVOS: liberar una receta vacía es lo que rechaza
+  // `liberarReceta` (y desde la corrección del reviewer, también el backfill y el ETL). Un helper
+  // que lo hiciera igual estaría sembrando un estado que el sistema no produce.
+  const renglones = congelados.filter((r) => !r.excluido).length;
   if (liberada && renglones > 0) {
     // ⭐ V1-E3h (§Post-F9.72) — LA FIRMA VIVE EN EL RENGLÓN, y la puerta de compra pregunta AHÍ.
     //
