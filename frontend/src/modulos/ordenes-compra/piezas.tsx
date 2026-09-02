@@ -55,10 +55,20 @@ export function EstatusOcBadge({ estatus }: { estatus: EstatusOrdenCompra }): Re
  * des-autorizar (con el permiso de Dirección); una recibida **no**. Sin el estado, quien lee el chip
  * no sabe cuál de los dos caminos tiene enfrente.
  *
- * ⛔ **Y NO hay botón de «des-autorizar» aquí, a propósito.** Ese acto exige `compras.desautorizar`,
- * que sólo tienen Administrador y Dirección: pintárselo al comprador sería pintarle un 403
- * (§Post-F9.145(f)). La puerta que sí se le puede abrir es **la OC misma**, que él sí ve — por eso
- * `alVer`, y por eso el llamador lo pasa **sólo** si la sesión tiene `compras.ver`.
+ * ⛔ **En ESTE componente no hay botón de «des-autorizar» — y NO porque no deba existir en ningún
+ * lado.** §Post-F9.68 tiene dos mitades, y la segunda es **enseñar lo que sí se puede usar**: desde
+ * la fila 0.068, a quien tiene `compras.desautorizar` **se le pinta** ese botón, a tres líneas de
+ * aquí, en el bloque del aviso de la receta (`PanelRecetaOrden.tsx:212-231`, en
+ * `AvisoCambioSobreLoComprado`), y abre el diálogo de siempre — no des-autoriza nada solo.
+ *
+ * El chip se queda siendo **sólo el chip** para que las dos pantallas que lo usan lo lean idéntico:
+ * quien quiera ofrecer además el ACTO lo pinta al lado, con su permiso y con su gate de estatus. Un
+ * botón metido aquí dentro se lo comería también la bandeja «Recetas por liberar», que es una lista
+ * de consulta y no un aviso (ver el porqué en `RecetasPorLiberarPagina.tsx`).
+ *
+ * La puerta que sí abre este componente es **la OC misma**, que el comprador sí ve — por eso
+ * `alVer`, y por eso el llamador lo pasa **sólo** si la sesión tiene `compras.ver` (§Post-F9.145(f):
+ * a nadie se le pinta un camino que acabaría en un 403).
  */
 export function ChipsOcComprometidas({
   ocs,

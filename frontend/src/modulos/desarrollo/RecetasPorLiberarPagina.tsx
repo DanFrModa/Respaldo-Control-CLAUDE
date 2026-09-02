@@ -61,8 +61,18 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
    *
    * Los chips de «ya está comprado» llevan a las compras de esta orden **sólo** con `compras.ver`.
    * Sin ese permiso informan igual, pero no se pinta un camino que acabaría en 403 (§Post-F9.68).
-   * ⛔ Lo que NO se ofrece nunca desde aquí es des-autorizar la OC: eso es de Dirección
-   * (`compras.desautorizar`) y pintárselo al comprador sería pintarle un rechazo (§Post-F9.145(f)).
+   * ⛔ **Desde aquí NO se ofrece des-autorizar la OC — pero OJO CON LA RAZÓN, porque ya no es «ese
+   * botón no se pinta nunca».** §Post-F9.68 tiene DOS mitades: esconder lo que no se puede usar **y
+   * enseñar lo que sí**. Desde la fila 0.068, quien tiene `compras.desautorizar` **SÍ lo ve**, en la
+   * receta de la orden (`PanelRecetaOrden.tsx:212-231`, en `AvisoCambioSobreLoComprado`). Y ojo
+   * también con esto: **Dirección abre esta bandeja igual que el comprador** —`desarrollo.ver`
+   * cascadea—, así que «aquí sólo entra el comprador» tampoco sería cierto.
+   *
+   * 🔴 **Lo que gobierna aquí es OTRA COSA: esta pantalla no da un AVISO, da una COLUMNA
+   * informativa.** §Post-F9.145 (*el aviso que pide un acto, lleva a hacerlo*) habla de AVISOS —de
+   * un bloque que salta porque acabas de hacer algo—, y esto es una lista que se consulta. La puerta
+   * permanente de Dirección para des-autorizar es la pantalla de **Órdenes de compra**. Por eso se
+   * queda como está: **por lo que ESTA pantalla es**, no porque el acto sea de nadie.
    */
   const { tienePermiso } = useSesion();
   const puedeVerCompras = tienePermiso('compras.ver');

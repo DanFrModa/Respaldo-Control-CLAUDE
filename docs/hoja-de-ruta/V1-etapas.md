@@ -1218,6 +1218,100 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E9q · EL AVISO LLEVA AL BOTÓN — a quien puede usarlo (2-sep-2026, versión **0.085**) — 🔶 MITAD (b) DE LA FILA 0.068
+
+Fila **0.068**, **sólo su mitad (b)**. §Post-F9.145: *el aviso que pide un acto, lleva a hacerlo*. Y el
+límite de Daniel (§Post-F9.173(a)): *«**No se puede cancelar la OC en automático: eso hay que negociarlo
+con el proveedor**»*.
+
+### 🔑 El «nunca» era más ancho que su propia justificación
+
+`PanelRecetaOrden.tsx:204-205` decía: *«⛔ Lo que NO se pinta **nunca** es des-autorizar la OC: eso exige
+`compras.desautorizar`… El texto del servidor ya dice a quién pedírselo»*, apoyado en §Post-F9.68
+(*esconder lo que no se puede usar*) y §Post-F9.145(f) (*no mandar a nadie a rebotar*).
+
+⭐ **Correcto para quien NO tiene la llave; falso para quien SÍ.** §Post-F9.68 tiene **dos mitades**, y la
+segunda —*enseñar lo que sí se puede usar*— aplicaba a Administración y Dirección, **que es quien Daniel
+pidió que lo tuviera**. No era decisión nueva: **coherencia entre dos reglas suyas ya escritas**.
+
+### Sólo frontend, y por qué
+
+**El backend no se tocó ni una línea.** La regla ya estaba completa y ya viajaba: el permiso lo re-valida
+`verificarPermiso`, el estatus lo re-valida `desautorizarOC`, y `OcComprometida` ya trae `estatus` y
+`recibida`. **No había nada que decidir en el dominio: sólo dejar de esconder una puerta que ya existía.**
+Sin permisos, sin migración, sin contrato.
+
+### ⭐ LLEVAR NO ES HACER — garantizado por construcción, no por cuidado
+
+- **El panel no tiene la mutación**: sólo un `useState` de qué OC se eligió ⇒ **no puede des-autorizar
+  aunque quisiera**. El único setter tiene **un solo llamador**: el `onClick` del botón.
+- **Sin la llave el diálogo ni se monta.**
+- **El acto vive en el diálogo de Compras**, el mismo — no una segunda versión: **motivo escrito
+  obligatorio** + confirmación, y en pantalla *«no la cancela con el proveedor»*.
+- **Probado en negativo**: una prueba hace clic y **afirma que la mutación NO se llamó**. La mutación
+  *«abrir el diálogo des-autoriza solo»* la pone roja **en dos** pruebas.
+
+### La guarda de la OC recibida, y su matiz honesto
+
+Se eligió `o.estatus === 'autorizada'` sobre `!o.recibida`: es **literalmente la misma expresión** con la
+que `OrdenesCompraPagina` pinta su botón (*una regla, una escritura*) y **falla cerrado** ante un cuarto
+estatus futuro.
+⚠️ **Pero el reviewer midió que su mutante alterno SOBREVIVE**: hoy las dos escrituras son
+*behaviouralmente idénticas* porque `ESTATUS_OC_COMPROMETIDA` sólo tiene tres estatus ⇒ **ninguna prueba
+las distingue**. La elección **es la correcta**; la propiedad *«falla cerrado»* es un **argumento de
+diseño, no una propiedad demostrada**, y así quedó escrito.
+
+### 🔴 Un defecto que el propio cambio habría creado — cazado por el coder
+
+`useDesautorizarOc` sólo invalida `['ordenes-compra']`, y el chip vive en `['ordenes','receta',id]` ⇒ quien
+des-autorizara **desde el aviso** seguiría viendo **el chip viejo Y SU BOTÓN**, y el segundo clic chocaría
+contra un 409. *«Habría mandado a rebotar justo a la única persona que sí puede hacerlo.»* Arreglado, con
+mutantes que verifican que la re-lectura llega **y apunta a la receta correcta**.
+
+### 🔴 EL RECHAZO: la razón derogada seguía viva en las DOS gemelas
+
+⭐⭐ **La rama gemela, aplicada a la PROSA.** Se corrigió `:204-205`, pero **la misma frase con la palabra
+«nunca» estaba en otros dos sitios**: `RecetasPorLiberarPagina.tsx:64-65` y `piezas.tsx:58-61` —esta
+última **a tres líneas de donde ahora sí se pinta un botón**—.
+**Ninguna mentía sobre lo que su archivo hace** —por eso pasaron el primer filtro— pero **las dos
+documentaban como decisión de diseño la mitad de la regla que esta etapa derogó**. *El próximo que las lea
+concluiría «no, a propósito no» — que es exactamente la ronda que costó.*
+
+⭐ **Y al corregirlas apareció que la premisa era falsa por partida DOBLE**, cosa que ni el lead ni el
+reviewer nombraron: *«aquí sólo entra el comprador»* tampoco era cierto — **Dirección abre esa bandeja
+igual** (`desarrollo.ver` **no se corta nunca** en el seed). Verificado por el reviewer.
+
+**Segundo hallazgo del rechazo: un residuo CALLADO.** El bloque recibe `d.ocsComprometidas`, que es *lo
+comprometido de TODA la orden*, mientras el texto nombra sólo el material tocado ⇒ **la puerta es más
+ancha que el aviso**. No se estrechó —los botones acompañan a los chips, y **los chips ya pintan toda la
+orden desde la 0.077**; estrecharlos sólo aquí haría que **botón y chip contaran cosas distintas en el
+mismo bloque**, y hacerlo de verdad exige contrato— pero **dejó de estar callado**.
+📌 *Un residuo declarado es una decisión; uno silencioso es una sorpresa.*
+
+### El número de entrega, fuera del código
+
+El coder había escrito **«0.086» en 19 sitios**. Ese número **no se conoce hasta llegar a `prueba`** — y
+**0.086 es la fila de las calificaciones de maquileros**, o sea trabajo ajeno. Ahora citan **la fila
+0.068**, que es lo estable. ⚠️ *(Y su justificación para dejar unas citas a «0.085» —«son entregas ya
+numeradas»— también era falsa: 0.085 es una **fila**, entregada como 0.077. El reviewer lo midió.)*
+
+### Verificación
+
+**8 mutaciones del coder + 5 del reviewer, re-corridas sobre el estado FINAL**; la única superviviente es
+la del matiz de la guarda, **declarada**. El doble no puede pasar por construcción: `idOrdenCompra` es
+**900** y el folio **12**, dos números distintos a propósito.
+
+**Gates:** frontend **1 979 / 205** · backend **2 656 / 202** · typecheck ×2 · lint ×2 (24 warnings,
+**idéntico a antes de la etapa**) · format ×2.
+
+### ⏳ Lo que queda de la fila 0.068
+
+**La mitad (a) — «el aviso del avío distinto entre OP hermanas» — NO existe en código** (el reviewer la
+buscó). Por eso **la fila queda 🔶, no ✅**: *marcarla cerrada dejaría el programa mintiendo sobre las
+filas pendientes.*
+
+---
+
 ## V1-E9p · ⭐⭐ «¿SE LOGRÓ LO PROMETIDO?» — el segundo final que la bandeja no tenía (2-sep-2026, versión **0.084**) — ✅ HECHA
 
 Fila **0.075**. §Post-F9.144(b), el reencuadre de Daniel: *«un estimado no es un dato pendiente de captura,
