@@ -58,7 +58,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 106 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 107 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
     // (106 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
@@ -68,8 +68,10 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // §Post-F9.36 punto 2); −1 en V1-E3d: el CATÁLOGO de arte desapareció —el arte vive dentro
     // del modelo (§Post-F9.35)— y solo sobrevive su galería; +1 en V1-E3h: la bandeja «Recetas
     // por liberar» de Desarrollo (§Post-F9.72); +1 en V1-E8r: su hermana «Recetas por revisar»,
-    // la cola de la revisión de receta (§Post-F9.140). Lo que cambia es SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(106);
+    // la cola de la revisión de receta (§Post-F9.140); +1 en V1-E9p: «Promesas incumplidas», la
+    // lista del DUEÑO con lo que se vendió y no se consiguió (§Post-F9.144(b)). Lo que cambia es
+    // SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(107);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -244,9 +246,12 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
           // Desarrollo, y una bandeja que hay que buscar no se abre.
           // V1-E8r (§Post-F9.140): su hermana «Recetas por revisar» entra por lo mismo, y va justo
           // después de «Modelos» porque es la cola de la revisión del modelo.
+          // V1-E9p (§Post-F9.144(b)): «Promesas incumplidas» va PEGADA a ella porque es la otra
+          // mitad de la misma pregunta — una se vacía al firmar, la otra se queda.
           hijos: [
             'modelos',
             'recetas-por-revisar',
+            'promesas-incumplidas',
             'recetas-por-liberar',
             'desarrollo',
             'listas-precios',
@@ -457,6 +462,7 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     expect(desarrollo?.hijos?.map((h) => h.titulo)).toEqual([
       'Modelos',
       'Recetas por revisar',
+      'Promesas incumplidas',
       'Recetas por liberar',
       'Pre-costeos',
       'Listas de precios',

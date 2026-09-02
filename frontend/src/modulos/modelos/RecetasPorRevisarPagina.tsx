@@ -14,6 +14,7 @@ import {
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
 
 /**
@@ -37,6 +38,18 @@ import { useDebounce } from '@/lib/useDebounce';
  * uno… no tiene sentido liberar las cosas sin ver"* (§Post-F9.80). Aquí no hay ningún botón que
  * apruebe desde la lista: el código y «Ver la receta» abren la ficha del modelo, que es donde vive
  * la firma y donde se ve la receta completa antes de firmarla.
+ *
+ * ⭐⭐ **V1-E9p (§Post-F9.144(b)) — Y AHORA ENSEÑA «PROMETIDO».** Daniel re-encuadró la pregunta:
+ * los estimados de la mesa *«son METAS… no es seguro que se consiga»*. La bandeja preguntaba *«¿ya
+ * capturaste?»*; la pregunta buena es *«¿se logró lo prometido?»* — y quien la va a contestar al
+ * firmar necesita **ver la meta**. Eso es esta columna: el costo con el que se cerró la
+ * negociación.
+ *
+ * ⚠️ **La columna llega VACÍA por DOS razones distintas, y las dos se pintan igual a propósito:**
+ * (a) esta versión no vino de una mesa registrada —y entonces la fila se comporta como siempre—, o
+ * (b) **quien mira no tiene `consultas.ver-importes`**: la meta es DINERO y la oculta el SERVIDOR
+ * (misma regla que el historial de negociación). Aquí NO se filtra por permiso: si alguien añade
+ * lógica de permisos en esta pantalla habrá dos rejas para el mismo dato, y una se quedará atrás.
  *
  * CÓMO SE LEE:
  *  • **Una fila por VERSIÓN** — lo que una persona resuelve de una sentada.
@@ -155,6 +168,7 @@ export function RecetasPorRevisarPagina(): React.JSX.Element {
                   <TablaDensaHead>Modelo</TablaDensaHead>
                   <TablaDensaHead>De</TablaDensaHead>
                   <TablaDensaHead>Cliente</TablaDensaHead>
+                  <TablaDensaHead className="text-right">Prometido</TablaDensaHead>
                   <TablaDensaHead>Entrega</TablaDensaHead>
                   <TablaDensaHead>Estado</TablaDensaHead>
                   <TablaDensaHead className="w-40" />
@@ -187,6 +201,15 @@ export function RecetasPorRevisarPagina(): React.JSX.Element {
                     {/* La «receta original» de la que salió esta versión: lo que Daniel quiere cotejar. */}
                     <TablaDensaCelda>{f.codigoPadre ?? '—'}</TablaDensaCelda>
                     <TablaDensaCelda>{f.cliente ?? '—'}</TablaDensaCelda>
+                    {/* ⭐⭐ V1-E9p — LA META que hay que salir a conseguir. Sin verla, la pregunta
+                        «¿se logró lo prometido?» que se hace al firmar no se puede contestar. */}
+                    <TablaDensaCelda className="num text-right">
+                      {f.costoPrometido === null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <span data-testid="rpr-prometido">{formatearMoneda(f.costoPrometido)}</span>
+                      )}
+                    </TablaDensaCelda>
                     <TablaDensaCelda>
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="text-sm">{f.fechaCompromiso ?? '—'}</span>

@@ -63,6 +63,9 @@ import {
   esquemaRevisionModeloSalida,
   esquemaRecetasPorRevisarQuery,
   esquemaRecetasPorRevisarPagina,
+  esquemaPromesasIncumplidasQuery,
+  esquemaPromesasIncumplidasPagina,
+  esquemaMetaPrometida,
   esquemaModeloFotoCrear,
   esquemaModeloFotoEditarCuerpo,
   esquemaModeloFotoSubida,
@@ -130,6 +133,10 @@ import {
 } from '../../dominio/modelos/revision-modelo.js';
 import { consultarRecetasPorRevisar } from '../../dominio/modelos/recetas-por-revisar.js';
 import {
+  consultarMetaPrometida,
+  consultarPromesasIncumplidas,
+} from '../../dominio/modelos/meta-negociada.js';
+import {
   actualizarFoto,
   listarFotos,
   marcarFotoPrincipal,
@@ -164,6 +171,15 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     revisadoPor: modelo.revisadoPor?.nombre ?? null,
     revisadoEn: modelo.revisadoEn === null ? null : modelo.revisadoEn.toISOString(),
     revisionNota: modelo.revisionNota,
+    // ⭐⭐ V1-E9p (§Post-F9.144(b)) — EL DESENLACE DE LA PROMESA de la mesa. `metaResultado` en null
+    // NO significa «se cumplió»: significa que nadie lo declaró (REGLA 0-B), que es el estado de
+    // todo lo firmado antes de esta etapa.
+    metaResultado: modelo.metaResultado,
+    metaCostoPrometido:
+      modelo.metaCostoPrometido === null ? null : modelo.metaCostoPrometido.toNumber(),
+    metaCostoConseguido:
+      modelo.metaCostoConseguido === null ? null : modelo.metaCostoConseguido.toNumber(),
+    metaNota: modelo.metaNota,
     descripcion: modelo.descripcion,
     composicion: modelo.composicion,
     maquilaBase: modelo.maquilaBase === null ? null : modelo.maquilaBase.toNumber(),
@@ -761,6 +777,70 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return consultarRecetasPorRevisar(sesion, request.query);
+    },
+  });
+
+  // ⭐ V1-E9p (§Post-F9.144(b)) — LA META de una versión, para poder contestar «¿se logró lo
+  // prometido?» VIENDO contra qué. La columna congelada del modelo no sirve para esto: sólo existe
+  // DESPUÉS de declarar un desenlace, o sea nunca en la primera firma, que es cuando se pregunta.
+  //
+  // Gate `modelos.aprobar-receta` (quien firma); el dominio exige además `consultas.ver-importes`
+  // porque es un importe. Los dos se cortan en el MISMO escalón del seed (Ventas), así que la
+  // pareja no cierra ninguna puerta que estuviera abierta. Sin permisos nuevos.
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/meta-prometida',
+    preHandler: app.conPermiso('modelos.aprobar-receta'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'La META con la que se vendió esta versión (el costo con el que se cerró la mesa)',
+      description:
+        'Resuelve EN VIVO el `costoEstimado` del último cierre de mesa de la negociación de la que ' +
+        'salió esta versión — la del expediente propio si lo tiene, si no la del modelo PADRE (la ' +
+        'mesa pasó antes de que la versión existiera). Null si no viene de una negociación registrada.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaMetaPrometida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return consultarMetaPrometida(sesion, request.params.id);
+    },
+  });
+
+  // ⭐⭐ V1-E9p (§Post-F9.144(b), DANIEL) — «PROMESAS INCUMPLIDAS»: la lista del DUEÑO.
+  //
+  // Daniel: *«todo eso se intentará hacer así, pero **no es seguro que se consiga**»*. La bandeja
+  // «Recetas por revisar» contesta *«¿ya lo cuadraste?»* y se VACÍA al firmar; esto contesta *«¿se
+  // logró?»* y **se queda**, porque un margen que se perdió no deja de haberse perdido porque
+  // alguien firme. La decisión lo dice con esas palabras: la brecha le importa **al dueño**, que ya
+  // le dio ese precio al cliente — no a quien despacha la cola.
+  //
+  // 🔴 De SOLO LECTURA, igual que la bandeja: aquí no se firma nada (§Post-F9.140 punto 4).
+  //
+  // Permisos SIN INVENTAR NINGUNO: `modelos.ver` (es una lista de modelos) **y**
+  // `consultas.ver-importes`, el permiso transversal que ya gobierna ver precios e importes. Los dos
+  // porque esta pantalla ES el dinero: ocultar las columnas de costo dejaría una lista sin sentido
+  // en vez de una puerta honesta. El dominio los vuelve a verificar (A1).
+  app.route({
+    method: 'GET',
+    url: '/promesas-incumplidas',
+    preHandler: app.conPermiso('consultas.ver-importes'),
+    schema: {
+      tags: ['modelos'],
+      summary: '«Promesas incumplidas»: lo que se negoció y NO se consiguió, con su brecha',
+      description:
+        'Las VERSIONES cuya revisión se firmó declarando que NO se consiguió el costo prometido ' +
+        'en la mesa, con la brecha por prenda (conseguido − prometido) y el IMPACTO en dinero ' +
+        '(brecha × piezas ya pedidas), ordenadas por lo que más cuesta. El `impactoTotal` es el de ' +
+        'toda la cartera, no el de la página: lo agrega el servidor.',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaPromesasIncumplidasQuery,
+      response: { 200: esquemaPromesasIncumplidasPagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return consultarPromesasIncumplidas(sesion, request.query);
     },
   });
 

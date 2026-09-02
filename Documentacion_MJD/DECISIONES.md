@@ -11931,3 +11931,39 @@ R2 no se toca nunca, y **lo que una OP oculta las demás lo siguen viendo**.
 - **Aplica en:** la prenda → versión **0.082**. El **ARTE** → versión **0.083**. El impreso del estampador → fila **0.094**. **Fecha:** 2026-09-01.
 
 ---
+
+#### (Post-F9.178) — ✅ CONSTRUIDA: §Post-F9.144(b) ya tiene su segundo final (2-sep-2026, versión **0.084**)
+
+Cierra el reencuadre de Daniel: *«un estimado no es un dato pendiente de captura, es una **promesa pendiente
+de cumplimiento**»* — *«no es seguro que se consiga»*.
+
+**Lo que se construyó:** al firmar se puede contestar **si se logró o no** y **con cuánto** se cerró; y una
+pantalla **«Promesas incumplidas»** enseña la brecha, **lo que cuesta** (brecha × piezas pedidas) y el
+**total de la cartera**, ordenado por lo que más duele.
+
+### Las tres reglas de Daniel que NO se movieron
+
+1. **«NO FIRMA, LLEVA»** (§Post-F9.140 p.4): contestar es **opcional**; firmar sin decir nada funciona
+   idéntico a antes. La bandeja **enseña, no decide**.
+2. **«Avisar no es bloquear»** (§Post-F9.64): un «no se consiguió» **no frena** producción ni compra.
+3. **Sólo quien ve importes ve el precio** (§Post-F9.144(e), *«nadie más que yo ve los factores»*): la
+   columna «Prometido» va **tras la reja de importes**. Ventas, Logística, Asistente y Secretarial ven la
+   **fila entera** —qué falta, de qué padre salió, qué pedido espera— **pero no el número**.
+
+### 🔴 Y de paso destapó un defecto EN VIVO
+
+**La columna «Cliente» de la bandeja salía SIEMPRE vacía** por el camino normal: buscaba el expediente de
+la versión, y **versionar un modelo no crea expediente** (cuelga del padre). Es el mismo eslabón que hacía
+falta para encontrar la meta, así que se arregló junto.
+
+⚠️ **Y el linaje es una CADENA, no un salto:** cuando se negocia **por segunda vez** y se versiona una
+versión, la mesa vive **dos escalones arriba**. Sin eso, la fila aparecía con la brecha en blanco — *«sé
+que algo se incumplió y no cuánto»*, silencio parcial en la pantalla que existe para romper el silencio.
+
+📌 **Lo que sigue sin medirse, y es otra cosa:** las **segundas** y los **faltantes**. Van con las
+calificaciones de maquileros, cuando Daniel fije los parámetros de aceptación (§Post-F9.173(b), fila
+**0.086**).
+
+- **Aplica en:** versión **0.084**, ficha `V1-E9p`. **Fecha:** 2026-09-02.
+
+---

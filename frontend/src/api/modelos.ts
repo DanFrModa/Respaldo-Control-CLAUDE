@@ -56,6 +56,18 @@ export type RevisionModelo =
 /** Cuerpo de «rechazar revisión» (el motivo es obligatorio). */
 export type RevisionRechazarCuerpo =
   paths['/api/modelos/{id}/revision/rechazar']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de «aprobar revisión» (nota opcional + ⭐ V1-E9p: el DESENLACE de la promesa). */
+export type RevisionAprobarCuerpo =
+  paths['/api/modelos/{id}/revision/aprobar']['post']['requestBody']['content']['application/json'];
+/**
+ * ⭐⭐ V1-E9p (§Post-F9.144(b)) — el DESENLACE de la promesa de la mesa: *«¿se logró lo prometido?»*.
+ * Cuando NO se logró, el backend exige el número conseguido y el porqué (sin ellos no hay brecha
+ * que enseñar ni forma de entenderla).
+ */
+export type DesenlaceMeta = NonNullable<RevisionAprobarCuerpo['meta']>;
+/** ⭐ V1-E9p — la META con la que se vendió una versión (`GET /api/modelos/{id}/meta-prometida`). */
+export type MetaPrometida =
+  paths['/api/modelos/{id}/meta-prometida']['get']['responses']['200']['content']['application/json'];
 
 /** Cuerpo de alta de modelo (`POST /api/modelos`). */
 export type ModeloCrear =
@@ -133,6 +145,18 @@ export const CLAVE_MODELOS = ['modelos'] as const;
  * tiene que sacar esa versión de la bandeja, o la cola enseñaría trabajo ya hecho.
  */
 export const CLAVE_RECETAS_POR_REVISAR = ['recetas-por-revisar'] as const;
+
+/**
+ * ⭐⭐ V1-E9p — clave de «Promesas incumplidas». La invalidan las MISMAS firmas: declarar «no se
+ * consiguió» tiene que aparecer ahí en el acto, y un rechazo (que borra el desenlace) tiene que
+ * sacarlo de ahí — si no, el dueño vería una brecha de una receta que volvió a corrección.
+ */
+export const CLAVE_PROMESAS_INCUMPLIDAS = ['promesas-incumplidas'] as const;
+
+/** Clave de la META de una versión (V1-E9p). */
+function claveMetaPrometida(id: number): readonly unknown[] {
+  return [...CLAVE_MODELOS, 'meta-prometida', id];
+}
 
 function claveListaModelos(query: ModelosQuery): readonly unknown[] {
   return [...CLAVE_MODELOS, 'lista', query];
@@ -402,6 +426,11 @@ export interface ArgsRevisionModelo {
   id: number;
   /** Motivo del rechazo (obligatorio al rechazar) o nota opcional de la aprobación. */
   texto?: string;
+  /**
+   * ⭐⭐ V1-E9p — el DESENLACE de la promesa, sólo al APROBAR. Omitirlo firma como siempre (y borra
+   * el desenlace anterior, porque el acto nuevo sustituye al anterior completo).
+   */
+  meta?: DesenlaceMeta;
 }
 
 /**
@@ -422,12 +451,17 @@ export function useAprobarRevisionModelo(): UseMutationResult<
 > {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, texto }: ArgsRevisionModelo) =>
-      firmarRevision(id, 'aprobar', texto === undefined || texto === '' ? {} : { nota: texto }),
+    mutationFn: ({ id, texto, meta }: ArgsRevisionModelo) =>
+      firmarRevision(id, 'aprobar', {
+        ...(texto === undefined || texto === '' ? {} : { nota: texto }),
+        // ⭐⭐ V1-E9p — sólo viaja si se contestó la pregunta; el backend lo valida (A1).
+        ...(meta === undefined ? {} : { meta }),
+      }),
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
       void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
       void queryClient.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_REVISAR });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PROMESAS_INCUMPLIDAS });
     },
   });
 }
@@ -453,6 +487,9 @@ export function useRechazarRevisionModelo(): UseMutationResult<
       // Rechazar NO la saca de la bandeja (sigue sin poder producirse): la ACTUALIZA, para que el
       // renglón enseñe ya el motivo que se acaba de escribir.
       void queryClient.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_REVISAR });
+      // ⭐⭐ V1-E9p — y SÍ la saca de «Promesas incumplidas»: el rechazo BORRA el desenlace, porque
+      // la brecha medía una receta que se va a corregir.
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PROMESAS_INCUMPLIDAS });
     },
   });
 }
@@ -891,6 +928,81 @@ export function useRecetasPorRevisar(
               : { busqueda: filtros.busqueda }),
           },
         },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+  });
+}
+
+// ══ ⭐⭐ V1-E9p — «PROMESAS INCUMPLIDAS» (§Post-F9.144(b), DANIEL) ═══════════════════════════════
+
+/** Página de «Promesas incumplidas» (`GET /api/promesas-incumplidas`). */
+export type PromesasIncumplidasPagina =
+  paths['/api/promesas-incumplidas']['get']['responses']['200']['content']['application/json'];
+/** Una promesa de mesa que NO se cumplió, con su brecha y lo que cuesta. */
+export type PromesaIncumplida = PromesasIncumplidasPagina['datos'][number];
+
+/** Filtros de «Promesas incumplidas» (lo que viaja en la URL del endpoint). */
+export interface FiltrosPromesasIncumplidas {
+  pagina?: number;
+  porPagina?: number;
+  busqueda?: string;
+}
+
+/**
+ * ⭐⭐ **LAS PROMESAS QUE NO SE CUMPLIERON** (§Post-F9.144(b)): lo que se vendió con un costo que
+ * después no se consiguió, con la brecha por prenda y el IMPACTO en dinero.
+ *
+ * ⚠️ **La brecha, el impacto y el `impactoTotal` vienen AGREGADOS DEL SERVIDOR** (A1): aquí no se
+ * suma nada. Y el `impactoTotal` es el de TODA la cartera, no el de la página — sumarlo en el
+ * cliente daría un número distinto en cada página, y es el número que se mira primero.
+ *
+ * Exige `modelos.ver` + `consultas.ver-importes`: esta pantalla ES el dinero.
+ */
+export function usePromesasIncumplidas(
+  filtros: FiltrosPromesasIncumplidas = {},
+): UseQueryResult<PromesasIncumplidasPagina, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_PROMESAS_INCUMPLIDAS, filtros],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/promesas-incumplidas', {
+        params: {
+          query: {
+            pagina: filtros.pagina ?? 1,
+            porPagina: filtros.porPagina ?? 20,
+            ...(filtros.busqueda === undefined || filtros.busqueda === ''
+              ? {}
+              : { busqueda: filtros.busqueda }),
+          },
+        },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+  });
+}
+
+/**
+ * ⭐ V1-E9p — **LA META de una versión**, para que quien va a firmar pueda contestar *«¿se logró lo
+ * prometido?»* **viendo contra qué**.
+ *
+ * ⚠️ **Por qué no se lee del modelo.** `Modelo.metaCostoPrometido` es la meta CONGELADA con el acto,
+ * y sólo existe **después** de que alguien declaró un desenlace: en la primera firma —que es cuando
+ * se hace la pregunta— viene en null. Esto la resuelve en vivo, con la misma consulta que la bandeja.
+ *
+ * `habilitada` en false mientras el diálogo esté cerrado: no se pregunta lo que no se va a enseñar.
+ */
+export function useMetaPrometida(
+  id: number | undefined,
+  habilitada = true,
+): UseQueryResult<MetaPrometida, ErrorDeApi> {
+  return useQuery({
+    queryKey: claveMetaPrometida(id ?? 0),
+    enabled: id !== undefined && habilitada,
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/modelos/{id}/meta-prometida', {
+        params: { path: { id: id as number } },
       });
       if (!data) throw new ErrorDeApi(error);
       return data;

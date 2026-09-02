@@ -2389,6 +2389,61 @@ model Modelo {
   /// la aprobación. Null = se firmó sin escribir nada.
   revisionNota  String?   @map("revision_nota") @db.Text
 
+  /// ⭐⭐ V1-E9p (§Post-F9.144(b)) — **EL DESENLACE DE LA PROMESA.** Daniel, textual: *«me quitan un
+  /// cierre y yo le pongo que estimo que la maquila costará 5 pesos menos… pero ya en la oficina se
+  /// tiene que **buscar** una maquila de ese costo… **Todo eso se intentará hacer así, pero no es
+  /// seguro que se consiga**»*.
+  ///
+  /// 🔴 **Un estimado de la mesa NO es un dato pendiente de captura: es una PROMESA pendiente de
+  /// cumplimiento**, y tiene DOS finales posibles. Hasta aquí la revisión sólo tenía uno bueno
+  /// (`aprobada` = «ya la miré») y el incumplimiento no cabía en ninguna parte: *Desarrollo cuadra
+  /// la receta con la maquila que sí consiguió, el renglón se va de la bandeja como «resuelto», y
+  /// nadie se entera de que el margen que Daniel vendió ya no existe*. Estas cuatro columnas son
+  /// ese segundo final.
+  ///
+  /// ⚠️ **NO es `revisionEstado = 'rechazada'`, y confundirlos sería el defecto.** `rechazada`
+  /// significa *«devuelta con observaciones: corrige la receta»* — la receta está MAL y el renglón
+  /// VUELVE a la cola. «No se consiguió» es lo contrario: la receta está BIEN, cuadrada y firmada;
+  /// lo que no se logró es el COSTO. Meter el incumplimiento económico en la etiqueta de trámite
+  /// mandaría a corregir una receta que no tiene nada malo y **escondería el hecho que importa**.
+  ///
+  /// ⚠️ **Es un EJE APARTE de la revisión, y por eso son columnas propias:** una versión puede estar
+  /// `aprobada` **y** `no_lograda` a la vez — que es justamente el caso que esta etapa vino a hacer
+  /// visible. Pero se escriben **JUNTAS Y CON EL ACTO** de revisión (misma regla que las cuatro de
+  /// arriba): la aprobación las pone, y el rechazo y la invalidación automática las LIMPIAN, porque
+  /// un desenlace medido sobre una receta que ya cambió es una tupla mentirosa. Lo anterior no se
+  /// pierde: va a la BITÁCORA, que se agrega y jamás se edita (D3).
+  ///
+  /// `NULL` = **no se declaró** (REGLA 0-B): es lo que tiene todo lo firmado antes de esta etapa y
+  /// lo que sigue teniendo quien firme sin contestar la pregunta. Una versión así **se comporta
+  /// exactamente como hoy** y no aparece en la lista del dueño.
+  ///
+  /// 🔒 Dos invariantes que vigila la BASE (`20260902120000_se_logro_lo_prometido`):
+  ///  • `modelos_meta_acto_completo_check` — sin resultado no puede haber ni prometido, ni
+  ///    conseguido, ni nota: media tupla sería una brecha que nadie declaró.
+  ///  • `modelos_meta_no_lograda_con_nota_check` — un «no se consiguió» SIN explicación no le sirve
+  ///    a nadie; es la misma regla que el motivo obligatorio del rechazo.
+  metaResultado ResultadoMetaNegociada? @map("meta_resultado")
+
+  /// La META, **congelada en el momento de la firma**: la suma de los costos estimados con los que
+  /// se cerró la mesa (`NegociacionEvento.costoEstimado`).
+  ///
+  /// ⚠️ **Se guarda, NO se lee en vivo**, y ésa es la decisión: el desenlace es la CONSTANCIA de un
+  /// acto (D3), así que su término de comparación tiene que ser el que había cuando se firmó. Leído
+  /// en vivo, una mesa posterior movería hacia atrás una brecha ya declarada.
+  ///
+  /// `NULL` = **no se encontró la mesa** — la versión no salió de una negociación registrada (se
+  /// creó a mano) o su expediente no llega a ninguna lista. No es un error: el desenlace vale igual
+  /// («no se consiguió», con lo que sí se consiguió y por qué) y la pantalla enseña la brecha sólo
+  /// cuando puede calcularla.
+  metaCostoPrometido  Decimal? @map("meta_costo_prometido") @db.Decimal(12, 2)
+  /// Lo que SÍ se consiguió, en costo por prenda, tal como lo declara quien salió a buscarlo. Es
+  /// TECLEADO, no derivado: *"se busca la maquila, los avíos, los artes"* es trabajo de oficina, y
+  /// su resultado no vive en ningún catálogo hasta que alguien lo cierra.
+  metaCostoConseguido Decimal? @map("meta_costo_conseguido") @db.Decimal(12, 2)
+  /// Por qué no se consiguió (obligatorio en `no_lograda`), o la observación de lo que sí se logró.
+  metaNota            String?  @map("meta_nota") @db.Text
+
   /// ⭐ V1-E8d (§Post-F9.127) — CUÁNDO se tocó por última vez la RECETA de este modelo, y QUÉ parte.
   ///
   /// Las escribe **una sola función**: `tocarModeloPorCambioDeReceta` (`dominio/modelos/
@@ -5959,6 +6014,24 @@ enum EstadoRevisionModelo {
   rechazada
 
   @@map("estado_revision_modelo")
+}
+
+/// ⭐⭐ V1-E9p (§Post-F9.144(b)) — **EN QUÉ TERMINÓ LA PROMESA de la mesa.** Daniel: *«todo eso se
+/// intentará hacer así, pero **no es seguro que se consiga**»*. Un estimado de negociación es un
+/// compromiso hacia afuera (ya se lo dijo al cliente) y una orden de trabajo hacia adentro; su
+/// desenlace tiene DOS finales, y hasta esta etapa sólo cabía uno.
+///
+/// ⚠️ **No se confunde con `EstadoRevisionModelo`, y es otro EJE.** Aquél contesta *«¿alguien miró
+/// la receta?»* (trámite); éste, *«¿se logró el costo que se prometió?»* (dinero). Una versión puede
+/// estar `aprobada` **y** `no_lograda`: la receta quedó bien y el margen no. Ver `Modelo.metaResultado`.
+enum ResultadoMetaNegociada {
+  /// Se consiguió lo que se prometió en la mesa (o mejor): la receta revisada cuadra con la meta.
+  lograda
+  /// ⭐ **NO se consiguió**, y la brecha se ve. NO es un rechazo: la receta está cuadrada y firmada;
+  /// lo que no se logró es el costo con el que se vendió.
+  no_lograda
+
+  @@map("resultado_meta_negociada")
 }
 
 enum OrigenModelo {

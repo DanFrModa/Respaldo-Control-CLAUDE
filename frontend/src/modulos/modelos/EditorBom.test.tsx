@@ -234,6 +234,11 @@ function fichaBase(
     revisadoPor: null,
     revisadoEn: null,
     revisionNota: null,
+    // ⭐⭐ V1-E9p — el DESENLACE de la promesa: null = nadie lo declaró (conducta de siempre).
+    metaResultado: null,
+    metaCostoPrometido: null,
+    metaCostoConseguido: null,
+    metaNota: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,

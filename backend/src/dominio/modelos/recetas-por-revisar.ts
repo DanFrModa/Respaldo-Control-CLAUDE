@@ -85,6 +85,29 @@
  * Permisos: `modelos.ver` para verla — el mismo que abre la ficha del modelo, así que el camino
  * nunca es un enlace muerto (mismo criterio que §Post-F9.68 en la bandeja hermana). FIRMAR es otro
  * endpoint (`modelos.aprobar-receta`) y vive en la ficha. **Sin permisos nuevos y sin migración.**
+ *
+ * ── ⭐⭐ V1-E9p (§Post-F9.144(b)) — LA BANDEJA AHORA ENSEÑA **LO PROMETIDO** ─────────────────────
+ *
+ * Daniel re-encuadró la pregunta: *«los estimados no son datos, son METAS… no es seguro que se
+ * consiga»*. La bandeja preguntaba *«¿ya capturaste?»*; la pregunta buena es *«¿se logró lo
+ * prometido?»*, y **quien va a contestarla tiene que poder VER la meta**. Por eso cada fila trae
+ * `costoPrometido`: el costo con el que se cerró la mesa (`NegociacionEvento.costoEstimado`).
+ *
+ * ⚠️ **Y de paso se arregló un hueco que estaba a la vista:** el `cliente` lo resolvía un `LATERAL`
+ * local que sólo miraba `d.id_modelo = m.id` — el expediente PROPIO de la versión. Pero
+ * `crearVersionDeModelo` **no crea expediente**, y la mesa pasa ANTES de que la versión exista
+ * (§Post-F9.144(a)), así que por el camino normal ese join daba NULL y la columna «Cliente» salía
+ * vacía siempre. Hoy lo resuelve {@link expedienteDeLaNegociacion}, que mira también al PADRE — y
+ * saca de ahí **el cliente y la meta juntos**, para que una fila no pueda estar contando dos
+ * negociaciones distintas como si fueran una. El porqué completo, medido, está en esa función.
+ *
+ * 🔴 **Y la meta va TRAS LA REJA DE LOS IMPORTES** (`consultas.ver-importes`), aunque la bandeja la
+ * abra `modelos.ver`: son dos preguntas distintas. `modelos.ver` no se resta en ningún escalón del
+ * seed, así que sin la reja el costo con el que se vendió llegaría a Ventas, Logística, Asistente y
+ * Secretarial — justo a quienes se les quitó ver importes. Se oculta el IMPORTE, no la FILA.
+ *
+ * ⚠️ **La bandeja sigue sin firmar: LLEVA** (§Post-F9.140 punto 4). Enseñar la meta no la convierte
+ * en una segunda autoridad; el desenlace se declara al FIRMAR, en la ficha del modelo.
  */
 import type {
   FiltrosRecetasPorRevisar,
@@ -94,10 +117,15 @@ import type {
 import { esquemaRecetasPorRevisarDominio } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import {
+  CTE_LINAJE_DE_VERSIONES,
+  dineroEsperando,
+  expedienteDeLaNegociacion,
+} from './meta-negociada.js';
 import {
   estadoRevisionEfectivo,
   SQL_REVISION_SIN_APROBAR,
@@ -118,59 +146,7 @@ interface FilaBandeja {
   proyecto: string | null;
   fechaCompromiso: Date | null;
   piezasPedidas: bigint | null;
-}
-
-/**
- * EL DINERO QUE YA ESTÁ ESPERANDO esta versión: los renglones de PEDIDO vivos (pedido no cancelado
- * y no marcado «no producir») de la empresa activa que apuntan a este modelo, con su fecha
- * comprometida más próxima y sus piezas.
- *
- * Se resuelve con un `LEFT JOIN LATERAL` agregado —una sola pasada por el índice
- * `pedido_linea(id_modelo)`— y no con un `count` por fila desde el llamador, que sería un N+1
- * contra toda la cartera.
- *
- * La fecha es `COALESCE(fecha_de, fecha_hasta)`: el compromiso es el ARRANQUE de la ventana de
- * entrega, y si ese dato falta se usa el cierre — una versión con fecha comprometida urge más que
- * una sin ninguna, y perderla por un `fecha_de` vacío la mandaría al final de la lista.
- */
-function dineroEsperando(idEmpresa: number): Prisma.Sql {
-  return Prisma.sql`
-    LEFT JOIN LATERAL (
-      SELECT MIN(COALESCE(pe."fecha_de", pe."fecha_hasta")) AS "fecha_compromiso",
-             SUM(pl."cantidad_pedida")::bigint              AS "piezas"
-        FROM "pedido_linea" pl
-        JOIN "pedidos" pe ON pe."id" = pl."id_pedido"
-       WHERE pl."id_modelo" = m."id"
-         AND pe."id_empresa" = ${idEmpresa}
-         AND pe."ped_cancelado" = false
-         AND pe."no_producir" = false
-    ) esp ON true
-  `;
-}
-
-/**
- * DE QUÉ NEGOCIACIÓN salió la versión: su expediente de Desarrollo vivo dentro de un proyecto de la
- * empresa activa, para poder decir con QUÉ CLIENTE se negoció — que es literalmente lo que Daniel
- * pide ver (*"lo que se negocio con el cliente. y como se cerro"*).
- *
- * Es un `LEFT JOIN` porque **puede no haberlo**: `crearVersionDeModelo` no exige ni crea un
- * `Desarrollo`, así que una versión creada a mano desde la ficha del modelo no tiene expediente.
- * Con un `JOIN` normal, esas versiones —bloqueadas igual— desaparecerían de la bandeja.
- */
-function negociacionDeLaVersion(idEmpresa: number): Prisma.Sql {
-  return Prisma.sql`
-    LEFT JOIN LATERAL (
-      SELECT c."nombre" AS "cliente", p."nombre" AS "proyecto"
-        FROM "desarrollos" d
-        JOIN "proyectos" p ON p."id" = d."id_proyecto"
-        JOIN "clientes"  c ON c."id" = p."id_cliente"
-       WHERE d."id_modelo" = m."id"
-         AND d."apagado" = false
-         AND p."id_empresa" = ${idEmpresa}
-       ORDER BY d."id" DESC
-       LIMIT 1
-    ) neg ON true
-  `;
+  costoPrometido: Prisma.Decimal | null;
 }
 
 /**
@@ -186,6 +162,17 @@ export async function consultarRecetasPorRevisar(
   const f = validarEntrada(esquemaRecetasPorRevisarDominio, filtros);
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
+  // 🔴🔴 LA META ES DINERO, Y VA TRAS LA REJA DE LOS IMPORTES. Esta bandeja la abre `modelos.ver`,
+  // que **no se resta en ningún escalón** de `prisma/seed.ts` ⇒ la ven Ventas, Logística, Asistente
+  // y Secretarial — exactamente los roles a los que se les QUITÓ `consultas.ver-importes` por
+  // decisión. Publicar aquí el costo con el que se cerró la mesa les enseñaría *«la información que
+  // vendí»* por la puerta de al lado. Es la MISMA columna que `desarrollo/negociacion.ts` ya oculta
+  // así (`costoEstimado: verImportes ? … : null`) y el mismo dato que `consultarMetaPrometida`
+  // protege con este permiso: una sola reja para un solo dato.
+  //
+  // ⚠️ **Se oculta el IMPORTE, no la FILA.** Quien no ve importes sigue viendo qué falta por
+  // revisar, de qué padre salió y qué pedido está esperando: la cola es su trabajo, el precio no.
+  const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
 
   const busqueda = f.busqueda ?? '';
   const condBusqueda =
@@ -203,7 +190,7 @@ export async function consultarRecetasPorRevisar(
   const desde = Prisma.sql`
     FROM "modelos" m
     LEFT JOIN "modelos" padre ON padre."id" = m."id_modelo_padre"
-    ${negociacionDeLaVersion(idEmpresa)}
+    ${expedienteDeLaNegociacion(idEmpresa)}
     ${dineroEsperando(idEmpresa)}
    WHERE ${SQL_REVISION_SIN_APROBAR}
      ${condBusqueda}
@@ -211,8 +198,12 @@ export async function consultarRecetasPorRevisar(
   `;
 
   const [conteo, filas] = await Promise.all([
-    cliente.$queryRaw<{ total: bigint }[]>(Prisma.sql`SELECT COUNT(*)::bigint AS "total" ${desde}`),
+    cliente.$queryRaw<{ total: bigint }[]>(
+      // ⚠️ La CTE del linaje va PEGADA al principio: el `LATERAL` del expediente la consulta.
+      Prisma.sql`${CTE_LINAJE_DE_VERSIONES} SELECT COUNT(*)::bigint AS "total" ${desde}`,
+    ),
     cliente.$queryRaw<FilaBandeja[]>(Prisma.sql`
+      ${CTE_LINAJE_DE_VERSIONES}
       SELECT m."id"                 AS "idModelo",
              m."codigo"             AS "codigo",
              m."descripcion"        AS "descripcion",
@@ -224,7 +215,8 @@ export async function consultarRecetasPorRevisar(
              neg."cliente"          AS "cliente",
              neg."proyecto"         AS "proyecto",
              esp."fecha_compromiso" AS "fechaCompromiso",
-             esp."piezas"           AS "piezasPedidas"
+             esp."piezas"           AS "piezasPedidas",
+             neg."costo_prometido"  AS "costoPrometido"
       ${desde}
       ORDER BY esp."fecha_compromiso" ASC NULLS LAST,
                (esp."piezas" IS NOT NULL) DESC,
@@ -252,6 +244,11 @@ export async function consultarRecetasPorRevisar(
       r.fechaCompromiso === null ? null : r.fechaCompromiso.toISOString().slice(0, 10),
     piezasPedidas: r.piezasPedidas === null ? 0 : Number(r.piezasPedidas),
     conPedido: r.piezasPedidas !== null,
+    // ⭐⭐ V1-E9p — LA META que quien cuadre esta receta tiene que salir a conseguir. Sin verla
+    // aquí, la pregunta «¿se logró lo prometido?» que le van a hacer al firmar no se puede
+    // contestar. Null = esta versión no viene de una negociación registrada (REGLA 0-B: la fila
+    // se comporta como siempre).
+    costoPrometido: verImportes && r.costoPrometido !== null ? r.costoPrometido.toNumber() : null,
   }));
 
   return {

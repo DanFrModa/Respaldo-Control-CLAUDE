@@ -71,6 +71,52 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.084 · 2-sep-2026 · **en prueba** — ⭐⭐ La bandeja ya pregunta **«¿se logró lo prometido?»**, no «¿ya capturaste?»
+
+### Qué se puede hacer ahora que antes no
+
+**Decir que NO se consiguió** — y que se vea.
+
+Cuando en una cita estimas que la maquila va a costar cinco pesos menos, eso **no es un dato pendiente de
+capturar: es una promesa que ya le hiciste al cliente**. Tus palabras: *«se tiene que buscar una maquila de
+ese costo… pero no es seguro que se consiga»*.
+
+Hasta hoy la bandeja de cuadre sólo podía terminar de **una** forma: *listo*. Así que si Desarrollo cuadraba
+la receta con la maquila que **sí** consiguió, el renglón se iba como resuelto y **nadie se enteraba de que
+el margen que vendiste ya no existe**. Un cuadre que sólo puede acabar en «listo» **convierte un
+incumplimiento en un silencio**.
+
+Ahora, al firmar, se puede contestar **si se logró o no** y con **cuánto** se cerró. Y hay una pantalla
+nueva, **«Promesas incumplidas»**, que te enseña la brecha —*prometí 43, conseguí 45*—, **lo que cuesta**
+(la brecha por las piezas ya pedidas) y **el total de toda la cartera**, ordenado por lo que más duele.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Se arregló un defecto que estaba vivo hoy: la columna «Cliente» de la bandeja salía SIEMPRE vacía.**
+  Buscaba el expediente de la versión, y versionar un modelo **no crea expediente** — cuelga del padre. Es
+  el mismo eslabón que hacía falta para encontrar tu meta, así que se arregló de paso.
+- **Contestar es OPCIONAL.** Firmar sin decir nada funciona **exactamente** igual que antes. La bandeja
+  **sigue sin firmar**: enseña, no decide. Nada frena producción ni compra.
+- **«No se consiguió» NO es «rechazada».** Rechazar significa *«la receta está mal, corrígela»* y devuelve
+  el renglón a la cola. Aquí la receta está **bien**; lo que falló es el **costo**. Son dos cosas distintas
+  y se guardan por separado: una versión puede estar **aprobada y no lograda a la vez**.
+- **Si la receta cambia después, el desenlace se borra.** Un «sí se consiguió» medido sobre una receta que
+  ya no es ésa sería mentira; se borra y queda en la bitácora.
+- ⚠️ **La bandeja suma la columna «Prometido»** — y **sólo la ve quien puede ver importes**. Ventas,
+  Logística, Asistente y Secretarial siguen viendo la fila entera (qué falta, de qué padre salió, qué
+  pedido espera), **pero no el precio**.
+- **Funciona aunque negocies varias veces.** Una versión de una versión encuentra su mesa **dos escalones
+  arriba**, y si esa versión tiene mesa propia, **gana la suya** — la más específica, que es la que vale.
+
+### Qué sigue pendiente o roto
+
+- **Las segundas y los faltantes siguen sin medirse**: eso es otra cosa y va con las calificaciones de
+  maquileros, cuando fijes los parámetros.
+- Sin permisos nuevos y sin datos que sembrar. **Lleva migración**, aditiva: el despliegue no necesita nada
+  especial.
+
+---
+
 ## 0.083 · 1-sep-2026 · **en prueba** — ⭐ Las fotos **del arte** también son de la OP (y el arte que agregas a mano por fin puede llevar foto)
 
 ### Qué se puede hacer ahora que antes no
