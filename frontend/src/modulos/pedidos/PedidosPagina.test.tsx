@@ -54,8 +54,17 @@ vi.mock('@/api/modelos', () => ({
   }),
 }));
 
-/** Un renglón de ejemplo. */
-function renglon(id: number, codigo: string, cantidad: number, precio: number | null) {
+/**
+ * Un renglón de ejemplo. `numerosProduccion` por defecto VACÍO: desde V1-E3 el renglón apunta a su
+ * modelo de desarrollo, así que sin OPs no hay ningún nº de 5 dígitos que enseñar.
+ */
+function renglon(
+  id: number,
+  codigo: string,
+  cantidad: number,
+  precio: number | null,
+  numeros: { numerosProduccion?: number[]; numeroProduccion?: number | null } = {},
+) {
   return {
     id,
     idModelo: id * 10,
@@ -68,7 +77,8 @@ function renglon(id: number, codigo: string, cantidad: number, precio: number | 
     entregadoParcialV1: null,
     cantFaltanteV1: null,
     idDesarrollo: null,
-    numeroProduccion: null,
+    numeroProduccion: numeros.numeroProduccion ?? null,
+    numerosProduccion: numeros.numerosProduccion ?? [],
   };
 }
 
@@ -386,5 +396,59 @@ describe('<PedidosPagina>', () => {
     expect(ultimaQuery?.busqueda).toBeUndefined();
     await usuario.type(screen.getByTestId('buscar-pedido'), '101');
     await vi.waitFor(() => expect(ultimaQuery?.busqueda).toBe('101'));
+  });
+
+  /**
+   * ⭐⭐ V1-E3 (fila 0.089) — **el nº de 5 dígitos que el detalle había perdido.**
+   *
+   * Hasta V1-E3 salía aquí POR ACCIDENTE: el renglón pinta `codigoModelo` y ese código *era* el de
+   * producción porque generar la OP transformaba el modelo. Hoy el desarrollo NO se transforma, así
+   * que el código que se pinta es el de desarrollo y el número vive en los modelos POR COLOR de sus
+   * OPs (`numerosProduccion`, agregado en el servidor) — igual que en la vista del MES.
+   */
+  describe('⭐⭐ nº de producción por color en el renglón (V1-E3)', () => {
+    /** El pedido 1 con un renglón de DESARROLLO y los números que le dé el servidor. */
+    function pedidoConNumeros(numerosProduccion: number[]): Pedido {
+      return {
+        ...pedido(1, 101, 'Liverpool'),
+        lineas: [renglon(101, 'CYA-26-71-009', 10, 50, { numerosProduccion })],
+      };
+    }
+
+    it('los enseña junto al código, uno por color y separados', () => {
+      usePedidos.mockReturnValue(consultaConDatos([pedidoConNumeros([71_001, 71_002])]));
+      renderConProveedores(<PedidosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+
+      const fila = within(screen.getByTestId('detalle-pedido')).getByTestId('renglon-pedido');
+      // El código que se pinta sigue siendo el del DESARROLLO…
+      expect(within(fila).getByText('CYA-26-71-009')).toBeInTheDocument();
+      // …y el número de producción sale APARTE, uno por color.
+      expect(within(fila).getByTestId('renglon-numeros-produccion')).toHaveTextContent(
+        'prod. #71001 · #71002',
+      );
+    });
+
+    it('🔴 LA GEMELA — sin números NO pinta nada (ni "prod." ni un cero)', () => {
+      usePedidos.mockReturnValue(consultaConDatos([pedidoConNumeros([])]));
+      renderConProveedores(<PedidosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+
+      const fila = within(screen.getByTestId('detalle-pedido')).getByTestId('renglon-pedido');
+      expect(within(fila).queryByTestId('renglon-numeros-produccion')).not.toBeInTheDocument();
+      expect(within(fila).queryByText(/prod\./)).not.toBeInTheDocument();
+    });
+
+    it('el renglón LEGADO cae a su propio `numeroProduccion` (lo nuevo no se comió lo viejo)', () => {
+      const legado: Pedido = {
+        ...pedido(1, 101, 'Liverpool'),
+        lineas: [renglon(101, '51114', 10, 50, { numeroProduccion: 51_114 })],
+      };
+      usePedidos.mockReturnValue(consultaConDatos([legado]));
+      renderConProveedores(<PedidosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+
+      const fila = within(screen.getByTestId('detalle-pedido')).getByTestId('renglon-pedido');
+      expect(within(fila).getByTestId('renglon-numeros-produccion')).toHaveTextContent(
+        'prod. #51114',
+      );
+    });
   });
 });

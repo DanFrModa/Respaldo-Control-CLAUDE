@@ -115,6 +115,38 @@ verificar. Es exactamente lo mismo que la hace segura.
 - **Los colores ya capturados como «Negro A» no se parten.** Sigue siendo así a propósito: *«lo viejo
   ahorita es irrelevante»*. Ese trabajo no desaparece — es requisito del **ETL de arranque**.
 - **El despliegue lleva migración** (dos columnas nuevas, aditiva). **No** hace falta `SEED_ON_START`.
+## 0.086 · 2-sep-2026 · **en prueba** — El detalle del pedido **vuelve a enseñar el nº de producción**, y se cierra una puerta trasera
+
+### Qué se puede hacer ahora que antes no
+
+**Ver el número de producción en el detalle del pedido**, otra vez — y ahora **uno por color**.
+
+Hasta la versión 0.078 ese número salía ahí **por accidente**: como sacar a producción *transformaba* el
+modelo, su código pasaba a ser el de 5 dígitos. Desde que cada color tiene su propio modelo, el renglón
+enseña el **código de desarrollo** — que es cierto y buscable, pero incompleto. **La vista del mes traía
+los dos y el detalle sólo uno.** Ya no.
+
+### Qué cambió y puede sorprender
+
+- **Salen todos los números del renglón, uno por cada OP** — igual que en la vista del mes, y con el mismo
+  formato. Si un renglón todavía no tiene ninguna orden, **no sale nada**: ni un cero ni un hueco raro.
+- ⭐ **Las dos pantallas ahora responden con una sola voz.** La regla de qué número enseñar y de **qué
+  orden cuenta** vivía escrita dos veces, una en cada pantalla. Se unificó — porque si se separaran, el
+  mismo renglón podría decirte *«3 órdenes»* en una y *«2»* en la otra.
+- **Se cerró una puerta trasera**: existía una forma de crear una orden **saltándose la entrada a
+  producción entera**, que dejaba la OP colgando de un modelo de desarrollo, sin número. Ahora se rechaza
+  y manda a **generar la OP**, que es el camino bueno. *(Nadie la usaba desde ninguna pantalla, pero
+  estaba abierta.)*
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Queda una tercera copia de la regla «qué orden cuenta»**, en la consulta que calcula **los totales**
+  de la vista del mes. Hoy dicen lo mismo; si algún día se separaran, **los totales discreparían de los
+  renglones de la misma pantalla**. Se dejó a propósito —unificarla traía más riesgo que el que
+  quitaba— y queda **anotada con su razón**, no callada.
+- Sin permisos nuevos, sin migración, sin datos que sembrar: el despliegue no necesita nada especial.
+
+---
 
 ## 0.085 · 2-sep-2026 · **en prueba** — ⭐ El aviso de «ya está comprado» ahora **lleva al botón**, a quien puede usarlo
 

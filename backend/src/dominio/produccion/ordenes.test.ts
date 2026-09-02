@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
@@ -32,7 +32,7 @@ const sesionSoloVer = () => sesionDePrueba({ permisos: ['ordenes.ver'] });
  * orden con UNA matriz: color Rojo con tallas CH=10 y M=5 → total 15. Sirve para verificar la
  * proyección del total derivado.
  */
-function bdParaCrear(): ContextoBd {
+function bdParaCrear(origenModelo: 'desarrollo' | 'produccion' = 'produccion'): ContextoBd {
   const ordenDetallada = {
     id: 1,
     folio: 7n,
@@ -94,7 +94,15 @@ function bdParaCrear(): ContextoBd {
         Promise.resolve({
           idModelo: 9,
           // La composición del MODELO es la fuente de la de la orden (Daniel 24-jul-2026).
-          modelo: { activo: true, codigo: '501', composicion: '100% ALGODÓN (MODELO)' },
+          // ⚠️ `origen` NO es decorado del stub: desde la fila 0.090 la guarda de
+          // `resolverOrigenPedido` lo lee, y sin él el doble diría `undefined` — que no es
+          // 'desarrollo' y por tanto dejaría pasar el alta **por construcción**, no por la regla.
+          modelo: {
+            activo: true,
+            codigo: '501',
+            composicion: '100% ALGODÓN (MODELO)',
+            origen: origenModelo,
+          },
           pedido: {
             idEmpresa: 1,
             idCliente: 3,
@@ -215,6 +223,42 @@ describe('dominio Órdenes (F2-E2) — total derivado por suma (D4)', () => {
     expect(salida.lineas).toHaveLength(1);
     expect(salida.lineas[0]?.totalPiezas).toBe(15); // 10 + 5
     expect(salida.totalPiezas).toBe(15); // total de la orden = Σ de todas las tallas
+  });
+});
+
+/**
+ * 🔴🔴 **UNA OP NUNCA LLEVA UN MODELO DE DESARROLLO** (fila 0.090, cierra §Post-F9.34).
+ *
+ * `POST /api/ordenes` es el único llamador de `crearOrden` que NO pasa `idModeloDeLaOrden`: por esa
+ * puerta nacía una OP de un modelo en `origen = 'desarrollo'`, sin nº de producción y —desde
+ * V1-E3— sin ningún modelo por color. `salidaAProduccion`, en cambio, siempre entrega un modelo de
+ * producción (heredado o el hijo por color recién nacido), así que a ella la guarda no la toca.
+ *
+ * La PAREJA es lo que da fe: el rechazo solo significa algo junto al alta legada que sigue pasando.
+ */
+describe('🔴🔴 dominio Órdenes — el alta por captura no produce un DESARROLLO (fila 0.090)', () => {
+  it('renglón de modelo de DESARROLLO → ErrorConflicto que manda a generar la OP', async () => {
+    const error = await crearOrden(
+      sesionAdmin(),
+      { idPedidoLinea: 50 },
+      bdParaCrear('desarrollo'),
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    // ANCLADO: no basta con negarse, tiene que nombrar la puerta buena.
+    expect((error as Error).message).toContain('salida-produccion');
+    expect((error as Error).message).toContain('501');
+  });
+
+  it('🔴 LA GEMELA — el renglón LEGADO (modelo ya de producción) SIGUE creando su orden', async () => {
+    // La fila 0.090 cierra un agujero; NO retira el endpoint. Los ~4,987 modelos migrados del
+    // Access están en `origen = 'produccion'` y su alta por captura tiene que seguir funcionando.
+    const salida = await crearOrden(
+      sesionAdmin(),
+      { idPedidoLinea: 50 },
+      bdParaCrear('produccion'),
+    );
+    expect(salida.idModelo).toBe(9);
   });
 });
 

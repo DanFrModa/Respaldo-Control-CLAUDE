@@ -1325,6 +1325,116 @@ contrato sin deriva. ⚠️ El `lint` del backend costó tres intentos (`EXIT=13
 V8 a 4 GB, y ventanas de 10 min con load 43) **y ninguno se reportó como pase**: cerró en verde al esperar
 memoria. **El coder cazó su propia primera pasada resumiendo `EXIT=137 | 0 errores`** — el falso verde exacto
 contra el que avisa la casa.
+## V1-E9r · LOS DOS CABOS QUE DEJÓ «UN MODELO POR COLOR» (2-sep-2026, versión **0.086**) — ✅ HECHA
+
+Filas **0.089** y **0.090**, juntas por ser el mismo tema: lo que la 0.078 dejó suelto.
+
+### 0.089 — el detalle del pedido sin el nº de producción
+
+Hasta la 0.078 lo enseñaba **por accidente**: el renglón pinta `codigoModelo` y ése **era** el de producción
+porque la promoción transformaba el modelo. **Lo que enseña hoy es cierto (D3)** — pero la vista del MES
+trae **los dos** y el detalle sólo uno.
+
+⚠️ **La trampa:** la línea del detalle **SÍ tiene `numeroProduccion`**, pero vale **`null` SIEMPRE** para un
+renglón de desarrollo ⇒ **enseñarlo daría un hueco, no el número**.
+
+### ⭐ Tres hallazgos del coder que el encargo no nombraba
+
+1. **El detalle tiene DOS lectores, no uno.** `aPedidoSalida` lo comparten `obtenerPedido` **y
+   `listarPedidos`**, y `/pedidos/administrar` pinta su panel **desde el payload de la LISTA** ⇒ el
+   agregado hubo que hacerlo **por PÁGINA**. 🔴 **Y eso abre un modo de fallo que nadie había nombrado:
+   que el lote le dé a un pedido los números de OTRO.** Tiene prueba propia (`pedidos.int.test.ts:865`).
+2. **El `.describe()` del contrato estaba a punto de volverse mentira** (`pedido.ts:261` decía *«Esta forma
+   NO lleva los números por color»*).
+3. **La regla iba a existir DOS veces en el frontend** ⇒ la extrajo, y su M8 (cambiar el separador) pone
+   rojas **las dos páginas**: *la prueba de que responden con una sola voz*.
+
+### 0.090 — `POST /api/ordenes` se saltaba la entrada a producción
+
+Deuda previa (§Post-F9.34) que la 0.078 **no cerró y cuya FORMA cambió**. 🔴 **Medido: NADIE la llama** —
+cero usos en `frontend/src`, `e2e/` y `migracion/` — **pero sigue publicada en el OpenAPI**.
+
+**Tomó (a) fallar cerrado, con un predicado MÁS FINO que el del encargo, y la medición es la razón:**
+
+> rechaza cuando **el modelo que queda SELLADO en la OP** es `origen = 'desarrollo'` — **no** cuando lo es
+> el modelo del renglón.
+
+🔴 **Escribirlo sobre el renglón HABRÍA ROTO `salidaAProduccion`**: ésa pasa `idModeloDeLaOrden` mientras el
+renglón **sigue apuntando a su modelo de desarrollo**. La puerta buena **no puede disparar la invariante
+por construcción** (los hijos nacen `origen: 'produccion'`), y la mala **se cierra antes de cualquier
+escritura** — ni persiste ni consume folio.
+
+**Descartó (b) midiendo:** `lineas` es **opcional** ⇒ un alta sin matriz **acuñaría un hijo multicolor con
+un nº de 5 dígitos que nadie confirmó** ⇒ *«una segunda puerta al acto más delicado del sistema»*.
+**(c) retirar el endpoint: prohibido** — no se retiran capacidades que el dueño no pidió retirar.
+
+### ⭐ El coder se cazó «la prueba que pasa por construcción»
+
+Su **M11**: el stub existente devolvía un modelo **sin `origen`** ⇒ `undefined !== 'desarrollo'` habría
+dejado pasar la guarda nueva **sin comprobar nada**. Lo parametrizó. El reviewer lo verificó **y lo afinó**:
+el agujero real estaba **en la GEMELA**, y hoy es una prueba viva (invertir la guarda la tumba, 5 rojas).
+
+### 🔴 EL RECHAZO: un comentario que la propia entrega volvía falso
+
+`e2e/pedidos.spec.ts` —**el único que prueba esto contra BD real**— tenía un comentario falso en **tres**
+puntos, incluido *«⇒ etapa aparte (0.089)»*… **cuando 0.089 ES esta entrega**.
+
+⭐⭐ **Y es el reflejo EXACTO del error que le dio su número a la 0.090** —una nota que *«se leería como
+cerrada sin estarlo»*— aquí al revés, **y en el mismo PR que arregla su gemela**. El coder había corregido
+el `.describe()` y **dejó éste, que era más explícito**.
+
+**Y la mitad que más pesaba: faltaba la aserción espejo, de UNA línea, con las dos variables ya en ámbito**
+⇒ sin ella, y con los `int.test` sin poder correrse local, **la 0.089 entraba sin una sola verificación de
+punta a punta**.
+
+### ⭐ La razón correcta de una prueba, medida contra el fuente de Playwright
+
+La primera versión justificaba la `toBeVisible` con una razón que **no distinguía nada**: las dos usan **el
+locator idéntico**, así que la regresión que describía las pondría rojas a las dos.
+
+**La razón verdadera la midió el reviewer en el fuente de Playwright 1.60:** `toContainText` usa
+`elementText`, que sólo salta `SCRIPT/NOSCRIPT/STYLE/<head>` y **no mira CSS** ⇒ **un renglón presente pero
+OCULTO satisface `toContainText` y falla `toBeVisible`**.
+
+📌 **Y el peligro iba en la dirección contraria a la que parece:** con la razón mal escrita, *el próximo que
+razone bien concluirá que sobra y borrará el chequeo de visibilidad*. **Un argumento falso defendiendo algo
+correcto es peligroso justo por eso.**
+
+### ⭐ La duplicación en el backend: el coder se aplicó su propio argumento
+
+El reviewer notó que la regla quedaba **duplicada en el backend** — *«literalmente el argumento que el
+propio coder usa en `numeros-produccion.ts:10` para el frontend»*. **La extrajo**, y **fue más lejos**:
+incluyó también **qué OP cuenta como viva**, porque *«viva» gobierna además `numOrdenes`, `cortado` y la OP
+más reciente ⇒ **divergir haría que el mismo renglón dijera «3 órdenes» aquí y «2» allá***.
+
+⚠️ **Y NO absorbió la tercera codificación** (SQL crudo, `consulta-mes.ts:245`, los **totales** de la
+página), con tres razones medidas: parametrizar un enum en SQL crudo **no tiene precedente en el repo** (7
+sitios, todos con literal) y **reventaría sólo en CI**; exportar un `Prisma.Sql` **arrastra el alias como
+contrato oculto** y la variante con `Prisma.raw` *«tiene forma de inyección»*; y **no son la misma cosa**
+(dos `where` vs. una condición de `JOIN` en un agregado).
+⭐ **Hizo algo más fuerte que el puntero sugerido: el comentario NOMBRA la función**, así que **un solo
+`grep` saca las tres**. Y el docstring estrena una sección **«LO QUE ESTE MÓDULO NO UNIFICA»** con la
+consecuencia visible. *El docstring ya no promete lo que no cumple.*
+
+### Verificación
+
+**14 mutaciones del coder + las del reviewer.** El reviewer atacó los dobles con contrafactual (alimentar
+la consulta con `l.id + 1` → **rojo con aserción limpia**; quitar el cableado → **no compila**), y verificó
+**mecánicamente** que meter la decisión 1 en el módulo compartido no cambió nada (`deepStrictEqual` del
+filtro contra el literal previo, y las otras tres agregaciones intactas).
+
+**Gates (lead):** backend **2 713 / 204** · frontend **2 004 / 206** · typecheck ×2 · lint ×2 · format ×2 ·
+**cero drift**. **Sin migración, sin permisos, `seed.ts` intacto.**
+
+### ⚠️ Un flake declarado, no escondido
+
+La **primera** corrida de `test:unit` tras el cambio dio **1 failed / 2 712** en **520 s** (frente a ~93 s):
+la máquina ahogada. **No se pudo nombrar la prueba** —el log se perdió— así que en vez de darlo por bueno se
+corrió **tres veces completo (2 713 ×3)** y **tres veces los archivos tocados (474 ×3)**. Lectura: contención
+del entorno, no el cambio (lo tocado son funciones puras y proyecciones). **Queda como antecedente por si CI
+enseña un rojo intermitente.**
+
+---
 
 ## V1-E9q · EL AVISO LLEVA AL BOTÓN — a quien puede usarlo (2-sep-2026, versión **0.085**) — 🔶 MITAD (b) DE LA FILA 0.068
 

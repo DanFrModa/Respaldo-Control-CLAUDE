@@ -708,3 +708,170 @@ describe('⭐ cancelar el pedido real (V1-E4)', () => {
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });
+
+/**
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)) — **EL Nº DE 5 DÍGITOS QUE EL DETALLE DEL PEDIDO HABÍA PERDIDO.**
+ *
+ * 🔴 Hasta V1-E3 el detalle lo enseñaba **por accidente**: pintaba `codigoModelo`, y ese código
+ * *era* el de producción porque generar la OP **transformaba** el modelo del renglón. Desde V1-E3 el
+ * desarrollo ya no se transforma —nacen modelos de producción POR COLOR—, así que
+ * `numeroProduccion` del renglón es `null` **para siempre** y el detalle se quedó sin ningún número
+ * que enseñar, **mientras la vista del MES sí los traía**. La misma necesidad se cubría en una
+ * pantalla y en la otra no; esto cierra la asimetría con la MISMA regla (`consulta-mes.ts`).
+ */
+describe('⭐⭐ Pedidos — numerosProduccion en el detalle (V1-E3)', () => {
+  /** Crea un pedido de un renglón con el modelo dado y devuelve el pedido y el id del renglón. */
+  async function pedidoDeUnRenglon(
+    idModelo: number,
+  ): Promise<{ idPedido: number; idLinea: number }> {
+    const pedido = await crearPedido(
+      sesion([...PERM_TODOS]),
+      { idCliente: clienteNegocio.id, lineas: [{ idModelo, cantidadPedida: 100, precio: 148 }] },
+      bd(),
+      archivos,
+    );
+    return { idPedido: pedido.id, idLinea: pedido.lineas[0]!.id };
+  }
+
+  /** Un modelo de DESARROLLO (el que apunta el renglón desde V1-E3: nunca tiene número). */
+  async function modeloDesarrollo(codigo: string): Promise<Modelo> {
+    return cliente.modelo.create({
+      data: { codigo, origen: 'desarrollo', codigoDesarrollo: codigo },
+    });
+  }
+
+  /** Un hijo de PRODUCCIÓN por color del desarrollo dado, con su nº de 5 dígitos (o sin él). */
+  async function hijoDeProduccion(
+    idModeloDesarrollo: number,
+    codigo: string,
+    numeroProduccion: number | null,
+  ): Promise<Modelo> {
+    return cliente.modelo.create({
+      data: {
+        codigo,
+        origen: 'produccion',
+        idModeloDesarrollo,
+        ...(numeroProduccion === null ? {} : { numeroProduccion }),
+      },
+    });
+  }
+
+  /** Una OP del renglón, con el modelo dado. `folio` es del llamador (único por empresa). */
+  async function opDelRenglon(
+    idLinea: number,
+    idModelo: number,
+    folio: number,
+    estado: 'completa' | 'cancelada' = 'completa',
+  ): Promise<void> {
+    await cliente.orden.create({
+      data: {
+        folio: BigInt(folio),
+        idEmpresa: empresa.id,
+        idPedidoLinea: idLinea,
+        idModelo,
+        idCliente: clienteNegocio.id,
+        estado,
+        ...(estado === 'cancelada' ? { motivoCancelada: 'prueba' } : {}),
+      },
+    });
+  }
+
+  it('los nº de los modelos POR COLOR de sus OPs vivas: ordenados y SIN repetir', async () => {
+    const desarrollo = await modeloDesarrollo('CYA-26-71-009');
+    // Se crean DESORDENADOS a propósito (71002 antes que 71001): el orden lo pone el servidor.
+    const rojo = await hijoDeProduccion(desarrollo.id, '71002', 71_002);
+    const azul = await hijoDeProduccion(desarrollo.id, '71001', 71_001);
+    const { idPedido, idLinea } = await pedidoDeUnRenglon(desarrollo.id);
+    await opDelRenglon(idLinea, rojo.id, 900);
+    await opDelRenglon(idLinea, azul.id, 901);
+    await opDelRenglon(idLinea, rojo.id, 902); // RESURTIDO del rojo: no repite su número.
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    // El renglón sigue apuntando a su DESARROLLO, que no tiene número…
+    expect(salida.lineas[0]?.codigoModelo).toBe('CYA-26-71-009');
+    expect(salida.lineas[0]?.numeroProduccion).toBeNull();
+    // …y lo que el detalle enseña son los de sus modelos por color.
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([71_001, 71_002]);
+  });
+
+  it('🔴 LA GEMELA — un renglón SIN OPs sale VACÍO (no un cero, no un hueco)', async () => {
+    const desarrollo = await modeloDesarrollo('CYA-26-71-010');
+    await hijoDeProduccion(desarrollo.id, '71003', 71_003); // el hijo existe, pero no hay OP.
+    const { idPedido } = await pedidoDeUnRenglon(desarrollo.id);
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([]);
+    expect(salida.lineas[0]?.numeroProduccion).toBeNull();
+  });
+
+  it('una OP CANCELADA no aporta su número (viva ≠ existente)', async () => {
+    const desarrollo = await modeloDesarrollo('CYA-26-71-011');
+    const viva = await hijoDeProduccion(desarrollo.id, '71004', 71_004);
+    const muerta = await hijoDeProduccion(desarrollo.id, '71005', 71_005);
+    const { idPedido, idLinea } = await pedidoDeUnRenglon(desarrollo.id);
+    await opDelRenglon(idLinea, viva.id, 910);
+    await opDelRenglon(idLinea, muerta.id, 911, 'cancelada');
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([71_004]);
+  });
+
+  /**
+   * ⚠️ **EL CONTRATO NO PUEDE PROMETER LO QUE EL DOMINIO NO PUEDE DAR.** `numerosProduccion` es
+   * `z.array(z.number().int())`: un `null` colado ahí no sería un dato feo, sería un **500** al
+   * serializar la respuesta. Y el caso existe de verdad: los 285 modelos del Access con código NO
+   * numérico (`51783a`, `M-18`) están en producción y no tienen número.
+   */
+  it('⭐ una OP de un modelo SIN número (histórico `M-18`) no mete un null en el array', async () => {
+    const sinNumero = await cliente.modelo.create({
+      data: { codigo: 'M-18', origen: 'produccion' },
+    });
+    const { idPedido, idLinea } = await pedidoDeUnRenglon(sinNumero.id);
+    await opDelRenglon(idLinea, sinNumero.id, 920);
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([]);
+  });
+
+  it('el renglón LEGADO sigue enseñando el número de su propio modelo (lo nuevo no se comió lo viejo)', async () => {
+    // Control negativo: `numeroProduccion` (el del modelo del RENGLÓN) NO se retiró. Para el
+    // histórico del Access —donde el renglón YA apunta a un modelo de producción— sigue siendo el
+    // dato bueno. Si `numerosProduccion` se hubiera hecho a costa de él, esta prueba cae.
+    await cliente.modelo.update({ where: { id: modeloA.id }, data: { numeroProduccion: 51_114 } });
+    const { idPedido } = await pedidoDeUnRenglon(modeloA.id);
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    expect(salida.lineas[0]?.numeroProduccion).toBe(51_114);
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([]);
+  });
+
+  /**
+   * 🔴 El agregado va POR LOTE (una consulta para toda la página). El modo de fallo propio del lote
+   * no es "no salen": es que **salgan los del pedido de al lado**. Sin esta prueba, repartir mal el
+   * `Map` por renglón pasa en verde con las de arriba, que miran un pedido solo.
+   */
+  it('⭐ en el LISTADO cada pedido se queda con SUS números (el lote no los cruza)', async () => {
+    const devA = await modeloDesarrollo('CYA-26-71-020');
+    const devB = await modeloDesarrollo('CYA-26-71-021');
+    const hijoA = await hijoDeProduccion(devA.id, '71020', 71_020);
+    const hijoB = await hijoDeProduccion(devB.id, '71021', 71_021);
+    const a = await pedidoDeUnRenglon(devA.id);
+    const b = await pedidoDeUnRenglon(devB.id);
+    await opDelRenglon(a.idLinea, hijoA.id, 930);
+    await opDelRenglon(b.idLinea, hijoB.id, 931);
+    // Un tercer pedido SIN OP: en la misma página, y tiene que salir vacío.
+    const sinOp = await pedidoDeUnRenglon(modeloB.id);
+
+    const pagina = await listarPedidos(sesion([...PERM_TODOS]), {}, bd(), archivos);
+    const porId = new Map(pagina.datos.map((p) => [p.id, p.lineas[0]?.numerosProduccion]));
+
+    expect(porId.get(a.idPedido)).toEqual([71_020]);
+    expect(porId.get(b.idPedido)).toEqual([71_021]);
+    expect(porId.get(sinOp.idPedido)).toEqual([]);
+  });
+});

@@ -20020,8 +20020,10 @@ export interface paths {
                   cantFaltanteV1: number | null;
                   /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                   idDesarrollo: number | null;
-                  /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                  /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                   numeroProduccion: number | null;
+                  /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                  numerosProduccion: number[];
                 }[];
                 /**
                  * Format: date-time
@@ -20252,8 +20254,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -20445,8 +20449,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -20661,8 +20667,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -20859,8 +20867,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -21063,8 +21073,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -24784,7 +24796,10 @@ export interface paths {
       };
     };
     put?: never;
-    /** Crear una orden de producción desde un renglón de pedido */
+    /**
+     * Crear una orden de producción desde un renglón de pedido cuyo modelo YA es de producción
+     * @description Alta directa por captura, con autorrelleno de modelo/cliente/empresa desde el renglón. ⚠️ Si el modelo del renglón es de DESARROLLO se rechaza con 409: esa OP se genera con `POST /api/pedidos/lineas/{idLinea}/salida-produccion`, que es quien hace nacer el modelo de producción del color con su nº de 5 dígitos (V1-E3, §Post-F9.34).
+     */
     post: {
       parameters: {
         query?: never;
