@@ -187,7 +187,7 @@ npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts
 **Por qué.** El ETL es **fiel a la fuente**: `crearOrdenMigrada` escribe el `estado` y la
 `fechaCompletada` EXPLÍCITOS que traía Access (`FechaDet`/`OrdCancelada`) y **no recalcula** — así
 debe ser, migrar es copiar el histórico, no reinterpretarlo. Pero desde el 26-jul-2026 el estado de
-la orden es **automático** (`completa` = tallas + avíos, y arte si aplica; `DECISIONES.md
+la orden es **automático** (`completa` = tallas + receta liberada, y arte si aplica; `DECISIONES.md
 §Post-F9.4`) y la pantalla **"Órdenes incompletas"** filtra por el estado GUARDADO. Sin este paso, el
 semáforo queda desalineado recién cargada la base y **el backlog que Daniel pidió atender queda
 invisible** (_"si no meten la información del arte, o no desmarcan la casilla, está como

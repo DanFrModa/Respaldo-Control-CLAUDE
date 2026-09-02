@@ -9,7 +9,8 @@
  *
  * Endpoints (todos GET, todos `ordenes.ver`, todos filtran por empresa activa A9):
  *  • `GET /ordenes/consulta` — listado LIGERO con filtros de servidor (proyección ligera).
- *  • `GET /ordenes/incompletas` — capturadas sin matriz, con `diasAntiguedad` + semáforo derivado.
+ *  • `GET /ordenes/incompletas` — `estado='capturada'` (les falta tallas, receta liberada o arte),
+ *    con `diasAntiguedad` + semáforo derivado.
  *  • `GET /ordenes/tablero/pedidos-por-mes` — agregado por mes (extensible a avances en F3).
  *  • `GET /ordenes/centro` — centro de comando (rediseño R2: 13 columnas agregadas en servidor).
  *  • `GET /ordenes/buscar` — buscador global ligero para el layout.
@@ -86,14 +87,17 @@ export const rutasConsultasOrden: FastifyPluginCallbackZod = (app, _opciones, do
     },
   });
 
-  // Incompletas: capturadas sin matriz, con antigüedad + semáforo derivado en servidor.
+  // Incompletas: `estado='capturada'` (les falta algún requisito), con antigüedad + semáforo
+  // derivado en servidor.
   app.route({
     method: 'GET',
     url: '/ordenes/incompletas',
     preHandler: app.conPermiso('ordenes.ver'),
     schema: {
       tags: ['ordenes'],
-      summary: 'Listar órdenes incompletas (capturadas sin matriz) con semáforo de antigüedad',
+      summary:
+        'Listar órdenes incompletas (les falta tallas, receta liberada o arte) con semáforo de ' +
+        'antigüedad',
       security: SEGURIDAD_SESION,
       querystring: esquemaIncompletasQuery,
       response: { 200: esquemaOrdenesIncompletasPagina, ...respuestasError },

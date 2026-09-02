@@ -71,6 +71,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.088 · 2-sep-2026 · **en prueba** — El renglón en ceros de la conciliación **ya dice por qué existe**, y el menú deja de mentir
+
+### Qué se puede hacer ahora que antes no
+
+**Ver las prendas incompletas dentro de la conciliación de maquileros**, con su propia columna y su total.
+
+Y sobre todo: cuando un grupo (orden + maquilero + proceso) **entregó SÓLO prendas incompletas**, ese renglón
+ahora **lleva una marca que lo explica**. Antes salía con tres ceros y **nadie sabía por qué estaba ahí** —
+parecía basura de pantalla.
+
+⭐ **Y resulta que no era basura: era la única huella de esa entrega.** Al medirlo se vio que un `recibido = 0`
+significa, exactamente, *«todos los recibos de ese grupo trajeron sólo prendas incompletas»*. Esconderlo habría
+borrado justo lo que pediste poder ver (*«sólo quisiera ver reflejado en algún lado que sí las entrego, para
+revisar los temas de pago»*). **No se esconde**, y el filtro «Solo con faltante por cargar» —que ya existía—
+sigue siendo la salida para quien no lo quiera ver.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **La marca NO promete que el renglón cuadre en ceros.** Dice sólo que *esos recibos no generaron cargo*.
+  Si en ese mismo grupo hay además un cargo **capturado a mano o migrado**, el renglón **puede salir en
+  negativo** — y está bien que lo haga, porque el descuadre es real y hay que verlo.
+- 🔴 **El menú «Órdenes incompletas» llevaba tiempo describiéndose mal.** Decía que son *«las órdenes capturadas
+  **sin matriz**»* y **es falso**: significa *«le falta un requisito»*, y una orden incompleta **sí puede tener
+  su matriz**. La descripción estaba además **publicada en el contrato del sistema**. Corregida en 22 sitios.
+- ⭐ **Y esa frase tenía dos caras, no una.** Junto a la anterior vivía *«los requisitos son tallas + avíos»*,
+  que quedó vieja cuando la receta pasó a liberarse: hoy es **tallas + receta liberada, y arte si aplica**.
+  Corregir la primera copiando la segunda habría sido **cambiar una mentira por otra**.
+- **No cambia ningún número.** Nada de lo que ya se calculaba se toca: sólo se enseña lo que no se enseñaba y
+  se dice la verdad donde se decía otra cosa.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Queda un cabo de esta misma familia** (el sesgo de tres pruebas que no distinguen «suma el acumulado» de
+  «mira sólo esta captura»). **No hay fallo de negocio detrás** —se midió: las tres funciones suman bien— pero
+  las pruebas no lo verían si se rompiera. Espera a que baje otra versión que toca los mismos archivos.
+- ⚠️ **La defensa de la marca nueva vive ENTERA en las pruebas contra base de datos real.** Si alguien la
+  rompiera, en la máquina de desarrollo **no se enteraría nadie**: sólo lo caza el CI.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.086 · 2-sep-2026 · **en prueba** — El detalle del pedido **vuelve a enseñar el nº de producción**, y se cierra una puerta trasera
 
 ### Qué se puede hacer ahora que antes no

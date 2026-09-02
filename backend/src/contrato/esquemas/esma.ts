@@ -397,7 +397,25 @@ export const esquemaConciliacionFila = z
     maquilero: z.string().describe('Nombre del maquilero.'),
     idTipoProceso: z.number().int().nullable().describe('Proceso de maquila.'),
     tipoProceso: z.string().describe('Nombre del proceso.'),
-    recibido: z.number().describe('Σ piezas recibidas (recibos vivos del periodo).'),
+    recibido: z.number().describe('Σ piezas BUENAS recibidas (recibos vivos del periodo).'),
+    incompletas: z
+      .number()
+      .int()
+      .describe(
+        'Σ prendas INCOMPLETAS que el maquilero entregó en los recibos del grupo (V1-E8k, ' +
+          '§Post-F9.136). INFORMATIVO y deliberadamente FUERA de `recibido`: no se producen ni se ' +
+          'pagan, así que no generan cargo y no pueden descuadrar la conciliación.',
+      ),
+    soloIncompletas: z
+      .boolean()
+      .describe(
+        '¿Todos los recibos VIVOS de este grupo trajeron SÓLO prendas incompletas? Es lo que ' +
+          'explica un renglón con `recibido` 0: esas prendas no se pagan, así que esos recibos NO ' +
+          'generaron cargo. NO afirma que el renglón cuadre: `cargado` incluye también los cargos ' +
+          'validados que no cuelgan de un recibo (histórico o manual), y uno de ésos puede dejar ' +
+          '`faltantePorCargar` negativo. Derivado en el servidor (A1) de `recibido === 0 && ' +
+          'incompletas > 0`; la pantalla sólo lo pinta.',
+      ),
     cargado: z.number().describe('Σ piezas cargadas a EsMa (cargos validados).'),
     faltantePorCargar: z.number().describe('recibido − cargado (>0 = falta cargar a EsMa).'),
     // ── F6-E5 add-on: contexto de producción/pago de la orden ────────────────────────────────────
@@ -431,6 +449,8 @@ export const esquemaConciliacionSalida = z
     totales: z
       .object({
         recibido: z.number(),
+        /** Σ de `incompletas` de las filas mostradas (fuera de `recibido`, nunca se le suma). */
+        incompletas: z.number().int(),
         cargado: z.number(),
         faltantePorCargar: z.number(),
         numCargosSinRecibo: z.number().int(),
