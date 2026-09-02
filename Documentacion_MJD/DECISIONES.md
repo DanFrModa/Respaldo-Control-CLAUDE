@@ -7327,11 +7327,16 @@ detrás el día del arranque.
   acentos y colapsa espacios. ⇒ **`NEGRO A` y `NEGRO B` son dos claves distintas y se crean al vuelo,
   como dos colores de catálogo.**
 - **No hay una sola línea de lógica de packs en el loader.** No es que esté mal escrita: **no existe**.
-- ⭐ **Lo que YA existe es la SUMA, no la regla.** `fusionarPacksEnUnaCorrida`
-  (`backend/src/dominio/pedidos/fusion-packs-cya.ts`, de §Post-F9.129) hace **exactamente una cosa**:
-  suma talla por talla varios renglones-pack en una sola corrida. **No sabe qué es un pack** —recibe
-  `RenglonPackCya[]` con la letra **ya resuelta por el parser del PDF**— y **devuelve UNA sola corrida
-  a propósito**, porque cada PDF de C&A es UNA OC con UN color genérico. ⚠️ **Una orden de Access trae
+- ⚠️⚠️ **ESTE PÁRRAFO QUEDÓ OBSOLETO EL 2-sep-2026 (v0.091) — y su petición SE CUMPLIÓ.** Decía:
+  *«lo que YA existe es la SUMA, no la regla: `fusionarPacksEnUnaCorrida`
+  (`backend/src/dominio/pedidos/fusion-packs-cya.ts`) … no sabe qué es un pack … y devuelve UNA sola
+  corrida a propósito»*. **Hoy es falso en nombre, ruta, retorno y responsabilidad**: esa función **ya no
+  existe**. La sustituyó **`agruparPacksEnRenglones`** (`backend/src/dominio/pedidos/packs-cya.ts`), que
+  **NO funde**: agrupa **por pack** y devuelve **un renglón por tendido**. ⭐ **Y sí sabe qué es un pack**,
+  porque usa **`normalizarPack` del dominio de producción** — que es **exactamente la regla compartida que
+  el punto siguiente pedía escribir UNA vez**. ⇒ **El ETL de Access ya no tiene que inventarla: la importa.**
+  Lo que sigue siendo suyo es **agrupar primero por color base**, porque una orden de Access trae muchos
+  colores y un PDF de C&A trae uno. ⚠️ **Una orden de Access trae
   MUCHOS colores**, así que el ETL no puede llamarla y ya: tiene que **agrupar primero por color base**
   y usarla para sumar cada grupo.
 - 🔴 **Dónde está el riesgo real de dos implementaciones: en la REGLA, no en la suma.** *"Qué es un
@@ -12128,5 +12133,37 @@ nuevo **sí** pasan.
 **Por qué:** cubre de sobra lo que C&A manda («A», «B», «PACK 1»). Es el más inocuo de los tres.
 
 - **Aplica en:** versión **0.087**, ficha `V1-E9s`. **Fecha:** 2026-09-02.
+
+---
+
+#### (Post-F9.183) — ⏳ PENDIENTE DE DANIEL: el pack **distingue mayúsculas** (2-sep-2026, versión **0.091**)
+
+> 📌 **No frena nada** (REGLA 0): está construido con su default y **Daniel sólo confirma o ajusta**.
+
+Al cablear la captura de packs apareció una decisión que **§Post-F9.179 no tomó**: esa sección fijó **el
+LARGO** de la etiqueta (12), **no la caja**.
+
+**Hoy `a` y `A` son DOS TENDIDOS DISTINTOS** del mismo color, porque `normalizarPack` **sólo recorta
+espacios**.
+
+**Dónde puede pasar y dónde no, medido:**
+- **Desde el PDF de C&A: NO puede.** El parser sólo emite **una letra `[A-Z]`** (`parseo-pdf-cya.ts:161`) y
+  **la vista previa no deja editarla** — las letras salen del parseo, no del teclado.
+- **Capturando a mano: SÍ.** El campo de pack acepta cualquier caja.
+- **No es invisible**: los dos tendidos salen apilados en la misma columna, a la vista.
+
+### Por qué NO se normalizó en la pantalla (y esto es lo que hay que preservar)
+1. El campo admite **12 caracteres para un rótulo** («Tendido 2»); subirlo a mayúsculas **reescribiría lo que
+   el usuario teclea mientras teclea**.
+2. ⭐ **La UI no es la única puerta**: el API y el ETL también escriben packs ⇒ normalizar ahí sería
+   **exactamente «un guardián que falla en silencio»**: parecería una invariante y no lo sería.
+3. ⭐⭐ **Y la razón de fondo, que aportó el reviewer: sería re-decidir una regla de negocio en la capa
+   equivocada (A1).** El sitio del arreglo real, si se quiere, es **`normalizarPack` en el dominio** — una
+   línea, y vale para las tres puertas.
+
+**Default propuesto: dejarlo así.** Si Daniel dice que el tendido **no** debe distinguir mayúsculas, se
+cambia en `normalizarPack` y aplica a todo.
+
+- **Aplica en:** versión **0.091**, ficha `V1-E9w`. **Fecha:** 2026-09-02.
 
 ---

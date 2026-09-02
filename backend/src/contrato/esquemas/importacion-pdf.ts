@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { LARGO_MAX_PACK } from './pack.js';
+
 import { esquemaPorcentajeAdicional } from './importacion-pedido.js';
 
 /**
@@ -55,19 +57,23 @@ export const esquemaAjusteTallaPdf = z
  * cotejarla contra el papel; por eso la matriz viaja como lista de packs y no como un total sumado.
  * `letra` null/vacía = la OC trae un solo pack.
  *
- * ⚠️ §Post-F9.129 — el pack YA NO se vuelve un color. Al persistir, el backend SUMA los packs talla por
- * talla en UN SOLO renglón de color de la OP (`Negro`, ya no `Negro A`/`Negro B`), porque todo aguas
- * abajo agrupa por color y dos colores partían las compras de una misma orden. El desglose por pack se
- * conserva íntegro en `Orden.packsCliente` (base del futuro módulo de empaque). Un renglón cuyas tallas
- * queden todas en 0 no aporta piezas (así se "integra" un pack en otro: el usuario mueve los números
- * entre renglones).
+ * ⭐ §Post-F9.10 — CADA PACK ES UN RENGLÓN DE LA OP. Al persistir, el backend crea un `OrdenLinea` POR
+ * TENDIDO, todos sobre el MISMO `Color` del catálogo (`Negro`, ya no `Negro A`/`Negro B` — §Post-F9.129:
+ * todo aguas abajo agrupa por color y dos colores partían las compras de una misma orden), con la letra
+ * en el campo propio `pack`. Así el tendido viaja al corte y a la entrega a maquila, que es donde Daniel
+ * pidió que viajara. La tabla SKU completa se sigue conservando aparte en `Orden.packsCliente` (base del
+ * futuro módulo de empaque). Un renglón cuyas tallas queden todas en 0 NO genera renglón en la OP (así
+ * se "integra" un pack en otro: el usuario mueve los números entre renglones), y dos renglones con la
+ * MISMA letra se suman en uno.
  */
 export const esquemaRenglonMatrizPdf = z
   .object({
     letra: z
       .string()
       .trim()
-      .max(8)
+      // El MISMO tope que el campo al que va a parar (`OrdenLinea.pack`): desde §Post-F9.10 esta
+      // letra ES el pack, así que un tope propio sólo podría divergir del que valida la matriz.
+      .max(LARGO_MAX_PACK)
       .nullable()
       .describe(
         'Letra del pack en la vista previa (A/B/C…); null/vacía = un solo pack. NO forma parte del nombre del color.',
@@ -75,7 +81,7 @@ export const esquemaRenglonMatrizPdf = z
     tallas: z
       .array(esquemaAjusteTallaPdf)
       .describe(
-        'Corrida EDITADA de ese pack (total por talla); se suma con la de los demás packs.',
+        'Corrida EDITADA de ese pack (total por talla); es la del renglón que ese tendido tendrá en la OP.',
       ),
   })
   .describe('Un renglón-pack de la vista previa (su letra + su corrida).');
@@ -87,7 +93,8 @@ export type RenglonMatrizPdf = z.infer<typeof esquemaRenglonMatrizPdf>;
  * Un PDF al CONFIRMAR: el PDF + (opcional) la matriz EDITADA en la vista previa y el pantone. Si `matriz`
  * viene, la OP se fabrica con ESOS renglones-pack (Daniel: el sistema propone el sobre-pedido por packs,
  * el usuario decide celda por celda y renglón por renglón); si se omite, se usa la propuesta calculada.
- * En ambos casos los packs se SUMAN en un solo renglón de color al persistir (§Post-F9.129).
+ * En ambos casos cada pack se persiste como su propio renglón del MISMO color, con su campo `pack`
+ * (§Post-F9.10).
  * `pantone` PREFILLEA/edita el pantone del color de la OP (uno por OC; vacío = sin pantone).
  */
 export const esquemaArchivoPdfConfirmar = esquemaArchivoPdf
@@ -96,7 +103,7 @@ export const esquemaArchivoPdfConfirmar = esquemaArchivoPdf
       .array(esquemaRenglonMatrizPdf)
       .optional()
       .describe(
-        'Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. Los packs se suman en UN solo renglón de color al crear la OP.',
+        'Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. Cada pack nace como un renglón propio del MISMO color, con su campo pack.',
       ),
     pantone: z
       .string()

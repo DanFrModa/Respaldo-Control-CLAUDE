@@ -1094,6 +1094,16 @@ export function MatrizResumen({ orden }: { orden: Orden }): React.JSX.Element {
             <tr key={linea.id} className="border-b">
               <td className="px-2 py-1 whitespace-nowrap">
                 <span className="font-medium">{linea.color}</span>
+                {/* §Post-F9.10: dos tendidos del mismo color son dos renglones; sin la etiqueta se
+                    leerían como el mismo color repetido con números distintos. */}
+                {linea.pack !== '' ? (
+                  <span
+                    className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                    data-testid="centro-matriz-pack"
+                  >
+                    Pack {linea.pack}
+                  </span>
+                ) : null}
                 {linea.pantone !== null && linea.pantone !== '' ? (
                   <span
                     className="block text-[10px] font-normal text-muted-foreground"

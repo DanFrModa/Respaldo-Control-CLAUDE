@@ -50,6 +50,8 @@ interface EstadoSeccion {
   etiqueta: string;
   /** ¿Tiene cambios sin guardar? */
   sucio: boolean;
+  /** Ver `impedimento` en `useSeccionGuardable`. `null` = la captura es guardable. */
+  impedimento: string | null;
 }
 
 interface ValorContexto {
@@ -58,6 +60,7 @@ interface ValorContexto {
     etiqueta: string,
     sucio: boolean,
     preparar: React.RefObject<PrepararGuardado>,
+    impedimento: string | null,
   ) => void;
   quitar: (clave: ClaveSeccionGuardable) => void;
   /** Ver `useReinicioBloqueado`. */
@@ -101,12 +104,21 @@ export function useReinicioBloqueado(): boolean {
  * @param etiqueta Nombre legible para los mensajes de error.
  * @param sucio    `true` si hay cambios sin guardar.
  * @param preparar Captura el payload y devuelve el ejecutor (o `null` si la captura es inválida).
+ * @param impedimento Motivo por el que lo capturado NO se puede mandar todavía (o `null`).
+ *
+ * ⭐ POR QUÉ `impedimento` VA APARTE DE `sucio` (§Post-F9.10). Una captura puede estar a medio
+ * hacer —y por tanto ser inválida— y aun así ser trabajo del usuario que NO se puede tirar. La
+ * salida fácil sería declarar la sección LIMPIA mientras es inválida: el botón se apagaría solo,
+ * pero el diálogo se cerraría sin preguntar y **lo tecleado se perdería en silencio** — peor que el
+ * 400 que se quería evitar. Por eso son dos ejes: `sucio` gobierna el guardia de cierre (y sigue
+ * en `true`), `impedimento` gobierna el BOTÓN. El texto se le enseña al usuario en el pie.
  */
 export function useSeccionGuardable(
   clave: ClaveSeccionGuardable,
   etiqueta: string,
   sucio: boolean,
   preparar: PrepararGuardado,
+  impedimento: string | null = null,
 ): void {
   const contexto = useContext(ContextoGuardadoOrden);
   const refPreparar = useRef<PrepararGuardado>(preparar);
@@ -123,9 +135,9 @@ export function useSeccionGuardable(
     if (registrar === undefined || quitar === undefined) {
       return;
     }
-    registrar(clave, etiqueta, sucio, refPreparar);
+    registrar(clave, etiqueta, sucio, refPreparar, impedimento);
     return () => quitar(clave);
-  }, [registrar, quitar, clave, etiqueta, sucio]);
+  }, [registrar, quitar, clave, etiqueta, sucio, impedimento]);
 }
 
 /** Lo que el diálogo obtiene del registro de secciones. */
@@ -134,6 +146,13 @@ export interface RegistroGuardado {
   valorContexto: ValorContexto;
   /** ¿Alguna sección tiene cambios sin guardar? */
   hayCambios: boolean;
+  /**
+   * Motivo por el que HOY no se puede guardar (la primera sección que lo declare, en el orden de
+   * `SECCIONES_GUARDABLES`), o `null` si todo lo capturado es mandable. El botón único se apaga con
+   * esto — NO poniendo la sección en limpio, que perdería lo capturado al cerrar (ver
+   * `useSeccionGuardable`).
+   */
+  impedimento: string | null;
   /** ¿Hay un guardado en curso? */
   guardando: boolean;
   /**
@@ -169,16 +188,24 @@ export function useRegistroGuardadoOrden(idOrden?: number | null): RegistroGuard
   // render, así que dos clics seguidos podrían disparar dos rondas de guardado.
   const enCurso = useRef(false);
 
-  const registrar = useCallback<ValorContexto['registrar']>((clave, etiqueta, sucio, preparar) => {
-    preparadores.current.set(clave, preparar);
-    setEstados((previo) => {
-      const actual = previo[clave];
-      if (actual !== undefined && actual.etiqueta === etiqueta && actual.sucio === sucio) {
-        return previo; // Sin cambio real: no se re-renderiza (evita el bucle registrar→render).
-      }
-      return { ...previo, [clave]: { etiqueta, sucio } };
-    });
-  }, []);
+  const registrar = useCallback<ValorContexto['registrar']>(
+    (clave, etiqueta, sucio, preparar, impedimento) => {
+      preparadores.current.set(clave, preparar);
+      setEstados((previo) => {
+        const actual = previo[clave];
+        if (
+          actual !== undefined &&
+          actual.etiqueta === etiqueta &&
+          actual.sucio === sucio &&
+          actual.impedimento === impedimento
+        ) {
+          return previo; // Sin cambio real: no se re-renderiza (evita el bucle registrar→render).
+        }
+        return { ...previo, [clave]: { etiqueta, sucio, impedimento } };
+      });
+    },
+    [],
+  );
 
   const quitar = useCallback<ValorContexto['quitar']>((clave) => {
     preparadores.current.delete(clave);
@@ -204,6 +231,11 @@ export function useRegistroGuardadoOrden(idOrden?: number | null): RegistroGuard
   );
 
   const hayCambios = SECCIONES_GUARDABLES.some((clave) => estados[clave]?.sucio === true);
+  // El primer impedimento declarado, en el orden de guardado: es el que se le enseña al usuario.
+  const impedimento =
+    SECCIONES_GUARDABLES.map((clave) => estados[clave]?.impedimento ?? null).find(
+      (m) => m !== null,
+    ) ?? null;
 
   const guardarTodo = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (enCurso.current) {
@@ -270,5 +302,5 @@ export function useRegistroGuardadoOrden(idOrden?: number | null): RegistroGuard
     }
   }, [estados]);
 
-  return { valorContexto, hayCambios, guardando, guardarTodo };
+  return { valorContexto, hayCambios, impedimento, guardando, guardarTodo };
 }

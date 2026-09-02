@@ -60,7 +60,7 @@ import { colorCanonico, normalizarNombreColor } from '../catalogos/colores.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
 import { claveColor, marcarColorDelPapel, resolverColoresDelPapel } from './color-del-papel.js';
-import { fusionarPacksEnUnaCorrida } from './fusion-packs-cya.js';
+import { agruparPacksEnRenglones } from './packs-cya.js';
 import { guardarPlantilla, leerCamposVariablesJson } from './importacion.js';
 import {
   cargarOcYaImportadas,
@@ -761,8 +761,13 @@ async function catalogoTallasPorEtiqueta(
 
 /**
  * Un renglón-pack de la matriz editada: su letra (A/B/C…, o null = un solo pack) y su corrida por talla.
- * Es unidad de EDICIÓN de la vista previa, NO de la OP: al persistir, los packs se funden en un solo
- * renglón de color (§Post-F9.129). La letra ya no viaja al nombre del color.
+ *
+ * Es la unidad de EDICIÓN de la vista previa y, desde §Post-F9.10, también la que se PERSISTE: cada
+ * uno acaba en su propio `OrdenLinea` con su campo `pack` (`agruparPacksEnRenglones`), todos del
+ * MISMO color — la letra no viaja al nombre del color (eso lo quitó §Post-F9.129). Con TRES matices,
+ * los tres deliberados: un renglón que quede entero en 0 no genera línea (así se "integra" un pack en
+ * otro); dos renglones con la MISMA letra se suman en uno (dos líneas de esa llave abortarían la
+ * importación); y una OC de un solo pack nace con `letra: null` ⇒ pack vacío, o sea SIN pack.
  */
 interface RenglonMatrizEditada {
   letra: string | null;
@@ -776,7 +781,9 @@ interface PdfAImportar {
   idModelo: number;
   /**
    * Matriz EDITADA en la vista previa como RENGLONES-PACK (un renglón por pack); si no viene, se derivan
-   * de la propuesta por packs. Los packs se SUMAN en un solo renglón de color al persistir (§Post-F9.129).
+   * de la propuesta por packs. Cada renglón-pack se persiste como SU PROPIA línea de la OP, con su
+   * campo `pack` y el mismo color que las demás (§Post-F9.10) — salvo el que quede en 0, que no
+   * genera línea, y los que compartan letra, que se suman en una. Ver {@link RenglonMatrizEditada}.
    */
   matrizEditada: RenglonMatrizEditada[] | null;
   /** Pantone editado/prefilleado del color de la OP (uno por OC); null = sin pantone. */
@@ -1077,10 +1084,11 @@ function tituloColor(base: string): string {
 }
 
 /**
- * El color del ÚNICO renglón de la OP: el color genérico de la OC, en Título. La LETRA DEL PACK YA NO
- * ENTRA (§Post-F9.129): antes se componía `{Base} {LETRA}` (`Negro A`, `Negro B`) y eso fabricaba un
- * color de catálogo por pack, que partía en dos las compras de una misma orden aguas abajo
- * (explosión/MRP, OC, inventario). El desglose por pack sigue vivo en `Orden.packsCliente`.
+ * El color de los renglones de la OP: el color genérico de la OC, en Título. Es UNO para todos los
+ * tendidos. La LETRA DEL PACK NO ENTRA (§Post-F9.129): antes se componía `{Base} {LETRA}` (`Negro A`,
+ * `Negro B`) y eso fabricaba un color de catálogo por pack, que partía en dos las compras de una misma
+ * orden aguas abajo (explosión/MRP, OC, inventario). Desde §Post-F9.10 el tendido vive en el campo
+ * `pack` del renglón, y el desglose SKU completo sigue en `Orden.packsCliente`.
  */
 function colorDeLaOrden(base: string): string {
   return tituloColor(base);
@@ -1088,9 +1096,15 @@ function colorDeLaOrden(base: string): string {
 
 /**
  * Deriva los RENGLONES-PACK de la matriz cuando el usuario NO editó la vista previa: un renglón por grupo
- * si la OC trae ≥2 packs; un solo renglón si trae 0 o 1 pack. Las cantidades ya vienen con el
+ * si la OC trae ≥2 packs; un solo renglón SIN pack si trae 0 o 1. Las cantidades ya vienen con el
  * sobre-pedido. Estos renglones son la unidad de EDICIÓN de la vista previa (el usuario mueve números
- * entre packs); antes de persistir se FUNDEN en una sola corrida (`fusionarPacksEnUnaCorrida`).
+ * entre packs) y, desde §Post-F9.10, también la unidad que se PERSISTE: cada uno acaba en su propio
+ * `OrdenLinea` con su `pack` (`agruparPacksEnRenglones`).
+ *
+ * 🔑 UNA OC CON UN SOLO PACK NACE SIN PACK, y no es un descuido: la letra sólo distingue algo cuando
+ * hay algo de qué distinguirla. Esa OC produce exactamente la misma orden que antes de §Post-F9.10,
+ * y ni el corte ni el envío piden un dato que no aporta nada. (Cuántas OCs caen de cada lado NO se
+ * ha medido: la única OC real del repo, la 620884, trae TRES packs.)
  */
 function filasDesdePropuesta(propuesta: PropuestaSobrepedido): RenglonMatrizEditada[] {
   if (propuesta.grupos.length >= 2) {
@@ -1108,10 +1122,10 @@ function filasDesdePropuesta(propuesta: PropuestaSobrepedido): RenglonMatrizEdit
 }
 
 /**
- * Crea, dentro de la tx, la OP de UN PDF: resuelve/crea color + tallas (matriz, UN SOLO renglón de color
- * por OC — §Post-F9.129), departamento y campos de referencia (D7), crea el renglón, la OP (reusa
- * `salidaAProduccion` → RC), sella el nº de orden C&A y la composición en la OP, y adjunta el PDF (ya
- * subido) a la orden. Devuelve la traza.
+ * Crea, dentro de la tx, la OP de UN PDF: resuelve/crea color + tallas (matriz de UN SOLO color con un
+ * renglón POR TENDIDO — §Post-F9.129 + §Post-F9.10), departamento y campos de referencia (D7), crea el
+ * renglón, la OP (reusa `salidaAProduccion` → RC), sella el nº de orden C&A y la composición en la OP,
+ * y adjunta el PDF (ya subido) a la orden. Devuelve la traza.
  */
 async function crearOrdenDesdePdf(
   tx: Tx,
@@ -1140,34 +1154,43 @@ async function crearOrdenDesdePdf(
   const filas = args.matrizEditada ?? filasDesdePropuesta(propuesta);
   const totalCliente = r.tallas.reduce((s, t) => s + Math.max(0, t.piezas), 0);
 
-  // ⭐ §Post-F9.129 — UN SOLO RENGLÓN DE COLOR POR OC. Los renglones-pack se FUNDEN aquí, talla por
-  // talla, ANTES de persistir: es la ÚNICA puerta por la que la matriz de un PDF llega a la OP, así que
-  // los dos caminos (propuesta automática Y matriz editada por el usuario) quedan cubiertos por igual.
-  // Antes se creaba un color de catálogo por pack (`Negro A`/`Negro B`) y, como todo aguas abajo agrupa
-  // por color, las compras de una misma orden salían partidas en dos. El desglose por pack NO se pierde:
-  // se persiste completo abajo en `Orden.packsCliente` (base del futuro módulo de EMPAQUE).
+  // ⭐ §Post-F9.10 — UN COLOR, UN RENGLÓN POR TENDIDO. Cada renglón-pack se persiste como su propio
+  // `OrdenLinea` con su campo `pack`, sobre el MISMO color del catálogo. Es la ÚNICA puerta por la que
+  // la matriz de un PDF llega a la OP, así que los dos caminos (propuesta automática Y matriz editada
+  // por el usuario) quedan cubiertos por igual.
+  //
+  // 🔴 LO QUE ESTO SUSTITUYE, para que nadie lo reintroduzca: hasta la v0.087 los packs se FUNDÍAN en
+  // una sola corrida y el tendido sólo sobrevivía en el jsonb `Orden.packsCliente`. Eso mataba el pack
+  // justo donde Daniel pidió que viajara —el corte y la entrega a maquila—. Antes de §Post-F9.129 el
+  // remedio había sido peor: la letra iba DENTRO del nombre del color (`Negro A`/`Negro B`), fabricando
+  // un color de catálogo por pack y partiendo en dos las compras de una misma orden. Hoy no hace falta
+  // elegir: UN solo `Color` y el tendido en su propio campo. `packsCliente` se sigue guardando abajo,
+  // porque trae la tabla SKU completa (base del futuro módulo de EMPAQUE), que no cabe en la matriz.
   //
   // PANTONE: es UNO por OC (`args.pantone` — la OC trae un color genérico y un pantone; el ajuste de la
-  // vista previa también es por PDF, no por pack), así que la fusión no puede toparse con dos pantones
-  // en conflicto: no hay nada que desempatar. Va tal cual en la única línea; `sincronizarMatriz` lo
-  // sella en el `OrdenLinea`.
+  // vista previa también es por PDF, no por pack), así que va IGUAL en todos los renglones: no hay dos
+  // pantones que desempatar. `sincronizarMatriz` lo sella en cada `OrdenLinea`.
   //
-  // El color (abierto, D14c) sólo se resuelve-o-crea si de verdad quedó corrida: una OC que el usuario
-  // vació entera no debe dejar un color nuevo huérfano en el catálogo.
-  const corrida = fusionarPacksEnUnaCorrida(filas);
+  // El color (abierto, D14c) sólo se resuelve-o-crea si de verdad quedó algún renglón: una OC que el
+  // usuario vació entera no debe dejar un color nuevo huérfano en el catálogo. Y se resuelve UNA vez,
+  // fuera del bucle: los N tendidos son del MISMO color.
+  const renglones = agruparPacksEnRenglones(filas);
   const matriz: {
     idColor: number;
+    pack: string;
     tallas: { idTalla: number; cantidad: number }[];
     pantone: string | null;
   }[] = [];
-  if (corrida.length > 0) {
+  if (renglones.length > 0) {
     const idColor = await resolverOCrearColor(tx, sesion, colorDeLaOrden(r.colorGenerico));
-    const tallas: { idTalla: number; cantidad: number }[] = [];
-    for (const t of corrida) {
-      const idTalla = await resolverOCrearTalla(tx, sesion, t.talla);
-      tallas.push({ idTalla, cantidad: t.cantidad });
+    for (const renglon of renglones) {
+      const tallas: { idTalla: number; cantidad: number }[] = [];
+      for (const t of renglon.tallas) {
+        const idTalla = await resolverOCrearTalla(tx, sesion, t.talla);
+        tallas.push({ idTalla, cantidad: t.cantidad });
+      }
+      matriz.push({ idColor, pack: renglon.pack, tallas, pantone: args.pantone });
     }
-    matriz.push({ idColor, tallas, pantone: args.pantone });
   }
   const totalFabricar = matriz.reduce(
     (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),

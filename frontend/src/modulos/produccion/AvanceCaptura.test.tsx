@@ -129,8 +129,10 @@ function orden(idMaquilero: number | null, maquilero: string | null): Orden {
     maquilero,
     lineas: [
       {
+        // `pack: ''` = la orden NO se fabrica por tendidos (§Post-F9.10): es el caso de siempre.
         idColor: 7,
         color: 'Rojo',
+        pack: '',
         tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
       },
     ],
@@ -975,7 +977,9 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
       isPending: false,
       data: {
         ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 6 }]),
-        porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+        porCortar: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 4 },
+        ],
       },
     });
     const usuario = userEvent.setup();
@@ -1007,7 +1011,16 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
             tipoProceso: 'Costura',
             codigoProceso: 'costura',
             generaEntradaPt: true,
-            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+            celdas: [
+              {
+                idColor: 7,
+                color: 'Rojo',
+                idTalla: 11,
+                etiquetaTalla: 'CH',
+                pack: '',
+                cantidad: 10,
+              },
+            ],
             totalPendiente: 10,
           },
         ],
@@ -1037,10 +1050,12 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
         cortado: 0,
         enviado: 0,
         // `porCortar` trae TODAS las celdas de la orden (el servidor no filtra los ceros ahí).
-        porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        porCortar: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
+        ],
         // Nada cortado: el servidor manda la celda en CERO (no la omite). Cero es un tope real.
         cortadoCeldas: [
-          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 0 },
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 0 },
         ],
         cortadoPorEnviar: [],
       },
@@ -1066,9 +1081,11 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
         ...wip([]),
         cortado: 10,
         enviado: 0,
-        porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 0 }],
+        porCortar: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 0 },
+        ],
         cortadoCeldas: [
-          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 },
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
         ],
         cortadoPorEnviar: [],
       },
@@ -1598,7 +1615,7 @@ describe('Captura del avance · los botones de precarga de un clic (V1-E8i)', ()
   function sugerencia(cantidad: number, motivo = 'hay', base = 'corte'): unknown {
     const celdas =
       cantidad > 0
-        ? [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad }]
+        ? [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad }]
         : [];
     return {
       data: {
@@ -1764,6 +1781,7 @@ describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)'
         {
           idColor: 7,
           color: 'Rojo',
+          pack: '',
           tallas: [
             { idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 },
             { idTalla: 12, etiquetaTalla: 'M', cantidad: 20 },
@@ -1825,7 +1843,9 @@ describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)'
         idOrden: 1,
         base: 'corte',
         idTipoProceso: null,
-        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 1726 }],
+        celdas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 1726 },
+        ],
         total: 1726,
         motivo: 'hay',
       },
@@ -1867,7 +1887,9 @@ describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)'
         idOrden: 1,
         base: 'envio',
         idTipoProceso: 6,
-        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 1000 }],
+        celdas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 1000 },
+        ],
         total: 1000,
         motivo: 'hay',
       },
@@ -1897,7 +1919,9 @@ describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)'
         idOrden: 1,
         base: 'envio',
         idTipoProceso: 6,
-        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        celdas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
+        ],
         total: 10,
         motivo: 'hay',
       },
@@ -1935,7 +1959,9 @@ describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)'
         idOrden: 1,
         base: 'corte',
         idTipoProceso: null,
-        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        celdas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
+        ],
         total: 10,
         motivo: 'hay',
       },
@@ -2063,5 +2089,313 @@ describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima pu
     const resumen = screen.getByTestId('avance-resumen');
     expect(resumen).toHaveTextContent('por recibir 4');
     expect(resumen).toHaveTextContent('Falta por recibir4');
+  });
+});
+
+// ── ⭐ EL PACK / TENDIDO EN LA CAPTURA (§Post-F9.10) ────────────────────────────────────────────
+//
+// La orden de estos casos trae DOS tendidos del MISMO color (A y B). Antes de la v0.087 eso no se
+// podía ni representar (la letra iba dentro del nombre del color) y desde la v0.087 se podía en la
+// BASE pero no en NINGUNA pantalla: ni se capturaba ni se pintaba. Aquí se comprueba que la pantalla
+// los trata como dos renglones independientes y que lo capturado viaja con su pack.
+
+/** Orden de UN color × UNA talla con DOS tendidos (packs A y B). */
+function ordenConPacks(): Orden {
+  return {
+    ...orden(77, 'Maquila del Norte'),
+    lineas: [
+      {
+        idColor: 7,
+        color: 'Rojo',
+        pack: 'A',
+        tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 6 }],
+      },
+      {
+        idColor: 7,
+        color: 'Rojo',
+        pack: 'B',
+        tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+      },
+    ],
+    totalPiezas: 10,
+  } as unknown as Orden;
+}
+
+/**
+ * WIP de la orden con packs. `celdasMaquilero` son las del desglose POR MAQUILERO tal como las
+ * emite el servidor: una por tendido y —cuando el maquilero devolvió algo sin decir de cuál— una de
+ * pack VACÍO, que sale NEGATIVA (residuo declarado de la v0.087).
+ */
+function wipConPacks(celdasMaquilero: { pack: string; cantidad: number }[]): WipOrden {
+  const base = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH' };
+  const celdaA = { ...base, pack: 'A' };
+  const celdaB = { ...base, pack: 'B' };
+  return {
+    ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 10 }]),
+    porCortar: [
+      { ...celdaA, cantidad: 6 },
+      { ...celdaB, cantidad: 4 },
+    ],
+    cortadoCeldas: [
+      { ...celdaA, cantidad: 6 },
+      { ...celdaB, cantidad: 4 },
+    ],
+    porRecibir: [
+      {
+        idTipoProceso: 5,
+        tipoProceso: 'Costura',
+        codigoProceso: 'costura',
+        generaEntradaPt: true,
+        devuelveAPt: false,
+        stockSinOrden: false,
+        celdas: celdasMaquilero.map((c) => ({ ...base, pack: c.pack, cantidad: c.cantidad })),
+        totalPendiente: celdasMaquilero.reduce((s, c) => s + c.cantidad, 0),
+        porMaquilero: [
+          {
+            idMaquilero: 77,
+            maquilero: 'Maquila del Norte',
+            celdas: celdasMaquilero.map((c) => ({
+              ...base,
+              pack: c.pack,
+              cantidad: c.cantidad,
+              incompletas: 0,
+            })),
+            totalPendiente: celdasMaquilero.reduce((s, c) => s + c.cantidad, 0),
+            totalIncompletas: 0,
+          },
+        ],
+      },
+    ],
+  } satisfies WipOrden;
+}
+
+describe('Captura del avance · EL PACK / TENDIDO (§Post-F9.10)', () => {
+  it('el CORTE pinta un renglón por tendido y manda cada uno con SU pack', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useWipOrden.mockReturnValue({ data: wipConPacks([]), isPending: false });
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    // DOS filas para el MISMO color: sin el pack en la llave serían una sola (y una celda).
+    expect(screen.getAllByTestId('avance-matriz-celda')).toHaveLength(2);
+    expect(screen.getAllByTestId('avance-matriz-pack').map((p) => p.textContent)).toEqual([
+      'Pack A',
+      'Pack B',
+    ]);
+
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '6');
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '4');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'Maquila del Sur');
+    await usuario.click(await screen.findByTestId('avance-proveedor-opcion'));
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearCorte).toHaveBeenCalledTimes(1);
+    const cuerpo = crearCorte.mock.calls[0]?.[0] as {
+      lineas: { idColor: number; pack: string; tallas: { idTalla: number; cantidad: number }[] }[];
+    };
+    // Dos renglones del mismo color, distinguidos SÓLO por el pack, con lo suyo cada uno.
+    expect(cuerpo.lineas).toEqual([
+      { idColor: 7, pack: 'A', tallas: [{ idTalla: 11, cantidad: 6 }] },
+      { idColor: 7, pack: 'B', tallas: [{ idTalla: 11, cantidad: 4 }] },
+    ]);
+  });
+
+  it('el ENVÍO topa TENDIDO POR TENDIDO: 6 en el pack B (que sólo cortó 4) se bloquea', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useWipOrden.mockReturnValue({ data: wipConPacks([]), isPending: false });
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    // 6 en el pack B, que sólo tiene 4 cortadas. El TOTAL (6 de 10 cortadas) sí cabría: lo que lo
+    // rechaza es el tope POR TENDIDO, que es el que aplica el servidor (decisión (g)).
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '6');
+    expect(screen.getByTestId('avance-aviso-exceso')).toHaveTextContent('2 pieza(s)');
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+  });
+
+  it('el RECIBO ofrece capturar los tendidos REVUELTOS, y entonces manda el renglón SIN pack', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    // Enviadas 6 del A y 4 del B; nada devuelto todavía.
+    useWipOrden.mockReturnValue({
+      data: wipConPacks([
+        { pack: 'A', cantidad: 6 },
+        { pack: 'B', cantidad: 4 },
+      ]),
+      isPending: false,
+    });
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('avance-proveedor-opcion'));
+
+    // Sin el interruptor, dos filas (una por tendido).
+    expect(screen.getAllByTestId('avance-matriz-celda')).toHaveLength(2);
+    // Se teclea ANTES de plegar: al plegar, esa llave (`7:11:A`) deja de tener fila. Si no se
+    // limpiara, seguiría contando en el total y en el tope — un número capturado que ya no se ve.
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '6');
+    expect(screen.getByTestId('avance-matriz-total-general')).toHaveTextContent('6');
+    await usuario.click(screen.getByTestId('avance-toggle-revueltos'));
+    expect(screen.getByTestId('avance-matriz-total-general')).toHaveTextContent('0');
+    // Con él, UNA sola fila por color y el aviso de lo que eso significa.
+    expect(screen.getAllByTestId('avance-matriz-celda')).toHaveLength(1);
+    expect(screen.getByTestId('avance-nota-revueltos')).toBeInTheDocument();
+
+    await usuario.type(screen.getByLabelText('Rojo, talla CH'), '10');
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearRecibo).toHaveBeenCalledTimes(1);
+    const cuerpo = crearRecibo.mock.calls[0]?.[0] as {
+      lineas: { idColor: number; pack: string; tallas: { idTalla: number; cantidad: number }[] }[];
+    };
+    // ⭐ Pack VACÍO = «el maquilero los devolvió revueltos»: ese renglón consume del saldo AGREGADO
+    // de todos los tendidos, que es exactamente lo que Daniel pidió que se pudiera capturar.
+    expect(cuerpo.lineas).toEqual([
+      { idColor: 7, pack: '', tallas: [{ idTalla: 11, cantidad: 10 }] },
+    ]);
+  });
+
+  it('la ENTREGA A CLIENTE pliega los tendidos: UNA fila por color (ahí ya no hay pack)', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useWipOrden.mockReturnValue({ data: wipConPacks([]), isPending: false });
+    // El seguimiento del servidor NO trae pack: la entrega sale del inventario de PT, que se lleva
+    // por modelo×color×talla×orden×almacén y no guarda el tendido.
+    useSeguimientoEntrega.mockReturnValue({
+      isPending: false,
+      data: {
+        idOrden: 1,
+        folioOrden: 5424,
+        idCliente: 4,
+        cliente: 'C&A',
+        idModelo: 3,
+        modelo: '62182',
+        celdas: [
+          {
+            idColor: 7,
+            color: 'Rojo',
+            idTalla: 11,
+            etiquetaTalla: 'CH',
+            pedido: 10,
+            entregado: 0,
+            faltante: 10,
+            disponible: 10,
+          },
+        ],
+        totalPedido: 10,
+        totalEntregado: 0,
+        totalFaltante: 10,
+      },
+    });
+    pintar();
+    await abrirCaptura(usuario, 'entrega-cliente');
+
+    // UNA celda, no dos: con los ejes CON pack saldrían dos filas idénticas, ofreciendo la MISMA
+    // existencia dos veces y sin nada en pantalla que las distinguiera.
+    expect(screen.getAllByTestId('avance-entrega-matriz-celda')).toHaveLength(1);
+    expect(screen.queryAllByTestId('avance-entrega-matriz-pack')).toHaveLength(0);
+
+    await usuario.selectOptions(screen.getByTestId('avance-entrega-almacen'), '1');
+    await usuario.type(screen.getByTestId('avance-entrega-matriz-celda'), '4');
+    // El tope viene del seguimiento (10 disponibles): sin plegar, la llave `7:11:` no casaría con
+    // ninguna fila y la referencia quedaría en 0 — el guardar saldría bloqueado por un exceso falso.
+    expect(screen.queryByTestId('avance-entrega-aviso-exceso')).not.toBeInTheDocument();
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearEntrega).toHaveBeenCalledTimes(1);
+    expect(crearEntrega.mock.calls[0]?.[0]).toMatchObject({
+      lineas: [{ idColor: 7, tallas: [{ idTalla: 11, cantidad: 4 }] }],
+    });
+  });
+
+  it('🔴 en una orden SIN packs el aviso NO duplica el exceso (es el MÁXIMO de las dos guardas, no su suma)', async () => {
+    // ⚠️ ESTA PRUEBA VIGILA UNA ARITMÉTICA QUE ESTA ETAPA CAMBIÓ PARA TODAS LAS ÓRDENES, packs o no.
+    // El exceso se calcula ahora con DOS condiciones —(2) por celda/tendido y (1) por color×talla
+    // plegando los tendidos— y se reporta el MAYOR. En una orden SIN packs las dos leen los MISMOS
+    // números (todas las celdas traen pack vacío), así que salen SIEMPRE iguales: sumarlas en vez
+    // de tomar el máximo DUPLICA el número que la pantalla le enseña al usuario, y no lo nota
+    // ninguna de las pruebas del caso CON packs (ahí suma y máximo coinciden por casualidad).
+    // Pendiente del maquilero 77: 6. Se teclean 8 ⇒ el exceso REAL es 2, no 4.
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '8');
+
+    const aviso = screen.getByTestId('avance-aviso-exceso');
+    // Con LÍMITE DE PALABRA: `toHaveTextContent` es subcadena y '2 pieza(s)…' casaría dentro de
+    // '12 pieza(s)…'. El `\b` es lo único que distingue el 2 de un número que lo contiene.
+    expect(aviso).toHaveTextContent(/\b2 pieza\(s\) por encima/);
+    expect(aviso).not.toHaveTextContent('4 pieza(s)');
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+  });
+
+  it('una orden SIN packs no ofrece el interruptor de "revueltos" (no habría nada que revolver)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    expect(screen.queryByTestId('avance-toggle-revueltos')).not.toBeInTheDocument();
+  });
+
+  it('🔴 el TOTAL se topa aunque cada tendido quepa: lo devuelto sin pack ya bajó el saldo', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    // Enviadas 6 de A y 4 de B (10). El maquilero ya devolvió 3 SIN decir de cuál: el servidor las
+    // pone en el bucket de pack vacío, en NEGATIVO. Saldo por tendido: A 6, B 4. Saldo AGREGADO: 7.
+    useWipOrden.mockReturnValue({
+      data: wipConPacks([
+        { pack: 'A', cantidad: 6 },
+        { pack: 'B', cantidad: 4 },
+        { pack: '', cantidad: -3 },
+      ]),
+      isPending: false,
+    });
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('avance-proveedor-opcion'));
+
+    // 6 + 4 = 10: cada tendido cabe EXACTO en el suyo (no hay exceso por celda), pero el saldo
+    // agregado es 7. Sólo la condición (1) lo ve — la (2) da 0 aquí.
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '6');
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '4');
+    expect(screen.getByTestId('avance-aviso-exceso')).toHaveTextContent('3 pieza(s)');
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+
+    // Y con 7 en total (4 + 3) sí cabe: la guarda no se pasa de estricta.
+    await usuario.clear(screen.getByLabelText('Rojo pack A, talla CH'));
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '4');
+    await usuario.clear(screen.getByLabelText('Rojo pack B, talla CH'));
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '3');
+    expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
   });
 });

@@ -160,7 +160,8 @@ export function DialogoOrden({
   const [aCopiarMatriz, setACopiarMatriz] = useState<Orden | null>(null);
 
   // Guardado único de las secciones con captura + guardia de cierre con cambios sin guardar.
-  const { valorContexto, hayCambios, guardando, guardarTodo } = useRegistroGuardadoOrden(idOrden);
+  const { valorContexto, hayCambios, impedimento, guardando, guardarTodo } =
+    useRegistroGuardadoOrden(idOrden);
   const [confirmarSalida, setConfirmarSalida] = useState(false);
 
   /** Guarda todo lo pendiente; devuelve si quedó todo guardado. */
@@ -300,8 +301,21 @@ export function DialogoOrden({
             className="flex shrink-0 items-center justify-end gap-3 border-t px-4 py-3"
             data-testid="pie-orden"
           >
-            <p className="mr-auto text-xs text-muted-foreground" data-testid="aviso-cambios-orden">
-              {hayCambios ? 'Tienes cambios sin guardar.' : 'Sin cambios pendientes.'}
+            {/* El impedimento MANDA sobre el "hay cambios": si algo capturado no se puede mandar,
+                lo que el usuario necesita leer aquí es POR QUÉ el botón está apagado — no que tiene
+                cambios (eso ya lo sabe). Lo capturado sigue vivo y el guardia de cierre sigue
+                preguntando (§Post-F9.10). */}
+            <p
+              className={
+                impedimento !== null
+                  ? 'mr-auto text-xs text-destructive'
+                  : 'mr-auto text-xs text-muted-foreground'
+              }
+              data-testid="aviso-cambios-orden"
+              {...(impedimento !== null ? { role: 'alert' } : {})}
+            >
+              {impedimento ??
+                (hayCambios ? 'Tienes cambios sin guardar.' : 'Sin cambios pendientes.')}
             </p>
             <Button
               type="button"
@@ -316,7 +330,7 @@ export function DialogoOrden({
               type="button"
               size="sm"
               onClick={() => void guardar()}
-              disabled={!hayCambios || guardando}
+              disabled={!hayCambios || guardando || impedimento !== null}
               data-testid="guardar-orden"
             >
               {guardando ? (
@@ -361,7 +375,15 @@ export function DialogoOrden({
           }
         }}
         titulo="Cambios sin guardar"
-        descripcion="Tienes cambios sin guardar en esta orden. ¿Quieres guardarlos antes de salir?"
+        descripcion={
+          // 🔴 EL PIE NO ES EL ÚNICO CAMINO AL GUARDADO: "Guardar y salir" entra por aquí, y ese
+          // botón no lo apaga el impedimento. Quien PARA la captura inválida es la sección misma
+          // (su `preparar` devuelve `null`, contrato de `PrepararGuardado`); lo que falta es que el
+          // usuario sepa POR QUÉ, porque este diálogo tapa el aviso en línea de la matriz. Por eso
+          // el motivo se dice aquí, en lugar del texto genérico (§Post-F9.10).
+          impedimento ??
+          'Tienes cambios sin guardar en esta orden. ¿Quieres guardarlos antes de salir?'
+        }
         textoCancelar="Cancelar"
         accionSecundaria={{
           texto: 'Salir sin guardar',

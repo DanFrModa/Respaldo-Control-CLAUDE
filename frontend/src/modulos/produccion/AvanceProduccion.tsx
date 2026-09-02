@@ -50,7 +50,7 @@ import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import { type ClaveEtapaAvance } from './etapas-avance';
-import { ejesDeOrden, piezasRecibibles } from './matriz-orden';
+import { ejesDeOrden, ejesDeOrdenPlegados, piezasRecibibles } from './matriz-orden';
 import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
@@ -1054,6 +1054,15 @@ function CapturaMovimiento({
    */
   const [capturarIncompletas, setCapturarIncompletas] = useState(false);
   const [incompletas, setIncompletas] = useState<Record<string, number>>({});
+  /**
+   * RECIBO CON LOS TENDIDOS REVUELTOS (§Post-F9.10) — *«que sea **opcional al recibir**»* (Daniel).
+   * El maquilero pudo devolver los packs separados (se captura cada tendido con su letra) o
+   * revueltos (se captura SIN pack, en un solo renglón por color). Con esto encendido la matriz
+   * pliega los tendidos en una fila por color y lo capturado viaja sin pack, que es lo que el
+   * dominio lee como «no sé de qué tendido es»: ese renglón consume del saldo AGREGADO de todos los
+   * packs, no del de ninguno.
+   */
+  const [revueltos, setRevueltos] = useState(false);
   // El typeahead busca EN SERVIDOR (hay >1,700 maquileros reales; la página local de 100 no basta).
   const [textoProveedor, setTextoProveedor] = useState('');
   const busquedaProveedor = useDebounce(textoProveedor.trim(), 250);
@@ -1213,8 +1222,21 @@ function CapturaMovimiento({
     void almacenes.refetch();
   }
 
-  // Matriz de la orden (candado D4): filas/columnas fijas.
-  const { tallas, colores } = useMemo(() => ejesDeOrden(orden), [orden]);
+  /**
+   * ¿La orden se fabrica POR TENDIDOS? (§Post-F9.10). Basta con que UN renglón traiga pack — la
+   * MISMA pregunta (y la misma forma de contestarla) que `packs.ts::ordenManejaPacks` en el
+   * servidor, de la que cuelga que el pack sea obligatorio en el corte y en la entrega a maquila.
+   */
+  const manejaPacks = orden.lineas.some((l) => l.pack !== '');
+  /** ¿ESTA captura se lleva sin distinguir tendido? Sólo el recibo puede, y sólo si hay tendidos. */
+  const sinDistinguirPack = esRecibo && manejaPacks && revueltos;
+
+  // Matriz de la orden (candado D4): filas/columnas fijas. Una fila por COLOR × PACK — salvo en el
+  // recibo «revueltos», donde los tendidos se pliegan en una fila por color (§Post-F9.10).
+  const { tallas, colores } = useMemo(
+    () => (sinDistinguirPack ? ejesDeOrdenPlegados(orden) : ejesDeOrden(orden)),
+    [orden, sinDistinguirPack],
+  );
 
   // Referencia (pendiente) por celda de la etapa activa, DERIVADA del WIP del servidor.
   //
@@ -1232,7 +1254,7 @@ function CapturaMovimiento({
   const referencia = useMemo<Map<string, number> | null>(() => {
     const mapa = new Map<string, number>();
     if (etapa === 'corte') {
-      for (const c of wip.porCortar) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
+      for (const c of wip.porCortar) mapa.set(claveCelda(c.idColor, c.idTalla, c.pack), c.cantidad);
       return mapa;
     }
     if (etapa === 'entrega-maquila' || etapa === 'entrega-aplicacion') {
@@ -1242,7 +1264,8 @@ function CapturaMovimiento({
           : String(p.idTipoProceso) === idProcesoAplicacion,
       );
       if (entrada !== undefined) {
-        for (const c of entrada.celdas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
+        for (const c of entrada.celdas)
+          mapa.set(claveCelda(c.idColor, c.idTalla, c.pack), c.cantidad);
         return mapa;
       }
       // Primer envío a este proceso: el disponible es lo CORTADO por celda, y lo manda el servidor
@@ -1250,7 +1273,8 @@ function CapturaMovimiento({
       // `pedido − porCortar` — la MISMA regla escrita en dos lados, que acaba derivando de la del
       // dominio. Viene SIEMPRE completo, incluso todo en cero: cero cortado es un tope real, no una
       // ausencia de dato (ver el comentario de arriba).
-      for (const c of wip.cortadoCeldas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
+      for (const c of wip.cortadoCeldas)
+        mapa.set(claveCelda(c.idColor, c.idTalla, c.pack), c.cantidad);
       return mapa;
     }
     const entrada = wip.porRecibir.find((p) =>
@@ -1277,10 +1301,48 @@ function CapturaMovimiento({
     // la misma regla escrita en dos lados acaba divergiendo, y el precio sería una matriz que
     // ofrece lo que el guardado rechaza.
     for (const c of delMaquilero.celdas) {
-      mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
+      // ⭐ CON LOS TENDIDOS REVUELTOS la referencia de la fila es el saldo AGREGADO del color×talla:
+      // se SUMAN las celdas de todos los packs (incluida la de pack vacío, que sale NEGATIVA —lo ya
+      // devuelto sin atribuir—), y esa suma es exactamente `Σ enviado − Σ devuelto`, la condición
+      // (1) que el servidor topa para un renglón sin pack (`packs.ts::excesosDelRecibo`). Leer sólo
+      // el bucket de pack vacío habría dado un tope de 0 o negativo y la captura revuelta —la que
+      // Daniel pidió que se pudiera hacer— habría quedado bloqueada siempre.
+      const clave = sinDistinguirPack
+        ? claveCelda(c.idColor, c.idTalla, '')
+        : claveCelda(c.idColor, c.idTalla, c.pack);
+      mapa.set(clave, (mapa.get(clave) ?? 0) + c.cantidad);
     }
     return mapa;
-  }, [etapa, wip, idProcesoAplicacion, idProveedor]);
+  }, [etapa, wip, idProcesoAplicacion, idProveedor, sinDistinguirPack]);
+  /**
+   * ⭐ EL SALDO AGREGADO POR COLOR×TALLA del maquilero, plegando TODOS los tendidos — la condición
+   * (1) de `packs.ts::excesosDelRecibo`: `Σ R[p] + R[·] ≤ Σ E[p]`. Sólo el RECIBO la necesita.
+   *
+   * 🔴 NO ES REDUNDANTE con la referencia por celda, y el caso donde se separan es real: la celda de
+   * pack VACÍO del desglose sale **negativa** cuando el maquilero ya devolvió piezas sin decir de
+   * qué tendido eran. Ahí `Σ_p (E[p] − R[p])` es MAYOR que el agregado, así que una captura tendido
+   * por tendido puede caber en cada pack y NO caber en total. Sin esto la pantalla la dejaría pasar
+   * y el servidor la rechazaría con la matriz ya tecleada — justo el 400 que este pre-chequeo evita.
+   *
+   * Y al revés tampoco: el agregado no ve el reparto, así que 10 del pack A habiendo enviado 5 de A
+   * y 5 de B cuadra en total y no cuadra por pack. Ninguna implica a la otra; van las dos.
+   */
+  const referenciaAgregada = useMemo<Map<string, number> | null>(() => {
+    if (!esRecibo || idProveedor === null) return null;
+    const entrada = wip.porRecibir.find((p) =>
+      etapa === 'recibo-maquila'
+        ? p.generaEntradaPt
+        : String(p.idTipoProceso) === idProcesoAplicacion,
+    );
+    const delMaquilero = entrada?.porMaquilero.find((m) => m.idMaquilero === idProveedor);
+    if (delMaquilero === undefined) return null;
+    const mapa = new Map<string, number>();
+    for (const c of delMaquilero.celdas) {
+      const clave = `${c.idColor}:${c.idTalla}`;
+      mapa.set(clave, (mapa.get(clave) ?? 0) + c.cantidad);
+    }
+    return mapa;
+  }, [esRecibo, etapa, wip, idProcesoAplicacion, idProveedor]);
   /** Incompletas que ESE maquilero ya entregó de este proceso (para explicar el tope de arriba). */
   const incompletasYaEntregadas = useMemo(() => {
     if (!esRecibo || idProveedor === null) return 0;
@@ -1375,7 +1437,9 @@ function CapturaMovimiento({
     if (propuesta === undefined || propuesta.celdas.length === 0) return;
     const nuevos: Record<string, number> = {};
     for (const c of propuesta.celdas) {
-      nuevos[claveCelda(c.idColor, c.idTalla)] = c.cantidad;
+      // La sugerencia viene POR TENDIDO desde el servidor (`sugerirCaptura` llavea con el pack): si
+      // aquí se plegara, el corte de dos tendidos del mismo color caería entero en una sola celda.
+      nuevos[claveCelda(c.idColor, c.idTalla, c.pack)] = c.cantidad;
     }
     setValores(nuevos);
     toast.success(
@@ -1436,31 +1500,77 @@ function CapturaMovimiento({
     ? Object.values(incompletas).reduce((s, v) => s + v, 0)
     : 0;
 
-  /**
-   * EXCESO sobre el pendiente de la etapa, celda por celda. Las dos reglas de F3-E2 NO son iguales
-   * y aquí se distinguen (antes el panel no miraba el exceso en absoluto y las pantallas viejas sí):
-   *  • decisión (f) SOBRE-CORTE **LIBRE**: el servidor lo acepta. Solo se AVISA, en ámbar, diciendo
-   *    que se permite (la matriz lo pinta rojo "Sobran N", que sin este aviso se lee como error).
-   *  • decisión (g) SOBRE-ENVÍO / SOBRE-RECIBO **ESTRICTOS** (`etapas.ts` / `recibos.ts` los
-   *    rechazan bajo lock): se bloquea el botón, para no mandar al usuario a comerse un 400.
-   * Sin referencia (`null` = primer movimiento de un proceso, sin base contra qué comparar) no se
-   * inventa un tope de 0: el exceso es 0 y decide el servidor.
-   */
-  const excede =
+  // ── EL EXCESO SOBRE EL PENDIENTE DE LA ETAPA ────────────────────────────────────────────────
+  //
+  // Las dos reglas de F3-E2 NO son iguales y aquí se distinguen (antes el panel no miraba el exceso
+  // en absoluto y las pantallas viejas sí):
+  //  • decisión (f) SOBRE-CORTE **LIBRE**: el servidor lo acepta. Solo se AVISA, en ámbar, diciendo
+  //    que se permite (la matriz lo pinta rojo "Sobran N", que sin este aviso se lee como error).
+  //  • decisión (g) SOBRE-ENVÍO / SOBRE-RECIBO **ESTRICTOS** (`etapas.ts` / `recibos.ts` los
+  //    rechazan bajo lock): se bloquea el botón, para no mandar al usuario a comerse un 400.
+  // Sin referencia (`null` = primer movimiento de un proceso, sin base contra qué comparar) no se
+  // inventa un tope de 0: el exceso es 0 y decide el servidor.
+  //
+  // ⭐ Desde §Post-F9.10 el cálculo son DOS condiciones, no una — las MISMAS que el servidor aplica
+  // bajo lock (`packs.ts::excesosDelRecibo`): (2) por celda/tendido y (1) por color×talla plegando
+  // los tendidos. Ninguna implica a la otra; ver {@link referenciaAgregada}.
+
+  /** Lo que ESTA captura devuelve en una celda: buenas + incompletas (V1-E8k), como topa el servidor. */
+  function devuelveEnCelda(clave: string): number {
+    return (valores[clave] ?? 0) + (capturarIncompletas ? (incompletas[clave] ?? 0) : 0);
+  }
+  /** Claves capturadas (con valor o con incompletas) — las mismas que se topan y que se guardan. */
+  const clavesCapturadas = [...new Set([...Object.keys(valores), ...Object.keys(incompletas)])];
+  /** (2) POR CELDA — cada renglón contra el pendiente de SU tendido (o el de su color sin packs). */
+  const excedeCelda =
     referencia === null
       ? 0
-      : [...new Set([...Object.keys(valores), ...Object.keys(incompletas)])].reduce(
-          (suma, clave) => {
-            const pendiente = Math.max(0, referencia.get(clave) ?? 0);
-            // V1-E8k: lo que topa es el total FÍSICO que el maquilero devuelve en esta captura —
-            // buenas + incompletas—, igual que el tope del servidor. Si solo se miraran las buenas,
-            // la pantalla dejaría pasar una captura que el guardado rechaza.
-            const devuelve =
-              (valores[clave] ?? 0) + (capturarIncompletas ? (incompletas[clave] ?? 0) : 0);
-            return devuelve > pendiente ? suma + (devuelve - pendiente) : suma;
-          },
-          0,
-        );
+      : clavesCapturadas.reduce((suma, clave) => {
+          const pendiente = Math.max(0, referencia.get(clave) ?? 0);
+          // V1-E8k: lo que topa es el total FÍSICO que el maquilero devuelve en esta captura —
+          // buenas + incompletas—, igual que el tope del servidor. Si solo se miraran las buenas,
+          // la pantalla dejaría pasar una captura que el guardado rechaza.
+          const devuelve = devuelveEnCelda(clave);
+          return devuelve > pendiente ? suma + (devuelve - pendiente) : suma;
+        }, 0);
+  /**
+   * (1) TOTAL POR COLOR×TALLA — se SUMAN los renglones de esta captura que caen en la misma celda
+   * (los de cada tendido y el de sin pack) y se topan JUNTOS contra el saldo agregado. Es la misma
+   * condición que `packs.ts::excesosDelRecibo` aplica bajo lock, y la razón de que no baste con (2)
+   * está en el comentario de {@link referenciaAgregada}.
+   */
+  const excedeAgregado =
+    referenciaAgregada === null
+      ? 0
+      : [
+          ...clavesCapturadas
+            .reduce((acum, clave) => {
+              // La llave es `color:talla:pack`; el agregado la quiere sin el pack. Se corta por los
+              // DOS primeros separadores (color y talla son enteros), igual que en el servidor: un
+              // `split(':')` truncaría en silencio un pack con `:` adentro.
+              const corte1 = clave.indexOf(':');
+              const corte2 = clave.indexOf(':', corte1 + 1);
+              const celda = corte2 < 0 ? clave : clave.slice(0, corte2);
+              acum.set(celda, (acum.get(celda) ?? 0) + devuelveEnCelda(clave));
+              return acum;
+            }, new Map<string, number>())
+            .entries(),
+        ].reduce((suma, [celda, devuelve]) => {
+          const pendiente = Math.max(0, referenciaAgregada.get(celda) ?? 0);
+          return devuelve > pendiente ? suma + (devuelve - pendiente) : suma;
+        }, 0);
+  /**
+   * El exceso que la pantalla reporta y con el que bloquea. Es el MAYOR de los dos, NO su suma:
+   * cuando las dos condiciones fallan en la misma celda miran las mismas piezas desde ángulos
+   * distintos, y sumarlas contaría dos veces la misma pieza sobrante.
+   *
+   * ⚠️ Y ahí está su límite, dicho porque es real: si (1) y (2) fallan en celdas DISTINTAS, el
+   * máximo se queda CORTO —3 de más en un tendido y 5 de más en el total de otra celda se reportan
+   * como 5, no como 8—. Se acepta a propósito: lo que este número decide es BLOQUEAR (basta con que
+   * sea > 0), y quién topa de verdad es el servidor bajo lock. Preferimos un número que nunca
+   * exagera a una suma que inventa piezas que no sobran.
+   */
+  const excede = Math.max(excedeCelda, excedeAgregado);
 
   const puedeGuardar =
     !ocupado &&
@@ -1488,15 +1598,27 @@ function CapturaMovimiento({
     // El sobre-corte SÍ se guarda (decisión (f)); el sobre-envío y el sobre-recibo, NO (decisión (g)).
     (etapa === 'corte' || excede === 0);
 
-  /** Convierte la captura al cuerpo `lineas` del API (descarta ceros). */
-  function lineasApi(): { idColor: number; tallas: { idTalla: number; cantidad: number }[] }[] {
+  /**
+   * Convierte la captura al cuerpo `lineas` del API (descarta ceros).
+   *
+   * ⭐ EL PACK VIAJA (§Post-F9.10): cada fila es un color×tendido y su pack va en el renglón. En una
+   * orden sin packs va la cadena vacía, que el dominio lee como «sin pack» — el cuerpo es, punto por
+   * punto, el de siempre. En el recibo «revueltos» las filas ya vienen plegadas con el pack vacío,
+   * que es justo lo que el dominio necesita para cobrarlo del saldo agregado.
+   */
+  function lineasApi(): {
+    idColor: number;
+    pack: string;
+    tallas: { idTalla: number; cantidad: number }[];
+  }[] {
     return colores
       .map((color) => ({
         idColor: color.idColor,
+        pack: color.pack,
         tallas: tallas
           .map((t) => ({
             idTalla: t.idTalla,
-            cantidad: valores[claveCelda(color.idColor, t.idTalla)] ?? 0,
+            cantidad: valores[claveCelda(color.idColor, t.idTalla, color.pack)] ?? 0,
           }))
           .filter((t) => t.cantidad > 0),
       }))
@@ -1511,6 +1633,7 @@ function CapturaMovimiento({
    */
   function lineasReciboApi(): {
     idColor: number;
+    pack: string;
     tallas: {
       idTalla: number;
       cantidad: number;
@@ -1525,9 +1648,10 @@ function CapturaMovimiento({
     return colores
       .map((color) => ({
         idColor: color.idColor,
+        pack: color.pack,
         tallas: tallas
           .map((t) => {
-            const clave = claveCelda(color.idColor, t.idTalla);
+            const clave = claveCelda(color.idColor, t.idTalla, color.pack);
             const cantidad = valores[clave] ?? 0;
             const seg = capturarSegundas ? (segundas[clave] ?? 0) : 0;
             const inc = capturarIncompletas ? (incompletas[clave] ?? 0) : 0;
@@ -1960,6 +2084,40 @@ function CapturaMovimiento({
         </div>
       ) : null}
 
+      {/* ── RECIBO CON LOS TENDIDOS REVUELTOS (§Post-F9.10) ─────────────────────────────────── */}
+      {esRecibo && manejaPacks ? (
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={revueltos}
+            onChange={(e) => {
+              setRevueltos(e.target.checked);
+              // Las llaves de la captura llevan el pack: al plegar (o desplegar) las filas dejan de
+              // significar lo mismo. Sin limpiar, lo tecleado antes seguiría contando en el total y
+              // en el tope aunque su fila ya no exista en pantalla.
+              //
+              // 🔑 Y éste es el ÚNICO sitio donde hay que limpiar, medido: el otro cambio que movería
+              // las llaves es cambiar de etapa, y el stepper cierra la captura al hacerlo
+              // (`setCapturaAbierta(false)` junto a `setEtapaActiva`), así que este componente se
+              // DESMONTA y su estado se va con él. `etapa` nunca cambia estando montado.
+              setValores({});
+              setSegundas({});
+              setIncompletas({});
+            }}
+            className="size-4 rounded border-input"
+            data-testid="avance-toggle-revueltos"
+          />
+          El maquilero devolvió los tendidos <b>revueltos</b> (no distingue pack)
+        </label>
+      ) : null}
+      {sinDistinguirPack ? (
+        <p className="text-xs text-muted-foreground" data-testid="avance-nota-revueltos">
+          La captura va <b>sin pack</b>: un renglón por color, que se descuenta del saldo de{' '}
+          <b>todos los tendidos juntos</b>. Se registra lo que volvió, pero ya no se sabrá de qué
+          tendido era.
+        </p>
+      ) : null}
+
       {/* En el RECIBO la referencia ES el pendiente de ese maquilero, y desde V1-E8v (§Post-F9.147)
           eso coincide con lo que todavía se le puede recibir: la prenda incompleta que ya entregó
           salió del tránsito, así que baja las dos cifras a la vez. Entre V1-E8k y V1-E8v fueron dos
@@ -1968,8 +2126,8 @@ function CapturaMovimiento({
         tallas={tallas}
         colores={colores}
         valores={valores}
-        onCambiar={(idColor, idTalla, cantidad) =>
-          setValores((v) => ({ ...v, [claveCelda(idColor, idTalla)]: cantidad }))
+        onCambiar={(idColor, idTalla, pack, cantidad) =>
+          setValores((v) => ({ ...v, [claveCelda(idColor, idTalla, pack)]: cantidad }))
         }
         {...(referencia === null ? {} : { referencia })}
         {...(totalReferencia === undefined ? {} : { totalReferencia })}
@@ -2008,8 +2166,8 @@ function CapturaMovimiento({
                 tallas={tallas}
                 colores={colores}
                 valores={segundas}
-                onCambiar={(idColor, idTalla, cantidad) =>
-                  setSegundas((v) => ({ ...v, [claveCelda(idColor, idTalla)]: cantidad }))
+                onCambiar={(idColor, idTalla, pack, cantidad) =>
+                  setSegundas((v) => ({ ...v, [claveCelda(idColor, idTalla, pack)]: cantidad }))
                 }
                 // La referencia de las segundas es el TOTAL capturado por celda: el tope real.
                 referencia={new Map(Object.entries(valores).filter(([, v]) => v > 0))}
@@ -2057,8 +2215,8 @@ function CapturaMovimiento({
                 tallas={tallas}
                 colores={colores}
                 valores={incompletas}
-                onCambiar={(idColor, idTalla, cantidad) =>
-                  setIncompletas((v) => ({ ...v, [claveCelda(idColor, idTalla)]: cantidad }))
+                onCambiar={(idColor, idTalla, pack, cantidad) =>
+                  setIncompletas((v) => ({ ...v, [claveCelda(idColor, idTalla, pack)]: cantidad }))
                 }
                 testid="avance-matriz-incompletas"
               />
@@ -2179,7 +2337,14 @@ function CapturaEntregaCliente({
     idAlmacen === '' ? {} : { idAlmacen: Number(idAlmacen) },
   );
 
-  const { tallas, colores } = useMemo(() => ejesDeOrden(orden), [orden]);
+  /**
+   * ⭐ EJES PLEGADOS (§Post-F9.10): la entrega a cliente NO maneja packs — sale de inventario de
+   * producto terminado, que se lleva por modelo×color×talla×orden×almacén y no guarda el tendido.
+   * Sus celdas (`seguimiento-entrega`) vienen sin pack, así que las filas van igual: una por color.
+   * Usar los ejes CON pack habría dado dos filas idénticas por cada color de dos tendidos, con la
+   * misma existencia ofrecida dos veces y sin nada que las distinguiera en pantalla.
+   */
+  const { tallas, colores } = useMemo(() => ejesDeOrdenPlegados(orden), [orden]);
 
   /** Aviso reintentable: sin almacenes la captura no arranca, y sin seguimiento no hay tope. */
   function reintentarCatalogos(): void {
@@ -2197,7 +2362,8 @@ function CapturaEntregaCliente({
     }
     const mapa = new Map<string, number>();
     for (const c of seguimiento.data.celdas) {
-      mapa.set(claveCelda(c.idColor, c.idTalla), c.disponible);
+      // Pack vacío: la entrega a cliente no lo maneja y sus filas van plegadas por color.
+      mapa.set(claveCelda(c.idColor, c.idTalla, ''), c.disponible);
     }
     return mapa;
   }, [idAlmacen, seguimiento.data]);
@@ -2232,7 +2398,7 @@ function CapturaEntregaCliente({
             tallas: tallas
               .map((t) => ({
                 idTalla: t.idTalla,
-                cantidad: valores[claveCelda(color.idColor, t.idTalla)] ?? 0,
+                cantidad: valores[claveCelda(color.idColor, t.idTalla, color.pack)] ?? 0,
               }))
               .filter((t) => t.cantidad > 0),
           }))
@@ -2321,8 +2487,8 @@ function CapturaEntregaCliente({
         tallas={tallas}
         colores={colores}
         valores={valores}
-        onCambiar={(idColor, idTalla, cantidad) =>
-          setValores((v) => ({ ...v, [claveCelda(idColor, idTalla)]: cantidad }))
+        onCambiar={(idColor, idTalla, pack, cantidad) =>
+          setValores((v) => ({ ...v, [claveCelda(idColor, idTalla, pack)]: cantidad }))
         }
         {...(referencia === null ? {} : { referencia })}
         {...(totalReferencia === undefined ? {} : { totalReferencia })}

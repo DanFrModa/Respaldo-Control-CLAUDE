@@ -356,6 +356,14 @@ export function PanelGenerarOP({
             </section>
           ) : null}
 
+          {/* ⚠️ AQUÍ NO SE CAPTURAN PACKS, Y ES DELIBERADO (§Post-F9.10): no se pasa `onPackChange`,
+              así que la columna Pack no aparece y una OP nacida de un PEDIDO arranca SIN tendidos
+              (todos sus renglones con pack vacío, que es «sin pack» — el caso normal). Los packs
+              vienen de dos sitios: del PDF de C&A, que los trae del papel, y de la matriz de la OP
+              ya creada, donde sí se editan. Si algún día se quisieran capturar desde aquí, no basta
+              con pasar la prop: hay que traerse también las dos guardas del panel de la matriz (o
+              todos con pack o ninguno, y `(color, pack)` no repetido), porque sin ellas el servidor
+              devuelve un 400 con la matriz ya tecleada. */}
           <MatrizColorTalla
             tallas={columnas}
             lineas={lineas}
@@ -366,8 +374,11 @@ export function PanelGenerarOP({
             tallasDisponibles={tallasDisponibles}
             onLineasChange={setLineas}
             onTallasChange={setColumnas}
-            onPantoneChange={(idColor, pantone) =>
-              setLineas((prev) => prev.map((l) => (l.idColor === idColor ? { ...l, pantone } : l)))
+            /* El primer argumento es la POSICIÓN de la fila, no el `idColor` (§Post-F9.10): con
+               packs el mismo color puede ocupar dos filas y el id dejó de distinguirlas. Los dos
+               son `number`, así que el compilador NO avisa si se confunden — por eso se nombra. */
+            onPantoneChange={(indice, pantone) =>
+              setLineas((prev) => prev.map((l, i) => (i === indice ? { ...l, pantone } : l)))
             }
             testid="matriz-op"
             /* V1-E4 (punto 7): el `<select>` nativo de la matriz se alimentaba de la PRIMERA

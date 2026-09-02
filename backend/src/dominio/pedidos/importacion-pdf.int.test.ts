@@ -1,9 +1,9 @@
 /**
  * Tests de INTEGRACIÓN del IMPORTADOR de OC por PDF (petición Daniel — plantilla C&A) contra el
  * Postgres efímero (testcontainers), usando el fixture REAL `__fixtures__/cya-620884.pdf`. Cubre:
- *  • CONFIRMAR 1 PDF: nace el pedido + su OP con matriz de UN SOLO RENGLÓN DE COLOR (§Post-F9.129:
- *    los packs A/B/C se SUMAN en "Blanco"; el pack ya no fabrica colores), el nº de orden de C&A en
- *    `Orden.ocCliente`, el
+ *  • CONFIRMAR 1 PDF: nace el pedido + su OP con UN RENGLÓN POR TENDIDO, todos del MISMO color
+ *    (§Post-F9.10: los packs A/B/C nacen como tres líneas de "Blanco" con su campo `pack`; la letra
+ *    no fabrica colores desde §Post-F9.129), el nº de orden de C&A en `Orden.ocCliente`, el
  *    departamento (División) + las referencias (D7) configuradas, el PDF ADJUNTO a la OP, y la LIGA
  *    aprendida (modelo del cliente → nuestro modelo),
  *  • COMPOSICIÓN (Daniel 24-jul-2026): la del MODELO manda; la del PDF sólo entra de RESPALDO
@@ -210,17 +210,19 @@ describe('confirmar importación por PDF (1 PDF)', () => {
     // del PDF entra como RESPALDO y queda marcada como override (no deriva del modelo).
     expect(orden.composicion).toContain('ALGOD');
     expect(orden.compForzada).toBe(true);
-    // ⭐ §Post-F9.129 — UN SOLO renglón de color: la OC 620884 trae 3 packs (A/B/C) y los tres se
-    // SUMAN en "Blanco". Antes nacían 3 líneas con 3 colores de catálogo ("Blanco A/B/C") y eso
-    // partía en tres las compras de una misma orden aguas abajo.
-    expect(orden.lineas).toHaveLength(1);
-    expect(orden.lineas.map((l) => l.color.nombre)).toEqual(['Blanco']);
+    // ⭐ §Post-F9.10 — UN RENGLÓN POR TENDIDO, TODOS DEL MISMO COLOR: la OC 620884 trae 3 packs
+    // (A/B/C) y nacen 3 líneas de "Blanco" con su `pack`. Antes de §Post-F9.129 nacían 3 COLORES de
+    // catálogo ("Blanco A/B/C") y eso partía en tres las compras de una misma orden aguas abajo;
+    // entre §Post-F9.129 y §Post-F9.10 nacía UNA sola línea y el tendido desaparecía del corte.
+    expect(orden.lineas).toHaveLength(3);
+    expect(orden.lineas.map((l) => l.color.nombre)).toEqual(['Blanco', 'Blanco', 'Blanco']);
+    expect([...orden.lineas].map((l) => l.pack).sort()).toEqual(['A', 'B', 'C']);
     const totalMatriz = orden.lineas.reduce(
       (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
       0,
     );
     expect(totalMatriz).toBe(1903);
-    // La OC real de C&A NO trae pantone → el renglón del color queda sin pantone.
+    // La OC real de C&A NO trae pantone → los renglones del color quedan sin pantone.
     for (const l of orden.lineas) expect(l.pantone).toBeNull();
     // El desglose SKU/packs del cliente quedó persistido con la orden (aun sin % adicional).
     expect(orden.packsCliente).not.toBeNull();
@@ -556,24 +558,42 @@ describe('sobre-pedido por packs (C&A = 7%)', () => {
       where: { id: res.ordenes[0]!.idOrden },
       include: { lineas: { include: { tallas: { include: { talla: true } }, color: true } } },
     });
-    // ⭐ §Post-F9.129 — UN SOLO renglón ("Blanco"): los 3 packs de la propuesta se SUMAN talla por
-    // talla. El sobre-pedido se sigue calculando POR PACK (A 119→127 = 254-127-127-381-381-254;
-    // B 57→61 = 61-0-0-122-122-122; C SKU +7% = 11-7-11-18-20-14 — cementados pack por pack en el
-    // unit `sobrepedido-cya.test.ts`); lo que cambia es que la OP recibe su SUMA, no tres renglones.
-    expect(orden.lineas).toHaveLength(1);
-    const linea0 = orden.lineas[0]!;
-    expect(linea0.color.nombre).toBe('Blanco');
-    const porTalla = new Map(linea0.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const));
-    // Los canónicos de la OC 620884 al 7%: 326-134-138-521-523-390 (= 2032).
-    expect(
-      ['5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map((t) => porTalla.get(t) ?? 0),
-    ).toEqual([326, 134, 138, 521, 523, 390]);
-    // Ninguna talla se duplicó al fundir (sería el defecto que `sincronizarMatriz` aborta).
-    expect(linea0.tallas).toHaveLength(6);
+    // ⭐ §Post-F9.10 — TRES renglones de "Blanco", uno por tendido, cada uno con SU corrida del
+    // sobre-pedido POR PACK (A 119→127 = 254-127-127-381-381-254; B 57→61 = 61-0-0-122-122-122;
+    // C SKU +7% = 11-7-11-18-20-14 — cementados pack por pack en el unit `sobrepedido-cya.test.ts`).
+    // Entre §Post-F9.129 y §Post-F9.10 la OP recibía su SUMA en una sola línea y el tendido se
+    // perdía; antes de §Post-F9.129, tres COLORES de catálogo distintos.
+    expect(orden.lineas).toHaveLength(3);
+    expect(new Set(orden.lineas.map((l) => l.color.nombre))).toEqual(new Set(['Blanco']));
+    const porPack = new Map(
+      orden.lineas.map(
+        (l) =>
+          [l.pack, new Map(l.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const))] as const,
+      ),
+    );
+    const tallasCya = ['5-6', '6-7', '7-8', '9-10', '11-12', '13-14'];
+    const corrida = (pack: string): number[] =>
+      tallasCya.map((t) => porPack.get(pack)?.get(t) ?? 0);
+    // 🔑 Cada tendido con LO SUYO, no la suma: si el importador siguiera fundiendo, estas tres
+    // aserciones serían imposibles de satisfacer a la vez.
+    expect(corrida('A')).toEqual([254, 127, 127, 381, 381, 254]);
+    expect(corrida('B')).toEqual([61, 0, 0, 122, 122, 122]);
+    expect(corrida('C')).toEqual([11, 7, 11, 18, 20, 14]);
+    // Ninguna talla se duplicó DENTRO de un tendido (sería el defecto que `sincronizarMatriz` aborta).
+    // El pack B trae dos tallas en 0, que no generan celda: 4, no 6.
+    expect(orden.lineas.map((l) => `${l.pack}:${l.tallas.length}`).sort()).toEqual([
+      'A:6',
+      'B:4',
+      'C:6',
+    ]);
     const totalMatriz = orden.lineas.reduce(
       (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
       0,
     );
+    // Y la SUMA de los tres tendidos sigue siendo la propuesta total: 326-134-138-521-523-390.
+    expect(
+      tallasCya.map((t) => ['A', 'B', 'C'].reduce((s, p) => s + (porPack.get(p)?.get(t) ?? 0), 0)),
+    ).toEqual([326, 134, 138, 521, 523, 390]);
     expect(totalMatriz).toBe(2032);
 
     // El RENGLÓN del pedido conserva la cantidad ORIGINAL del cliente (lo contractual) y el precio.
@@ -668,28 +688,42 @@ describe('sobre-pedido por packs (C&A = 7%)', () => {
       where: { id: res.ordenes[0]!.idOrden },
       include: { lineas: { include: { tallas: { include: { talla: true } }, color: true } } },
     });
-    // ⭐ §Post-F9.129 por la PUERTA DE LA MATRIZ EDITADA: los renglones-pack que mandó el usuario
-    // también se funden en UN solo renglón de color. A(500) + B(100) = 600; el pack C vaciado no
-    // aporta nada. Antes salían 2 colores de catálogo ("Blanco A" y "Blanco B").
-    expect(orden.lineas).toHaveLength(1);
-    const linea0 = orden.lineas[0]!;
-    expect(linea0.color.nombre).toBe('Blanco');
-    const porTalla = new Map(linea0.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const));
-    // A: 5-6 100, 6-7 100, 9-10 150, 13-14 150 · B: 5-6 50, 9-10 50 → sumados por talla.
-    expect(porTalla.get('5-6')).toBe(150);
-    expect(porTalla.get('6-7')).toBe(100);
-    expect(porTalla.get('9-10')).toBe(200);
-    expect(porTalla.get('13-14')).toBe(150);
-    expect(linea0.tallas).toHaveLength(4);
-    expect(linea0.tallas.reduce((s, t) => s + t.cantidad, 0)).toBe(600);
+    // ⭐ §Post-F9.10 por la PUERTA DE LA MATRIZ EDITADA: nacen DOS renglones (A y B) del MISMO
+    // color, cada uno con la corrida que tecleó el usuario. El pack C vaciado NO genera renglón:
+    // así se "integra" un pack en otro. Antes de §Post-F9.129 salían 2 COLORES de catálogo
+    // ("Blanco A" y "Blanco B"); entre §Post-F9.129 y §Post-F9.10, un solo renglón con la suma.
+    expect(orden.lineas).toHaveLength(2);
+    expect(new Set(orden.lineas.map((l) => l.color.nombre))).toEqual(new Set(['Blanco']));
+    const porPack = new Map(
+      orden.lineas.map(
+        (l) =>
+          [l.pack, new Map(l.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const))] as const,
+      ),
+    );
+    expect([...porPack.keys()].sort()).toEqual(['A', 'B']);
+    // A: 5-6 100, 6-7 100, 9-10 150, 13-14 150 — TAL CUAL, sin sumarle el B.
+    expect([...(porPack.get('A') ?? [])].sort()).toEqual([
+      ['13-14', 150],
+      ['5-6', 100],
+      ['6-7', 100],
+      ['9-10', 150],
+    ]);
+    // B: 5-6 50, 9-10 50.
+    expect([...(porPack.get('B') ?? [])].sort()).toEqual([
+      ['5-6', 50],
+      ['9-10', 50],
+    ]);
+    expect(
+      orden.lineas.reduce((s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0), 0),
+    ).toBe(600);
     // Y el color quedó UNO SOLO en el catálogo (la letra del pack ya no lo fabrica).
     expect(
       await cliente.color.count({
         where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
       }),
     ).toBe(1);
-    // El pantone editado quedó sellado en el renglón del color de la OP.
-    expect(linea0.pantone).toBe('11-0601 TCX');
+    // El pantone editado se sella en TODOS los renglones (es UNO por OC, no por tendido).
+    expect(orden.lineas.map((l) => l.pantone)).toEqual(['11-0601 TCX', '11-0601 TCX']);
     // El renglón del pedido SIGUE conservando lo pedido (1903).
     const linea = await cliente.pedidoLinea.findFirstOrThrow({ where: { idPedido: res.idPedido } });
     expect(linea.cantidadPedida).toBe(1903);
@@ -922,10 +956,11 @@ describe('idempotencia de catálogos', () => {
     // 2) …y NO acumuló referencias nuevas (era la vuelta de tuerca de este resolver: el id se
     //    amarra a la matriz color×talla de la OP).
     expect(await cliente.ordenLinea.count({ where: { idColor: absorbido.id } })).toBe(0);
-    // 3) La OP quedó amarrada al color BUENO, que es lo que la fusión quiso decir.
+    // 3) La OP quedó amarrada al color BUENO, que es lo que la fusión quiso decir. Son TRES
+    //    renglones —uno por tendido (§Post-F9.10)— pero del MISMO color, que es lo que se afirma.
     const lineas = await cliente.ordenLinea.findMany();
-    expect(lineas).toHaveLength(1);
-    expect(lineas[0]?.idColor).toBe(canonico.id);
+    expect(lineas).toHaveLength(3);
+    expect(new Set(lineas.map((l) => l.idColor))).toEqual(new Set([canonico.id]));
     // 4) Tampoco se fabricó un color nuevo para esquivar el problema (`nombre` es único global).
     expect(await cliente.color.count()).toBe(2);
     // 5) 🔴 EL DESVÍO QUEDA ANOTADO (A7). Es el caso NORMAL —el canónico ya está activo, así que no
@@ -967,7 +1002,8 @@ describe('idempotencia de catálogos', () => {
 
     const despues = await cliente.color.findUniqueOrThrow({ where: { id: apagado.id } });
     expect(despues.activo).toBe(true);
-    expect(await cliente.ordenLinea.count({ where: { idColor: apagado.id } })).toBe(1);
+    // Tres renglones (uno por tendido, §Post-F9.10), todos sobre ESE color reactivado.
+    expect(await cliente.ordenLinea.count({ where: { idColor: apagado.id } })).toBe(3);
     // Y la reactivación quedó DICHA (A7), no en silencio.
     const bit = await cliente.bitacora.findFirstOrThrow({
       where: { entidad: 'Color', idEntidad: String(apagado.id), accion: 'MODIFICAR' },

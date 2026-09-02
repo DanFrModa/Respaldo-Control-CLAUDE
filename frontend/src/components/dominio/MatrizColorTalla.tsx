@@ -6,10 +6,14 @@ import { cn } from '@/lib/utils';
 
 /**
  * MATRIZ COLOR × TALLA con CANDADO (rediseño R2, §4.3 — proto `.proc-matrix`): la captura de un
- * movimiento de avance (corte / envío / recibo) SOLO sobre los colores y tallas DE LA ORDEN — las
+ * movimiento de avance (corte / envío / recibo) SOLO sobre los renglones y tallas DE LA ORDEN — las
  * filas y columnas son FIJAS (nada de agregar/quitar: ese es el candado que pidió Daniel). Los
  * totales (fila, columna y general) se suman solos, y el estado cuadra/faltan/sobran se deriva
  * contra una REFERENCIA (p. ej. el pendiente por cortar/enviar de esa etapa).
+ *
+ * ⭐ UNA FILA ES UN COLOR × PACK (§Post-F9.10): en una orden con dos tendidos del mismo color hay
+ * DOS filas, cada una con su propia cuenta y su propio pendiente. En una orden sin packs el pack va
+ * vacío, la fila es la de siempre y nada en pantalla cambia.
  *
  * Distinta de `componentes/matriz-color-talla` (la captura de la MATRIZ de la orden, F2-E3, que sí
  * agrega/quita colores y tallas): aquí la orden manda y la captura solo llena celdas.
@@ -24,15 +28,39 @@ export interface CeldaTalla {
   etiqueta: string;
 }
 
-/** Una fila (color) de la matriz. */
+/**
+ * Una fila de la matriz: un COLOR × su PACK (§Post-F9.10). En una orden sin packs `pack` va vacío y
+ * la fila es la de siempre, «un renglón por color».
+ */
 export interface CeldaColor {
   idColor: number;
   nombre: string;
+  /** PACK / TENDIDO de la fila. CADENA VACÍA = la orden no maneja packs (o la etapa no lo maneja). */
+  pack: string;
 }
 
-/** Clave estable de una celda (misma convención `color:talla` que el backend). */
-export function claveCelda(idColor: number, idTalla: number): string {
-  return `${idColor}:${idTalla}`;
+/**
+ * Clave estable de una celda color×talla×PACK — la MISMA convención `color:talla:pack` que
+ * `packs.ts::claveCeldaPack` en el backend, que es de donde vienen los pendientes y las sugerencias
+ * que esta matriz lee. Si las dos convenciones divergieran, la referencia de cada celda se buscaría
+ * con una llave que el servidor nunca escribió y saldría siempre `undefined`.
+ *
+ * ⚠️ El `pack` es OBLIGATORIO a propósito (no tiene default `''`). Antes de §Post-F9.10 la llave era
+ * de dos partes y los ~15 sitios que la construyen en `AvanceProduccion` la escribían así; dejarlo
+ * opcional habría hecho que los que se olvidaran de pasarlo siguieran compilando y **plegaran dos
+ * tendidos en la misma celda en silencio** — dos filas distintas editando el mismo número. Que sea
+ * obligatorio convierte cada olvido en un error de compilación.
+ *
+ * El color y la talla son enteros, así que los dos primeros separadores son inequívocos y el pack es
+ * todo lo que queda: una etiqueta con `:` adentro no puede hacerse pasar por otra celda.
+ */
+export function claveCelda(idColor: number, idTalla: number, pack: string): string {
+  return `${idColor}:${idTalla}:${pack}`;
+}
+
+/** Clave estable de una FILA (color × pack), para el `key` de React y los refs de teclado. */
+function claveFila(color: CeldaColor): string {
+  return `${color.idColor}:${color.pack}`;
 }
 
 /** Estado derivado de la captura contra su referencia (cuadra / faltan / sobran). */
@@ -79,12 +107,12 @@ export function estadoCaptura(
 export interface PropsMatrizCandado {
   /** Columnas: las tallas DE LA ORDEN (fijas). */
   tallas: readonly CeldaTalla[];
-  /** Filas: los colores DE LA ORDEN (fijos). */
+  /** Filas: los renglones DE LA ORDEN (color × pack, fijos). */
   colores: readonly CeldaColor[];
-  /** Cantidades capturadas por celda (`claveCelda(color,talla)` → cantidad). Controlado. */
+  /** Cantidades capturadas por celda (`claveCelda(color,talla,pack)` → cantidad). Controlado. */
   valores: Readonly<Record<string, number>>;
-  /** Emite la celda editada (cantidad entera ≥ 0). */
-  onCambiar: (idColor: number, idTalla: number, cantidad: number) => void;
+  /** Emite la celda editada (cantidad entera ≥ 0). El `pack` es el de la FILA. */
+  onCambiar: (idColor: number, idTalla: number, pack: string, cantidad: number) => void;
   /** Referencia por celda (p. ej. pendiente de la etapa) para el hint bajo cada input. */
   referencia?: ReadonlyMap<string, number>;
   /** Total de referencia del movimiento (para el estado cuadra/faltan/sobran). */
@@ -132,14 +160,20 @@ export function MatrizColorTalla({
   const totalesFila = useMemo(
     () =>
       colores.map((color) =>
-        tallas.reduce((s, t) => s + (valores[claveCelda(color.idColor, t.idTalla)] ?? 0), 0),
+        tallas.reduce(
+          (s, t) => s + (valores[claveCelda(color.idColor, t.idTalla, color.pack)] ?? 0),
+          0,
+        ),
       ),
     [colores, tallas, valores],
   );
   const totalesColumna = useMemo(
     () =>
       tallas.map((t) =>
-        colores.reduce((s, color) => s + (valores[claveCelda(color.idColor, t.idTalla)] ?? 0), 0),
+        colores.reduce(
+          (s, color) => s + (valores[claveCelda(color.idColor, t.idTalla, color.pack)] ?? 0),
+          0,
+        ),
       ),
     [colores, tallas, valores],
   );
@@ -198,10 +232,22 @@ export function MatrizColorTalla({
           </thead>
           <tbody>
             {colores.map((color, indiceFila) => (
-              <tr key={color.idColor} className="border-b" data-testid={`${testid}-fila`}>
-                <td className="px-2.5 py-1 font-medium whitespace-nowrap">{color.nombre}</td>
+              <tr key={claveFila(color)} className="border-b" data-testid={`${testid}-fila`}>
+                <td className="px-2.5 py-1 font-medium whitespace-nowrap">
+                  {color.nombre}
+                  {/* El PACK va PEGADO al color y no en una columna aparte: dos tendidos del mismo
+                      color son dos filas que, sin esto, se leerían idénticas (§Post-F9.10). */}
+                  {color.pack !== '' ? (
+                    <span
+                      className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[10.5px] font-semibold text-muted-foreground"
+                      data-testid={`${testid}-pack`}
+                    >
+                      Pack {color.pack}
+                    </span>
+                  ) : null}
+                </td>
                 {tallas.map((t, indiceColumna) => {
-                  const clave = claveCelda(color.idColor, t.idTalla);
+                  const clave = claveCelda(color.idColor, t.idTalla, color.pack);
                   const cantidad = valores[clave] ?? 0;
                   // El pendiente puede venir NEGATIVO (sobre-corte, decisión f): el hint se
                   // clampa a 0 — "de −2" no significa nada para quien captura.
@@ -221,12 +267,16 @@ export function MatrizColorTalla({
                         step={1}
                         disabled={deshabilitada}
                         className="mx-auto h-8 w-16 text-center"
-                        aria-label={`${color.nombre}, talla ${t.etiqueta}`}
+                        aria-label={
+                          color.pack === ''
+                            ? `${color.nombre}, talla ${t.etiqueta}`
+                            : `${color.nombre} pack ${color.pack}, talla ${t.etiqueta}`
+                        }
                         data-testid={`${testid}-celda`}
                         value={cantidad === 0 ? '' : String(cantidad)}
                         placeholder="0"
                         onChange={(e) =>
-                          onCambiar(color.idColor, t.idTalla, aCantidad(e.target.value))
+                          onCambiar(color.idColor, t.idTalla, color.pack, aCantidad(e.target.value))
                         }
                         onKeyDown={(e) => navegar(e, indiceFila, indiceColumna)}
                       />
@@ -279,7 +329,7 @@ export function MatrizColorTalla({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <Lock className="size-3" aria-hidden />
-          Candado: solo colores y tallas de la orden
+          Candado: solo los renglones y tallas de la orden
         </span>
         <span
           className={cn(

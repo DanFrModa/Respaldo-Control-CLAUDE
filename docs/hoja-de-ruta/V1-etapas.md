@@ -1512,6 +1512,113 @@ backend **204 archivos / 2 713 pruebas** · frontend **206 / 2 005** · typechec
 format ×2 · contrato regenerado **sin deriva**. ⚠️ Los cuatro largos **el coder no pudo terminarlos** (la caja
 saturada le dio 31 min de reloj por 1:52 de CPU): **los corrió el reviewer**, y los cuatro en verde.
 
+## V1-E9w · ⭐⭐ EL PACK, LA MITAD DE ARRIBA — que se capture, se vea y NAZCA DEL PAPEL (2-sep-2026, versión **0.091**) — ✅ CIERRA LA FILA 0.084
+
+**Qué entregó.** La segunda mitad de §Post-F9.10. Con la v0.087 el pack ya era campo propio y viajaba al
+corte y al envío, pero **no se podía usar desde ninguna pantalla** y **el importador seguía fundiendo los
+tendidos**. Ahora la OP **nace del PDF con sus packs separados**, se capturan a mano, se ven en el Centro y
+en el tablero, y la captura de avance distingue tendido por tendido.
+
+### ⚠️ Una etapa que se entregó SIN reporte — y qué se hizo con eso
+
+🔴 **La sesión del coder se perdió a mitad de la etapa.** El trabajo quedó **intacto en disco** (29 archivos,
+gates verdes) pero **sin una línea de qué midió, decidió o dejó fuera**. En vez de comitear a ciegas o
+tirarlo, se **reconstruyó el reporte leyendo el diff** con un analista de solo lectura, y esa reconstrucción
+—declarada como **de segunda mano**— fue la base del encargo del reviewer.
+📌 **Precedente que conviene conservar:** una entrega huérfana **no se comitea por estar verde**. Los gates
+dicen que no está roto; **no dicen qué falta**.
+
+### ⭐ Lo central, verificado ENUMERANDO
+
+**La fusión salió y el cableado entró en la misma jugada** — que era la advertencia medida de la etapa.
+`fusionarPacksEnUnaCorrida` → **`agruparPacksEnRenglones`**, que agrupa por pack (con `normalizarPack` **del
+dominio de producción**, cerrando de paso la petición de §Post-F9.129 de *«escribir la regla UNA vez y
+compartirla»*) y **funde dos renglones que compartan letra**, que es el duplicado que la llave
+`(idOrden, idColor, pack)` prohíbe.
+
+El reviewer **enumeró las puertas de escritura de `OrdenLinea`** —no grepeó— y confirmó que **el hueco no
+existe por construcción**: los tres actos del dominio pasan por `sincronizarMatriz`, que rechaza el duplicado
+**antes de escribir**, y el ETL agrupa por color. Además **el parser sólo puede emitir una letra `[A-Z]`** y
+**la previa no deja editarla**, así que una matriz mezclada no puede llegar de ahí.
+
+Y la prueba que lo sostiene **discrimina de verdad**: la OC real 620884 nace con **tres líneas de «Blanco»**
+y cada tendido conserva **su** corrida — *imposibles de satisfacer a la vez si el importador siguiera
+fundiendo*.
+
+### 🔴 Lo que el reviewer rechazó, y por qué era rechazo
+
+**(1) La regla «con packs o sin packs» no tenía guarda en pantalla, y el propio diff creaba el estado
+inválido.** Agregar un color dejaba la fila **sin letra** ⇒ 400 del servidor con la matriz ya tecleada. Lo que
+lo volvió rechazo y no observación: **en el mismo diff, a 200 líneas**, sí se invirtió trabajo en
+pre-chequear el exceso del recibo *«para no mandar al usuario a comerse un 400»*. **El mismo estándar,
+incumplido consigo mismo.**
+
+**(2) 🔴🔴 Y la medición que lo prueba todo:** el reviewer construyó el mutante `Math.max` → `+` en el cálculo
+del exceso al recibir y **sobrevivió las 2 033 pruebas del frontend**. En una orden **sin packs** los dos
+excesos son iguales siempre, así que el mutante **duplica el número que la pantalla le enseña al usuario**.
+⇒ **La etapa cambió la aritmética del recibo de las órdenes sin packs y nada la pinzaba.** Ésa es la prueba,
+con número, de que *«no aparece la columna, no aparece la etiqueta»* **no bastaba** para sostener que una
+orden sin packs se comporta igual que antes.
+
+**(3) Seis textos falsos en código vivo**, dos de ellos en archivos que **se contradecían a sí mismos**:
+seguían diciendo que los packs se funden, que es justo lo que la etapa eliminó.
+
+### ⭐ Tres hallazgos del coder de correcciones que el encargo no nombraba
+
+1. 🔴 **El botón del pie NO era la única puerta.** *«Guardar y salir»* del guardia de cierre llama a
+   `guardarTodo()` y **no lo gobierna el pie** ⇒ **la matriz inválida se habría mandado igual**. El corte real
+   quedó **dentro de la sección** (`preparar → null`), que aborta antes de mandar nada.
+2. 🔴 **La guarda tenía un hueco sin recortar espacios**: para el dominio `'A'` y `' A '` son **el mismo
+   tendido** ⇒ el duplicado se colaba. **Y al recortar ahí hubo que recortar también en `contenido()`**, o la
+   llave del cliente deja de casar con la del servidor **y un renglón existente viaja SIN su `id`** —
+   borrar-y-recrear en silencio en vez de actualizar.
+3. **Eran TRES caminos al 400, no dos**: borrar **las dos** letras deja dos renglones idénticos sin pack.
+
+### ⭐ Y dos veces se cazó la afirmación falsa ANTES de escribirla
+
+- El coder de correcciones iba a escribir que esos rechazos *«se responden con su 400»* y **al verificarlo
+  eran 409** (`ErrorConflicto`). Lo corrigió antes de dejarlo.
+- Y al llevar al frontend la cláusula de la misma letra, **le buscó el cuadrante falso y encontró dos**:
+  decidió **no** arrastrar el matiz de mayúsculas allá porque **desde la previa es inalcanzable** (las letras
+  salen del parser, no se teclean) — sería ruido sobre un caso imposible.
+
+### Cómo quedó la guarda
+
+`impedimentoDeLaMatriz(lineas)` deriva los dos estados que el servidor rechaza, los pinta **en línea** y apaga
+el botón por **un eje nuevo separado de «sucio»**. ⚠️ **Esquivó la trampa señalada**: no se resolvió dejando la
+sección limpia — eso habría **perdido lo capturado al cerrar, en silencio**, que es peor que el 400. La sección
+sigue sucia y el guardia de cierre sigue preguntando, **con su propio mutante que lo pinza**.
+
+### Lo declarado (dentro del código, donde el lector aterriza)
+
+- **El segundo `TableroWipPagina`** (`modulos/indicadores/`) **no se necesita**: es KPI agregado, una fila por
+  orden, sin superficie color×talla. Verificado por dos lectores independientes.
+- **`PanelGenerarOP` no captura packs**: una OP nacida de un pedido arranca sin tendidos.
+- **La caja del pack**: `a` y `A` son dos tendidos. **Se declara, no se normaliza en la UI** — el reviewer
+  avaló el argumento y añadió el suyo, mejor: **§Post-F9.179 fijó el LARGO, no la caja**, así que
+  normalizarla en la pantalla sería **re-decidir una regla de negocio en la capa equivocada** (A1) y **daría
+  una garantía falsa**, porque el API y el ETL también escriben packs. ⏳ **Sube a Daniel** como
+  §Post-F9.183.
+
+### Residuos declarados
+
+- **El impreso de la orden y la bandeja de recetas por liberar** no muestran el tendido (no se pidieron).
+- **`filasDesdePropuesta`**: una OC con 0 ó 1 pack nace **sin pack**, y el propio comentario declara que
+  **cuántas OCs caen de cada lado NO se ha medido**.
+- **Sin prueba de integración** del caso «OC de un solo pack».
+- Una asimetría **inocua y medida**: `manejaPacks`/`hayPacks` no recortan, así que un espacio suelto enciende
+  el modo tendidos — **pero todas sus consecuencias peligrosas las atrapa el impedimento, que sí recorta**.
+
+### Despliegue
+
+**Sin migración, sin permisos, sin seed** ⇒ **NO requiere `SEED_ON_START`**. El contrato cambia en **un solo
+sitio**: `letra` de `maxLength 8 → 12` — **ensanchamiento**, no rompe clientes.
+
+### Gates
+
+backend **210 archivos / 2 789 pruebas** · frontend **206 / 2 036** · typecheck ×2 · lint ×2 (0 errores) ·
+format ×2 · contrato **regenerado con md5 idéntico**. Corridos por el lead **y repetidos por el reviewer**.
+
 ## V1-E9s · ⭐ EL PACK, COMO CAMPO PROPIO — la mitad de abajo (2-sep-2026, versión **0.087**) — 🔶 MITAD DE LA FILA 0.084
 
 **Qué entregó.** El pack deja de vivir dentro del nombre del color («Negro A») y pasa a ser **campo propio**
@@ -7345,7 +7452,7 @@ cambiar en **§Post-F9.10**.
 | Pieza | Dónde |
 | --- | --- |
 | La letra del pack sale del nombre del color (`componerColor` → **`colorDeLaOrden`**) | `backend/src/dominio/pedidos/importacion-pdf.ts` |
-| **`fusionarPacksEnUnaCorrida`** — suma pura de los renglones-pack talla por talla | `backend/src/dominio/pedidos/fusion-packs-cya.ts` (módulo nuevo) + su unit |
+| **`fusionarPacksEnUnaCorrida`** — suma pura de los renglones-pack talla por talla ⚠️ **RETIRADA el 2-sep-2026 (v0.091): la sustituyó `agruparPacksEnRenglones`, que NO funde — agrupa por pack. La ruta de abajo YA NO EXISTE** | ~~`backend/src/dominio/pedidos/fusion-packs-cya.ts`~~ → hoy `packs-cya.ts` (módulo nuevo) + su unit |
 | La orden nace con **UN renglón de color** (fusión aplicada en `crearOrdenDesdePdf`) | `backend/src/dominio/pedidos/importacion-pdf.ts` |
 | La vista previa etiqueta **packs**, y su renglón de totales dice **«A fabricar · Negro»** | `frontend/src/modulos/pedidos/ImportadorPedidoPdf.tsx` |
 | Prosa del contrato (`.describe()` de Zod) al día con lo construido | `backend/src/contrato/esquemas/importacion-pdf.ts` |

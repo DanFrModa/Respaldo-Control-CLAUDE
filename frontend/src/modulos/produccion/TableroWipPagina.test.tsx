@@ -188,3 +188,55 @@ describe('<TableroWipPagina> · puertas a la acción', () => {
     expect(screen.queryByTestId('wip-drill-entregar')).not.toBeInTheDocument();
   });
 });
+
+describe('<TableroWipPagina> · el PACK / TENDIDO en el drill-down (§Post-F9.10)', () => {
+  /** Celdas «por cortar» de una orden con DOS tendidos del mismo color y talla. */
+  const CELDAS_CON_PACK = [
+    { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: 'A', cantidad: 6 },
+    { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: 'B', cantidad: 4 },
+  ];
+
+  it('la columna Pack aparece y distingue los dos tendidos de la MISMA celda', async () => {
+    const usuario = userEvent.setup();
+    useWipOrden.mockReturnValue({
+      data: { ...DETALLE, porCortar: CELDAS_CON_PACK },
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<TableroWipPagina />, {
+      sesion: estadoSesionDePrueba([...PERMISOS]),
+    });
+    await usuario.click(screen.getAllByTestId('wip-detalle')[0] as HTMLElement);
+
+    // Sin la columna, el drill-down enseñaría dos renglones «Rojo · CH» idénticos con 6 y 4, y no
+    // habría manera de saber a qué tendido pertenece cada número.
+    const encabezados = (await screen.findAllByRole('columnheader')).map((c) => c.textContent);
+    expect(encabezados).toContain('Pack');
+    expect(screen.getByRole('cell', { name: 'A' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'B' })).toBeInTheDocument();
+  });
+
+  it('en una orden SIN tendidos NO se cuela una columna Pack vacía', async () => {
+    const usuario = userEvent.setup();
+    useWipOrden.mockReturnValue({
+      data: {
+        ...DETALLE,
+        porCortar: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
+        ],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<TableroWipPagina />, {
+      sesion: estadoSesionDePrueba([...PERMISOS]),
+    });
+    await usuario.click(screen.getAllByTestId('wip-detalle')[0] as HTMLElement);
+
+    await screen.findByRole('cell', { name: 'Rojo' });
+    const encabezados = screen.getAllByRole('columnheader').map((c) => c.textContent);
+    expect(encabezados).not.toContain('Pack');
+  });
+});
