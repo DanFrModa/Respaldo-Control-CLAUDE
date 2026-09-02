@@ -50,6 +50,7 @@ import { PanelHabilitacionOrden } from '@/modulos/notas-salida/PanelHabilitacion
 import { PanelRutaOrden } from '@/modulos/ruta-critica/PanelRutaOrden';
 import { useSesion } from '@/sesion/useSesion';
 
+import { ChipHermanas } from './AvisoHermanas';
 import { DialogoOrden } from './DialogoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelPreciosOrden } from './PanelPreciosOrden';
@@ -758,6 +759,13 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                                   {textoFaltantes(fila.faltantes)}
                                 </span>
                               )}
+                            {/* ⭐⭐ fila 0.068 (a) — el aviso EN LA FAMILIA, también en móvil: es la
+                                gemela de la celda de la tabla y omitirla dejaría media pantalla sin
+                                el aviso, que es el defecto que esta etapa vino a evitar. */}
+                            <ChipHermanas
+                              frenteAlGrupo={fila.frenteAlGrupo}
+                              className="mt-0.5 justify-end"
+                            />
                           </div>
                         </div>
                         <p className="mt-1 truncate text-sm font-medium">{fila.cliente}</p>
@@ -899,6 +907,12 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                                     {textoFaltantes(fila.faltantes)}
                                   </span>
                                 )}
+                              {/* ⭐⭐ fila 0.068 (a) — **EL AVISO EN LA FAMILIA.** El Centro es la
+                                  única pantalla que enseña juntas todas las OP de un modelo, así
+                                  que es donde se reconoce a la que se salió del grupo sin abrirlas
+                                  una por una. Va bajo el chip de estatus, como `faltantes`, y NO
+                                  ocupa columna nueva. El texto lo redacta el servidor. */}
+                              <ChipHermanas frenteAlGrupo={fila.frenteAlGrupo} className="mt-0.5" />
                             </TablaDensaCelda>
                           </TablaDensaFila>
                         );

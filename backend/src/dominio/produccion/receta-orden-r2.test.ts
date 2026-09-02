@@ -94,6 +94,33 @@ function arteDeLaOrden(agregadoAMano: boolean) {
 /**
  * Stub de la transacción con lo mínimo que recorre `quitarRenglonReceta` sobre un ARTE: la orden,
  * el renglón, sus fotos propias, el borrado y la bitácora. Todo lo demás contesta vacío.
+ *
+ * ---
+ * ⚠️⚠️ **Y las CINCO consultas del aviso de hermanas (0.090), que este doble tiene que servir
+ * enteras.** `armarReceta` llama a `frenteAlGrupoDeOrdenes`, y ese cargador pide:
+ *
+ *  1. `orden.findMany` — el LINAJE de las órdenes pedidas (`select: {id, modelo}`);
+ *  2. `orden.findMany` — toda la FAMILIA de esos linajes (`select: {id, folio, modelo}`);
+ *  3. `ordenTela.findMany` · 4. `ordenAvio.findMany` · 5. `ordenArte.findMany` — su receta congelada.
+ *
+ * 🔴 **Este archivo se puso ROJO al juntar las dos etapas** (`lector.orden.findMany is not a
+ * function`): el doble se escribió a la medida del camino que `quitarRenglonReceta` recorría
+ * ENTONCES, y por debajo le creció una llamada nueva. Las tres pruebas cayeron a la vez.
+ *
+ * ⭐ **Por qué `orden.findMany` devuelve LA ORDEN y no `[]`, que es lo que arreglaría el `TypeError`
+ * igual de rápido.** Con `[]`, el cargador corta en la consulta 1 (`if (pedidas.length === 0)
+ * return new Map()`) y **las otras cuatro no se ejecutan nunca**: el guardián volvería a verde con
+ * el aviso de hermanas apagado, y el próximo defecto en ese camino —o una sexta consulta— pasaría
+ * inadvertido otra vez. Devolviendo la orden, las cinco corren de verdad contra este doble, que es
+ * la única protección que un stub puede dar. Además `[]` sería **incoherente con el resto del
+ * doble**: `orden.findFirst` sí devuelve la orden 55; un `findMany` vacío modelaría una base en la
+ * que esa orden no existe.
+ *
+ * ⚠️ **Las tres tablas de receta SÍ contestan vacío, y eso es correcto AQUÍ:** este stub describe
+ * una familia de UNA sola orden cuya receta congelada está vacía, así que el resultado honesto es
+ * *«no hay hermanas con quién compararse»* — no es la función silenciada, es la función corriendo
+ * entera y concluyendo lo que toca. Poblarlas obligaría a inventar una hermana y a fingir sus
+ * renglones, y este archivo vigila el borrado en R2, no la comparación.
  */
 function bdParaQuitarArte(opciones: {
   agregadoAMano: boolean;
@@ -122,9 +149,20 @@ function bdParaQuitarArte(opciones: {
     cliente: { nombre: 'C&A' },
   };
 
+  // Las DOS consultas de `frenteAlGrupoDeOrdenes` sobre `orden` (linaje pedido y familia) se
+  // sirven con un mismo objeto: lleva `id`, `folio` y `modelo` con la forma de
+  // `SELECT_LINAJE_RECETA`, así que vale para los dos `select`. `idModeloDesarrollo: null` = «la
+  // receta es la mía» ⇒ el linaje es el propio modelo, que es el caso de esta orden.
+  const ordenDelLinaje = {
+    id: ID_ORDEN,
+    folio: orden.folio,
+    modelo: { id: 7, idModeloDesarrollo: null },
+  };
+
   const tx = {
     orden: {
       findFirst: vi.fn(() => Promise.resolve(orden)),
+      findMany: vi.fn(() => Promise.resolve([ordenDelLinaje])),
       findUniqueOrThrow: vi.fn(() =>
         Promise.resolve({ recetaLiberadaEn: null, recetaLiberadaPorId: null }),
       ),
