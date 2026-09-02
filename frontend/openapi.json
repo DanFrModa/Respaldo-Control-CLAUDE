@@ -55016,6 +55016,11 @@
                             }
                           ]
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "default": [],
                           "description": "Cantidades por talla de este color.",
@@ -55536,6 +55541,10 @@
                                 ],
                                 "description": "Código PANTONE de este color, o null."
                               },
+                              "pack": {
+                                "type": "string",
+                                "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                              },
                               "tallas": {
                                 "type": "array",
                                 "items": {
@@ -55580,6 +55589,7 @@
                               "idColor",
                               "color",
                               "pantone",
+                              "pack",
                               "tallas",
                               "totalPiezas"
                             ],
@@ -59512,6 +59522,10 @@
                                   ],
                                   "description": "Código PANTONE de este color, o null."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                                },
                                 "tallas": {
                                   "type": "array",
                                   "items": {
@@ -59556,6 +59570,7 @@
                                 "idColor",
                                 "color",
                                 "pantone",
+                                "pack",
                                 "tallas",
                                 "totalPiezas"
                               ],
@@ -60090,6 +60105,11 @@
                             }
                           ]
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "default": [],
                           "description": "Cantidades por talla de este color.",
@@ -60549,6 +60569,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -60593,6 +60617,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -61371,6 +61396,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -61415,6 +61444,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -62312,6 +62342,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -62356,6 +62390,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -62737,6 +62772,11 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack.",
+                          "type": "string",
+                          "maxLength": 12
                         },
                         "tallas": {
                           "default": [],
@@ -63211,6 +63251,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -63255,6 +63299,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -64054,6 +64099,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -64098,6 +64147,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -64897,6 +64947,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -64941,6 +64995,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -65758,6 +65813,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -65802,6 +65861,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -68187,6 +68247,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -68231,6 +68295,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -133221,6 +133286,11 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la orden maneja packs; ausente o vacío en las órdenes que no los manejan.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "minItems": 1,
                           "type": "array",
@@ -133490,6 +133560,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -133531,6 +133605,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -134021,6 +134096,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -134062,6 +134141,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -134379,6 +134459,11 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la orden maneja packs; ausente o vacío en las órdenes que no los manejan.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "minItems": 1,
                           "type": "array",
@@ -134649,6 +134734,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -134690,6 +134779,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -135180,6 +135270,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -135221,6 +135315,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -135505,6 +135600,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = la orden no maneja packs."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -135525,6 +135624,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -135579,6 +135679,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK de la celda. CADENA VACÍA = la orden no maneja packs."
+                                },
                                 "idTalla": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
@@ -135599,6 +135703,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "idTalla",
                                 "etiquetaTalla",
                                 "cantidad"
@@ -135873,6 +135978,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = la orden no maneja packs."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -135893,6 +136002,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -136350,6 +136460,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                                },
                                 "tallas": {
                                   "type": "array",
                                   "items": {
@@ -136391,6 +136505,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "tallas",
                                 "totalPiezas"
                               ],
@@ -137321,6 +137436,11 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10). OPCIONAL SIEMPRE: vacío = «el maquilero los devolvió revueltos», y ese renglón consume del saldo agregado de todos los packs. Con pack, consume además del saldo de ese pack. En una orden sin packs va vacío.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "minItems": 1,
                           "type": "array",
@@ -137634,6 +137754,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = se recibió sin distinguir pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -137723,6 +137847,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas",
                           "totalIncompletas"
@@ -138249,6 +138374,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = se recibió sin distinguir pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -138338,6 +138467,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas",
                           "totalIncompletas"
@@ -138664,6 +138794,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK de la celda. CADENA VACÍA = sin pack (en una orden con packs, lo devuelto revuelto)."
+                                },
                                 "idTalla": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
@@ -138690,6 +138824,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "idTalla",
                                 "etiquetaTalla",
                                 "cantidad",
@@ -138748,6 +138883,10 @@
                                         "type": "string",
                                         "description": "Nombre del color."
                                       },
+                                      "pack": {
+                                        "type": "string",
+                                        "description": "PACK de la celda. CADENA VACÍA = sin pack (en una orden con packs, lo devuelto revuelto)."
+                                      },
                                       "idTalla": {
                                         "type": "integer",
                                         "minimum": -9007199254740991,
@@ -138774,6 +138913,7 @@
                                     "required": [
                                       "idColor",
                                       "color",
+                                      "pack",
                                       "idTalla",
                                       "etiquetaTalla",
                                       "cantidad",
@@ -142117,6 +142257,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -142137,6 +142281,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -142160,6 +142305,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -142180,6 +142329,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -142226,6 +142376,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                                },
                                 "idTalla": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
@@ -142246,6 +142400,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "idTalla",
                                 "etiquetaTalla",
                                 "cantidad"
@@ -142311,6 +142466,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                                },
                                 "idTalla": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
@@ -142331,6 +142490,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "idTalla",
                                 "etiquetaTalla",
                                 "cantidad"
@@ -142390,6 +142550,10 @@
                                         "type": "string",
                                         "description": "Nombre del color."
                                       },
+                                      "pack": {
+                                        "type": "string",
+                                        "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                                      },
                                       "idTalla": {
                                         "type": "integer",
                                         "minimum": -9007199254740991,
@@ -142416,6 +142580,7 @@
                                     "required": [
                                       "idColor",
                                       "color",
+                                      "pack",
                                       "idTalla",
                                       "etiquetaTalla",
                                       "cantidad",
@@ -142480,6 +142645,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -142500,6 +142669,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"

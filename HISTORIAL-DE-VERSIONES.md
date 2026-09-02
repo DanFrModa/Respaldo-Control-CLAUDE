@@ -110,6 +110,50 @@ sigue siendo la salida para quien no lo quiera ver.
   rompiera, en la máquina de desarrollo **no se enteraría nadie**: sólo lo caza el CI.
 - **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
 
+## 0.087 · 2-sep-2026 · **en prueba** — El **pack** deja de vivir dentro del nombre del color *(primera mitad: la de abajo)*
+
+### Qué se puede hacer ahora que antes no
+
+**En pantalla, todavía nada — y hay que decirlo con esas palabras.**
+
+C&A manda **varios tendidos en una misma orden** (un pack con corrida 1-2-2-1, otro con 1-1-1-2…), y hasta
+hoy el pack vivía **metido dentro del nombre del color**: «Negro A», «Negro B». Desde esta versión el
+sistema **sabe qué es un pack**: es un **campo propio** del renglón de la orden y del detalle de cada
+movimiento de producción, y **viaja al corte y al envío a maquila**.
+
+Pero **ninguna pantalla lo captura ni lo pinta todavía**, y **el importador del PDF sigue fusionando los
+packs en un solo renglón** — así que, operando normal, **no vas a notar ningún cambio**. Ésta es la mitad
+de abajo; la de arriba (pantallas + importador) es la fila **0.095** y va enseguida.
+
+⚠️ **Gabriel no puede verificar esta versión en `prueba`, y no es un descuido:** no hay nada observable que
+verificar. Es exactamente lo mismo que la hace segura.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Una orden SIN packs se comporta EXACTAMENTE igual que antes.** No es una promesa: se midió. Se copió
+  la guarda vieja del recibo y se corrió contra la nueva en **576 escenarios** —dentro del saldo, justo en
+  el límite y pasado— con **cero diferencias**. (Y para probar que la medición servía, se forzó el caso
+  contrario: ahí aparecieron 98 diferencias.)
+- **Al recibir se topa por partida doble:** por el **total** de la celda, como siempre, **y además por
+  pack** para los renglones que declaran uno. Ninguna de las dos sobra: sin la primera, tres tendidos de 5
+  colarían 15 piezas de 10; sin la segunda, se podrían recibir 10 del pack A habiendo enviado 5.
+- 🔴 **Se destapó un defecto de la Ruta Crítica que los packs disparaban:** al medir el avance comparaba
+  renglón por renglón contra un total ya sumado ⇒ con dos tendidos del mismo color y talla **habría dado
+  «corte terminado» con 100 piezas de 150**. Arreglado, con su prueba.
+- **Dos reglas nuevas que decidimos nosotros y esperan tu visto bueno** (ver más abajo): una orden es **con
+  packs o sin packs, nunca mezclada**; y **el pack de un renglón que ya tiene producción viva no se
+  cambia** — si ya cortaste contra «pack A», re-etiquetarlo dejaría esas piezas cortadas **imposibles de
+  enviar**, con un error que además culparía al usuario.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Las pantallas y el importador del PDF** (fila **0.095**). Mientras el importador siga fusionando, el
+  campo nuevo **es inalcanzable desde el único sitio del que los packs vienen de verdad**.
+- ⏳ **Dos decisiones esperándote**: las dos reglas de arriba, y el largo máximo de la etiqueta del pack
+  (hoy 12 caracteres, suficiente para «A» o «PACK 1»).
+- **Los colores ya capturados como «Negro A» no se parten.** Sigue siendo así a propósito: *«lo viejo
+  ahorita es irrelevante»*. Ese trabajo no desaparece — es requisito del **ETL de arranque**.
+- **El despliegue lleva migración** (dos columnas nuevas, aditiva). **No** hace falta `SEED_ON_START`.
 ## 0.086 · 2-sep-2026 · **en prueba** — El detalle del pedido **vuelve a enseñar el nº de producción**, y se cierra una puerta trasera
 
 ### Qué se puede hacer ahora que antes no

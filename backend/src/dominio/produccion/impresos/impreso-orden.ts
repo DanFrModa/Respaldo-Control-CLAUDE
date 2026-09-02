@@ -319,6 +319,16 @@ export interface DepsImpreso {
 }
 
 /**
+ * Etiqueta de la fila de la matriz: el color y, cuando la orden se fabrica por packs (§Post-F9.10),
+ * SU TENDIDO. El pack tiene que salir en el papel: es lo que el cortador y el maquilero usan para
+ * saber qué corrida están manejando, y sin él dos filas del mismo color se leerían como un error de
+ * captura. En una orden sin packs es cadena vacía y la fila se imprime exactamente igual que antes.
+ */
+function etiquetaColorPack(color: string, pack: string): string {
+  return pack.trim() === '' ? color : `${color}  ·  PACK ${pack.trim()}`;
+}
+
+/**
  * Proyecta la matriz de la orden (lista de colores, cada uno con sus tallas) a la tabla
  * color × talla del impreso: columnas = unión ordenada de tallas que aparecen (preservando el
  * orden en que se ven), filas = colores, con totales por fila, por columna y total general.
@@ -326,6 +336,8 @@ export interface DepsImpreso {
 export function armarTabla(
   lineas: {
     color: string;
+    /** Pack / tendido del renglón (§Post-F9.10); cadena vacía en las órdenes sin packs. */
+    pack: string;
     pantone?: string | null;
     tallas: { etiquetaTalla: string; cantidad: number }[];
   }[],
@@ -352,7 +364,12 @@ export function armarTabla(
       totalesColumna[i] = (totalesColumna[i] ?? 0) + cantidad;
     });
     totalPiezas += totalFila;
-    return { color: linea.color, pantone: linea.pantone ?? null, cantidades, totalFila };
+    return {
+      color: etiquetaColorPack(linea.color, linea.pack),
+      pantone: linea.pantone ?? null,
+      cantidades,
+      totalFila,
+    };
   });
 
   return { tallas, renglones, totalesColumna, totalPiezas };

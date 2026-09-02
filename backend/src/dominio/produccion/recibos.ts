@@ -14,7 +14,11 @@
  *     se pagan. Desde V1-E8v (§Post-F9.147) SÍ cierran el pendiente: ya volvieron del taller. La
  *     aritmética del concepto vive en `incompletas.ts`.
  *  2. Validación `recibido ≤ enviado` ESTRICTO (decisión (g)): por suma directa de
- *     `EtapaMovimientoDet` bajo bloqueo de la orden, excluyendo canceladas — NUNCA la vista.
+ *     `EtapaMovimientoDet` bajo bloqueo de la orden, excluyendo canceladas — NUNCA la vista. ⭐
+ *     Desde §Post-F9.10 (el PACK como campo propio) esa validación es HÍBRIDA, porque Daniel dejó el
+ *     pack OPCIONAL al recibir: un renglón SIN pack consume del saldo AGREGADO de todos los packs y
+ *     uno CON pack consume además del suyo, y las dos formas conviven sin dejar recibir de más EN
+ *     TOTAL. La aritmética vive pura en `packs.ts` (`excesosDelRecibo`), probada sin BD.
  *  3. El efecto sobre el kardex de PT, que desde V1-E4b (§Post-F9.61) tiene DOS formas — y cuál
  *     aplica lo decide DÓNDE VA EL PROCESO en esta orden, no el tipo de proceso (§Post-F9.59):
  *       a) el proceso CREA producto terminado (`TipoProceso.generaEntradaPt`, la costura) ⇒ ENTRADA
@@ -85,12 +89,20 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
 import { pendientePorCelda, piezasDevueltas } from './incompletas.js';
 import {
+  SIN_PACK,
+  claveCeldaPack,
+  esSinPack,
+  excesosDelRecibo,
+  normalizarPack,
+  ordenManejaPacks,
+} from './packs.js';
+import {
   devolverPrendasDeTransito,
   formaDelEnvioVivo,
   rechazarAlmacenDeTransito,
   revertirMovimientosDeHecho,
 } from './transito.js';
-import { pendientePorMaquilero, type MetaCelda } from './wip.js';
+import { metaPara, pendientePorMaquilero, type MetaCelda } from './wip.js';
 
 /** Tipo de movimiento de kardex para la entrada a PT del recibo de costura (seed, dirección entrada). */
 const COD_ENTRADA_MAQUILA = 'entrada-maquila';
@@ -114,10 +126,16 @@ function rolDelProceso(codigoProceso: string): string {
 
 // ── Tipos internos ──────────────────────────────────────────────────────────────────────────────
 
-/** Una celda color×talla "aplanada" con su calidad (un renglón por talla). */
+/** Una celda color×talla×PACK "aplanada" con su calidad (un renglón por talla). */
 interface CeldaRecibo {
   idColor: number;
   idTalla: number;
+  /**
+   * Pack / tendido del renglón (§Post-F9.10). ⭐ OPCIONAL en el recibo por decisión de Daniel —
+   * *«que sea opcional al recibir»*: la cadena VACÍA significa que el maquilero devolvió los packs
+   * revueltos, y ese renglón consume del saldo AGREGADO de todos ellos.
+   */
+  pack: string;
   /** Total recibido BUENO (= primeras + segundas). Lo que produce, inventaría y se paga. */
   cantidad: number;
   primeras: number;
@@ -146,7 +164,17 @@ interface ContextoOrden {
   idEmpresa: number;
   estado: string;
   colores: Set<number>;
+  /**
+   * Tallas válidas por COLOR (unión de todos sus packs). En el recibo la pertenencia se valida por
+   * color y no por renglón a propósito: un recibo SIN pack no sabe de qué tendido viene la pieza,
+   * así que exigirle la talla de un pack concreto sería pedirle justo el dato que Daniel dijo que
+   * puede faltar.
+   */
   tallasPorColor: Map<number, Set<number>>;
+  /** ¿La orden se fabrica por packs? De aquí cuelga si un pack en la captura es válido siquiera. */
+  manejaPacks: boolean;
+  /** Packs válidos de cada color, para validar el que venga y para redactar el error. */
+  packsPorColor: Map<number, Set<string>>;
 }
 
 /** Resuelve la orden de la EMPRESA ACTIVA con sus combinaciones color×talla válidas (A9). */
@@ -160,7 +188,7 @@ async function resolverOrden(
     select: {
       idEmpresa: true,
       estado: true,
-      lineas: { select: { idColor: true, tallas: { select: { idTalla: true } } } },
+      lineas: { select: { idColor: true, pack: true, tallas: { select: { idTalla: true } } } },
     },
   });
   if (orden === null) {
@@ -171,13 +199,24 @@ async function resolverOrden(
   }
   const colores = new Set<number>();
   const tallasPorColor = new Map<number, Set<number>>();
+  const packsPorColor = new Map<number, Set<string>>();
   for (const linea of orden.lineas) {
     colores.add(linea.idColor);
     const tallas = tallasPorColor.get(linea.idColor) ?? new Set<number>();
     for (const t of linea.tallas) tallas.add(t.idTalla);
     tallasPorColor.set(linea.idColor, tallas);
+    const packs = packsPorColor.get(linea.idColor) ?? new Set<string>();
+    packs.add(normalizarPack(linea.pack));
+    packsPorColor.set(linea.idColor, packs);
   }
-  return { idEmpresa: orden.idEmpresa, estado: orden.estado, colores, tallasPorColor };
+  return {
+    idEmpresa: orden.idEmpresa,
+    estado: orden.estado,
+    colores,
+    tallasPorColor,
+    manejaPacks: ordenManejaPacks(orden.lineas.map((l) => l.pack)),
+    packsPorColor,
+  };
 }
 
 /**
@@ -192,9 +231,13 @@ async function resolverOrden(
  * descartarlo por "cantidad 0" habría hecho incapturable justo el caso que Daniel describió.
  */
 function aplanarYValidar(lineas: DatosReciboLineaEntrada[], orden: ContextoOrden): CeldaRecibo[] {
-  const idsColor = lineas.map((l) => l.idColor);
-  if (new Set(idsColor).size !== idsColor.length) {
-    throw new ErrorValidacion('Un color no puede aparecer dos veces en la misma captura.');
+  const claves = lineas.map((l) => `${l.idColor}:${normalizarPack(l.pack)}`);
+  if (new Set(claves).size !== claves.length) {
+    throw new ErrorValidacion(
+      orden.manejaPacks
+        ? 'Un mismo color y pack no pueden aparecer dos veces en la misma captura.'
+        : 'Un color no puede aparecer dos veces en la misma captura.',
+    );
   }
 
   const celdas: CeldaRecibo[] = [];
@@ -203,6 +246,26 @@ function aplanarYValidar(lineas: DatosReciboLineaEntrada[], orden: ContextoOrden
       throw new ErrorValidacion(
         `El color ${linea.idColor} no pertenece a la orden; solo se reciben colores de la orden.`,
       );
+    }
+    // ⭐ EL PACK ES OPCIONAL AL RECIBIR (§Post-F9.10, decisión de Daniel): vacío = «los devolvió
+    // revueltos». Lo único que se valida es que, si viene, EXISTA — un pack inventado se guardaría
+    // mudo, consumiría de un saldo que no existe (0) y el recibo entero se caería con un mensaje
+    // que no dice la verdad.
+    const pack = normalizarPack(linea.pack);
+    if (!esSinPack(pack)) {
+      if (!orden.manejaPacks) {
+        throw new ErrorValidacion(
+          `Esta orden no se fabrica por packs, así que el renglón del color ${linea.idColor} no ` +
+            `puede llevar el pack "${pack}".`,
+        );
+      }
+      if (orden.packsPorColor.get(linea.idColor)?.has(pack) !== true) {
+        throw new ErrorValidacion(
+          `El color ${linea.idColor} de la orden no tiene el pack "${pack}"; sus packs son: ` +
+            `${packsDelColor(orden, linea.idColor)}. Si el maquilero los devolvió revueltos, ` +
+            'captura el renglón SIN pack.',
+        );
+      }
     }
     const tallasOrden = orden.tallasPorColor.get(linea.idColor) ?? new Set<number>();
     const idsTalla = linea.tallas.map((t) => t.idTalla);
@@ -248,6 +311,7 @@ function aplanarYValidar(lineas: DatosReciboLineaEntrada[], orden: ContextoOrden
       celdas.push({
         idColor: linea.idColor,
         idTalla: t.idTalla,
+        pack,
         cantidad: t.cantidad,
         primeras,
         segundas,
@@ -261,6 +325,14 @@ function aplanarYValidar(lineas: DatosReciboLineaEntrada[], orden: ContextoOrden
     );
   }
   return celdas;
+}
+
+/** Los packs que la orden tiene para un color, en texto, para redactar errores accionables. */
+function packsDelColor(orden: ContextoOrden, idColor: number): string {
+  const packs = [...(orden.packsPorColor.get(idColor) ?? new Set<string>())]
+    .filter((p) => !esSinPack(p))
+    .sort((a, b) => a.localeCompare(b, 'es'));
+  return packs.length > 0 ? packs.map((p) => `"${p}"`).join(', ') : '(ninguno)';
 }
 
 /**
@@ -308,9 +380,23 @@ async function bloquearEtapasDeOrden(tx: Tx, idEmpresa: number, idOrden: number)
 }
 
 /**
- * Suma las celdas color×talla de las etapas VIVAS (no canceladas) de una orden que cumplan el filtro
- * de tipo/proceso, leyendo `EtapaMovimientoDet` DIRECTO (sin acumuladores; ADR-0010 §3). Base de
- * "enviado" y "devuelto" por proceso para el `recibido ≤ enviado` y los pendientes.
+ * Las DOS agregaciones que el tope del recibo necesita, de UNA sola lectura (§Post-F9.10): la de
+ * siempre —color×talla, plegando los packs— y la nueva —color×talla×pack—. Se devuelven juntas
+ * porque salen de las MISMAS filas: pedirlas por separado serían dos consultas idénticas y, peor,
+ * dos oportunidades de que una quedara filtrada distinto que la otra.
+ */
+interface SumaCeldas {
+  /** Por `claveCelda` (color:talla): el AGREGADO de todos los packs. */
+  total: Map<string, number>;
+  /** Por `claveCeldaPack` (color:talla:pack): el saldo de cada tendido. */
+  porPack: Map<string, number>;
+}
+
+/**
+ * Suma las celdas de las etapas VIVAS (no canceladas) de una orden que cumplan el filtro de
+ * tipo/proceso, leyendo `EtapaMovimientoDet` DIRECTO (sin acumuladores; ADR-0010 §3). Base de
+ * "enviado" y "devuelto" por proceso para el `recibido ≤ enviado` y los pendientes. Devuelve las dos
+ * llaves que el tope híbrido necesita ({@link SumaCeldas}).
  *
  * ⭐ En los RECIBOS suma las piezas FÍSICAMENTE DEVUELTAS —buenas **más** incompletas, vía
  * {@link piezasDevueltas}—, no solo las buenas: si al maquilero se le mandaron 100 y ya trajo 95
@@ -325,7 +411,7 @@ async function sumarCeldas(
   idTipoProceso: number,
   /** Acota la suma a UN maquilero (el saldo de recibo se lleva por tercero, no por proceso). */
   idTercero?: number,
-): Promise<Map<string, number>> {
+): Promise<SumaCeldas> {
   const filas = await tx.etapaMovimientoDet.findMany({
     where: {
       etapaMov: {
@@ -336,14 +422,24 @@ async function sumarCeldas(
         ...(idTercero === undefined ? {} : { idTercero }),
       },
     },
-    select: { idColor: true, idTalla: true, cantidad: true, cantidadIncompletas: true },
+    select: {
+      idColor: true,
+      idTalla: true,
+      pack: true,
+      cantidad: true,
+      cantidadIncompletas: true,
+    },
   });
-  const acumulado = new Map<string, number>();
+  const total = new Map<string, number>();
+  const porPack = new Map<string, number>();
   for (const f of filas) {
-    const clave = claveCelda(f.idColor, f.idTalla);
-    acumulado.set(clave, (acumulado.get(clave) ?? 0) + piezasDevueltas(f));
+    const piezas = piezasDevueltas(f);
+    const claveTotal = claveCelda(f.idColor, f.idTalla);
+    total.set(claveTotal, (total.get(claveTotal) ?? 0) + piezas);
+    const clavePack = claveCeldaPack(f.idColor, f.idTalla, f.pack);
+    porPack.set(clavePack, (porPack.get(clavePack) ?? 0) + piezas);
   }
-  return acumulado;
+  return { total, porPack };
 }
 
 /**
@@ -419,11 +515,24 @@ async function aReciboSalida(
     orderBy: { id: 'asc' },
   });
 
-  const porColor = new Map<number, { color: string; tallas: ReciboConDetalle['detalles'] }>();
+  // Agrupa por COLOR × PACK (§Post-F9.10): el renglón del recibo es el tendido cuando el maquilero
+  // los devolvió separados, y el color a secas cuando los revolvió. Agrupar sólo por color habría
+  // fundido en un renglón dos devoluciones que el saldo lleva por separado.
+  const porRenglon = new Map<
+    string,
+    { idColor: number; color: string; pack: string; tallas: ReciboConDetalle['detalles'] }
+  >();
   for (const det of recibo.detalles) {
-    const grupo = porColor.get(det.idColor) ?? { color: det.color.nombre, tallas: [] };
+    const pack = normalizarPack(det.pack);
+    const clave = `${det.idColor}:${pack}`;
+    const grupo = porRenglon.get(clave) ?? {
+      idColor: det.idColor,
+      color: det.color.nombre,
+      pack,
+      tallas: [],
+    };
     grupo.tallas.push(det);
-    porColor.set(det.idColor, grupo);
+    porRenglon.set(clave, grupo);
   }
 
   let totalPiezas = 0;
@@ -432,7 +541,7 @@ async function aReciboSalida(
   // Las INCOMPLETAS llevan su propio total, aparte de `totalPiezas` (§Post-F9.136): sumarlas ahí
   // sería decir que se produjeron.
   let totalIncompletas = 0;
-  const lineas = [...porColor.entries()].map(([idColor, grupo]) => {
+  const lineas = [...porRenglon.values()].map((grupo) => {
     let totalLinea = 0;
     let incompletasLinea = 0;
     const tallas = grupo.tallas
@@ -455,8 +564,9 @@ async function aReciboSalida(
     totalPiezas += totalLinea;
     totalIncompletas += incompletasLinea;
     return {
-      idColor,
+      idColor: grupo.idColor,
       color: grupo.color,
+      pack: grupo.pack,
       tallas,
       totalPiezas: totalLinea,
       totalIncompletas: incompletasLinea,
@@ -602,7 +712,7 @@ export async function registrarReciboMaquila(
       datos.idTipoProceso,
       datos.idMaquilero,
     );
-    if (enviado.size === 0) {
+    if (enviado.total.size === 0) {
       const { nombres, sinMaquilero } = await maquilerosConEnvio(
         tx,
         datos.idOrden,
@@ -623,22 +733,52 @@ export async function registrarReciboMaquila(
           `no se le puede recibir. ${detalle}`,
       );
     }
-    for (const c of celdas) {
-      const clave = claveCelda(c.idColor, c.idTalla);
-      // MISMA aritmética que el pendiente que la pantalla usa como tope (`pendientePorMaquilero`
-      // en `wip.ts`, que resta las incompletas ya entregadas): una copia reducida aquí haría que
-      // la pantalla ofreciera lo que el servidor rechaza.
-      const disponible = pendientePorCelda(enviado.get(clave) ?? 0, yaDevuelto.get(clave) ?? 0);
-      // Lo que topa es el total FÍSICO de esta captura: buenas + incompletas. No se pueden devolver
-      // más piezas de las que salieron del taller (decisión (g), sobre-recibo estricto).
-      const devuelveAhora = c.cantidad + c.incompletas;
-      if (devuelveAhora > disponible) {
-        throw new ErrorConflicto(
-          `No se puede recibir ${devuelveAhora} pza(s) de ese color/talla de "${proceso.nombre}" ` +
-            `(${c.cantidad} recibida(s) + ${c.incompletas} incompleta(s)): a ese maquilero solo le ` +
-            `quedan ${disponible} enviada(s) sin devolver.`,
-        );
-      }
+    // ⭐⭐ EL TOPE HÍBRIDO (§Post-F9.10) — lo que Daniel pidió *«definir (y probar)»*:
+    //   *«Un recibo SIN pack consume del saldo AGREGADO de todos los packs de esa orden y proceso;
+    //   uno CON pack, del suyo. Hay que definir (y probar) que las dos formas convivan sin permitir
+    //   recibir de más EN TOTAL.»*
+    // La aritmética entera vive en `packs.ts` (pura y probada sin BD); aquí sólo se le dan los
+    // cuatro saldos leídos bajo el lock y se redacta el error.
+    //
+    // 🔑 Lo que topa es el total FÍSICO de cada renglón: buenas + incompletas. No se pueden devolver
+    // más piezas de las que salieron del taller (decisión (g), sobre-recibo estricto).
+    //
+    // 🔑 Y el tope AGREGADO usa la MISMA aritmética que el pendiente que la pantalla ofrece
+    // (`pendientePorMaquilero` en `wip.ts`, vía `pendientePorCelda`): una copia reducida aquí haría
+    // que la pantalla ofreciera lo que el servidor rechaza.
+    const excesos = excesosDelRecibo(
+      celdas.map((c) => ({
+        idColor: c.idColor,
+        idTalla: c.idTalla,
+        pack: c.pack,
+        devuelveAhora: c.cantidad + c.incompletas,
+      })),
+      {
+        enviadoTotal: enviado.total,
+        devueltoTotal: yaDevuelto.total,
+        enviadoPorPack: enviado.porPack,
+        devueltoPorPack: yaDevuelto.porPack,
+      },
+    );
+    // Cuál se REPORTA cuando fallan las dos: la que DE VERDAD limita, o sea la de menor
+    // `disponible`. No es cosmética — enviado A=5 y B=5 con 10 ya devueltas sin pack deja el
+    // agregado en 0 y el saldo del pack A en 5: reportar el del pack diría *«te quedan 5 de ese
+    // pack»* y el usuario reintentaría con 5 para que lo rechazaran otra vez. A igualdad de tope
+    // gana el del PACK, que es el más específico y nombra el tendido que hay que corregir.
+    const exceso = [...excesos].sort(
+      (a, b) => a.disponible - b.disponible || (a.motivo === 'pack' ? -1 : 1),
+    )[0];
+    if (exceso !== undefined) {
+      throw new ErrorConflicto(
+        exceso.motivo === 'pack'
+          ? `No se puede recibir ${exceso.pide} pza(s) del pack "${exceso.pack}" de ese ` +
+              `color/talla de "${proceso.nombre}": a ese maquilero solo le quedan ` +
+              `${exceso.disponible} enviada(s) sin devolver DE ESE PACK. Si el maquilero los ` +
+              'devolvió revueltos, captura el renglón sin pack.'
+          : `No se puede recibir ${exceso.pide} pza(s) de ese color/talla de "${proceso.nombre}": ` +
+              `a ese maquilero solo le quedan ${exceso.disponible} enviada(s) sin devolver` +
+              `${orden.manejaPacks ? ', sumando todos sus packs' : ''}.`,
+      );
     }
 
     // ── ¿Este recibo mete mercancía a PT, y de qué forma? (V1-E4b, §Post-F9.59/§Post-F9.61) ─────
@@ -715,6 +855,8 @@ export async function registrarReciboMaquila(
           create: celdas.map((c) => ({
             idColor: c.idColor,
             idTalla: c.idTalla,
+            // El pack, si el maquilero los devolvió separados; vacío si los revolvió (§Post-F9.10).
+            pack: c.pack,
             cantidad: c.cantidad,
             cantidadPrimeras: c.primeras,
             cantidadSegundas: c.segundas,
@@ -736,24 +878,37 @@ export async function registrarReciboMaquila(
     if (meteAPt) {
       const idModelo = await modeloDeLaOrden(tx, datos.idOrden);
       // PT por orden (F6-E2): lo que entra queda etiquetado con la orden del recibo.
-      const lineasPrimeras = celdas
-        .filter((c) => c.primeras > 0)
-        .map<LineaMovimientoPt>((c) => ({
-          idModelo,
-          idColor: c.idColor,
-          idTalla: c.idTalla,
-          idOrden: datos.idOrden,
-          cantidad: c.primeras,
-        }));
-      const lineasSegundas = celdas
-        .filter((c) => c.segundas > 0)
-        .map<LineaMovimientoPt>((c) => ({
-          idModelo,
-          idColor: c.idColor,
-          idTalla: c.idTalla,
-          idOrden: datos.idOrden,
-          cantidad: c.segundas,
-        }));
+      //
+      // ⭐ AQUÍ SE PLIEGA EL PACK (§Post-F9.10), y no es un detalle: el INVENTARIO DE PT NO MANEJA
+      // PACKS —*«ahí ya es sólo color»*—, así que un recibo con dos tendidos de la MISMA celda
+      // (pack A: 5 CH, pack B: 3 CH) tiene que entrar al kardex como UN renglón de 8, no como dos
+      // de la misma llave. Dos renglones sumarían bien la existencia (es Σ de movimientos, D3) pero
+      // partirían en dos el movimiento, tomarían dos veces el lock del artículo y, en la salida del
+      // tránsito, le pedirían al validador de no-negativo que sumara por su cuenta lo que aquí ya
+      // se sabe. Se pliega en la frontera, que es donde el pack deja de significar algo.
+      const plegarPorCelda = (cantidadDe: (c: CeldaRecibo) => number): LineaMovimientoPt[] => {
+        const porCelda = new Map<string, LineaMovimientoPt>();
+        for (const c of celdas) {
+          const cantidad = cantidadDe(c);
+          if (cantidad <= 0) continue;
+          const clave = claveCelda(c.idColor, c.idTalla);
+          const acum = porCelda.get(clave);
+          if (acum === undefined) {
+            porCelda.set(clave, {
+              idModelo,
+              idColor: c.idColor,
+              idTalla: c.idTalla,
+              idOrden: datos.idOrden,
+              cantidad,
+            });
+          } else {
+            acum.cantidad += cantidad;
+          }
+        }
+        return [...porCelda.values()];
+      };
+      const lineasPrimeras = plegarPorCelda((c) => c.primeras);
+      const lineasSegundas = plegarPorCelda((c) => c.segundas);
 
       if (devuelveAPt) {
         const devolver = async (
@@ -1076,6 +1231,7 @@ export async function pendientesPorRecibir(
       lineas: {
         select: {
           idColor: true,
+          pack: true,
           color: { select: { nombre: true } },
           tallas: { select: { idTalla: true, talla: { select: { etiqueta: true, orden: true } } } },
         },
@@ -1086,19 +1242,27 @@ export async function pendientesPorRecibir(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
+  // La llave del metadato lleva el PACK (§Post-F9.10) porque `pendientePorMaquilero` devuelve las
+  // celdas partidas por tendido: con la llave plegada, ninguna encontraría su nombre de color.
   const meta = new Map<string, MetaCelda>();
   for (const linea of orden.lineas) {
+    const pack = normalizarPack(linea.pack);
     for (const t of linea.tallas) {
-      const clave = claveCelda(linea.idColor, t.idTalla);
-      if (!meta.has(clave)) {
-        meta.set(clave, {
-          idColor: linea.idColor,
-          color: linea.color.nombre,
-          idTalla: t.idTalla,
-          etiquetaTalla: t.talla.etiqueta,
-          ordenTalla: t.talla.orden,
-        });
-      }
+      const datos = {
+        idColor: linea.idColor,
+        color: linea.color.nombre,
+        idTalla: t.idTalla,
+        etiquetaTalla: t.talla.etiqueta,
+        ordenTalla: t.talla.orden,
+      };
+      const clave = claveCeldaPack(linea.idColor, t.idTalla, pack);
+      if (!meta.has(clave)) meta.set(clave, { ...datos, pack });
+      // ⭐ Y también SIN pack (§Post-F9.10): cuando el maquilero devuelve los tendidos revueltos, el
+      // pendiente saca una celda de pack vacío —en negativo, lo devuelto sin atribuir—. Si no se
+      // registra aquí su metadato, esa celda cae en el respaldo defensivo y sale rotulada «Color 7»
+      // con la talla en blanco: un renglón real de la pantalla, con el nombre equivocado.
+      const claveSinPack = claveCeldaPack(linea.idColor, t.idTalla, SIN_PACK);
+      if (!meta.has(claveSinPack)) meta.set(claveSinPack, { ...datos, pack: SIN_PACK });
     }
   }
 
@@ -1151,18 +1315,11 @@ export async function pendientesPorRecibir(
     const claves = new Set<string>([...enviado.keys(), ...recibido.keys(), ...incompletas.keys()]);
     const celdas = [...claves]
       .map((clave) => {
-        const m =
-          meta.get(clave) ??
-          (() => {
-            const [idColor, idTalla] = clave.split(':').map(Number);
-            return {
-              idColor: idColor ?? 0,
-              color: `Color ${idColor ?? 0}`,
-              idTalla: idTalla ?? 0,
-              etiquetaTalla: '',
-              ordenTalla: 0,
-            };
-          })();
+        // MISMO respaldo que el drill-down del WIP (`metaPara`, exportado por `wip.ts`), y no una
+        // copia: la copia partía la llave con `split(':')` y, desde que la llave lleva el PACK
+        // (§Post-F9.10), habría devuelto un pack truncado en silencio. Dos vistas del mismo
+        // pendiente no pueden nombrar distinto a la misma celda.
+        const m = metaPara(meta, clave);
         // PENDIENTE = enviado − buenas − incompletas, por la MISMA función que el tope de
         // `registrarReciboMaquila` (arriba, bajo lock). Desde V1-E8v (§Post-F9.147) «lo que falta
         // por recibirle» y «lo que todavía se le puede recibir» son EL MISMO número: la incompleta
@@ -1181,7 +1338,13 @@ export async function pendientesPorRecibir(
         };
       })
       .filter((c) => c.cantidad !== 0 || c.incompletas !== 0)
-      .sort((a, b) => a.idColor - b.idColor || a.ordenTalla - b.ordenTalla || a.idTalla - b.idTalla)
+      .sort(
+        (a, b) =>
+          a.idColor - b.idColor ||
+          a.pack.localeCompare(b.pack, 'es') ||
+          a.ordenTalla - b.ordenTalla ||
+          a.idTalla - b.idTalla,
+      )
       .map(({ ordenTalla: _o, ...resto }) => resto);
     const totalIncompletas = [...incompletas.values()].reduce((s, v) => s + v, 0);
     const totalPendiente = pendientePorCelda(

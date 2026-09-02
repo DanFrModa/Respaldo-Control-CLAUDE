@@ -55,6 +55,7 @@ import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { pendientePorCelda } from './incompletas.js';
+import { SIN_PACK, claveCeldaPack, normalizarPack } from './packs.js';
 import { armarBusquedaConSinonimos } from './ordenes.js';
 
 /** Cliente de LECTURA (sin transacción) — el tipo del resultado de `clienteLectura`. */
@@ -62,8 +63,22 @@ type ClienteLectura = ReturnType<typeof clienteLectura>;
 
 // ── Helpers de suma directa (DERIVADO, sin acumuladores) ──────────────────────────────────────────
 
-/** Clave estable de una celda color×talla (para mapas). */
-function claveCelda(idColor: number, idTalla: number): string {
+/**
+ * Clave estable de una celda del WIP: color×talla×PACK (§Post-F9.10). El saldo de producción se
+ * lleva tendido por tendido, así que el pendiente que esta pantalla OFRECE tiene que estar partido
+ * igual que el que el guardado TOPA. Con `claveCeldaPack` compartida con `packs.ts` las dos caras
+ * usan literalmente la misma llave.
+ */
+function claveCelda(idColor: number, idTalla: number, pack: string): string {
+  return claveCeldaPack(idColor, idTalla, pack);
+}
+
+/**
+ * Clave PLEGADA (color×talla, sin pack) para lo que NO maneja packs: la entrega a cliente, donde
+ * *«ya es sólo color»* (§Post-F9.10). Mezclarla con la de arriba habría hecho que las celdas de
+ * entrega no encontraran su metadato y salieran sin nombre de color ni etiqueta de talla.
+ */
+function claveCeldaPlegada(idColor: number, idTalla: number): string {
   return `${idColor}:${idTalla}`;
 }
 
@@ -149,14 +164,18 @@ export async function pedidoPorOrden(
 }
 
 /**
- * Suma `EtapaMovimientoDet` por color×talla de UNA orden para un filtro de tipo (+ proceso opcional),
- * leyendo el detalle DIRECTO. Solo etapas vivas. Base de los pendientes por celda del drill-down.
+ * Suma `EtapaMovimientoDet` de UNA orden para un filtro de tipo (+ proceso opcional), leyendo el
+ * detalle DIRECTO. Solo etapas vivas. Base de los pendientes por celda del drill-down.
+ *
+ * `plegarPack` elige la llave: por defecto color×talla×PACK (corte y envío, que llevan tendido), y
+ * `true` para lo que NO maneja packs —la entrega a cliente—, donde la llave es color×talla.
  */
 async function sumarCeldasOrden(
   cliente: ClienteLectura,
   idOrden: number,
   tipo: TipoEtapaMovimiento,
   idTipoProceso?: number,
+  plegarPack = false,
 ): Promise<Map<string, number>> {
   const filas = await cliente.etapaMovimientoDet.findMany({
     where: {
@@ -167,11 +186,13 @@ async function sumarCeldasOrden(
         ...(idTipoProceso === undefined ? {} : { idTipoProceso }),
       },
     },
-    select: { idColor: true, idTalla: true, cantidad: true },
+    select: { idColor: true, idTalla: true, pack: true, cantidad: true },
   });
   const acumulado = new Map<string, number>();
   for (const f of filas) {
-    const clave = claveCelda(f.idColor, f.idTalla);
+    const clave = plegarPack
+      ? claveCeldaPlegada(f.idColor, f.idTalla)
+      : claveCelda(f.idColor, f.idTalla, f.pack);
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;
@@ -202,6 +223,7 @@ async function sumarCeldasPorTercero(
     select: {
       idColor: true,
       idTalla: true,
+      pack: true,
       cantidad: true,
       cantidadIncompletas: true,
       etapaMov: { select: { idTercero: true, tercero: { select: { nombre: true } } } },
@@ -227,7 +249,11 @@ async function sumarCeldasPorTercero(
       };
       porTercero.set(idTercero, grupo);
     }
-    const clave = claveCelda(f.idColor, f.idTalla);
+    // ⭐ La llave lleva el PACK. Un recibo capturado SIN pack (el maquilero los devolvió revueltos,
+    // §Post-F9.10) cae en el bucket vacío, y de ahí sale la celda NEGATIVA del desglose: es lo
+    // devuelto sin decir de qué tendido era. Se deja ver a propósito — sin ella, Σ celdas dejaría de
+    // dar `totalPendiente` y el desglose contradiría a su propio total.
+    const clave = claveCelda(f.idColor, f.idTalla, f.pack);
     grupo.celdas.set(clave, (grupo.celdas.get(clave) ?? 0) + f.cantidad);
     const inc = f.cantidadIncompletas ?? 0;
     if (inc > 0) {
@@ -315,6 +341,14 @@ export async function pendientePorMaquilero(
           // maquilero todavía tiene y lo que todavía se le puede recibir son lo mismo desde que la
           // incompleta sale del tránsito. Lo que quede aquí cuando ya cerró su entrega es el
           // FALTANTE, que es lo que se le cobra.
+          //
+          // ⭐ CON PACKS (§Post-F9.10) la celda es por TENDIDO, y hay que leer esto con cuidado
+          // para no afirmar de más: la ARITMÉTICA es la misma que la del guardado, pero el tope de
+          // un renglón CON pack es esta celda, mientras que el de uno SIN pack es la SUMA de las
+          // celdas de ese color×talla (el agregado), porque *«un recibo sin pack consume del saldo
+          // agregado»*. Por eso lo devuelto sin pack cae en el bucket de pack vacío —en negativo—
+          // en vez de repartirse entre los tendidos: así Σ celdas sigue dando `totalPendiente` y
+          // el agregado que el servidor topa se lee directo del desglose, sumándolo.
           cantidad: pendientePorCelda(
             grupoEnviado?.celdas.get(clave) ?? 0,
             (grupoRecibido?.celdas.get(clave) ?? 0) + (grupoRecibido?.incompletas.get(clave) ?? 0),
@@ -693,35 +727,58 @@ function aFilaTablero(
 
 // ── Drill-down de una orden ───────────────────────────────────────────────────────────────────
 
-/** Metadato de presentación de una celda (color/talla). */
+/** Metadato de presentación de una celda (color/pack/talla). */
 export interface MetaCelda {
   idColor: number;
   color: string;
+  /** Pack / tendido de la celda (§Post-F9.10); cadena vacía cuando no aplica. */
+  pack: string;
   idTalla: number;
   etiquetaTalla: string;
   ordenTalla: number;
 }
 
-/** Defensivo: si una celda no tiene metadato (etapa de un color/talla raro), arma uno mínimo. */
-function metaPara(meta: Map<string, MetaCelda>, clave: string): MetaCelda {
+/**
+ * Defensivo: si una celda no tiene metadato (etapa de un color/talla raro), arma uno mínimo.
+ *
+ * 🔗 ÚNICA COPIA, y a propósito: la comparten el drill-down del WIP (aquí), los pendientes por
+ * recibir (`recibos.ts`) y los pendientes/sugerencias de corte y envío (`etapas.ts`, que hasta
+ * §Post-F9.10 tenía una copia privada palabra por palabra). Las tres leen llaves `color:talla:pack`
+ * armadas por `claveCeldaPack`; si el respaldo se duplica, las vistas del MISMO pendiente acaban
+ * nombrando distinto a la misma celda.
+ *
+ * ⚠️ La llave es `color:talla:pack` y el PACK ES TEXTO LIBRE que puede traer `:`. Por eso se corta
+ * por los DOS primeros separadores (color y talla son enteros) y el resto se toma ENTERO como pack:
+ * con `split(':')` una etiqueta como "A:B" habría dado un pack truncado, en silencio.
+ */
+export function metaPara(meta: Map<string, MetaCelda>, clave: string): MetaCelda {
   const m = meta.get(clave);
   if (m !== undefined) return m;
-  const [idColor, idTalla] = clave.split(':').map(Number);
+  const corte1 = clave.indexOf(':');
+  const corte2 = corte1 < 0 ? -1 : clave.indexOf(':', corte1 + 1);
+  const idColor = corte1 < 0 ? 0 : Number(clave.slice(0, corte1));
+  const idTalla =
+    corte2 < 0 ? Number(clave.slice(corte1 + 1)) : Number(clave.slice(corte1 + 1, corte2));
   return {
-    idColor: idColor ?? 0,
-    color: `Color ${idColor ?? 0}`,
-    idTalla: idTalla ?? 0,
+    idColor: Number.isFinite(idColor) ? idColor : 0,
+    color: `Color ${Number.isFinite(idColor) ? idColor : 0}`,
+    pack: corte2 < 0 ? SIN_PACK : clave.slice(corte2 + 1),
+    idTalla: Number.isFinite(idTalla) ? idTalla : 0,
     etiquetaTalla: '',
     ordenTalla: 0,
   };
 }
 
-/** Ordena celdas por color, luego por el orden del catálogo de talla, luego idTalla. */
-function ordenarCeldas<T extends { idColor: number; ordenTalla: number; idTalla: number }>(
-  arr: T[],
-): T[] {
+/** Ordena celdas por color, luego por pack, luego por el orden del catálogo de talla, luego idTalla. */
+function ordenarCeldas<
+  T extends { idColor: number; ordenTalla: number; idTalla: number; pack: string },
+>(arr: T[]): T[] {
   return arr.sort(
-    (a, b) => a.idColor - b.idColor || a.ordenTalla - b.ordenTalla || a.idTalla - b.idTalla,
+    (a, b) =>
+      a.idColor - b.idColor ||
+      a.pack.localeCompare(b.pack, 'es') ||
+      a.ordenTalla - b.ordenTalla ||
+      a.idTalla - b.idTalla,
   );
 }
 
@@ -751,6 +808,7 @@ export async function wipDeOrden(
       lineas: {
         select: {
           idColor: true,
+          pack: true,
           color: { select: { nombre: true } },
           tallas: {
             select: {
@@ -768,31 +826,48 @@ export async function wipDeOrden(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
-  // Metadatos + pedido por celda (de la matriz de la orden).
+  // Metadatos + pedido por celda (de la matriz de la orden), llave color×talla×PACK.
   const meta = new Map<string, MetaCelda>();
   const pedido = new Map<string, number>();
+  // Metadatos PLEGADOS (color×talla) para lo que no maneja packs: la entrega a cliente. Se arma en
+  // la misma pasada; el pack se deja vacío porque ahí de verdad no significa nada.
+  const metaPlegada = new Map<string, MetaCelda>();
   for (const linea of orden.lineas) {
+    const pack = normalizarPack(linea.pack);
     for (const t of linea.tallas) {
-      const clave = claveCelda(linea.idColor, t.idTalla);
+      const clave = claveCelda(linea.idColor, t.idTalla, pack);
       pedido.set(clave, (pedido.get(clave) ?? 0) + t.cantidad);
-      if (!meta.has(clave)) {
-        meta.set(clave, {
-          idColor: linea.idColor,
-          color: linea.color.nombre,
-          idTalla: t.idTalla,
-          etiquetaTalla: t.talla.etiqueta,
-          ordenTalla: t.talla.orden,
-        });
+      const datos = {
+        idColor: linea.idColor,
+        color: linea.color.nombre,
+        idTalla: t.idTalla,
+        etiquetaTalla: t.talla.etiqueta,
+        ordenTalla: t.talla.orden,
+      };
+      if (!meta.has(clave)) meta.set(clave, { ...datos, pack });
+      // ⭐ Y también SIN pack (§Post-F9.10): cuando el maquilero devuelve los tendidos revueltos, el
+      // pendiente saca una celda de pack vacío —en negativo, lo devuelto sin atribuir—. Si no se
+      // registra aquí su metadato, esa celda cae en el respaldo defensivo y sale rotulada «Color 7»
+      // con la talla en blanco: un renglón real de la pantalla, con el nombre equivocado.
+      const claveSinPack = claveCelda(linea.idColor, t.idTalla, SIN_PACK);
+      if (!meta.has(claveSinPack)) meta.set(claveSinPack, { ...datos, pack: SIN_PACK });
+      const clavePlegada = claveCeldaPlegada(linea.idColor, t.idTalla);
+      if (!metaPlegada.has(clavePlegada)) {
+        metaPlegada.set(clavePlegada, { ...datos, pack: SIN_PACK });
       }
     }
   }
 
-  // Sumas por etapa (color×talla). Corte, recibido total/costura y entregado no dependen del proceso.
+  // Sumas por etapa. Corte va por color×talla×PACK (lleva tendido); la entrega a cliente va PLEGADA
+  // —ahí ya es sólo color (§Post-F9.10)—, y por eso también usa el metadato plegado: buscarla en el
+  // mapa con pack habría dejado sus celdas sin nombre de color ni etiqueta de talla.
   const cortado = await sumarCeldasOrden(cliente, idOrden, TipoEtapaMovimiento.corte);
   const entregadoMapa = await sumarCeldasOrden(
     cliente,
     idOrden,
     TipoEtapaMovimiento.entrega_cliente,
+    undefined,
+    true,
   );
 
   // Procesos efectivamente usados (envíos vivos): enumera cortadoPorEnviar/porRecibir.
@@ -951,10 +1026,10 @@ export async function wipDeOrden(
     }),
   ).map(({ ordenTalla: _o, ...resto }) => resto);
 
-  // Entregado a cliente, por celda.
+  // Entregado a cliente, por celda (SIN pack: la entrega no lo maneja).
   const entregadoCeldas = ordenarCeldas(
     [...entregadoMapa.keys()].map((clave) => {
-      const m = metaPara(meta, clave);
+      const m = metaPara(metaPlegada, clave);
       return { ...m, cantidad: entregadoMapa.get(clave) ?? 0 };
     }),
   )

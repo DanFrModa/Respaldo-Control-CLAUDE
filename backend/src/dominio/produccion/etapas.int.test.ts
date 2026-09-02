@@ -859,3 +859,231 @@ describe('Permisos (deny-by-default, A4)', () => {
     ).rejects.toBeInstanceOf(Error);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ EL PACK / TENDIDO EN CORTE Y ENTREGA A MAQUILA (§Post-F9.10)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 DANIEL: *«Creo que sí es importante que viaje el pack **al menos en el corte, entrega a
+// maquila**…»* — ahí es OBLIGATORIO (cada tendido es de un pack), a diferencia del recibo, donde él
+// lo dejó opcional. Corte y envío comparten `aplanarYValidar`, así que las reglas de captura se
+// prueban contra los DOS caminos y no contra uno solo (son ramas gemelas).
+describe('Corte y envío por PACK (§Post-F9.10)', () => {
+  /** Orden con dos tendidos del mismo Rojo: pack A (CH 5) y pack B (CH 5, M 3). */
+  async function crearOrdenConPacks(): Promise<number> {
+    const pedido = await cliente.pedido.create({
+      data: { folio: 90n, idEmpresa: empresa.id, idCliente: clienteNegocioId },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: 13, precio: 10 },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 90n,
+        idEmpresa: empresa.id,
+        idPedidoLinea: linea.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        lineas: {
+          create: [
+            {
+              idColor: colorRojo.id,
+              pack: 'A',
+              tallas: { create: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+            },
+            {
+              idColor: colorRojo.id,
+              pack: 'B',
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 5 },
+                  { idTalla: tallaM.id, cantidad: 3 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    return orden.id;
+  }
+
+  const cortar = async (id: number, pack: string | undefined, idTalla: number, cantidad: number) =>
+    registrarCorte(
+      sesion(),
+      {
+        idOrden: id,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            ...(pack === undefined ? {} : { pack }),
+            tallas: [{ idTalla, cantidad }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+  const enviar = async (id: number, pack: string | undefined, idTalla: number, cantidad: number) =>
+    registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden: id,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            ...(pack === undefined ? {} : { pack }),
+            tallas: [{ idTalla, cantidad }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+  it('el CORTE exige el pack cuando la orden los maneja, y nombra los que hay', async () => {
+    const id = await crearOrdenConPacks();
+    await expect(cortar(id, undefined, tallaCH.id, 5)).rejects.toThrow(/se fabrica por packs/);
+    await expect(cortar(id, undefined, tallaCH.id, 5)).rejects.toThrow(/"A", "B"/);
+  });
+
+  it('la ENTREGA A MAQUILA también lo exige (la rama gemela del corte)', async () => {
+    const id = await crearOrdenConPacks();
+    await cortar(id, 'A', tallaCH.id, 5);
+    await expect(enviar(id, undefined, tallaCH.id, 5)).rejects.toThrow(/se fabrica por packs/);
+  });
+
+  it('rechaza un pack que la orden no tiene, en corte y en envío', async () => {
+    const id = await crearOrdenConPacks();
+    await expect(cortar(id, 'Z', tallaCH.id, 1)).rejects.toThrow(/no tiene el pack "Z"/);
+    await cortar(id, 'A', tallaCH.id, 5);
+    await expect(enviar(id, 'Z', tallaCH.id, 1)).rejects.toThrow(/no tiene el pack "Z"/);
+  });
+
+  it('rechaza una talla que ese TENDIDO no pidió, aunque el color sí la tenga en otro pack', async () => {
+    // M sólo existe en el pack B. Validar contra la unión por color habría dejado cortar M del A.
+    const id = await crearOrdenConPacks();
+    await expect(cortar(id, 'A', tallaM.id, 1)).rejects.toThrow(/no pertenece al pack "A"/);
+    await expect(cortar(id, 'B', tallaM.id, 3)).resolves.toBeTruthy();
+  });
+
+  it('🔴 el sobre-envío ESTRICTO se lleva TENDIDO POR TENDIDO, no por color', async () => {
+    const id = await crearOrdenConPacks();
+    await cortar(id, 'A', tallaCH.id, 5);
+    await cortar(id, 'B', tallaCH.id, 5);
+
+    // 10 cortadas de Rojo/CH en total, pero sólo 5 del pack A: enviar 6 de A no cabe.
+    await expect(enviar(id, 'A', tallaCH.id, 6)).rejects.toThrow(ErrorConflicto);
+    await expect(enviar(id, 'A', tallaCH.id, 6)).rejects.toThrow(/pack "A"/);
+
+    // Y los 5 de cada uno sí caben.
+    const envA = await enviar(id, 'A', tallaCH.id, 5);
+    expect(envA.lineas[0]?.pack).toBe('A');
+    await expect(enviar(id, 'B', tallaCH.id, 5)).resolves.toBeTruthy();
+    // Agotados los dos tendidos, no queda nada que enviar.
+    await expect(enviar(id, 'A', tallaCH.id, 1)).rejects.toThrow(ErrorConflicto);
+  });
+
+  it('un mismo color y pack no puede repetirse en una captura (pero dos packs sí)', async () => {
+    const id = await crearOrdenConPacks();
+    await expect(
+      registrarCorte(
+        sesion(),
+        {
+          idOrden: id,
+          idCortador: cortador.id,
+          fecha: '2026-06-18',
+          lineas: [
+            { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+            { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/color y pack no pueden aparecer dos veces/);
+
+    const corte = await registrarCorte(
+      sesion(),
+      {
+        idOrden: id,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [
+          { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+          { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+        ],
+      },
+      bd(),
+    );
+    expect(corte.totalPiezas).toBe(10);
+    expect(corte.lineas.map((l) => l.pack).sort()).toEqual(['A', 'B']);
+  });
+
+  it('los pendientes se parten por tendido (lo que la pantalla ofrece = lo que el servidor topa)', async () => {
+    const id = await crearOrdenConPacks();
+    await cortar(id, 'A', tallaCH.id, 5);
+    await enviar(id, 'A', tallaCH.id, 2);
+
+    const pend = await pendientesPorOrden(sesion(), id, bd());
+    const porCortar = new Map(
+      pend.porCortar.filter((c) => c.idTalla === tallaCH.id).map((c) => [c.pack, c.cantidad]),
+    );
+    expect(porCortar.get('A')).toBe(0); // 5 pedidas − 5 cortadas
+    expect(porCortar.get('B')).toBe(5); // 5 pedidas − 0 cortadas
+
+    const costura = pend.cortadoPorEnviar.find((p) => p.idTipoProceso === procesoCostura.id);
+    const porEnviar = new Map(costura?.celdas.map((c) => [c.pack, c.cantidad]));
+    expect(porEnviar.get('A')).toBe(3); // 5 cortadas − 2 enviadas, sólo de A
+    expect(porEnviar.has('B')).toBe(false); // B no se cortó: no hay celda ≠ 0
+  });
+
+  it('🔴 una orden SIN packs se comporta EXACTAMENTE igual que antes: el pack sobra y se rechaza', async () => {
+    // `idOrden` es la orden de siempre (Rojo CH/M + Azul M), sin packs.
+    await expect(
+      registrarCorte(
+        sesion(),
+        {
+          idOrden,
+          idCortador: cortador.id,
+          fecha: '2026-06-18',
+          lineas: [
+            { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/no se fabrica por packs/);
+
+    // Y sin pack, el flujo de siempre sigue intacto: corte, envío estricto y el pack sale vacío.
+    const corte = await registrarCorte(
+      sesion(),
+      {
+        idOrden,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    expect(corte.lineas[0]?.pack).toBe('');
+    await expect(
+      registrarEnvioMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-19',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 11 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorConflicto);
+  });
+});

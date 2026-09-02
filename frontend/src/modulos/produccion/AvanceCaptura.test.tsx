@@ -149,7 +149,9 @@ function wip(
     celdas?: { cantidad: number; incompletas?: number }[];
   }[],
 ): WipOrden {
-  const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH' };
+  // `pack: ''` = la orden NO se fabrica por tendidos (§Post-F9.10). Toda celda del WIP lo trae
+  // desde que el pack es campo propio; vacío es el caso de siempre y la pantalla lo ignora.
+  const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '' };
   return {
     idOrden: 1,
     folio: 5424,
@@ -1430,7 +1432,16 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
             devuelveAPt: true,
             stockSinOrden: false,
             // Celdas del PROCESO: sólo `cantidad` (las incompletas viajan por maquilero, V1-E8v).
-            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+            celdas: [
+              {
+                idColor: 7,
+                color: 'Rojo',
+                idTalla: 11,
+                etiquetaTalla: 'CH',
+                pack: '',
+                cantidad: 4,
+              },
+            ],
             totalPendiente: 4,
             porMaquilero: [
               {
@@ -1442,6 +1453,7 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
                     color: 'Rojo',
                     idTalla: 11,
                     etiquetaTalla: 'CH',
+                    pack: '',
                     cantidad: 4,
                     incompletas: 0,
                   },
@@ -1646,7 +1658,16 @@ describe('Captura del avance · los botones de precarga de un clic (V1-E8i)', ()
             tipoProceso: 'Costura',
             codigoProceso: 'costura',
             generaEntradaPt: true,
-            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+            celdas: [
+              {
+                idColor: 7,
+                color: 'Rojo',
+                idTalla: 11,
+                etiquetaTalla: 'CH',
+                pack: '',
+                cantidad: 4,
+              },
+            ],
             totalPendiente: 4,
           },
         ],
@@ -1953,7 +1974,9 @@ describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima pu
    * sobre el RENDER (`avance-resumen`), con `incompletas ≠ 0`.
    */
   function wipConIncompletas(): WipOrden {
-    const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH' };
+    // `pack: ''` = la orden NO se fabrica por tendidos (§Post-F9.10). Toda celda del WIP lo trae
+    // desde que el pack es campo propio; vacío es el caso de siempre y la pantalla lo ignora.
+    const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '' };
     // 10 a costura y 10 a arte; de cada uno vuelven 8 buenas + 2 incompletas ⇒ pendiente 0 en los
     // dos. Restar `enviado − recibido` daría 2 en cada bloque: ése es exactamente el defecto.
     const proceso = (id: number, nombre: string, costura: boolean) => ({
