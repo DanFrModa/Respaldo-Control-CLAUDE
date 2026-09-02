@@ -10,18 +10,19 @@ cualquier flujo que capture cantidades por color × talla.
 El componente es **controlado en dos ejes independientes**: el padre es dueño de las columnas
 (`tallas`) y de las filas (`lineas`), y reacciona a sus dos callbacks.
 
-| Prop                 | Tipo                                            | Descripción                                                                 |
-| -------------------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
-| `tallas`             | `MatrizTalla[]` (`{ idTalla, etiqueta }`)       | Columnas, en orden. Estado controlado del padre.                            |
-| `lineas`             | `MatrizLinea[]` (`{ idColor, color, cantidades }`) | Filas (valor controlado). `cantidades` = `{ [idTalla]: number }`; ausente = 0. |
-| `coloresDisponibles` | `MatrizColorOpcion[]` (`{ id, nombre }`)        | Catálogo para agregar una fila. Los colores ya usados se **ocultan**.       |
-| `tallasDisponibles`  | `MatrizTalla[]`                                  | Catálogo para agregar columnas fuera de curva. Las presentes se **ocultan**.|
-| `onLineasChange`     | `(lineas) => void`                              | Emite el nuevo set de filas (editar celda, agregar/quitar color).           |
-| `onTallasChange`     | `(tallas) => void`                              | Emite el nuevo set de columnas (agregar/quitar talla).                      |
-| `soloLectura?`       | `boolean`                                       | Oculta toda edición (orden cancelada / sin permiso); la matriz sigue visible.|
-| `testid?`            | `string` (def. `"matriz"`)                      | Base de los `data-testid`.                                                   |
-| `slotAgregarColor?`  | `ReactNode`                                     | Reemplaza el `<select>` de "agregar color" (p. ej. el combobox con alta al vuelo de la OP). Los demás flujos, sin la prop, conservan el select. |
-| `onPantoneChange?`   | ver código                                      | Callback del pantone por fila (importador de OC C&A).                        |
+| Prop                 | Tipo                                                                | Descripción                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tallas`             | `MatrizTalla[]` (`{ idTalla, etiqueta }`)                           | Columnas, en orden. Estado controlado del padre.                                                                                                |
+| `lineas`             | `MatrizLinea[]` (`{ idColor, color, cantidades, pantone?, pack? }`) | Filas (valor controlado). `cantidades` = `{ [idTalla]: number }`; ausente = 0.                                                                  |
+| `coloresDisponibles` | `MatrizColorOpcion[]` (`{ id, nombre }`)                            | Catálogo para agregar una fila. Los colores ya usados se **ocultan**, salvo cuando la matriz maneja tendidos (ver el bullet del PACK).          |
+| `tallasDisponibles`  | `MatrizTalla[]`                                                     | Catálogo para agregar columnas fuera de curva. Las presentes se **ocultan**.                                                                    |
+| `onLineasChange`     | `(lineas) => void`                                                  | Emite el nuevo set de filas (editar celda, agregar/quitar color).                                                                               |
+| `onTallasChange`     | `(tallas) => void`                                                  | Emite el nuevo set de columnas (agregar/quitar talla).                                                                                          |
+| `soloLectura?`       | `boolean`                                                           | Oculta toda edición (orden cancelada / sin permiso); la matriz sigue visible.                                                                   |
+| `testid?`            | `string` (def. `"matriz"`)                                          | Base de los `data-testid`.                                                                                                                      |
+| `slotAgregarColor?`  | `ReactNode`                                                         | Reemplaza el `<select>` de "agregar color" (p. ej. el combobox con alta al vuelo de la OP). Los demás flujos, sin la prop, conservan el select. |
+| `onPantoneChange?`   | `(indice, pantone) => void`                                         | Callback del pantone por fila. **El 1er argumento es la POSICIÓN de la fila**, no el `idColor`.                                                 |
+| `onPackChange?`      | `(indice, pack) => void`                                            | Si se pasa, aparece la columna **Pack** (§Post-F9.10). Sin ella, la matriz es la de siempre.                                                    |
 
 ### Comportamiento
 
@@ -31,8 +32,16 @@ El componente es **controlado en dos ejes independientes**: el padre es dueño d
   total general (`<testid>-total-general`), recalculados al teclear.
 - **Captura por teclado**: `Tab` (nativo), `Enter` y flechas mueven el foco entre celdas; una fila
   completa se captura sin tocar el mouse. Al enfocar una celda se selecciona su contenido.
-- **Agregar/quitar fila (color)** y **agregar/quitar columna (talla extra)**. El color duplicado se
-  bloquea en la UX (no aparece en el selector); el backend re-valida la unicidad.
+- **Agregar/quitar fila (color)** y **agregar/quitar columna (talla extra)**. Mientras la matriz **no
+  maneje tendidos**, el color duplicado se bloquea en la UX (no aparece en el selector); en cuanto
+  alguna fila trae pack esa protección se levanta a propósito (ver el bullet siguiente). El backend
+  re-valida la unicidad —que desde §Post-F9.10 es por `color + pack`— en los dos casos.
+- **PACK / TENDIDO (§Post-F9.10)**: con `onPackChange` cada fila gana un campo `Pack`. La identidad
+  de una fila pasa a ser su **posición** (no el `idColor`), porque una orden con tendidos trae dos
+  filas del MISMO color; llavear por `color:pack` no sirve: la llave cambiaría con cada tecla del
+  campo y el input perdería el foco letra a letra. El color ya usado se vuelve a ofrecer en el
+  selector **sólo cuando alguna fila ya trae pack** — mientras no, sigue en pie la protección de
+  siempre contra el color duplicado.
 - **Responsive**: scroll horizontal en móvil. Usa tokens de tema shadcn (`bg-muted`,
   `text-muted-foreground`, …); nunca colores fijos, para que el modo oscuro funcione solo.
 - **Rendimiento**: memoizado (`memo`) y con cálculos `useMemo`; teclear en una celda no re-renderiza

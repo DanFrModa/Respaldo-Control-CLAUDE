@@ -71,6 +71,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.091 · 2-sep-2026 · **en prueba** — ⭐⭐ El **pack** ya se usa de punta a punta: nace del PDF, se captura, se ve y viaja
+
+### Qué se puede hacer ahora que antes no
+
+**Trabajar con los tendidos de C&A como lo que son.** Hasta hoy el pack era un campo que existía por dentro
+y **no se podía usar desde ninguna pantalla**. Con esta versión:
+
+- ⭐ **La orden nace del PDF con sus tendidos separados.** Antes el importador **sumaba** los packs en un
+  solo renglón por color: una OC con packs A, B y C entraba como **un solo «Blanco»**. Ahora entra como
+  **tres renglones de «Blanco»**, cada uno con **su propia corrida de tallas**.
+- **Se capturan y se ven a mano:** la matriz de la orden tiene columna de **Pack**, el Centro de Órdenes
+  marca cada renglón con su tendido, y el tablero de producción los separa.
+- **La captura de avance distingue tendido por tendido** — cortar, enviar y recibir van por su pack.
+  Y al recibir hay un interruptor **«revueltos»** para cuando el maquilero devuelve todo junto y ya no se
+  sabe de qué tendido salió cada pieza.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Una orden que NO usa packs se ve y se comporta exactamente igual que antes.** El pack sólo aparece
+  cuando la orden lo tiene: ni columna, ni etiqueta, ni interruptor. *(Y esta vez está probado de verdad:
+  ver abajo.)*
+- **La pantalla ya no te deja guardar una matriz que el servidor iba a rechazar.** Si un color lleva
+  tendido y otro no, o si dos renglones quedan iguales, sale un aviso **en línea** y el botón se apaga —
+  antes te dejaba teclear todo y te lo rechazaba al guardar.
+- ⚠️ **El tendido distingue mayúsculas:** `a` y `A` serían **dos tendidos distintos** del mismo color.
+  Desde el PDF **no puede pasar** (el papel sólo trae letras mayúsculas y no se editan), **pero al
+  capturar a mano sí**. Se ven apilados en la misma columna, así que no es invisible. **Queda pendiente de
+  tu confirmación**; si molesta, se arregla en el sistema, no en la pantalla.
+- **Una OC con un solo pack nace SIN tendido**, como hasta ahora. Sólo se separan cuando de verdad hay
+  varios.
+
+### Qué sigue pendiente o roto
+
+- **El impreso de la orden y la bandeja de recetas por liberar no muestran el tendido.** No se pidieron.
+- **Los colores ya capturados como «Negro A» no se parten.** Sigue siendo requisito del **ETL de arranque**.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+- ✅ **Con esto Gabriel ya puede verificar el pack en `prueba`** — hasta la versión anterior no había nada
+  observable que mirar.
+
 ## 0.089 · 2-sep-2026 · **en prueba** — 🔴 Una fuga que creíamos dormida **estaba despierta**: borrar un arte de la OP dejaba su foto pagándose en la nube
 
 ### Qué se puede hacer ahora que antes no

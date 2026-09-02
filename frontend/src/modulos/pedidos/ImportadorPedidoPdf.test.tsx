@@ -357,7 +357,7 @@ describe('ImportadorPedidoPdf', () => {
     };
     const archivo = cuerpo.archivos[0];
     // El CABLE sigue llevando los 3 renglones-pack (A/B/C) tal como el usuario los editó: la suma en
-    // un solo renglón de color la hace el BACKEND al persistir (§Post-F9.129), no el navegador.
+    // el renglón por tendido lo arma el BACKEND al persistir (§Post-F9.10), no el navegador.
     expect(archivo?.matriz.map((f) => f.letra)).toEqual(['A', 'B', 'C']);
     const packA = archivo?.matriz.find((f) => f.letra === 'A');
     expect(packA?.tallas).toContainEqual({ talla: '5-6', cantidad: 300 }); // editado en el pack A
@@ -380,11 +380,13 @@ describe('ImportadorPedidoPdf', () => {
     expect(screen.queryByText(/Blanco A/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Blanco B/)).not.toBeInTheDocument();
 
-    // El renglón de totales retrata la OP: un solo color con la suma de los packs.
-    expect(screen.getByText(/A fabricar · Blanco/)).toBeInTheDocument();
+    // El renglón de totales es la SUMA del color, para cotejar contra el papel — ya no "el renglón
+    // de la OP": desde §Post-F9.10 la OP lleva un renglón POR PACK, todos del mismo color.
+    expect(screen.getByText(/Total a fabricar · Blanco/)).toBeInTheDocument();
     expect(screen.getByTestId('importador-pdf-nota-packs')).toHaveTextContent(
-      /un solo renglón por color/i,
+      /un renglón por pack/i,
     );
+    expect(screen.getByTestId('importador-pdf-nota-packs')).toHaveTextContent(/mismo color/i);
   });
 
   it('sin permiso modelos.administrar, no ofrece crear un modelo nuevo', async () => {

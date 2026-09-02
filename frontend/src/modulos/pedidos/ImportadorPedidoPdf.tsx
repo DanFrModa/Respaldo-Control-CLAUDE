@@ -65,10 +65,12 @@ function tituloColor(base: string): string {
  * Etiqueta del renglón-pack en la vista previa: "Pack A" (o "Pack único" si la OC trae uno solo).
  *
  * ⚠️ §Post-F9.129 — ANTES aquí se componía el nombre del COLOR (`Negro A`), porque el backend creaba
- * un color de catálogo por pack. Ya no: la OP recibe UN SOLO renglón de color con la SUMA de los
- * packs. La vista previa sigue mostrándolos separados —Daniel la usa para cotejar contra el papel de
- * la OC, y ahí los packs existen— pero etiquetados como lo que son (packs), no como colores que
- * nunca van a existir. El renglón "A fabricar · {Color}" de abajo es el que sí retrata la OP.
+ * un color de catálogo por pack. Ya no: la OP recibe UN RENGLÓN POR PACK, todos del MISMO color, con
+ * la letra en el campo `pack` (§Post-F9.10). Así que la etiqueta dice lo que la fila ES —un pack—, y
+ * eso ya no es una traducción: cada fila de esta previa acaba siendo una línea de la OP — salvo la
+ * que el usuario deje entera en 0, que se "integra" en otra y no nace, y las que compartan letra,
+ * que se suman en una (`agruparPacksEnRenglones`). El renglón "Total a fabricar · {Color}" de abajo
+ * NO es "el renglón de la OP": es la cifra con la que Daniel coteja el papel.
  */
 function etiquetaPack(letra: string | null): string {
   return letra !== null && letra !== '' ? `Pack ${letra.toUpperCase()}` : 'Pack único';
@@ -77,8 +79,10 @@ function etiquetaPack(letra: string | null): string {
 /**
  * Deriva los RENGLONES-PACK editables de un renglón del análisis: un renglón por grupo (si la OC trae ≥2
  * packs) o uno solo (0/1 pack). Espeja `filasDesdePropuesta` del backend para que la propuesta
- * prefilleada coincida con lo que se crea si el usuario no edita. Son renglones de EDICIÓN: el backend
- * los suma en un solo renglón de color al crear la OP (§Post-F9.129).
+ * prefilleada coincida con lo que se crea si el usuario no edita. Y desde §Post-F9.10 espeja también
+ * lo que se PERSISTE: cada renglón-pack nace como su propia línea de la OP, con su campo `pack` y el
+ * mismo color que las demás — salvo el que quede en 0, que no genera línea, y los que compartan
+ * letra, que se suman en una.
  */
 function filasDesdePreview(r: RenglonPdfPreview): RenglonPackEditable[] {
   if (r.grupos.length >= 2) {
@@ -994,11 +998,13 @@ function FilaPdf({
       {abierto ? (
         <div className="space-y-3 border-t px-3 py-3">
           <MatrizPacksEditable r={r} filas={filas} onCelda={onCelda} />
-          {/* §Post-F9.129: la previa es fiel al papel (packs separados), pero no debe mentir sobre
-              lo que va a quedar en la OP. Se dice con todas sus letras, sin rediseñar la pantalla. */}
+          {/* La previa es fiel al papel (packs separados) y ahora la OP TAMBIÉN lo es: cada tendido
+              nace como su propio renglón, con un solo color de catálogo (§Post-F9.10). Se dice con
+              todas sus letras porque es lo que cambia respecto de lo que la pantalla decía antes. */}
           <p className="text-[11px] text-muted-foreground" data-testid="importador-pdf-nota-packs">
-            La OP lleva <b>un solo renglón por color</b>: los packs se suman. El desglose por pack
-            se guarda con la orden para el empaque.
+            La OP lleva <b>un renglón por pack</b>, todos del <b>mismo color</b>: el tendido viaja
+            al corte y a la entrega a maquila. El desglose SKU se guarda con la orden para el
+            empaque.
           </p>
           <label className="flex items-center gap-2 text-[11px]">
             <span className="font-medium text-muted-foreground">PANTONE del color</span>
@@ -1032,13 +1038,16 @@ function FilaPdf({
 
 /**
  * Matriz EDITABLE POR PACK: una fila "Cliente pidió" (solo lectura, agregada) + una fila EDITABLE por pack
- * con inputs por talla y su total, y abajo el renglón "A fabricar · {Color}" con la SUMA.
+ * —cada una es una línea de la OP (§Post-F9.10), salvo la que quede entera en 0, que no genera
+ * línea, y las que compartan letra, que se suman en una— con inputs por talla y su total, y abajo
+ * el renglón "Total a fabricar · {Color}", que suma los tendidos para cotejar contra el papel.
  *
- * ⚠️ §Post-F9.129 — LA VISTA PREVIA MUESTRA PACKS; LA OP LLEVA UN SOLO COLOR. Los packs se siguen
- * editando por separado porque así viene el papel de C&A y así lo coteja Daniel; pero el backend los
- * SUMA en un único renglón de color al crear la OP ("Negro", no "Negro A"/"Negro B"). Por eso el
- * renglón de totales dice el nombre del color: es el que de verdad retrata lo que va a quedar en la
- * orden. Para "integrar" un pack en otro el usuario mueve los números entre renglones.
+ * ⭐ §Post-F9.10 — CADA PACK ES UN RENGLÓN DE LA OP, y todos del MISMO color ("Negro", no
+ * "Negro A"/"Negro B", que es lo que §Post-F9.129 quitó). Los packs se editan por separado porque
+ * así viene el papel de C&A y así lo coteja Daniel, y ahora la OP se les parece: cada uno con su
+ * corrida y su tendido en el campo `pack`. El renglón de totales sigue abajo porque es la cifra que
+ * el usuario compara contra el papel, no porque la OP vaya a llevar una sola fila. Para "integrar"
+ * un pack en otro el usuario mueve los números entre renglones: el que quede en 0 no genera renglón.
  */
 function MatrizPacksEditable({
   r,
@@ -1106,10 +1115,10 @@ function MatrizPacksEditable({
             </tr>
           ))}
           <tr className="border-t">
-            {/* Éste es el renglón que de verdad va a quedar en la OP: un solo color con la suma de
-                los packs (§Post-F9.129). Por eso lleva el nombre del color y va resaltado. */}
+            {/* El TOTAL del color: la suma de los tendidos. Ya no es "el renglón de la OP" —la OP
+                lleva uno por pack (§Post-F9.10)—, es la cifra contra la que se coteja el papel. */}
             <td className="px-1.5 py-1 font-medium whitespace-nowrap text-primary">
-              A fabricar{colorBase !== '' ? ` · ${tituloColor(colorBase)}` : ''}
+              Total a fabricar{colorBase !== '' ? ` · ${tituloColor(colorBase)}` : ''}
             </td>
             {columnas.map((talla) => (
               <td key={talla} className="num px-1.5 py-1 text-center text-muted-foreground">

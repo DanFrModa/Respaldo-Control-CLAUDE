@@ -23,11 +23,13 @@ function Anfitrion({
   lineasIniciales = [],
   soloLectura = false,
   conPantone = false,
+  conPacks = false,
 }: {
   tallasIniciales?: MatrizTalla[];
   lineasIniciales?: MatrizLinea[];
   soloLectura?: boolean;
   conPantone?: boolean;
+  conPacks?: boolean;
 }): React.JSX.Element {
   const [tallas, setTallas] = useState<MatrizTalla[]>(tallasIniciales);
   const [lineas, setLineas] = useState<MatrizLinea[]>(lineasIniciales);
@@ -41,8 +43,15 @@ function Anfitrion({
       onLineasChange={setLineas}
       {...(conPantone
         ? {
-            onPantoneChange: (idColor: number, pantone: string) =>
-              setLineas((prev) => prev.map((l) => (l.idColor === idColor ? { ...l, pantone } : l))),
+            // La fila se identifica por POSICIÓN (§Post-F9.10): con packs el `idColor` se repite.
+            onPantoneChange: (indice: number, pantone: string) =>
+              setLineas((prev) => prev.map((l, i) => (i === indice ? { ...l, pantone } : l))),
+          }
+        : {})}
+      {...(conPacks
+        ? {
+            onPackChange: (indice: number, pack: string) =>
+              setLineas((prev) => prev.map((l, i) => (i === indice ? { ...l, pack } : l))),
           }
         : {})}
       soloLectura={soloLectura}
@@ -184,6 +193,80 @@ describe('<MatrizColorTalla>', () => {
     expect(pantone.tagName).toBe('INPUT');
     await usuario.type(pantone, '11-0601 TCX');
     expect(pantone).toHaveValue('11-0601 TCX');
+  });
+
+  // ── EL PACK / TENDIDO (§Post-F9.10) ──────────────────────────────────────────────────────────
+
+  /** Dos tendidos del MISMO color: el caso que el `idColor` como llave de fila no sabía distinguir. */
+  function dosTendidos(): MatrizLinea[] {
+    return [
+      { idColor: 10, color: 'Rojo', cantidades: { 1: 2 }, pack: 'A' },
+      { idColor: 10, color: 'Rojo', cantidades: { 1: 7 }, pack: 'B' },
+    ];
+  }
+
+  it('sin `onPackChange` NO hay columna Pack (los demás flujos no ven nada nuevo)', () => {
+    render(<Anfitrion lineasIniciales={[lineaRojo()]} />);
+    expect(screen.queryByTestId('m-pack')).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Pack' })).not.toBeInTheDocument();
+  });
+
+  it('con packs, teclear en un tendido NO toca el otro del mismo color', async () => {
+    const usuario = userEvent.setup();
+    render(<Anfitrion lineasIniciales={dosTendidos()} conPacks />);
+    const celdas = screen.getAllByTestId('m-celda');
+
+    // Fila 1 (pack A), columna CH. Con la fila llaveada por `idColor` esto habría escrito en LAS DOS.
+    await usuario.type(celdas[0] as HTMLElement, '{selectall}5');
+
+    const totalesFila = screen.getAllByTestId('m-total-fila');
+    expect(totalesFila[0]).toHaveTextContent('5');
+    expect(totalesFila[1]).toHaveTextContent('7');
+    expect(screen.getByTestId('m-total-general')).toHaveTextContent('12');
+  });
+
+  it('con un tendido ya capturado, el color YA USADO se sigue ofreciendo (el 2º tendido es otra fila)', () => {
+    render(<Anfitrion lineasIniciales={[{ ...lineaRojo(), pack: 'A' }]} conPacks />);
+    const selector = screen.getByTestId('m-agregar-color');
+    // Sin packs, Rojo se ocultaba (y su prueba de al lado lo sigue exigiendo). Con un tendido ya
+    // puesto NO: ocultarlo dejaría el segundo tendido del Rojo sin manera de capturarse.
+    expect(within(selector).getByRole('option', { name: 'Rojo' })).toBeInTheDocument();
+  });
+
+  it('con la columna Pack pero SIN ningún tendido capturado, el color usado se sigue ocultando', () => {
+    // La protección de siempre contra el color duplicado no se pierde por el mero hecho de que el
+    // flujo pueda manejar tendidos: casi ninguna orden los usa, y ahí repetir un color es el
+    // duplicado que el servidor rechaza.
+    render(<Anfitrion lineasIniciales={[lineaRojo()]} conPacks />);
+    const selector = screen.getByTestId('m-agregar-color');
+    expect(within(selector).queryByRole('option', { name: 'Rojo' })).not.toBeInTheDocument();
+  });
+
+  it('el PACK se teclea entero sin perder el foco (la fila no se remonta por tecla)', async () => {
+    const usuario = userEvent.setup();
+    render(
+      <Anfitrion
+        lineasIniciales={[{ idColor: 10, color: 'Rojo', cantidades: { 1: 2 }, pack: '' }]}
+        conPacks
+      />,
+    );
+    const pack = screen.getByTestId('m-pack');
+    await usuario.type(pack, 'AB');
+    // Si la `key` de la fila incluyera el pack, la fila se remontaría al escribir la "A", el foco
+    // se perdería y la "B" no llegaría: quedaría "A".
+    expect(pack).toHaveValue('AB');
+    expect(document.activeElement).toBe(pack);
+  });
+
+  it('quitar el SEGUNDO tendido deja vivo al primero (se quita por posición, no por color)', async () => {
+    const usuario = userEvent.setup();
+    render(<Anfitrion lineasIniciales={dosTendidos()} conPacks />);
+    const botones = screen.getAllByTestId('m-quitar-color');
+    await usuario.click(botones[1] as HTMLElement);
+
+    // Quitar "por idColor" habría borrado LAS DOS filas del Rojo.
+    expect(screen.getAllByTestId('m-fila')).toHaveLength(1);
+    expect(screen.getByTestId('m-pack')).toHaveValue('A');
   });
 
   it('en solo lectura muestra el PANTONE de la fila como texto (sin input)', () => {

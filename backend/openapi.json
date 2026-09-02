@@ -58569,7 +58569,7 @@
                           "description": "Contenido del PDF en base64 (acepta prefijo data: URL)."
                         },
                         "matriz": {
-                          "description": "Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. Los packs se suman en UN solo renglón de color al crear la OP.",
+                          "description": "Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. Cada pack nace como un renglón propio del MISMO color, con su campo pack.",
                           "type": "array",
                           "items": {
                             "type": "object",
@@ -58578,7 +58578,7 @@
                                 "anyOf": [
                                   {
                                     "type": "string",
-                                    "maxLength": 8
+                                    "maxLength": 12
                                   },
                                   {
                                     "type": "null"
@@ -58609,7 +58609,7 @@
                                   ],
                                   "description": "Ajuste manual del total a fabricar de una talla."
                                 },
-                                "description": "Corrida EDITADA de ese pack (total por talla); se suma con la de los demás packs."
+                                "description": "Corrida EDITADA de ese pack (total por talla); es la del renglón que ese tendido tendrá en la OP."
                               }
                             },
                             "required": [

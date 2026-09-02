@@ -473,7 +473,9 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     // ── Registrar un CORTE real: combobox con búsqueda (homónimos) + candado ────
     await avance.getByTestId('avance-abrir-captura').click();
     const captura = avance.getByTestId('avance-captura');
-    await expect(captura.getByText(/Candado: solo colores y tallas de la orden/)).toBeVisible();
+    await expect(
+      captura.getByText(/Candado: solo los renglones y tallas de la orden/),
+    ).toBeVisible();
     // El combobox filtra sin acentos/mayúsculas: "cortador e2e" encuentra al proveedor.
     await captura.getByTestId('avance-proveedor-input').fill(`cortador e2e ${sufijo}`);
     await page.getByTestId('avance-proveedor-opcion').first().click();

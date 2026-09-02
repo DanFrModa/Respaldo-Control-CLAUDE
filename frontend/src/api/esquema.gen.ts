@@ -24340,11 +24340,11 @@ export interface paths {
               nombreArchivo: string;
               /** @description Contenido del PDF en base64 (acepta prefijo data: URL). */
               archivoBase64: string;
-              /** @description Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. Los packs se suman en UN solo renglón de color al crear la OP. */
+              /** @description Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. Cada pack nace como un renglón propio del MISMO color, con su campo pack. */
               matriz?: {
                 /** @description Letra del pack en la vista previa (A/B/C…); null/vacía = un solo pack. NO forma parte del nombre del color. */
                 letra: string | null;
-                /** @description Corrida EDITADA de ese pack (total por talla); se suma con la de los demás packs. */
+                /** @description Corrida EDITADA de ese pack (total por talla); es la del renglón que ese tendido tendrá en la OP. */
                 tallas: {
                   /** @description Etiqueta de la talla ajustada. */
                   talla: string;

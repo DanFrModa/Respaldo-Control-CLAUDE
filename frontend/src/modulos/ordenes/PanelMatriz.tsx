@@ -49,13 +49,22 @@ const QUERY_COLORES = {
   incluirInactivos: 'false',
 } as const;
 
-/** Construye las filas iniciales de la matriz a partir de las líneas que ya trae la orden. */
+/**
+ * Construye las filas iniciales de la matriz a partir de las líneas que ya trae la orden. Una fila
+ * por RENGLÓN (color × pack, §Post-F9.10): con dos tendidos del mismo color son dos filas.
+ */
 function filasDesdeOrden(orden: Orden): MatrizLinea[] {
   return orden.lineas.map((linea) => ({
     idColor: linea.idColor,
     color: linea.color,
+    pack: linea.pack,
     cantidades: Object.fromEntries(linea.tallas.map((t) => [t.idTalla, t.cantidad])),
   }));
+}
+
+/** Llave de identidad de un renglón de la matriz: color × pack (la misma del `@@unique` de la tabla). */
+function claveRenglon(idColor: number, pack: string | undefined): string {
+  return `${idColor}:${pack ?? ''}`;
 }
 
 /**
@@ -80,13 +89,25 @@ function columnasIniciales(
   return [...mapa.values()];
 }
 
-/** Color + tallas con cantidad de un renglón, sin ids de fila (el CONTENIDO que captura el usuario). */
+/**
+ * Color + PACK + tallas con cantidad de un renglón, sin ids de fila (el CONTENIDO que captura el
+ * usuario).
+ *
+ * 🔑 EL PACK ENTRA EN EL CONTENIDO, y no es decorativo: de aquí sale la FIRMA con la que el diálogo
+ * decide si hay cambios sin guardar. Si el pack quedara fuera, cambiarle el tendido a un renglón
+ * —sin tocar una sola cantidad— no marcaría la sección como sucia y el cambio se perdería al
+ * cerrar, sin aviso.
+ */
 function contenido(
   lineas: MatrizLinea[],
   columnas: MatrizTalla[],
-): { idColor: number; tallas: { idTalla: number; cantidad: number }[] }[] {
+): { idColor: number; pack: string; tallas: { idTalla: number; cantidad: number }[] }[] {
   return lineas.map((linea) => ({
     idColor: linea.idColor,
+    // RECORTADO, igual que `normalizarPack` en el dominio: para el servidor `"A"` y `" A "` son el
+    // MISMO tendido. Si aquí no se recortara, la llave de renglón de abajo no casaría con la que
+    // devuelve el servidor y un renglón existente se mandaría como nuevo.
+    pack: (linea.pack ?? '').trim(),
     tallas: columnas
       .map((col) => ({ idTalla: col.idTalla, cantidad: linea.cantidades[col.idTalla] ?? 0 }))
       .filter((t) => t.cantidad > 0),
@@ -110,13 +131,57 @@ function construirCuerpo(
   columnas: MatrizTalla[],
   orden: Orden,
 ): OrdenMatriz {
-  const porColor = new Map(orden.lineas.map((l) => [l.idColor, l.id]));
+  // 🔴 EL ÍNDICE ES POR COLOR × PACK (§Post-F9.10). Indexado sólo por color, dos tendidos del mismo
+  // color recibían EL MISMO `id` de renglón: el backend actualizaría el mismo `OrdenLinea` dos
+  // veces, la segunda pisando a la primera, y el otro tendido desaparecería de la matriz sin que
+  // nada lo dijera. En una orden sin packs el índice es idéntico al de siempre (todos con pack '').
+  const porRenglon = new Map(orden.lineas.map((l) => [claveRenglon(l.idColor, l.pack), l.id]));
   return {
     lineas: contenido(lineas, columnas).map((linea) => {
-      const idExistente = porColor.get(linea.idColor);
+      const idExistente = porRenglon.get(claveRenglon(linea.idColor, linea.pack));
       return { ...(idExistente === undefined ? {} : { id: idExistente }), ...linea };
     }),
   };
+}
+
+/**
+ * ⭐ LOS DOS ESTADOS DE CAPTURA QUE §Post-F9.10 HACE POSIBLES Y EL SERVIDOR RECHAZA, derivados de
+ * lo tecleado. Devuelve el motivo a enseñar, o `null` si la matriz es mandable.
+ *
+ * ⚠️ NO son todo lo que `sincronizarMatriz` rechaza —también rechaza un color desactivado y
+ * re-empacar un color que ya tiene producción viva (los dos, con un 409)—, y a propósito: esos
+ * dependen de datos que la pantalla no tiene (si el color se desactivó después, si la orden ya
+ * tiene movimientos vivos), así que se contestan desde el servidor. Aquí sólo se adelantan los dos
+ * que se leen de lo tecleado.
+ *
+ * 🔴 POR QUÉ EXISTE. Con tendidos, «agregar color» pone una fila SIN pack (es la única manera de
+ * estrenar el segundo tendido: primero la fila, luego su letra). Eso deja, a propósito, dos estados
+ * intermedios que `sincronizarMatriz` rechaza con un 400:
+ *   • MEZCLADA — unos renglones con pack y otros sin. Es el estado normal justo después de agregar
+ *     la fila, mientras el usuario no le ha escrito su letra.
+ *   • REPETIDA — el mismo `(color, pack)` dos veces. Con packs, el combobox deja de esconder los
+ *     colores ya usados (tiene que hacerlo), así que elegir dos veces el mismo color produce dos
+ *     renglones `(color, '')` — el duplicado que la llave única de la tabla prohíbe.
+ * Sin esto, «Guardar» quedaba encendido y el usuario se comía el 400 con la matriz ya tecleada; es
+ * el MISMO estándar que el pre-chequeo del exceso en la captura de avance (`AvanceProduccion`).
+ *
+ * 🔑 NO se "arregla" el estado (no se rellena un pack ni se descarta la fila): se DECLARA inválido
+ * y se bloquea el botón. La captura sigue siendo del usuario, y sigue marcada como sucia.
+ */
+function impedimentoDeLaMatriz(lineas: MatrizLinea[]): string | null {
+  // Recortado, igual que `normalizarPack` del dominio: quien decide si dos packs son el mismo es el
+  // servidor, y aquí se hace su misma pregunta (si no, `"A"` y `" A "` pasarían por distintos).
+  const packs = lineas.map((l) => (l.pack ?? '').trim());
+  if (packs.some((p) => p !== '') && packs.some((p) => p === '')) {
+    return 'Falta el pack de algún renglón: o todos llevan pack, o ninguno.';
+  }
+  const claves = lineas.map((l, i) => claveRenglon(l.idColor, packs[i]));
+  if (new Set(claves).size !== claves.length) {
+    return packs.some((p) => p !== '')
+      ? 'Hay dos renglones con el mismo color y pack: cámbiale el pack a uno.'
+      : 'Hay dos renglones del mismo color: quita uno, o dale su pack a cada uno.';
+  }
+  return null;
 }
 
 /**
@@ -188,25 +253,54 @@ export function PanelMatriz({
     () => (colores.data?.datos ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
     [colores.data],
   );
-  // Los colores que YA están en la matriz (el combobox del alta al vuelo no los ofrece).
-  const idsColoresUsados = useMemo(() => new Set(lineas.map((l) => l.idColor)), [lineas]);
+  /**
+   * ⭐ ¿ESTA orden se fabrica por TENDIDOS? (§Post-F9.10). Basta con que un renglón traiga pack —la
+   * MISMA pregunta que hace el servidor (`packs.ts::ordenManejaPacks`)—. Gobierna DOS cosas: que el
+   * combobox deje de esconder los colores ya usados, y que una orden en SOLO LECTURA enseñe su
+   * columna de packs. (La columna EDITABLE no cuelga de esto: se ofrece siempre que se pueda editar,
+   * porque es la única manera de estrenar tendidos en una orden que todavía no los tiene.)
+   *
+   * 🔑 Se mira el estado EN CAPTURA (`lineas`), no la orden guardada, y eso sí cambia el
+   * comportamiento: en cuanto el usuario teclea el pack del PRIMER renglón, el combobox tiene que
+   * dejarle agregar OTRA fila del mismo color para el segundo tendido. Con `orden.lineas` habría
+   * que guardar y volver a entrar para poder capturar el segundo.
+   */
+  const manejaPacks = useMemo(() => lineas.some((l) => (l.pack ?? '') !== ''), [lineas]);
+  /**
+   * Los colores que YA están en la matriz (el combobox del alta al vuelo no los ofrece).
+   *
+   * ⚠️ VACÍO cuando la orden maneja packs: ahí el segundo tendido del Negro es otra fila del MISMO
+   * color, y ocultarlo lo dejaría sin manera de capturarse.
+   */
+  const idsColoresUsados = useMemo(
+    () => (manejaPacks ? new Set<number>() : new Set(lineas.map((l) => l.idColor))),
+    [lineas, manejaPacks],
+  );
 
   // R2-9: contador de AGREGADOS para remontar el combobox del alta al vuelo. Un contador
   // propio y no `lineas.length`: quitar una fila también cambia el length y remontaría el
   // combobox sin necesidad (perdiendo lo tecleado a media búsqueda).
   const [vecesAgregado, setVecesAgregado] = useState(0);
 
-  /** Agrega la fila de un color (elegido del catálogo o recién creado al vuelo). */
+  /**
+   * Agrega la fila de un color (elegido del catálogo o recién creado al vuelo).
+   *
+   * 🔴 CON TENDIDOS, EL COLOR REPETIDO SÍ ENTRA (§Post-F9.10). La guarda «si ya está, no lo
+   * agregues» sigue en pie para las órdenes sin packs —ahí un color dos veces es el duplicado que
+   * el servidor rechaza—, pero en una orden por tendidos el segundo Negro es OTRA fila del mismo
+   * color. Sin este `manejaPacks`, el combobox ofrecía el color (porque `idsColoresUsados` va vacío)
+   * y al elegirlo NO PASABA NADA: un botón que no hace nada y no dice por qué.
+   */
   const agregarColorFila = useCallback(
     (idColor: number, nombre: string): void => {
       setLineas((previas) =>
-        previas.some((l) => l.idColor === idColor)
+        !manejaPacks && previas.some((l) => l.idColor === idColor)
           ? previas
           : [...previas, { idColor, color: nombre, cantidades: {} }],
       );
       setVecesAgregado((n) => n + 1);
     },
-    [setLineas],
+    [setLineas, manejaPacks],
   );
   const tallasDisponibles = useMemo(
     () => (tallas.data?.datos ?? []).map((t) => ({ idTalla: t.id, etiqueta: t.etiqueta })),
@@ -216,17 +310,26 @@ export function PanelMatriz({
   // ¿Hay cambios sin guardar? Se compara el contenido capturado contra la firma con que se cargó.
   const cuerpo = useMemo(() => construirCuerpo(lineas, columnas, orden), [lineas, columnas, orden]);
   const sucio = firmaCargada !== null && firmaMatriz(lineas, columnas) !== firmaCargada;
+  // ⭐ ¿Lo capturado es MANDABLE? (§Post-F9.10) Ver `impedimentoDeLaMatriz`. En solo lectura no hay
+  // nada que mandar, así que tampoco hay nada que impedir.
+  const impedimento = soloLectura ? null : impedimentoDeLaMatriz(lineas);
 
   // Guardado ÚNICO del diálogo: se captura el cuerpo AHORA y se devuelve el ejecutor.
   const idOrden = orden.id;
   const preparar = useCallback((): Promise<EjecutorGuardado | null> => {
+    // La sección NO arma su guardado mientras la captura sea inválida: el botón ya está apagado,
+    // y esto lo cierra también para cualquier otro camino que dispare el guardado (el contrato de
+    // `PrepararGuardado`: `null` = captura inválida, no se manda NADA de ninguna sección).
+    if (impedimento !== null) {
+      return Promise.resolve(null);
+    }
     const capturado = cuerpo;
     return Promise.resolve(async () => {
       await guardar.mutateAsync({ id: idOrden, cuerpo: capturado });
     });
-  }, [cuerpo, guardar, idOrden]);
+  }, [cuerpo, guardar, idOrden, impedimento]);
 
-  useSeccionGuardable('matriz', 'la matriz', !soloLectura && sucio, preparar);
+  useSeccionGuardable('matriz', 'la matriz', !soloLectura && sucio, preparar, impedimento);
 
   if (ficha.isError) {
     return <p className="text-sm text-destructive">{ficha.error.message}</p>;
@@ -241,6 +344,15 @@ export function PanelMatriz({
         tallasDisponibles={tallasDisponibles}
         onLineasChange={setLineas}
         onTallasChange={setColumnas}
+        // ⭐ El PACK / TENDIDO por renglón (§Post-F9.10). La columna aparece siempre que se pueda
+        // editar: es la ÚNICA manera de ponerle tendidos a una orden capturada a mano, y en las
+        // órdenes sin packs se queda vacía (que es lo que significa «sin pack»).
+        {...(soloLectura && !manejaPacks
+          ? {}
+          : {
+              onPackChange: (indice: number, pack: string) =>
+                setLineas((previas) => previas.map((l, i) => (i === indice ? { ...l, pack } : l))),
+            })}
         soloLectura={soloLectura}
         testid="matriz-orden"
         // Combobox con alta de color AL VUELO (§Post-F9.11): busca los existentes EN EL
@@ -258,6 +370,18 @@ export function PanelMatriz({
           )
         }
       />
+
+      {impedimento !== null ? (
+        // El motivo también sale en el PIE del diálogo (es lo que apaga «Guardar»), pero aquí es
+        // donde el usuario está mirando: junto a los renglones que hay que arreglar.
+        <p
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
+          data-testid="matriz-orden-aviso-invalida"
+        >
+          {impedimento} No se puede guardar así: el servidor lo rechazaría.
+        </p>
+      ) : null}
 
       {!soloLectura ? (
         <div className="flex flex-wrap items-center gap-2">

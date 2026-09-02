@@ -19,8 +19,14 @@ import { useDebounce } from '@/lib/useDebounce';
 
 /**
  * Diálogo de COPIAR MATRIZ desde otra orden (F2-E3): se elige una orden ORIGEN (búsqueda) y el
- * backend copia su matriz (colores × tallas) a la orden destino. Útil para reusar la curva de una
- * orden parecida. El backend re-valida (misma empresa) y recalcula el estado de la orden.
+ * backend copia su matriz (colores × tallas × PACK) a la orden destino. Útil para reusar la curva de
+ * una orden parecida. El backend re-valida (misma empresa) y recalcula el estado de la orden.
+ *
+ * ⭐ EL TENDIDO VIAJA CON LA MATRIZ (§Post-F9.10): copiar una OP de C&A trae sus packs tal cual. Y
+ * si la orden DESTINO ya tiene producción capturada con otros packs, el servidor rechaza la copia
+ * —cambiar los packs de un color con corte vivo dejaría esas piezas sin poder enviarse nunca—; el
+ * mensaje sale en el toast del error. Aquí no se re-implementa esa regla: la autoridad es el
+ * dominio (A1) y una segunda copia de la comprobación acabaría divergiendo de ella.
  */
 export function DialogoCopiarMatriz({
   abierto,
@@ -79,8 +85,8 @@ export function DialogoCopiarMatriz({
         <DialogHeader>
           <DialogTitle>Copiar matriz de otra orden</DialogTitle>
           <DialogDescription>
-            Elige la orden de la que se copiará la matriz (colores y tallas) a la orden{' '}
-            {orden?.folio ?? ''}.
+            Elige la orden de la que se copiará la matriz (colores, tallas y packs) a la orden{' '}
+            {orden?.folio ?? ''}. Reemplaza por completo la matriz actual.
           </DialogDescription>
         </DialogHeader>
 
