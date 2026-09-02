@@ -20020,8 +20020,10 @@ export interface paths {
                   cantFaltanteV1: number | null;
                   /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                   idDesarrollo: number | null;
-                  /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                  /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                   numeroProduccion: number | null;
+                  /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                  numerosProduccion: number[];
                 }[];
                 /**
                  * Format: date-time
@@ -20252,8 +20254,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -20445,8 +20449,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -20661,8 +20667,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -20859,8 +20867,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -21063,8 +21073,10 @@ export interface paths {
                 cantFaltanteV1: number | null;
                 /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
                 idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`). */
+                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
                 numeroProduccion: number | null;
+                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                numerosProduccion: number[];
               }[];
               /**
                * Format: date-time
@@ -22911,6 +22923,8 @@ export interface paths {
               idColor: number;
               /** @description Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone). */
               pantone?: string | null;
+              /** @description PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack. */
+              pack?: string;
               /**
                * @description Cantidades por talla de este color.
                * @default []
@@ -23046,6 +23060,8 @@ export interface paths {
                   color: string;
                   /** @description Código PANTONE de este color, o null. */
                   pantone: string | null;
+                  /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                  pack: string;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -24628,6 +24644,8 @@ export interface paths {
                   color: string;
                   /** @description Código PANTONE de este color, o null. */
                   pantone: string | null;
+                  /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                  pack: string;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -24778,7 +24796,10 @@ export interface paths {
       };
     };
     put?: never;
-    /** Crear una orden de producción desde un renglón de pedido */
+    /**
+     * Crear una orden de producción desde un renglón de pedido cuyo modelo YA es de producción
+     * @description Alta directa por captura, con autorrelleno de modelo/cliente/empresa desde el renglón. ⚠️ Si el modelo del renglón es de DESARROLLO se rechaza con 409: esa OP se genera con `POST /api/pedidos/lineas/{idLinea}/salida-produccion`, que es quien hace nacer el modelo de producción del color con su nº de 5 dígitos (V1-E3, §Post-F9.34).
+     */
     post: {
       parameters: {
         query?: never;
@@ -24819,6 +24840,8 @@ export interface paths {
               idColor: number;
               /** @description Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone). */
               pantone?: string | null;
+              /** @description PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack. */
+              pack?: string;
               /**
                * @description Cantidades por talla de este color.
                * @default []
@@ -24933,6 +24956,8 @@ export interface paths {
                 color: string;
                 /** @description Código PANTONE de este color, o null. */
                 pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -25198,6 +25223,8 @@ export interface paths {
                 color: string;
                 /** @description Código PANTONE de este color, o null. */
                 pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -25480,6 +25507,8 @@ export interface paths {
                 color: string;
                 /** @description Código PANTONE de este color, o null. */
                 pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -25652,6 +25681,8 @@ export interface paths {
               idColor: number;
               /** @description Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone). */
               pantone?: string | null;
+              /** @description PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack. */
+              pack?: string;
               /**
                * @description Cantidades por talla de este color.
                * @default []
@@ -25766,6 +25797,8 @@ export interface paths {
                 color: string;
                 /** @description Código PANTONE de este color, o null. */
                 pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -26041,6 +26074,8 @@ export interface paths {
                 color: string;
                 /** @description Código PANTONE de este color, o null. */
                 pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -26315,6 +26350,8 @@ export interface paths {
                 color: string;
                 /** @description Código PANTONE de este color, o null. */
                 pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -26593,6 +26630,8 @@ export interface paths {
                 color: string;
                 /** @description Código PANTONE de este color, o null. */
                 pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -27538,6 +27577,8 @@ export interface paths {
                 color: string;
                 /** @description Código PANTONE de este color, o null. */
                 pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -51411,6 +51452,8 @@ export interface paths {
             /** @description Matriz color×talla de la etapa (D4). */
             lineas: {
               idColor: number;
+              /** @description PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la orden maneja packs; ausente o vacío en las órdenes que no los manejan. */
+              pack?: string;
               /** @description Cantidades por talla de este color. */
               tallas: {
                 idTalla: number;
@@ -51481,6 +51524,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -51684,6 +51729,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -51849,6 +51896,8 @@ export interface paths {
             /** @description Matriz color×talla de la etapa (D4). */
             lineas: {
               idColor: number;
+              /** @description PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la orden maneja packs; ausente o vacío en las órdenes que no los manejan. */
+              pack?: string;
               /** @description Cantidades por talla de este color. */
               tallas: {
                 idTalla: number;
@@ -51919,6 +51968,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -52122,6 +52173,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack. */
+                pack: string;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -52273,6 +52326,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK de la celda. CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta visible de la talla. */
@@ -52298,6 +52353,8 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color. */
                   color: string;
+                  /** @description PACK de la celda. CADENA VACÍA = la orden no maneja packs. */
+                  pack: string;
                   /** @description Id de la talla. */
                   idTalla: number;
                   /** @description Etiqueta visible de la talla. */
@@ -52446,6 +52503,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK de la celda. CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta visible de la talla. */
@@ -52642,6 +52701,8 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color. */
                   color: string;
+                  /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack. */
+                  pack: string;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -53161,6 +53222,8 @@ export interface paths {
             /** @description Matriz color×talla del recibo (D4) con su calidad. */
             lineas: {
               idColor: number;
+              /** @description PACK / TENDIDO de este renglón (§Post-F9.10). OPCIONAL SIEMPRE: vacío = «el maquilero los devolvió revueltos», y ese renglón consume del saldo agregado de todos los packs. Con pack, consume además del saldo de ese pack. En una orden sin packs va vacío. */
+              pack?: string;
               /** @description Cantidades por talla de este color. */
               tallas: {
                 idTalla: number;
@@ -53236,6 +53299,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = se recibió sin distinguir pack. */
+                pack: string;
                 /** @description Cantidades por talla (con calidad). */
                 tallas: {
                   /** @description Id de la talla. */
@@ -53450,6 +53515,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = se recibió sin distinguir pack. */
+                pack: string;
                 /** @description Cantidades por talla (con calidad). */
                 tallas: {
                   /** @description Id de la talla. */
@@ -53627,6 +53694,8 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color. */
                   color: string;
+                  /** @description PACK de la celda. CADENA VACÍA = sin pack (en una orden con packs, lo devuelto revuelto). */
+                  pack: string;
                   /** @description Id de la talla. */
                   idTalla: number;
                   /** @description Etiqueta visible de la talla. */
@@ -53652,6 +53721,8 @@ export interface paths {
                     idColor: number;
                     /** @description Nombre del color. */
                     color: string;
+                    /** @description PACK de la celda. CADENA VACÍA = sin pack (en una orden con packs, lo devuelto revuelto). */
+                    pack: string;
                     /** @description Id de la talla. */
                     idTalla: number;
                     /** @description Etiqueta visible de la talla. */
@@ -55139,6 +55210,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK de la celda. CADENA VACÍA = sin pack. */
+                pack: string;
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta visible de la talla. */
@@ -55152,6 +55225,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK de la celda. CADENA VACÍA = sin pack. */
+                pack: string;
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta visible de la talla. */
@@ -55175,6 +55250,8 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color. */
                   color: string;
+                  /** @description PACK de la celda. CADENA VACÍA = sin pack. */
+                  pack: string;
                   /** @description Id de la talla. */
                   idTalla: number;
                   /** @description Etiqueta visible de la talla. */
@@ -55201,6 +55278,8 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color. */
                   color: string;
+                  /** @description PACK de la celda. CADENA VACÍA = sin pack. */
+                  pack: string;
                   /** @description Id de la talla. */
                   idTalla: number;
                   /** @description Etiqueta visible de la talla. */
@@ -55226,6 +55305,8 @@ export interface paths {
                     idColor: number;
                     /** @description Nombre del color. */
                     color: string;
+                    /** @description PACK de la celda. CADENA VACÍA = sin pack. */
+                    pack: string;
                     /** @description Id de la talla. */
                     idTalla: number;
                     /** @description Etiqueta visible de la talla. */
@@ -55247,6 +55328,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description PACK de la celda. CADENA VACÍA = sin pack. */
+                pack: string;
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta visible de la talla. */

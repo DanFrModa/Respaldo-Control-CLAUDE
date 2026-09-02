@@ -228,6 +228,94 @@ describe('Órdenes (F2-E2) — alta desde pedido + autorrelleno (A2, A9)', () =>
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 
+  /**
+   * 🔴🔴 **EL ALTA POR CAPTURA SE SALTABA LA ENTRADA A PRODUCCIÓN ENTERA** (§Post-F9.34, cerrada en
+   * la fila 0.090). `POST /api/ordenes` es el único llamador de `crearOrden` que NO pasa
+   * `idModeloDeLaOrden`: por esa puerta nacía una OP de un modelo que sigue en
+   * `origen = 'desarrollo'`, sin `numeroProduccion` y —desde V1-E3— sin ningún modelo por color.
+   *
+   * Las cuatro pruebas van juntas a propósito: sin la del renglón LEGADO y la del hijo por color,
+   * "arreglarlo" cerrando el alta entera pasaría en verde.
+   */
+  describe('🔴🔴 una OP nunca lleva un modelo de DESARROLLO (fila 0.090)', () => {
+    /** Un desarrollo (lo que apunta el renglón desde V1-E3) y su hijo de producción por color. */
+    async function desarrolloYSuHijo(): Promise<{ desarrollo: Modelo; hijo: Modelo }> {
+      const desarrollo = await cliente.modelo.create({
+        data: {
+          codigo: 'CYA-26-71-030',
+          codigoDesarrollo: 'CYA-26-71-030',
+          origen: 'desarrollo',
+          llevaArte: false,
+        },
+      });
+      const hijo = await cliente.modelo.create({
+        data: {
+          codigo: '71030',
+          origen: 'produccion',
+          numeroProduccion: 71_030,
+          idModeloDesarrollo: desarrollo.id,
+          llevaArte: false,
+        },
+      });
+      return { desarrollo, hijo };
+    }
+
+    it('🔴 el alta por CAPTURA de un renglón de desarrollo se RECHAZA, y nada persiste', async () => {
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, desarrollo.id);
+
+      const error = await crearOrden(s, { idPedidoLinea: renglon.id }, bd()).catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(ErrorConflicto);
+      // ANCLADO a la puerta buena: el mensaje tiene que MANDAR a generar la OP, no solo negarse.
+      expect((error as Error).message).toContain('CYA-26-71-030');
+      expect((error as Error).message).toContain('salida-produccion');
+      expect(await cliente.orden.count({ where: { idPedidoLinea: renglon.id } })).toBe(0);
+    });
+
+    it('🔴 LA GEMELA — el renglón LEGADO (modelo ya de producción) SIGUE creando su orden', async () => {
+      // Control negativo obligado: la fila 0.090 cierra un agujero, NO retira el endpoint. Los
+      // ~4,987 modelos migrados del Access están en `origen = 'produccion'` y su alta por captura
+      // tiene que seguir funcionando igual que antes.
+      const s = sesion([...PERM_TODOS]);
+      const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+
+      expect(orden.idModelo).toBe(modelo.id);
+      expect(await cliente.orden.count({ where: { idPedidoLinea: lineaPedido.id } })).toBe(1);
+    });
+
+    it('⭐⭐ con el HIJO por color (lo que pasa `salidaAProduccion`) SÍ se crea, sellada con él', async () => {
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo, hijo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, desarrollo.id);
+
+      const orden = await crearOrden(s, { idPedidoLinea: renglon.id }, bd(), {
+        idModeloDeLaOrden: hijo.id,
+      });
+
+      // La OP lleva el HIJO; el renglón se queda con su desarrollo (de ahí salen receta y precio).
+      expect(orden.idModelo).toBe(hijo.id);
+      const linea = await cliente.pedidoLinea.findUniqueOrThrow({ where: { id: renglon.id } });
+      expect(linea.idModelo).toBe(desarrollo.id);
+    });
+
+    it('⭐ la guarda mira el modelo que QUEDA en la orden, no la puerta: un desarrollo por `idModeloDeLaOrden` también se rechaza', async () => {
+      // El renglón apunta a un modelo de PRODUCCIÓN vivo; lo que se intenta sellar en la OP es un
+      // desarrollo. Si la guarda se hubiera escrito sobre el modelo del RENGLÓN, esto pasaría.
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+
+      await expect(
+        crearOrden(s, { idPedidoLinea: renglon.id }, bd(), { idModeloDeLaOrden: desarrollo.id }),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+      expect(await cliente.orden.count({ where: { idPedidoLinea: renglon.id } })).toBe(0);
+    });
+  });
+
   it('un renglón de pedido de OTRA empresa no existe para esta sesión (A9)', async () => {
     const s = sesion([...PERM_TODOS]);
     const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa');
@@ -1034,5 +1122,212 @@ describe('Órdenes (F2-E2) — bitácora (A7)', () => {
     expect(eventos.map((e) => e.accion)).toEqual(['CREAR', 'MODIFICAR']);
     const matriz = eventos[1]?.datos as { matriz?: number } | null;
     expect(matriz?.matriz).toBe(1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ EL PACK / TENDIDO EN LA MATRIZ DE LA OP (§Post-F9.10)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 DANIEL: *«Me gusta que exista **un solo Negro** y no esté fragmentado en miles de colores
+// escritos de diferente manera.»* C&A pide varios TENDIDOS en una misma OP y antes la letra iba
+// dentro del nombre del color («Negro A», «Negro B»). Desde §Post-F9.10 el renglón de la matriz es
+// COLOR × PACK, y la llave `@@unique([idOrden, idColor, pack])` lo sostiene en la BD.
+describe('Matriz de la OP por PACK (§Post-F9.10)', () => {
+  const s = () => sesion([...PERM_TODOS]);
+
+  const guardar = async (id: number, lineas: unknown[]) =>
+    guardarMatrizOrden(s(), id, { lineas } as never, bd());
+
+  it('el MISMO color puede ir dos veces si son tendidos distintos', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    const conPacks = await guardar(orden.id, [
+      { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 3 }] },
+    ]);
+    expect(conPacks.lineas).toHaveLength(2);
+    expect(conPacks.lineas.map((l) => l.pack).sort()).toEqual(['A', 'B']);
+    expect(new Set(conPacks.lineas.map((l) => l.idColor)).size).toBe(1);
+    expect(conPacks.totalPiezas).toBe(8);
+  });
+
+  it('…pero el mismo color CON EL MISMO pack sigue siendo un error de captura', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await expect(
+      guardar(orden.id, [
+        { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+        { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaM.id, cantidad: 1 }] },
+      ]),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('🔴 la orden es CON packs o SIN packs, nunca mezclada', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await expect(
+      guardar(orden.id, [
+        { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+        { idColor: colorAzul.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+      ]),
+    ).rejects.toThrow(/o todos los tendidos llevan su pack, o ninguno/);
+  });
+
+  it('los espacios no fabrican un tendido: "  " sigue siendo «sin pack»', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    const sinPack = await guardar(orden.id, [
+      { idColor: colorRojo.id, pack: '   ', tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] },
+    ]);
+    expect(sinPack.lineas[0]?.pack).toBe('');
+  });
+
+  it('🔴 una orden SIN packs se guarda exactamente igual que antes (el campo sale vacío)', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    const sinPacks = await guardar(orden.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+      { idColor: colorAzul.id, tallas: [{ idTalla: tallaM.id, cantidad: 5 }] },
+    ]);
+    expect(sinPacks.lineas.map((l) => l.pack)).toEqual(['', '']);
+    // Y la regla vieja sigue viva: un color no puede repetirse cuando no hay packs.
+    await expect(
+      guardar(orden.id, [
+        { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+        { idColor: colorRojo.id, tallas: [{ idTalla: tallaM.id, cantidad: 1 }] },
+      ]),
+    ).rejects.toThrow(/color no puede aparecer dos veces/);
+  });
+
+  it('el pack de un renglón YA EN PRODUCCIÓN no se puede cambiar', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    const guardada = await guardar(orden.id, [
+      { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+    ]);
+    const idRenglon = guardada.lineas[0]?.id;
+
+    // Una etapa VIVA cualquiera basta: el corte se guardó con el pack que tenía la matriz.
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 900n,
+        idEmpresa: empresa.id,
+        idOrden: orden.id,
+        tipo: 'corte',
+        fecha: new Date('2026-06-18'),
+      },
+    });
+
+    await expect(
+      guardar(orden.id, [
+        {
+          id: idRenglon,
+          idColor: colorRojo.id,
+          pack: 'B',
+          tallas: [{ idTalla: tallaCH.id, cantidad: 5 }],
+        },
+      ]),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Dejarle SU pack sí se puede: lo que se bloquea es cambiarlo, no tocar el renglón.
+    const igual = await guardar(orden.id, [
+      {
+        id: idRenglon,
+        idColor: colorRojo.id,
+        pack: 'A',
+        tallas: [{ idTalla: tallaCH.id, cantidad: 7 }],
+      },
+    ]);
+    expect(igual.lineas[0]?.pack).toBe('A');
+    expect(igual.totalPiezas).toBe(7);
+  });
+
+  // ── Las DOS puertas por las que se colaba una guarda atada al `id` del renglón ────────────────
+  //
+  // La prueba de arriba sólo cubre el camino CON `id` (editar un renglón existente). Una matriz
+  // puede re-empacar un color SIN tocar un solo `id`, y por ahí el daño entraba en silencio: el
+  // corte queda llaveado con el pack viejo y esas piezas ya NO se pueden enviar nunca.
+
+  /** Marca la orden como «ya en producción» con una etapa viva (basta una, `requisitos-orden.ts`). */
+  async function conProduccionViva(idOrden: number, folio: bigint): Promise<void> {
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'corte',
+        fecha: new Date('2026-06-18'),
+      },
+    });
+  }
+
+  it('🔴 PUERTA A — borrar y recrear: re-empacar un color SIN mandar `id` tampoco se puede', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await guardar(orden.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+    ]);
+    await conProduccionViva(orden.id, 901n);
+
+    // Mismo color, ahora partido en dos tendidos, SIN un solo `id`: el diff borra el renglón viejo
+    // y crea dos nuevos. Atada al `id`, la guarda no veía ningún cambio y esto pasaba.
+    await expect(
+      guardar(orden.id, [
+        { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+        { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      ]),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Y la matriz quedó como estaba: sin packs, un renglón. No se guardó nada a medias (A2).
+    const despues = await obtenerOrden(s(), orden.id, bd());
+    expect(despues.lineas).toHaveLength(1);
+    expect(despues.lineas[0]?.pack).toBe('');
+
+    // Recapturar el MISMO color con el MISMO pack (vacío) y otras cantidades sí se puede: lo que se
+    // bloquea es re-empacar, no volver a teclear el renglón.
+    const ok = await guardar(orden.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 12 }] },
+    ]);
+    expect(ok.totalPiezas).toBe(12);
+  });
+
+  it('🔴 PUERTA B — `copiarDetalleOrden`: copiar una matriz CON packs sobre una orden ya cortada', async () => {
+    // El origen se fabrica por tendidos…
+    const origen = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await guardar(origen.id, [
+      { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+    ]);
+
+    // …y el destino ya tiene ese color cortado SIN packs.
+    const renglonDestino = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+    const destino = await crearOrden(s(), { idPedidoLinea: renglonDestino.id }, bd());
+    await guardar(destino.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+    ]);
+    await conProduccionViva(destino.id, 902n);
+
+    // `copiarDetalleOrden` arma su set SIN `id` en ningún renglón: una guarda por `id` NUNCA se
+    // ejecutaba aquí, así que esto re-empacaba el destino en silencio, siempre.
+    await expect(
+      copiarDetalleOrden(s(), destino.id, { idOrdenOrigen: origen.id }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    const despues = await obtenerOrden(s(), destino.id, bd());
+    expect(despues.lineas).toHaveLength(1);
+    expect(despues.lineas[0]?.pack).toBe('');
+  });
+
+  it('copiar una matriz SIN packs sobre una orden cortada sin packs sigue funcionando', async () => {
+    // La contraprueba: la guarda tiene que morder SÓLO cuando los packs de un color cambian. Sin
+    // ella, esta copia —el flujo de siempre— quedaría rota por una regla demasiado ancha.
+    const origen = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await guardar(origen.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] },
+    ]);
+    const renglonDestino = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+    const destino = await crearOrden(s(), { idPedidoLinea: renglonDestino.id }, bd());
+    await guardar(destino.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+    ]);
+    await conProduccionViva(destino.id, 903n);
+
+    const copiada = await copiarDetalleOrden(s(), destino.id, { idOrdenOrigen: origen.id }, bd());
+    expect(copiada.totalPiezas).toBe(4);
+    expect(copiada.lineas[0]?.pack).toBe('');
   });
 });

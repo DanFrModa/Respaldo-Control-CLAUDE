@@ -40,6 +40,39 @@ describe('calcularCompletitud (color×talla)', () => {
     { idColor: 1, idTalla: 11, cantidad: 20 },
   ];
 
+  // ⭐ §Post-F9.10 — LA MATRIZ DE LA ORDEN PUEDE REPETIR UNA CELDA. Con el pack como campo propio,
+  // una OP de C&A trae un renglón por TENDIDO: el pack A pide 100 CH y el pack B otras 50 CH, y en
+  // `pedido` esa celda viene DOS veces. Estas dos pruebas son la pareja que fija la regla: lo pedido
+  // se SUMA antes de comparar (si no, cada tendido se daba por cubierto con las piezas del otro).
+  describe('matriz con la MISMA celda repetida (packs, §Post-F9.10)', () => {
+    const pedidoConPacks = [
+      { idColor: 1, idTalla: 10, cantidad: 100 }, // pack A
+      { idColor: 1, idTalla: 10, cantidad: 50 }, // pack B
+    ];
+
+    it('🔴 NO se da por completo con lo que pide UN SOLO tendido', () => {
+      const r = calcularCompletitud(pedidoConPacks, [{ idColor: 1, idTalla: 10, cantidad: 100 }]);
+      expect(r.completo).toBe(false);
+      expect(r.hayAvance).toBe(true);
+    });
+
+    it('se completa con la SUMA de los dos tendidos', () => {
+      const r = calcularCompletitud(pedidoConPacks, [{ idColor: 1, idTalla: 10, cantidad: 150 }]);
+      expect(r.completo).toBe(true);
+    });
+
+    it('un renglón en 0 no exige nada y no estorba (pack vaciado)', () => {
+      const r = calcularCompletitud(
+        [
+          { idColor: 1, idTalla: 10, cantidad: 30 },
+          { idColor: 1, idTalla: 10, cantidad: 0 },
+        ],
+        [{ idColor: 1, idTalla: 10, cantidad: 30 }],
+      );
+      expect(r.completo).toBe(true);
+    });
+  });
+
   it('parcial: cubre una celda pero no la otra', () => {
     const r = calcularCompletitud(pedido, [{ idColor: 1, idTalla: 10, cantidad: 10 }]);
     expect(r.completo).toBe(false);

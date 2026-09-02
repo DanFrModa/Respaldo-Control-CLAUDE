@@ -19,11 +19,23 @@
  * `Color`. Un `group by` sobre esa clave sólo podría producir un grupo — sería una rama que ninguna
  * prueba puede poner en rojo. Se prefiere decir la verdad estructural: una OC, un renglón.
  *
- * ⚠️ POR QUÉ SE FUSIONA ANTES DE PERSISTIR Y NO EN `sincronizarMatriz`. Esa función impone la regla
- * `@@unique([idOrden, idColor])` con un mensaje claro ("Un color no puede aparecer dos veces en la
- * misma orden") y es la MISMA que usa la captura manual de la OP. Mandarle dos renglones del mismo
- * color y pedirle que los sume ahí escondería un error de captura real. La fusión es asunto del
- * importador: es él quien sabe que esos renglones son packs de un mismo color.
+ * 🔴 POR QUÉ SE SIGUE FUSIONANDO — Y OJO, LA RAZÓN VIEJA YA NO ES CIERTA (§Post-F9.10, 2-sep-2026).
+ * Este párrafo decía que se fusionaba porque `sincronizarMatriz` impone `@@unique([idOrden, idColor])`
+ * y rechaza dos renglones del mismo color. **Eso dejó de ser verdad**: desde que el PACK es campo
+ * propio, la llave es `@@unique([idOrden, idColor, pack])` (`schema.prisma`) y `sincronizarMatriz`
+ * **YA ACEPTA** dos renglones del mismo color con packs distintos — su mensaje de duplicado es hoy
+ * condicional ("Un mismo color y pack no pueden aparecer dos veces…" cuando la orden maneja packs).
+ *
+ * ⚠️ Entonces, ¿por qué sigue fusionando este módulo? **Sólo porque el importador todavía NO se
+ * cableó al campo nuevo.** No es una decisión de diseño ni una restricción del dominio: es trabajo
+ * pendiente de §Post-F9.10, cuyo alcance incluye el importador de PDF (`DECISIONES.md`). Cuando se
+ * cablee, este módulo debe **desaparecer** y cada renglón-pack persistirse como su propio
+ * `OrdenLinea` con su `pack` — que es justo lo que Daniel pidió: *«un solo Negro»*, con el tendido
+ * en su propio campo.
+ *
+ * 🚫 Mientras tanto, **NO quites la fusión sin cablear el importador en la misma jugada**: sin ella,
+ * dos packs con la misma talla llegarían a `sincronizarMatriz` como dos renglones del MISMO color y
+ * el MISMO pack vacío, que sí sigue siendo un duplicado prohibido, y reventaría la importación.
  *
  * ⚠️ LA NORMALIZACIÓN DE LA ETIQUETA DE TALLA NO ES COSMÉTICA. `resolverOCrearTalla` resuelve la
  * talla sin distinguir mayúsculas ni espacios de sobra: `"CH"`, `"ch"` y `" CH "` son la MISMA talla

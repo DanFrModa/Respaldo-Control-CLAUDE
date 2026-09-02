@@ -102,7 +102,13 @@ import type {
   DatosOrdenReferenciaEntrada,
   OrdenSalida,
 } from '../../contrato/esquemas/orden.js';
-import type { Orden, OrdenLinea, OrdenLineaTalla, Prisma } from '../../datos/index.js';
+import type {
+  Orden,
+  OrdenLinea,
+  OrdenLineaTalla,
+  OrigenModelo,
+  Prisma,
+} from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -133,6 +139,13 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { sinonimosDeDepartamentos } from '../catalogos/cliente-departamentos-sinonimos.js';
 
+import {
+  SIN_PACK,
+  coloresReempacados,
+  normalizarPack,
+  ordenManejaPacks,
+  packsPorColor,
+} from './packs.js';
 import { copiarRecetaDelModelo } from './receta-orden.js';
 import { recalcularEstadoOrden, requisitosOrden } from './requisitos-orden.js';
 
@@ -264,7 +277,10 @@ interface OrigenPedidoLinea {
  *  • que el renglón exista,
  *  • que su pedido sea de la EMPRESA ACTIVA (A9),
  *  • que el pedido NO esté cancelado (`pedCancelado`) ni marcado `noProducir`,
- *  • que el modelo del renglón siga ACTIVO (no producir un modelo descontinuado).
+ *  • que el modelo del renglón siga ACTIVO (no producir un modelo descontinuado),
+ *  • 🔴 que el modelo que va a QUEDAR en la orden NO sea de `origen = 'desarrollo'` (fila 0.090,
+ *    cierra §Post-F9.34): un desarrollo no se produce, se le genera la OP —y ahí nace su modelo de
+ *    producción por color. Ver la guarda, abajo, para quién la cruza y quién no.
  * Devuelve el modelo/cliente/empresa para sellarlos en la orden.
  *
  * ⭐⭐ V1-E3 — `idModeloDeLaOrden` (opcional): el modelo que de verdad va a llevar la orden cuando
@@ -289,7 +305,7 @@ async function resolverOrigenPedido(
     where: { id: idPedidoLinea },
     select: {
       idModelo: true,
-      modelo: { select: { activo: true, codigo: true, composicion: true } },
+      modelo: { select: { activo: true, codigo: true, composicion: true, origen: true } },
       pedido: {
         select: {
           idEmpresa: true,
@@ -332,6 +348,31 @@ async function resolverOrigenPedido(
       ? { id: linea.idModelo, ...linea.modelo }
       : await exigirModeloProducible(tx, idModeloDeLaOrden);
 
+  // 🔴🔴 V1-E3 (§Post-F9.34, cerrada en la fila 0.090) — **UNA OP NUNCA LLEVA UN MODELO DE
+  // DESARROLLO.** La guarda mira el modelo que se va a SELLAR en la orden, no la puerta por la que
+  // se entró, porque lo que hay que prohibir es el resultado: un desarrollo produciéndose.
+  //
+  // Quién la cruza y quién no, medido:
+  //  • `salidaAProduccion` — NUNCA la toca: `resolverModeloDeLaOp` le entrega o un modelo de
+  //    producción heredado (renglón legado) o el hijo por color que acaba de nacer/reusar, y los
+  //    dos son `origen = 'produccion'` por construcción.
+  //  • `POST /api/ordenes` — la cruza justo en el caso que era el agujero: renglón que apunta a un
+  //    desarrollo, sin `idModeloDeLaOrden`. Por esa puerta nacía una OP de un modelo que sigue en
+  //    `origen = 'desarrollo'`, sin `numeroProduccion` y —desde V1-E3— sin ningún modelo por color.
+  //    Su caso LEGADO (renglón que ya apunta a producción) sigue funcionando igual: no se retira
+  //    ninguna capacidad, se cierra una que producía una OP inválida.
+  //
+  // FALLA CERRADO y manda a la puerta buena: el número de 5 dígitos es del MODELO, y quien lo hace
+  // nacer es la salida a producción. Crear la orden aquí y "arreglar el modelo después" no existe.
+  if (modeloDeLaOrden.origen === 'desarrollo') {
+    throw new ErrorConflicto(
+      `El modelo "${modeloDeLaOrden.codigo}" es de desarrollo: no se le puede crear una orden por ` +
+        `captura directa. Genera la OP desde el renglón del pedido ("Generar OP", ` +
+        `POST /api/pedidos/lineas/{idLinea}/salida-produccion): ahí nace el modelo de producción ` +
+        `del color con su número de 5 dígitos, que es el que lleva la orden.`,
+    );
+  }
+
   return {
     idModelo: modeloDeLaOrden.id,
     idCliente: linea.pedido.idCliente,
@@ -349,10 +390,16 @@ async function resolverOrigenPedido(
 async function exigirModeloProducible(
   tx: Tx,
   idModelo: number,
-): Promise<{ id: number; activo: boolean; codigo: string; composicion: string | null }> {
+): Promise<{
+  id: number;
+  activo: boolean;
+  codigo: string;
+  composicion: string | null;
+  origen: OrigenModelo;
+}> {
   const modelo = await tx.modelo.findUnique({
     where: { id: idModelo },
-    select: { id: true, activo: true, codigo: true, composicion: true },
+    select: { id: true, activo: true, codigo: true, composicion: true, origen: true },
   });
   if (modelo === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
@@ -395,12 +442,17 @@ async function exigirTelaExiste(tx: Tx, idTela: number): Promise<void> {
 // ── Sincronización de la matriz (colores × tallas) — diff mínimo, conserva auditoría ──
 
 /**
- * Sincroniza la matriz (renglones de color + sus tallas) al `set` deseado en la transacción (A2),
- * conservando la auditoría de los renglones que no cambian (diff mínimo, como `sincronizarLineas`
- * de pedidos). Valida:
- *  • COLOR no repetido en el set (regla `@@unique([idOrden, idColor])` + mensaje claro).
+ * Sincroniza la matriz (renglones de color × PACK + sus tallas) al `set` deseado en la transacción
+ * (A2), conservando la auditoría de los renglones que no cambian (diff mínimo, como
+ * `sincronizarLineas` de pedidos). Valida:
+ *  • La pareja COLOR + PACK no repetida en el set (regla `@@unique([idOrden, idColor, pack])` +
+ *    mensaje claro). Sin packs eso es lo de siempre: «un color no puede aparecer dos veces».
+ *  • ⭐ COHERENCIA DEL PACK (§Post-F9.10): la orden es CON packs o SIN packs, nunca mezclada. Una
+ *    matriz mitad y mitad dejaría sin respuesta la pregunta de la que cuelga todo lo de aguas abajo
+ *    —«¿el corte de esta orden tiene que declarar pack?»— y produciría órdenes en las que unas
+ *    piezas se pueden cortar y otras no, sin que nada lo explique.
  *  • Todos los colores existen y están activos.
- *  • Todas las tallas existen en el catálogo y no se repiten dentro de un mismo color.
+ *  • Todas las tallas existen en el catálogo y no se repiten dentro de un mismo renglón.
  *  • Cantidades enteras ≥0 (ya las validó Zod; aquí se confía en el tipo).
  *
  * Renglones con `id` que existan se ACTUALIZAN (y sus tallas se reemplazan diff-mínimo); los
@@ -413,11 +465,29 @@ async function sincronizarMatriz(
   idOrden: number,
   set: DatosOrdenLineaEntrada[],
 ): Promise<number> {
-  // 1) Color no repetido en el set entrante.
-  const idsColor = set.map((l) => l.idColor);
-  if (new Set(idsColor).size !== idsColor.length) {
-    throw new ErrorValidacion('Un color no puede aparecer dos veces en la misma orden.');
+  // 1) La pareja COLOR + PACK no repetida en el set entrante (§Post-F9.10). Sin packs, la regla es
+  //    literalmente la de siempre: un color no puede aparecer dos veces.
+  const packs = set.map((l) => normalizarPack(l.pack));
+  const clavesRenglon = set.map((l, i) => `${l.idColor}:${packs[i] ?? SIN_PACK}`);
+  if (new Set(clavesRenglon).size !== clavesRenglon.length) {
+    throw new ErrorValidacion(
+      ordenManejaPacks(packs)
+        ? 'Un mismo color y pack no pueden aparecer dos veces en la misma orden.'
+        : 'Un color no puede aparecer dos veces en la misma orden.',
+    );
   }
+
+  // 1b) ⭐ COHERENCIA DEL PACK: o TODOS los renglones traen pack, o NINGUNO. Una matriz mezclada
+  //     dejaría sin respuesta «¿el corte de esta orden declara pack?», que es de donde cuelga que el
+  //     pack sea obligatorio aguas abajo (corte y entrega a maquila).
+  if (packs.some((p) => p !== SIN_PACK) && packs.some((p) => p === SIN_PACK)) {
+    throw new ErrorValidacion(
+      'La orden no puede tener unos renglones con pack y otros sin pack: o todos los tendidos ' +
+        'llevan su pack, o ninguno.',
+    );
+  }
+
+  const idsColor = set.map((l) => l.idColor);
 
   // 2) Colores existen y están activos.
   if (idsColor.length > 0) {
@@ -458,9 +528,50 @@ async function sincronizarMatriz(
     }
   }
 
-  // 4) Diff de renglones (colores) por id.
-  const actuales = await tx.ordenLinea.findMany({ where: { idOrden }, select: { id: true } });
+  // 4) Diff de renglones (color × pack) por id.
+  const actuales = await tx.ordenLinea.findMany({
+    where: { idOrden },
+    select: { id: true, idColor: true, pack: true },
+  });
   const idsActuales = new Set(actuales.map((l) => l.id));
+
+  // 4b) ⭐ LOS PACKS DE UN COLOR YA EN PRODUCCIÓN NO CAMBIAN (§Post-F9.10).
+  //
+  //     EL DAÑO QUE EVITA: el corte y la entrega a maquila guardan SU pack en cada celda, y el saldo
+  //     «enviado ≤ cortado» se lleva tendido por tendido — `sumarCeldas` llavea lo cortado con
+  //     `color:talla:packViejo` y `registrarEnvioMaquila` lo busca con `color:talla:packNuevo`. Si
+  //     los packs de un color se re-empacan después de cortar, ese `cortadoCelda` da 0 y las piezas
+  //     ya cortadas **no se pueden enviar nunca**, con un error que además culpa al usuario. Se
+  //     ARREGLA LA ENTRADA (REGLA 0-B): se impide el cambio, no se inventa una reparación.
+  //
+  //     🔴 SE COMPARA POR COLOR, NO POR RENGLÓN, y eso es lo único que cierra las DOS puertas por
+  //     las que se colaba una comprobación atada al `id` de la fila:
+  //       • BORRAR Y RECREAR — un `set` con los mismos colores pero SIN `id` no cambia ningún
+  //         renglón: borra los viejos (abajo) y crea otros. Atada al `id`, la guarda no veía nada.
+  //       • `copiarDetalleOrden` — arma su `set` SIN `id` en ningún renglón, así que una guarda por
+  //         `id` **jamás** se ejecutaba ahí: copiar una matriz sobre una orden ya cortada la
+  //         re-empacaba en silencio, siempre.
+  //
+  //     Un color que se QUITA entero, o uno NUEVO, se dejan pasar: eso ya se podía antes de esta
+  //     etapa (la matriz siempre dejó borrar un color con cortes) y no es lo que este campo rompe.
+  // La ARITMÉTICA vive pura en `packs.ts` (probada sin BD y mutada allí); aquí sólo se leen los dos
+  // mapas y se consulta si hay producción viva.
+  const packsAntes = packsPorColor(actuales);
+  const packsDespues = packsPorColor(
+    set.map((l, i) => ({ idColor: l.idColor, pack: packs[i] ?? SIN_PACK })),
+  );
+  const reempacados = coloresReempacados(packsAntes, packsDespues);
+  if (reempacados.length > 0) {
+    const vivas = await tx.etapaMovimiento.count({ where: { idOrden, canceladoEn: null } });
+    if (vivas > 0) {
+      throw new ErrorConflicto(
+        'Esta orden ya tiene producción capturada (corte o entrega a maquila), y esas piezas se ' +
+          'guardaron con el pack que tenía la matriz: ya no se le pueden cambiar los packs a un ' +
+          'color (ni poniéndoselos, ni quitándoselos, ni recapturando el renglón). Cancela esos ' +
+          'movimientos si de verdad hay que recapturar la orden.',
+      );
+    }
+  }
   const idsDeseados = new Set(set.filter((l) => l.id !== undefined).map((l) => l.id as number));
 
   const aBorrar = [...idsActuales].filter((id) => !idsDeseados.has(id));
@@ -469,19 +580,24 @@ async function sincronizarMatriz(
     await tx.ordenLinea.deleteMany({ where: { id: { in: aBorrar }, idOrden } });
   }
 
-  for (const linea of set) {
+  for (const [i, linea] of set.entries()) {
     // Pantone POR color (petición Daniel): sólo se toca si viene en el set (undefined = no lo mandó,
     // se conserva; null = limpiarlo; string = capturarlo).
     const datosPantone = linea.pantone !== undefined ? { pantone: linea.pantone } : {};
+    // El PACK, en cambio, SIEMPRE se escribe: es parte de la identidad del renglón (color × pack) y
+    // el contrato lo normaliza a cadena vacía cuando no viene, así que no hay un «no lo mandó» que
+    // distinguir. Dejarlo fuera del update habría hecho que quitarle el pack a un renglón fuera
+    // imposible.
+    const pack = packs[i] ?? SIN_PACK;
     if (linea.id !== undefined && idsActuales.has(linea.id)) {
       await tx.ordenLinea.update({
         where: { id: linea.id },
-        data: { idColor: linea.idColor, ...datosPantone, ...datosModificacion(sesion) },
+        data: { idColor: linea.idColor, pack, ...datosPantone, ...datosModificacion(sesion) },
       });
       await reemplazarTallas(tx, sesion, linea.id, linea.tallas);
     } else {
       const creada = await tx.ordenLinea.create({
-        data: { idOrden, idColor: linea.idColor, ...datosPantone, ...datosCreacion(sesion) },
+        data: { idOrden, idColor: linea.idColor, pack, ...datosPantone, ...datosCreacion(sesion) },
       });
       await reemplazarTallas(tx, sesion, creada.id, linea.tallas);
     }
@@ -567,6 +683,7 @@ function aOrdenSalida(
       idColor: l.idColor,
       color: l.color.nombre,
       pantone: l.pantone,
+      pack: l.pack,
       tallas,
       totalPiezas: totalLinea,
     };
@@ -770,6 +887,10 @@ export interface OpcionesAltaOrden {
  * ⭐⭐ V1-E3 — `opciones.idModeloDeLaOrden` ({@link OpcionesAltaOrden}) sella la orden con OTRO
  * modelo que el del renglón: el hijo de producción por color que hace nacer `salidaAProduccion`.
  * NO viaja por el contrato REST a propósito (ver el tipo). Sin él, todo sigue exactamente igual.
+ *
+ * 🔴 Y por eso mismo el alta por CAPTURA (la ruta `POST /api/ordenes`, que no pasa ese modelo)
+ * rechaza los renglones de DESARROLLO: sin el hijo por color, su OP nacería de un modelo que no
+ * está en producción y sin nº de 5 dígitos. La guarda vive en `resolverOrigenPedido`.
  */
 export async function crearOrden(
   sesion: SesionUsuario,
@@ -1044,8 +1165,12 @@ export async function copiarDetalleOrden(
 
     // Construye el set deseado a partir de la matriz del origen y lo sincroniza (reemplaza la del
     // destino). El mapeo "por etiqueta" se honra reutilizando la MISMA talla del catálogo global.
+    // El PACK viaja con el renglón (§Post-F9.10): copiar la matriz de una OP de C&A sin sus tendidos
+    // habría producido una orden con dos renglones del mismo color y sin nada que los distinga — que
+    // es exactamente lo que la llave `(orden, color, pack)` impide, así que ni siquiera guardaría.
     const set: DatosOrdenLineaEntrada[] = origen.lineas.map((l) => ({
       idColor: l.idColor,
+      pack: l.pack,
       tallas: l.tallas.map((t) => ({ idTalla: t.idTalla, cantidad: t.cantidad })),
     }));
     const renglones = await sincronizarMatriz(tx, sesion, id, set);
