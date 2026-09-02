@@ -866,7 +866,7 @@ hay órdenes que coincidan", y no se habría podido cortar ni entregar. Ahora es
   `src/dominio/produccion/requisitos-orden.ts` (la regla, ÚNICA fuente) ·
   `src/comun/png.ts` (lectura del IHDR) · `src/api/cache-documentos.ts` (hook `no-store`).
 - **Backend (modificados):** `src/dominio/produccion/ordenes.ts` (los 3 puntos usan la regla) ·
-  `src/dominio/modelos/bom-modelo.ts` (capturar avíos/arte COMPLETA las órdenes del modelo, en la
+  `src/dominio/modelos/bom-modelo.ts` (capturar avíos/arte COMPLETA las órdenes del modelo — ⚠️ **ya no: V1-E3d retiró esa llamada**, hoy el único disparo por catálogo es desmarcar «lleva arte»; corregido el 2-sep-2026, v0.088— en la
   misma transacción; nunca las degrada) · `src/dominio/produccion/centro-comando.ts` (`faltantes`) ·
   `src/comun/auditoria.ts` (`registrarBitacoraLote`, para dejar bitácora por orden) ·
   `src/dominio/produccion/consultas.ts` (las incompletas ya suman piezas) ·

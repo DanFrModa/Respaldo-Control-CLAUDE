@@ -22,16 +22,18 @@
  * desligar la orden de su pedido; se exige que esa empresa sea la de la sesión activa (A9).
  *
  * ESTADO AUTOMÁTICO (no editable por el usuario; Daniel 26-jul-2026): la orden pasa sola a
- * `completa` cuando cumple sus REQUISITOS —**tallas + avíos, y arte si aplica**—. La regla vive
+ * `completa` cuando cumple sus REQUISITOS —**tallas + receta liberada, y arte si aplica**—. La regla vive
  * ENTERA en `requisitos-orden.ts` (función pura `requisitosOrden` + `recalcularEstadoOrden`), y
  * este módulo la invoca en los tres puntos donde la orden cambia: alta, guardar matriz y copiar
  * matriz. `fechaCompletada` se sella la PRIMERA vez que se completa y NUNCA se borra (paridad con
  * `Ordenes.FechaDet = Now()` de v1). `cancelada` (por `cancelarOrden`) SIEMPRE gana.
  *   DES-COMPLETAR es la excepción, no la regla: una orden solo vuelve de `completa` a `capturada`
  * al editar LA MATRIZ DE ESA ORDEN y siempre que NO tenga actividad de producción viva (corte o
- * envío sin cancelar). Los cambios del BOM del MODELO (`modelos/bom-modelo.ts`) SOLO pueden
- * COMPLETAR órdenes de ese modelo, nunca degradarlas: editar un catálogo no puede sacar de los
- * tableros a lo que ya se está produciendo ni degradar el histórico.
+ * envío sin cancelar). Editar el BOM del MODELO ya NO alcanza a sus órdenes (V1-E3d: cada orden
+ * tiene su receta congelada, `modelos/bom-modelo.ts`); lo único del modelo que las recalcula es la
+ * casilla "lleva arte" (`modelos/modelos.ts`), y ésa SOLO puede COMPLETAR, nunca degradar: editar
+ * un catálogo no puede sacar de los tableros a lo que ya se está produciendo ni degradar el
+ * histórico.
  *   El estado es un SEMÁFORO DE CAPTURA, no una llave para operar: ninguna pantalla exige
  * `completa` para cortar/enviar/recibir/entregar (lo único que bloquea es `cancelada`).
  *
@@ -953,8 +955,18 @@ export async function crearOrden(
     });
 
     // Matriz inicial opcional: la sincroniza y deja que la regla derive el estado (tallas +
-    // avíos, y arte si aplica — `requisitos-orden.ts`). Una orden que nace ya con matriz y con
-    // la receta de avíos de su modelo nace COMPLETA sola; si le falta algo, nace `capturada`.
+    // receta liberada, y arte si aplica — `requisitos-orden.ts`).
+    // ⚠️ POR ESTA VÍA ninguna orden puede nacer `completa`, ni trayendo su matriz: la receta se
+    // copia unas líneas más abajo y `copiarRecetaDelModelo` NO escribe `liberadoEn` (la deja en
+    // NULL), así que `recetaLiberadaEn` de la orden nunca se pone y el recálculo del final SIEMPRE
+    // encuentra el requisito `receta` en falso. Una orden capturada a mano nace `capturada` y sólo
+    // se completa cuando Desarrollo libera su receta.
+    // La EXCEPCIÓN es la otra vía de creación: `crearOrdenMigrada` (`migracion.ts`) escribe el
+    // `estado` explícito de Access —que puede ser `completa`— y libera la receta migrada SÓLO si
+    // la orden no está cancelada y su receta no quedó vacía (`migracion.ts:220`). Como 2 de cada 3
+    // modelos del viejo no tienen BOM, muchas órdenes históricas nacen `completa` SIN cumplir la
+    // regla — por eso `realinear-estado-ordenes.ts` es paso obligatorio al cerrar la carga.
+    // No pasa por aquí (ver la nota de `crearOrden` más arriba).
     if (datos.lineas !== undefined && datos.lineas.length > 0) {
       await sincronizarMatriz(tx, sesion, orden.id, datos.lineas);
     }

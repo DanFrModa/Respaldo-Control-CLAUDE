@@ -122,7 +122,8 @@ function aOrdenLigera(fila: FilaLigera, totalPiezas: number): OrdenLigeraSalida 
 /**
  * Suma de piezas (Σ de `OrdenLineaTalla.cantidad`) POR orden, para un conjunto de ids, en UNA sola
  * consulta agregada (no trae la matriz a memoria). Devuelve un mapa `idOrden -> total`; las órdenes
- * sin matriz (incompletas) no aparecen en el mapa y se proyectan con total 0. Exportada: el centro
+ * sin matriz capturada no aparecen en el mapa y se proyectan con total 0 (sin matriz ≠ incompleta:
+ * una orden `capturada` puede tener matriz y sumar piezas). Exportada: el centro
  * de comando (R2) la reusa para la columna "Cant. ordenada".
  */
 export async function totalesPorOrden(
@@ -243,12 +244,12 @@ export async function consultarOrdenes(
   return armarPagina(datos, total, paginacion);
 }
 
-// ── Incompletas (capturadas sin matriz, con semáforo) ────────────────────────────────
+// ── Incompletas (`estado='capturada'`: les falta algún requisito, con semáforo) ───────
 
 /**
  * Órdenes INCOMPLETAS de la empresa activa: las que están en `estado='capturada'`, es decir, las
- * que NO cumplen todavía los requisitos de la regla (tallas + avíos, y arte si aplica — ver
- * `requisitos-orden.ts`). Proyección ligera + `diasAntiguedad` (desde `creadoEn`, con `fecha` como
+ * que NO cumplen todavía los requisitos de la regla (tallas + receta liberada, y arte si aplica —
+ * ver `requisitos-orden.ts`). Proyección ligera + `diasAntiguedad` (desde `creadoEn`, con `fecha` como
  * respaldo) + el `semaforo` DERIVADO (> 7 días = urgente). El orden por defecto es por antigüedad
  * descendente (las más viejas primero).
  *

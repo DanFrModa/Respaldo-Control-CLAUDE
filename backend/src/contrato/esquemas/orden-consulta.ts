@@ -126,8 +126,13 @@ export const esquemaSemaforoOrden = z
 export type SemaforoOrden = z.infer<typeof esquemaSemaforoOrden>;
 
 /**
- * Orden INCOMPLETA (capturada sin matriz; paridad con `FechaDet Is Null` del viejo) en proyección
- * ligera + su antigüedad en días + el semáforo derivado. `urgente` = > 7 días (regla `EsUrgente`).
+ * Orden INCOMPLETA (`estado='capturada'`: le falta al menos uno de los requisitos —tallas + receta
+ * liberada, y arte si aplica—, ver `dominio/produccion/requisitos-orden.ts`) en proyección ligera +
+ * su antigüedad en días + el semáforo derivado. `urgente` = > 7 días (regla `EsUrgente`).
+ *
+ * ⚠️ NO es "capturada sin matriz" ni la paridad con `FechaDet Is Null` del viejo (26-jul-2026): una
+ * incompleta PUEDE tener su matriz —le puede faltar la receta o el arte— y hasta puede traer
+ * `fechaCompletada` de cuando sí estuvo completa.
  */
 export const esquemaOrdenIncompletaSalida = esquemaOrdenLigeraSalida
   .extend({
@@ -137,7 +142,10 @@ export const esquemaOrdenIncompletaSalida = esquemaOrdenLigeraSalida
       .describe('Días desde el alta de la orden (creadoEn, o fecha como respaldo).'),
     semaforo: esquemaSemaforoOrden,
   })
-  .describe('Orden incompleta (capturada sin matriz) con su antigüedad y semáforo.');
+  .describe(
+    'Orden incompleta (`capturada`: le falta tallas, receta liberada o arte) con su antigüedad y ' +
+      'semáforo. NO significa "sin matriz": una incompleta puede tenerla.',
+  );
 
 /** Forma de una orden incompleta en la API. */
 export type OrdenIncompletaSalida = z.infer<typeof esquemaOrdenIncompletaSalida>;

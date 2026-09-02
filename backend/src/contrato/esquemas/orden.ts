@@ -217,8 +217,11 @@ export type DatosOrdenPatchCuerpo = z.infer<typeof esquemaOrdenPatchCuerpo>;
 /**
  * Cuerpo de guardar la matriz completa de una orden (doc 03-Produccion `OrdenesDet`): el SET
  * COMPLETO de colores con sus tallas/cantidades. El dominio sincroniza (agrega/edita/quita) en una
- * transacción A2, valida color no repetido + tallas del catálogo + cantidades ≥0, y DERIVA
- * `estado='completa'` + `fechaCompletada` en el primer guardado con líneas (paridad con `FechaDet`).
+ * transacción A2, valida color no repetido + tallas del catálogo + cantidades ≥0, y RECALCULA el
+ * estado con la regla única (`requisitos-orden.ts`). Guardar líneas cubre el requisito de `tallas`,
+ * pero NO completa la orden por sí solo: también hacen falta la receta liberada y el arte si el
+ * modelo lo lleva. `fechaCompletada` se sella la primera vez que se cumplen todos (paridad con
+ * `FechaDet`) y nunca se borra.
  */
 export const esquemaOrdenMatrizCuerpo = z.object({
   lineas: z

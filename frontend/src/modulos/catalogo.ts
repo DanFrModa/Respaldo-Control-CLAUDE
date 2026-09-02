@@ -435,7 +435,9 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'ordenes-incompletas',
             titulo: 'Órdenes incompletas',
-            descripcion: 'Órdenes capturadas sin matriz, con semáforo de antigüedad',
+            descripcion:
+              'Órdenes a las que les falta un requisito (tallas, receta liberada o arte), con ' +
+              'semáforo de antigüedad',
             ruta: '/produccion/incompletas',
             icono: 'alerta',
             permisos: ['ordenes.ver'],

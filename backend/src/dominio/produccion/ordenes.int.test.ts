@@ -154,7 +154,7 @@ describe('Órdenes (F2-E2) — alta desde pedido + autorrelleno (A2, A9)', () =>
     expect(orden.idCliente).toBe(clienteNegocio.id);
     expect(orden.idEmpresa).toBe(empresa.id);
     expect(orden.idPedidoLinea).toBe(lineaPedido.id);
-    expect(orden.estado).toBe('capturada'); // sin matriz aún
+    expect(orden.estado).toBe('capturada'); // recién creada: aún le faltan requisitos
     expect(orden.folio).toBe(1);
   });
 

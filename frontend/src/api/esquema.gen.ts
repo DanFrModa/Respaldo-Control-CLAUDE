@@ -34483,7 +34483,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Listar órdenes incompletas (capturadas sin matriz) con semáforo de antigüedad */
+    /** Listar órdenes incompletas (les falta tallas, receta liberada o arte) con semáforo de antigüedad */
     get: {
       parameters: {
         query?: {
@@ -57581,8 +57581,12 @@ export interface paths {
                 idTipoProceso: number | null;
                 /** @description Nombre del proceso. */
                 tipoProceso: string;
-                /** @description Σ piezas recibidas (recibos vivos del periodo). */
+                /** @description Σ piezas BUENAS recibidas (recibos vivos del periodo). */
                 recibido: number;
+                /** @description Σ prendas INCOMPLETAS que el maquilero entregó en los recibos del grupo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `recibido`: no se producen ni se pagan, así que no generan cargo y no pueden descuadrar la conciliación. */
+                incompletas: number;
+                /** @description ¿Todos los recibos VIVOS de este grupo trajeron SÓLO prendas incompletas? Es lo que explica un renglón con `recibido` 0: esas prendas no se pagan, así que esos recibos NO generaron cargo. NO afirma que el renglón cuadre: `cargado` incluye también los cargos validados que no cuelgan de un recibo (histórico o manual), y uno de ésos puede dejar `faltantePorCargar` negativo. Derivado en el servidor (A1) de `recibido === 0 && incompletas > 0`; la pantalla sólo lo pinta. */
+                soloIncompletas: boolean;
                 /** @description Σ piezas cargadas a EsMa (cargos validados). */
                 cargado: number;
                 /** @description recibido − cargado (>0 = falta cargar a EsMa). */
@@ -57616,6 +57620,7 @@ export interface paths {
               /** @description Totales del periodo. */
               totales: {
                 recibido: number;
+                incompletas: number;
                 cargado: number;
                 faltantePorCargar: number;
                 numCargosSinRecibo: number;
