@@ -79,7 +79,12 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { claveCeldaPack, esSinPack, normalizarPack, ordenManejaPacks } from './packs.js';
 import { revertirMovimientosDeHecho, traspasarPrendasATransito } from './transito.js';
+// `metaPara`/`MetaCelda` viven en `wip.ts` (una sola copia, §Post-F9.10). Sin ciclo: el cierre
+// transitivo de `wip.ts` (incompletas · packs · ordenes · receta-* · requisitos-orden) NO
+// alcanza este módulo.
+import { metaPara, type MetaCelda } from './wip.js';
 
 /** Clave de la secuencia de folios de las etapas de producción (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ETAPA = 'etapa-mov';
@@ -126,10 +131,12 @@ function rolDelProceso(codigoProceso: string): string {
 
 // ── Tipos internos ──────────────────────────────────────────────────────────────────────────────
 
-/** Una celda color×talla "aplanada" (un renglón por talla), para sumas y comparaciones. */
+/** Una celda color×talla×PACK "aplanada" (un renglón por talla), para sumas y comparaciones. */
 interface Celda {
   idColor: number;
   idTalla: number;
+  /** Pack / tendido del renglón (§Post-F9.10); cadena vacía en las órdenes que no los manejan. */
+  pack: string;
   cantidad: number;
 }
 
@@ -158,12 +165,33 @@ interface ContextoOrden {
   /** Modelo que fabrica la orden: el artículo que el kardex mueve al tránsito (V1-E4b). */
   idModelo: number;
   estado: string;
-  /** Lo pedido por celda (orden − corte usa esto). */
+  /** Lo pedido por celda (orden − corte usa esto). Cada celda lleva su pack (§Post-F9.10). */
   pedido: Celda[];
   /** Colores válidos de la orden. */
   colores: Set<number>;
-  /** Tallas válidas por color (la combinación color×talla debe existir en la orden). */
-  tallasPorColor: Map<number, Set<number>>;
+  /**
+   * ⭐ ¿La orden se fabrica POR PACKS? (§Post-F9.10). De aquí cuelga que el pack sea OBLIGATORIO en
+   * el corte y en la entrega a maquila —*«cada tendido es de un pack»*— y que en una orden sin packs
+   * mandarlo sea un error de captura. La matriz no puede estar mezclada (lo impide `ordenes.ts`).
+   */
+  manejaPacks: boolean;
+  /**
+   * Tallas válidas por RENGLÓN de la orden = por `color:pack` ({@link claveRenglon}). Con packs, la
+   * talla EG puede existir en el pack B y no en el A: validar contra la unión por color dejaría
+   * cortar un tendido que la orden no pidió.
+   */
+  tallasPorRenglon: Map<string, Set<number>>;
+  /** Packs válidos de cada color, para redactar errores que digan qué SÍ se puede capturar. */
+  packsPorColor: Map<number, Set<string>>;
+}
+
+/**
+ * Clave de un RENGLÓN de la matriz de la orden: color × pack (§Post-F9.10). Acepta el pack tal como
+ * llega del contrato (donde es opcional) y lo normaliza: `undefined`, `null` y `'  '` son el mismo
+ * «sin pack», y tienen que producir la MISMA llave que la columna, que guarda cadena vacía.
+ */
+function claveRenglon(idColor: number, pack: string | null | undefined): string {
+  return `${idColor}:${normalizarPack(pack)}`;
 }
 
 /**
@@ -181,7 +209,13 @@ async function resolverOrden(
       idEmpresa: true,
       idModelo: true,
       estado: true,
-      lineas: { select: { idColor: true, tallas: { select: { idTalla: true, cantidad: true } } } },
+      lineas: {
+        select: {
+          idColor: true,
+          pack: true,
+          tallas: { select: { idTalla: true, cantidad: true } },
+        },
+      },
     },
   });
   if (orden === null) {
@@ -193,15 +227,21 @@ async function resolverOrden(
 
   const pedido: Celda[] = [];
   const colores = new Set<number>();
-  const tallasPorColor = new Map<number, Set<number>>();
+  const tallasPorRenglon = new Map<string, Set<number>>();
+  const packsPorColor = new Map<number, Set<string>>();
   for (const linea of orden.lineas) {
+    const pack = normalizarPack(linea.pack);
     colores.add(linea.idColor);
-    const tallas = tallasPorColor.get(linea.idColor) ?? new Set<number>();
+    const packs = packsPorColor.get(linea.idColor) ?? new Set<string>();
+    packs.add(pack);
+    packsPorColor.set(linea.idColor, packs);
+    const clave = claveRenglon(linea.idColor, pack);
+    const tallas = tallasPorRenglon.get(clave) ?? new Set<number>();
     for (const t of linea.tallas) {
       tallas.add(t.idTalla);
-      pedido.push({ idColor: linea.idColor, idTalla: t.idTalla, cantidad: t.cantidad });
+      pedido.push({ idColor: linea.idColor, idTalla: t.idTalla, pack, cantidad: t.cantidad });
     }
-    tallasPorColor.set(linea.idColor, tallas);
+    tallasPorRenglon.set(clave, tallas);
   }
   return {
     idEmpresa: orden.idEmpresa,
@@ -209,20 +249,34 @@ async function resolverOrden(
     estado: orden.estado,
     pedido,
     colores,
-    tallasPorColor,
+    manejaPacks: ordenManejaPacks(orden.lineas.map((l) => l.pack)),
+    tallasPorRenglon,
+    packsPorColor,
   };
 }
 
 /**
- * Aplana la matriz de la entrada a celdas, validando SANIDAD (D4): cantidades enteras ≥ 0, color y
- * talla SIN repetir dentro de la captura, y que cada color×talla PERTENEZCA a la orden (no se puede
- * cortar/enviar un color o una talla que la orden no pidió). Esto aplica TANTO al corte (f) como al
- * envío (g): la holgura de sobre-corte es solo de CANTIDAD, no de colores/tallas inventados.
+ * Aplana la matriz de la entrada a celdas, validando SANIDAD (D4): cantidades enteras ≥ 0, renglón
+ * (color × PACK) SIN repetir dentro de la captura, talla sin repetir dentro del renglón, y que cada
+ * renglón y cada talla PERTENEZCAN a la orden (no se puede cortar/enviar un color, un pack o una
+ * talla que la orden no pidió). Esto aplica TANTO al corte (f) como al envío (g): la holgura de
+ * sobre-corte es solo de CANTIDAD, no de colores/packs/tallas inventados.
+ *
+ * ⭐ EL PACK (§Post-F9.10) — *«que viaje el pack al menos en el corte, entrega a maquila»*: en una
+ * orden que maneja packs es OBLIGATORIO (cada tendido es de un pack) y tiene que ser uno de los
+ * packs de ESE color; en una orden que no los maneja, mandarlo es un error de captura y se rechaza
+ * en vez de ignorarse — un pack silenciosamente descartado habría producido un corte que dice una
+ * cosa en la pantalla y otra en la BD. Ambas ramas comparten esta única función a propósito: corte y
+ * envío son caminos gemelos y aquí no pueden divergir.
  */
 function aplanarYValidar(lineas: DatosEtapaLineaEntrada[], orden: ContextoOrden): Celda[] {
-  const idsColor = lineas.map((l) => l.idColor);
-  if (new Set(idsColor).size !== idsColor.length) {
-    throw new ErrorValidacion('Un color no puede aparecer dos veces en la misma captura.');
+  const claves = lineas.map((l) => claveRenglon(l.idColor, l.pack));
+  if (new Set(claves).size !== claves.length) {
+    throw new ErrorValidacion(
+      orden.manejaPacks
+        ? 'Un mismo color y pack no pueden aparecer dos veces en la misma captura.'
+        : 'Un color no puede aparecer dos veces en la misma captura.',
+    );
   }
 
   const celdas: Celda[] = [];
@@ -232,7 +286,28 @@ function aplanarYValidar(lineas: DatosEtapaLineaEntrada[], orden: ContextoOrden)
         `El color ${linea.idColor} no pertenece a la orden; solo se capturan colores de la orden.`,
       );
     }
-    const tallasOrden = orden.tallasPorColor.get(linea.idColor) ?? new Set<number>();
+    const pack = normalizarPack(linea.pack);
+    if (orden.manejaPacks && esSinPack(pack)) {
+      throw new ErrorValidacion(
+        `Esta orden se fabrica por packs: di de qué pack es cada renglón. Los del color ` +
+          `${linea.idColor} son: ${packsDelColor(orden, linea.idColor)}.`,
+      );
+    }
+    if (!orden.manejaPacks && !esSinPack(pack)) {
+      throw new ErrorValidacion(
+        `Esta orden no se fabrica por packs, así que el renglón del color ${linea.idColor} no ` +
+          `puede llevar el pack "${pack}".`,
+      );
+    }
+    const tallasOrden = orden.tallasPorRenglon.get(claveRenglon(linea.idColor, pack));
+    if (tallasOrden === undefined) {
+      // Sólo puede pasar con packs: el color existe pero ESE pack no. Se nombra lo que sí hay, para
+      // que el error diga qué corregir en vez de dejar al operador adivinando.
+      throw new ErrorValidacion(
+        `El color ${linea.idColor} de la orden no tiene el pack "${pack}"; sus packs son: ` +
+          `${packsDelColor(orden, linea.idColor)}.`,
+      );
+    }
     const idsTalla = linea.tallas.map((t) => t.idTalla);
     if (new Set(idsTalla).size !== idsTalla.length) {
       throw new ErrorValidacion('Una talla no puede aparecer dos veces en el mismo color.');
@@ -243,11 +318,14 @@ function aplanarYValidar(lineas: DatosEtapaLineaEntrada[], orden: ContextoOrden)
       }
       if (!tallasOrden.has(t.idTalla)) {
         throw new ErrorValidacion(
-          `La talla ${t.idTalla} no pertenece al color ${linea.idColor} de la orden.`,
+          esSinPack(pack)
+            ? `La talla ${t.idTalla} no pertenece al color ${linea.idColor} de la orden.`
+            : `La talla ${t.idTalla} no pertenece al pack "${pack}" del color ${linea.idColor} ` +
+                'de la orden.',
         );
       }
       if (t.cantidad > 0) {
-        celdas.push({ idColor: linea.idColor, idTalla: t.idTalla, cantidad: t.cantidad });
+        celdas.push({ idColor: linea.idColor, idTalla: t.idTalla, pack, cantidad: t.cantidad });
       }
     }
   }
@@ -257,9 +335,32 @@ function aplanarYValidar(lineas: DatosEtapaLineaEntrada[], orden: ContextoOrden)
   return celdas;
 }
 
-/** Clave estable de una celda color×talla (para mapas). */
-function claveCelda(idColor: number, idTalla: number): string {
-  return `${idColor}:${idTalla}`;
+/**
+ * Pliega las celdas de una captura a color×talla, SUMANDO los tendidos. Es la frontera con lo que
+ * NO maneja packs (§Post-F9.10): hoy, el kardex de producto terminado.
+ */
+function plegarCeldasSinPack(
+  celdas: readonly Celda[],
+): { idColor: number; idTalla: number; cantidad: number }[] {
+  const porCelda = new Map<string, { idColor: number; idTalla: number; cantidad: number }>();
+  for (const c of celdas) {
+    const clave = `${c.idColor}:${c.idTalla}`;
+    const acum = porCelda.get(clave);
+    if (acum === undefined) {
+      porCelda.set(clave, { idColor: c.idColor, idTalla: c.idTalla, cantidad: c.cantidad });
+    } else {
+      acum.cantidad += c.cantidad;
+    }
+  }
+  return [...porCelda.values()];
+}
+
+/** Los packs que la orden tiene para un color, en texto, para redactar errores accionables. */
+function packsDelColor(orden: ContextoOrden, idColor: number): string {
+  const packs = [...(orden.packsPorColor.get(idColor) ?? new Set<string>())]
+    .filter((p) => !esSinPack(p))
+    .sort((a, b) => a.localeCompare(b, 'es'));
+  return packs.length > 0 ? packs.map((p) => `"${p}"`).join(', ') : '(ninguno)';
 }
 
 /**
@@ -312,9 +413,13 @@ async function bloquearEtapasDeOrden(tx: Tx, idEmpresa: number, idOrden: number)
 }
 
 /**
- * Suma las celdas color×talla de las etapas VIVAS (no canceladas) de una orden que cumplan el
+ * Suma las celdas color×talla×PACK de las etapas VIVAS (no canceladas) de una orden que cumplan el
  * filtro de tipo/proceso, leyendo `EtapaMovimientoDet` DIRECTO (sin acumuladores; ADR-0010 §3). Es
  * la base de "cortado disponible por proceso" (g) y de los pendientes derivados.
+ *
+ * ⭐ La llave lleva el PACK (§Post-F9.10) porque corte y entrega a maquila lo declaran los DOS: el
+ * saldo «enviado ≤ cortado» se lleva tendido por tendido, que es lo que Daniel pidió. En una orden
+ * sin packs todas las celdas caen en el pack vacío y la llave es, punto por punto, la de siempre.
  */
 async function sumarCeldas(
   tx: Tx,
@@ -330,11 +435,11 @@ async function sumarCeldas(
         ...(filtro.idTipoProceso === undefined ? {} : { idTipoProceso: filtro.idTipoProceso }),
       },
     },
-    select: { idColor: true, idTalla: true, cantidad: true },
+    select: { idColor: true, idTalla: true, pack: true, cantidad: true },
   });
   const acumulado = new Map<string, number>();
   for (const f of filas) {
-    const clave = claveCelda(f.idColor, f.idTalla);
+    const clave = claveCeldaPack(f.idColor, f.idTalla, f.pack);
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;
@@ -354,16 +459,28 @@ function aEtapaSalida(
   nombres: ReadonlyMap<string, string>,
   ocultarPrecio = false,
 ): EtapaSalida {
-  // Agrupa el detalle por color, ordenando las tallas por su `orden` del catálogo.
-  const porColor = new Map<number, { color: string; tallas: EtapaConDetalle['detalles'] }>();
+  // Agrupa el detalle por COLOR × PACK (§Post-F9.10 — el renglón de la etapa es el tendido, no el
+  // color), ordenando las tallas por su `orden` del catálogo. Agrupar sólo por color habría fundido
+  // en un renglón dos tendidos con corridas distintas, que es justo lo que esta etapa vino a separar.
+  const porRenglon = new Map<
+    string,
+    { idColor: number; color: string; pack: string; tallas: EtapaConDetalle['detalles'] }
+  >();
   for (const det of etapa.detalles) {
-    const grupo = porColor.get(det.idColor) ?? { color: det.color.nombre, tallas: [] };
+    const pack = normalizarPack(det.pack);
+    const clave = claveRenglon(det.idColor, pack);
+    const grupo = porRenglon.get(clave) ?? {
+      idColor: det.idColor,
+      color: det.color.nombre,
+      pack,
+      tallas: [],
+    };
     grupo.tallas.push(det);
-    porColor.set(det.idColor, grupo);
+    porRenglon.set(clave, grupo);
   }
 
   let totalPiezas = 0;
-  const lineas = [...porColor.entries()].map(([idColor, grupo]) => {
+  const lineas = [...porRenglon.values()].map((grupo) => {
     let totalLinea = 0;
     const tallas = grupo.tallas
       .slice()
@@ -373,7 +490,13 @@ function aEtapaSalida(
         return { idTalla: t.idTalla, etiquetaTalla: t.talla.etiqueta, cantidad: t.cantidad };
       });
     totalPiezas += totalLinea;
-    return { idColor, color: grupo.color, tallas, totalPiezas: totalLinea };
+    return {
+      idColor: grupo.idColor,
+      color: grupo.color,
+      pack: grupo.pack,
+      tallas,
+      totalPiezas: totalLinea,
+    };
   });
 
   return {
@@ -473,6 +596,8 @@ export async function registrarCorte(
           create: celdas.map((c) => ({
             idColor: c.idColor,
             idTalla: c.idTalla,
+            // El pack VIAJA con la pieza (§Post-F9.10): cadena vacía en las órdenes sin packs.
+            pack: c.pack,
             cantidad: c.cantidad,
           })),
         },
@@ -658,14 +783,17 @@ export async function registrarEnvioMaquila(
     });
 
     for (const c of celdas) {
-      const clave = claveCelda(c.idColor, c.idTalla);
+      // La llave lleva el PACK: cada tendido tiene su propio saldo de cortado (§Post-F9.10). Sin
+      // packs es la celda de siempre.
+      const clave = claveCeldaPack(c.idColor, c.idTalla, c.pack);
       const cortadoCelda = cortado.get(clave) ?? 0;
       const enviadoCelda = yaEnviado.get(clave) ?? 0;
       const disponible = cortadoCelda - enviadoCelda;
       const topeConHolgura = Math.floor(disponible * (1 + TOLERANCIA_SOBRE_ENVIO));
       if (c.cantidad > topeConHolgura) {
         throw new ErrorConflicto(
-          `No se puede enviar ${c.cantidad} pza(s) de ese color/talla a "${proceso.nombre}": ` +
+          `No se puede enviar ${c.cantidad} pza(s) de ese color/talla` +
+            `${esSinPack(c.pack) ? '' : ` del pack "${c.pack}"`} a "${proceso.nombre}": ` +
             `solo hay ${disponible} cortada(s) sin enviar a ese proceso.`,
         );
       }
@@ -695,6 +823,8 @@ export async function registrarEnvioMaquila(
           create: celdas.map((c) => ({
             idColor: c.idColor,
             idTalla: c.idTalla,
+            // El pack VIAJA con la pieza (§Post-F9.10): cadena vacía en las órdenes sin packs.
+            pack: c.pack,
             cantidad: c.cantidad,
           })),
         },
@@ -714,7 +844,12 @@ export async function registrarEnvioMaquila(
         fecha: aDateColumna(datos.fecha),
         origenTipo: ORIGEN.envioMaquila,
         origenId: String(etapa.id),
-        celdas,
+        // ⭐ EL PACK SE PLIEGA AQUÍ (§Post-F9.10): el inventario de PT no maneja packs —*«ahí ya es
+        // sólo color»*—, así que dos tendidos de la MISMA celda (pack A: 5 CH, pack B: 3 CH) salen
+        // al tránsito como UN renglón de 8. Sin plegar, el traspaso llevaría dos renglones de la
+        // misma llave: el mismo saldo, pero el movimiento partido en dos y el lock del artículo
+        // tomado dos veces. El tendido sigue vivo donde importa: en la celda del WIP.
+        celdas: plegarCeldasSinPack(celdas),
       });
     }
 
@@ -1002,6 +1137,7 @@ export async function pendientesPorOrden(
       lineas: {
         select: {
           idColor: true,
+          pack: true,
           color: { select: { nombre: true } },
           tallas: {
             select: {
@@ -1022,6 +1158,8 @@ export async function pendientesPorOrden(
   interface MetaCelda {
     idColor: number;
     color: string;
+    /** Pack / tendido de la celda (§Post-F9.10); cadena vacía en las órdenes sin packs. */
+    pack: string;
     idTalla: number;
     etiquetaTalla: string;
     ordenTalla: number;
@@ -1029,13 +1167,18 @@ export async function pendientesPorOrden(
   const meta = new Map<string, MetaCelda>();
   const pedido = new Map<string, number>();
   for (const linea of orden.lineas) {
+    // La llave lleva el PACK (§Post-F9.10): dos tendidos del mismo color son DOS celdas distintas,
+    // con su propio pendiente. Plegarlos aquí haría que la pantalla ofreciera un tope agregado que
+    // el servidor rechaza tendido por tendido al enviar (sobre-envío ESTRICTO, decisión (g)).
+    const pack = normalizarPack(linea.pack);
     for (const t of linea.tallas) {
-      const clave = claveCelda(linea.idColor, t.idTalla);
+      const clave = claveCeldaPack(linea.idColor, t.idTalla, pack);
       pedido.set(clave, (pedido.get(clave) ?? 0) + t.cantidad);
       if (!meta.has(clave)) {
         meta.set(clave, {
           idColor: linea.idColor,
           color: linea.color.nombre,
+          pack,
           idTalla: t.idTalla,
           etiquetaTalla: t.talla.etiqueta,
           ordenTalla: t.talla.orden,
@@ -1062,11 +1205,19 @@ export async function pendientesPorOrden(
   // de pedido ∪ corte para porCortar y cortadoTotal.
   const todasClaves = new Set<string>([...pedido.keys(), ...cortado.keys()]);
 
-  const ordenarCeldas = <T extends { ordenTalla: number; idColor: number; idTalla: number }>(
+  // El PACK entra en el orden justo detrás del color: los tendidos de un mismo color salen juntos y
+  // en orden estable (§Post-F9.10). Sin packs, todos comparten la cadena vacía y el orden no cambia.
+  const ordenarCeldas = <
+    T extends { ordenTalla: number; idColor: number; idTalla: number; pack: string },
+  >(
     arr: T[],
   ): T[] =>
     arr.sort(
-      (a, b) => a.idColor - b.idColor || a.ordenTalla - b.ordenTalla || a.idTalla - b.idTalla,
+      (a, b) =>
+        a.idColor - b.idColor ||
+        a.pack.localeCompare(b.pack, 'es') ||
+        a.ordenTalla - b.ordenTalla ||
+        a.idTalla - b.idTalla,
     );
 
   const porCortar = ordenarCeldas(
@@ -1163,6 +1314,7 @@ export async function sugerirCaptura(
       lineas: {
         select: {
           idColor: true,
+          pack: true,
           color: { select: { nombre: true } },
           tallas: {
             select: {
@@ -1182,19 +1334,21 @@ export async function sugerirCaptura(
   const base = idTipoProceso === undefined ? 'corte' : 'envio';
 
   // Metadatos + pedido por celda (de la matriz de la orden, D4).
-  const meta = new Map<
-    string,
-    { idColor: number; color: string; idTalla: number; etiquetaTalla: string; ordenTalla: number }
-  >();
+  const meta = new Map<string, MetaCeldaPendiente>();
   const pedido = new Map<string, number>();
   for (const linea of orden.lineas) {
+    // La llave lleva el PACK (§Post-F9.10): dos tendidos del mismo color son DOS celdas distintas,
+    // con su propio pendiente. Plegarlos aquí haría que la pantalla ofreciera un tope agregado que
+    // el servidor rechaza tendido por tendido al enviar (sobre-envío ESTRICTO, decisión (g)).
+    const pack = normalizarPack(linea.pack);
     for (const t of linea.tallas) {
-      const clave = claveCelda(linea.idColor, t.idTalla);
+      const clave = claveCeldaPack(linea.idColor, t.idTalla, pack);
       pedido.set(clave, (pedido.get(clave) ?? 0) + t.cantidad);
       if (!meta.has(clave)) {
         meta.set(clave, {
           idColor: linea.idColor,
           color: linea.color.nombre,
+          pack,
           idTalla: t.idTalla,
           etiquetaTalla: t.talla.etiqueta,
           ordenTalla: t.talla.orden,
@@ -1216,7 +1370,13 @@ export async function sugerirCaptura(
   const { disponible, motivo } = resolverSugerencia({ base, pedido, cortado, enviado });
   const celdas = [...disponible]
     .map(([clave, cantidad]) => ({ ...metaPara(meta, clave), cantidad }))
-    .sort((a, b) => a.idColor - b.idColor || a.ordenTalla - b.ordenTalla || a.idTalla - b.idTalla)
+    .sort(
+      (a, b) =>
+        a.idColor - b.idColor ||
+        a.pack.localeCompare(b.pack, 'es') ||
+        a.ordenTalla - b.ordenTalla ||
+        a.idTalla - b.idTalla,
+    )
     .map(({ ordenTalla: _o, ...resto }) => resto);
 
   return {
@@ -1304,27 +1464,21 @@ export function resolverSugerencia(entrada: {
   return disponible.size === 0 ? vacio('todo-enviado') : { disponible, motivo: 'hay' };
 }
 
-/** Devuelve el metadato de presentación de una celda (defensivo: si falta, arma uno mínimo). */
-function metaPara(
-  meta: Map<
-    string,
-    { idColor: number; color: string; idTalla: number; etiquetaTalla: string; ordenTalla: number }
-  >,
-  clave: string,
-): { idColor: number; color: string; idTalla: number; etiquetaTalla: string; ordenTalla: number } {
-  const m = meta.get(clave);
-  if (m !== undefined) return m;
-  const [idColor, idTalla] = clave.split(':').map(Number);
-  return {
-    idColor: idColor ?? 0,
-    color: `Color ${idColor ?? 0}`,
-    idTalla: idTalla ?? 0,
-    etiquetaTalla: '',
-    ordenTalla: 0,
-  };
-}
+/**
+ * Metadato de presentación de una celda color×talla×PACK de los pendientes/sugerencias.
+ *
+ * 🔗 Es el MISMO tipo (y el mismo respaldo defensivo, {@link metaPara}) que usa el drill-down del
+ * WIP: vive UNA sola vez, en `produccion/wip.ts`. Aquí había una copia privada palabra por palabra
+ * —salvo una rama— y se retiró: dos versiones del respaldo de la misma llave `color:talla:pack` son
+ * exactamente la clase de gemela que se desincroniza sin que nadie lo note.
+ */
+type MetaCeldaPendiente = MetaCelda;
 
-/** Variante de {@link sumarCeldas} para un cliente de LECTURA (sin transacción), para las consultas. */
+/**
+ * Variante de {@link sumarCeldas} para un cliente de LECTURA (sin transacción), para las consultas.
+ * Misma llave color×talla×PACK que la transaccional, a propósito: si la lectura plegara el pack y la
+ * escritura no, la pantalla ofrecería un tope que el servidor rechaza.
+ */
 async function sumarCeldasLectura(
   cliente: ReturnType<typeof clienteLectura>,
   idOrden: number,
@@ -1339,11 +1493,11 @@ async function sumarCeldasLectura(
         ...(filtro.idTipoProceso === undefined ? {} : { idTipoProceso: filtro.idTipoProceso }),
       },
     },
-    select: { idColor: true, idTalla: true, cantidad: true },
+    select: { idColor: true, idTalla: true, pack: true, cantidad: true },
   });
   const acumulado = new Map<string, number>();
   for (const f of filas) {
-    const clave = claveCelda(f.idColor, f.idTalla);
+    const clave = claveCeldaPack(f.idColor, f.idTalla, f.pack);
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;

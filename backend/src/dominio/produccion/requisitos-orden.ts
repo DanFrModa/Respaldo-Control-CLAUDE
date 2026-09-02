@@ -111,13 +111,16 @@ function evaluarArte(llevaArte: boolean, artesOrden: number): 'no-aplica' | bool
 }
 
 /**
- * Texto corto de "qué le falta" en lenguaje de negocio (p. ej. `Falta: avíos`), o `null` si no
- * falta nada. Vive aquí (con la regla) para que la UI y los mensajes del backend digan lo mismo.
+ * Texto corto de "qué le falta" en lenguaje de negocio (p. ej. `Falta: liberar la receta`), o
+ * `null` si no falta nada. Las etiquetas salen de {@link ETIQUETA_REQUISITO_ORDEN}, así que este
+ * texto sigue a la regla y no al revés. Vive aquí (con la regla) para que la UI y los mensajes del
+ * backend digan lo mismo.
  */
 export function textoFaltantesOrden(requisitos: RequisitosOrden): string | null {
   if (requisitos.faltantes.length === 0) return null;
   const etiquetas = requisitos.faltantes.map((f) => ETIQUETA_REQUISITO_ORDEN[f]);
-  // "tallas", "tallas y avíos", "tallas, avíos y arte" (coma hasta el penúltimo, "y" al final).
+  // "tallas", "tallas y liberar la receta", "tallas, liberar la receta y arte" (coma hasta el
+  // penúltimo, "y" al final).
   const ultima = etiquetas.pop() as string;
   return `Falta: ${etiquetas.length === 0 ? ultima : `${etiquetas.join(', ')} y ${ultima}`}`;
 }
@@ -153,8 +156,9 @@ export async function insumosRequisitosDeOrden(
  * de lo que la orden tiene HOY. Puro (no toca BD) para poder probarlo sin Postgres.
  *
  *  • `cancelada` SIEMPRE gana: una orden cancelada no cambia de estado por esta regla.
- *  • El `estado` refleja la VERDAD ACTUAL: si deja de cumplir requisitos (le borran la matriz, le
- *    quitan los avíos al modelo) vuelve a `capturada`. No es un sello de una sola vía.
+ *  • El `estado` refleja la VERDAD ACTUAL: si deja de cumplir requisitos (le borran la matriz, o su
+ *    receta deja de estar liberada por completo) vuelve a `capturada`. No es un sello de una sola
+ *    vía. Editar el BOM del MODELO ya no la mueve (V1-E3d: la receta de la orden está congelada).
  *  • `fechaCompletada` sella la PRIMERA vez que se cumple y NUNCA se borra (es el `FechaDet` de
  *    v1: el dato histórico de "cuándo quedó lista por primera vez").
  *  • Devuelve `null` cuando no hay nada que escribir (evita UPDATEs vacíos).
@@ -238,8 +242,10 @@ const LOTE_RECALCULO = 500;
 
 /**
  * Qué disparó el recálculo por catálogo. Va TAL CUAL a la bitácora de cada orden, así que tiene que
- * nombrar la causa REAL: `bom-modelo` (se editó la receta de avíos/arte) o `lleva-arte` (se marcó o
- * desmarcó la casilla del modelo).
+ * nombrar la causa REAL. Hoy hay UNA sola: `lleva-arte` (se marcó o desmarcó la casilla del
+ * modelo), y su único llamador es `modelos/modelos.ts`. Editar el BOM del modelo ya NO recalcula
+ * nada (V1-E3d: cada orden vive de su receta congelada), por eso el motivo `bom-modelo` desapareció
+ * del tipo y de la bitácora.
  */
 export type MotivoRecalculoModelo = 'lleva-arte';
 

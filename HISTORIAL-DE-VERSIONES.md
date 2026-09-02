@@ -109,6 +109,156 @@ está dividido.
   no de la receta.
 - **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
 
+## 0.089 · 2-sep-2026 · **en prueba** — 🔴 Una fuga que creíamos dormida **estaba despierta**: borrar un arte de la OP dejaba su foto pagándose en la nube
+
+### Qué se puede hacer ahora que antes no
+
+**Nada nuevo en pantalla.** Esta versión no agrega funciones: **tapa una fuga real y pone tres vigilantes** donde
+antes sólo había advertencias escritas en un documento que nadie está obligado a leer.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **La fuga estaba VIVA, no dormida.** El plan decía, con esas palabras, *«hoy NO ocurre»*. Y ocurría:
+  **quitar un renglón de arte agregado a mano en la receta de una OP** borraba ese arte y, por arrastre, su
+  marca de foto — **dejando el archivo vivo y su objeto pagándose en la nube para siempre**. Y era el peor caso
+  posible: un arte metido a mano **sólo puede tener fotos propias**, así que se iban todas.
+- ⭐ **Por qué el plan no lo vio, que es lo que más importa:** su lista de «qué borrados vigilar» era **correcta
+  y no servía**. El borrado que fugaba es de una tabla **que nació dos semanas después de escribirse la lista**.
+  Por eso el vigilante nuevo **no lleva lista escrita a mano: la calcula del modelo de datos**, y el día que
+  alguien añada otro puente **la prueba se pone roja sola y le explica la trampa**.
+- **Y no eran siete puentes: son ocho, más tres campos** que corren el mismo riesgo y que el plan ni mencionaba.
+- 🧹 **Segundo vigilante: el techo de memoria.** Estaba escrito desde agosto que *«cuando 6 GB no alcancen hay
+  que atacar la causa, no volver a subir el número»*. Ahora **subirlo pone la prueba en rojo** y el mensaje
+  nombra las tres curas reales. ⚠️ Y el techo **no vivía en un sitio: vive en cuatro** — el propio archivo de
+  CI ya avisaba de eso y nadie lo había leído.
+- 🧹 **Tercer vigilante, y el que más nos ha costado: un `Killed` ya no se puede leer como aprobado.** Se
+  estrenó en vivo: mientras se probaba, la máquina se quedó sin memoria de verdad y el kernel mató una
+  validación. El script imprimió *«MUERTO POR EL OOM-KILLER — la corrida NO VALE y NO es un pase»* y
+  **se negó a decir que estaba verde**.
+
+### Qué sigue pendiente o roto
+
+- **Cuatro puertas a la nube siguen sin ese vigilante** (las de adjuntos). Es deuda vieja y ahora está
+  **declarada dentro del propio código**, no en una nota suelta.
+- **El vigilante de borrados es por archivo, no por función**: hoy no hay hueco, pero **una tercera puerta
+  dentro de un archivo que ya tiene dos pasaría inadvertida**. También queda dicho ahí mismo.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+## 0.088 · 2-sep-2026 · **en prueba** — El renglón en ceros de la conciliación **ya dice por qué existe**, y el menú deja de mentir
+
+### Qué se puede hacer ahora que antes no
+
+**Ver las prendas incompletas dentro de la conciliación de maquileros**, con su propia columna y su total.
+
+Y sobre todo: cuando un grupo (orden + maquilero + proceso) **entregó SÓLO prendas incompletas**, ese renglón
+ahora **lleva una marca que lo explica**. Antes salía con tres ceros y **nadie sabía por qué estaba ahí** —
+parecía basura de pantalla.
+
+⭐ **Y resulta que no era basura: era la única huella de esa entrega.** Al medirlo se vio que un `recibido = 0`
+significa, exactamente, *«todos los recibos de ese grupo trajeron sólo prendas incompletas»*. Esconderlo habría
+borrado justo lo que pediste poder ver (*«sólo quisiera ver reflejado en algún lado que sí las entrego, para
+revisar los temas de pago»*). **No se esconde**, y el filtro «Solo con faltante por cargar» —que ya existía—
+sigue siendo la salida para quien no lo quiera ver.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **La marca NO promete que el renglón cuadre en ceros.** Dice sólo que *esos recibos no generaron cargo*.
+  Si en ese mismo grupo hay además un cargo **capturado a mano o migrado**, el renglón **puede salir en
+  negativo** — y está bien que lo haga, porque el descuadre es real y hay que verlo.
+- 🔴 **El menú «Órdenes incompletas» llevaba tiempo describiéndose mal.** Decía que son *«las órdenes capturadas
+  **sin matriz**»* y **es falso**: significa *«le falta un requisito»*, y una orden incompleta **sí puede tener
+  su matriz**. La descripción estaba además **publicada en el contrato del sistema**. Corregida en 22 sitios.
+- ⭐ **Y esa frase tenía dos caras, no una.** Junto a la anterior vivía *«los requisitos son tallas + avíos»*,
+  que quedó vieja cuando la receta pasó a liberarse: hoy es **tallas + receta liberada, y arte si aplica**.
+  Corregir la primera copiando la segunda habría sido **cambiar una mentira por otra**.
+- **No cambia ningún número.** Nada de lo que ya se calculaba se toca: sólo se enseña lo que no se enseñaba y
+  se dice la verdad donde se decía otra cosa.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Queda un cabo de esta misma familia** (el sesgo de tres pruebas que no distinguen «suma el acumulado» de
+  «mira sólo esta captura»). **No hay fallo de negocio detrás** —se midió: las tres funciones suman bien— pero
+  las pruebas no lo verían si se rompiera. Espera a que baje otra versión que toca los mismos archivos.
+- ⚠️ **La defensa de la marca nueva vive ENTERA en las pruebas contra base de datos real.** Si alguien la
+  rompiera, en la máquina de desarrollo **no se enteraría nadie**: sólo lo caza el CI.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
+## 0.087 · 2-sep-2026 · **en prueba** — El **pack** deja de vivir dentro del nombre del color *(primera mitad: la de abajo)*
+
+### Qué se puede hacer ahora que antes no
+
+**En pantalla, todavía nada — y hay que decirlo con esas palabras.**
+
+C&A manda **varios tendidos en una misma orden** (un pack con corrida 1-2-2-1, otro con 1-1-1-2…), y hasta
+hoy el pack vivía **metido dentro del nombre del color**: «Negro A», «Negro B». Desde esta versión el
+sistema **sabe qué es un pack**: es un **campo propio** del renglón de la orden y del detalle de cada
+movimiento de producción, y **viaja al corte y al envío a maquila**.
+
+Pero **ninguna pantalla lo captura ni lo pinta todavía**, y **el importador del PDF sigue fusionando los
+packs en un solo renglón** — así que, operando normal, **no vas a notar ningún cambio**. Ésta es la mitad
+de abajo; la de arriba (pantallas + importador) es la fila **0.095** y va enseguida.
+
+⚠️ **Gabriel no puede verificar esta versión en `prueba`, y no es un descuido:** no hay nada observable que
+verificar. Es exactamente lo mismo que la hace segura.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Una orden SIN packs se comporta EXACTAMENTE igual que antes.** No es una promesa: se midió. Se copió
+  la guarda vieja del recibo y se corrió contra la nueva en **576 escenarios** —dentro del saldo, justo en
+  el límite y pasado— con **cero diferencias**. (Y para probar que la medición servía, se forzó el caso
+  contrario: ahí aparecieron 98 diferencias.)
+- **Al recibir se topa por partida doble:** por el **total** de la celda, como siempre, **y además por
+  pack** para los renglones que declaran uno. Ninguna de las dos sobra: sin la primera, tres tendidos de 5
+  colarían 15 piezas de 10; sin la segunda, se podrían recibir 10 del pack A habiendo enviado 5.
+- 🔴 **Se destapó un defecto de la Ruta Crítica que los packs disparaban:** al medir el avance comparaba
+  renglón por renglón contra un total ya sumado ⇒ con dos tendidos del mismo color y talla **habría dado
+  «corte terminado» con 100 piezas de 150**. Arreglado, con su prueba.
+- **Dos reglas nuevas que decidimos nosotros y esperan tu visto bueno** (ver más abajo): una orden es **con
+  packs o sin packs, nunca mezclada**; y **el pack de un renglón que ya tiene producción viva no se
+  cambia** — si ya cortaste contra «pack A», re-etiquetarlo dejaría esas piezas cortadas **imposibles de
+  enviar**, con un error que además culparía al usuario.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Las pantallas y el importador del PDF** (fila **0.095**). Mientras el importador siga fusionando, el
+  campo nuevo **es inalcanzable desde el único sitio del que los packs vienen de verdad**.
+- ⏳ **Dos decisiones esperándote**: las dos reglas de arriba, y el largo máximo de la etiqueta del pack
+  (hoy 12 caracteres, suficiente para «A» o «PACK 1»).
+- **Los colores ya capturados como «Negro A» no se parten.** Sigue siendo así a propósito: *«lo viejo
+  ahorita es irrelevante»*. Ese trabajo no desaparece — es requisito del **ETL de arranque**.
+- **El despliegue lleva migración** (dos columnas nuevas, aditiva). **No** hace falta `SEED_ON_START`.
+## 0.086 · 2-sep-2026 · **en prueba** — El detalle del pedido **vuelve a enseñar el nº de producción**, y se cierra una puerta trasera
+
+### Qué se puede hacer ahora que antes no
+
+**Ver el número de producción en el detalle del pedido**, otra vez — y ahora **uno por color**.
+
+Hasta la versión 0.078 ese número salía ahí **por accidente**: como sacar a producción *transformaba* el
+modelo, su código pasaba a ser el de 5 dígitos. Desde que cada color tiene su propio modelo, el renglón
+enseña el **código de desarrollo** — que es cierto y buscable, pero incompleto. **La vista del mes traía
+los dos y el detalle sólo uno.** Ya no.
+
+### Qué cambió y puede sorprender
+
+- **Salen todos los números del renglón, uno por cada OP** — igual que en la vista del mes, y con el mismo
+  formato. Si un renglón todavía no tiene ninguna orden, **no sale nada**: ni un cero ni un hueco raro.
+- ⭐ **Las dos pantallas ahora responden con una sola voz.** La regla de qué número enseñar y de **qué
+  orden cuenta** vivía escrita dos veces, una en cada pantalla. Se unificó — porque si se separaran, el
+  mismo renglón podría decirte *«3 órdenes»* en una y *«2»* en la otra.
+- **Se cerró una puerta trasera**: existía una forma de crear una orden **saltándose la entrada a
+  producción entera**, que dejaba la OP colgando de un modelo de desarrollo, sin número. Ahora se rechaza
+  y manda a **generar la OP**, que es el camino bueno. *(Nadie la usaba desde ninguna pantalla, pero
+  estaba abierta.)*
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Queda una tercera copia de la regla «qué orden cuenta»**, en la consulta que calcula **los totales**
+  de la vista del mes. Hoy dicen lo mismo; si algún día se separaran, **los totales discreparían de los
+  renglones de la misma pantalla**. Se dejó a propósito —unificarla traía más riesgo que el que
+  quitaba— y queda **anotada con su razón**, no callada.
+- Sin permisos nuevos, sin migración, sin datos que sembrar: el despliegue no necesita nada especial.
+
+---
+
 ## 0.085 · 2-sep-2026 · **en prueba** — ⭐ El aviso de «ya está comprado» ahora **lleva al botón**, a quien puede usarlo
 
 ### Qué se puede hacer ahora que antes no

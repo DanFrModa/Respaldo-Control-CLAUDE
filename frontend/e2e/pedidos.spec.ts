@@ -285,20 +285,34 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     // color— y el renglón del pedido sigue apuntando a él. `PedidosPagina.tsx` pinta
     // `l.codigoModelo`, que es el del renglón.
     //
-    // ⚠️ Es la GEMELA de la aserción de la vista por MES (arriba), que además enseña `prod. #<nº>`.
-    // Y la diferencia NO es que a esta forma le falte el campo: `esquemaPedidoLineaSalida` **sí
-    // tiene `numeroProduccion`** (comprobado compilando contra `PedidoLinea`). Lo que pasa es que
-    // ese campo es el número del modelo **DEL RENGLÓN**, y tras V1-E3 el renglón apunta al
-    // DESARROLLO —que ya no se promueve nunca— ⇒ **vale `null` para siempre**. Enseñarlo no
-    // devolvería el número: enseñaría un hueco.
+    // ⚠️ Y el campo `numeroProduccion` de esta forma NO sirve para enseñarlo: es el número del
+    // modelo **DEL RENGLÓN**, y tras V1-E3 el renglón apunta al DESARROLLO —que ya no se promueve
+    // nunca— ⇒ **vale `null` para siempre**. Enseñarlo no devolvería el número: enseñaría un hueco.
     //
-    // Los números que Daniel quiere ver son los de los modelos HIJOS, uno por color, y ésos piden
-    // la misma agregación en servidor que la vista del mes (`numerosProduccion`): contrato +
-    // dominio + frontend ⇒ **etapa aparte (0.089)**, no un parche a esta prueba. Mientras tanto lo
-    // que el detalle enseña —el nº de desarrollo— es dato cierto y buscable (D3).
+    // ✅ **0.089 lo cerró.** Los números que Daniel quiere ver son los de los modelos HIJOS, uno por
+    // color, y llegan por la MISMA agregación en servidor que la vista del mes
+    // (`numerosProduccion`). Esta aserción cubre lo mismo que la del MES (`:201-204`) y algo más:
+    // allá se comprueba el `prod. #<nº>`; aquí, además, que el renglón esté VISIBLE.
+    //
+    // 🔴 **Por qué son DOS líneas, y no es por el locator.** El locator es idéntico en las dos
+    // (`filter({ hasText: codigoDesarrollo })`), así que si ese código dejara de pintarse el filtro
+    // resolvería a cero y **las dos** se pondrían rojas: esa regresión no las separa. Lo que las
+    // separa es qué mira cada matcher — medido contra el fuente de Playwright 1.60, no de memoria:
+    //   • `toContainText` compara con `elementText`, que sólo salta `SCRIPT/NOSCRIPT/STYLE/<head>`
+    //     y **no mira CSS**: ni `display:none`, ni `visibility:hidden`, ni tamaño cero.
+    //   • `toBeVisible` sí hace ese chequeo explícito.
+    // ⇒ un renglón **presente en el DOM pero OCULTO** (cajón plegado, panel `hidden`) satisface la
+    // segunda y falla la primera. Ahí es donde la `toBeVisible` se gana el sitio.
+    //
+    // ⚠️ **NO la borres razonando "mismo locator ⇒ sobra".** Lo que se perdería no es la
+    // comprobación del código, es la de que el usuario pueda VERLO. Y sin la segunda, la 0.089
+    // —contrato + dominio + frontend— llegaría a `prueba` sin una sola verificación punta a punta.
     await expect(
       detallePedido.getByTestId('renglon-pedido').filter({ hasText: codigoDesarrollo }),
     ).toBeVisible();
+    await expect(
+      detallePedido.getByTestId('renglon-pedido').filter({ hasText: codigoDesarrollo }),
+    ).toContainText(`prod. #${numeroProduccion}`);
     await detallePedido.getByTestId('nuevo-pedido-real').click();
     const dialogoReal = page.getByRole('dialog');
     await expect(dialogoReal.getByRole('heading', { name: 'Nuevo pedido real' })).toBeVisible();

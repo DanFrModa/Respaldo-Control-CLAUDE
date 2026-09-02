@@ -47555,7 +47555,16 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`)."
+                                  "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`)."
+                                },
+                                "numerosProduccion": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "description": "⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`)."
                                 }
                               },
                               "required": [
@@ -47570,7 +47579,8 @@
                                 "entregadoParcialV1",
                                 "cantFaltanteV1",
                                 "idDesarrollo",
-                                "numeroProduccion"
+                                "numeroProduccion",
+                                "numerosProduccion"
                               ],
                               "additionalProperties": false,
                               "description": "Renglón de un pedido interno."
@@ -48222,7 +48232,16 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`)."
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`)."
+                          },
+                          "numerosProduccion": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "description": "⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`)."
                           }
                         },
                         "required": [
@@ -48237,7 +48256,8 @@
                           "entregadoParcialV1",
                           "cantFaltanteV1",
                           "idDesarrollo",
-                          "numeroProduccion"
+                          "numeroProduccion",
+                          "numerosProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -48756,7 +48776,16 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`)."
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`)."
+                          },
+                          "numerosProduccion": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "description": "⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`)."
                           }
                         },
                         "required": [
@@ -48771,7 +48800,8 @@
                           "entregadoParcialV1",
                           "cantFaltanteV1",
                           "idDesarrollo",
-                          "numeroProduccion"
+                          "numeroProduccion",
+                          "numerosProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -49435,7 +49465,16 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`)."
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`)."
+                          },
+                          "numerosProduccion": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "description": "⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`)."
                           }
                         },
                         "required": [
@@ -49450,7 +49489,8 @@
                           "entregadoParcialV1",
                           "cantFaltanteV1",
                           "idDesarrollo",
-                          "numeroProduccion"
+                          "numeroProduccion",
+                          "numerosProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -49990,7 +50030,16 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`)."
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`)."
+                          },
+                          "numerosProduccion": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "description": "⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`)."
                           }
                         },
                         "required": [
@@ -50005,7 +50054,8 @@
                           "entregadoParcialV1",
                           "cantFaltanteV1",
                           "idDesarrollo",
-                          "numeroProduccion"
+                          "numeroProduccion",
+                          "numerosProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -50545,7 +50595,16 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Esta forma NO lleva los números por color: la consulta que sí los agrega es `pedidos-mes` (`numerosProduccion`)."
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`)."
+                          },
+                          "numerosProduccion": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "description": "⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`)."
                           }
                         },
                         "required": [
@@ -50560,7 +50619,8 @@
                           "entregadoParcialV1",
                           "cantFaltanteV1",
                           "idDesarrollo",
-                          "numeroProduccion"
+                          "numeroProduccion",
+                          "numerosProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -54956,6 +55016,11 @@
                             }
                           ]
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "default": [],
                           "description": "Cantidades por talla de este color.",
@@ -55476,6 +55541,10 @@
                                 ],
                                 "description": "Código PANTONE de este color, o null."
                               },
+                              "pack": {
+                                "type": "string",
+                                "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                              },
                               "tallas": {
                                 "type": "array",
                                 "items": {
@@ -55520,6 +55589,7 @@
                               "idColor",
                               "color",
                               "pantone",
+                              "pack",
                               "tallas",
                               "totalPiezas"
                             ],
@@ -59452,6 +59522,10 @@
                                   ],
                                   "description": "Código PANTONE de este color, o null."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                                },
                                 "tallas": {
                                   "type": "array",
                                   "items": {
@@ -59496,6 +59570,7 @@
                                 "idColor",
                                 "color",
                                 "pantone",
+                                "pack",
                                 "tallas",
                                 "totalPiezas"
                               ],
@@ -59873,10 +59948,11 @@
         }
       },
       "post": {
-        "summary": "Crear una orden de producción desde un renglón de pedido",
+        "summary": "Crear una orden de producción desde un renglón de pedido cuyo modelo YA es de producción",
         "tags": [
           "ordenes"
         ],
+        "description": "Alta directa por captura, con autorrelleno de modelo/cliente/empresa desde el renglón. ⚠️ Si el modelo del renglón es de DESARROLLO se rechaza con 409: esa OP se genera con `POST /api/pedidos/lineas/{idLinea}/salida-produccion`, que es quien hace nacer el modelo de producción del color con su nº de 5 dígitos (V1-E3, §Post-F9.34).",
         "requestBody": {
           "required": true,
           "content": {
@@ -60028,6 +60104,11 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack.",
+                          "type": "string",
+                          "maxLength": 12
                         },
                         "tallas": {
                           "default": [],
@@ -60488,6 +60569,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -60532,6 +60617,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -61310,6 +61396,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -61354,6 +61444,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -62251,6 +62342,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -62295,6 +62390,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -62676,6 +62772,11 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones con y sin pack.",
+                          "type": "string",
+                          "maxLength": 12
                         },
                         "tallas": {
                           "default": [],
@@ -63150,6 +63251,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -63194,6 +63299,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -63993,6 +64099,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -64037,6 +64147,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -64836,6 +64947,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -64880,6 +64995,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -65697,6 +65813,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -65741,6 +65861,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -68126,6 +68247,10 @@
                             ],
                             "description": "Código PANTONE de este color, o null."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -68170,6 +68295,7 @@
                           "idColor",
                           "color",
                           "pantone",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -89541,7 +89667,7 @@
     },
     "/api/ordenes/incompletas": {
       "get": {
-        "summary": "Listar órdenes incompletas (capturadas sin matriz) con semáforo de antigüedad",
+        "summary": "Listar órdenes incompletas (les falta tallas, receta liberada o arte) con semáforo de antigüedad",
         "tags": [
           "ordenes"
         ],
@@ -89745,7 +89871,7 @@
                           "semaforo"
                         ],
                         "additionalProperties": false,
-                        "description": "Orden incompleta (capturada sin matriz) con su antigüedad y semáforo."
+                        "description": "Orden incompleta (`capturada`: le falta tallas, receta liberada o arte) con su antigüedad y semáforo. NO significa \"sin matriz\": una incompleta puede tenerla."
                       },
                       "description": "Órdenes incompletas de la página."
                     },
@@ -134384,6 +134510,11 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la orden maneja packs; ausente o vacío en las órdenes que no los manejan.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "minItems": 1,
                           "type": "array",
@@ -134653,6 +134784,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -134694,6 +134829,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -135184,6 +135320,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -135225,6 +135365,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -135542,6 +135683,11 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la orden maneja packs; ausente o vacío en las órdenes que no los manejan.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "minItems": 1,
                           "type": "array",
@@ -135812,6 +135958,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -135853,6 +136003,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -136343,6 +136494,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -136384,6 +136539,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -136668,6 +136824,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = la orden no maneja packs."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -136688,6 +136848,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -136742,6 +136903,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK de la celda. CADENA VACÍA = la orden no maneja packs."
+                                },
                                 "idTalla": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
@@ -136762,6 +136927,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "idTalla",
                                 "etiquetaTalla",
                                 "cantidad"
@@ -137036,6 +137202,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = la orden no maneja packs."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -137056,6 +137226,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -137513,6 +137684,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                                },
                                 "tallas": {
                                   "type": "array",
                                   "items": {
@@ -137554,6 +137729,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "tallas",
                                 "totalPiezas"
                               ],
@@ -138484,6 +138660,11 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10). OPCIONAL SIEMPRE: vacío = «el maquilero los devolvió revueltos», y ese renglón consume del saldo agregado de todos los packs. Con pack, consume además del saldo de ese pack. En una orden sin packs va vacío.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
                         "tallas": {
                           "minItems": 1,
                           "type": "array",
@@ -138797,6 +138978,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = se recibió sin distinguir pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -138886,6 +139071,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas",
                           "totalIncompletas"
@@ -139412,6 +139598,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = se recibió sin distinguir pack."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -139501,6 +139691,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "tallas",
                           "totalPiezas",
                           "totalIncompletas"
@@ -139827,6 +140018,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK de la celda. CADENA VACÍA = sin pack (en una orden con packs, lo devuelto revuelto)."
+                                },
                                 "idTalla": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
@@ -139853,6 +140048,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "idTalla",
                                 "etiquetaTalla",
                                 "cantidad",
@@ -139911,6 +140107,10 @@
                                         "type": "string",
                                         "description": "Nombre del color."
                                       },
+                                      "pack": {
+                                        "type": "string",
+                                        "description": "PACK de la celda. CADENA VACÍA = sin pack (en una orden con packs, lo devuelto revuelto)."
+                                      },
                                       "idTalla": {
                                         "type": "integer",
                                         "minimum": -9007199254740991,
@@ -139937,6 +140137,7 @@
                                     "required": [
                                       "idColor",
                                       "color",
+                                      "pack",
                                       "idTalla",
                                       "etiquetaTalla",
                                       "cantidad",
@@ -143280,6 +143481,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -143300,6 +143505,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -143323,6 +143529,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -143343,6 +143553,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -143389,6 +143600,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                                },
                                 "idTalla": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
@@ -143409,6 +143624,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "idTalla",
                                 "etiquetaTalla",
                                 "cantidad"
@@ -143474,6 +143690,10 @@
                                   "type": "string",
                                   "description": "Nombre del color."
                                 },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                                },
                                 "idTalla": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
@@ -143494,6 +143714,7 @@
                               "required": [
                                 "idColor",
                                 "color",
+                                "pack",
                                 "idTalla",
                                 "etiquetaTalla",
                                 "cantidad"
@@ -143553,6 +143774,10 @@
                                         "type": "string",
                                         "description": "Nombre del color."
                                       },
+                                      "pack": {
+                                        "type": "string",
+                                        "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                                      },
                                       "idTalla": {
                                         "type": "integer",
                                         "minimum": -9007199254740991,
@@ -143579,6 +143804,7 @@
                                     "required": [
                                       "idColor",
                                       "color",
+                                      "pack",
                                       "idTalla",
                                       "etiquetaTalla",
                                       "cantidad",
@@ -143643,6 +143869,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK de la celda. CADENA VACÍA = sin pack."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -143663,6 +143893,7 @@
                         "required": [
                           "idColor",
                           "color",
+                          "pack",
                           "idTalla",
                           "etiquetaTalla",
                           "cantidad"
@@ -148416,7 +148647,17 @@
                           },
                           "recibido": {
                             "type": "number",
-                            "description": "Σ piezas recibidas (recibos vivos del periodo)."
+                            "description": "Σ piezas BUENAS recibidas (recibos vivos del periodo)."
+                          },
+                          "incompletas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Σ prendas INCOMPLETAS que el maquilero entregó en los recibos del grupo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `recibido`: no se producen ni se pagan, así que no generan cargo y no pueden descuadrar la conciliación."
+                          },
+                          "soloIncompletas": {
+                            "type": "boolean",
+                            "description": "¿Todos los recibos VIVOS de este grupo trajeron SÓLO prendas incompletas? Es lo que explica un renglón con `recibido` 0: esas prendas no se pagan, así que esos recibos NO generaron cargo. NO afirma que el renglón cuadre: `cargado` incluye también los cargos validados que no cuelgan de un recibo (histórico o manual), y uno de ésos puede dejar `faltantePorCargar` negativo. Derivado en el servidor (A1) de `recibido === 0 && incompletas > 0`; la pantalla sólo lo pinta."
                           },
                           "cargado": {
                             "type": "number",
@@ -148447,6 +148688,8 @@
                           "idTipoProceso",
                           "tipoProceso",
                           "recibido",
+                          "incompletas",
+                          "soloIncompletas",
                           "cargado",
                           "faltantePorCargar",
                           "cortado",
@@ -148534,6 +148777,11 @@
                         "recibido": {
                           "type": "number"
                         },
+                        "incompletas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "cargado": {
                           "type": "number"
                         },
@@ -148548,6 +148796,7 @@
                       },
                       "required": [
                         "recibido",
+                        "incompletas",
                         "cargado",
                         "faltantePorCargar",
                         "numCargosSinRecibo"

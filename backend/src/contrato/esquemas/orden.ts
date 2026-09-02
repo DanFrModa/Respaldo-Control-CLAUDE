@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPackEntrada, esquemaPackSalida } from './pack.js';
+
 /**
  * Contrato Zod del módulo ÓRDENES de producción (F2-E2 — doc `Documentacion_MJD/03-Produccion.md`
  * y `02-Pedidos.md`). La orden es el documento con el que se manda a PRODUCIR un renglón de un
@@ -66,9 +68,10 @@ export const esquemaOrdenTallaEntrada = z.object({
 export type DatosOrdenTallaEntrada = z.infer<typeof esquemaOrdenTallaEntrada>;
 
 /**
- * Renglón de la matriz = un COLOR del catálogo (F1) con sus cantidades por talla. Color ÚNICO por
- * orden (lo valida el dominio). El `id` viene SOLO en edición para conservar la auditoría del
- * renglón existente (diff-mínimo; si falta, es renglón nuevo).
+ * Renglón de la matriz = un COLOR del catálogo (F1) × su PACK, con sus cantidades por talla. La
+ * pareja COLOR + PACK es ÚNICA por orden (lo valida el dominio y el `@@unique` de la tabla); sin
+ * packs eso es lo de siempre, «un renglón por color». El `id` viene SOLO en edición para conservar
+ * la auditoría del renglón existente (diff-mínimo; si falta, es renglón nuevo).
  */
 export const esquemaOrdenLineaEntrada = z.object({
   id: z
@@ -90,6 +93,12 @@ export const esquemaOrdenLineaEntrada = z.object({
     .describe(
       'Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone).',
     ),
+  pack: esquemaPackEntrada.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10): C&A pide varias corridas distintas en una misma ' +
+      'OP y antes la letra iba dentro del nombre del color («Negro A»). Omitirlo o mandarlo vacío = ' +
+      'la orden NO maneja packs. Una orden es con packs o sin packs: no se pueden mezclar renglones ' +
+      'con y sin pack.',
+  ),
   tallas: z
     .array(esquemaOrdenTallaEntrada)
     .default([])
@@ -208,8 +217,11 @@ export type DatosOrdenPatchCuerpo = z.infer<typeof esquemaOrdenPatchCuerpo>;
 /**
  * Cuerpo de guardar la matriz completa de una orden (doc 03-Produccion `OrdenesDet`): el SET
  * COMPLETO de colores con sus tallas/cantidades. El dominio sincroniza (agrega/edita/quita) en una
- * transacción A2, valida color no repetido + tallas del catálogo + cantidades ≥0, y DERIVA
- * `estado='completa'` + `fechaCompletada` en el primer guardado con líneas (paridad con `FechaDet`).
+ * transacción A2, valida color no repetido + tallas del catálogo + cantidades ≥0, y RECALCULA el
+ * estado con la regla única (`requisitos-orden.ts`). Guardar líneas cubre el requisito de `tallas`,
+ * pero NO completa la orden por sí solo: también hacen falta la receta liberada y el arte si el
+ * modelo lo lleva. `fechaCompletada` se sella la primera vez que se cumplen todos (paridad con
+ * `FechaDet`) y nunca se borra.
  */
 export const esquemaOrdenMatrizCuerpo = z.object({
   lineas: z
@@ -357,6 +369,9 @@ export const esquemaOrdenLineaSalida = z
     idColor: z.number().int().describe('Id del color.'),
     color: z.string().describe('Nombre del color (para la UI).'),
     pantone: z.string().nullable().describe('Código PANTONE de este color, o null.'),
+    pack: esquemaPackSalida.describe(
+      'PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs.',
+    ),
     tallas: z.array(esquemaOrdenTallaSalida).describe('Cantidades por talla.'),
     totalPiezas: z.number().int().describe('Suma de las cantidades de las tallas de este color.'),
   })

@@ -1302,6 +1302,202 @@ antes del despliegue**, `TypeError` y **se cae la pantalla de la receta entera**
 - **Una medida editada en una talla que sólo una OP pide no se detecta** (es diferencia del pedido).
 - **Rendimiento sin medir**: hasta 100 linajes por página, y las 5 consultas corren **dentro de la
   transacción de escritura** de cada mutación de receta.
+## V1-E9u · LOS DOS GUARDIANES — y la fuga que el plan daba por dormida (2-sep-2026, versión **0.089**) — ✅ FILAS 0.091 y 0.092
+
+**Qué entregó.** Las dos filas eran **advertencias que vivían en una fila del plan y que nadie está obligado a
+leer**. El encargo era convertirlas en **guardianes que se disparen solos** — o medir que no se puede y decirlo.
+Salieron **tres**, y de paso **una fuga real tapada**.
+
+### 🔴 La fila 0.091 mentía en su afirmación central
+
+Decía **«✅ Hoy NO ocurre»** y **«los siete puentes»**. Las dos falsas:
+
+- `receta-orden.ts:2641` (`quitarRenglonReceta`, rama del **arte agregado a mano**) hacía
+  `tx.ordenArte.delete(...)` ⇒ cascada a `OrdenArteFoto` ⇒ **la fila `Archivo` queda viva y su objeto de R2
+  pagándose para siempre**. Peor caso posible: un arte a mano (`idModeloArte` NULL) **sólo puede llevar foto
+  por `OrdenArteFoto`** ⇒ **se iban todas sus fotos**.
+- ⭐ **Por qué la fila no lo vio:** su lista (`modelo/orden/pedido/desarrollo/proveedor/entradaTela`) era
+  **correcta y no servía** — el borrado es de `ordenArte`, **un padre que nació con la v0.083**, dos semanas
+  después de escribirse la fila.
+- **Números reales** (sonda sobre `schema.prisma`: 166 modelos, 328 FKs, confirmados por el reviewer con sonda
+  propia): **11 FKs** hacia `Archivo` = **8 puentes** (el octavo es `OrdenArteFoto`) **+ 3 campos del dueño**
+  (`Empresa.archivoLogo`, `EntradaTela.archivoCfdi`, `MovimientoTercero.archivoCfdi`) que **corren el mismo
+  riesgo y la fila no menciona**. Cierre de ancestros ⇒ **19 modelos vigilables**.
+
+**El arreglo:** `liberarFotosPropiasDeArteOrden` libera los `Archivo` dentro de la transacción y **suelta las
+keys de R2 DESPUÉS del commit**; la bitácora guarda **los nombres** (D3, no un conteo). El reviewer confirmó la
+cascada **en el DDL real**, no sólo en el esquema.
+
+### Los tres guardianes, y por qué la superficie se CALCULA
+
+1. **`archivos-huerfanos.test.ts`** — inventario que debe coincidir **exactamente** con el esquema, y una
+   superficie de hard-delete **calculada del esquema con cierre de ancestros**, no listada a mano. Así **el
+   noveno puente no puede pasar callado**.
+2. **`techo-de-memoria.test.ts`** — ⚠️ el techo **no está en un sitio: está en CUATRO** (`ci.yml` ×3 +
+   `backend/Dockerfile` inline), y **`ci.yml:313-320` ya avisaba** de que el techo del workflow no cruza al
+   `docker build` (*«hubo cuarta vez el mismo día»*) ⇒ **un guardián de un solo sitio habría sido la rama
+   gemela literal**. Cubre **las dos grafías** que Node acepta y **sólo prohíbe SUBIR**.
+3. **`gates.ts` + `gates-locales.test.ts`** — pre-vuelo serializado que traduce `137`/`134` y **sólo imprime la
+   frase de verde si pasó todo**.
+
+### ⭐ El pre-vuelo se validó SOLO, contra el fallo que venía a atrapar
+
+Durante las pruebas la caja se quedó sin memoria **de verdad** y el kernel mató un gate. Salió:
+*«✗ backend: lint — MUERTO POR EL OOM-KILLER DEL KERNEL (137/SIGKILL) — la corrida NO VALE y NO es un pase»*,
+**sin frase de verde**. Un control compensatorio validado en vivo y sin buscarlo.
+
+### 🔴 Dos rechazos, los dos por el defecto que la etapa venía a matar
+
+**C1 · El guardián que decía «el CI corre TODOS estos gates» no lo comprobaba para 2 de los 8.** Se apoyaba en
+`run: npm run test` y el CI los corre como **`run: npm test`**; la única línea del workflow con esa cadena era
+**la del e2e**, o sea **justo el gate que el propio archivo declara prohibido**. El reviewer lo probó en las dos
+direcciones: la mutación que cambia los dos comandos de prueba por un `echo` dejaba **10/10 en verde con el CI
+sin correr ni una prueba**.
+⭐ **Y al arreglarlo el coder se cazó un SEGUNDO defecto propio**: su red de seguridad era `size > 8` y —con
+**16 líneas `run: npm …` que colapsan a 9 comandos**— la mutación se ponía roja **por el conteo, no por la
+invariante**. *«Un guardián que se dispara por la razón equivocada es el mismo defecto con otra ropa.»* Cambiada
+por un ancla que **no solapa con ningún gate**.
+🔴 **N1 · Y todavía mentía en el mensaje.** El reviewer mutó el ancla (`npm ci` **con banderas**): fallaba, sí,
+pero acusando al regex ⇒ *quien lo viera en rojo iría a depurar lo que sí funciona*. Separadas las dos
+afirmaciones.
+
+**C3 · La correspondencia «puerta a R2 ↔ prueba de commit» era una lista a mano — y ya había envejecido una
+vez.** Probado: **con la fuga reintroducida, el guardián de hard-delete sigue 8/8 en verde**; quien la mata es
+la prueba de commit. Y `fotos-arte-orden.ts` fue puerta **desde la 0.083 sin guardián**, descubierto a mano.
+Ahora se **escanea**: cada módulo-puerta debe estar importado por algún `*-r2.test.ts`, **detectando las dos
+formas de importación** (tres de los siete usan la dinámica). ⭐ Medido: **12 puertas, no 11** — la que faltaba
+es `respaldo-bd.ts`, **exenta con razón** (el reviewer la verificó por tres patas: no crea fila `Archivo`, no
+vive dentro de ninguna transacción, y su invariante real ya tiene prueba).
+🔴 **N2 · El guardián es por MÓDULO, no por PUERTA, y no lo decía**: **15 sitios en 12 módulos**. Hoy sin
+hueco, pero **una tercera puerta en uno de los que ya tienen dos pasaría inadvertida** ⇒ escrito en el docblock,
+y cerrada la otra mitad: **importar no basta, hay que INVOCAR el guardián**.
+
+### Lo que el reviewer añadió y el coder no había hecho
+
+Cuatro mutaciones propias, todas muertas: **ofuscar el import** (especificador calculado) · **que la puerta
+exenta deje de ser puerta** (⇒ *«el registro de exentas tampoco se puede pudrir»*) · **el ancla con banderas** ·
+y un **techo con guiones bajos en `railway.json`**. Y en la de romper el parser, que sobrevivía en 2 de 8,
+demostró con **control negativo** que esas dos **no son vacuas**: rompiendo la otra pieza mueren **8 de 8**.
+
+### La ronda que yo pedí: la puerta gemela
+
+`quitarFotoArteOrden` **YA liberaba bien** — *«no había defecto que arreglar: había una invariante sin
+vigilancia»*. Su prueba nueva lo blinda, y el dato que la hace valiosa: con el borrado movido **dentro** de la
+transacción, **la suite que ya cubría esa puerta se queda 44/44 EN VERDE**. Era completamente ciega.
+⭐ Y **el título de esa suite mentía**: prometía *«borra el objeto de R2 **tras el commit**»* sobre un montaje
+que **no hace commit**. Corregido.
+
+### Y una prueba que ejercitaba la fuga leyéndose como limpia
+
+`fotos-arte-orden.int.test.ts` borraba la orden, comprobaba que las marcas desaparecían… y **nunca miraba si el
+`Archivo` sobrevivía**. Ahora lo afirma, **con el comentario de que eso está LATENTE y de que el día que
+alguien construya «eliminar orden» esa aserción tiene que darse la vuelta**.
+
+### Residuos declarados (dentro del código, no en una nota suelta)
+
+- **Los cuatro `adjuntos-*` siguen sin guardián de commit** — deuda de la 0.081(a), y ahora se sabe **por
+  medición** que su suite tampoco los ve.
+- El guardián de hard-delete es **de texto**: no ve `$executeRaw` (hoy 0), despacho por variable, borrados
+  anidados (hoy 0) ni el SQL de migraciones. **Lo que lo salva de envejecer es que la superficie sale del
+  esquema.**
+- **No escanea `scripts/` ni `migracion/`** (3 hard-deletes de demo y 0, respectivamente; cubiertos por REGLA
+  0-B). ⚠️ *Si mañana un ETL borra una `Orden` con adjuntos, no lo ve.*
+- El pre-vuelo **puede quedarse corto** sin que nadie se entere: su guardián impide que prometa **de más**, no
+  que se quede corto. **Deliberado: el CI es el único juez.**
+- La invariante que autoriza el borrado a ciegas —que ningún `ModeloArteFoto` apunte a un `Archivo` subido en
+  una OP— **sigue siendo sólo prosa**; heredada de la 0.083.
+
+### Despliegue
+
+**Sin migración** (el cambio en `schema.prisma` son comentarios `///`; `prisma validate` EXIT=0), **sin
+permisos, sin seed** ⇒ **NO requiere `SEED_ON_START`**.
+
+### Gates
+
+`format:check` **0** · `typecheck` **0** · `lint` **0** · `test:unit` **0** — **209 archivos / 2 743 pruebas**.
+Frontend sin tocar; contrato intacto. ⚠️ **El `lint` costó cuatro intentos entre los dos** (`137` del
+OOM-killer, `134` de V8, uno abandonado) **y ninguno se reportó como pase**; el verde salió con la caja libre y
+con el techo del CI. **Es la fila 0.092 ocurriendo en vivo mientras se revisaba la fila 0.092.**
+## V1-E9t · LOS DOS CABOS QUE SE PODÍAN HACER YA — y la fila que hubo que reescribir (2-sep-2026, versión **0.088**) — 🔶 O2 y O4 DE LA FILA 0.082
+
+**Qué entregó.** Dos de los cuatro cabos de las prendas incompletas. Pero lo primero que hizo esta etapa fue
+**medir la fila 0.082 contra el código, y la fila salió mal escrita en sus cuatro cabos**.
+
+### 🔴 Lo que la medición desmintió, antes de escribir una línea
+
+- **O1 no era un cabo: era un duplicado de la fila 0.061, decidido al revés.** La fila decía *«darle salida
+  automática SÍ SERÍA INVENTAR UNA MERMA»* citando §Post-F9.61 — y §Post-F9.154(a) (30-ago) dice lo contrario:
+  **la incompleta sale de tránsito como merma automática, auditada y reversible**. ⚠️ **Y §Post-F9.154 nació
+  justo de descubrir que esa cita decía lo contrario** ⇒ **la fila repetía el error que ya se había corregido
+  una vez**. Se **borra** de la 0.082.
+- **O2 estaba al revés.** El renglón «en ceros» **no es ruido**: `recibido === 0` **⟺** todos los recibos del
+  grupo trajeron **sólo incompletas** (`recibos.ts:227` descarta la celda vacía, `:257-262` rechaza el recibo
+  sin celdas) ⇒ **es la única huella de esa entrega en la conciliación**, que es literalmente lo que Daniel
+  pidió ver. Y **el filtro que la fila quería construir ya existía**.
+- **O4 tampoco era un choque de nombres.** Enumerado: los dos conceptos **nunca comparten pantalla** y los
+  textos ya van calificados. Lo que estaba mal era **la descripción**.
+- **O5 sí era cierto**, pero con un matiz que cambia su valor: **el sesgo está SÓLO en las pruebas**.
+
+### ⭐ La corrección que el coder me hizo a mí, y tenía razón
+
+Yo le dije que `recibido === 0` **equivale** a «puras incompletas». Él midió que **eso vale sólo para lo que
+crea el dominio**: `cantidadIncompletas` es `Int?` y **lo migrado trae la columna en NULL** (el propio `///`
+del esquema lo dice: *«NULL en corte/envío/entrega y en TODO lo migrado»*). ⇒ la marca correcta es
+**`recibido === 0 && incompletas > 0`**, con su caso HISTÓRICO en la prueba. Es la pregunta de REGLA 0-B
+—*«¿funciona bien cuando el dato NO está?»*— contestada bien.
+
+### La prueba que no existía
+
+`dominio/esma/conciliacion.ts` **no tenía archivo de prueba**; lo único que lo rozaba nunca veía una
+incompleta. Ahora tiene el suyo, con **cuatro grupos** para que no pase por construcción: MEZCLADO · PURAS
+INCOMPLETAS · LIMPIO · HISTÓRICO (fila insertada a mano con la columna NULL). El reviewer verificó que
+**discriminan de verdad**: cada forma equivocada de escribir la condición muere en un grupo distinto.
+⚠️ **Escrita a ciegas** (integración, sin Docker aquí): **su primera corrida real es CI.**
+
+### 🔴 Tres rechazos, y los tres por lo mismo
+
+**Ronda 1** — el barrido dejó **5 sitios vivos**, uno **en el archivo que el propio coder editó**, 850 líneas
+más abajo, y con **una segunda falsedad peor**: *«una orden que nace ya con matriz nace COMPLETA sola»*, cuando
+**ninguna orden puede nacer completa por esa vía** (la receta se copia **sin firma**). Los otros: el README del
+script que sí editó, la **documentación viva del módulo** (con la firma de la función ya desactualizada), una
+**instrucción operativa de F10**, y un TSDoc que decía *«tiene que nombrar la causa REAL»* y nombraba un motivo
+que ya no existe.
+
+**Ronda 2** — ⚠️ **la trampa anunciada**: corrigió la frase falsa **con otra falsa**. Escribió *«NINGUNA orden
+puede nacer completa»* y existe una segunda vía viva, `crearOrdenMigrada`, que inserta con el estado explícito
+de Access. **Su propio archivo lo contradecía 76 líneas arriba.** Y la promesa a acotar vivía en **siete
+sitios, no seis**: el que quedaba era **la gemela literal de uno que él sí arregló**.
+
+**Ronda 3** — otra vez, ahora en **el remate añadido**: *«la orden del ETL nace completa Y cumpliendo la
+regla»*. 🔴 Falso para **2 de cada 3**: el sellado es condicional, y **2 577 órdenes del viejo tienen modelo sin
+BOM** ⇒ nacen `completa` **con la receta sin liberar**. Y la frase **se contradecía sola**: si el histórico ya
+cumpliera la regla, `realinear-estado-ordenes.ts` **no tendría nada que degradar**.
+
+📌 **La lección, porque el patrón fue idéntico las tres veces: el arreglo era correcto y lo que falló fue la
+JUSTIFICACIÓN añadida.** ⇒ *cuando se mide una condición, se escribe entera; **una excepción contada a medias
+es una afirmación nueva** y hay que medirla como tal.*
+
+### Lo que el reviewer verificó, no creyó
+
+Regeneró el contrato y comparó **md5 byte a byte** (`OK ×3`), leyó el diff con `-U0` para confirmar que **la
+composición es exactamente la esperada y no hay nada de más**, enumeró **todos los escritores de `Orden`** para
+descartar una tercera vía (dos funciones, cero `INSERT` en migraciones, cero `$executeRaw`), y **repitió el
+barrido de reincidencia con sus propias variantes**.
+
+### La migración que NO se toca, y son DOS
+
+`20260726120000_modelo_lleva_arte:6` y `20260726130000_recalculo_estado_ordenes:18` llevan la frase vieja.
+**Intocables**: Prisma guarda el checksum y `migrate deploy` —que corre el entrypoint **en cada arranque**—
+falla en duro si el archivo cambia ⇒ corregir ese comentario **tumbaría el despliegue de `prueba` y el de
+producción**. La segunda además **se auto-declara congelada** en su línea 36.
+
+### Residuos declarados
+
+- ⚠️ **La defensa de `soloIncompletas` vive ENTERA en el job de integración.** Si alguien la rompe, **en local
+  no muere ninguna aserción**: el test de pantalla mockea el hook y defiende el **pintado**, no la derivación.
+- El renglón de **totales** habla de todas las filas mientras la tabla muestra el subconjunto filtrado en
+  cliente. **Preexistente**; `incompletas` sólo se suma al patrón que ya había.
+- **O5 espera** a que baje la versión que toca `recibos.int.test.ts`.
 
 ### Despliegue
 
@@ -1312,6 +1508,227 @@ antes del despliegue**, `TypeError` y **se cae la pantalla de la receta entera**
 backend **205 archivos / 2 765 pruebas** · frontend **206 / 2 017** · typecheck ×2 · lint ×2 · format ×2 ·
 contrato **sin deriva byte a byte**. Corridos por el coder **y repetidos por el reviewer**, con cifras
 coincidentes.
+backend **204 archivos / 2 713 pruebas** · frontend **206 / 2 005** · typecheck ×2 · lint ×2 (0 errores) ·
+format ×2 · contrato regenerado **sin deriva**. ⚠️ Los cuatro largos **el coder no pudo terminarlos** (la caja
+saturada le dio 31 min de reloj por 1:52 de CPU): **los corrió el reviewer**, y los cuatro en verde.
+
+## V1-E9s · ⭐ EL PACK, COMO CAMPO PROPIO — la mitad de abajo (2-sep-2026, versión **0.087**) — 🔶 MITAD DE LA FILA 0.084
+
+**Qué entregó.** El pack deja de vivir dentro del nombre del color («Negro A») y pasa a ser **campo propio**
+de `OrdenLinea` y de `EtapaMovimientoDet`, viajando al **corte** y al **envío a maquila** y siendo opcional
+al **recibir**. Es la **mitad de abajo**: las pantallas y el importador se separaron a la fila **0.095** al
+medir que no cabían en una entrega.
+
+### Las tres cosas que el encargo no nombraba, y las tres las trajo la medición
+
+1. **Un `pack` NULLABLE habría destruido en silencio una garantía viva.** `OrdenLinea` tenía
+   `@@unique([idOrden, idColor])`; al crecer a `(idOrden, idColor, pack)` con NULL, Postgres considera
+   distintos dos `(1, 5, NULL)` ⇒ **la unicidad «un renglón por color» desaparecería justo para el caso
+   normal**. La salida limpia sería `NULLS NOT DISTINCT`, y **Prisma 7.8 no la sabe expresar** (verificado
+   con `prisma validate`: *«No such argument»*). De ahí `text NOT NULL DEFAULT ''` — vacío = «sin pack» —,
+   que además mata el mapeo `null ↔ ''` entre contrato, dominio y columna.
+2. 🔴 **Un defecto latente de la RUTA CRÍTICA que los packs disparaban.** `autoAvance.ts:calcularCompletitud`
+   agregaba `pasado` pero **recorría `pedido` en crudo**: con dos renglones del mismo color×talla —que es
+   exactamente lo que crea un pack— cada tendido se daba por cubierto con las piezas del otro ⇒ **la RC
+   habría dado «corte terminado» con 100 de 150**. Arreglado agregando los dos lados. El reviewer **buscó
+   la gemela y no la encontró**: `completitudRecepcionTela`, `pedidoPorOrden`, `piezasDeLaOrden`,
+   `piezasPorTallaOrden` y `curvas-de-la-orden` agregan todas.
+3. **El kardex habría recibido renglones duplicados.** Dos tendidos de la misma celda producían dos
+   `MovimientoDetPt` de la MISMA llave, el lock del artículo tomado dos veces y el no-negativo del tránsito
+   sumando por su cuenta ⇒ **el pack se pliega en esa frontera**. El reviewer verificó que las **dos**
+   puertas de `recibos.ts` y la de `etapas.ts` consumen el plegado, y **enumeró los 9 llamadores** del motor
+   de kardex PT para descartar una tercera.
+
+### ⭐ La propiedad que hace segura la etapa está MEDIDA, no prometida
+
+*«Una orden sin packs evalúa sólo la guarda vieja.»* El reviewer no la creyó: copió la guarda anterior
+**literal de `git show HEAD`** y la corrió contra la nueva en **576 escenarios** (dentro, en el límite,
+pasado; con y sin incompletas; 1 y 2 celdas) ⇒ **0 diferencias** de aceptación y 0 de números. **Control
+negativo** (fingir que las celdas traen pack): **98 diferencias** ⇒ la sonda sí medía. Única diferencia real,
+cosmética: el mensaje ya no lleva el desglose `(N recibidas + M incompletas)` porque `pide` es ahora una suma.
+
+**El tope es híbrido y ninguna condición implica a la otra** (`packs.ts:excesosDelRecibo`, pura): **(1)
+TOTAL** por color×talla plegando el pack —la guarda que ya existía, intacta— y **(2) POR PACK**, que el
+renglón sin pack **no dispara**. Sin (1): 5 de A + 5 de B + 5 sin pack = **15 de 10 enviadas**. Sin (2): 10
+del pack A habiendo enviado 5. Y (1) tuvo que aprender algo nuevo: **sumar los renglones de la MISMA celda
+dentro de una captura**, porque antes una celda sólo podía aparecer una vez.
+
+### 🔴 El rechazo: una guarda que fallaba EN SILENCIO, y por DOS puertas
+
+«El pack de un renglón con producción viva no se cambia» **existía y no se ejecutaba**: sólo miraba
+renglones que traían `l.id`.
+- **Puerta A — borrar y recrear.** Un `set` con el mismo color **sin `id`** dejaba la comprobación vacía; a
+  continuación se borraba el renglón viejo y se creaban los nuevos.
+- **Puerta B — `copiarDetalleOrden`.** Arma su lista **sin `id` en ningún renglón** ⇒ la guarda **nunca** se
+  ejecutaba ahí: copiar una matriz sobre una orden ya cortada la re-empacaba en silencio, **siempre**.
+
+Y el daño era el que **el propio comentario de la guarda** describía: el cortado queda llaveado con el pack
+viejo y el envío busca el nuevo ⇒ **esas piezas cortadas no se pueden enviar nunca**, con un error que
+culpa al usuario.
+
+**Arreglo:** comparación **por COLOR**, independiente de la identidad de fila, dentro de
+`sincronizarMatriz` ⇒ **una sola corrección cierra las dos puertas**. ⭐ **Y la aritmética se extrajo a
+función pura** (`coloresReempacados` / `packsPorColor`) por una razón honesta: *las pruebas de las dos
+puertas son de integración y sin extraerla no se podía mutar nada localmente* (precedente en el repo:
+`resolverSugerencia`). El reviewer verificó que **no hay segunda verdad**: `packsDespues` se arma con la
+**misma expresión** que usa la escritura, así que se compara exactamente lo que se escribe.
+
+**El riesgo simétrico también se midió:** que la guarda quedara **demasiado ancha**. Sonda del reviewer con
+la composición exacta del llamador, **15 casos, 0 desacuerdos** (control negativo: 7). Pasan —como deben—
+un color quitado entero, un color nuevo, recapturar el mismo pack, y copiar una matriz sin packs.
+
+### ⚠️ Una declaración retirada por su autor
+
+El coder había archivado esto como *«hueco preexistente»*. **No lo era en su efecto**: antes del pack,
+borrar y recrear devolvía la MISMA identidad `(orden, color)` y las celdas de corte seguían casando. **El
+daño lo introduce esta etapa**, al meter el pack en la llave de las dos partes. Y la puerta de
+`copiarDetalleOrden` **no estaba declarada en ningún lado**.
+
+### La gemela que la limpieza no había alcanzado
+
+`metaPara` vivía dos veces (`wip.ts` exportada + copia privada en `etapas.ts`). Se unificó **midiendo**: no
+hay ciclo (el cierre transitivo de `wip.ts`, ~30 módulos, no alcanza `etapas.ts`) y la única rama que
+diferían era **inalcanzable** desde `etapas.ts` (llave de 2 partes; los tres sitios de llamada reciben
+llaves de `claveCeldaPack`, siempre de 3). Queda **una sola copia**, con un comentario que **nombra a sus
+tres consumidores**.
+
+### Decisiones tomadas por el equipo, pendientes del visto bueno de Daniel
+
+Van en `DECISIONES.md` §Post-F9.179: **«con packs o sin packs, nunca mezclada»** · **«el pack de un renglón
+con producción viva no se cambia»** · **`LARGO_MAX_PACK = 12`**.
+
+### Residuos declarados
+
+- El bucket de pack vacío sale **negativo** en el desglose por recibir (lo devuelto sin atribuir). Es
+  deliberado: sin él **`Σ celdas ≠ totalPendiente`** y el desglose contradiría a su propio total.
+- **Hueco preexistente NO ampliado:** con producción viva se puede borrar un renglón y recrearlo con otro
+  color (el cascade no toca las etapas). Ya existía; con packs la consecuencia es nueva **y ésa sí se cerró**.
+- **`colores-fusion-referencias.ts` sin tocar** (0 líneas): el bloqueo de fusionar colores con
+  `OrdenLinea`/`EtapaMovimientoDet` sigue en pie.
+
+### Despliegue
+
+**Lleva migración** (`20260902190000_el_pack_como_campo_propio`, aditiva: 2 columnas + 2 índices únicos;
+verificada carácter por carácter contra `prisma migrate diff`). **Sin permisos ni seed nuevos** ⇒ **no
+requiere `SEED_ON_START=true`**.
+
+### Gates
+
+backend **205 archivos / 2 749 pruebas** · frontend **206 / 2 001** · typecheck ×2 · lint ×2 · format ×2 ·
+contrato sin deriva. ⚠️ El `lint` del backend costó tres intentos (`EXIT=137` del OOM-killer, `EXIT=134` de
+V8 a 4 GB, y ventanas de 10 min con load 43) **y ninguno se reportó como pase**: cerró en verde al esperar
+memoria. **El coder cazó su propia primera pasada resumiendo `EXIT=137 | 0 errores`** — el falso verde exacto
+contra el que avisa la casa.
+## V1-E9r · LOS DOS CABOS QUE DEJÓ «UN MODELO POR COLOR» (2-sep-2026, versión **0.086**) — ✅ HECHA
+
+Filas **0.089** y **0.090**, juntas por ser el mismo tema: lo que la 0.078 dejó suelto.
+
+### 0.089 — el detalle del pedido sin el nº de producción
+
+Hasta la 0.078 lo enseñaba **por accidente**: el renglón pinta `codigoModelo` y ése **era** el de producción
+porque la promoción transformaba el modelo. **Lo que enseña hoy es cierto (D3)** — pero la vista del MES
+trae **los dos** y el detalle sólo uno.
+
+⚠️ **La trampa:** la línea del detalle **SÍ tiene `numeroProduccion`**, pero vale **`null` SIEMPRE** para un
+renglón de desarrollo ⇒ **enseñarlo daría un hueco, no el número**.
+
+### ⭐ Tres hallazgos del coder que el encargo no nombraba
+
+1. **El detalle tiene DOS lectores, no uno.** `aPedidoSalida` lo comparten `obtenerPedido` **y
+   `listarPedidos`**, y `/pedidos/administrar` pinta su panel **desde el payload de la LISTA** ⇒ el
+   agregado hubo que hacerlo **por PÁGINA**. 🔴 **Y eso abre un modo de fallo que nadie había nombrado:
+   que el lote le dé a un pedido los números de OTRO.** Tiene prueba propia (`pedidos.int.test.ts:865`).
+2. **El `.describe()` del contrato estaba a punto de volverse mentira** (`pedido.ts:261` decía *«Esta forma
+   NO lleva los números por color»*).
+3. **La regla iba a existir DOS veces en el frontend** ⇒ la extrajo, y su M8 (cambiar el separador) pone
+   rojas **las dos páginas**: *la prueba de que responden con una sola voz*.
+
+### 0.090 — `POST /api/ordenes` se saltaba la entrada a producción
+
+Deuda previa (§Post-F9.34) que la 0.078 **no cerró y cuya FORMA cambió**. 🔴 **Medido: NADIE la llama** —
+cero usos en `frontend/src`, `e2e/` y `migracion/` — **pero sigue publicada en el OpenAPI**.
+
+**Tomó (a) fallar cerrado, con un predicado MÁS FINO que el del encargo, y la medición es la razón:**
+
+> rechaza cuando **el modelo que queda SELLADO en la OP** es `origen = 'desarrollo'` — **no** cuando lo es
+> el modelo del renglón.
+
+🔴 **Escribirlo sobre el renglón HABRÍA ROTO `salidaAProduccion`**: ésa pasa `idModeloDeLaOrden` mientras el
+renglón **sigue apuntando a su modelo de desarrollo**. La puerta buena **no puede disparar la invariante
+por construcción** (los hijos nacen `origen: 'produccion'`), y la mala **se cierra antes de cualquier
+escritura** — ni persiste ni consume folio.
+
+**Descartó (b) midiendo:** `lineas` es **opcional** ⇒ un alta sin matriz **acuñaría un hijo multicolor con
+un nº de 5 dígitos que nadie confirmó** ⇒ *«una segunda puerta al acto más delicado del sistema»*.
+**(c) retirar el endpoint: prohibido** — no se retiran capacidades que el dueño no pidió retirar.
+
+### ⭐ El coder se cazó «la prueba que pasa por construcción»
+
+Su **M11**: el stub existente devolvía un modelo **sin `origen`** ⇒ `undefined !== 'desarrollo'` habría
+dejado pasar la guarda nueva **sin comprobar nada**. Lo parametrizó. El reviewer lo verificó **y lo afinó**:
+el agujero real estaba **en la GEMELA**, y hoy es una prueba viva (invertir la guarda la tumba, 5 rojas).
+
+### 🔴 EL RECHAZO: un comentario que la propia entrega volvía falso
+
+`e2e/pedidos.spec.ts` —**el único que prueba esto contra BD real**— tenía un comentario falso en **tres**
+puntos, incluido *«⇒ etapa aparte (0.089)»*… **cuando 0.089 ES esta entrega**.
+
+⭐⭐ **Y es el reflejo EXACTO del error que le dio su número a la 0.090** —una nota que *«se leería como
+cerrada sin estarlo»*— aquí al revés, **y en el mismo PR que arregla su gemela**. El coder había corregido
+el `.describe()` y **dejó éste, que era más explícito**.
+
+**Y la mitad que más pesaba: faltaba la aserción espejo, de UNA línea, con las dos variables ya en ámbito**
+⇒ sin ella, y con los `int.test` sin poder correrse local, **la 0.089 entraba sin una sola verificación de
+punta a punta**.
+
+### ⭐ La razón correcta de una prueba, medida contra el fuente de Playwright
+
+La primera versión justificaba la `toBeVisible` con una razón que **no distinguía nada**: las dos usan **el
+locator idéntico**, así que la regresión que describía las pondría rojas a las dos.
+
+**La razón verdadera la midió el reviewer en el fuente de Playwright 1.60:** `toContainText` usa
+`elementText`, que sólo salta `SCRIPT/NOSCRIPT/STYLE/<head>` y **no mira CSS** ⇒ **un renglón presente pero
+OCULTO satisface `toContainText` y falla `toBeVisible`**.
+
+📌 **Y el peligro iba en la dirección contraria a la que parece:** con la razón mal escrita, *el próximo que
+razone bien concluirá que sobra y borrará el chequeo de visibilidad*. **Un argumento falso defendiendo algo
+correcto es peligroso justo por eso.**
+
+### ⭐ La duplicación en el backend: el coder se aplicó su propio argumento
+
+El reviewer notó que la regla quedaba **duplicada en el backend** — *«literalmente el argumento que el
+propio coder usa en `numeros-produccion.ts:10` para el frontend»*. **La extrajo**, y **fue más lejos**:
+incluyó también **qué OP cuenta como viva**, porque *«viva» gobierna además `numOrdenes`, `cortado` y la OP
+más reciente ⇒ **divergir haría que el mismo renglón dijera «3 órdenes» aquí y «2» allá***.
+
+⚠️ **Y NO absorbió la tercera codificación** (SQL crudo, `consulta-mes.ts:245`, los **totales** de la
+página), con tres razones medidas: parametrizar un enum en SQL crudo **no tiene precedente en el repo** (7
+sitios, todos con literal) y **reventaría sólo en CI**; exportar un `Prisma.Sql` **arrastra el alias como
+contrato oculto** y la variante con `Prisma.raw` *«tiene forma de inyección»*; y **no son la misma cosa**
+(dos `where` vs. una condición de `JOIN` en un agregado).
+⭐ **Hizo algo más fuerte que el puntero sugerido: el comentario NOMBRA la función**, así que **un solo
+`grep` saca las tres**. Y el docstring estrena una sección **«LO QUE ESTE MÓDULO NO UNIFICA»** con la
+consecuencia visible. *El docstring ya no promete lo que no cumple.*
+
+### Verificación
+
+**14 mutaciones del coder + las del reviewer.** El reviewer atacó los dobles con contrafactual (alimentar
+la consulta con `l.id + 1` → **rojo con aserción limpia**; quitar el cableado → **no compila**), y verificó
+**mecánicamente** que meter la decisión 1 en el módulo compartido no cambió nada (`deepStrictEqual` del
+filtro contra el literal previo, y las otras tres agregaciones intactas).
+
+**Gates (lead):** backend **2 713 / 204** · frontend **2 004 / 206** · typecheck ×2 · lint ×2 · format ×2 ·
+**cero drift**. **Sin migración, sin permisos, `seed.ts` intacto.**
+
+### ⚠️ Un flake declarado, no escondido
+
+La **primera** corrida de `test:unit` tras el cambio dio **1 failed / 2 712** en **520 s** (frente a ~93 s):
+la máquina ahogada. **No se pudo nombrar la prueba** —el log se perdió— así que en vez de darlo por bueno se
+corrió **tres veces completo (2 713 ×3)** y **tres veces los archivos tocados (474 ×3)**. Lectura: contención
+del entorno, no el cambio (lo tocado son funciones puras y proyecciones). **Queda como antecedente por si CI
+enseña un rojo intermitente.**
+
+---
 
 ## V1-E9q · EL AVISO LLEVA AL BOTÓN — a quien puede usarlo (2-sep-2026, versión **0.085**) — 🔶 MITAD (b) DE LA FILA 0.068
 
@@ -5873,9 +6290,8 @@ Ninguna es un defecto de esta etapa; se escriben para que no se descubran solas 
   primeras vs. segundas y las incompletas no son ninguna de las dos. Puede ser lo que Daniel quiere
   (no son un defecto de calidad, son piezas que faltaron) o puede ser justo lo que quiere medir.
   **No se decidió: hay que preguntárselo.**
-- **O4 · Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (órdenes capturadas sin
-  matriz, F2-E4), que es **otro concepto**. Hoy no se cruzan en ninguna pantalla, pero conviene
-  saberlo antes de nombrar algo nuevo «incompletas».
+- **O4 · Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (⚠️ **aquí se escribió «órdenes capturadas sin matriz» y es FALSO** — significa *«le falta un requisito»*, y una incompleta **puede** tener matriz; F2-E4), que es **otro concepto**. Hoy no se cruzan en ninguna pantalla, pero conviene
+  saberlo antes de nombrar algo nuevo «incompletas». ✅ **CERRADO midiéndolo el 2-sep-2026 (v0.088): NO hay choque** —los dos conceptos nunca comparten pantalla y los textos ya van calificados—; **lo que sí estaba mal era la descripción**, y se corrigió en 22 sitios.
 - **O5 · Sesgo del acumulado en las pruebas** — `incompletasDeMaquilero`,
   `recibosSemanalesPorMaquilero` y `aCargoSalida` se ejercitan con **un solo recibo y una sola
   celda**. Suman bien por construcción, pero es el MISMO sesgo que dejó viva la mutación que EXCEDE.

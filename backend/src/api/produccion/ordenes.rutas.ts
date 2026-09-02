@@ -135,7 +135,13 @@ export const rutasOrdenes: FastifyPluginCallbackZod = (app, _opciones, done) => 
     preHandler: app.conPermiso('ordenes.administrar'),
     schema: {
       tags: ['ordenes'],
-      summary: 'Crear una orden de producción desde un renglón de pedido',
+      summary:
+        'Crear una orden de producción desde un renglón de pedido cuyo modelo YA es de producción',
+      description:
+        'Alta directa por captura, con autorrelleno de modelo/cliente/empresa desde el renglón. ' +
+        '⚠️ Si el modelo del renglón es de DESARROLLO se rechaza con 409: esa OP se genera con ' +
+        '`POST /api/pedidos/lineas/{idLinea}/salida-produccion`, que es quien hace nacer el modelo ' +
+        'de producción del color con su nº de 5 dígitos (V1-E3, §Post-F9.34).',
       security: SEGURIDAD_SESION,
       body: esquemaOrdenCrear,
       response: { 201: esquemaOrdenSalida, ...respuestasError },
@@ -168,7 +174,8 @@ export const rutasOrdenes: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
   });
 
-  // Guardar la MATRIZ (colores × tallas). El dominio recalcula el estado (tallas + avíos).
+  // Guardar la MATRIZ (colores × tallas). El dominio recalcula el estado con la regla completa
+  // (tallas + receta liberada, y arte si aplica): guardar la matriz no basta para completarla.
   app.route({
     method: 'PUT',
     url: '/ordenes/:id/matriz',

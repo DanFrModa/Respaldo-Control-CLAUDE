@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPackSalida } from './pack.js';
+
 /**
  * Esquemas Zod del TABLERO WIP + existencias en poder del maquilero (F3-E5; doc 03-Produccion, form
  * `Proceso` + `MaqExis`). UNA sola definición de reglas para UI y servidor (alimenta el OpenAPI).
@@ -171,10 +173,18 @@ export type TableroWipPagina = z.infer<typeof esquemaTableroWipPagina>;
 
 // ── Drill-down de una orden: pendientes por etapa y por color×talla ──────────────────────────────
 
-/** Una celda color×talla con su cantidad (para las matrices del drill-down). */
+/**
+ * Una celda color×talla×PACK con su cantidad (para las matrices del drill-down).
+ *
+ * ⭐ El PACK entra en la llave de la celda desde §Post-F9.10 porque el saldo de producción se lleva
+ * tendido por tendido: sin él, la pantalla ofrecería un tope agregado por color que el servidor
+ * rechaza pack por pack. En una orden sin packs va vacío y la celda es la de siempre. La ENTREGA A
+ * CLIENTE no maneja packs (ahí ya es sólo color), así que sus celdas lo traen siempre vacío.
+ */
 const esquemaWipCelda = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe('PACK de la celda. CADENA VACÍA = sin pack.'),
   idTalla: z.number().int().describe('Id de la talla.'),
   etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
   cantidad: z.number().int().describe('Cantidad (puede ser negativa por sobre-corte).'),
