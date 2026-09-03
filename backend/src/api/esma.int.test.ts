@@ -82,7 +82,12 @@ async function sembrarCargoValidado(): Promise<void> {
   const talla = await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } });
   // El TipoProceso 'costura' YA lo siembra el seed (F3-E1): se REUSA (crearlo choca con su @unique).
   const proceso = await cliente.tipoProceso.findFirstOrThrow({ where: { codigo: 'costura' } });
-  const maquilero = await cliente.proveedor.create({ data: { nombre: 'Maquila Costura SA' } });
+  // Modalidad de facturación (fila 0.110): sin ella no se le puede capturar NINGÚN movimiento.
+  // `solo_sin` es la de deriva cero aquí: ninguna aserción de este archivo mira el segmento, y
+  // `conFactura` pasa de `null` a `false`, que el segmento "sin factura" ya contaba igual.
+  const maquilero = await cliente.proveedor.create({
+    data: { nombre: 'Maquila Costura SA', modalidadFacturacion: 'solo_sin' },
+  });
   idMaquilero = maquilero.id;
   const pedido = await cliente.pedido.create({
     data: { folio: 1n, idEmpresa: empresa.id, idCliente: clienteNegocio.id },

@@ -13,6 +13,8 @@ import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import { type Tx } from '../../comun/transaccion.js';
 import { type PrismaClient, type TipoTercero } from '../../datos/index.js';
 
+import type { ModalidadFacturacion } from '../esma/facturacion.js';
+
 /** Datos del tercero ya resueltos y validados. */
 export interface TerceroResuelto {
   tipoTercero: TipoTercero;
@@ -21,6 +23,16 @@ export interface TerceroResuelto {
   nombre: string;
   /** Días de crédito para el aging (D15d). 0 = contado (también cuando el catálogo lo trae en null). */
   diasCredito: number;
+  /**
+   * Modalidad de facturación del PROVEEDOR (`solo_con`/`solo_sin`/`ambos`), o `null` si todavía no
+   * se ha definido. Siempre `null` para un CLIENTE: la modalidad es un atributo del proveedor
+   * (decide de dónde sale SU pago, §Post-F9.184(f)), no del cliente.
+   *
+   * Se resuelve aquí —dentro de la misma transacción que escribe el movimiento— para que el motor
+   * pueda derivar el segmento con/sin factura sin una segunda lectura, y para que un cambio
+   * concurrente de la modalidad no deje el movimiento marcado con una regla que ya no está vigente.
+   */
+  modalidadFacturacion: ModalidadFacturacion | null;
 }
 
 /**
@@ -49,12 +61,13 @@ export async function exigirTercero(
       idTercero,
       nombre: cliente.nombre,
       diasCredito: cliente.diasCredito ?? 0,
+      modalidadFacturacion: null,
     };
   }
 
   const proveedor = await tx.proveedor.findUnique({
     where: { id: idTercero },
-    select: { nombre: true, activo: true, diasCredito: true },
+    select: { nombre: true, activo: true, diasCredito: true, modalidadFacturacion: true },
   });
   if (proveedor === null) {
     throw new ErrorNoEncontrado('Proveedor', idTercero);
@@ -67,6 +80,7 @@ export async function exigirTercero(
     idTercero,
     nombre: proveedor.nombre,
     diasCredito: proveedor.diasCredito ?? 0,
+    modalidadFacturacion: proveedor.modalidadFacturacion,
   };
 }
 

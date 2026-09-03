@@ -9,6 +9,7 @@ import {
   esquemaProveedorEditar,
   esquemaProveedorPatchCuerpo,
 } from './proveedor.js';
+import { esquemaMovimientoTerceroCrear } from './terceros.js';
 import { esquemaUsuarioCrear, esquemaUsuarioEditar } from './usuario.js';
 
 describe('esquemaLogin', () => {
@@ -132,12 +133,52 @@ describe('esquemas de edición: omitir un campo con default NO lo rellena (Zod .
     // si se mandan, se respetan
     expect(esquemaEmpresaEditar.parse({ favorita: true }).favorita).toBe(true);
   });
+
+  /**
+   * ⭐ EL DEFAULT-TRAP MÁS CARO DEL SISTEMA (fila 0.110, §Post-F9.186(a)).
+   *
+   * `esquemaMovimientoTerceroCrear.esFiscal` traía `.default(false)`. En un movimiento de PROVEEDOR
+   * eso no es una marca cosmética: decide **de dónde sale su pago** —CON factura, del estado de
+   * cuenta del banco; SIN factura, de la relación que Daniel define (§Post-F9.184(f))—. Con el
+   * default, un alta que no dijera nada nacía en el segundo camino **en silencio**, sin que nadie lo
+   * hubiera decidido: exactamente la misma puerta trasera que el `default` de `resolverConFactura`,
+   * sólo que en otra pared. (El esquema de CxP ya lo había dejado `.optional()` por este motivo.)
+   *
+   * Esta prueba defiende el `.optional()`: si alguien le devuelve el `.default(false)`, el `undefined`
+   * —la señal de "no lo dije"— deja de existir antes de llegar al dominio, `resolverEsFiscalMotor` no
+   * tiene nada que derivar, y la ruta vuelve a parir movimientos sin clasificar.
+   */
+  it('⭐ esquemaMovimientoTerceroCrear: omitir `esFiscal` lo deja UNDEFINED (no rellena false)', () => {
+    const datos = esquemaMovimientoTerceroCrear.parse({
+      tipoTercero: 'proveedor',
+      idTercero: 1,
+      fecha: '2026-09-03',
+      origen: 'factura_proveedor',
+      importe: 100,
+    });
+    // Si esto fuera `false`, el "no lo dije" sería indistinguible del "dije que sin factura".
+    expect(datos.esFiscal).toBeUndefined();
+    expect('esFiscal' in datos).toBe(false);
+  });
+
+  it('…y si SÍ se manda, se conserva tal cual (los dos valores)', () => {
+    const base = {
+      tipoTercero: 'proveedor',
+      idTercero: 1,
+      fecha: '2026-09-03',
+      origen: 'factura_proveedor',
+      importe: 100,
+    } as const;
+    expect(esquemaMovimientoTerceroCrear.parse({ ...base, esFiscal: true }).esFiscal).toBe(true);
+    expect(esquemaMovimientoTerceroCrear.parse({ ...base, esFiscal: false }).esFiscal).toBe(false);
+  });
 });
 
 // ── Proveedor enriquecido (F1-E1B, R15): campos fiscales/pago + roles + regla ──
 describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
   it('acepta un alta con roles + campos fiscales/comerciales válidos', () => {
     const datos = esquemaProveedorCrear.parse({
+      modalidadFacturacion: 'solo_con',
       nombre: 'Maquilas del Norte',
       tipo: 'SERVICIOS',
       roles: [1, 2],
@@ -156,12 +197,24 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
   });
 
   it('regla factura ⇒ exige RFC + régimen (alta)', () => {
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', factura: true }).success).toBe(false);
     expect(
-      esquemaProveedorCrear.safeParse({ nombre: 'X', factura: true, rfc: 'ABC010101AB1' }).success,
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        factura: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        factura: true,
+        rfc: 'ABC010101AB1',
+      }).success,
     ).toBe(false); // falta régimen
     expect(
       esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
         nombre: 'X',
         factura: true,
         rfc: 'ABC010101AB1',
@@ -169,8 +222,16 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
       }).success,
     ).toBe(true);
     // factura falso/omitido NO exige nada (filas migradas)
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X' }).success).toBe(true);
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', factura: false }).success).toBe(true);
+    expect(
+      esquemaProveedorCrear.safeParse({ modalidadFacturacion: 'solo_con', nombre: 'X' }).success,
+    ).toBe(true);
+    expect(
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        factura: false,
+      }).success,
+    ).toBe(true);
   });
 
   it('regla factura ⇒ RFC también en edición y en el cuerpo del PATCH', () => {
@@ -187,25 +248,64 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
 
   it('valida CLABE (dígito de control), moneda y método de pago', () => {
     expect(
-      esquemaProveedorCrear.safeParse({ nombre: 'X', clabe: '002010077777777772' }).success,
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        clabe: '002010077777777772',
+      }).success,
     ).toBe(false); // dígito de control malo
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', clabe: '123' }).success).toBe(false);
     expect(
-      esquemaProveedorCrear.safeParse({ nombre: 'X', clabe: '002010077777777771' }).success,
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        clabe: '123',
+      }).success,
+    ).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        clabe: '002010077777777771',
+      }).success,
     ).toBe(true);
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', moneda: 'EUR' }).success).toBe(false);
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', metodoPago: 'XXX' }).success).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        moneda: 'EUR',
+      }).success,
+    ).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        metodoPago: 'XXX',
+      }).success,
+    ).toBe(false);
   });
 
   it('valida el RFC cuando viene (forma física/moral)', () => {
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', rfc: 'NO' }).success).toBe(false);
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', rfc: 'ABC010101AB1' }).success).toBe(
-      true,
-    );
+    expect(
+      esquemaProveedorCrear.safeParse({ modalidadFacturacion: 'solo_con', nombre: 'X', rfc: 'NO' })
+        .success,
+    ).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        rfc: 'ABC010101AB1',
+      }).success,
+    ).toBe(true);
   });
 
   it('rechaza roles repetidos en el arreglo', () => {
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', roles: [1, 1, 2] }).success).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        roles: [1, 1, 2],
+      }).success,
+    ).toBe(false);
   });
 
   it('edición: omitir `roles` los deja undefined (no toca los existentes)', () => {
@@ -266,6 +366,7 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
   // en V1-E3f pieza B (§Post-F9.57 punto 2): un solo campo corto, y ÚNICO.
   it('alta: acepta nombreCorto/asegurado/obsPago y NO les inyecta default (no son default-trap)', () => {
     const datos = esquemaProveedorCrear.parse({
+      modalidadFacturacion: 'solo_con',
       nombre: 'Taller',
       nombreCorto: 'TLR',
       asegurado: true,
@@ -276,7 +377,7 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
     expect(datos.obsPago).toBe('paga viernes');
 
     // Omitirlos en el alta los deja undefined (sin default que pise valores).
-    const sin = esquemaProveedorCrear.parse({ nombre: 'Taller' });
+    const sin = esquemaProveedorCrear.parse({ modalidadFacturacion: 'solo_con', nombre: 'Taller' });
     expect('nombreCorto' in sin).toBe(false);
     expect('asegurado' in sin).toBe(false);
     expect('obsPago' in sin).toBe(false);
@@ -312,8 +413,17 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
   });
 
   it('alta: los opcionales NO aceptan null (en el alta se omite, no se manda null)', () => {
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', rfc: null }).success).toBe(false);
-    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', diasCredito: null }).success).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({ modalidadFacturacion: 'solo_con', nombre: 'X', rfc: null })
+        .success,
+    ).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({
+        modalidadFacturacion: 'solo_con',
+        nombre: 'X',
+        diasCredito: null,
+      }).success,
+    ).toBe(false);
   });
 
   it('edición: si se intenta vaciar el RFC con factura activa, la regla lo rechaza', () => {

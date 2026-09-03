@@ -69,7 +69,12 @@ beforeEach(async () => {
   otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa CxP');
   // 5 días de crédito: los cargos caen holgadamente dentro de sus cubetas (5 días de margen a los bordes).
   proveedor = await cliente.proveedor.create({
-    data: { nombre: 'Hilaturas del Norte', nombreCorto: 'HDN', diasCredito: 5 },
+    data: {
+      modalidadFacturacion: 'ambos',
+      nombre: 'Hilaturas del Norte',
+      nombreCorto: 'HDN',
+      diasCredito: 5,
+    },
   });
 });
 
@@ -85,7 +90,7 @@ describe('captura de movimientos de CxP', () => {
     await registrarMovimientoCxp(
       sesion(),
       proveedor.id,
-      { fecha: hace(0), origen: 'pago', importe: 300 },
+      { fecha: hace(0), origen: 'pago', importe: 300, esFiscal: false },
       bd(),
     );
 
@@ -105,7 +110,7 @@ describe('captura de movimientos de CxP', () => {
         sesion(),
         proveedor.id,
         // @ts-expect-error — origen fuera del enum de CxP (lo valida Zod).
-        { fecha: hace(0), origen: 'recibo_maquila', importe: 100 },
+        { fecha: hace(0), origen: 'recibo_maquila', importe: 100, esFiscal: false },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
@@ -179,7 +184,7 @@ describe('bandeja por pagar (aging + resumen server-side)', () => {
     await registrarMovimientoCxp(
       sesion(),
       proveedor.id,
-      { fecha: hace(0), origen: 'pago', importe: 60 },
+      { fecha: hace(0), origen: 'pago', importe: 60, esFiscal: false },
       bd(),
     );
     const bandeja = await bandejaPorPagar(sesion(), {}, bd());
@@ -196,7 +201,9 @@ describe('bandeja por pagar (aging + resumen server-side)', () => {
   // ── (f) filtro con-saldo vs todos ─────────────────────────────────────────────────────────────
   it('"con-saldo" excluye a un proveedor con saldo 0; "todos" lo incluye', async () => {
     // Segundo proveedor: cargo 100 + pago 100 → saldo 0.
-    const otro = await cliente.proveedor.create({ data: { nombre: 'Saldado SA' } });
+    const otro = await cliente.proveedor.create({
+      data: { modalidadFacturacion: 'ambos', nombre: 'Saldado SA' },
+    });
     await registrarMovimientoCxp(
       sesion(),
       otro.id,
@@ -206,7 +213,7 @@ describe('bandeja por pagar (aging + resumen server-side)', () => {
     await registrarMovimientoCxp(
       sesion(),
       otro.id,
-      { fecha: hace(0), origen: 'pago', importe: 100 },
+      { fecha: hace(0), origen: 'pago', importe: 100, esFiscal: false },
       bd(),
     );
     // El primero sí tiene saldo.
@@ -316,7 +323,7 @@ describe('RBAC de CxP (A4)', () => {
       registrarMovimientoCxp(
         sesion(['cxp.ver', 'terceros.ver']),
         proveedor.id,
-        { fecha: hace(0), origen: 'pago', importe: 10 },
+        { fecha: hace(0), origen: 'pago', importe: 10, esFiscal: false },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorPermiso);
@@ -327,7 +334,7 @@ describe('RBAC de CxP (A4)', () => {
       registrarMovimientoCxp(
         sesion(['cxp.administrar', 'consultas.ver-importes']),
         proveedor.id,
-        { fecha: hace(0), origen: 'pago', importe: 10 },
+        { fecha: hace(0), origen: 'pago', importe: 10, esFiscal: false },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorPermiso);
@@ -391,7 +398,7 @@ describe('convivencia EsMa en la bandeja (cubeta maquila)', () => {
 
   it('un maquilero con deuda EsMa y 0 en el motor APARECE con su saldo en la cubeta maquila', async () => {
     const maquilero = await cliente.proveedor.create({
-      data: { nombre: 'Maquilas del Sur', nombreCorto: 'MDS' },
+      data: { modalidadFacturacion: 'ambos', nombre: 'Maquilas del Sur', nombreCorto: 'MDS' },
     });
     await sembrarCargoEsMa(maquilero.id, 10, 50); // 500 de maquila, 0 en el motor
 
@@ -418,7 +425,9 @@ describe('convivencia EsMa en la bandeja (cubeta maquila)', () => {
       { fecha: hace(0), origen: 'entrada_sin_factura', importe: 300 },
       bd(),
     );
-    const maquilero = await cliente.proveedor.create({ data: { nombre: 'Maquilas del Sur' } });
+    const maquilero = await cliente.proveedor.create({
+      data: { modalidadFacturacion: 'ambos', nombre: 'Maquilas del Sur' },
+    });
     await sembrarCargoEsMa(maquilero.id, 10, 50);
 
     const bandeja = await bandejaPorPagar(sesion(), {}, bd());

@@ -173,6 +173,25 @@ export const ETIQUETAS_METODO_PAGO: Record<MetodoPagoClave, string> = {
   PPD: 'PPD — Pago en parcialidades o diferido',
 };
 
+/**
+ * MODALIDAD DE FACTURACIÓN del proveedor (espejo de `MODALIDADES_FACTURACION` del backend).
+ *
+ * ⭐ Es OBLIGATORIA en el alta (fila 0.110). Daniel (3-sep-2026, §Post-F9.186(a)): *"es un campo
+ * **obligatorio** de llenar. **A fuerzas hay que definir si es con, sin o ambas**"*. No es una
+ * preferencia de vista: decide **de dónde sale el pago** del proveedor — CON factura el pago nace
+ * del estado de cuenta del BANCO; SIN factura, de la RELACIÓN que Daniel define y que se ejecuta
+ * tal cual (§Post-F9.184(f)).
+ */
+export const MODALIDADES_FACTURACION = ['solo_con', 'solo_sin', 'ambos'] as const;
+/** Clave de modalidad de facturación. */
+export type ModalidadFacturacionClave = (typeof MODALIDADES_FACTURACION)[number];
+/** Etiquetas para UI de cada modalidad, en el lenguaje del negocio. */
+export const ETIQUETAS_MODALIDAD_FACTURACION: Record<ModalidadFacturacionClave, string> = {
+  solo_con: 'Solo CON factura',
+  solo_sin: 'Solo SIN factura',
+  ambos: 'De las dos formas (con y sin factura)',
+};
+
 /** Tipos documentales de adjunto de proveedor (espejo del backend, R15 §4). */
 export const TIPOS_ARCHIVO_PROVEEDOR = ['CONSTANCIA', 'CONTRATO', 'OTRO'] as const;
 /** Clave de tipo de adjunto. */
@@ -354,11 +373,31 @@ export const esquemaProveedorFormulario = z
       .string()
       .trim()
       .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' }),
+    // ── Facturación (fila 0.110) ─────────────────────────────────────────────────
+    /**
+     * ⭐ El ÚNICO enum del formulario que NO admite "sin elegir": *"a fuerzas hay que definir si es
+     * con, sin o ambas"* (Daniel, §Post-F9.186(a)). Se captura como string —un `<select>` siempre
+     * entrega string— y el `.refine` de abajo exige que no quede vacío. El backend re-valida y es
+     * la autoridad (A1): `esquemaProveedorCrear` la pide obligatoria y `esquemaProveedorEditar`
+     * rechaza vaciarla.
+     *
+     * En un proveedor MIGRADO llega vacía y la ficha se ve igual que siempre (REGLA 0-B: los datos
+     * viejos se leen sin estorbo); lo que pasa es que al GUARDAR hay que elegirla.
+     */
+    modalidadFacturacion: z.string(),
   })
   .refine(
     // Regla de captura R15 (espejo del backend): si emite CFDI, exige RFC + régimen.
     (datos) => !datos.factura || (datos.rfc !== '' && datos.regimenFiscalSat !== ''),
     { error: 'Si el proveedor factura, captura su RFC y su régimen fiscal', path: ['rfc'] },
+  )
+  .refine(
+    // Fila 0.110: la modalidad de facturación no puede quedar sin elegir.
+    (datos) => (MODALIDADES_FACTURACION as readonly string[]).includes(datos.modalidadFacturacion),
+    {
+      error: 'Indica cómo factura este proveedor: solo con, solo sin, o de las dos formas',
+      path: ['modalidadFacturacion'],
+    },
   );
 
 /** Datos del formulario de proveedor. */

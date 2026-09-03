@@ -89,7 +89,11 @@ async function crearProveedorConRol(nombre: string, codigoRol: string): Promise<
     create: { codigo: codigoRol, nombre: codigoRol },
   });
   return cliente.proveedor.create({
-    data: { nombre, roles: { create: { idRolProveedor: rol.id } } },
+    data: {
+      modalidadFacturacion: 'solo_sin',
+      nombre,
+      roles: { create: { idRolProveedor: rol.id } },
+    },
   });
 }
 

@@ -45,6 +45,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { esOrigenCargo, signoDeOrigen } from './origen-tercero.js';
+import { resolverEsFiscalMotor } from './segmento-motor.js';
 import { exigirTercero, obtenerNombreTercero } from './terceros.js';
 import { aporteEsMaSaldo, proyectarMovimientosEsMa } from './convivencia-esma.js';
 import { segmentoWhere } from './cxp/facturacion-cxp.js';
@@ -191,6 +192,15 @@ export async function registrarMovimientoTerceroInterno(
     const fecha = aDateColumna(datos.fecha);
     // El signo lo pone el origen; el importe llega positivo (validado por Zod).
     const monto = redondear2(signoDeOrigen(origen) * datos.importe);
+    // SEGMENTO con/sin factura (fila 0.110): si el llamador no lo dijo, lo deriva la modalidad del
+    // proveedor —y si no tiene modalidad, se rechaza la captura en vez de elegir "sin factura" en
+    // silencio—. Lo dicho explícitamente se respeta: ver el TSDoc de `segmento-motor.ts`. La
+    // modalidad viene de `exigirTercero`, leída en ESTA misma transacción.
+    const esFiscal = resolverEsFiscalMotor(
+      datos.tipoTercero,
+      tercero.modalidadFacturacion,
+      datos.esFiscal,
+    );
     const fechaVencimiento = calcularVencimiento(origen, fecha, tercero.diasCredito);
     const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_TERCERO);
 
@@ -204,7 +214,7 @@ export async function registrarMovimientoTerceroInterno(
         origen,
         monto,
         fechaVencimiento,
-        esFiscal: datos.esFiscal,
+        esFiscal,
         ...(datos.uuidCfdi === undefined ? {} : { uuidCfdi: datos.uuidCfdi }),
         ...(datos.rfcTercero === undefined ? {} : { rfcTercero: datos.rfcTercero }),
         ...(datos.idArchivoCfdi === undefined ? {} : { idArchivoCfdi: datos.idArchivoCfdi }),
@@ -225,7 +235,7 @@ export async function registrarMovimientoTerceroInterno(
         idTercero: datos.idTercero,
         origen,
         monto,
-        esFiscal: datos.esFiscal,
+        esFiscal,
       },
     });
 

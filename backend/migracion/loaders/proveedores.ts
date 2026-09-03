@@ -19,13 +19,13 @@
  * DEDUP: por **nombre normalizado** (`normalizarParaDedup`) contra los proveedores ya
  * existentes y los recién creados en esta corrida. Si coincide, se FUSIONAN los roles (vía
  * `actualizarProveedor`) y se reportan los homónimos ambiguos. Carga VÍA el dominio (A1):
- * `crearProveedor` + `actualizarProveedor`. Persiste un mapeo por cada fuente
+ * `crearProveedorMigrado` + `actualizarProveedor`. Persiste un mapeo por cada fuente
  * (`Proveedor:IdProveedor`, `:IdMaquileros`, `:IdEstampadores`, `:IdCortadores`).
  */
 import {
   actualizarProveedor,
   crearContactoProveedor,
-  crearProveedor,
+  crearProveedorMigrado,
   listarRolesProveedor,
 } from '../../src/dominio/catalogos/proveedores.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
@@ -226,7 +226,7 @@ export async function cargarProveedores(
     // El `contacto` del viejo ya NO es un campo del proveedor: se da de alta como su primer
     // CONTACTO (§Post-F9.56 punto 1), con el puesto vacío porque el viejo nunca lo preguntó.
     try {
-      const creado = await crearProveedor(
+      const creado = await crearProveedorMigrado(
         sesion,
         {
           nombre,

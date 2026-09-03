@@ -79,8 +79,12 @@ afterAll(async () => {
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
   await sembrar(cliente);
+  // Modalidad de facturación (fila 0.110): el motor ya no marca "sin factura" en silencio, así que
+  // un movimiento de proveedor que no diga `esFiscal` necesita que el catálogo lo tenga definido.
+  // `solo_sin` no cambia nada de lo que este archivo mide: lo omitido nace `false` (como con el
+  // viejo `.default(false)`) y el `esFiscal: true` explícito de más abajo se sigue respetando.
   const prov = await cliente.proveedor.create({
-    data: { nombre: 'Proveedor HTTP', diasCredito: 15 },
+    data: { nombre: 'Proveedor HTTP', diasCredito: 15, modalidadFacturacion: 'solo_sin' },
   });
   idProveedor = prov.id;
 });

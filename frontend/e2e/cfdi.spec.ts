@@ -56,6 +56,8 @@ test.describe('Importar CFDI de proveedor (F9-E3)', () => {
     await dialogo.locator('#proveedor-nombre').fill(proveedor);
     // El campo TIPO se retiró en V1-E3f pieza B (§Post-F9.56 punto 3).
     await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
+    // La modalidad de facturación es OBLIGATORIA (fila 0.110).
+    await dialogo.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
     await page.getByTestId('guardar-proveedor').click();
     await expect(page.getByText(`Proveedor "${proveedor}" creado.`)).toBeVisible();
 

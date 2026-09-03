@@ -109,10 +109,27 @@ export const esquemaMovimientoTerceroCrear = z
       .number({ error: 'El importe es obligatorio' })
       .min(0.01, { error: 'El importe debe ser de al menos 0.01' })
       .describe('Importe POSITIVO (≥ 0.01; el servidor le pone el signo según el origen).'),
+    /**
+     * ¿Este movimiento es CON factura? **SIN default a propósito** (fila 0.110).
+     *
+     * Tenía `.default(false)`: si el capturista no lo decía, el movimiento nacía SIN factura en
+     * silencio. Para un PROVEEDOR eso no es una marca cosmética —decide de dónde sale su pago
+     * (§Post-F9.184(f))—, y era la misma puerta trasera que el `default` de `resolverConFactura`,
+     * sólo que en otra pared. El esquema de CxP (`esquemas/cxp.ts`) ya lo había dejado
+     * `.optional()` por este motivo exacto; el del motor se había quedado atrás.
+     *
+     * Ahora `undefined` significa "no lo dije" y el servidor lo DERIVA de la modalidad del
+     * proveedor; si el proveedor no tiene modalidad, o factura de las dos formas, se rechaza la
+     * captura en vez de elegir por él. Para un CLIENTE no hay modalidad que consultar: sigue
+     * naciendo `false`, como siempre.
+     */
     esFiscal: z
       .boolean()
-      .default(false)
-      .describe('¿Movimiento fiscal (con CFDI)? Filtra la vista fiscal del contador.'),
+      .optional()
+      .describe(
+        '¿Movimiento fiscal (con CFDI)? Si se omite, lo deriva la modalidad de facturación del ' +
+          'proveedor (para un cliente, false). Filtra la vista fiscal del contador.',
+      ),
     uuidCfdi: z
       .string()
       .trim()

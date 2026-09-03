@@ -33,6 +33,7 @@ import {
   esquemaProveedorContactoCrear,
   esquemaProveedorContactoEditarCuerpo,
   esquemaProveedorCrear,
+  esquemaProveedorCrearMigrado,
   esquemaProveedorEditar,
   type DatosProveedorAdjuntoCrear,
   type DatosProveedorAvioAsignar,
@@ -76,6 +77,9 @@ const CARPETA_ADJUNTOS = 'proveedores';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearProveedor = z.input<typeof esquemaProveedorCrear>;
+
+/** Alta en modo MIGRACIÓN: igual, pero la modalidad de facturación puede faltar (REGLA 0-B). */
+export type EntradaCrearProveedorMigrado = z.input<typeof esquemaProveedorCrearMigrado>;
 
 /** Edición: `id` + cambios parciales (incluye `activo` para des/reactivar). */
 export type EntradaActualizarProveedor = z.input<typeof esquemaProveedorEditar>;
@@ -251,7 +255,7 @@ async function sincronizarRoles(
 
 /** Construye el `data` de los campos enriquecidos presentes en el alta (solo los definidos). */
 function datosEnriquecidosCrear(
-  datos: z.output<typeof esquemaProveedorCrear>,
+  datos: z.output<typeof esquemaProveedorCrearMigrado>,
 ): Partial<Prisma.ProveedorCreateInput> {
   const data: Partial<Prisma.ProveedorCreateInput> = {};
   // Campo corto ÚNICO de uso diario ("Bloom" para BLOOM TEXTIL; A1.1 + §Post-F9.57/.58). La
@@ -383,7 +387,9 @@ function aplicarEnriquecidosEditar(
     }
   }
 
-  // `modalidadFacturacion` es enum (F6-E5): omitir = no tocar; `null` = borrar (sin definir).
+  // `modalidadFacturacion` es enum (F6-E5): omitir = no tocar. **`null` YA NO se admite** (fila
+  // 0.110): el esquema lo rechaza antes de llegar aquí, porque vaciarla dejaría al proveedor sin
+  // saber por qué camino sale su pago (§Post-F9.186(a)). Se cambia de valor, no se borra.
   if (datos.modalidadFacturacion !== undefined) {
     const nuevo = datos.modalidadFacturacion;
     if (nuevo !== actual.modalidadFacturacion) {
@@ -398,13 +404,21 @@ function aplicarEnriquecidosEditar(
  * Crea un proveedor (catálogo global) con sus roles en UNA transacción (A2). Reglas:
  * permiso `proveedores.administrar`; nombre único global → `ErrorConflicto`; **≥1 rol**
  * (R15); si `factura=true` exige RFC + régimen (regla de captura, validada en el
- * esquema); nace activo; auditoría y bitácora en la misma transacción (A7).
+ * esquema); **`modalidadFacturacion` OBLIGATORIA** (fila 0.110, ver abajo); nace activo;
+ * auditoría y bitácora en la misma transacción (A7).
+ *
+ * ⭐ LA MODALIDAD DE FACTURACIÓN SE PREGUNTA AL DAR DE ALTA. Daniel (3-sep-2026,
+ * §Post-F9.186(a)): *"es un campo **obligatorio** de llenar. **A fuerzas hay que definir si es con,
+ * sin o ambas**"*. No es cosmético: decide **de dónde sale el pago** del proveedor —CON factura, el
+ * pago nace del estado de cuenta del BANCO; SIN factura, de la RELACIÓN que Daniel define
+ * (§Post-F9.184(f))—. Sin ella, su pago no sabe por cuál de los dos caminos entrar. Lo exige
+ * `esquemaProveedorCrear`; el ETL usa {@link crearProveedorMigrado}.
  *
  * Condición de pago: `diasCredito` (null o 0 = contado; >0 = días de crédito).
  *
  * @example
  * const p = await crearProveedor(sesion, {
- *   nombre: "Maquilas SA", roles: [1, 2],
+ *   nombre: "Maquilas SA", roles: [1, 2], modalidadFacturacion: "solo_con",
  *   factura: true, rfc: "MSA010101AB1", regimenFiscalSat: "601", diasCredito: 30,
  * });
  */
@@ -414,7 +428,36 @@ export async function crearProveedor(
   bd?: ContextoBd,
 ): Promise<ProveedorConRoles> {
   verificarPermiso(sesion, 'proveedores.administrar');
-  const datos = validarEntrada(esquemaProveedorCrear, entrada);
+  return crearProveedorValidado(sesion, validarEntrada(esquemaProveedorCrear, entrada), bd);
+}
+
+/**
+ * MISMA alta, con la **modalidad de facturación opcional**. Uso EXCLUSIVO del ETL
+ * (`migracion/loaders/proveedores.ts`), **jamás desde una ruta REST** — mismo patrón que
+ * `registrarMovimientoTerceroInterno` en el motor de terceros.
+ *
+ * Por qué existe (REGLA 0-B, `CLAUDE.md` §7): Access nunca preguntó cómo factura cada proveedor,
+ * así que el histórico llega con el dato vacío **a propósito** y eso NO es un defecto. Daniel: *"yo
+ * me encargo de ponerlo bien cuando hagamos la migración de datos reales"*. Inventar aquí un valor
+ * para cuadrar el alta sería justo lo que la regla prohíbe. El proveedor migrado se consulta y
+ * aparece en su estado de cuenta con normalidad; lo que no se le puede es **capturar un movimiento
+ * nuevo** hasta que se le defina la modalidad (`resolverConFactura` lo corta).
+ */
+export async function crearProveedorMigrado(
+  sesion: SesionUsuario,
+  entrada: EntradaCrearProveedorMigrado,
+  bd?: ContextoBd,
+): Promise<ProveedorConRoles> {
+  verificarPermiso(sesion, 'proveedores.administrar');
+  return crearProveedorValidado(sesion, validarEntrada(esquemaProveedorCrearMigrado, entrada), bd);
+}
+
+/** Cuerpo compartido del alta (ya validada y con el permiso verificado). */
+async function crearProveedorValidado(
+  sesion: SesionUsuario,
+  datos: z.output<typeof esquemaProveedorCrearMigrado>,
+  bd?: ContextoBd,
+): Promise<ProveedorConRoles> {
   if (datos.roles === undefined || datos.roles.length === 0) {
     throw new ErrorValidacion('El proveedor debe tener al menos un rol/servicio.');
   }
