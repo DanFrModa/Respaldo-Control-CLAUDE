@@ -7,7 +7,6 @@ import {
   Coins,
   CreditCard,
   FileText,
-  Hash,
   Landmark,
   Mail,
   MapPin,
@@ -70,6 +69,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { AviosQueSurte } from './AviosQueSurte';
 import { DialogoProveedor } from './DialogoProveedor';
+import { etiquetaTipoCuenta, numeroEnmascarado } from './cuentas-pago';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
@@ -214,16 +214,16 @@ export function ProveedoresPagina(): React.JSX.Element {
 
   // ── Dialogos ───────────────────────────────────────────────────────────────
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
-  const [proveedorEnEdicion, setProveedorEnEdicion] = useState<Proveedor | undefined>(undefined);
+  const [enEdicion, setEnEdicion] = useState<Proveedor | undefined>(undefined);
   const [aDesactivar, setADesactivar] = useState<Proveedor | null>(null);
 
   function abrirAlta(): void {
-    setProveedorEnEdicion(undefined);
+    setEnEdicion(undefined);
     setDialogoAbierto(true);
   }
 
   function abrirEdicion(proveedor: Proveedor): void {
-    setProveedorEnEdicion(proveedor);
+    setEnEdicion(proveedor);
     setDialogoAbierto(true);
   }
 
@@ -259,6 +259,16 @@ export function ProveedoresPagina(): React.JSX.Element {
   const total = datos?.total ?? 0;
   const totalPaginas = datos?.totalPaginas ?? 1;
   const seleccion = filas.find((p) => p.id === seleccionId) ?? null;
+
+  /**
+   * ⭐ El diálogo lee SIEMPRE la versión FRESCA de la consulta, no el objeto que se guardó al
+   * abrirlo: lo que se agrega desde adentro (contactos, cuentas de pago…) invalida la lista, y con
+   * una foto congelada el diálogo seguía mostrando el mundo de hace tres altas. El objeto guardado
+   * queda de respaldo por si la fila se sale del filtro/página con el diálogo abierto (si no, el
+   * diálogo se convertiría en un alta a media edición).
+   */
+  const proveedorEnEdicion =
+    enEdicion === undefined ? undefined : (filas.find((p) => p.id === enEdicion.id) ?? enEdicion);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5 lg:overflow-visible">
@@ -554,8 +564,7 @@ function DetalleProveedor({
     hayTexto(p.moneda) ||
     hayTexto(p.formaPago) ||
     hayTexto(p.metodoPago) ||
-    hayTexto(p.banco) ||
-    hayTexto(p.clabe) ||
+    p.cuentasPago.length > 0 ||
     hayTexto(p.condiciones);
 
   const hayOperativo = p.leadTimeDias !== null || hayTexto(p.notas) || p.cantidadAdjuntos > 0;
@@ -642,8 +651,29 @@ function DetalleProveedor({
                 {etiquetaMetodoPago(p.metodoPago)}
               </CampoDetalle>
             ) : null}
-            <CampoTextoSiHay icono={Landmark} etiqueta="Banco" valor={p.banco} />
-            <CampoTextoSiHay icono={Hash} etiqueta="CLABE" valor={p.clabe} />
+            {/* ⭐ Las CUENTAS reemplazan al par `banco`/`clabe` viejo (0.112): un proveedor tiene
+                varias, cada una a nombre de SU beneficiario —que casi nunca es él— y una queda por
+                omisión. Los campos viejos siguen en la base pero ya nadie los lee (REGLA 0-B). */}
+            {p.cuentasPago.length > 0 ? (
+              <CampoDetalle icono={Landmark} etiqueta="Cuentas de pago" anchoCompleto>
+                <span className="flex flex-col gap-1" data-testid="cuentas-pago-detalle">
+                  {p.cuentasPago.map((c) => (
+                    <span key={c.id} className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-medium text-foreground">{c.beneficiario}</span>
+                      <span className="text-muted-foreground">
+                        {/* R3: aquí el número va ENMASCARADO. Este cajón sirve para RECONOCER la
+                            cuenta, no para transferir desde él; el completo está en el editor. */}
+                        {[c.banco, etiquetaTipoCuenta(c.tipoCuenta), numeroEnmascarado(c.cuenta)]
+                          .filter((v) => v !== null && v !== '')
+                          .join(' · ')}
+                      </span>
+                      {c.esDefault ? <TipoBadge tono="pt">Por omisión</TipoBadge> : null}
+                      {c.esFiscal ? <TipoBadge tono="telas">Cuenta fiscal</TipoBadge> : null}
+                    </span>
+                  ))}
+                </span>
+              </CampoDetalle>
+            ) : null}
             {p.limiteCredito !== null ? (
               <CampoDetalle icono={Banknote} etiqueta="Límite de crédito">
                 {formatearLimite(p.limiteCredito, p.moneda)}

@@ -691,8 +691,13 @@ model Proveedor {
   formaPago     String?  @map("forma_pago")
   /// Método de pago del CFDI: PUE (una exhibición) o PPD (parcialidades/diferido).
   metodoPago    String?  @map("metodo_pago")
+  /// ⚠️ SUPERADO por `ProveedorCuentaPago` (0.112). Cabía UNA sola cuenta, sin beneficiario y sin
+  /// distinguir CLABE de tarjeta, y la realidad de la relación de pago semanal de Daniel no cabe
+  /// aquí: el beneficiario casi nunca es el proveedor y un mismo proveedor tiene VARIAS cuentas.
+  /// Se conserva por REGLA 0-B (lo viejo no se migra ni se repara): ya NO se captura ni se lee en
+  /// pantalla — quien quiera el dato bancario va a `cuentasPago`.
   banco         String?
-  /// CLABE interbancaria (18 dígitos con dígito de control, validada en Zod).
+  /// ⚠️ SUPERADO por `ProveedorCuentaPago.cuenta` + `tipoCuenta` (0.112). Ver la nota de `banco`.
   clabe         String?
   /// Límite de crédito (opcional), para alertas de CxP en F8.
   limiteCredito Decimal? @map("limite_credito") @db.Decimal(14, 2)
@@ -733,6 +738,8 @@ model Proveedor {
   roles                   ProveedorRol[]
   /// Contactos del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1): N personas por proveedor.
   contactos               ProveedorContacto[]
+  /// Cuentas/destinos de pago del proveedor (0.112): N cuentas con su BENEFICIARIO, una default.
+  cuentasPago             ProveedorCuentaPago[]
   /// Adjuntos del proveedor en R2 (F1-E1B: constancia, contrato…).
   archivos                ProveedorArchivo[]
   /// Avíos que surte este proveedor (F1-E3, R1, N:N vía `AvioProveedor`).
@@ -761,7 +768,7 @@ model Proveedor {
   /// Entradas de tela por factura/remisión de este proveedor, contra sus OC (B1; §Post-F9.159(a)). Restrict.
   entradasTela            EntradaTela[]
   /// Requerimientos de explosión MRP donde es el proveedor SUGERIDO (F4-E4, R1/R3). Restrict.
-  requerimientosSugeridos RequerimientoOrden[] @relation("RequerimientoProveedorSugerido")
+  requerimientosSugeridos RequerimientoOrden[]  @relation("RequerimientoProveedorSugerido")
   /// Notas de salida donde este proveedor es el MAQUILERO destino del envío (F4-E5). Restrict.
   notasSalida             NotaSalida[]
   /// Auditorías de calidad donde este proveedor es el MAQUILERO auditado (F6-E2). Restrict.
@@ -771,7 +778,7 @@ model Proveedor {
   /// Eventos de precio de orden donde es el proveedor con quien se NEGOCIÓ (rediseño R2). Restrict.
   ordenPrecioEventos      OrdenPrecioEvento[]
   /// Modelos que lo cotizaron como MAQUILERO de costura en su desarrollo (rediseño R5, B9). Restrict.
-  modelosCotizados        Modelo[]             @relation("ModeloMaquileroCotizado")
+  modelosCotizados        Modelo[]              @relation("ModeloMaquileroCotizado")
   /// Movimientos de cuenta corriente (CxP/EsMa) de este proveedor (F9-E1). Restrict.
   movimientosTerceros     MovimientoTercero[]
 
@@ -837,6 +844,109 @@ model ProveedorContacto {
 
   @@index([idProveedor])
   @@map("proveedor_contacto")
+}
+
+/// Cómo se identifica el destino del depósito (0.112). Hoy `Proveedor.clabe` era UN campo donde
+/// caían las dos cosas revueltas, y no se podía saber cuál era cuál sin contar los dígitos.
+///  • `clabe`   — CLABE interbancaria: 18 dígitos con dígito de control (Banxico).
+///  • `tarjeta` — número de tarjeta de débito: 15–19 dígitos (transferencia a tarjeta).
+enum TipoCuentaPago {
+  clabe
+  tarjeta
+
+  @@map("tipo_cuenta_pago")
+}
+
+/// ⭐ CUENTA / DESTINO DE PAGO de un proveedor (0.112).
+///
+/// 🔴 **Nació de leer el Excel con el que Daniel paga cada semana (~150 beneficiarios), no de una
+/// entrevista.** Dos cosas saltaron del archivo y ninguna cabía en el modelo viejo:
+///
+/// 🔒 **Los nombres de aquí abajo («TALLER NORTE 1/2/3», «TALLER PONIENTE», «TALLER SUR») son
+/// INVENTADOS.** Los reales son proveedores PERSONA FÍSICA y este repositorio es PÚBLICO: un alias
+/// pegado a información de pago es dato personal (fila 0.123). Y estos comentarios se re-emiten
+/// dentro del cliente Prisma generado, así que aquí pesa doble. **No los "restaures" nunca.**
+///
+/// 1. **El BENEFICIARIO casi nunca es el proveedor.** El renglón «TALLER NORTE 1» se deposita a
+///    OTRA persona; «TALLER PONIENTE» y «TALLER SUR», igual. Por eso `beneficiario` es un campo
+///    propio y OBLIGATORIO: es el nombre que va en la transferencia, y no es el del catálogo.
+/// 2. **«TALLER NORTE 1 / 2 / 3» no son tres proveedores: es UNO con TRES cuentas**, partido en
+///    tres renglones porque Excel no sabe modelar otra cosa. Daniel, textual: *«Estaría bien poder
+///    tener **más de una cuenta**, definir una como **default**, pero tener las demás como
+///    **historial de cuentas**, para poder **reutilizarlas**.»* De ahí `esDefault` + `activo`.
+///
+/// Y la marca fiscal, también textual: *«Tendría **una cuenta Fiscal**, y podría tener **más de una
+/// cuenta no fiscal**.»* `esFiscal` habilita la guarda de que **un pago CON factura sólo puede
+/// salir a una cuenta fiscal** (si sale a la cuenta personal de alguien, el pago y el comprobante
+/// dejan de corresponder). Lo sin factura se reparte libre. **La guarda la construye la fila que
+/// pague; aquí sólo vive la marca.**
+///
+/// 📌 **Un pago PARTIDO son DOS pagos**, cada uno a su cuenta y con su renglón en la relación
+/// (Daniel: *«así debe salir para poder hacer las dos transferencias»*). Nada de este modelo asume
+/// "una cuenta por proveedor por semana": la cuenta se elige POR PAGO, no por semana.
+///
+/// 🔑 **CÓMO SE GARANTIZA «UNA SOLA DEFAULT» — y por qué `esDefault` es NULLABLE.**
+/// La regla la sostiene la BASE, no sólo la aplicación: `@@unique([idProveedor, esDefault])` con el
+/// truco estándar de Postgres de que **los NULL son distintos entre sí**. `esDefault` vale `true`
+/// en la cuenta por omisión y **NULL** en todas las demás (NUNCA `false`), así que la base admite N
+/// cuentas con NULL pero **una sola** con `true` por proveedor. Un índice único PARCIAL
+/// (`WHERE es_default`) diría lo mismo, pero **Prisma 7 no lo sabe expresar**: quedaría fuera del
+/// esquema y el `migrate diff` marcaría drift para siempre (misma razón por la que se descartó
+/// `UNIQUE NULLS NOT DISTINCT` en la migración del pack). Con el nullable la garantía es REAL y el
+/// esquema declara la verdad.
+///
+/// ⚠️ **Al leerlo, `esDefault === true`** — nunca `if (cuenta.esDefault)` sobre un `boolean | null`
+/// esperando que `false` exista: aquí el "no" se escribe `null`.
+///
+/// **Nada se borra (D3).** Retirar una cuenta la pone `activo = false` y ahí se queda como
+/// HISTORIAL reutilizable: se puede revivir, y los pagos viejos siguen sabiendo a dónde salieron.
+///
+/// `onDelete: Cascade` hacia `Proveedor`, igual que contactos/roles/archivos (el proveedor no se
+/// borra físicamente: borrado suave con `activo`, así que en la práctica no se dispara).
+model ProveedorCuentaPago {
+  id          Int       @id @default(autoincrement())
+  idProveedor Int       @map("id_proveedor")
+  proveedor   Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Cascade)
+
+  /// ⭐ A NOMBRE DE QUIÉN está la cuenta: el nombre que va en la transferencia. Obligatorio, y
+  /// **casi nunca es el nombre del proveedor** (por eso no se deriva de él ni se deja en blanco).
+  beneficiario String
+  /// Banco del destino ("BBVA", "Banorte"…). Texto libre, como el `banco` viejo: no hay catálogo.
+  banco        String?
+  /// ¿El número es una CLABE o una tarjeta? Antes se confundían en un solo campo.
+  tipoCuenta   TipoCuentaPago @map("tipo_cuenta")
+  /// El número, SÓLO DÍGITOS (sin espacios ni guiones: se normaliza al capturar). Único por
+  /// proveedor —capturar dos veces la misma cuenta es un error de dedo, no dos destinos—; entre
+  /// proveedores distintos sí puede repetirse (dos talleres que cobran a la misma persona).
+  cuenta       String
+  /// Cómo la llama Daniel en su relación: su «1», «2», «3»… o "la de la esposa". Opcional.
+  alias        String?
+
+  /// ⭐ ¿Es la cuenta FISCAL? A ella —y sólo a ella— puede salir un pago CON factura. Un proveedor
+  /// puede tener varias NO fiscales. NO se exige unicidad en la base: un mismo RFC puede tener más
+  /// de una cuenta a su nombre, y bloquearlo dejaría a Daniel sin poder capturar su realidad.
+  esFiscal Boolean @default(false) @map("es_fiscal")
+
+  /// ⭐ La cuenta POR OMISIÓN del proveedor. `true` en una sola; **NULL** en las demás (nunca
+  /// `false`) — ver el bloque «una sola default» del comentario del modelo. La unicidad la
+  /// garantiza `@@unique([idProveedor, esDefault])`.
+  esDefault Boolean? @map("es_default")
+
+  notas String?
+
+  /// Borrado SUAVE (D3): retirar una cuenta la archiva; sigue siendo historial REUTILIZABLE.
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// UNA SOLA DEFAULT POR PROVEEDOR, garantizada por la base (ver el comentario del modelo).
+  @@unique([idProveedor, esDefault])
+  /// La misma cuenta no se captura dos veces en el mismo proveedor.
+  @@unique([idProveedor, cuenta])
+  @@map("proveedor_cuenta_pago")
 }
 
 /// Rol/servicio que un proveedor puede prestar (F1-E1B, R15 §4.1). Catálogo

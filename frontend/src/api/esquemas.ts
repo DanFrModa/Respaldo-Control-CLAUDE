@@ -231,8 +231,11 @@ function esRfcValido(rfc: string): boolean {
 /**
  * ¿Es una CLABE interbancaria válida? Espejo de `esClabeValida` del backend: 18
  * dígitos con dígito de control (algoritmo Banxico, pesos 3-7-1).
+ *
+ * Exportada desde 0.112 para que el editor de CUENTAS del proveedor dé el aviso al momento. Es
+ * cortesía de captura, no la regla: el backend revalida y es la autoridad (A1).
  */
-function esClabeValida(clabe: string): boolean {
+export function esClabeValida(clabe: string): boolean {
   const limpio = clabe.trim();
   if (!/^\d{18}$/.test(limpio)) {
     return false;
@@ -336,13 +339,9 @@ export const esquemaProveedorFormulario = z
       .trim()
       .max(50, { error: 'La forma de pago no puede tener más de 50 caracteres' }),
     metodoPago: z.string(),
-    banco: z.string().trim().max(100, { error: 'El banco no puede tener más de 100 caracteres' }),
-    clabe: z
-      .string()
-      .trim()
-      .refine((v) => v === '' || esClabeValida(v), {
-        error: 'La CLABE debe tener 18 dígitos con dígito de control válido',
-      }),
+    // `banco`/`clabe` YA NO se capturan aquí (0.112): el dato bancario vive en las CUENTAS del
+    // proveedor (`ProveedorCuentaPago`), que tienen beneficiario, tipo (CLABE/tarjeta), marca
+    // fiscal y una default. Los campos siguen existiendo en el contrato pero nadie los escribe.
     limiteCredito: numeroOpcional({
       min: 0,
       mensajeNoNumero: 'El límite de crédito debe ser un número',

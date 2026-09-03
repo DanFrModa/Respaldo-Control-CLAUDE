@@ -252,6 +252,195 @@ export const esquemaProveedorContactoSalida = z
 /** Contacto de proveedor tal como sale de la API. */
 export type ProveedorContactoSalida = z.infer<typeof esquemaProveedorContactoSalida>;
 
+// ── CUENTAS / DESTINOS DE PAGO del proveedor (0.112) ─────────────────────────────────────────────
+//
+// 🔴 Salió de LEER el Excel con el que Daniel paga cada semana (~150 beneficiarios), no de una
+// entrevista. Dos hallazgos, y ninguno cabía en `Proveedor.banco` + `Proveedor.clabe`:
+// 🔒 Los nombres son INVENTADOS: los reales son personas físicas y el repo es PÚBLICO (fila 0.123).
+//   1. El BENEFICIARIO casi nunca es el proveedor («TALLER NORTE 1» se deposita a otra persona).
+//   2. «TALLER NORTE 1 / 2 / 3» no son tres proveedores: es UNO con TRES cuentas, partido en tres
+//      renglones porque Excel no sabe modelar otra cosa.
+// Daniel: *«Estaría bien poder tener más de una cuenta, definir una como default, pero tener las
+// demás como historial de cuentas, para poder reutilizarlas.»* Y: *«Tendría una cuenta Fiscal, y
+// podría tener más de una cuenta no fiscal.»*
+
+/** Cómo se identifica el destino del depósito. Espejo del enum Prisma `TipoCuentaPago`. */
+export const TIPOS_CUENTA_PAGO = ['clabe', 'tarjeta'] as const;
+/** Clave de tipo de cuenta de pago. */
+export type TipoCuentaPagoClave = (typeof TIPOS_CUENTA_PAGO)[number];
+
+/** Etiquetas para UI de cada tipo de cuenta. */
+export const ETIQUETAS_TIPO_CUENTA_PAGO: Record<TipoCuentaPagoClave, string> = {
+  clabe: 'CLABE interbancaria',
+  tarjeta: 'Tarjeta de débito',
+};
+
+/** Dígitos de una CLABE (Banxico): 17 + dígito de control. */
+const LARGO_CLABE = 18;
+/** Rango de dígitos de un número de tarjeta (PAN): 15 (Amex) a 19. */
+const LARGO_TARJETA_MIN = 15;
+const LARGO_TARJETA_MAX = 19;
+
+/**
+ * Deja SÓLO los dígitos de un número de cuenta capturado a mano o pegado del banco (que llega con
+ * espacios, guiones o puntos). Es lo que se guarda: así la unicidad por proveedor compara peras con
+ * peras y no deja pasar la misma cuenta escrita de dos maneras.
+ */
+export function normalizarNumeroDeCuenta(cuenta: string): string {
+  return cuenta.replace(/\D/g, '');
+}
+
+/**
+ * ¿Qué tiene de malo este número para el tipo declarado? Devuelve el mensaje en español, o `null`
+ * si está bien. Función PURA y COMPARTIDA a propósito: la usa el Zod del alta (donde el par llega
+ * completo) y la usa el DOMINIO al editar (donde el tipo puede venir de la base y el número del
+ * cuerpo, o al revés) — una sola regla, dos lugares que la aplican.
+ *
+ * ⚠️ **Tiene un ESPEJO en el front**, `frontend/src/modulos/proveedores/cuentas-pago.ts` (mismo
+ * criterio que `esClabeValida`, que ya vivía duplicado): el aviso al capturar tiene que decir lo
+ * mismo que contesta el servidor. **Si cambian estas reglas o los largos, cámbialos también allá.**
+ *
+ * La CLABE se valida ENTERA (18 dígitos + dígito de control de Banxico), igual que el campo viejo:
+ * una CLABE con el control mal es un error de dedo garantizado. La TARJETA sólo se valida por
+ * longitud (15–19 dígitos) y NO por Luhn: rebotar la captura de Daniel el día que esté cargando sus
+ * ~150 beneficiarios cuesta más que dejar pasar un dígito cambiado, que el banco rechaza igual.
+ */
+export function motivoCuentaInvalida(tipo: TipoCuentaPagoClave, cuenta: string): string | null {
+  const digitos = normalizarNumeroDeCuenta(cuenta);
+  if (digitos === '') {
+    return 'Escribe el número de la cuenta.';
+  }
+  if (tipo === 'clabe') {
+    if (digitos.length !== LARGO_CLABE) {
+      return `La CLABE debe tener ${LARGO_CLABE} dígitos (llevas ${digitos.length}).`;
+    }
+    return esClabeValida(digitos)
+      ? null
+      : 'La CLABE no es válida: su dígito de control no cuadra. Revisa el número.';
+  }
+  if (digitos.length < LARGO_TARJETA_MIN || digitos.length > LARGO_TARJETA_MAX) {
+    return `El número de tarjeta debe tener entre ${LARGO_TARJETA_MIN} y ${LARGO_TARJETA_MAX} dígitos (llevas ${digitos.length}).`;
+  }
+  return null;
+}
+
+/** Campos comunes de una cuenta de pago (mismas reglas en alta y edición). */
+const camposCuentaPago = {
+  /**
+   * ⭐ A NOMBRE DE QUIÉN está la cuenta. Obligatorio, y **casi nunca es el proveedor**: por eso no
+   * se deriva de él ni se deja vacío "porque se entiende".
+   */
+  beneficiario: z
+    .string({ error: 'El beneficiario es obligatorio' })
+    .trim()
+    .min(1, { error: 'Escribe a nombre de quién está la cuenta' })
+    .max(150, { error: 'El beneficiario no puede tener más de 150 caracteres' }),
+  /** Banco del destino ("BBVA", "Banorte"…). Texto libre: no hay catálogo de bancos. */
+  banco: z
+    .string()
+    .trim()
+    .max(100, { error: 'El banco no puede tener más de 100 caracteres' })
+    .optional(),
+  tipoCuenta: z.enum(TIPOS_CUENTA_PAGO, { error: 'El tipo de cuenta debe ser CLABE o tarjeta' }),
+  /** El número tal como se captura (con o sin espacios); se guarda sólo con dígitos. */
+  cuenta: z
+    .string({ error: 'El número de cuenta es obligatorio' })
+    .trim()
+    .min(1, { error: 'Escribe el número de la cuenta' })
+    .max(40, { error: 'El número de cuenta no puede tener más de 40 caracteres' }),
+  /** Cómo la llama Daniel en su relación: su «1», «2», «3»… o "la de la esposa". */
+  alias: z
+    .string()
+    .trim()
+    .max(60, { error: 'El alias no puede tener más de 60 caracteres' })
+    .optional(),
+  /** ⭐ ¿Es la cuenta FISCAL? A ella puede salir un pago CON factura. */
+  esFiscal: z.boolean({ error: '¿Es cuenta fiscal? debe ser verdadero o falso' }).optional(),
+  notas: z
+    .string()
+    .trim()
+    .max(1000, { error: 'Las notas no pueden tener más de 1000 caracteres' })
+    .optional(),
+} as const;
+
+/**
+ * Alta de una cuenta de pago (el proveedor va en la URL, no en el cuerpo).
+ *
+ * `esDefault` NO se pide en el alta: la PRIMERA cuenta del proveedor queda default sola (el dominio
+ * lo decide) y las demás se promueven después con el PATCH. Así el alta nunca compite por la marca.
+ */
+export const esquemaProveedorCuentaPagoCrear = z
+  .object(camposCuentaPago)
+  .superRefine((datos, ctx) => {
+    const motivo = motivoCuentaInvalida(datos.tipoCuenta, datos.cuenta);
+    if (motivo !== null) {
+      ctx.addIssue({ code: 'custom', message: motivo, path: ['cuenta'] });
+    }
+  })
+  .describe('Alta de una cuenta/destino de pago del proveedor.');
+
+/** Datos validados del alta de una cuenta de pago. */
+export type DatosProveedorCuentaPagoCrear = z.infer<typeof esquemaProveedorCuentaPagoCrear>;
+
+/**
+ * Edición PARCIAL de una cuenta: omitir = no tocar; `null`/'' = borrar el dato opcional.
+ *
+ * El par (tipo, número) NO se puede validar aquí cuando sólo viene uno de los dos: el otro está en
+ * la base. Esa validación la hace el DOMINIO sobre el par EFECTIVO, con la misma función pura
+ * (`motivoCuentaInvalida`) — la autoridad es el servidor (A1), no este esquema.
+ */
+export const esquemaProveedorCuentaPagoEditarCuerpo = z
+  .object({
+    beneficiario: camposCuentaPago.beneficiario.optional(),
+    banco: camposCuentaPago.banco.nullable(),
+    tipoCuenta: camposCuentaPago.tipoCuenta.optional(),
+    cuenta: camposCuentaPago.cuenta.optional(),
+    alias: camposCuentaPago.alias.nullable(),
+    esFiscal: camposCuentaPago.esFiscal,
+    notas: camposCuentaPago.notas.nullable(),
+    /**
+     * ⭐ `true` la vuelve LA cuenta por omisión del proveedor (y apaga la que lo era, en la misma
+     * transacción); `false` sólo le quita la marca — no promueve a nadie más.
+     */
+    esDefault: z
+      .boolean({ error: '¿Es la cuenta por omisión? debe ser verdadero o falso' })
+      .optional(),
+    /** Borrado SUAVE (D3): `false` RETIRA la cuenta (queda como historial), `true` la revive. */
+    activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
+  })
+  .describe('Edición parcial de una cuenta/destino de pago del proveedor.');
+
+/** Datos validados de la edición de una cuenta de pago. */
+export type DatosProveedorCuentaPagoEditarCuerpo = z.infer<
+  typeof esquemaProveedorCuentaPagoEditarCuerpo
+>;
+
+/**
+ * Forma de una cuenta de pago tal como la devuelve la API.
+ *
+ * ⚠️ `esDefault` sale como **boolean puro**: adentro la columna es `true`/NULL (así la base
+ * garantiza una sola default por proveedor), pero eso es plomería del esquema y no tiene por qué
+ * cruzar el contrato. La ruta lo proyecta con `=== true`.
+ */
+export const esquemaProveedorCuentaPagoSalida = z
+  .object({
+    id: z.number().int().describe('Id de la cuenta.'),
+    idProveedor: z.number().int().describe('Id del proveedor dueño de la cuenta.'),
+    beneficiario: z.string().describe('A nombre de quién está la cuenta (el del depósito).'),
+    banco: z.string().nullable().describe('Banco, o null.'),
+    tipoCuenta: z.enum(TIPOS_CUENTA_PAGO).describe('CLABE o tarjeta.'),
+    cuenta: z.string().describe('El número, sólo dígitos.'),
+    alias: z.string().nullable().describe('Cómo se le llama en la relación de pago ("1", "2"…).'),
+    esFiscal: z.boolean().describe('Verdadero si a ella puede salir un pago CON factura.'),
+    esDefault: z.boolean().describe('Verdadero si es LA cuenta por omisión del proveedor.'),
+    notas: z.string().nullable().describe('Notas, o null.'),
+    activo: z.boolean().describe('Falso si está retirada (sigue siendo historial reutilizable).'),
+  })
+  .describe('Cuenta/destino de pago de un proveedor.');
+
+/** Cuenta de pago tal como sale de la API. */
+export type ProveedorCuentaPagoSalida = z.infer<typeof esquemaProveedorCuentaPagoSalida>;
+
 // ── CONSTANCIA DE SITUACIÓN FISCAL (V1-E3f pieza B, §Post-F9.55) ─────────────────────────────────
 //
 // Daniel: *"En proveedores me gustaría poder subir su Constancia de Situación Fiscal para darlos de
@@ -577,6 +766,11 @@ export const esquemaProveedorSalida = z
     contactos: z
       .array(esquemaProveedorContactoSalida)
       .describe('Contactos ACTIVOS del proveedor (V1-E3f pieza B).'),
+    cuentasPago: z
+      .array(esquemaProveedorCuentaPagoSalida)
+      .describe(
+        'Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte.',
+      ),
     cantidadAdjuntos: z.number().int().describe('Cantidad de adjuntos del proveedor.'),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
