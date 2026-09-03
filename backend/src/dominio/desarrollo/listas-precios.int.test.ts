@@ -1030,8 +1030,9 @@ describe('desgloseCostoLinea — desglose de costo por concepto (§4.8)', () => 
    * 🔴🔴 **LA REJA DE IMPORTES, RENGLÓN POR RENGLÓN** (ronda de corrección de V1-E8w). El desglose
    * abierto NO es sólo subtotales desde esta etapa: trae el `precioUnit` y el `importe` de **cada
    * tela y cada avío**, y ésos son el dato más sensible del módulo. La puerta del endpoint es
-   * `listas.ver`, que cascadea hasta Secretarial; el candado del dinero es `consultas.ver-importes`,
-   * que se corta en Ventas (`prisma/seed.ts`) — o sea que si los ternarios de `desgloseCostoLinea`
+   * `listas.ver`, que en `prisma/seed.ts` lo lleva todo perfil menos `Basico`; el candado del dinero
+   * es `consultas.ver-importes`, que sólo lo llevan Administrador, AdministracionDireccion,
+   * Directivo y Gerencial — o sea que si los ternarios de `desgloseCostoLinea`
    * se cayeran, el precio de cada material llegaría a Ventas/Logística/Asistente/Secretarial.
    *
    * La prueba anterior sólo miraba `costoTotal` y los subtotales: el reviewer quitó los dos

@@ -1686,9 +1686,10 @@ function CapturaMovimiento({
    *
    * ⚠️ NO se gatea con `ordenes.ver-precio-real-maquila`: ese permiso gobierna la LECTURA (el
    * backend REDACTA el campo a `null` al devolver etapas y recibos — `etapas.ts`/`recibos.ts`),
-   * **no la captura** (así lo fija `recibos.int.test.ts`: *"la captura no"*). Y el seed corta ese
-   * permiso de Logística hacia abajo, mientras `produccion.envio`/`.recibo` no se cortan en ninguna
-   * parte: gatear el campo dejaría SIN precio justo a los roles que capturan la maquila diaria y,
+   * **no la captura** (así lo fija `recibos.int.test.ts`: *"la captura no"*). Y en el seed ese
+   * permiso llega hasta Ventas y no más abajo, mientras `produccion.envio`/`.recibo` los lleva todo
+   * perfil menos `Basico`: gatear el campo dejaría SIN precio justo a los roles que capturan la
+   * maquila diaria —Logística, Asistente, Secretarial— y,
    * como el cargo EsMa cae al `precioPactado` del recibo cuando la OP no trae precio
    * (`esma/cargos.ts`), el cargo nacería sin precio — la doble captura que v2 elimina.
    * La regla es: se puede TECLEAR el precio que se pactó hoy; NO se puede VER el que capturó otro.

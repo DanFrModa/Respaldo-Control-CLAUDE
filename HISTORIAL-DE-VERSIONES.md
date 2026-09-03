@@ -71,6 +71,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.095 · 3-sep-2026 · **en prueba** — Los permisos se declaran uno por uno
+
+### Qué se puede hacer ahora que antes no
+
+**Nada nuevo, y ése es el punto.** Los nueve perfiles quedan **exactamente con los mismos permisos que
+tenían** — verificado por dos fuentes independientes. Lo que cambió es **cómo se definen**.
+
+Antes cada perfil se describía como *«todo lo del perfil de arriba, menos estas cosas»*. Suena práctico y
+tiene un defecto grave: **cuando se agrega un permiso nuevo y nadie dice a quién quitárselo, le llega a
+todos**. Así fue como el perfil más bajo terminó pudiendo **autorizar órdenes de compra** — nadie lo
+decidió; nadie lo impidió.
+
+- Ahora **cada perfil dice lo que tiene**, no lo que le falta.
+- **Un permiso nuevo no llega a nadie** hasta que alguien escriba quién debe tenerlo, **y por qué**.
+- Si alguien agrega un permiso y se olvida de repartirlo, **el sistema se pone rojo** en vez de regalarlo.
+
+Deja el terreno listo para cuando Daniel arme los perfiles con los puestos reales: va a trabajar sobre una
+lista completa y explícita, no sobre una donde lo que no se dice se concede solo.
+
+### Qué cambió y puede sorprender
+
+- **En Administración › Roles hay un aviso nuevo** al abrir uno de los nueve perfiles de fábrica: dice que
+  se restablecen en cada actualización —**salvo administrar usuarios y administrar roles**, que el sistema
+  nunca retira—. Eso ya pasaba y nadie lo decía.
+- **Los perfiles propios que crees tú no se tocan**: el sistema ni los mira.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Los perfiles concretos siguen sin decidirse.** Daniel los arma al final, con los puestos reales. Hoy
+  el perfil secretarial conserva **76 permisos**, 22 de ellos capaces de autorizar, cancelar o mover dinero.
+- 🔴 **«Administrar roles» sigue funcionando como interruptor de "es administrador"** en cinco lugares:
+  dárselo a alguien le concede de pasada capturar cualquier proceso de la ruta crítica, ver la bandeja
+  completa y editar una orden de compra ya autorizada. Es la fila **0.120**.
+- **Sin migración, sin permisos nuevos** ⇒ el despliegue **no** requiere `SEED_ON_START`: como el reparto no
+  cambia, volver a sembrar no escribiría nada. Lo único verificable en vivo es el aviso de Roles.
+
 ## 0.094 · 3-sep-2026 · **en prueba** — Las decisiones de la noche quedan escritas, y el incidente de los archivos reales queda con número
 
 ### Qué se puede hacer ahora que antes no

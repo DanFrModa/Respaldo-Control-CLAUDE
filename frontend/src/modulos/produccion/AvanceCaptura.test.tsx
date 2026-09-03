@@ -1109,7 +1109,8 @@ describe('Captura del avance · el precio pactado y la fecha compromiso (migrado
     );
     const usuario = userEvent.setup();
     // Sesión SIN el permiso de ver el precio real, pero CON el de enviar: es el caso del seed, donde
-    // `ordenes.ver-precio-real-maquila` se corta de Logística hacia abajo y `produccion.envio` no.
+    // `ordenes.ver-precio-real-maquila` llega hasta Ventas y `produccion.envio` lo lleva todo perfil
+    // menos `Basico` (o sea: Logística, Asistente y Secretarial capturan sin poder ver el precio).
     // Si el campo se escondiera, estos roles capturarían la maquila diaria sin precio y el cargo
     // EsMa nacería sin precio (`esma/cargos.ts` cae al `precioPactado` del recibo).
     renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {

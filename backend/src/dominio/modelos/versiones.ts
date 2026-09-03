@@ -415,12 +415,16 @@ export interface RecetaCopiada {
  * Copia la RECETA de un modelo a OTRO modelo recién nacido (telas, avíos + sus medidas por talla,
  * y arte con sus fotos compartidas).
  *
- * ⚠️ **Por qué no se reusa `copiarBom` de `bom-modelo.ts`, que copia lo mismo.** Porque exige
- * `modelos.administrar`, y ése se corta en Directivo: reusarlo dejaría fuera a Gerencial, que es
- * exactamente a quien Daniel le encargó aprobar recetas (*"Aurora podría hacerlo aparte de mí"*).
- * Aquí, además, el destino acaba de nacer VACÍO: no hay nada que reemplazar, fusionar ni
- * deduplicar, así que el camino es recto. Tampoco se reusa `copiarRecetaDelModelo`
- * (`produccion/receta-orden.ts`): ése es modelo→ORDEN y congela PRECIOS, que aquí no aplican.
+ * ⚠️ **Por qué no se reusa `copiarBom` de `bom-modelo.ts`, que copia lo mismo.** `copiarBom`
+ * **exige** `modelos.administrar` (`bom-modelo.ts`, primera línea del cuerpo) —eso sigue igual—, y
+ * cuando esto se escribió ese permiso no le llegaba a Gerencial, justo a quien Daniel le encargó
+ * aprobar recetas (*"Aurora podría hacerlo aparte de mí"*). ⚠️ Lo que cambió NO es el requisito
+ * sino el REPARTO: desde §Post-F9.123 Gerencial sí lleva `modelos.administrar` (medido en
+ * `definirRoles()`), así que hoy ese argumento ya no separa a las dos funciones. La razón que sigue
+ * en pie, y basta por sí sola, es la otra: aquí el destino acaba de nacer VACÍO, no hay nada que
+ * reemplazar, fusionar ni deduplicar, y el camino es recto. Tampoco se reusa
+ * `copiarRecetaDelModelo` (`produccion/receta-orden.ts`): ése es modelo→ORDEN y congela PRECIOS,
+ * que aquí no aplican.
  *
  * ⭐ **V1-E8y la EXPORTA** (§Post-F9.152). «Copiar un modelo» desde la mesa de negociación necesita
  * exactamente esto —un destino recién nacido y vacío que hereda la receta entera— y la alternativa

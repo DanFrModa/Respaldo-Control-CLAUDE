@@ -273,7 +273,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           // Logística, Asistente…— y al entrar recibirían un 403: un ENLACE MUERTO, justo lo que el
           // criterio de §Post-F9.68 evita. Con la restrictiva sola el conjunto es EXACTO:
           // `consultas.ver-importes` lo tienen Administrador, AdministracionDireccion, Directivo y
-          // Gerencial (se corta en Ventas, `prisma/seed.ts`), y los cuatro tienen `modelos.ver`.
+          // Gerencial —y nadie más, `prisma/seed.ts`—, y los cuatro tienen `modelos.ver`.
           // Sin permisos nuevos.
           {
             clave: 'promesas-incumplidas',

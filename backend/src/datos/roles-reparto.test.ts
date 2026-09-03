@@ -12,11 +12,34 @@
  * *"Si se juntaran por descuido, Aurora acabaría aprobando precios sin que nadie lo hubiera
  * decidido."* Aurora es **Gerencial**.
  *
- * ⚠️ Por qué esta prueba existe aparte de `seed.int.test.ts`: aquélla comprueba que la CASCADA de
- * conteos baja (Ventas ⊂ Gerencial ⊂ Directivo…), y una cascada de conteos **no ve** que un
- * permiso se mueva de un escalón a otro — los dos conteos se compensan y todo sigue "bajando".
- * Lo que Daniel fijó es QUÉ escalón corta CUÁL permiso, y eso hay que nombrarlo. Además es PURA
- * (`definirRoles` no toca la base), así que corre en el proyecto `unit` sin Docker.
+ * ⚠️ NOTA DEL 3-sep-2026: el seed ya NO reparte por cascada (`sin(…)` desapareció; cada perfil
+ * declara lo que TIENE, ver `prisma/seed.ts`). Estas pruebas siguen valiendo TAL CUAL —y ahora
+ * valen más—: nombran QUÉ perfil puede QUÉ, que es lo único que el reparto nuevo no deduce solo.
+ * Donde abajo se habla de «la cascada» y de `sin()` se está contando cómo estaba escrito el seed
+ * entonces, no cómo está hoy.
+ *
+ * ⚠️ **POR QUÉ ESTE ARCHIVO EXISTE APARTE — tres archivos, tres preguntas DISTINTAS.** Ninguno
+ * cubre al otro, y el que las confunde acaba borrando el que hace falta:
+ *
+ * | Archivo | La pregunta que contesta |
+ * |---|---|
+ * | **este** (`roles-reparto.test.ts`) | **¿QUÉ perfil puede QUÉ, por decisión de Daniel?** La INTENCIÓN, nombrada permiso por permiso |
+ * | `reparto-de-permisos.test.ts` | ¿el reparto **se movió** respecto a la foto del 3-sep?, ¿queda alguna clave **sin dueño**?, ¿lo nacido después **se decidió por escrito**? |
+ * | `seed.int.test.ts` (integración) | ¿la **BASE DE DATOS** recibe exactamente lo que dice `definirRoles()`? Pura MECÁNICA del sembrado |
+ *
+ * 🔑 **El que jamás puede sustituir a éste es el de integración**, y no por lo que compara sino por
+ * contra qué: compara la BD **contra la propia definición**, así que si la definición le regala
+ * `listas.aprobar` a Ventas, la BD lo recibe, coinciden y **pasa en verde**. Con una excepción que
+ * conviene tener presente: de los **extremos** sí opina, porque los ancla a fuentes independientes
+ * —`Administrador`/`AdministracionDireccion` contra el catálogo entero, `Basico` contra cero—. De
+ * los **seis perfiles de en medio**, que son donde vive el reparto de verdad, no opina nada. Lo que
+ * Daniel fijó es a QUIÉN le toca cada permiso, y eso hay que escribirlo; se escribe aquí.
+ *
+ * *(Hasta el 3-sep-2026 esa prueba comparaba CONTEOS y exigía que la cascada «bajara»; en esta
+ * misma fila se cambió a conjuntos exactos de claves. El párrafo que decía eso quedó falso y por eso
+ * se reescribió: no cambia la conclusión, cambia el motivo.)*
+ *
+ * Además es PURA (`definirRoles` no toca la base), así que corre en el proyecto `unit` sin Docker.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -75,17 +98,30 @@ describe('reparto de las DOS aprobaciones (§Post-F9.110 (b) + F8-E4 (h))', () =
     // desarrollo con modelo nuevo. Nada de eso es de un rol clerical.
     //
     // Por eso NO basta con afirmar que Gerencial lo tiene (arriba): hay que fijar dónde TERMINA.
-    // Las aserciones de conteo de `seed.int.test.ts` no lo ven —una fuga infla los dos escalones a
-    // la vez y la cascada «sigue bajando»—, así que el alcance se nombra rol por rol aquí.
+    //
+    // ⚠️ Y aquí hay que ser exacto, porque la primera redacción de este comentario (3-sep-2026)
+    // decía que «ninguna de las otras dos pruebas lo ve» y **era falsa**: la foto de
+    // `reparto-de-permisos.test.ts` SÍ caza esta fuga —de hecho el reviewer la metió y murieron las
+    // dos pruebas—, porque `modelos.administrar` está entre las 122 claves congeladas. Lo cierto es
+    // esto, y sostiene mejor el argumento:
+    //
+    //  • `seed.int.test.ts` no la ve NUNCA: compara la BD contra la propia `definirRoles()`, así
+    //    que una fuga metida EN LA DEFINICIÓN se siembra tal cual y coincide.
+    //  • La foto sí la vería… pero **sólo por casualidad de la fecha**: cubre las claves que
+    //    existían el 3-sep-2026. Un permiso nacido después se le escapa, y entonces no quedaría
+    //    nadie mirando.
+    //
+    // Lo que NO depende de la fecha es nombrarlo aquí, rol por rol.
     for (const rol of ['Ventas', 'Logistica', 'Asistente', 'Secretarial']) {
       expect(permisosDe(rol), rol).not.toContain('modelos.administrar');
     }
   });
 
-  it('⭐ ALCANCE: y la cascada NO se invierte — Directivo (30) lo tiene, Secretarial (60) no', () => {
+  it('⭐ ALCANCE hacia arriba: Directivo y Gerencial SÍ lo tienen (y Secretarial no)', () => {
     // El otro síntoma del `.concat`: dejaba a Directivo SIN el permiso y a Secretarial CON él, al
-    // revés de la regla que el propio seed documenta ("menor nivel ⊃ mayor nivel", `sin()`). El
-    // permiso se corta en UN escalón (Ventas) y de ahí hacia abajo no existe.
+    // revés de la regla que el seed documentaba entonces ("menor nivel ⊃ mayor nivel", `sin()`).
+    // Desde el 3-sep-2026 ya no hay tal regla —cada perfil lista lo suyo—, así que el reparto de
+    // este permiso deja de estar garantizado por la forma y pasa a estar garantizado por ESTO.
     for (const rol of ['Administrador', 'AdministracionDireccion', 'Directivo', 'Gerencial']) {
       expect(permisosDe(rol), rol).toContain('modelos.administrar');
     }

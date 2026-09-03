@@ -102,9 +102,10 @@
  * negociaciones distintas como si fueran una. El porqué completo, medido, está en esa función.
  *
  * 🔴 **Y la meta va TRAS LA REJA DE LOS IMPORTES** (`consultas.ver-importes`), aunque la bandeja la
- * abra `modelos.ver`: son dos preguntas distintas. `modelos.ver` no se resta en ningún escalón del
- * seed, así que sin la reja el costo con el que se vendió llegaría a Ventas, Logística, Asistente y
- * Secretarial — justo a quienes se les quitó ver importes. Se oculta el IMPORTE, no la FILA.
+ * abra `modelos.ver`: son dos preguntas distintas. `modelos.ver` lo lleva todo perfil del seed
+ * menos `Basico`, así que sin la reja el costo con el que se vendió llegaría a Ventas, Logística,
+ * Asistente y Secretarial — justo a quienes NO se les dio ver importes. Se oculta el IMPORTE, no la
+ * FILA.
  *
  * ⚠️ **La bandeja sigue sin firmar: LLEVA** (§Post-F9.140 punto 4). Enseñar la meta no la convierte
  * en una segunda autoridad; el desenlace se declara al FIRMAR, en la ficha del modelo.
@@ -163,8 +164,8 @@ export async function consultarRecetasPorRevisar(
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
   // 🔴🔴 LA META ES DINERO, Y VA TRAS LA REJA DE LOS IMPORTES. Esta bandeja la abre `modelos.ver`,
-  // que **no se resta en ningún escalón** de `prisma/seed.ts` ⇒ la ven Ventas, Logística, Asistente
-  // y Secretarial — exactamente los roles a los que se les QUITÓ `consultas.ver-importes` por
+  // que en `prisma/seed.ts` lo lleva **todo perfil menos `Basico`** ⇒ la ven Ventas, Logística,
+  // Asistente y Secretarial — exactamente los roles que NO llevan `consultas.ver-importes` por
   // decisión. Publicar aquí el costo con el que se cerró la mesa les enseñaría *«la información que
   // vendí»* por la puerta de al lado. Es la MISMA columna que `desarrollo/negociacion.ts` ya oculta
   // así (`costoEstimado: verImportes ? … : null`) y el mismo dato que `consultarMetaPrometida`

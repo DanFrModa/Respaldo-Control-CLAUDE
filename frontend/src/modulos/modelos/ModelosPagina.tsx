@@ -255,10 +255,19 @@ function puedeVerCostoRealDeModelo(tienePermiso: (clave: ClavePermiso) => boolea
 export function ModelosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('modelos.administrar');
-  // ⭐ V1-E7b (§Post-F9.110) — aprobar la RECETA creando la versión es un permiso APARTE, que
-  // llega hasta Gerencial (Daniel: *"Aurora podría hacerlo aparte de mí"*) mientras
-  // `modelos.administrar` se corta en Directivo. Por eso NO se cuelga de `puedeAdministrar`: si lo
-  // hiciera, a quien Daniel le encargó el trabajo no le aparecería el botón.
+  // ⭐ V1-E7b (§Post-F9.110) — aprobar la RECETA creando la versión es un permiso APARTE de
+  // `modelos.administrar`, y por eso NO se cuelga de `puedeAdministrar`.
+  //
+  // ⚠️ La razón ESCRITA aquí llevaba meses caducada: decía que `modelos.aprobar-receta` llegaba
+  // hasta Gerencial (Daniel: *"Aurora podría hacerlo aparte de mí"*) «mientras `modelos.administrar`
+  // se corta en Directivo». Desde §Post-F9.123 los DOS los llevan exactamente los mismos cuatro
+  // perfiles —Administrador, AdministracionDireccion, Directivo y Gerencial, medido en
+  // `definirRoles()`—, así que ese contraste ya no separa nada.
+  //
+  // La decisión NO cambia, y ahora se sostiene sola: son dos permisos distintos a propósito
+  // —firmar la receta no es administrar el catálogo (§Post-F9.110 (b))— y **los roles son DATOS
+  // editables**; un rol a la medida puede llevar uno sin el otro, y cuando Daniel arme los perfiles
+  // por puesto real este botón tiene que seguir la facultad de FIRMAR, no la de administrar.
   const puedeVersionar = tienePermiso('modelos.aprobar-receta');
   // ⭐ §Post-F9.137 — la columna «Costo» enseña el costo REAL del último costeo (F7): «cómo
   // terminamos», no el plan. Daniel: *«Escóndesela»*. Se calcula UNA vez y gobierna sus DOS

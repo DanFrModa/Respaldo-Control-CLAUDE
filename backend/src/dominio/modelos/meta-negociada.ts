@@ -432,9 +432,10 @@ export async function resolverCostoPrometido(
  * tres enseñan y congelan el mismo número.
  *
  * ⚠️ Permisos: `modelos.aprobar-receta` (quien firma) **y** `consultas.ver-importes` (es un
- * importe). En el reparto de `prisma/seed.ts` los dos se cortan en el MISMO escalón —Ventas—, así
- * que todo el que puede firmar puede ver la meta: la pareja no cierra ninguna puerta que estuviera
- * abierta. **Sin permisos nuevos.**
+ * importe). En el reparto de `prisma/seed.ts` los dos los llevan EXACTAMENTE los mismos cuatro
+ * perfiles (Administrador, AdministracionDireccion, Directivo y Gerencial), así que todo el que
+ * puede firmar puede ver la meta: la pareja no cierra ninguna puerta que estuviera abierta.
+ * **Sin permisos nuevos.**
  */
 export async function consultarMetaPrometida(
   sesion: SesionUsuario,

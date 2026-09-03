@@ -31,8 +31,9 @@ import { simularNegociacion } from './negociacion.js';
 
 /**
  * El DUEÑO: `listas.aprobar` (Administrador / AdministracionDireccion / Directivo). Se le dan los
- * permisos que esos roles TIENEN de verdad en el seed —`listas.negociar` incluido, que se corta en
- * Ventas—: una sesión de prueba más pobre que el rol real probaría un usuario que no existe.
+ * permisos que esos roles TIENEN de verdad en el seed —`listas.negociar` incluido, que llega hasta
+ * Gerencial y no más abajo—: una sesión de prueba más pobre que el rol real probaría un usuario que
+ * no existe.
  */
 const dueno = () =>
   sesionDePrueba({
