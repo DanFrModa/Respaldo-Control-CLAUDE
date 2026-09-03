@@ -2118,8 +2118,12 @@ un verde* (deuda **0.092**).
 
 `impreso-envio-maquila.ts` **no imprime ni una imagen**, ni antes ni después de esta etapa (verificado
 enumerando: `impreso-orden.ts` es el **único** archivo de `dominio/` que usa `Image`). 🔴 **Si la OP manda
-sobre la foto del arte, ése es el papel que el proveedor tiene en la mano.** ⇒ fila **0.094**, **pendiente
-de Daniel** con default *sí*, y **barata**: esta etapa ya resuelve **cuál** foto manda en cada OP.
+sobre la foto del arte, ése es el papel que el proveedor tiene en la mano.** ⇒ fila **0.094**, ✅ **CERRADA el 3-sep-2026
+como versión `0.092`** (Daniel confirmó en §Post-F9.181(c): *«sí lleva foto la ficha de estampado»*). Salió
+**barata**, como se preveía: esta etapa ya resolvía **cuál** foto manda en cada OP, así que imprimirla fue
+**leer lo ya resuelto**. La regla de imagen quedó extraída en `impresos/imagenes-impreso.ts`, compartida con
+el impreso de la orden. 🔑 **Y destapó dos filas nuevas**: `impreso-orden.ts` descarta fotos en silencio y su
+conteo miente (**0.106**), y el recibo de maquila de arte tiene el hueco simétrico (**0.107**).
 
 ---
 
