@@ -71,6 +71,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.100 · 3-sep-2026 · **en prueba** — El semáforo de pruebas ya no puede callarse cuando un paso muere a medias
+
+### Qué se puede hacer ahora que antes no
+
+⚠️ **Nada nuevo en pantalla: esta versión es de la herramienta con la que se valida el código antes de
+subirlo**, no del programa.
+
+- Cuando uno de los pasos de validación **muere antes de terminar** —por falta de memoria, por una señal
+  del sistema, por lo que sea— el semáforo lo marca **en rojo con su causa**, en vez de quedarse callado.
+  Antes, un paso que reventaba sin llegar a imprimir su resumen no dejaba ni cruz ni frase: el principio
+  *«si no ves la frase, no pasó»* vivía sólo en la prosa.
+
+### Qué cambió y puede sorprender
+
+- Cada paso de validación declara ahora **qué frase imprime su herramienta al terminar** (prettier y
+  vitest la tienen); si un paso termina «bien» pero esa frase no aparece, el semáforo lo marca **«TERMINÓ
+  SIN RESUMEN… NO es un pase»** y devuelve fallo de verdad al sistema — ya no hay forma de imprimir «NO
+  PASÓ» y aun así reportar éxito.
+- Los pasos que no tienen frase de cierre (el lint y el typecheck no imprimen nada al pasar) lo dicen en
+  su propia línea: *«OK, pero SIN VIGILANCIA DE RESUMEN»* con el motivo. Un pase de ésos se apoya sólo
+  en el código de salida, y ahora se ve cuál es cuál.
+- La exigencia de esa frase se decide por la **herramienta que corre el comando**, no por cómo se llame
+  el paso, y la salida normal y la de errores se vigilan **por separado** — un aviso a mitad de línea ya
+  no puede convertir un verde real en un rojo falso.
+- Ese rojo falso **no era hipotético**: el reviewer lo reprodujo separando las escrituras unos milisegundos,
+  y desde esta versión lo vigila una prueba que lanza un proceso de verdad, no sólo funciones sueltas.
+
+- El semáforo ahora dice al arrancar **con cuánta memoria corre**. Un verde obtenido con 8 GB heredados
+  del contenedor no es lo mismo que uno con la memoria que se eligió; ahora se sabe cuál fue.
+
+### Qué sigue pendiente o roto
+
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.099 · 3-sep-2026 · **en prueba** — ⭐ El saldo del maquilero ya sólo cuenta lo **revisado**, y lo que espera tu decisión se ve al lado
 
 ### Qué se puede hacer ahora que antes no
