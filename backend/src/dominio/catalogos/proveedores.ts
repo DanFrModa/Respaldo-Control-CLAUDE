@@ -44,6 +44,7 @@ import type {
   Proveedor,
   ProveedorArchivo,
   ProveedorContacto,
+  ProveedorCuentaPago,
   RolProveedor,
 } from '../../datos/index.js';
 import { z } from 'zod';
@@ -88,6 +89,7 @@ export type EntradaActualizarProveedor = z.input<typeof esquemaProveedorEditar>;
 export type ProveedorConRoles = Proveedor & {
   roles: { rol: Pick<RolProveedor, 'id' | 'codigo' | 'nombre'> }[];
   contactos: ProveedorContacto[];
+  cuentasPago: ProveedorCuentaPago[];
   _count: { archivos: number };
 };
 
@@ -102,6 +104,15 @@ const incluirRolesYConteo = {
     orderBy: { rol: { nombre: 'asc' } },
   },
   contactos: { where: { activo: true }, orderBy: [{ nombre: 'asc' }, { id: 'asc' }] },
+  // Cuentas de pago ACTIVAS, la DEFAULT primero (0.112). Las retiradas son historial: no viajan en
+  // la ficha, se piden con `?incluirInactivas=true` en su listado propio.
+  // ⚠️ `nulls: 'last'` NO es adorno: `esDefault` es `true`/NULL (así la base garantiza una sola
+  // default) y en Postgres un `ORDER BY ... DESC` pone los NULL PRIMERO. Sin esto, la default
+  // saldría hasta el final.
+  cuentasPago: {
+    where: { activo: true },
+    orderBy: [{ esDefault: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+  },
   _count: { select: { archivos: true } },
 } satisfies Prisma.ProveedorInclude;
 
@@ -177,8 +188,11 @@ async function exigirCortoLibre(tx: Tx, corto: string, idActual?: number): Promi
   }
 }
 
-/** Busca un proveedor por id o lanza `ErrorNoEncontrado`. */
-async function exigirProveedor(tx: Tx, id: number): Promise<Proveedor> {
+/**
+ * Confirma que el proveedor existe (404 si no). EXPORTADO: lo reusan los sub-catálogos que cuelgan
+ * del proveedor y viven en su propio archivo (`proveedor-cuentas-pago.ts`).
+ */
+export async function exigirProveedor(tx: Tx, id: number): Promise<Proveedor> {
   const proveedor = await tx.proveedor.findUnique({ where: { id } });
   if (proveedor === null) {
     throw new ErrorNoEncontrado('Proveedor', id);

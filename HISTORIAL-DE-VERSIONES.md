@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.098 · 3-sep-2026 · **en prueba** — ⭐ El proveedor ya tiene **sus cuentas de pago**: beneficiario, varias cuentas, una por omisión y la marca fiscal
+
+### Qué se puede hacer ahora que antes no
+
+- **Capturar a quién se le deposita, que casi nunca es el proveedor.** Cada cuenta lleva su **beneficiario**,
+  su banco, si es **CLABE o tarjeta**, el número, un alias («1», «2», «3») y **si es la cuenta fiscal**.
+- **Varias cuentas por proveedor**, una marcada **por omisión** y las demás guardadas como **historial
+  reutilizable**: retirar una no la borra, y se puede reactivar.
+- **Editar una cuenta ya capturada** — un error de dedo en el beneficiario se corrige ahí mismo. Y en el
+  cajón de la lista el número sale **enmascarado** (`•••• 7771`); completo sólo en el editor, que es donde
+  se copia a la transferencia.
+
+### Qué cambió y puede sorprender
+
+- **Los campos viejos «Banco» y «CLABE» del proveedor ya no se capturan**: los sustituyen las cuentas. Lo que
+  había capturado no se borra, sólo deja de leerse — un proveedor migrado **no muestra dato bancario** hasta
+  que se le capture su cuenta (es lo esperado: Daniel las captura el día de la migración).
+- **Una sola cuenta por omisión por proveedor lo garantiza la base de datos**, no la pantalla. Quitar la marca
+  no promueve a nadie automáticamente —el proveedor queda sin cuenta por omisión hasta que se elija otra— y
+  la pantalla avisa.
+- **La cuenta fiscal queda libre**: no se fuerza a una sola por proveedor (decisión de Daniel).
+- **No se pueden capturar cuentas mientras se da de alta el proveedor**: hay que guardarlo primero, igual que
+  con contactos y adjuntos.
+
+### Qué sigue pendiente o roto
+
+- **La corrida semanal de pagos** que usa estas cuentas para armar la lista del banco es la fila **0.113**; la
+  guarda de «un pago con factura sólo sale a una cuenta fiscal» va ahí.
+- ⏳ `obsPago` («observaciones de pago») sigue viviendo en «Datos de taller» cuando parece del mundo de las
+  cuentas; no se movió.
+- **Con migración** (una tabla nueva), **sin permisos nuevos, sin seed** ⇒ el despliegue **no** requiere
+  `SEED_ON_START`.
+
 ## 0.097 · 3-sep-2026 · **en prueba** — La regla que faltaba: nadie mergea lo que otro está revisando
 
 ### Qué se puede hacer ahora que antes no

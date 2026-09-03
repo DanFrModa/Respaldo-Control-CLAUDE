@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -60,6 +60,15 @@ vi.mock('@/api/proveedores', () => ({
   useCrearContactoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarContactoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
   useAnalizarConstancia: () => ({ mutate: vi.fn(), isPending: false }),
+  // Cuentas de pago (0.112): el diálogo monta su editor si se abre esa sección.
+  useCrearCuentaPagoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarCuentaPagoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useCuentasPagoProveedor: () => ({
+    data: undefined,
+    isPending: true,
+    isError: false,
+    error: null,
+  }),
 }));
 
 // El selector de avíos del cajón (B17) consulta el catálogo de avíos.
@@ -105,6 +114,7 @@ function proveedor(id: number, nombre: string, activo = true): Proveedor {
     modalidadFacturacion: null,
     roles: [],
     contactos: [],
+    cuentasPago: [],
     cantidadAdjuntos: 0,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
@@ -333,8 +343,23 @@ describe('<ProveedoresPagina>', () => {
     completo.moneda = 'USD';
     completo.formaPago = '03 — Transferencia';
     completo.metodoPago = 'PPD';
-    completo.banco = 'BBVA';
-    completo.clabe = '002010077777777771';
+    // 0.112: el dato bancario ya no es `banco`/`clabe` del proveedor, son sus CUENTAS —cada una a
+    // nombre de SU beneficiario, que casi nunca es el proveedor— con una marcada por omisión.
+    completo.cuentasPago = [
+      {
+        id: 77,
+        idProveedor: 5,
+        beneficiario: 'Fulana de Tal',
+        banco: 'BBVA',
+        tipoCuenta: 'clabe',
+        cuenta: '002010077777777771',
+        alias: '1',
+        esFiscal: true,
+        esDefault: true,
+        notas: null,
+        activo: true,
+      },
+    ];
     completo.limiteCredito = 50000;
     completo.leadTimeDias = 12;
     completo.notas = 'Cliente preferente';
@@ -357,12 +382,72 @@ describe('<ProveedoresPagina>', () => {
     // Datos de pago (la moneda y el método se muestran con su etiqueta legible).
     expect(within(detalle).getByText('30 días')).toBeInTheDocument();
     expect(within(detalle).getByText('Dólar (USD)')).toBeInTheDocument();
-    expect(within(detalle).getByText('BBVA')).toBeInTheDocument();
-    expect(within(detalle).getByText('002010077777777771')).toBeInTheDocument();
+    // La cuenta se lee con su BENEFICIARIO y sus marcas (por omisión / fiscal).
+    const cuentas = within(detalle).getByTestId('cuentas-pago-detalle');
+    expect(within(cuentas).getByText('Fulana de Tal')).toBeInTheDocument();
+    // R3: en el cajón el número va ENMASCARADO (aquí se RECONOCE la cuenta, no se transfiere).
+    expect(within(cuentas).getByText('BBVA · CLABE · •••• 7771')).toBeInTheDocument();
+    expect(within(cuentas).queryByText(/0020 1007/)).not.toBeInTheDocument();
+    expect(within(cuentas).getByText('Por omisión')).toBeInTheDocument();
+    expect(within(cuentas).getByText('Cuenta fiscal')).toBeInTheDocument();
     // Operativo + adjuntos.
     expect(within(detalle).getByText('12 días')).toBeInTheDocument();
     expect(within(detalle).getByText('Cliente preferente')).toBeInTheDocument();
     expect(within(detalle).getByText('2 archivos')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ EL DIÁLOGO LEE LA VERSIÓN FRESCA, NO LA FOTO DE CUANDO SE ABRIÓ (0.112).
+   *
+   * `proveedorEnEdicion` se DERIVA de la consulta por id (`filas.find(...)`) en vez de guardarse en
+   * un `useState` al abrir. Sin eso, todo lo que se agrega DESDE DENTRO del diálogo —cuentas de
+   * pago, contactos— se guardaba bien pero el diálogo seguía mostrando el mundo de hace tres altas:
+   * capturando 150 cuentas no había forma de ver qué llevabas, y al reintentar salía un 409.
+   *
+   * Se comprueba con CONTACTOS porque es lo que el diálogo pinta directamente desde el objeto del
+   * proveedor. Si alguien devuelve la derivación a un `useState`, esta prueba se pone roja.
+   */
+  it('⭐ el diálogo de edición refleja lo que llega DESPUÉS de abrirlo (no una foto)', async () => {
+    const usuario = userEvent.setup();
+    const contacto = (id: number, nombre: string) => ({
+      id,
+      idProveedor: 7,
+      nombre,
+      puesto: null,
+      telefono: null,
+      email: null,
+      notas: null,
+      activo: true,
+    });
+    const conUno = proveedor(7, 'Proveedor Vivo');
+    conUno.contactos = [contacto(1, 'Ana')];
+    useProveedores.mockReturnValue(consultaConDatos([conUno]));
+
+    renderConProveedores(<ProveedoresPagina />, {
+      sesion: estadoSesionDePrueba(['proveedores.ver', 'proveedores.administrar']),
+    });
+
+    // Se abre el cajón de la fila y, desde él, el diálogo de edición.
+    await usuario.click(screen.getByTestId('fila-proveedor'));
+    await usuario.click(await screen.findByTestId('editar-proveedor'));
+    await usuario.click(await screen.findByRole('button', { name: 'Contactos' }));
+    const editor = await screen.findByTestId('editor-contactos');
+    expect(within(editor).getByText('Ana')).toBeInTheDocument();
+    expect(within(editor).queryByText('Beto')).not.toBeInTheDocument();
+
+    // Llega un contacto nuevo (como lo haría el refetch que dispara agregarlo desde el diálogo):
+    // OBJETO NUEVO, con un contacto más.
+    const conDos = proveedor(7, 'Proveedor Vivo');
+    conDos.contactos = [contacto(1, 'Ana'), contacto(2, 'Beto')];
+    useProveedores.mockReturnValue(consultaConDatos([conDos]));
+    // Se fuerza el re-render de la página. `fireEvent` y no `userEvent`: con un diálogo de radix
+    // abierto, jsdom deja el resto del body con `pointer-events: none` y un click no llegaría.
+    fireEvent.change(screen.getByTestId('buscar-proveedor'), { target: { value: 'Prov' } });
+
+    // El diálogo YA muestra el contacto nuevo: leyó la versión fresca, no la del momento de abrir.
+    expect(
+      await within(screen.getByTestId('editor-contactos')).findByText('Beto'),
+    ).toBeInTheDocument();
   });
 
   it('no muestra las secciones enriquecidas si el proveedor no tiene esos datos', async () => {

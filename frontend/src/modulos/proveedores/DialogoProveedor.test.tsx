@@ -1,11 +1,20 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Proveedor, ProveedorCrear, RolProveedor } from '@/api/tipos';
+import { useState } from 'react';
+import { toast } from 'sonner';
+
+import type { Proveedor, ProveedorCrear, ProveedorCuentaPago, RolProveedor } from '@/api/tipos';
 import { renderConProveedores } from '@/pruebas/utilidades';
 
 import { DialogoProveedor } from './DialogoProveedor';
+
+// El editor de cuentas AVISA con `toast.warning` al retirar la cuenta por omisión (R2); hay que
+// poder verlo. `success`/`error` se mockean también porque el resto del diálogo los usa.
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
 
 // Se controla la capa de datos: las pruebas no tocan la red. Se capturan los
 // argumentos de crear/actualizar para verificar el cuerpo (roles incluidos).
@@ -13,6 +22,10 @@ const crearMutate = vi.fn();
 const actualizarMutate = vi.fn();
 const crearContactoMutate = vi.fn();
 const actualizarContactoMutate = vi.fn();
+const crearCuentaPagoMutate = vi.fn();
+const actualizarCuentaPagoMutate = vi.fn();
+/** Lo que devuelve `useCuentasPagoProveedor` (activas + retiradas). Cada prueba lo fija si le toca. */
+let cuentasDeLaConsulta: ProveedorCuentaPago[] | undefined;
 const analizarConstanciaMutate = vi.fn();
 const subirAdjuntoMutate = vi.fn();
 
@@ -41,6 +54,20 @@ vi.mock('@/api/proveedores', () => ({
   useCrearContactoProveedor: () => ({ mutate: crearContactoMutate, isPending: false }),
   useActualizarContactoProveedor: () => ({ mutate: actualizarContactoMutate, isPending: false }),
   useAnalizarConstancia: () => ({ mutate: analizarConstanciaMutate, isPending: false }),
+  // Hooks de 0.112: las CUENTAS de pago del proveedor (beneficiario + varias cuentas).
+  useCrearCuentaPagoProveedor: () => ({ mutate: crearCuentaPagoMutate, isPending: false }),
+  useActualizarCuentaPagoProveedor: () => ({
+    mutate: actualizarCuentaPagoMutate,
+    isPending: false,
+  }),
+  // La consulta propia del editor (activas + retiradas). `undefined` = todavía cargando, y el
+  // editor usa la semilla de la ficha; las pruebas del historial la fijan a mano.
+  useCuentasPagoProveedor: () => ({
+    data: cuentasDeLaConsulta,
+    isPending: cuentasDeLaConsulta === undefined,
+    isError: false,
+    error: null,
+  }),
 }));
 
 /** Proveedor de ejemplo (enriquecido R15) para las pruebas de edicion. */
@@ -75,6 +102,7 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
     modalidadFacturacion: 'solo_con',
     roles: [],
     contactos: [],
+    cuentasPago: [],
     cantidadAdjuntos: 0,
     activo: true,
     creadoEn: '2026-01-01T00:00:00.000Z',
@@ -93,6 +121,11 @@ describe('<DialogoProveedor>', () => {
     actualizarContactoMutate.mockReset();
     analizarConstanciaMutate.mockReset();
     subirAdjuntoMutate.mockReset();
+    crearCuentaPagoMutate.mockReset();
+    actualizarCuentaPagoMutate.mockReset();
+    cuentasDeLaConsulta = undefined;
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.warning).mockClear();
   });
 
   /**
@@ -925,6 +958,384 @@ describe('<DialogoProveedor>', () => {
       };
       // Y nunca viaja como `null`: vaciarla es justo lo que el backend rechaza.
       expect(args.cuerpo.modalidadFacturacion).toBe('solo_sin');
+    });
+  });
+
+  /**
+   * ⭐⭐ LA SIEMBRA DEL FORMULARIO ES UNA VEZ POR APERTURA, NO POR RE-RENDER.
+   *
+   * 🔴 Regresión REAL, no teórica: la pantalla entrega a propósito la versión FRESCA del proveedor
+   * (para que los editores de adentro vean lo que acaban de agregar), así que el objeto cambia de
+   * IDENTIDAD cada vez que una cuenta o un contacto invalidan la lista — con el mismo contenido.
+   * Mientras `proveedor` fue dependencia del efecto de siembra, ese re-render disparaba
+   * `formulario.reset(...)`: quien estuviera corrigiendo el teléfono, el RFC o la razón social y
+   * todavía no hubiera guardado, **perdía lo escrito en silencio** en cuanto agregaba una cuenta.
+   * Y con ello se iba también la Constancia leída y aún no conservada.
+   */
+  describe('la siembra del formulario', () => {
+    /**
+     * Anfitrión que re-renderiza el MISMO diálogo montado con otro objeto de proveedor.
+     *
+     * ⚠️ Tiene que ser un anfitrión con estado y NO el `rerender` de testing-library: como el
+     * helper de render envuelve el árbol en los proveedores, un `rerender` monta el diálogo DE
+     * NUEVO — y un componente recién montado siempre siembra el formulario, así que la prueba
+     * pasaría igual con el efecto roto. (Comprobado por mutación: con `rerender` la prueba de
+     * abajo sobrevivía a quitarle `idEnEdicion` a las dependencias.)
+     */
+    function Anfitrion({
+      inicial,
+      siguiente,
+    }: {
+      inicial: Proveedor;
+      /** Lo que entrega el botón. Por omisión, una COPIA del inicial (identidad nueva). */
+      siguiente?: Proveedor;
+    }): React.JSX.Element {
+      const [p, setP] = useState<Proveedor>(inicial);
+      return (
+        <>
+          <button
+            data-testid="refrescar"
+            type="button"
+            onClick={() => setP(siguiente ?? { ...inicial })}
+          >
+            refrescar
+          </button>
+          <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={p} />
+        </>
+      );
+    }
+
+    it('un objeto NUEVO con el mismo contenido NO pisa lo que se está escribiendo', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<Anfitrion inicial={proveedorEjemplo({ telefono: '55-1111' })} />);
+
+      const nombre = screen.getByTestId('proveedor-nombre-corto');
+      await usuario.clear(nombre);
+      await usuario.type(nombre, 'BLOOM');
+      expect(nombre).toHaveValue('BLOOM');
+
+      // Llega la versión fresca (identidad nueva, contenido idéntico), como tras agregar una cuenta.
+      // `fireEvent` porque con el diálogo de radix abierto jsdom deja el body sin pointer-events.
+      fireEvent.click(screen.getByTestId('refrescar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('proveedor-nombre-corto')).toHaveValue('BLOOM');
+      });
+    });
+
+    it('pero pasar a OTRO proveedor sí vuelve a sembrar el formulario', async () => {
+      renderConProveedores(
+        <Anfitrion
+          inicial={proveedorEjemplo({ id: 10, nombreCorto: 'UNO' })}
+          siguiente={proveedorEjemplo({ id: 11, nombreCorto: 'DOS' })}
+        />,
+      );
+      expect(screen.getByTestId('proveedor-nombre-corto')).toHaveValue('UNO');
+
+      fireEvent.click(screen.getByTestId('refrescar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('proveedor-nombre-corto')).toHaveValue('DOS');
+      });
+    });
+  });
+
+  // ── 0.112: las CUENTAS de pago, N por proveedor, con su beneficiario ────────
+  describe('cuentas de pago del proveedor', () => {
+    /** Una cuenta como la devuelve el API. */
+    function cuenta(sobre: Partial<Proveedor['cuentasPago'][number]> = {}) {
+      return {
+        id: 3,
+        idProveedor: 10,
+        beneficiario: 'Fulana de Tal',
+        banco: 'BBVA',
+        tipoCuenta: 'clabe' as const,
+        cuenta: '002010077777777771',
+        alias: '1',
+        esFiscal: true,
+        esDefault: true,
+        notas: null,
+        activo: true,
+        ...sobre,
+      };
+    }
+
+    it('el BANCO y la CLABE ya no se capturan en la sección Pago (0.112)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={proveedorEjemplo()} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Pago' }));
+      expect(screen.queryByLabelText('Banco')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('CLABE')).not.toBeInTheDocument();
+    });
+
+    it('en ALTA no se pueden capturar todavía: pide guardar primero', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      expect(await screen.findByTestId('cuentas-pago-requiere-guardar')).toBeInTheDocument();
+      expect(screen.queryByTestId('editor-cuentas-pago')).not.toBeInTheDocument();
+    });
+
+    it('en EDICIÓN lista las cuentas con su beneficiario y marcas, y permite agregar otra', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta()] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+
+      const editor = await screen.findByTestId('editor-cuentas-pago');
+      // El BENEFICIARIO es lo que se lee, no el nombre del proveedor.
+      expect(within(editor).getByText('Fulana de Tal')).toBeInTheDocument();
+      expect(within(editor).getByText('Por omisión')).toBeInTheDocument();
+      expect(within(editor).getByText('Cuenta fiscal')).toBeInTheDocument();
+
+      await usuario.type(screen.getByTestId('cuenta-beneficiario'), 'Zutano de Tal');
+      await usuario.type(screen.getByTestId('cuenta-numero'), '002010077777777771');
+      await usuario.click(screen.getByTestId('cuenta-es-fiscal'));
+      await usuario.click(screen.getByTestId('agregar-cuenta-pago'));
+
+      expect(crearCuentaPagoMutate).toHaveBeenCalledTimes(1);
+      const args = crearCuentaPagoMutate.mock.calls[0]?.[0] as {
+        id: number;
+        cuerpo: { beneficiario: string; tipoCuenta: string; esFiscal: boolean };
+      };
+      expect(args.id).toBe(10);
+      expect(args.cuerpo).toMatchObject({
+        beneficiario: 'Zutano de Tal',
+        tipoCuenta: 'clabe',
+        esFiscal: true,
+      });
+    });
+
+    it('agregar sin beneficiario no llama al API y muestra el error', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={proveedorEjemplo()} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('agregar-cuenta-pago'));
+
+      expect(crearCuentaPagoMutate).not.toHaveBeenCalled();
+      expect(screen.getByText('Escribe a nombre de quién está la cuenta.')).toBeInTheDocument();
+    });
+
+    it('retirar una cuenta manda activo:false (historial reutilizable, D3)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 9 })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('retirar-cuenta-pago'));
+
+      expect(actualizarCuentaPagoMutate).toHaveBeenCalledTimes(1);
+      expect(actualizarCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        id: 10,
+        idCuenta: 9,
+        cuerpo: { activo: false },
+      });
+    });
+
+    it('⭐ se puede EDITAR una cuenta capturada: el typo del beneficiario se corrige', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            cuentasPago: [cuenta({ id: 5, beneficiario: 'Fulana de Tl', alias: '1' })],
+          })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('editar-cuenta-pago'));
+
+      // El formulario se llena con lo que había (es el mismo, en modo edición).
+      expect(screen.getByTestId('titulo-formulario-cuenta')).toHaveTextContent('Editando');
+      expect(screen.getByTestId('cuenta-beneficiario')).toHaveValue('Fulana de Tl');
+      expect(screen.getByTestId('cuenta-alias')).toHaveValue('1');
+
+      await usuario.clear(screen.getByTestId('cuenta-beneficiario'));
+      await usuario.type(screen.getByTestId('cuenta-beneficiario'), 'Fulana de Tal');
+      await usuario.type(screen.getByTestId('cuenta-notas'), 'la corrigió el capturista');
+      await usuario.click(screen.getByTestId('guardar-cuenta-pago'));
+
+      expect(crearCuentaPagoMutate).not.toHaveBeenCalled();
+      expect(actualizarCuentaPagoMutate).toHaveBeenCalledTimes(1);
+      expect(actualizarCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        id: 10,
+        idCuenta: 5,
+        cuerpo: {
+          beneficiario: 'Fulana de Tal',
+          tipoCuenta: 'clabe',
+          esFiscal: true,
+          alias: '1',
+          notas: 'la corrigió el capturista',
+        },
+      });
+    });
+
+    it('editando, los opcionales vaciados viajan como null (para poder BORRARLOS)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 5, alias: '1' })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('editar-cuenta-pago'));
+      await usuario.clear(screen.getByTestId('cuenta-alias'));
+      await usuario.clear(screen.getByTestId('cuenta-banco'));
+      await usuario.click(screen.getByTestId('guardar-cuenta-pago'));
+
+      expect(actualizarCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        cuerpo: { alias: null, banco: null, notas: null },
+      });
+    });
+
+    it('cancelar la edición devuelve el formulario al modo ALTA', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 5 })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('editar-cuenta-pago'));
+      await usuario.click(screen.getByTestId('cancelar-edicion-cuenta'));
+
+      expect(screen.getByTestId('titulo-formulario-cuenta')).toHaveTextContent(
+        'Agregar una cuenta',
+      );
+      expect(screen.getByTestId('cuenta-beneficiario')).toHaveValue('');
+      expect(screen.getByTestId('agregar-cuenta-pago')).toBeInTheDocument();
+    });
+
+    it('el alta puede capturar NOTAS (antes era una columna muerta desde la UI)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={proveedorEjemplo()} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.type(await screen.findByTestId('cuenta-beneficiario'), 'Fulana de Tal');
+      await usuario.type(screen.getByTestId('cuenta-numero'), '002010077777777771');
+      await usuario.type(screen.getByTestId('cuenta-notas'), 'sólo hasta el día 15');
+      await usuario.click(screen.getByTestId('agregar-cuenta-pago'));
+
+      expect(crearCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        cuerpo: { notas: 'sólo hasta el día 15' },
+      });
+    });
+
+    it('⭐ una cuenta retirada NO se pinta también como activa (una sola fuente)', async () => {
+      const usuario = userEvent.setup();
+      // La consulta manda: la 5 sigue activa, la 6 está retirada. La ficha (semilla) está vieja y
+      // todavía trae la 6 como activa — antes eso las pintaba en las DOS listas.
+      cuentasDeLaConsulta = [
+        cuenta({ id: 5, beneficiario: 'Fulana de Tal' }),
+        cuenta({ id: 6, beneficiario: 'Zutano de Tal', esDefault: false, activo: false }),
+      ];
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            cuentasPago: [
+              cuenta({ id: 5, beneficiario: 'Fulana de Tal' }),
+              cuenta({ id: 6, beneficiario: 'Zutano de Tal', esDefault: false }),
+            ],
+          })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('ver-historial-cuentas'));
+
+      const activas = screen.getAllByTestId('cuenta-pago-proveedor');
+      const archivadas = screen.getAllByTestId('cuenta-pago-retirada');
+      expect(activas).toHaveLength(1);
+      expect(archivadas).toHaveLength(1);
+      expect(within(activas[0] as HTMLElement).getByText('Fulana de Tal')).toBeInTheDocument();
+      expect(within(archivadas[0] as HTMLElement).getByText('Zutano de Tal')).toBeInTheDocument();
+      // Y "Zutano de Tal" aparece UNA sola vez en toda la pantalla.
+      expect(screen.getAllByText('Zutano de Tal')).toHaveLength(1);
+    });
+
+    it('retirar la cuenta por omisión AVISA que el proveedor se quedó sin una (R2)', async () => {
+      const usuario = userEvent.setup();
+      actualizarCuentaPagoMutate.mockImplementation(
+        (_args: unknown, opciones: { onSuccess?: (c: unknown) => void }) => {
+          opciones.onSuccess?.(cuenta({ id: 5, activo: false }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 5, esDefault: true })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('retirar-cuenta-pago'));
+
+      expect(vi.mocked(toast.warning)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(toast.warning).mock.calls[0]?.[0]).toMatch(/sin una|por omisión/i);
+    });
+
+    it('retirar una cuenta que NO es la por omisión no avisa nada', async () => {
+      const usuario = userEvent.setup();
+      actualizarCuentaPagoMutate.mockImplementation(
+        (_args: unknown, opciones: { onSuccess?: (c: unknown) => void }) => {
+          opciones.onSuccess?.(cuenta({ id: 5, activo: false }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 5, esDefault: false })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('retirar-cuenta-pago'));
+
+      expect(vi.mocked(toast.warning)).not.toHaveBeenCalled();
+    });
+
+    it('marcar otra por omisión manda esDefault:true (la anterior la apaga el backend)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            cuentasPago: [cuenta({ id: 12, esDefault: false, beneficiario: 'Perengano de Tal' })],
+          })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('usar-cuenta-por-omision'));
+
+      expect(actualizarCuentaPagoMutate).toHaveBeenCalledTimes(1);
+      expect(actualizarCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        id: 10,
+        idCuenta: 12,
+        cuerpo: { esDefault: true },
+      });
     });
   });
 });

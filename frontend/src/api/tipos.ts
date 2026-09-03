@@ -86,6 +86,17 @@ export type ProveedorContactoCrear =
 /** Cuerpo de edicion de un contacto (`PATCH /api/proveedores/{id}/contactos/{idContacto}`). */
 export type ProveedorContactoEditar =
   paths['/api/proveedores/{id}/contactos/{idContacto}']['patch']['requestBody']['content']['application/json'];
+/** Una CUENTA / destino de pago del proveedor (0.112). */
+export type ProveedorCuentaPago = Proveedor['cuentasPago'][number];
+/** Cuerpo de alta de una cuenta de pago (`POST /api/proveedores/{id}/cuentas-pago`). */
+export type ProveedorCuentaPagoCrear =
+  paths['/api/proveedores/{id}/cuentas-pago']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de una cuenta (`PATCH /api/proveedores/{id}/cuentas-pago/{idCuenta}`). */
+export type ProveedorCuentaPagoEditar =
+  paths['/api/proveedores/{id}/cuentas-pago/{idCuenta}']['patch']['requestBody']['content']['application/json'];
+/** Lista de cuentas de pago, incluido el historial (`GET /api/proveedores/{id}/cuentas-pago`). */
+export type ProveedorCuentasPagoLista =
+  paths['/api/proveedores/{id}/cuentas-pago']['get']['responses']['200']['content']['application/json'];
 /** Datos que PROPONE la Constancia de Situacion Fiscal (`POST /api/proveedores/constancia/analizar`). */
 export type ConstanciaPropuesta =
   paths['/api/proveedores/constancia/analizar']['post']['responses']['200']['content']['application/json'];

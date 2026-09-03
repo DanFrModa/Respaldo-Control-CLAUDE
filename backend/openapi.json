@@ -4331,6 +4331,103 @@
                             },
                             "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                           },
+                          "cuentasPago": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la cuenta."
+                                },
+                                "idProveedor": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del proveedor dueño de la cuenta."
+                                },
+                                "beneficiario": {
+                                  "type": "string",
+                                  "description": "A nombre de quién está la cuenta (el del depósito)."
+                                },
+                                "banco": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Banco, o null."
+                                },
+                                "tipoCuenta": {
+                                  "type": "string",
+                                  "enum": [
+                                    "clabe",
+                                    "tarjeta"
+                                  ],
+                                  "description": "CLABE o tarjeta."
+                                },
+                                "cuenta": {
+                                  "type": "string",
+                                  "description": "El número, sólo dígitos."
+                                },
+                                "alias": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                                },
+                                "esFiscal": {
+                                  "type": "boolean",
+                                  "description": "Verdadero si a ella puede salir un pago CON factura."
+                                },
+                                "esDefault": {
+                                  "type": "boolean",
+                                  "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                                },
+                                "notas": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Notas, o null."
+                                },
+                                "activo": {
+                                  "type": "boolean",
+                                  "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "idProveedor",
+                                "beneficiario",
+                                "banco",
+                                "tipoCuenta",
+                                "cuenta",
+                                "alias",
+                                "esFiscal",
+                                "esDefault",
+                                "notas",
+                                "activo"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Cuenta/destino de pago de un proveedor."
+                            },
+                            "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                          },
                           "cantidadAdjuntos": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -4406,6 +4503,7 @@
                           "modalidadFacturacion",
                           "roles",
                           "contactos",
+                          "cuentasPago",
                           "cantidadAdjuntos",
                           "activo",
                           "creadoEn",
@@ -5169,6 +5267,103 @@
                       },
                       "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                     },
+                    "cuentasPago": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la cuenta."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño de la cuenta."
+                          },
+                          "beneficiario": {
+                            "type": "string",
+                            "description": "A nombre de quién está la cuenta (el del depósito)."
+                          },
+                          "banco": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Banco, o null."
+                          },
+                          "tipoCuenta": {
+                            "type": "string",
+                            "enum": [
+                              "clabe",
+                              "tarjeta"
+                            ],
+                            "description": "CLABE o tarjeta."
+                          },
+                          "cuenta": {
+                            "type": "string",
+                            "description": "El número, sólo dígitos."
+                          },
+                          "alias": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                          },
+                          "esFiscal": {
+                            "type": "boolean",
+                            "description": "Verdadero si a ella puede salir un pago CON factura."
+                          },
+                          "esDefault": {
+                            "type": "boolean",
+                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "beneficiario",
+                          "banco",
+                          "tipoCuenta",
+                          "cuenta",
+                          "alias",
+                          "esFiscal",
+                          "esDefault",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Cuenta/destino de pago de un proveedor."
+                      },
+                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                    },
                     "cantidadAdjuntos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -5244,6 +5439,7 @@
                     "modalidadFacturacion",
                     "roles",
                     "contactos",
+                    "cuentasPago",
                     "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
@@ -5846,6 +6042,103 @@
                       },
                       "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                     },
+                    "cuentasPago": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la cuenta."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño de la cuenta."
+                          },
+                          "beneficiario": {
+                            "type": "string",
+                            "description": "A nombre de quién está la cuenta (el del depósito)."
+                          },
+                          "banco": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Banco, o null."
+                          },
+                          "tipoCuenta": {
+                            "type": "string",
+                            "enum": [
+                              "clabe",
+                              "tarjeta"
+                            ],
+                            "description": "CLABE o tarjeta."
+                          },
+                          "cuenta": {
+                            "type": "string",
+                            "description": "El número, sólo dígitos."
+                          },
+                          "alias": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                          },
+                          "esFiscal": {
+                            "type": "boolean",
+                            "description": "Verdadero si a ella puede salir un pago CON factura."
+                          },
+                          "esDefault": {
+                            "type": "boolean",
+                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "beneficiario",
+                          "banco",
+                          "tipoCuenta",
+                          "cuenta",
+                          "alias",
+                          "esFiscal",
+                          "esDefault",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Cuenta/destino de pago de un proveedor."
+                      },
+                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                    },
                     "cantidadAdjuntos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -5921,6 +6214,7 @@
                     "modalidadFacturacion",
                     "roles",
                     "contactos",
+                    "cuentasPago",
                     "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
@@ -6799,6 +7093,103 @@
                       },
                       "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                     },
+                    "cuentasPago": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la cuenta."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño de la cuenta."
+                          },
+                          "beneficiario": {
+                            "type": "string",
+                            "description": "A nombre de quién está la cuenta (el del depósito)."
+                          },
+                          "banco": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Banco, o null."
+                          },
+                          "tipoCuenta": {
+                            "type": "string",
+                            "enum": [
+                              "clabe",
+                              "tarjeta"
+                            ],
+                            "description": "CLABE o tarjeta."
+                          },
+                          "cuenta": {
+                            "type": "string",
+                            "description": "El número, sólo dígitos."
+                          },
+                          "alias": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                          },
+                          "esFiscal": {
+                            "type": "boolean",
+                            "description": "Verdadero si a ella puede salir un pago CON factura."
+                          },
+                          "esDefault": {
+                            "type": "boolean",
+                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "beneficiario",
+                          "banco",
+                          "tipoCuenta",
+                          "cuenta",
+                          "alias",
+                          "esFiscal",
+                          "esDefault",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Cuenta/destino de pago de un proveedor."
+                      },
+                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                    },
                     "cantidadAdjuntos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -6874,6 +7265,7 @@
                     "modalidadFacturacion",
                     "roles",
                     "contactos",
+                    "cuentasPago",
                     "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
@@ -7474,6 +7866,103 @@
                       },
                       "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                     },
+                    "cuentasPago": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la cuenta."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño de la cuenta."
+                          },
+                          "beneficiario": {
+                            "type": "string",
+                            "description": "A nombre de quién está la cuenta (el del depósito)."
+                          },
+                          "banco": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Banco, o null."
+                          },
+                          "tipoCuenta": {
+                            "type": "string",
+                            "enum": [
+                              "clabe",
+                              "tarjeta"
+                            ],
+                            "description": "CLABE o tarjeta."
+                          },
+                          "cuenta": {
+                            "type": "string",
+                            "description": "El número, sólo dígitos."
+                          },
+                          "alias": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                          },
+                          "esFiscal": {
+                            "type": "boolean",
+                            "description": "Verdadero si a ella puede salir un pago CON factura."
+                          },
+                          "esDefault": {
+                            "type": "boolean",
+                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "beneficiario",
+                          "banco",
+                          "tipoCuenta",
+                          "cuenta",
+                          "alias",
+                          "esFiscal",
+                          "esDefault",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Cuenta/destino de pago de un proveedor."
+                      },
+                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                    },
                     "cantidadAdjuntos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -7549,6 +8038,7 @@
                     "modalidadFacturacion",
                     "roles",
                     "contactos",
+                    "cuentasPago",
                     "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
@@ -9948,6 +10438,980 @@
                   ],
                   "additionalProperties": false,
                   "description": "Contacto de un proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proveedores/{id}/cuentas-pago": {
+      "get": {
+        "summary": "Listar las cuentas de pago del proveedor (la default primero)",
+        "tags": [
+          "proveedores"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirInactivas",
+            "required": false,
+            "description": "Incluye las cuentas RETIRADAS (el historial reutilizable): \"true\"/\"false\"."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cuentas/destinos de pago del proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la cuenta."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño de la cuenta."
+                          },
+                          "beneficiario": {
+                            "type": "string",
+                            "description": "A nombre de quién está la cuenta (el del depósito)."
+                          },
+                          "banco": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Banco, o null."
+                          },
+                          "tipoCuenta": {
+                            "type": "string",
+                            "enum": [
+                              "clabe",
+                              "tarjeta"
+                            ],
+                            "description": "CLABE o tarjeta."
+                          },
+                          "cuenta": {
+                            "type": "string",
+                            "description": "El número, sólo dígitos."
+                          },
+                          "alias": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                          },
+                          "esFiscal": {
+                            "type": "boolean",
+                            "description": "Verdadero si a ella puede salir un pago CON factura."
+                          },
+                          "esDefault": {
+                            "type": "boolean",
+                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "beneficiario",
+                          "banco",
+                          "tipoCuenta",
+                          "cuenta",
+                          "alias",
+                          "esFiscal",
+                          "esDefault",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Cuenta/destino de pago de un proveedor."
+                      }
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Cuentas/destinos de pago del proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Agregar una cuenta de pago al proveedor (la primera queda por omisión)",
+        "tags": [
+          "proveedores"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "beneficiario": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "banco": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "tipoCuenta": {
+                    "type": "string",
+                    "enum": [
+                      "clabe",
+                      "tarjeta"
+                    ]
+                  },
+                  "cuenta": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "alias": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "esFiscal": {
+                    "type": "boolean"
+                  },
+                  "notas": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "beneficiario",
+                  "tipoCuenta",
+                  "cuenta"
+                ],
+                "description": "Alta de una cuenta/destino de pago del proveedor."
+              }
+            }
+          },
+          "description": "Alta de una cuenta/destino de pago del proveedor."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Cuenta/destino de pago de un proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la cuenta."
+                    },
+                    "idProveedor": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del proveedor dueño de la cuenta."
+                    },
+                    "beneficiario": {
+                      "type": "string",
+                      "description": "A nombre de quién está la cuenta (el del depósito)."
+                    },
+                    "banco": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Banco, o null."
+                    },
+                    "tipoCuenta": {
+                      "type": "string",
+                      "enum": [
+                        "clabe",
+                        "tarjeta"
+                      ],
+                      "description": "CLABE o tarjeta."
+                    },
+                    "cuenta": {
+                      "type": "string",
+                      "description": "El número, sólo dígitos."
+                    },
+                    "alias": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                    },
+                    "esFiscal": {
+                      "type": "boolean",
+                      "description": "Verdadero si a ella puede salir un pago CON factura."
+                    },
+                    "esDefault": {
+                      "type": "boolean",
+                      "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas, o null."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idProveedor",
+                    "beneficiario",
+                    "banco",
+                    "tipoCuenta",
+                    "cuenta",
+                    "alias",
+                    "esFiscal",
+                    "esDefault",
+                    "notas",
+                    "activo"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Cuenta/destino de pago de un proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proveedores/{id}/cuentas-pago/{idCuenta}": {
+      "patch": {
+        "summary": "Editar, marcar por omisión o retirar una cuenta de pago del proveedor",
+        "tags": [
+          "proveedores"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "beneficiario": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "banco": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "tipoCuenta": {
+                    "type": "string",
+                    "enum": [
+                      "clabe",
+                      "tarjeta"
+                    ]
+                  },
+                  "cuenta": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "alias": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 60
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "esFiscal": {
+                    "type": "boolean"
+                  },
+                  "notas": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "esDefault": {
+                    "type": "boolean"
+                  },
+                  "activo": {
+                    "type": "boolean"
+                  }
+                },
+                "description": "Edición parcial de una cuenta/destino de pago del proveedor."
+              }
+            }
+          },
+          "description": "Edición parcial de una cuenta/destino de pago del proveedor."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idCuenta",
+            "required": true,
+            "description": "Id de la cuenta de pago."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cuenta/destino de pago de un proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la cuenta."
+                    },
+                    "idProveedor": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del proveedor dueño de la cuenta."
+                    },
+                    "beneficiario": {
+                      "type": "string",
+                      "description": "A nombre de quién está la cuenta (el del depósito)."
+                    },
+                    "banco": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Banco, o null."
+                    },
+                    "tipoCuenta": {
+                      "type": "string",
+                      "enum": [
+                        "clabe",
+                        "tarjeta"
+                      ],
+                      "description": "CLABE o tarjeta."
+                    },
+                    "cuenta": {
+                      "type": "string",
+                      "description": "El número, sólo dígitos."
+                    },
+                    "alias": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                    },
+                    "esFiscal": {
+                      "type": "boolean",
+                      "description": "Verdadero si a ella puede salir un pago CON factura."
+                    },
+                    "esDefault": {
+                      "type": "boolean",
+                      "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas, o null."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idProveedor",
+                    "beneficiario",
+                    "banco",
+                    "tipoCuenta",
+                    "cuenta",
+                    "alias",
+                    "esFiscal",
+                    "esDefault",
+                    "notas",
+                    "activo"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Cuenta/destino de pago de un proveedor."
                 }
               }
             }

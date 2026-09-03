@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, type UseFormRegister } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -52,6 +52,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import { AdjuntadorProveedor } from './AdjuntadorProveedor';
 import { EditorContactosProveedor } from './EditorContactosProveedor';
+import { EditorCuentasPagoProveedor } from './EditorCuentasPagoProveedor';
 import { LectorConstanciaProveedor } from './LectorConstanciaProveedor';
 import { SelectorRolesProveedor } from './SelectorRolesProveedor';
 
@@ -98,8 +99,6 @@ const VALORES_INICIALES: DatosProveedorFormulario = {
   moneda: SIN_ELEGIR,
   formaPago: '',
   metodoPago: SIN_ELEGIR,
-  banco: '',
-  clabe: '',
   limiteCredito: '',
   // Operativo
   leadTimeDias: '',
@@ -174,8 +173,6 @@ function aCuerpoFormulario(datos: DatosProveedorFormulario): ProveedorCrear {
     ['direccion', datos.direccion],
     ['telefono', datos.telefono],
     ['formaPago', datos.formaPago],
-    ['banco', datos.banco],
-    ['clabe', datos.clabe],
     ['condiciones', datos.condiciones],
     ['notas', datos.notas],
     // Datos de taller (fusión de terceros, D12/R15).
@@ -249,8 +246,9 @@ function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
     direccion: textoONull(datos.direccion),
     telefono: textoONull(datos.telefono),
     formaPago: textoONull(datos.formaPago),
-    banco: textoONull(datos.banco),
-    clabe: textoONull(datos.clabe),
+    // `banco`/`clabe` YA NO viajan (0.112): el dato bancario vive en las CUENTAS del proveedor.
+    // Omitirlos en el PATCH = "no tocar", así que lo ya capturado se queda donde está (REGLA 0-B:
+    // lo viejo no se migra ni se repara — tampoco se borra de paso).
     condiciones: textoONull(datos.condiciones),
     notas: textoONull(datos.notas),
     // Datos de taller (fusión de terceros, D12/R15): texto opcional vacio -> null (borrar).
@@ -323,11 +321,30 @@ export function DialogoProveedor({
     defaultValues: VALORES_INICIALES,
   });
 
-  // Al abrir, sincroniza el formulario y los roles con el proveedor en edicion (o limpia).
+  /**
+   * ⚠️ **El proveedor VIVE; la SIEMBRA del formulario, no.** La pantalla entrega a propósito la
+   * versión fresca de la consulta (para que el editor de cuentas y el de contactos vean lo que
+   * acaban de agregar), así que este objeto cambia de IDENTIDAD cada vez que algo de adentro
+   * invalida la lista — aunque su contenido sea el mismo.
+   *
+   * 🔴 **Por eso `proveedor` NO puede ser dependencia del efecto de abajo.** Lo era, y el resultado
+   * era que agregar una cuenta de pago con el formulario a medio corregir **revertía en silencio lo
+   * que la persona llevaba escrito** (teléfono, RFC, razón social…) y tiraba la Constancia ya leída
+   * y todavía no conservada. El efecto siembra **una sola vez por apertura** —de eso hablan sus
+   * dependencias `[abierto, proveedor?.id]`— y lee el objeto por REFERENCIA, siempre el último.
+   */
+  const proveedorRef = useRef(proveedor);
+  useEffect(() => {
+    proveedorRef.current = proveedor;
+  });
+
+  // Al abrir, sincroniza UNA VEZ el formulario y los roles con el proveedor en edicion (o limpia).
+  const idEnEdicion = proveedor?.id;
   useEffect(() => {
     if (!abierto) {
       return;
     }
+    const proveedor = proveedorRef.current;
     setErrorRoles(null);
     setPdfConstancia(null);
     if (proveedor) {
@@ -353,8 +370,6 @@ export function DialogoProveedor({
         moneda: texto(proveedor.moneda),
         formaPago: texto(proveedor.formaPago),
         metodoPago: texto(proveedor.metodoPago),
-        banco: texto(proveedor.banco),
-        clabe: texto(proveedor.clabe),
         limiteCredito: numeroTexto(proveedor.limiteCredito),
         // Operativo
         leadTimeDias: numeroTexto(proveedor.leadTimeDias),
@@ -373,7 +388,10 @@ export function DialogoProveedor({
       formulario.reset(VALORES_INICIALES);
       setIdsRoles([]);
     }
-  }, [abierto, proveedor, formulario]);
+    // ⚠️ `proveedor` NO va aquí a propósito (se lee del ref): con él, cada refetch de la lista
+    // reseteaba el formulario encima de lo que la persona estaba escribiendo. Ver el bloque de
+    // arriba. El `id` sí, para reseembrar cuando se abre con OTRO proveedor.
+  }, [abierto, idEnEdicion, formulario]);
 
   /**
    * Sube el PDF de la constancia como adjunto `CONSTANCIA` del proveedor, si se leyó uno
@@ -858,30 +876,9 @@ export function DialogoProveedor({
                       <FieldError errors={[errors.metodoPago]} />
                     </Field>
 
-                    <Field data-invalid={Boolean(errors.banco)}>
-                      <FieldLabel htmlFor="proveedor-banco">Banco</FieldLabel>
-                      <Input
-                        id="proveedor-banco"
-                        aria-invalid={Boolean(errors.banco)}
-                        disabled={guardando}
-                        {...registrar('banco')}
-                      />
-                      <FieldError errors={[errors.banco]} />
-                    </Field>
-
-                    <Field data-invalid={Boolean(errors.clabe)}>
-                      <FieldLabel htmlFor="proveedor-clabe">CLABE</FieldLabel>
-                      <Input
-                        id="proveedor-clabe"
-                        inputMode="numeric"
-                        placeholder="Ej. 012180001234567895"
-                        aria-invalid={Boolean(errors.clabe)}
-                        disabled={guardando}
-                        {...registrar('clabe')}
-                      />
-                      <FieldDescription>18 dígitos.</FieldDescription>
-                      <FieldError errors={[errors.clabe]} />
-                    </Field>
+                    {/* El BANCO y la CLABE ya no se capturan aquí (0.112): un proveedor tiene
+                        VARIAS cuentas, con su beneficiario —que casi nunca es él— y su marca
+                        fiscal. Viven en la sección «Cuentas de pago». */}
 
                     <Field data-invalid={Boolean(errors.limiteCredito)}>
                       <FieldLabel htmlFor="proveedor-limite-credito">Límite de crédito</FieldLabel>
@@ -981,6 +978,26 @@ export function DialogoProveedor({
                   </AccordionContent>
                 </AccordionItem>
               ) : null}
+
+              {/* ── Cuentas de pago (N por proveedor, 0.112) ─────────────────── */}
+              <AccordionItem value="cuentas-pago">
+                <AccordionTrigger>Cuentas de pago</AccordionTrigger>
+                <AccordionContent>
+                  {esEdicion ? (
+                    <EditorCuentasPagoProveedor
+                      idProveedor={proveedor.id}
+                      cuentas={proveedor.cuentasPago}
+                      nombreProveedor={proveedor.nombre}
+                    />
+                  ) : (
+                    <FieldDescription data-testid="cuentas-pago-requiere-guardar">
+                      Guarda el proveedor primero y luego captura a nombre de quién se le deposita
+                      (que casi nunca es él) y sus cuentas: una queda por omisión y las demás como
+                      historial reutilizable.
+                    </FieldDescription>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
 
               {/* ── Contactos (N por proveedor, §Post-F9.56 punto 1) ─────────── */}
               <AccordionItem value="contactos">

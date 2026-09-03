@@ -35,6 +35,9 @@ import {
   esquemaProveedorContactoCrear,
   esquemaProveedorContactoEditarCuerpo,
   esquemaProveedorContactoSalida,
+  esquemaProveedorCuentaPagoCrear,
+  esquemaProveedorCuentaPagoEditarCuerpo,
+  esquemaProveedorCuentaPagoSalida,
   esquemaProveedorCrear,
   esquemaProveedorPatchCuerpo,
   esquemaProveedoresPagina,
@@ -46,6 +49,12 @@ import type { RolProveedor } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import { parsearConstanciaPdf } from '../../dominio/catalogos/constancia-fiscal.js';
+import {
+  actualizarCuentaPagoProveedor,
+  crearCuentaPagoProveedor,
+  listarCuentasPagoProveedor,
+  type CuentaPagoProveedor,
+} from '../../dominio/catalogos/proveedor-cuentas-pago.js';
 import {
   actualizarContactoProveedor,
   actualizarProveedor,
@@ -104,6 +113,7 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
       nombre: r.rol.nombre,
     })),
     contactos: proveedor.contactos.map(aContactoSalida),
+    cuentasPago: proveedor.cuentasPago.map(aCuentaPagoSalida),
     cantidadAdjuntos: proveedor._count.archivos,
     activo: proveedor.activo,
     creadoEn: proveedor.creadoEn.toISOString(),
@@ -122,6 +132,31 @@ function aContactoSalida(c: ContactoProveedor): z.infer<typeof esquemaProveedorC
     puesto: c.puesto,
     telefono: c.telefono,
     email: c.email,
+    notas: c.notas,
+    activo: c.activo,
+  };
+}
+
+/**
+ * Proyecta una cuenta de pago a la forma JSON del contrato.
+ *
+ * ⚠️ `esDefault` sale como **boolean puro** (`=== true`): en la base es `true`/NULL —así el unique
+ * `(idProveedor, esDefault)` garantiza una sola default por proveedor— pero eso es plomería del
+ * esquema y no cruza el contrato.
+ */
+function aCuentaPagoSalida(
+  c: CuentaPagoProveedor,
+): z.infer<typeof esquemaProveedorCuentaPagoSalida> {
+  return {
+    id: c.id,
+    idProveedor: c.idProveedor,
+    beneficiario: c.beneficiario,
+    banco: c.banco,
+    tipoCuenta: c.tipoCuenta,
+    cuenta: c.cuenta,
+    alias: c.alias,
+    esFiscal: c.esFiscal,
+    esDefault: c.esDefault === true,
     notas: c.notas,
     activo: c.activo,
   };
@@ -206,6 +241,33 @@ const esquemaParamContacto = z.object({
     .positive()
     .describe('Id del contacto.'),
 });
+
+/** Parámetros `:id` (proveedor) + `:idCuenta` para editar/retirar una cuenta de pago. */
+const esquemaParamCuentaPago = z.object({
+  id: z.coerce
+    .number({ error: 'El id del proveedor debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del proveedor.'),
+  idCuenta: z.coerce
+    .number({ error: 'El id de la cuenta debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id de la cuenta de pago.'),
+});
+
+/** Querystring del listado de cuentas de pago. */
+const esquemaCuentasPagoQuery = z.object({
+  incluirInactivas: z
+    .stringbool()
+    .default(false)
+    .describe('Incluye las cuentas RETIRADAS (el historial reutilizable): "true"/"false".'),
+});
+
+/** Lista de cuentas de pago de un proveedor. */
+const esquemaCuentasPagoLista = z
+  .object({ datos: z.array(esquemaProveedorCuentaPagoSalida) })
+  .describe('Cuentas/destinos de pago del proveedor.');
 
 /** Querystring del listado de contactos. */
 const esquemaContactosQuery = z.object({
@@ -562,6 +624,79 @@ export const rutasProveedores: FastifyPluginCallbackZod = (app, _opciones, done)
         request.body,
       );
       return aContactoSalida(contacto);
+    },
+  });
+
+  // ── Cuentas / destinos de pago del proveedor (0.112) ────────────────────────
+  // SIN permisos nuevos: se gobiernan con `proveedores.ver`/`.administrar`.
+  // El BENEFICIARIO casi nunca es el proveedor, y un proveedor tiene VARIAS cuentas: una default y
+  // las demás como historial reutilizable (Daniel, leyendo su relación de pago semanal).
+
+  app.route({
+    method: 'GET',
+    url: '/proveedores/:id/cuentas-pago',
+    preHandler: app.conPermiso('proveedores.ver'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Listar las cuentas de pago del proveedor (la default primero)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      querystring: esquemaCuentasPagoQuery,
+      response: { 200: esquemaCuentasPagoLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const cuentas = await listarCuentasPagoProveedor(
+        sesion,
+        request.params.id,
+        request.query.incluirInactivas,
+      );
+      return { datos: cuentas.map(aCuentaPagoSalida) };
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/proveedores/:id/cuentas-pago',
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Agregar una cuenta de pago al proveedor (la primera queda por omisión)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaProveedorCuentaPagoCrear,
+      response: { 201: esquemaProveedorCuentaPagoSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const cuenta = await crearCuentaPagoProveedor(sesion, request.params.id, request.body);
+      return reply.code(201).send(aCuentaPagoSalida(cuenta));
+    },
+  });
+
+  // PATCH parcial; `esDefault: true` la vuelve la cuenta por omisión y `activo: false` la RETIRA
+  // (queda como historial reutilizable — no hay DELETE, D3).
+  app.route({
+    method: 'PATCH',
+    url: '/proveedores/:id/cuentas-pago/:idCuenta',
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Editar, marcar por omisión o retirar una cuenta de pago del proveedor',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamCuentaPago,
+      body: esquemaProveedorCuentaPagoEditarCuerpo,
+      response: { 200: esquemaProveedorCuentaPagoSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const cuenta = await actualizarCuentaPagoProveedor(
+        sesion,
+        request.params.id,
+        request.params.idCuenta,
+        request.body,
+      );
+      return aCuentaPagoSalida(cuenta);
     },
   });
 

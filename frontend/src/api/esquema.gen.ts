@@ -1741,6 +1741,34 @@ export interface paths {
                   /** @description Falso si está archivado (borrado suave). */
                   activo: boolean;
                 }[];
+                /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
+                cuentasPago: {
+                  /** @description Id de la cuenta. */
+                  id: number;
+                  /** @description Id del proveedor dueño de la cuenta. */
+                  idProveedor: number;
+                  /** @description A nombre de quién está la cuenta (el del depósito). */
+                  beneficiario: string;
+                  /** @description Banco, o null. */
+                  banco: string | null;
+                  /**
+                   * @description CLABE o tarjeta.
+                   * @enum {string}
+                   */
+                  tipoCuenta: 'clabe' | 'tarjeta';
+                  /** @description El número, sólo dígitos. */
+                  cuenta: string;
+                  /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                  alias: string | null;
+                  /** @description Verdadero si a ella puede salir un pago CON factura. */
+                  esFiscal: boolean;
+                  /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                  esDefault: boolean;
+                  /** @description Notas, o null. */
+                  notas: string | null;
+                  /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                  activo: boolean;
+                }[];
                 /** @description Cantidad de adjuntos del proveedor. */
                 cantidadAdjuntos: number;
                 /** @description Falso si está desactivado (borrado suave). */
@@ -1989,6 +2017,34 @@ export interface paths {
                 /** @description Falso si está archivado (borrado suave). */
                 activo: boolean;
               }[];
+              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
+              cuentasPago: {
+                /** @description Id de la cuenta. */
+                id: number;
+                /** @description Id del proveedor dueño de la cuenta. */
+                idProveedor: number;
+                /** @description A nombre de quién está la cuenta (el del depósito). */
+                beneficiario: string;
+                /** @description Banco, o null. */
+                banco: string | null;
+                /**
+                 * @description CLABE o tarjeta.
+                 * @enum {string}
+                 */
+                tipoCuenta: 'clabe' | 'tarjeta';
+                /** @description El número, sólo dígitos. */
+                cuenta: string;
+                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                alias: string | null;
+                /** @description Verdadero si a ella puede salir un pago CON factura. */
+                esFiscal: boolean;
+                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                esDefault: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                activo: boolean;
+              }[];
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
               /** @description Falso si está desactivado (borrado suave). */
@@ -2207,6 +2263,34 @@ export interface paths {
                 /** @description Falso si está archivado (borrado suave). */
                 activo: boolean;
               }[];
+              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
+              cuentasPago: {
+                /** @description Id de la cuenta. */
+                id: number;
+                /** @description Id del proveedor dueño de la cuenta. */
+                idProveedor: number;
+                /** @description A nombre de quién está la cuenta (el del depósito). */
+                beneficiario: string;
+                /** @description Banco, o null. */
+                banco: string | null;
+                /**
+                 * @description CLABE o tarjeta.
+                 * @enum {string}
+                 */
+                tipoCuenta: 'clabe' | 'tarjeta';
+                /** @description El número, sólo dígitos. */
+                cuenta: string;
+                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                alias: string | null;
+                /** @description Verdadero si a ella puede salir un pago CON factura. */
+                esFiscal: boolean;
+                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                esDefault: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                activo: boolean;
+              }[];
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
               /** @description Falso si está desactivado (borrado suave). */
@@ -2412,6 +2496,34 @@ export interface paths {
                 /** @description Notas, o null. */
                 notas: string | null;
                 /** @description Falso si está archivado (borrado suave). */
+                activo: boolean;
+              }[];
+              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
+              cuentasPago: {
+                /** @description Id de la cuenta. */
+                id: number;
+                /** @description Id del proveedor dueño de la cuenta. */
+                idProveedor: number;
+                /** @description A nombre de quién está la cuenta (el del depósito). */
+                beneficiario: string;
+                /** @description Banco, o null. */
+                banco: string | null;
+                /**
+                 * @description CLABE o tarjeta.
+                 * @enum {string}
+                 */
+                tipoCuenta: 'clabe' | 'tarjeta';
+                /** @description El número, sólo dígitos. */
+                cuenta: string;
+                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                alias: string | null;
+                /** @description Verdadero si a ella puede salir un pago CON factura. */
+                esFiscal: boolean;
+                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                esDefault: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
                 activo: boolean;
               }[];
               /** @description Cantidad de adjuntos del proveedor. */
@@ -2653,6 +2765,34 @@ export interface paths {
                 /** @description Notas, o null. */
                 notas: string | null;
                 /** @description Falso si está archivado (borrado suave). */
+                activo: boolean;
+              }[];
+              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
+              cuentasPago: {
+                /** @description Id de la cuenta. */
+                id: number;
+                /** @description Id del proveedor dueño de la cuenta. */
+                idProveedor: number;
+                /** @description A nombre de quién está la cuenta (el del depósito). */
+                beneficiario: string;
+                /** @description Banco, o null. */
+                banco: string | null;
+                /**
+                 * @description CLABE o tarjeta.
+                 * @enum {string}
+                 */
+                tipoCuenta: 'clabe' | 'tarjeta';
+                /** @description El número, sólo dígitos. */
+                cuenta: string;
+                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                alias: string | null;
+                /** @description Verdadero si a ella puede salir un pago CON factura. */
+                esFiscal: boolean;
+                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                esDefault: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
                 activo: boolean;
               }[];
               /** @description Cantidad de adjuntos del proveedor. */
@@ -3886,6 +4026,462 @@ export interface paths {
               /** @description Notas, o null. */
               notas: string | null;
               /** @description Falso si está archivado (borrado suave). */
+              activo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/proveedores/{id}/cuentas-pago': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar las cuentas de pago del proveedor (la default primero) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Incluye las cuentas RETIRADAS (el historial reutilizable): "true"/"false". */
+          incluirInactivas?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Cuentas/destinos de pago del proveedor. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                /** @description Id de la cuenta. */
+                id: number;
+                /** @description Id del proveedor dueño de la cuenta. */
+                idProveedor: number;
+                /** @description A nombre de quién está la cuenta (el del depósito). */
+                beneficiario: string;
+                /** @description Banco, o null. */
+                banco: string | null;
+                /**
+                 * @description CLABE o tarjeta.
+                 * @enum {string}
+                 */
+                tipoCuenta: 'clabe' | 'tarjeta';
+                /** @description El número, sólo dígitos. */
+                cuenta: string;
+                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                alias: string | null;
+                /** @description Verdadero si a ella puede salir un pago CON factura. */
+                esFiscal: boolean;
+                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                esDefault: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                activo: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Agregar una cuenta de pago al proveedor (la primera queda por omisión) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Alta de una cuenta/destino de pago del proveedor. */
+      requestBody: {
+        content: {
+          'application/json': {
+            beneficiario: string;
+            banco?: string;
+            /** @enum {string} */
+            tipoCuenta: 'clabe' | 'tarjeta';
+            cuenta: string;
+            alias?: string;
+            esFiscal?: boolean;
+            notas?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Cuenta/destino de pago de un proveedor. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la cuenta. */
+              id: number;
+              /** @description Id del proveedor dueño de la cuenta. */
+              idProveedor: number;
+              /** @description A nombre de quién está la cuenta (el del depósito). */
+              beneficiario: string;
+              /** @description Banco, o null. */
+              banco: string | null;
+              /**
+               * @description CLABE o tarjeta.
+               * @enum {string}
+               */
+              tipoCuenta: 'clabe' | 'tarjeta';
+              /** @description El número, sólo dígitos. */
+              cuenta: string;
+              /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+              alias: string | null;
+              /** @description Verdadero si a ella puede salir un pago CON factura. */
+              esFiscal: boolean;
+              /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+              esDefault: boolean;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+              activo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/proveedores/{id}/cuentas-pago/{idCuenta}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Editar, marcar por omisión o retirar una cuenta de pago del proveedor */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+          /** @description Id de la cuenta de pago. */
+          idCuenta: number;
+        };
+        cookie?: never;
+      };
+      /** @description Edición parcial de una cuenta/destino de pago del proveedor. */
+      requestBody: {
+        content: {
+          'application/json': {
+            beneficiario?: string;
+            banco?: string | null;
+            /** @enum {string} */
+            tipoCuenta?: 'clabe' | 'tarjeta';
+            cuenta?: string;
+            alias?: string | null;
+            esFiscal?: boolean;
+            notas?: string | null;
+            esDefault?: boolean;
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Cuenta/destino de pago de un proveedor. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la cuenta. */
+              id: number;
+              /** @description Id del proveedor dueño de la cuenta. */
+              idProveedor: number;
+              /** @description A nombre de quién está la cuenta (el del depósito). */
+              beneficiario: string;
+              /** @description Banco, o null. */
+              banco: string | null;
+              /**
+               * @description CLABE o tarjeta.
+               * @enum {string}
+               */
+              tipoCuenta: 'clabe' | 'tarjeta';
+              /** @description El número, sólo dígitos. */
+              cuenta: string;
+              /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+              alias: string | null;
+              /** @description Verdadero si a ella puede salir un pago CON factura. */
+              esFiscal: boolean;
+              /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+              esDefault: boolean;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está retirada (sigue siendo historial reutilizable). */
               activo: boolean;
             };
           };
