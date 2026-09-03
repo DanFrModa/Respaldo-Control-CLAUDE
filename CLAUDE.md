@@ -291,8 +291,10 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
    > **Qué hacer, siempre, antes de mergear:**
    > 1. **Leer los comentarios y las revisiones DEL PR.** Si hay un «no mergear», **para** y averigua por qué,
    >    aunque el CI esté verde y aunque te lo hayan pedido.
-   > 2. **Listar las sesiones activas del repo** (`list_sessions`) y mirar su estado: si otra está trabajando
-   >    ese PR, **no lo toques**. ⚠️ **No la despiertes** con un mensaje si alguien la apagó a propósito: eso
+   > 2. **Listar las sesiones activas del repo** (`list_sessions`) y mirar su estado. **Qué cuenta como «otra
+   >    sesión revisando ese PR»** (criterio verificable): una sesión cuya rama actual sea la rama *head* del
+   >    PR, o cuyo título o estado nombre el número del PR. Si la hay, **no lo toques**. Si `list_sessions` no
+   >    existe (sesiones locales), **el paso 1 es el autoritativo** y éste es complementario. ⚠️ **No la despiertes** con un mensaje si alguien la apagó a propósito: eso
    >    la resucita. La evidencia del listado y del PR basta.
    > 3. **Verificar JUSTO ANTES de mergear**, no una hora antes: entre una comprobación y el merge, otra sesión
    >    pudo haber empezado.

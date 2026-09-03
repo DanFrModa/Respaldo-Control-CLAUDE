@@ -12146,7 +12146,8 @@ Con la fila 0.115 el saldo sólo suma lo **revisado**. Un maquilero cuyos movimi
 revisar quedaría con saldo 0 y, con el corte viejo de la bandeja (`saldo ≠ 0`), **desaparecería** de la
 pantalla donde Daniel decide a quién paga. **Decisión:** que **no desaparezca**: aparece con el saldo en
 cero y la columna **«pendiente de tu decisión»** con su importe. ⇒ El corte de la bandeja de CxP pasa a
-`saldo ≠ 0 **o** pendiente ≠ 0`, igual que ya hace el tablero de EsMa. *Va en 0.115 (o en su remate).*
+`saldo ≠ 0 **o** pendiente ≠ 0`, el mismo criterio que **0.115 le pone al tablero de EsMa** (hoy ese
+tablero también corta sólo por `saldo ≠ 0`, `saldos-todos.ts`). *Va en 0.115.*
 
 ## (b) ✅ LA CUENTA FISCAL: **libre**, no se fuerza a una sola por proveedor
 Daniel había dicho *«tendría una cuenta Fiscal»*; la fila 0.112 **no** lo forzó. **Decisión: se queda
@@ -12157,8 +12158,10 @@ cuenta fiscal»*, que es igual de correcta.
 ## (c) ✅ EL REPOSITORIO: **se pone privado** mientras se pide el purgado
 Es la decisión (ii) de la fila **0.123**. **Decisión: privado**, mañana a primera hora, mientras Gabriel
 pide a GitHub el purgado. Es reversible y no cuesta nada. 📌 Dato que empeoró lo medido: la primera medición
-contó **77** nombres en una columna de un archivo; la revisión de los cinco `.xlsx` contó **169 · 174 ·
-140 · 29 · 7** cadenas con forma de nombre, más autores reales en los metadatos de cada uno. ⏳ Las
+contó **77** nombres en una columna de un archivo; la revisión de los cinco `.xlsx` contó **~169 · ~174 · ~140 · ~29 · ~7** cadenas con forma de
+nombre (heurística Title-Case/MAYÚSCULAS de 2–4 palabras; un segundo conteo independiente dio 169 / 182 /
+156 / 30 / 8 — **el orden de magnitud es el dato, la cifra exacta se fijará con un script cuando se
+trabaje la 0.123**), más autores reales en los metadatos de cada uno. ⏳ Las
 decisiones (a)/(b)/(c) de 0.123 sobre qué dato personal cabe en la prosa **siguen abiertas**.
 
 ## (d) 🔴 LOS DOS CAMPOS QUE CHOCAN SOBRE SI FACTURA: **SÍ se corrigen — es un error que existan** (fila 0.124)
@@ -12168,8 +12171,8 @@ por los dos caminos** según por qué puerta entraron. Daniel: *«¿se va a corr
 ¿no?»* — **sí, se corrige.**
 📌 **Y NO nació de las dos sesiones en paralelo**: los dos campos **ya existían antes de esta noche**
 (`schema.prisma` líneas 666 y 727 al arrancar el día) — vienen de **dos fases distintas** que resolvieron
-la misma pregunta por separado (el proveedor enriquecido de F1/R15 puso `factura`; Finanzas F9 puso
-`modalidadFacturacion`). El PR #290 **los encontró**, no los creó; su aviso no bloqueante fue la mitigación
+la misma pregunta por separado (el proveedor enriquecido de **F1-E1B/R15** puso `factura`; **EsMa F6-E4**,
+decisión (h), puso `modalidadFacturacion` — migración `20260701120000_f6_e4_esma_movimientos`). El PR #290 **los encontró**, no los creó; su aviso no bloqueante fue la mitigación
 correcta para no encerrar a los migrados.
 **Cómo se corrige (0.124):** **una sola verdad**, `modalidadFacturacion` —la rica—; `factura` deja de
 capturarse y se **deriva** de ella (`solo_sin` → false; `solo_con`/`ambos` → true) donde todavía se lea.

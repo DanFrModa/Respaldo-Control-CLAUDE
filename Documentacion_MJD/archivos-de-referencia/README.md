@@ -11,7 +11,7 @@
 > | Números de cuenta (CLABE y tarjeta) | ✅ **fuera** — cero rastros |
 > | RFC | ✅ **fuera** — cero rastros |
 > | **Nombres de los beneficiarios** | 🔴 **DENTRO: 77 nombres completos de personas físicas**, cada uno **pegado al monto que cobra** (`relacion-pagos-sin-factura.xlsx`, hoja «General», columna O) |
-> | **Autores en los metadatos** | 🔴 **DENTRO** — `docProps/core.xml` de los cinco conserva nombres reales, incluido el de quien armó la cotización |
+> | **Autores en los metadatos** | 🔴 **DENTRO** — `docProps/core.xml` de los cinco conserva nombres reales de autor |
 >
 > ⛔ **Trátalos como datos personales**: no los reenvíes, no los adjuntes a un ticket, no los publiques y
 > no los copies fuera de aquí. **Este repositorio es público**, así que ya están expuestos; el pendiente

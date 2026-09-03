@@ -84,6 +84,12 @@ no dependa de que alguien se acuerde.
 
 ### Qué cambió y puede sorprender
 
+- **Además entran cinco decisiones que Daniel tomó esa tarde**, cada una cerrando algo que la noche dejó
+  abierto: el maquilero con todo sin revisar **no desaparece** de la pantalla de pagos (sale con saldo 0 y
+  su pendiente); la cuenta fiscal del proveedor **queda libre**, no se fuerza a una sola; **el repositorio
+  se pone privado** mientras se pide el purgado; **los dos campos que se contradicen sobre si un proveedor
+  factura se corrigen** — y no nacieron de las dos sesiones en paralelo, ya existían de dos fases
+  distintas—; y **el precosteo lo arma Aurora**, no el cliente.
 - **Nace de algo que salió mal el mismo día.** Dos sesiones trabajaban a la vez. Una subió cinco archivos
   reales presentándolos como limpios de datos sensibles; la otra los midió, **encontró 77 nombres de
   personas pegados a lo que cobra cada una**, no los mergeó y lo dejó escrito. La primera **mergeó de todas
@@ -207,8 +213,8 @@ que decide qué se construye después.
 - 🔴 **La exposición sigue viva y no se arregla con código** (fila **0.123**). **De Gabriel:** pedirle a
   GitHub el purgado —que ahora hay que pedirlo por **tres** sitios: los archivos en el historial de
   `prueba`, la rama del PR que los subió, y los tres nombres de la versión 0.093— y decidir si los
-  archivos se retiran de la copia actual. **De Daniel:** decidir si el repositorio debe seguir siendo
-  público.
+  archivos se retiran de la copia actual. **Daniel ya decidió que el repositorio se pone privado**
+  mientras eso ocurre; ejecutarlo es de Gabriel.
 - ⏳ **Tres preguntas abiertas para Daniel**, todas sobre qué dato personal cabe en un repositorio
   público: si se seudonimizan los **alias de proveedores persona física** («CESAR VICTORIA 1»); si se
   conservan los **nombres de pila de empleadas junto a una valoración de su trabajo** (son cita textual
