@@ -12173,8 +12173,8 @@ mundos** — también falso: en el lado sin factura la relación **sí** es auto
   **proponer, no aplicar en silencio** — dos pagos del mismo monto son ambiguos.
 
 ## (b) LAS CUENTAS BANCARIAS — el beneficiario casi nunca es el proveedor
-De leer su archivo real (`08_28_26.xlsx`, ~150 beneficiarios): «CESAR VICTORIA 1» → *Lourdes Herrera López* ·
-«LEOPOLDO DIAZ» → *Deoney Carlo Díaz* · «ARTURO LOPEZ» → *Rosalina García*. **Daniel no lo había mencionado.**
+De leer su archivo real (`08_28_26.xlsx`, ~150 beneficiarios): «CESAR VICTORIA 1» → *otra persona* · «LEOPOLDO DIAZ» → *otra persona* ·
+«ARTURO LOPEZ» → *otra persona* (nombres reales omitidos a propósito: son datos personales). **Daniel no lo había mencionado.**
 
 🔴 **Y el lead leyó mal el resto**: creyó que «CESAR VICTORIA 1/2/3» eran **tres proveedores**. Daniel:
 > *«Estaría bien poder tener **más de una cuenta**, definir una como **default**, pero tener las demás como
@@ -12448,8 +12448,8 @@ De leer su Excel real (`08_28_26.xlsx`, 158 filas): la hoja «General» es un **
 `CUENTA`), y «Transfers Concentrado» es **la lista ejecutable** (sólo los que llevan monto, ordenados por
 monto). Totales de esa semana: **30,000 efectivo + 108,201 transferencia**.
 
-⭐ **El BENEFICIARIO casi nunca es el proveedor** — «CESAR VICTORIA 1» → *Lourdes Herrera López*;
-«ARTURO LOPEZ» → *Rosalina García*. **Daniel no lo había mencionado; salió de leer el archivo.**
+⭐ **El BENEFICIARIO casi nunca es el proveedor** — «CESAR VICTORIA 1» → *otra persona*;
+«ARTURO LOPEZ» → *otra persona*. **Daniel no lo había mencionado; salió de leer el archivo.**
 
 🔴 **Y el lead leyó mal el resto: «CESAR VICTORIA 1/2/3» NO son tres proveedores.** Daniel:
 > *«Estaría bien poder tener **más de una cuenta**, definir una como **default**, pero tener las demás como
