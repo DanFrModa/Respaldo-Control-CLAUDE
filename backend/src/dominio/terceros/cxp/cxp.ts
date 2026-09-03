@@ -44,6 +44,13 @@ import {
   cancelarMovimientoTercero,
   estadoDeCuentaTercero,
 } from '../cuenta-terceros.js';
+import {
+  armarPendiente,
+  hayPendiente,
+  pendienteParaSalida,
+  tieneSaldo,
+  type PendienteRevision,
+} from '../../esma/formula-saldo.js';
 import { aportesEsMaSaldoLote } from '../convivencia-esma.js';
 import { leerLimitesAging } from '../config-aging.js';
 import { type LimitesAging } from '../aging-comun.js';
@@ -53,11 +60,6 @@ import { resolverSegmentoCxp } from './facturacion-cxp.js';
 /** Redondeo monetario a 2 decimales. */
 function redondear2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-/** ¿Un saldo es distinto de cero? (tolerancia de medio centavo para el ruido de coma flotante). */
-function tieneSaldo(saldo: number): boolean {
-  return Math.abs(saldo) >= 0.005;
 }
 
 /** Quita acentos y pasa a minúsculas para comparar (misma norma que el combobox del frontend). */
@@ -230,6 +232,11 @@ interface FilaNeta extends CubetasAging {
   diasCredito: number;
   /** Aporte EsMa (maquila) — cubeta APARTE: no entra al aging del motor ni al "vencido". */
   maquila: number;
+  /**
+   * Maquila capturada y AÚN sin revisar: no suma al saldo ni a ninguna cubeta, pero decide si la fila
+   * se ve (§Post-F9.188a: el maquilero con todo sin revisar no desaparece).
+   */
+  maquilaPorRevisar: PendienteRevision;
   /** Saldo combinado = corriente + d1a30 + d31a60 + mas60 + maquila. */
   saldo: number;
 }
@@ -311,6 +318,7 @@ function netearFila(f: FilaAgregadoCxp): FilaNeta {
     d31a60: c.d31a60,
     mas60: c.mas60,
     maquila: 0,
+    maquilaPorRevisar: armarPendiente(0, 0, 0, 0),
     saldo: 0,
   };
   fila.saldo = saldoDeFila(fila);
@@ -328,25 +336,38 @@ function netearFila(f: FilaAgregadoCxp): FilaNeta {
  */
 function calcularResumen(
   conSaldo: FilaNeta[],
-  oculto: (v: number) => number | null,
+  visibles: FilaNeta[],
+  puedeVerImportes: boolean,
 ): ResumenCxpSalida {
+  const oculto = (v: number): number | null => (puedeVerImportes ? v : null);
   const carteraTotal = redondear2(conSaldo.reduce((s, f) => s + f.saldo, 0));
   const maquilaTotal = redondear2(conSaldo.reduce((s, f) => s + f.maquila, 0));
   const carteraMotor = redondear2(
     conSaldo.reduce((s, f) => s + f.corriente + f.d1a30 + f.d31a60 + f.mas60, 0),
   );
   const vencido = redondear2(conSaldo.reduce((s, f) => s + f.d1a30 + f.d31a60 + f.mas60, 0));
-  const alCorrientePct =
-    Math.abs(carteraMotor) < 0.005
-      ? null
-      : Math.min(100, Math.max(0, Math.round(((carteraMotor - vencido) / carteraMotor) * 100)));
+  const alCorrientePct = !tieneSaldo(carteraMotor)
+    ? null
+    : Math.min(100, Math.max(0, Math.round(((carteraMotor - vencido) / carteraMotor) * 100)));
   return {
     carteraTotal: oculto(carteraTotal),
     vencido: oculto(vencido),
     maquilaTotal: oculto(maquilaTotal),
     alCorrientePct,
     proveedoresConSaldo: conSaldo.length,
+    // Lo que espera revisión, APARTE: no es deuda todavía, pero tampoco puede desaparecer del resumen.
+    maquilaPorRevisar: pendienteParaSalida(sumarPorRevisar(visibles), puedeVerImportes),
   };
+}
+
+/** Σ del pendiente de maquila de las filas dadas (lo que espera revisión y NO suma a ningún saldo). */
+function sumarPorRevisar(filas: FilaNeta[]): PendienteRevision {
+  return armarPendiente(
+    filas.reduce((s, f) => s + f.maquilaPorRevisar.abonos, 0),
+    filas.reduce((s, f) => s + f.maquilaPorRevisar.pagos, 0),
+    filas.reduce((s, f) => s + f.maquilaPorRevisar.descuentos, 0),
+    filas.reduce((s, f) => s + f.maquilaPorRevisar.partidas, 0),
+  );
 }
 
 /**
@@ -362,6 +383,10 @@ function calcularResumen(
  * veraces, y (c) la bandeja concuerda con el estado de cuenta del click. El aporte EsMa va en una
  * cubeta APARTE ("maquila", SIN antigüedad): los cargos EsMa no traen fecha de vencimiento por ítem
  * — el aging fino de maquila llegará cuando EsMa registre por el motor (E6/decisión posterior).
+ *
+ * ⭐ §Post-F9.188(a) (Daniel): un maquilero con TODO sin revisar NO desaparece de la bandeja. Su saldo
+ * es 0 (al saldo sólo entra lo revisado, fila 0.115) pero la fila se queda, con su «por revisar»
+ * explicado. Los KPIs siguen contando sólo saldo ≠ 0: lo pendiente todavía no es deuda.
  */
 export async function bandejaPorPagar(
   sesion: SesionUsuario,
@@ -379,6 +404,12 @@ export async function bandejaPorPagar(
   const limites = await leerLimitesAging(cliente, idEmpresa);
   // Motor: aging por proveedor. EsMa: aporte de maquila por proveedor (ambos en UN agregado c/u).
   const crudas = await agregarPorProveedor(cliente, idEmpresa, limites);
+  // ⭐ El aporte EsMa trae DOS cosas por maquilero (fila 0.115 + §Post-F9.188a): el saldo —sólo lo
+  // REVISADO; el estado de revisión manda en los cuatro conceptos— y lo que sigue CAPTURADO sin
+  // revisar. Lo segundo no suma un centavo, pero decide si la fila se ve: un maquilero con TODO sin
+  // revisar tiene saldo 0 y, si la bandeja cortara sólo por saldo, DESAPARECERÍA justo cuando alguien
+  // tiene que decidir sobre ese dinero. Daniel lo dijo así: no debe desaparecer. Mismo corte que el
+  // tablero de EsMa (saldo ≠ 0 o partidas por revisar).
   const aportesEsMa = await aportesEsMaSaldoLote(cliente, idEmpresa);
 
   // Combinar por proveedor: netear el aging del motor y sumar la cubeta de maquila. Los proveedores
@@ -396,10 +427,11 @@ export async function bandejaPorPagar(
           select: { id: true, nombre: true, nombreCorto: true, diasCredito: true },
         });
   const infoPorId = new Map(infoSoloEsMa.map((p) => [p.id, p]));
-  for (const [id, saldoEsMa] of aportesEsMa) {
+  for (const [id, aporte] of aportesEsMa) {
     const existente = porId.get(id);
     if (existente !== undefined) {
-      existente.maquila = saldoEsMa;
+      existente.maquila = aporte.saldo;
+      existente.maquilaPorRevisar = aporte.pendiente;
       existente.saldo = saldoDeFila(existente);
       continue;
     }
@@ -416,17 +448,25 @@ export async function bandejaPorPagar(
       d1a30: 0,
       d31a60: 0,
       mas60: 0,
-      maquila: saldoEsMa,
-      saldo: redondear2(saldoEsMa),
+      maquila: aporte.saldo,
+      maquilaPorRevisar: aporte.pendiente,
+      saldo: redondear2(aporte.saldo),
     });
   }
 
   const netas = [...porId.values()];
+  // Dos cortes distintos, a propósito: `conSaldo` alimenta los KPIs (cartera, vencido, proveedores
+  // CON SALDO — ahí un pendiente no es deuda todavía); `visibles` es lo que la tabla enseña con el
+  // chip "con saldo": saldo ≠ 0 **o** algo por revisar (§Post-F9.188a — el que tiene todo sin
+  // revisar no desaparece). Las DOS mitades salen de `formula-saldo.ts` —`tieneSaldo` y
+  // `hayPendiente`— para que este corte no se separe del del tablero de EsMa. El pendiente se mide
+  // por CONTEO, no por neto: un abono y un pago capturados iguales netean 0 y esconderían la fila.
   const conSaldo = netas.filter((f) => tieneSaldo(f.saldo));
-  const resumen = calcularResumen(conSaldo, oculto);
+  const visibles = netas.filter((f) => tieneSaldo(f.saldo) || hayPendiente(f.maquilaPorRevisar));
+  const resumen = calcularResumen(conSaldo, visibles, puedeVerImportes);
 
   // Universo de la tabla según el chip; la búsqueda NO afecta al resumen (KPIs de toda la cartera).
-  let base = filtros.filtro === 'todos' ? netas : conSaldo;
+  let base = filtros.filtro === 'todos' ? netas : visibles;
   if (filtros.busqueda !== undefined && filtros.busqueda !== '') {
     const q = normalizar(filtros.busqueda);
     base = base.filter(
@@ -453,6 +493,7 @@ export async function bandejaPorPagar(
     d31a60: oculto(f.d31a60),
     mas60: oculto(f.mas60),
     maquila: oculto(f.maquila),
+    maquilaPorRevisar: pendienteParaSalida(f.maquilaPorRevisar, puedeVerImportes),
   }));
 
   return {

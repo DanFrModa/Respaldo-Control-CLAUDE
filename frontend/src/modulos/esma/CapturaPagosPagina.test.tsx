@@ -82,6 +82,7 @@ vi.mock('@/api/esma', () => ({
       totalPagos: 0,
       totalDescuentos: 0,
       saldo: 160,
+      pendienteRevision: { abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 0 },
     },
     isPending: false,
     isError: false,

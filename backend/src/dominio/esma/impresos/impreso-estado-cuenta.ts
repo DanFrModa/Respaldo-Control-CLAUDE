@@ -38,6 +38,7 @@ import {
   LeyendaTruncado,
 } from '../../../comun/impresos-estilos.js';
 import { estadoCuentaDesglosado } from '../estado-cuenta.js';
+import { hayPendiente, pendienteDeRevisionPlano } from '../formula-saldo.js';
 import type { z } from 'zod';
 import type { esquemaEstadoCuentaQuery } from '../../../contrato/index.js';
 
@@ -222,6 +223,15 @@ function tablaCargos(datos: DatosImpresoEstadoCuenta): ReactElement {
   );
 }
 
+/**
+ * Marca del renglón cuando la partida sigue CAPTURADA y no entró al saldo. En la pantalla eso es un
+ * badge con su botón «Autorizar»; en el papel, donde no hay botón, tiene que decirse con letras —si
+ * no, el lector ve el total excluir un importe y no sabe CUÁL de los renglones fue.
+ */
+export function marcaPendiente(estadoRevision: 'capturado' | 'revisado'): string {
+  return pendienteDeRevisionPlano(estadoRevision) ? '  · por revisar' : '';
+}
+
 /** Tabla simple de abonos o descuentos (fecha/observaciones/importe). */
 function tablaMovimientos(titulo: string, filasDatos: DesglosadoSalida['abonos']): ReactElement {
   if (filasDatos.length === 0) {
@@ -248,7 +258,11 @@ function tablaMovimientos(titulo: string, filasDatos: DesglosadoSalida['abonos']
       View,
       { style: estilosDoc.filaTabla, key: `m-${i}` },
       h(Text, { style: [estilosDoc.celda, estilos.colMedia] }, m.fecha),
-      h(Text, { style: [estilosDoc.celda, estilos.colFlex] }, m.observaciones ?? '—'),
+      h(
+        Text,
+        { style: [estilosDoc.celda, estilos.colFlex] },
+        `${m.observaciones ?? '—'}${marcaPendiente(m.estadoRevision)}`,
+      ),
       h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(m.monto)),
     ),
   );
@@ -282,7 +296,11 @@ function tablaPagos(datos: DatosImpresoEstadoCuenta): ReactElement {
       View,
       { style: estilosDoc.filaTabla, key: `p-${i}` },
       h(Text, { style: [estilosDoc.celda, estilos.colMedia] }, p.fecha),
-      h(Text, { style: [estilosDoc.celda, estilos.colFlex] }, folios || `Pago #${String(p.id)}`),
+      h(
+        Text,
+        { style: [estilosDoc.celda, estilos.colFlex] },
+        `${folios || `Pago #${String(p.id)}`}${marcaPendiente(p.estadoRevision)}`,
+      ),
       h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(p.monto)),
     );
   });
@@ -353,43 +371,56 @@ function tablaIncompletas(datos: DatosImpresoEstadoCuenta): ReactElement | null 
   );
 }
 
-/** Bloque final con el saldo derivado. */
+/**
+ * Bloque final con el saldo derivado. Si hay partidas capturadas SIN revisar, el papel lo dice: el
+ * detalle de arriba las lista y el saldo NO las cuenta, así que sin esta columna la hoja no cuadraría
+ * y el maquilero (o Daniel) vería un total más chico sin explicación.
+ *
+ * 🔴 La condición es `hayPendiente` —el CONTEO de partidas—, JAMÁS `neto !== 0`. Con el neto, un
+ * abono capturado de 500 y un pago capturado de 500 se cancelan: el detalle listaría las dos
+ * partidas, los totales las excluirían y el papel no diría nada. Y el papel es la superficie menos
+ * recuperable de todas (se firma). Es la misma regla que usan el tablero, el Excel y la pantalla.
+ */
 function bloqueSaldo(datos: DatosImpresoEstadoCuenta): ReactElement {
-  const s = datos.desglosado.saldo;
-  return h(
-    View,
-    { style: estilos.saldoBloque },
+  const columnas = columnasBloqueSaldo(datos.desglosado.saldo);
+  const hijos = columnas.map((col) =>
     h(
       View,
-      { style: estilos.saldoItem, key: 'c' },
-      h(Text, { style: estilosDoc.etiquetaMenor }, 'Cargos'),
-      h(Text, { style: estilos.saldoValor }, pesos(s.totalCargos)),
-    ),
-    h(
-      View,
-      { style: estilos.saldoItem, key: 'a' },
-      h(Text, { style: estilosDoc.etiquetaMenor }, 'Abonos'),
-      h(Text, { style: estilos.saldoValor }, pesos(s.totalAbonos)),
-    ),
-    h(
-      View,
-      { style: estilos.saldoItem, key: 'p' },
-      h(Text, { style: estilosDoc.etiquetaMenor }, 'Pagos'),
-      h(Text, { style: estilos.saldoValor }, pesos(s.totalPagos)),
-    ),
-    h(
-      View,
-      { style: estilos.saldoItem, key: 'd' },
-      h(Text, { style: estilosDoc.etiquetaMenor }, 'Descuentos'),
-      h(Text, { style: estilos.saldoValor }, pesos(s.totalDescuentos)),
-    ),
-    h(
-      View,
-      { style: estilos.saldoItem, key: 's' },
-      h(Text, { style: estilosDoc.etiquetaMenor }, 'Saldo'),
-      h(Text, { style: estilos.saldoTotal }, pesos(s.saldo)),
+      { style: estilos.saldoItem, key: col.clave },
+      h(Text, { style: estilosDoc.etiquetaMenor }, col.etiqueta),
+      h(
+        Text,
+        { style: col.clave === 's' ? estilos.saldoTotal : estilos.saldoValor },
+        pesos(col.valor),
+      ),
     ),
   );
+  return h(View, { style: estilos.saldoBloque }, hijos);
+}
+
+/** Una columna del pie del estado de cuenta. */
+export interface ColumnaBloqueSaldo {
+  clave: string;
+  etiqueta: string;
+  valor: number | null;
+}
+
+/**
+ * QUÉ COLUMNAS lleva el pie del estado de cuenta. Pura, para poder aseverar SIN renderizar un PDF
+ * (misma idea que {@link avisoTruncadoTexto}): lo que importa aquí no es cómo se dibuja, es **si el
+ * renglón «Por revisar» aparece**, que es la regla que esta fila vino a sostener.
+ */
+export function columnasBloqueSaldo(s: DesglosadoSalida['saldo']): ColumnaBloqueSaldo[] {
+  return [
+    { clave: 'c', etiqueta: 'Cargos', valor: s.totalCargos },
+    { clave: 'a', etiqueta: 'Abonos', valor: s.totalAbonos },
+    { clave: 'p', etiqueta: 'Pagos', valor: s.totalPagos },
+    { clave: 'd', etiqueta: 'Descuentos', valor: s.totalDescuentos },
+    ...(hayPendiente(s.pendienteRevision)
+      ? [{ clave: 'r', etiqueta: 'Por revisar', valor: s.pendienteRevision.neto }]
+      : []),
+    { clave: 's', etiqueta: 'Saldo', valor: s.saldo },
+  ];
 }
 
 /**

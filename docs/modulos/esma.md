@@ -33,8 +33,48 @@ semanales, impresos R9 (estado de cuenta + recibo de pago) y export a Excel.
 - **`PagoAplicacion`** — puente N:N pago↔cargo (decisión (g)): cuántas prendas de un cargo cubrió un
   pago y por qué importe. PK `(idPago, idCargo)`.
 
-El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σ(cargos validados no sin-costo) + Σabonos −
-Σpagos − Σdescuentos`.
+El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σcargos + Σabonos − Σpagos − Σdescuentos`,
+y al saldo **sólo entra lo YA REVISADO, en los CUATRO conceptos** — cargo `validado` y no `sinCosto`;
+abono, pago y descuento `revisado`. Lo `capturado` (y el cargo `propuesto`) **no suma**.
+
+### La fórmula vive UNA vez: `dominio/esma/formula-saldo.ts` (V1, fila 0.115)
+
+El criterio de cada concepto —qué renglones cuentan al saldo y cuáles siguen pendientes— se declara
+**una sola vez**, en el objeto `DEFINICION`. De ahí salen las cláusulas de Prisma (`WHERE_CUENTA_*` /
+`WHERE_PENDIENTE_*`), los fragmentos de SQL crudo (`sqlCuenta`/`sqlPendiente`, **generados** del mismo
+objeto y no escritos aparte), los predicados de un renglón suelto (`cuentaAlSaldoPlano`,
+`pendienteDeRevisionCargo`, `aporteCargoAlSaldo`…) y la aritmética (`SIGNO_SALDO`, `saldoDeTotales`,
+`tieneSaldo`, `redondear2`).
+
+- **Por qué:** la fórmula estaba escrita TRES veces (`saldos.ts` con Prisma + los dos SQL crudos de
+  `saldos-todos.ts`) y el estado de revisión sólo se había puesto en los CARGOS: abonos, pagos y
+  descuentos `capturado` movían el saldo sin que nadie los hubiera autorizado —y el detalle ya los
+  marcaba «pendiente» mientras la suma los contaba—. Arreglar un archivo pasaba en verde dejando mal
+  los otros dos, y con ellos CxP/terceros, que reusan los de EsMa.
+- Una **guardia** (`formula-saldo.test.ts`) recorre `src/` + `migracion/` y falla si un archivo agrega
+  sobre las cuatro tablas de EsMa sin pedirle el criterio a la definición única (o pidiéndoselo y
+  escribiendo además una condición a mano). Garantiza que nadie **reescriba** el criterio; no que todo
+  el que sume lo aplique — `migracion/cuadre-f6.ts` suma los planos sin filtrar por revisión a
+  propósito, porque compara contra un Access que no conocía el concepto.
+
+### `pendienteRevision`: el dinero excluido se VE
+
+Lo capturado y aún sin revisar no suma al saldo, pero **tampoco desaparece**: viaja junto a él, con su
+desglose por concepto (`abonos`/`pagos`/`descuentos`), su `neto` —mismos signos del saldo— y el CONTEO
+de `partidas`.
+
+- **Manda el conteo, no el neto:** dos partidas pueden netear cero (un abono y un pago capturados del
+  mismo importe, o los montos negativos que carga el ETL) y seguir siendo dos cosas que alguien tiene
+  que decidir. `hayPendiente` mira `partidas > 0`, y es el único criterio de «hay algo pendiente».
+- **Los importes se ocultan sin `consultas.ver-importes`; el CONTEO no** (`pendienteParaSalida`): no es
+  dinero, y sin él quien no ve importes tampoco sabría que hay algo esperando decisión.
+- Se ve en la tarjeta del saldo, la columna «Por revisar» del tablero, el estado de cuenta (que marca
+  cada renglón pendiente con el MISMO criterio de la suma), el PDF/Excel y la bandeja de CxP.
+- ⭐ **§Post-F9.188(a) (Daniel):** un maquilero con TODO sin revisar tiene saldo 0 y **NO desaparece**.
+  El tablero de EsMa y la bandeja de CxP lo listan igual: el corte es `tieneSaldo(saldo) ||
+  hayPendiente(pendiente)`, no `saldo ≠ 0`.
+- Los cargos `propuesto` **no** entran al bloque: todavía no tienen importe (`cantidadReal`/
+  `precioReal` son NULL hasta validarlos) — su lugar es la cola de validación de cargos.
 
 ### Prendas INCOMPLETAS: lo que se ve pero NO es dinero (V1-E8k, §Post-F9.136)
 
@@ -70,10 +110,15 @@ Las prendas que el maquilero entrega **sin terminar de coser** aparecen en el es
     cantidadReal − Σ(PagoAplicacion.cantidad)` por **suma directa bajo `pg_advisory_xact_lock` por
     maquilero** (nunca una columna cacheada como verdad, D3); pagar de más lanza `ErrorConflicto`. El
     `monto` = Σ(cantidad × precioReal); actualiza `cantidadPagada` y **recalcula `Orden.pagada`**
-    (derivada, decisión (f), `orden-pagada.ts`). Permiso `esma.ver-pagos`.
+    (derivada, decisión (f), `orden-pagada.ts` — sus cargos «pagables» son `WHERE_CUENTA_CARGO`, el
+    MISMO conjunto que le cuenta al saldo). Permiso `esma.ver-pagos`.
+  - `formula-saldo.ts` — ⭐ la **definición ÚNICA** del criterio del saldo y del pendiente (arriba).
+    Sin dependencias de negocio: la consumen `saldos.ts`, `saldos-todos.ts`, `estado-cuenta.ts`,
+    `orden-pagada.ts`, `convivencia-esma.ts`, CxP y el cuadre del ETL.
   - `saldos.ts` (`saldoDeMaquilero`) y `saldos-todos.ts` (`saldosDeTodosMaquileros`, SQL agregado, sin
-    N+1) — el saldo DERIVADO, segmentable por `conFactura` (decisión (h)). Ocultan importes sin
-    `consultas.ver-importes` (server-side).
+    N+1; + `saldosEsMaPorMaquilero`, el lote que consume la bandeja de CxP) — el saldo DERIVADO y su
+    `pendienteRevision`, segmentables por `conFactura` (decisión (h)). Ocultan importes sin
+    `consultas.ver-importes` (server-side); el conteo de partidas nunca.
   - `conciliacion.ts` (`conciliarEsMa`) — cuadra por periodo+orden+maquilero+proceso lo **recibido**
     (F3) vs lo **cargado** a EsMa; lista los `cargosSinRecibo` (histórico/manual).
   - `estado-cuenta.ts` / `semanales.ts` — estado de cuenta detallado + vistas semanales (F6-E5). El

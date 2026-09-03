@@ -666,6 +666,9 @@ describe('no-regresión EsMa (convivencia)', () => {
       data: {
         idEmpresa: empresa.id,
         idMaquilero: idProveedor,
+        // REVISADO a propósito: desde V1 (fila 0.115) un movimiento plano sólo cuenta al saldo si
+        // ya se revisó. El fixture mide la convivencia, no la cola de revisión.
+        estadoRevision: 'revisado',
         monto: 20,
         fecha: new Date('2026-06-02T00:00:00Z'),
         conFactura: false,
@@ -675,6 +678,9 @@ describe('no-regresión EsMa (convivencia)', () => {
       data: {
         idEmpresa: empresa.id,
         idMaquilero: idProveedor,
+        // REVISADO a propósito: desde V1 (fila 0.115) un movimiento plano sólo cuenta al saldo si
+        // ya se revisó. El fixture mide la convivencia, no la cola de revisión.
+        estadoRevision: 'revisado',
         monto: 15,
         fecha: new Date('2026-06-03T00:00:00Z'),
         conFactura: false,
@@ -684,6 +690,9 @@ describe('no-regresión EsMa (convivencia)', () => {
       data: {
         idEmpresa: empresa.id,
         idMaquilero: idProveedor,
+        // REVISADO a propósito: desde V1 (fila 0.115) un movimiento plano sólo cuenta al saldo si
+        // ya se revisó. El fixture mide la convivencia, no la cola de revisión.
+        estadoRevision: 'revisado',
         monto: 5,
         fecha: new Date('2026-06-04T00:00:00Z'),
         conFactura: false,

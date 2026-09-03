@@ -58794,14 +58794,27 @@ export interface paths {
               conFactura: ('con' | 'sin') | null;
               /** @description Σ cargos validados no sin-costo (o null). */
               totalCargos: number | null;
-              /** @description Σ abonos (o null). */
+              /** @description Σ abonos revisados (o null). */
               totalAbonos: number | null;
-              /** @description Σ pagos (o null). */
+              /** @description Σ pagos revisados (o null). */
               totalPagos: number | null;
-              /** @description Σ descuentos (o null). */
+              /** @description Σ descuentos revisados (o null). */
               totalDescuentos: number | null;
               /** @description Saldo derivado (o null si se ocultan importes). */
               saldo: number | null;
+              /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+              pendienteRevision: {
+                /** @description Σ abonos capturados sin revisar (o null). */
+                abonos: number | null;
+                /** @description Σ pagos capturados sin revisar (o null). */
+                pagos: number | null;
+                /** @description Σ descuentos capturados sin revisar (o null). */
+                descuentos: number | null;
+                /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                neto: number | null;
+                /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                partidas: number;
+              };
             };
           };
         };
@@ -59479,7 +59492,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Saldos de todos los maquileros activos con saldo ≠ 0 (drill-down) */
+    /** Saldos de maquileros activos con saldo ≠ 0 o algo por revisar (drill-down) */
     get: {
       parameters: {
         query?: {
@@ -59501,7 +59514,7 @@ export interface paths {
             'application/json': {
               /** @description Segmento aplicado o null. */
               conFactura: ('con' | 'sin') | null;
-              /** @description Maquileros activos con saldo ≠ 0. */
+              /** @description Maquileros activos con saldo ≠ 0 o pendiente ≠ 0. */
               filas: {
                 /** @description Maquilero (Proveedor). */
                 idMaquilero: number;
@@ -59511,17 +59524,32 @@ export interface paths {
                 nombreCorto: string | null;
                 /** @description Σ cargos validados no sin-costo (o null). */
                 totalCargos: number | null;
-                /** @description Σ abonos (o null). */
+                /** @description Σ abonos revisados (o null). */
                 totalAbonos: number | null;
-                /** @description Σ pagos (o null). */
+                /** @description Σ pagos revisados (o null). */
                 totalPagos: number | null;
-                /** @description Σ descuentos (o null). */
+                /** @description Σ descuentos revisados (o null). */
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
+                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                pendienteRevision: {
+                  /** @description Σ abonos capturados sin revisar (o null). */
+                  abonos: number | null;
+                  /** @description Σ pagos capturados sin revisar (o null). */
+                  pagos: number | null;
+                  /** @description Σ descuentos capturados sin revisar (o null). */
+                  descuentos: number | null;
+                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  neto: number | null;
+                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  partidas: number;
+                };
               }[];
               /** @description Σ de los saldos (o null si se ocultan importes). */
               totalSaldo: number | null;
+              /** @description Σ del pendiente neto de todas las filas (o null si se ocultan importes). */
+              totalPendienteNeto: number | null;
             };
           };
         };
@@ -60108,14 +60136,27 @@ export interface paths {
                 conFactura: ('con' | 'sin') | null;
                 /** @description Σ cargos validados no sin-costo (o null). */
                 totalCargos: number | null;
-                /** @description Σ abonos (o null). */
+                /** @description Σ abonos revisados (o null). */
                 totalAbonos: number | null;
-                /** @description Σ pagos (o null). */
+                /** @description Σ pagos revisados (o null). */
                 totalPagos: number | null;
-                /** @description Σ descuentos (o null). */
+                /** @description Σ descuentos revisados (o null). */
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
+                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                pendienteRevision: {
+                  /** @description Σ abonos capturados sin revisar (o null). */
+                  abonos: number | null;
+                  /** @description Σ pagos capturados sin revisar (o null). */
+                  pagos: number | null;
+                  /** @description Σ descuentos capturados sin revisar (o null). */
+                  descuentos: number | null;
+                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  neto: number | null;
+                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  partidas: number;
+                };
               };
               /** @description Renglones del periodo, ordenados por fecha (fecha+id). */
               movimientos: {
@@ -60473,14 +60514,27 @@ export interface paths {
                 conFactura: ('con' | 'sin') | null;
                 /** @description Σ cargos validados no sin-costo (o null). */
                 totalCargos: number | null;
-                /** @description Σ abonos (o null). */
+                /** @description Σ abonos revisados (o null). */
                 totalAbonos: number | null;
-                /** @description Σ pagos (o null). */
+                /** @description Σ pagos revisados (o null). */
                 totalPagos: number | null;
-                /** @description Σ descuentos (o null). */
+                /** @description Σ descuentos revisados (o null). */
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
+                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                pendienteRevision: {
+                  /** @description Σ abonos capturados sin revisar (o null). */
+                  abonos: number | null;
+                  /** @description Σ pagos capturados sin revisar (o null). */
+                  pagos: number | null;
+                  /** @description Σ descuentos capturados sin revisar (o null). */
+                  descuentos: number | null;
+                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  neto: number | null;
+                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  partidas: number;
+                };
               };
             };
           };
@@ -61620,7 +61674,7 @@ export interface paths {
           pagina?: number;
           /** @description Renglones por página (máx 100). */
           porPagina?: number;
-          /** @description con-saldo (saldo ≠ 0) | todos (con movimientos). */
+          /** @description con-saldo (saldo ≠ 0 o con maquila por revisar) | todos (con movimientos). */
           filtro?: 'con-saldo' | 'todos';
           /** @description Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas). */
           busqueda?: string;
@@ -61638,7 +61692,7 @@ export interface paths {
           };
           content: {
             'application/json': {
-              /** @description Renglones de la página (saldo desc). */
+              /** @description Renglones de la página (saldo desc): saldo ≠ 0 o con maquila por revisar. */
               filas: {
                 /** @description Id del proveedor. */
                 idProveedor: number;
@@ -61660,6 +61714,19 @@ export interface paths {
                 mas60: number | null;
                 /** @description Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte). */
                 maquila: number | null;
+                /** @description Maquila (EsMa) capturada y AÚN sin revisar: no suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a). */
+                maquilaPorRevisar: {
+                  /** @description Σ abonos capturados sin revisar (o null). */
+                  abonos: number | null;
+                  /** @description Σ pagos capturados sin revisar (o null). */
+                  pagos: number | null;
+                  /** @description Σ descuentos capturados sin revisar (o null). */
+                  descuentos: number | null;
+                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  neto: number | null;
+                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  partidas: number;
+                };
               }[];
               /** @description Total de proveedores que cumplen el filtro. */
               total: number;
@@ -61681,6 +61748,19 @@ export interface paths {
                 alCorrientePct: number | null;
                 /** @description Proveedores con saldo ≠ 0. */
                 proveedoresConSaldo: number;
+                /** @description Σ de la maquila capturada sin revisar en toda la cartera: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero no desaparece. */
+                maquilaPorRevisar: {
+                  /** @description Σ abonos capturados sin revisar (o null). */
+                  abonos: number | null;
+                  /** @description Σ pagos capturados sin revisar (o null). */
+                  pagos: number | null;
+                  /** @description Σ descuentos capturados sin revisar (o null). */
+                  descuentos: number | null;
+                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  neto: number | null;
+                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  partidas: number;
+                };
               };
               /** @description Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas. */
               limitesAging: {

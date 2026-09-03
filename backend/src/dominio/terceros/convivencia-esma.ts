@@ -21,8 +21,11 @@ import type { MovimientoTerceroSalida } from '../../contrato/index.js';
 import { type Tx } from '../../comun/transaccion.js';
 import type { PrismaClient } from '../../datos/index.js';
 
+import { aporteCargoAlSaldo, cuentaAlSaldoPlano } from '../esma/formula-saldo.js';
 import { calcularSaldoMaquilero, type SaldoMaquileroCalculado } from '../esma/saldos.js';
-import { saldosEsMaPorMaquilero } from '../esma/saldos-todos.js';
+import { saldosEsMaPorMaquilero, type AporteEsMaLote } from '../esma/saldos-todos.js';
+
+export type { AporteEsMaLote };
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
@@ -118,14 +121,16 @@ export async function aporteEsMaSaldo(
 /**
  * APORTE EsMa al saldo de CADA proveedor con movimientos EsMa, en UN agregado (NUNCA N+1) — la versión
  * EN LOTE de {@link aporteEsMaSaldo}, para la BANDEJA de CxP (F9-E2). Reusa {@link saldosEsMaPorMaquilero}
- * (misma fórmula de F6 → no-regresión). Devuelve un Map idProveedor→saldo EsMa (solo ≠ 0), vista
- * operativa. Es el aporte que la bandeja muestra como cubeta "Maquila" (sin antigüedad: los cargos EsMa
- * no traen fecha de vencimiento por ítem — el aging fino llega cuando EsMa registre por el motor).
+ * (misma fórmula de F6 → no-regresión). Devuelve un Map idProveedor→{saldo, pendiente}: el saldo EsMa
+ * (sólo lo REVISADO) y lo capturado que aún espera revisión; entra quien tenga saldo ≠ 0 **o** algo
+ * pendiente (§Post-F9.188a: el maquilero con todo sin revisar no desaparece de la bandeja). Vista
+ * operativa. El saldo es lo que la bandeja muestra como cubeta "Maquila" (sin antigüedad: los cargos
+ * EsMa no traen fecha de vencimiento por ítem — el aging fino llega cuando EsMa registre por el motor).
  */
 export async function aportesEsMaSaldoLote(
   cliente: Tx | PrismaClient,
   idEmpresa: number,
-): Promise<Map<number, number>> {
+): Promise<Map<number, AporteEsMaLote>> {
   return saldosEsMaPorMaquilero(cliente, idEmpresa);
 }
 
@@ -144,6 +149,11 @@ export interface OpcionesProyeccionEsMa {
  * "esma"). El `monto` de cada renglón es su aporte al saldo (cargo +, abono +, pago −, descuento −),
  * de modo que su Σ = el aporte EsMa del saldo. Los cargos `propuesto` (aún sin importe real) salen
  * con `monto = null`; los `sinCosto`, en 0. Filtra los cargos `cancelado`.
+ *
+ * ⭐ Un abono/pago/descuento CAPTURADO sin revisar tampoco aporta al saldo (criterio único de
+ * `esma/formula-saldo.ts`), así que su `monto` va en null —igual que un cargo `propuesto`— para que
+ * la promesa de arriba (Σ renglones = saldo) siga siendo cierta. Para que ese "—" no parezca un
+ * error, el renglón lo DICE en sus observaciones: el dinero no se esconde, se explica.
  */
 export async function proyectarMovimientosEsMa(
   cliente: Tx | PrismaClient,
@@ -155,6 +165,9 @@ export async function proyectarMovimientosEsMa(
   const { desde, hasta, segmento, puedeVerImportes } = opciones;
   const factura = facturaWhere(segmento);
   const oculto = (v: number): number | null => (puedeVerImportes ? redondear2(v) : null);
+  /** Texto del renglón, avisando cuando está capturado y todavía no cuenta al saldo. */
+  const conNota = (texto: string | null, cuenta: boolean): string | null =>
+    cuenta ? texto : `${texto ?? ''} (pendiente de revisión)`.trim();
 
   const [cargos, abonos, descuentos, pagos] = await Promise.all([
     cliente.esMaCargo.findMany({
@@ -187,6 +200,7 @@ export async function proyectarMovimientosEsMa(
         fecha: true,
         conFactura: true,
         observaciones: true,
+        estadoRevision: true,
         creadoEn: true,
         creadoPorId: true,
       },
@@ -199,6 +213,7 @@ export async function proyectarMovimientosEsMa(
         fecha: true,
         conFactura: true,
         observaciones: true,
+        estadoRevision: true,
         creadoEn: true,
         creadoPorId: true,
       },
@@ -211,6 +226,7 @@ export async function proyectarMovimientosEsMa(
         fecha: true,
         conFactura: true,
         observaciones: true,
+        estadoRevision: true,
         creadoEn: true,
         creadoPorId: true,
       },
@@ -244,14 +260,9 @@ export async function proyectarMovimientosEsMa(
         ? null
         : c.cantidadReal.toNumber() * c.precioReal.toNumber();
     // Signo + (cargo): validado con costo → importe real; sin costo → 0; propuesto → sin importe.
-    const monto =
-      c.estado !== 'validado'
-        ? null
-        : c.sinCosto
-          ? oculto(0)
-          : importeReal === null
-            ? null
-            : oculto(importeReal);
+    // El criterio es el de la suma (formula-saldo.ts), no una copia local.
+    const aporte = aporteCargoAlSaldo(c, importeReal);
+    const monto = aporte === null ? null : oculto(aporte);
     filas.push({
       ...base(c.id, c.conFactura),
       origen: 'recibo_maquila',
@@ -266,12 +277,13 @@ export async function proyectarMovimientosEsMa(
   }
 
   for (const a of abonos) {
-    // Signo + (abono EsMa = cargo extra al maquilero, convención F6).
+    // Signo + (abono EsMa = cargo extra al maquilero, convención F6). Sin revisar: no aporta.
+    const cuentaA = cuentaAlSaldoPlano(a.estadoRevision);
     filas.push({
       ...base(a.id, a.conFactura),
       origen: 'abono',
-      monto: oculto(a.monto.toNumber()),
-      observaciones: a.observaciones,
+      monto: cuentaA ? oculto(a.monto.toNumber()) : null,
+      observaciones: conNota(a.observaciones, cuentaA),
       fecha: a.fecha.toISOString().slice(0, 10),
       creadoEn: a.creadoEn.toISOString(),
       creadoPorId: a.creadoPorId,
@@ -279,12 +291,13 @@ export async function proyectarMovimientosEsMa(
   }
 
   for (const d of descuentos) {
-    // Signo − (descuento resta).
+    // Signo − (descuento resta). Sin revisar: no aporta.
+    const cuentaD = cuentaAlSaldoPlano(d.estadoRevision);
     filas.push({
       ...base(d.id, d.conFactura),
       origen: 'descuento',
-      monto: oculto(-d.monto.toNumber()),
-      observaciones: d.observaciones,
+      monto: cuentaD ? oculto(-d.monto.toNumber()) : null,
+      observaciones: conNota(d.observaciones, cuentaD),
       fecha: d.fecha.toISOString().slice(0, 10),
       creadoEn: d.creadoEn.toISOString(),
       creadoPorId: d.creadoPorId,
@@ -292,12 +305,13 @@ export async function proyectarMovimientosEsMa(
   }
 
   for (const p of pagos) {
-    // Signo − (pago resta).
+    // Signo − (pago resta). Sin revisar: no aporta.
+    const cuentaP = cuentaAlSaldoPlano(p.estadoRevision);
     filas.push({
       ...base(p.id, p.conFactura),
       origen: 'pago',
-      monto: oculto(-p.monto.toNumber()),
-      observaciones: p.observaciones,
+      monto: cuentaP ? oculto(-p.monto.toNumber()) : null,
+      observaciones: conNota(p.observaciones, cuentaP),
       fecha: p.fecha.toISOString().slice(0, 10),
       creadoEn: p.creadoEn.toISOString(),
       creadoPorId: p.creadoPorId,

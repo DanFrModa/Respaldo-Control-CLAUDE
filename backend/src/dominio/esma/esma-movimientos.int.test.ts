@@ -29,7 +29,7 @@ import type { ClavePermiso } from '../../contrato/index.js';
 import { registrarCorte, registrarEnvioMaquila } from '../produccion/etapas.js';
 import { registrarReciboMaquila } from '../produccion/recibos.js';
 import { listarCargosEsMa, validarCargoEsMa } from './cargos.js';
-import { crearAbonoMaquilero, crearDescuentoMaquilero } from './movimientos.js';
+import { crearAbonoMaquilero, crearDescuentoMaquilero, revisarMovimiento } from './movimientos.js';
 import { crearPagoMaquilero } from './pagos.js';
 import { saldoDeMaquilero } from './saldos.js';
 import { conciliarEsMa } from './conciliacion.js';
@@ -258,18 +258,18 @@ describe('Saldo derivado (decisión: fórmula EsMa_SaldosMaq con nulos=0)', () =
     // Cargo validado 10 × 8 = 80.
     const idCargo = await cargoValidado(procesoCostura, maquileroCostura, 10, 10, 8);
     // Abono 15, descuento 5.
-    await crearAbonoMaquilero(
+    const abono = await crearAbonoMaquilero(
       sesion(),
       { idMaquilero: maquileroCostura.id, monto: 15, fecha: '2026-06-21' },
       bd(),
     );
-    await crearDescuentoMaquilero(
+    const descuento = await crearDescuentoMaquilero(
       sesion(),
       { idMaquilero: maquileroCostura.id, monto: 5, fecha: '2026-06-21' },
       bd(),
     );
     // Pago de 6 prendas × 8 = 48.
-    await crearPagoMaquilero(
+    const pago = await crearPagoMaquilero(
       sesion(),
       {
         idMaquilero: maquileroCostura.id,
@@ -278,6 +278,12 @@ describe('Saldo derivado (decisión: fórmula EsMa_SaldosMaq con nulos=0)', () =
       },
       bd(),
     );
+    // Los tres movimientos planos nacen `capturado` y NO cuentan hasta que alguien los revisa
+    // (V1, fila 0.115). Aquí se mide la fórmula, así que se revisan: con el saldo movido ya
+    // completo, cualquier signo equivocado se ve.
+    await revisarMovimiento(sesion(), 'abono', abono.id, bd());
+    await revisarMovimiento(sesion(), 'descuento', descuento.id, bd());
+    await revisarMovimiento(sesion(), 'pago', pago.id, bd());
 
     const saldo = await saldoDeMaquilero(sesion(), maquileroCostura.id, {}, bd());
     // 80 + 15 − 48 − 5 = 42
@@ -286,6 +292,8 @@ describe('Saldo derivado (decisión: fórmula EsMa_SaldosMaq con nulos=0)', () =
     expect(saldo.totalPagos).toBe(48);
     expect(saldo.totalDescuentos).toBe(5);
     expect(saldo.saldo).toBe(42);
+    // Y no queda nada esperando decisión: todo lo capturado ya pasó al saldo.
+    expect(saldo.pendienteRevision.neto).toBe(0);
   });
 
   it('(b) segundas SIN COSTO se excluyen del saldo', async () => {
@@ -413,6 +421,26 @@ describe('Orden pagada: derivada + override (decisión f)', () => {
     expect(orden.pagada).toBe(true);
   });
 
+  it('⭐ los cargos PAGABLES son los mismos que le cuentan al saldo (validado y con costo)', async () => {
+    // `calcularDerivada` pide su criterio a `WHERE_CUENTA_CARGO` (formula-saldo.ts) en vez de
+    // escribirlo: "lo que hay que pagarle para dar la orden por pagada" tiene que ser EL MISMO
+    // conjunto que "lo que se le debe". Los dos excluidos, en un solo caso:
+    //  • un cargo PROPUESTO (aún sin cantidad ni precio reales) no es pagable;
+    //  • una segunda SIN COSTO ya validada tampoco (decisión (f): no se le paga al maquilero).
+    // Si alguien vuelve a escribir el criterio aquí y se le olvida una de las dos, la orden se
+    // declararía pagada sin haber pagado nada.
+    await enviar(procesoCostura, maquileroCostura, 10);
+    await recibir(procesoCostura, maquileroCostura, 10); // deja el cargo en `propuesto`
+    let estatus = await obtenerOrdenPagada(sesion(), idOrden, bd());
+    expect(estatus.cargosPagables).toBe(0);
+    expect(estatus.pagadaDerivada).toBe(false);
+
+    await cargoValidado(procesoEstampado, estampador, 10, 10, 8, { sinCosto: true });
+    estatus = await obtenerOrdenPagada(sesion(), idOrden, bd());
+    expect(estatus.cargosPagables).toBe(0);
+    expect(estatus.pagadaDerivada).toBe(false);
+  });
+
   it('override manual fuerza el estatus y null vuelve a la derivación', async () => {
     await cargoValidado(procesoCostura, maquileroCostura, 10, 10, 8); // no pagado → derivada false
     const forzada = await forzarOrdenPagada(sesion(), idOrden, { pagadaForzada: true }, bd());
@@ -510,12 +538,13 @@ describe('Facturación por movimiento (decisión h)', () => {
       { cantidadReal: 10, precioReal: 8, conFactura: true },
       bd(),
     );
-    // Abono SIN factura (20).
-    await crearAbonoMaquilero(
+    // Abono SIN factura (20), revisado para que entre al saldo de su segmento.
+    const abonoSinFactura = await crearAbonoMaquilero(
       sesion(),
       { idMaquilero: maquileroCostura.id, monto: 20, fecha: '2026-06-21', conFactura: false },
       bd(),
     );
+    await revisarMovimiento(sesion(), 'abono', abonoSinFactura.id, bd());
 
     const conFac = await saldoDeMaquilero(
       sesion(),

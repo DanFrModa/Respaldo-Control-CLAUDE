@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useBandejaPorPagar } from '@/api/cxp';
-import type { CxpBandejaQuery } from '@/api/tipos';
+import type { CxpBandejaFila, CxpBandejaQuery } from '@/api/tipos';
 import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { ChipsFiltro, type OpcionChip } from '@/components/dominio/ChipsFiltro';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
@@ -15,9 +15,19 @@ import {
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
+import { hayPendienteDeRevision, textoPorRevisar } from '@/modulos/esma/comun';
 import { useSesion } from '@/sesion/useSesion';
 
 import { celdaAging, moneda } from './comun';
+
+/**
+ * Celda «Por revisar» de una fila: vacía si no hay nada capturado sin revisar (el 99 % de las filas).
+ * El texto (importe + conteo de partidas) lo arma `textoPorRevisar`, compartido con el tablero de
+ * EsMa: es el MISMO dato, y decía cosas distintas en cada pantalla.
+ */
+function celdaPorRevisar(p: CxpBandejaFila['maquilaPorRevisar']): string {
+  return hayPendienteDeRevision(p) ? textoPorRevisar(p) : '';
+}
 
 /** Chips del filtro (proto vCxp: "Con saldo | Todos"). */
 const CHIPS: OpcionChip<'con-saldo' | 'todos'>[] = [
@@ -34,6 +44,11 @@ const CHIPS: OpcionChip<'con-saldo' | 'todos'>[] = [
  * antigüedad por ítem, por eso va aparte — el aging fino de maquila llegará cuando EsMa registre por
  * el motor. Click en un renglón → estado de cuenta. Solo lectura (`cxp.ver`); importes en "—" sin
  * `consultas.ver-importes`.
+ *
+ * La columna «Por revisar» es maquila CAPTURADA y aún sin revisar (V1, fila 0.115): no suma al saldo
+ * ni a la cartera, pero es la razón por la que un maquilero con saldo 0 sigue en la bandeja —Daniel
+ * (§Post-F9.188a): el que tiene todo sin revisar NO debe desaparecer. El servidor decide quién se ve;
+ * la pantalla sólo explica el porqué.
  */
 export function CxpPagina(): React.JSX.Element {
   const navigate = useNavigate();
@@ -64,10 +79,18 @@ export function CxpPagina(): React.JSX.Element {
   // antigüedad, así que se muestra APARTE y el % viaja en null ("—") cuando no hay cartera del motor.
   const pct = resumen?.alCorrientePct ?? null;
   const maquilaTotal = resumen?.maquilaTotal ?? null;
-  const pieMaquila =
+  // Lo capturado sin revisar (§Post-F9.188a) se anuncia APARTE: no es cartera todavía, pero tampoco
+  // puede desaparecer del vistazo. Se decide por CONTEO (el neto puede ser 0 con partidas reales).
+  const porRevisar = resumen?.maquilaPorRevisar;
+  const piezasPie = [
     typeof maquilaTotal === 'number' && Math.abs(maquilaTotal) >= 0.005
       ? `Maquila sin antig.: ${moneda(maquilaTotal)}`
-      : 'saldo vivo';
+      : null,
+    porRevisar !== undefined && hayPendienteDeRevision(porRevisar)
+      ? `por revisar ${textoPorRevisar(porRevisar)} (no suma)`
+      : null,
+  ].filter((p): p is string => p !== null);
+  const pieMaquila = piezasPie.length === 0 ? 'saldo vivo' : piezasPie.join(' · ');
 
   const kpis: Kpi[] = [
     {
@@ -223,6 +246,14 @@ export function CxpPagina(): React.JSX.Element {
                         <span className="text-muted-foreground">Maquila</span>
                         <span className="num text-muted-foreground">{celdaAging(f.maquila)}</span>
                       </span>
+                      {hayPendienteDeRevision(f.maquilaPorRevisar) ? (
+                        <span className="flex justify-between gap-2">
+                          <span className="text-muted-foreground">Por revisar</span>
+                          <span className="num text-muted-foreground">
+                            {textoPorRevisar(f.maquilaPorRevisar)}
+                          </span>
+                        </span>
+                      ) : null}
                     </div>
                   </button>
                 ))}
@@ -242,6 +273,12 @@ export function CxpPagina(): React.JSX.Element {
                       <TablaDensaHead numerica>+{l2} d</TablaDensaHead>
                       <TablaDensaHead numerica title="Saldo de maquila (EsMa), sin antigüedad">
                         Maquila
+                      </TablaDensaHead>
+                      <TablaDensaHead
+                        numerica
+                        title="Maquila capturada y aún sin revisar: no suma al saldo (§Post-F9.188a)"
+                      >
+                        Por revisar
                       </TablaDensaHead>
                     </TablaDensaFila>
                   </TablaDensaEncabezado>
@@ -276,6 +313,9 @@ export function CxpPagina(): React.JSX.Element {
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica className="text-muted-foreground">
                           {celdaAging(f.maquila)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="text-muted-foreground">
+                          {celdaPorRevisar(f.maquilaPorRevisar)}
                         </TablaDensaCelda>
                       </TablaDensaFila>
                     ))}

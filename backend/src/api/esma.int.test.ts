@@ -209,14 +209,52 @@ describe('API EsMa (F6-E4)', () => {
     expect(pago.statusCode).toBe(201);
     expect(pago.json<{ monto: number }>().monto).toBe(48); // 6 × 8
 
-    // Saldo = cargos(80) + abonos(15) − pagos(48) − descuentos(5) = 42.
+    // Recién capturados, los TRES nacen `capturado`: el saldo sigue siendo el de los cargos y los
+    // importes esperan decisión aparte (V1, fila 0.115 — el estado de revisión manda en los cuatro
+    // conceptos, no sólo en los cargos).
+    const saldoAntes = await app.inject({
+      method: 'GET',
+      url: `/api/esma/maquileros/${String(idMaquilero)}/saldo`,
+      headers: { cookie },
+    });
+    expect(saldoAntes.statusCode).toBe(200);
+    const antes = saldoAntes.json<{
+      saldo: number;
+      pendienteRevision: { abonos: number; pagos: number; descuentos: number; neto: number };
+    }>();
+    expect(antes.saldo).toBe(80); // sólo los cargos
+    expect(antes.pendienteRevision.abonos).toBe(15);
+    expect(antes.pendienteRevision.pagos).toBe(48);
+    expect(antes.pendienteRevision.descuentos).toBe(5);
+    expect(antes.pendienteRevision.neto).toBe(-38); // 15 − 48 − 5
+
+    // Se revisan las tres partidas por el mismo endpoint que usa la pantalla.
+    for (const [concepto, respuesta] of [
+      ['abono', abono],
+      ['descuento', descuento],
+      ['pago', pago],
+    ] as const) {
+      const revision = await app.inject({
+        method: 'POST',
+        url: `/api/esma/movimientos/${concepto}/${String(respuesta.json<{ id: number }>().id)}/revisar`,
+        headers: { cookie },
+      });
+      expect(revision.statusCode).toBe(200);
+    }
+
+    // Saldo = cargos(80) + abonos(15) − pagos(48) − descuentos(5) = 42, y ya no queda pendiente.
     const saldo = await app.inject({
       method: 'GET',
       url: `/api/esma/maquileros/${String(idMaquilero)}/saldo`,
       headers: { cookie },
     });
     expect(saldo.statusCode).toBe(200);
-    expect(saldo.json<{ saldo: number }>().saldo).toBe(42);
+    const despues = saldo.json<{
+      saldo: number;
+      pendienteRevision: { neto: number };
+    }>();
+    expect(despues.saldo).toBe(42);
+    expect(despues.pendienteRevision.neto).toBe(0);
   });
 
   it('el recibo de pago responde 200 application/pdf', async () => {

@@ -987,7 +987,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             clave: 'esma-saldos',
             titulo: 'Saldos de maquileros',
             descripcion:
-              'Maquileros activos con saldo distinto de cero, con drill-down al estado de cuenta',
+              'Maquileros activos con saldo distinto de cero —o con partidas por revisar—, con drill-down al estado de cuenta',
             ruta: '/esma/saldos',
             icono: 'billete',
             permisos: ['esma.ver-pagos'],

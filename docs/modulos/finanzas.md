@@ -56,7 +56,18 @@ auditado** (patrón kardex), jamás una edición/borrado. Toda la lógica vive e
     pagos/abonos/descuentos/NC, estado de cuenta operativo/fiscal, **aging server-side**
     (`aging-comun.ts`: cubetas + neteo FIFO). La bandeja "por pagar" **foldea** el saldo EsMa (misma
     cuenta del maquilero, en cubeta "Maquila sin antigüedad"); el `%` al corriente es honesto (`null`
-    si no hay cartera clasificable).
+    si no hay cartera clasificable). El fold trae DOS cosas por maquilero (`aportesEsMaSaldoLote`, un
+    solo agregado, nunca N+1): el **saldo** —al que sólo entra lo REVISADO en los cuatro conceptos,
+    V1 fila 0.115— y `maquilaPorRevisar`, lo capturado que aún espera revisión.
+    - ⭐ **El corte de la bandeja es `saldo ≠ 0` **o** algo por revisar** (§Post-F9.188a, Daniel): un
+      maquilero con TODO sin revisar tiene saldo 0 y, con el corte anterior, DESAPARECÍA justo cuando
+      alguien tiene que decidir sobre ese dinero. Es el mismo corte del tablero de EsMa, con las
+      mismas funciones (`tieneSaldo` / `hayPendiente` de `esma/formula-saldo.ts`), y se mide por el
+      CONTEO de partidas, no por el neto (dos partidas pueden netear cero).
+    - Lo por revisar **no es deuda todavía**: no suma a `carteraTotal`, a `maquilaTotal` ni a
+      `proveedoresConSaldo` (los KPIs siguen contando sólo saldo ≠ 0), pero se declara aparte en el
+      resumen y en la columna «Por revisar» de la tabla, con su importe y su conteo. Los importes se
+      ocultan sin `consultas.ver-importes`; el conteo nunca.
   - `cfdi/` — `parser-cfdi.ts` (CFDI **4.0** puro, endurecido contra XML no confiable: sin DTD, sin
     expansión de entidades, tope 2 MB), `cfdi-proveedor.ts` (I → `factura_proveedor` +, E →
     `nota_credito` −) y `cfdi-ventas.ts` (reusa el parser con roles invertidos: emisor = empresa,

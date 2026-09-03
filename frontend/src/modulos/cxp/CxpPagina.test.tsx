@@ -13,6 +13,9 @@ vi.mock('@/api/cxp', () => ({
   useBandejaPorPagar: () => estado.valor,
 }));
 
+/** Nada capturado sin revisar (lo normal). */
+const sinPorRevisar = { abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 0 };
+
 const conCartera: CxpBandeja = {
   filas: [
     {
@@ -26,6 +29,7 @@ const conCartera: CxpBandeja = {
       d31a60: 0,
       mas60: 0,
       maquila: 0,
+      maquilaPorRevisar: sinPorRevisar,
     },
     // Maquilero con SOLO deuda EsMa (0 en el motor): su saldo vive en la cubeta "Maquila".
     {
@@ -39,6 +43,7 @@ const conCartera: CxpBandeja = {
       d31a60: 0,
       mas60: 0,
       maquila: 15000,
+      maquilaPorRevisar: sinPorRevisar,
     },
   ],
   total: 2,
@@ -52,6 +57,7 @@ const conCartera: CxpBandeja = {
     maquilaTotal: 15000,
     alCorrientePct: 46,
     proveedoresConSaldo: 2,
+    maquilaPorRevisar: sinPorRevisar,
   },
   limitesAging: { limite1: 30, limite2: 60 },
 };
@@ -101,6 +107,7 @@ describe('CxpPagina (F9-E2)', () => {
           maquilaTotal: 15000,
           alCorrientePct: null,
           proveedoresConSaldo: 1,
+          maquilaPorRevisar: sinPorRevisar,
         },
       },
       isPending: false,
@@ -134,5 +141,107 @@ describe('CxpPagina (F9-E2)', () => {
     const fila = screen.getByTestId('cxp-fila-9');
     expect(fila).toHaveTextContent('Maquilas del Sur');
     expect(fila).toHaveTextContent('$15,000.00');
+  });
+
+  it('sin nada por revisar, el vistazo no anuncia un pendiente que no existe', () => {
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver', 'consultas.ver-importes']),
+    });
+    expect(screen.getByTestId('kpi-cartera')).not.toHaveTextContent(/por revisar/i);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// §Post-F9.188(a) — EL MAQUILERO CON TODO SIN REVISAR NO DESAPARECE DE LA BANDEJA
+// Al saldo sólo entra lo revisado (V1, fila 0.115). Sin esta columna, la fila con saldo 0 que el
+// servidor decide enseñar se vería "en ceros" sin explicación; y con el corte viejo ni siquiera se vería.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('CxpPagina · maquila por revisar', () => {
+  /** Un maquilero cuya ÚNICA maquila está capturada: saldo 0, y algo esperando decisión. */
+  const todoCapturado: CxpBandeja['filas'][number] = {
+    idProveedor: 11,
+    proveedor: 'Maquila Todo Capturado',
+    nombreCorto: null,
+    diasCredito: 0,
+    saldo: 0,
+    corriente: 0,
+    d1a30: 0,
+    d31a60: 0,
+    mas60: 0,
+    maquila: 0,
+    maquilaPorRevisar: { abonos: 400, pagos: 0, descuentos: 0, neto: 400, partidas: 1 },
+  };
+
+  it('⭐ el maquilero con TODO sin revisar se ve, con saldo 0 y su «por revisar» explicado', () => {
+    estado.valor = {
+      data: {
+        ...conCartera,
+        filas: [...conCartera.filas, todoCapturado],
+        total: 3,
+        resumen: { ...conCartera.resumen, maquilaPorRevisar: todoCapturado.maquilaPorRevisar },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver', 'consultas.ver-importes']),
+    });
+    expect(screen.getByRole('columnheader', { name: /por revisar/i })).toBeInTheDocument();
+    const fila = screen.getByTestId('cxp-fila-11');
+    expect(fila).toHaveTextContent('Maquila Todo Capturado');
+    expect(fila).toHaveTextContent('$400.00');
+    // Y el vistazo lo anuncia APARTE: la cartera sigue siendo la misma (no suma).
+    const kpi = screen.getByTestId('kpi-cartera');
+    expect(kpi).toHaveTextContent('$103,000.00');
+    expect(kpi).toHaveTextContent(/por revisar/i);
+    expect(kpi).toHaveTextContent('$400.00');
+  });
+
+  it('con los importes ocultos, dice CUÁNTAS partidas (el conteo nunca se oculta)', () => {
+    estado.valor = {
+      data: {
+        ...conCartera,
+        filas: [
+          {
+            ...todoCapturado,
+            saldo: null,
+            corriente: null,
+            d1a30: null,
+            d31a60: null,
+            mas60: null,
+            maquila: null,
+            maquilaPorRevisar: {
+              abonos: null,
+              pagos: null,
+              descuentos: null,
+              neto: null,
+              partidas: 2,
+            },
+          },
+        ],
+        total: 1,
+        resumen: {
+          carteraTotal: null,
+          vencido: null,
+          maquilaTotal: null,
+          alCorrientePct: null,
+          proveedoresConSaldo: 0,
+          maquilaPorRevisar: {
+            abonos: null,
+            pagos: null,
+            descuentos: null,
+            neto: null,
+            partidas: 2,
+          },
+        },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<CxpPagina />, { sesion: estadoSesionDePrueba(['cxp.ver']) });
+    expect(screen.getByTestId('cxp-fila-11')).toHaveTextContent('2 partidas');
+    expect(screen.getByTestId('kpi-cartera')).toHaveTextContent('2 partidas');
   });
 });

@@ -7,9 +7,14 @@
  *      tablas de Calidad se cuentan por Prisma directo (NO depende del código del ETL de Calidad).
  *  (2) SALDOS por maquilero: saldo v1 (fórmula `EsMa_SaldosMaq` con "ceronulo" sobre los CSV,
  *      calculada de forma COMPARABLE a v2 — solo cargos VALIDADOS de órdenes migradas) vs saldo v2
- *      (mismo cálculo que `dominio/esma/saldos.ts`, D3). Lista los descuadres con su causa probable;
- *      la diferencia sistemática (cargos de órdenes NO migradas, cargos `propuesto`) se explica, NO
- *      se corrige. Cruce con el tablero de dominio (`saldosDeTodosMaquileros`).
+ *      sobre lo CARGADO. Lista los descuadres con su causa probable; la diferencia sistemática
+ *      (cargos de órdenes NO migradas, cargos `propuesto`) se explica, NO se corrige. Cruce con el
+ *      tablero de dominio (`saldosDeTodosMaquileros`).
+ *
+ *      ⚠️ Este bloque mide que la MIGRACIÓN cargó todo, NO lo que se le debe hoy al maquilero: por
+ *      eso los abonos/pagos/descuentos entran TODOS, revisados o no. El saldo operativo (V1, fila
+ *      0.115) sólo cuenta los revisados, así que el cruce con el tablero de dominio puede salir MÁS
+ *      CHICO que `totalV2` — y eso NO es un descuadre de migración. Ver `dominio/esma/formula-saldo.ts`.
  *  (3) CONCILIACIÓN sobre el periodo histórico completo (`dominio/esma/conciliacion.ts`): recibido
  *      (F3) vs cargado (EsMa) — criterio de salida "EsMa cuadra contra los recibos del periodo".
  *  (+) INCONSISTENCIAS de origen LISTADAS (no se corrigen): cargos sin cabecera EsMa (los 12 con
@@ -21,6 +26,7 @@
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, Prisma, type PrismaClient } from '../src/datos/index.js';
+import { sqlCuenta } from '../src/dominio/esma/formula-saldo.js';
 import { saldosDeTodosMaquileros } from '../src/dominio/esma/saldos-todos.js';
 import { conciliarEsMa } from '../src/dominio/esma/conciliacion.js';
 
@@ -229,7 +235,11 @@ async function calcularSaldos(cliente: PrismaClient): Promise<SaldosF6> {
     if (prov !== null) acumular(v1, prov, 'pagos', parsearDinero(r.PagoEsMa) ?? 0);
   }
 
-  // v2: agregado por maquilero (misma fórmula que `saldoDeMaquilero`, D3), acotado a la empresa.
+  // v2: agregado por maquilero de lo CARGADO, acotado a la empresa. El criterio del CARGO sale de
+  // la definición única (`dominio/esma/formula-saldo.ts`) para no re-escribirlo; los movimientos
+  // planos entran TODOS —revisados o no— a propósito: aquí se compara contra un v1 (Access) que no
+  // conocía el estado de revisión, y un movimiento bien migrado pero sin revisar NO es un error de
+  // migración. Por eso este número puede ser mayor que el saldo operativo del dominio.
   const filasV2 = await cliente.$queryRaw<FilaV2[]>(Prisma.sql`
     SELECT p."id" AS "idMaquilero", p."nombre" AS "nombre",
       COALESCE(c."total", 0)::float8 AS "cargos",
@@ -239,7 +249,7 @@ async function calcularSaldos(cliente: PrismaClient): Promise<SaldosF6> {
     FROM "proveedores" p
     LEFT JOIN (
       SELECT "id_maquilero", SUM("cantidad_real" * "precio_real") AS "total" FROM "esma_cargo"
-      WHERE "id_empresa" = ${idEmpresa} AND "estado" = 'validado' AND "sin_costo" = FALSE
+      WHERE "id_empresa" = ${idEmpresa} AND ${sqlCuenta('cargo')}
       GROUP BY "id_maquilero"
     ) c ON c."id_maquilero" = p."id"
     LEFT JOIN (
@@ -291,7 +301,7 @@ async function calcularSaldos(cliente: PrismaClient): Promise<SaldosF6> {
     }
   }
 
-  // Cruce con el tablero de dominio (activos con rol y saldo ≠ 0).
+  // Cruce con el tablero de dominio (activos con rol y saldo ≠ 0 o partidas por revisar).
   const sesion = sesionEtl(idEmpresa);
   let totalTableroDominio: number | null = null;
   let filasTableroDominio = 0;
@@ -487,7 +497,11 @@ export function formatearCuadreF6(c: CuadreF6): string {
   );
   if (s.totalTableroDominio !== null) {
     p.push(
-      `  Cruce tablero de dominio (saldosDeTodosMaquileros, activos c/rol y saldo≠0): ${String(s.filasTableroDominio)} maquileros, total ${s.totalTableroDominio.toFixed(2)}`,
+      `  Cruce tablero de dominio (saldosDeTodosMaquileros, activos c/rol, saldo≠0 o pendiente≠0): ${String(s.filasTableroDominio)} maquileros, total ${s.totalTableroDominio.toFixed(2)}`,
+    );
+    p.push(
+      '    (informativo: el tablero sólo suma movimientos REVISADOS, así que puede quedar por ' +
+        'debajo de totalV2 sin que eso sea un descuadre de migración)',
     );
   }
   if (s.detalle.length > 0) {
