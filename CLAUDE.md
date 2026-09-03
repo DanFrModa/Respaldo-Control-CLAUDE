@@ -270,6 +270,37 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
    4. El lead le **PREGUNTA a Gabriel si abrir el PR a `prueba`**. Con su OK → se abre el PR; Railway despliega `prueba`.
    5. **Gabriel verifica en vivo en el servidor de `prueba` de Railway** (NO corriendo docker local). Si aprueba → PR de `prueba` → `main`.
    *(Incidente 13-jun-2026: un push automático mandó E1B-backend a `prueba` sin permiso — no repetir.)*
+
+   > ## 🔴 ANTES DE MERGEAR CUALQUIER PR: VERIFICAR QUE NINGUNA OTRA SESIÓN LO ESTÉ REVISANDO (GABRIEL, 3-sep-2026)
+   >
+   > **Textual:** *«antes de mergear cualquier PR, verifica que ninguna otra sesión lo esté revisando. Anoche
+   > se publicaron datos personales porque una sesión mergeó lo que otra ya había marcado como “no mergear”.»*
+   >
+   > ⚠️ **Cómo nació — el incidente del 3-sep-2026.** Dos sesiones trabajaban el mismo repo a la vez. Una abrió
+   > el PR #287 (cinco Excel reales del dueño, presentados como «limpios de datos sensibles»). La otra los
+   > **midió abriendo el XML**, encontró **77 nombres completos de personas físicas pegados al monto que cobra
+   > cada una** más los autores en los metadatos, **no lo mergeó** y lo dejó escrito. La primera sesión **mergeó
+   > su propio PR de todas formas**, y esos datos entraron a `prueba` — en un repositorio **público**, donde lo
+   > que entra queda en el historial para siempre. El pendiente de remediación vive en la fila **0.123**.
+   >
+   > 🔑 **La lección exacta: el aviso EXISTÍA y nadie lo leyó antes de mergear.** El fallo no fue de detección
+   > —la revisión funcionó y encontró el problema— sino de **coordinación**: el veredicto vivía en el chat de
+   > una sesión, invisible para la otra. *Un hallazgo que no está donde se toma la decisión es un hallazgo que
+   > no existe.*
+   >
+   > **Qué hacer, siempre, antes de mergear:**
+   > 1. **Leer los comentarios y las revisiones DEL PR.** Si hay un «no mergear», **para** y averigua por qué,
+   >    aunque el CI esté verde y aunque te lo hayan pedido.
+   > 2. **Listar las sesiones activas del repo** (`list_sessions`) y mirar su estado: si otra está trabajando
+   >    ese PR, **no lo toques**. ⚠️ **No la despiertes** con un mensaje si alguien la apagó a propósito: eso
+   >    la resucita. La evidencia del listado y del PR basta.
+   > 3. **Verificar JUSTO ANTES de mergear**, no una hora antes: entre una comprobación y el merge, otra sesión
+   >    pudo haber empezado.
+   >
+   > ⭐ **Y el corolario, que es la otra mitad del arreglo:** cuando TÚ marques un PR como «no mergear», **déjalo
+   > como comentario EN EL PR**, no sólo en el chat con Gabriel o con Daniel. El día del incidente el «no lo
+   > mergees» vivía en una conversación que la otra sesión no podía ver. Un marcador en el PR lo ve cualquiera
+   > que vaya a mergearlo — que es exactamente quien tiene que verlo.
 3. **Equipo mínimo por tarea: 1 coder + 1 reviewer independiente.** Nada se integra sin el visto bueno del reviewer (tiene la última palabra) y el CI en verde. **El orquestador (lead) NO escribe código de producción**: coordina, decide arquitectura, revisa y reporta a Gabriel.
    - **UN DEFECTO CONOCIDO NO ES "MENOR" (innegociable — regla de Gabriel, 5-jul-2026).** Todo hallazgo de un reviewer se **arregla en la misma ronda de corrección**. Está PROHIBIDO archivarlo como "menor", "aceptado", "improbable" o "no lo alcanza el seed de hoy": los seeds, roles y permisos cambian (ya hay cicatrices de CI por eso) y conocer el defecto lo vuelve responsabilidad, no nota al pie. Antes de siquiera pensar en no arreglar algo, **re-evaluar su severidad REAL** (¿toca una invariante A1–A9 / D#?) — a veces lo etiquetado "menor" es en realidad una violación de una invariante central (caso F8-E3: un "write-skew aceptado" era en realidad una violación de la inmutabilidad D3). Si de verdad NO se arregla, se dice con la **razón de diseño explícita** y se anota como deuda en `HOJA-DE-RUTA.md` §4 — jamás se calla con un "es menor".
 4. **ECONOMÍA DE TOKENS (innegociable — el costo se dispara fácil; toda sesión la cumple):**

@@ -71,6 +71,34 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.097 · 3-sep-2026 · **en prueba** — La regla que faltaba: nadie mergea lo que otro está revisando
+
+### Qué se puede hacer ahora que antes no
+
+⚠️ **Nada nuevo en pantalla: esta versión no toca el programa.** Es una regla de trabajo, escrita para que
+no dependa de que alguien se acuerde.
+
+- Queda escrito en `CLAUDE.md` que **antes de mergear cualquier cambio hay que verificar que ninguna otra
+  sesión lo esté revisando**, con los pasos concretos: leer los comentarios del propio cambio, mirar qué
+  otras sesiones están trabajando el repositorio, y hacerlo **justo antes** de mergear y no una hora antes.
+
+### Qué cambió y puede sorprender
+
+- **Nace de algo que salió mal el mismo día.** Dos sesiones trabajaban a la vez. Una subió cinco archivos
+  reales presentándolos como limpios de datos sensibles; la otra los midió, **encontró 77 nombres de
+  personas pegados a lo que cobra cada una**, no los mergeó y lo dejó escrito. La primera **mergeó de todas
+  formas**, y esos datos entraron al repositorio, que es público.
+- 🔑 **Lo que se aprendió no es «hay que revisar mejor»:** la revisión funcionó y encontró el problema. Lo
+  que falló fue que **el aviso vivía en una conversación que la otra sesión no podía ver**. Por eso la regla
+  trae una segunda mitad: cuando se marca algo como «no mergear», **se escribe en el cambio mismo**, donde lo
+  ve quien va a mergearlo.
+
+### Qué sigue pendiente o roto
+
+- **La remediación de aquellos archivos sigue abierta** (fila **0.123**): es de Gabriel pedirle a GitHub el
+  purgado, y de Daniel decidir si el repositorio sigue siendo público.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.095 · 3-sep-2026 · **en prueba** — Los permisos se declaran uno por uno
 
 ### Qué se puede hacer ahora que antes no
