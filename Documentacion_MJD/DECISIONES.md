@@ -12150,10 +12150,17 @@ nuevo **sí** pasan.
 pide el purgado a GitHub y no se cambia la visibilidad del repositorio. **Todo eso es de Gabriel** y
 espera a que él decida. La fila **0.123** queda ⬜ con esa nota.
 
-✅ **Lo que sí siguió** (es lo contrario de una acción de riesgo): la documentación entró **sin** los
-archivos y **retirando** los **cuatro** nombres de personas físicas —**tres** de ellos publicados desde
-la v0.093, y en **dos** archivos (`DECISIONES.md` §Post-F9.185 y `HOJA-DE-RUTA.md` fila 0.112)—.
-Dejarlos habría sido la decisión activa; quitarlos sólo reduce la exposición mientras Gabriel decide.
+🔴 **Y el terreno cambió DESPUÉS de esta decisión, sin que Daniel lo supiera:** a las **07:20 UTC de ese
+mismo día el PR #287 se mergeó a `prueba`** —lo hizo la sesión que lo había abierto, no Gabriel ni
+Daniel—, así que **los cinco archivos ya están en la rama compartida**, no sólo en una rama de trabajo.
+⚠️ Su instrucción se tomó **al pie de la letra igual**: **no se retiran**. Retirarlos del tip no arregla
+la exposición (el historial y `refs/pull/287/head` quedan; sólo el purgado de GitHub lo arregla), así que
+adelantarse habría sido una acción de riesgo sin beneficio, y contra lo que él dijo. **Lo que sí se hizo
+es que la fila 0.123 diga la verdad nueva**, para que quien la lea mañana no trabaje con el mapa viejo.
+
+✅ **Lo que sí siguió** (es lo contrario de una acción de riesgo): retirar de la prosa **el nombre de
+persona física que el #287 dejó vivo** y que hoy sigue publicado en `prueba` (§Post-F9.186(f)). Los otros
+tres —dos en §Post-F9.185 y uno más en la fila 0.112— **los retiró el propio #287 al mergearse**.
 ⏳ **Sigue abierta** la pregunta de si los alias de proveedores persona física («CESAR VICTORIA 1») deben
 seudonimizarse en todo el repo.
 
@@ -12212,12 +12219,16 @@ descuento por faltante de §Post-F9.185 baje el saldo desde el momento de propon
 > ver lo que realmente se entregó»*.
 > 🔑 **La regla que deja esta noche: el proceso se puede contar; los ERRORES sólo aparecen en los datos.**
 >
-> ## ⛔ LOS CINCO ARCHIVOS **NO** VIVEN EN ESTE REPOSITORIO — y la razón importa
+> ## 🔴 LOS CINCO ARCHIVOS **SÍ ENTRARON** AL REPOSITORIO, y la limpieza que traían FALLÓ
 >
-> Se intentó guardarlos aquí «limpios» (PR #287) y **la limpieza falló**: quitó cuentas, CLABE, tarjetas y
-> RFC —eso sí quedó en cero— pero **dejó intactos los 77 nombres completos de los beneficiarios**, cada uno
-> pegado al monto que cobra. El mismo PR **tachaba esos nombres en esta prosa** y los subía crudos en el
-> adjunto de al lado.
+> Entraron con el **PR #287, mergeado a `prueba` el 3-sep a las 07:20 UTC** — mientras esta revisión estaba
+> en curso y con la recomendación expresa de **no** mergearlo ya puesta por escrito.
+>
+> **Lo que se midió abriendo el XML de los cinco:** cuentas, CLABE, tarjetas y RFC **sí** estaban quitados
+> —cero rastros, verificado— pero quedaron dentro **77 nombres completos de beneficiarios**, cada uno
+> **pegado al monto que cobra** (`relacion-pagos-sin-factura.xlsx`, hoja «General», columna O), y **nombres
+> de autor reales en los metadatos** (`docProps/core.xml`). El mismo PR **tachaba esos nombres en esta
+> prosa** y los subía crudos en el adjunto de al lado.
 >
 > 🔑 **La lección, que vale para todo el proyecto:** *un dato personal no se quita del texto, se quita del
 > **archivo**; y una limpieza que no se puede **volver a correr** no es una limpieza, es una afirmación.*
@@ -12225,9 +12236,9 @@ descuento por faltante de §Post-F9.185 baje el saldo desde el momento de propon
 > el nombre del autor de la cotización— y no la prosa que lo acompaña.
 >
 > ⚠️ **Y en git no hay vuelta atrás**: lo que entra queda en el historial, y este repositorio es **público**.
-> Por eso los archivos se quedan fuera y **lo que se conserva es lo medido de ellos** —estructura,
-> cantidades, precios, totales y la forma de los cálculos—, que es justamente lo que sirve para construir.
-> El pendiente de remediación tiene número: **fila 0.123**.
+> ⛔ **Los archivos NO se retiran desde aquí**, aunque estén medidos y el diagnóstico esté cerrado: Daniel
+> lo dejó dicho esa misma noche (*«esperamos a mañana a Gabriel… ahorita déjalo así»*, §Post-F9.187(a)).
+> El pendiente tiene número: **fila 0.123**.
 
 ---
 
