@@ -71,44 +71,89 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
-## 0.094 · 3-sep-2026 · **en prueba** — Los permisos se declaran uno por uno
+## 0.095 · 3-sep-2026 · **en prueba** — Los permisos se declaran uno por uno
 
 ### Qué se puede hacer ahora que antes no
 
 **Nada nuevo, y ése es el punto.** Los nueve perfiles quedan **exactamente con los mismos permisos que
-tenían** — se verificó uno por uno. Lo que cambió es **cómo se definen**, y eso importa para lo que viene.
+tenían** — verificado por dos fuentes independientes. Lo que cambió es **cómo se definen**.
 
 Antes cada perfil se describía como *«todo lo del perfil de arriba, menos estas cosas»*. Suena práctico y
 tiene un defecto grave: **cuando se agrega un permiso nuevo y nadie dice a quién quitárselo, le llega a
 todos**. Así fue como el perfil más bajo terminó pudiendo **autorizar órdenes de compra** — nadie lo
-decidió; simplemente nadie lo impidió.
+decidió; nadie lo impidió.
 
 - Ahora **cada perfil dice lo que tiene**, no lo que le falta.
 - **Un permiso nuevo no llega a nadie** hasta que alguien escriba quién debe tenerlo, **y por qué**.
 - Si alguien agrega un permiso y se olvida de repartirlo, **el sistema se pone rojo** en vez de regalarlo.
 
-Eso deja el terreno listo para cuando Daniel arme los perfiles con los puestos reales de su gente: va a
-trabajar sobre una lista completa y explícita, no sobre una donde lo que no se dice se concede solo.
+Deja el terreno listo para cuando Daniel arme los perfiles con los puestos reales: va a trabajar sobre una
+lista completa y explícita, no sobre una donde lo que no se dice se concede solo.
 
 ### Qué cambió y puede sorprender
 
 - **En Administración › Roles hay un aviso nuevo** al abrir uno de los nueve perfiles de fábrica: dice que
-  se restablecen en cada actualización del programa —**salvo administrar usuarios y administrar roles**,
-  que el sistema nunca retira—. Antes eso pasaba y nadie lo decía: un permiso palomeado a mano ahí se
-  borraba callado en el siguiente despliegue.
+  se restablecen en cada actualización —**salvo administrar usuarios y administrar roles**, que el sistema
+  nunca retira—. Eso ya pasaba y nadie lo decía.
 - **Los perfiles propios que crees tú no se tocan**: el sistema ni los mira.
 
 ### Qué sigue pendiente o roto
 
-- ⚠️ **Los perfiles concretos siguen sin decidirse.** Daniel los va a armar al final, con los puestos
-  reales. Hoy siguen tal cual estaban — incluido que **el perfil secretarial conserva 76 permisos**, 22 de
-  ellos capaces de autorizar, cancelar o mover dinero.
-- 🔴 **«Administrar roles» sigue funcionando como interruptor de "es administrador"** en cinco lugares del
-  sistema: dárselo a alguien le concede de pasada capturar cualquier proceso de la ruta crítica, ver la
-  bandeja completa y editar una orden de compra ya autorizada. Es la fila **0.120** y necesita decisión.
-- **Sin migración, sin permisos nuevos** ⇒ el despliegue **no** requiere `SEED_ON_START`: como el reparto
-  no cambia, volver a sembrar no escribiría nada. Lo único verificable en vivo es el aviso de la pantalla
-  de Roles.
+- ⚠️ **Los perfiles concretos siguen sin decidirse.** Daniel los arma al final, con los puestos reales. Hoy
+  el perfil secretarial conserva **76 permisos**, 22 de ellos capaces de autorizar, cancelar o mover dinero.
+- 🔴 **«Administrar roles» sigue funcionando como interruptor de "es administrador"** en cinco lugares:
+  dárselo a alguien le concede de pasada capturar cualquier proceso de la ruta crítica, ver la bandeja
+  completa y editar una orden de compra ya autorizada. Es la fila **0.120**.
+- **Sin migración, sin permisos nuevos** ⇒ el despliegue **no** requiere `SEED_ON_START`: como el reparto no
+  cambia, volver a sembrar no escribiría nada. Lo único verificable en vivo es el aviso de Roles.
+
+## 0.094 · 3-sep-2026 · **en prueba** — Las decisiones de la noche quedan escritas, y el incidente de los archivos reales queda con número
+
+### Qué se puede hacer ahora que antes no
+
+⚠️ **Nada nuevo en pantalla: esta versión no toca el programa.** Cambia lo que está *escrito*, que es lo
+que decide qué se construye después.
+
+- Quedan registradas **las cuatro respuestas que Daniel dio esa noche antes de dormirse**: los archivos
+  expuestos **esperan a Gabriel**; **la fórmula del precio de lista no se toca** (*«me da igual el peso»*)
+  —aunque sigue viva la pantalla que sí pidió—; el permiso que concede de más **se arregla al ir a
+  producción**, no ahora; y la prioridad es **la cadena de pagos**.
+- El **incidente de los cinco archivos reales queda con número** (fila **0.123**), con lo que se midió,
+  quién tiene cada parte pendiente y la regla que deja.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Los cinco Excel de Daniel SÍ están en el repositorio.** Entraron esa madrugada **sin pasar por una
+  versión**: se subieron a `prueba` sin subir el número ni escribir su entrada aquí, así que **esta 0.094
+  es la primera que los cuenta**. Y **la limpieza que traían falló**: las cuentas, CLABE, tarjetas y RFC sí
+  se habían quitado —eso quedó en cero, verificado—, pero seguían dentro **77 nombres completos de
+  beneficiarios, cada uno pegado al monto que cobra**, y los nombres de los autores en las propiedades de
+  los archivos.
+- **No se retiraron**, a propósito: Daniel dijo que eso lo decide Gabriel. Y quitarlos de la copia actual
+  **no arreglaría nada** —lo que entra a git se queda en el historial—; el arreglo de verdad es pedirle el
+  purgado a GitHub.
+- **Se retiró el último nombre de persona que quedaba en la documentación.** Los otros tres los quitó el
+  propio cambio que subió los archivos — y **fue la versión anterior, la 0.093, la que los había
+  publicado**.
+- **Y el aviso de la carpeta de los archivos decía lo contrario de la verdad.** Su README juraba que eran
+  «copias SIN datos sensibles», con doble verificación, **y mandaba a abrirlos**. Ahora dice lo que se
+  midió y advierte de lo que hay dentro: es el texto que alguien va a leer justo antes de tocarlos.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **La exposición sigue viva y no se arregla con código** (fila **0.123**). **De Gabriel:** pedirle a
+  GitHub el purgado —que ahora hay que pedirlo por **tres** sitios: los archivos en el historial de
+  `prueba`, la rama del PR que los subió, y los tres nombres de la versión 0.093— y decidir si los
+  archivos se retiran de la copia actual. **De Daniel:** decidir si el repositorio debe seguir siendo
+  público.
+- ⏳ **Tres preguntas abiertas para Daniel**, todas sobre qué dato personal cabe en un repositorio
+  público: si se seudonimizan los **alias de proveedores persona física** («CESAR VICTORIA 1»); si se
+  conservan los **nombres de pila de empleadas junto a una valoración de su trabajo** (son cita textual
+  suya, pero identifican a alguien real); y si al citar un archivo se puede nombrar a quien lo manda.
+- ⏳ **Una cuarta, más chica:** de quién le llega la cotización que sirvió para medir el precosteo. La
+  documentación se contradecía —una vez el cliente, otra Aurora, que es la gerente general de la casa— y
+  **no se adivinó**: quedó descrito sólo lo verificable.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
 
 ## 0.093 · 3-sep-2026 · **en prueba** — ⭐ El inventario de telas, listo para cargarse de cero
 
