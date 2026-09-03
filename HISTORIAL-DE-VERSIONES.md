@@ -96,8 +96,12 @@ que decide qué se construye después.
 - **No se retiraron**, a propósito: Daniel dijo que eso lo decide Gabriel. Y quitarlos de la copia actual
   **no arreglaría nada** —lo que entra a git se queda en el historial—; el arreglo de verdad es pedirle el
   purgado a GitHub.
-- **Se retiró el último nombre de persona que quedaba en la documentación.** Los otros tres los había
-  quitado ya la versión anterior.
+- **Se retiró el último nombre de persona que quedaba en la documentación.** Los otros tres los quitó el
+  propio cambio que subió los archivos — y **fue la versión anterior, la 0.093, la que los había
+  publicado**.
+- **Y el aviso de la carpeta de los archivos decía lo contrario de la verdad.** Su README juraba que eran
+  «copias SIN datos sensibles», con doble verificación, **y mandaba a abrirlos**. Ahora dice lo que se
+  midió y advierte de lo que hay dentro: es el texto que alguien va a leer justo antes de tocarlos.
 
 ### Qué sigue pendiente o roto
 
