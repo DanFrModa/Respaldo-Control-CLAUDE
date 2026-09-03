@@ -71,6 +71,54 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.094 · 3-sep-2026 · **en prueba** — Las decisiones de la noche quedan escritas, y el incidente de los archivos reales queda con número
+
+### Qué se puede hacer ahora que antes no
+
+⚠️ **Nada nuevo en pantalla: esta versión no toca el programa.** Cambia lo que está *escrito*, que es lo
+que decide qué se construye después.
+
+- Quedan registradas **las cuatro respuestas que Daniel dio esa noche antes de dormirse**: los archivos
+  expuestos **esperan a Gabriel**; **la fórmula del precio de lista no se toca** (*«me da igual el peso»*)
+  —aunque sigue viva la pantalla que sí pidió—; el permiso que concede de más **se arregla al ir a
+  producción**, no ahora; y la prioridad es **la cadena de pagos**.
+- El **incidente de los cinco archivos reales queda con número** (fila **0.123**), con lo que se midió,
+  quién tiene cada parte pendiente y la regla que deja.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Los cinco Excel de Daniel SÍ están en el repositorio.** Entraron esa madrugada **sin pasar por una
+  versión**: se subieron a `prueba` sin subir el número ni escribir su entrada aquí, así que **esta 0.094
+  es la primera que los cuenta**. Y **la limpieza que traían falló**: las cuentas, CLABE, tarjetas y RFC sí
+  se habían quitado —eso quedó en cero, verificado—, pero seguían dentro **77 nombres completos de
+  beneficiarios, cada uno pegado al monto que cobra**, y los nombres de los autores en las propiedades de
+  los archivos.
+- **No se retiraron**, a propósito: Daniel dijo que eso lo decide Gabriel. Y quitarlos de la copia actual
+  **no arreglaría nada** —lo que entra a git se queda en el historial—; el arreglo de verdad es pedirle el
+  purgado a GitHub.
+- **Se retiró el último nombre de persona que quedaba en la documentación.** Los otros tres los quitó el
+  propio cambio que subió los archivos — y **fue la versión anterior, la 0.093, la que los había
+  publicado**.
+- **Y el aviso de la carpeta de los archivos decía lo contrario de la verdad.** Su README juraba que eran
+  «copias SIN datos sensibles», con doble verificación, **y mandaba a abrirlos**. Ahora dice lo que se
+  midió y advierte de lo que hay dentro: es el texto que alguien va a leer justo antes de tocarlos.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **La exposición sigue viva y no se arregla con código** (fila **0.123**). **De Gabriel:** pedirle a
+  GitHub el purgado —que ahora hay que pedirlo por **tres** sitios: los archivos en el historial de
+  `prueba`, la rama del PR que los subió, y los tres nombres de la versión 0.093— y decidir si los
+  archivos se retiran de la copia actual. **De Daniel:** decidir si el repositorio debe seguir siendo
+  público.
+- ⏳ **Tres preguntas abiertas para Daniel**, todas sobre qué dato personal cabe en un repositorio
+  público: si se seudonimizan los **alias de proveedores persona física** («CESAR VICTORIA 1»); si se
+  conservan los **nombres de pila de empleadas junto a una valoración de su trabajo** (son cita textual
+  suya, pero identifican a alguien real); y si al citar un archivo se puede nombrar a quien lo manda.
+- ⏳ **Una cuarta, más chica:** de quién le llega la cotización que sirvió para medir el precosteo. La
+  documentación se contradecía —una vez el cliente, otra Aurora, que es la gerente general de la casa— y
+  **no se adivinó**: quedó descrito sólo lo verificable.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.093 · 3-sep-2026 · **en prueba** — ⭐ El inventario de telas, listo para cargarse de cero
 
 ### Qué se puede hacer ahora que antes no

@@ -12136,14 +12136,109 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.187) — LAS CUATRO DE LA NOCHE (3-sep-2026): Daniel contesta antes de dormirse
+
+> **Cómo nació.** El lead le entregó las cuatro decisiones que podían frenar el trabajo de la noche, cada
+> una con su default propuesto (regla de §6: todas de una vez, no de a gotas). Daniel contestó las cuatro
+> y se fue a dormir con la instrucción *«dale toda la noche… necesitamos enfocarnos en desarrollar la
+> mayor cantidad de renglones posibles, manteniendo las reglas que puso Gabriel»*.
+
+## (a) LOS ARCHIVOS EXPUESTOS: **esperar a Gabriel** — no se toca nada
+> *«Esperamos a mañana a Gabriel a ver qué dice. Ahorita déjalo así.»*
+
+⛔ **NO se ejecuta ninguna acción de remediación**: no se cierra el PR #287, no se borra su rama, no se
+pide el purgado a GitHub y no se cambia la visibilidad del repositorio. **Todo eso es de Gabriel** y
+espera a que él decida. La fila **0.123** queda ⬜ con esa nota.
+
+🔴 **Y el terreno cambió DESPUÉS de esta decisión, sin que Daniel lo supiera:** a las **07:20 UTC de ese
+mismo día el PR #287 se mergeó a `prueba`** —lo hizo la sesión que lo había abierto, no Gabriel ni
+Daniel—, así que **los cinco archivos ya están en la rama compartida**, no sólo en una rama de trabajo.
+⚠️ Su instrucción se tomó **al pie de la letra igual**: **no se retiran**. Retirarlos del tip no arregla
+la exposición (el historial y `refs/pull/287/head` quedan; sólo el purgado de GitHub lo arregla), así que
+adelantarse habría sido una acción de riesgo sin beneficio, y contra lo que él dijo. **Lo que sí se hizo
+es que la fila 0.123 diga la verdad nueva**, para que quien la lea mañana no trabaje con el mapa viejo.
+
+✅ **Lo que sí siguió** (es lo contrario de una acción de riesgo): retirar de la prosa **el nombre de
+persona física que el #287 dejó vivo** y que hoy sigue publicado en `prueba` (§Post-F9.186(f)). Los otros
+tres —dos en §Post-F9.185 y uno más en la fila 0.112— **los retiró el propio #287 al mergearse**.
+⏳ **Sigue abierta** la pregunta de si los alias de proveedores persona física («CESAR VICTORIA 1») deben
+seudonimizarse en todo el repo.
+
+## (b) 🔽 LA FÓRMULA DEL PRECIO DE LISTA: **NO SE TOCA** (cierra la mitad de la fila 0.122)
+> *«Es irrelevante que haya un peso de diferencia. Déjalo así. **Me da igual**.»*
+
+El sistema **suma los factores y divide una vez**; Daniel divide **tres veces seguidas**. Con el redondeo
+al alza eso da **un peso arriba en 1 de cada 3-4 modelos** (medido: Milano 92.20 → él 167 / el sistema
+168; C&A 83.11 → él 136 / el sistema 137). **Queda como está, por decisión suya.**
+
+🔑 **Y es una decisión, no un olvido:** el helper `costos/precio-lista.ts` está aislado y es puro
+justamente para poder cambiarlo en una línea el día que haga falta. No hace falta.
+
+⚠️ **OJO — esto cierra la mitad de la fila 0.122, NO la fila entera.** Lo que Daniel descartó es **la
+aritmética**. Sigue vivo, y es lo valioso: **la FORMA de la pantalla** —nunca salir de la cuadrícula
+(*«me preguntan de un modelo mientras negocio otro»*), llegar tecleando el código, editar en celda con
+recálculo al instante, guardado continuo, el desglose de avíos en ventana emergente— y sobre todo **el
+margen del CONJUNTO ponderado por piezas mientras negocia**, que es lo que Excel no puede darle (medido
+en su archivo: 39.1 % calculado contra 33.3 % cerrado, sobre 39 modelos). **Confundir «me da igual el
+peso» con «me da igual la fila» perdería justo lo que sí pidió.**
+
+## (c) `roles.administrar`: **se arregla al ir a producción**, no ahora (fila 0.120)
+> *«Déjalo así por ahora. **Lo arreglamos cuando vayamos a producción.**»*
+
+Dar «administrar roles» concede hoy **de pasada** capturar cualquier proceso de Ruta Crítica, ver la
+bandeja completa y **editar una OC ya autorizada**, en 5 sitios del código. **Hoy no cambia nada** porque
+está dentro de `SOLO_ADMINISTRADOR`.
+
+⇒ La fila **0.120 se queda ⬜** y **entra al checklist de F10 (Migración + Go-live)**, que es cuando se
+reparten los permisos de verdad entre los 23 usuarios reales — el momento exacto en que el defecto
+dejaría de ser teórico. 📌 Cuando se haga: **leer los 5 sitios primero**; puede que cada uno necesite un
+permiso **distinto**, y meterlos bajo uno solo **repetiría el defecto con otro nombre**.
+
+## (d) LA PRIORIDAD DE LA NOCHE: **la cadena de pagos**
+> *«Está bien como propones. **Con temas de pagos**.»*
+
+Orden confirmado: **0.115** (el estado «revisado» que sólo manda en los cargos) → **0.110** (la
+facturación no puede quedar sin definir) → **0.112** (destinos de pago: beneficiario y varias cuentas).
+Es la cadena que desemboca en **0.113**, la corrida semanal que mata sus dos Excel.
+
+🔑 **Por qué 0.115 va primero y no es un rodeo:** cerrarla hace que **el anticipo que pidió en
+§Post-F9.186(h) salga gratis** —el mecanismo (`estadoRevision: capturado`) ya existe— y evita que el
+descuento por faltante de §Post-F9.185 baje el saldo desde el momento de proponerlo.
+
+---
+
 #### (Post-F9.186) — ⭐ LA NOCHE DE LOS ARCHIVOS REALES (3-sep-2026): cinco Excel de Daniel corrigen el plan
 
 > **Cómo nació esta sección.** Daniel subió **cinco archivos reales** —la relación de pagos sin factura, el
-> Excel semanal de maquilas de producción, la antigüedad de saldos, la cotización que le manda Aurora y la
+> Excel semanal de maquilas de producción, la antigüedad de saldos, la cotización de la propuesta de un
+> cliente que a él le llega armada (⏳ **por confirmar con Daniel de quién le llega**: el archivo se
+> describió una vez como del cliente y otra como de Aurora, y **Aurora es la gerente general de la casa**,
+> no el cliente — cambia cómo se lee todo el punto (m)) y la
 > lista de precios que él arma—. **Cada uno corrigió algo que ninguna conversación había sacado.** Textual
 > suyo, al final: *«el me manda la información de referencia con **miles de errores**… por eso yo tengo que
 > ver lo que realmente se entregó»*.
 > 🔑 **La regla que deja esta noche: el proceso se puede contar; los ERRORES sólo aparecen en los datos.**
+>
+> ## 🔴 LOS CINCO ARCHIVOS **SÍ ENTRARON** AL REPOSITORIO, y la limpieza que traían FALLÓ
+>
+> Entraron con el **PR #287, mergeado a `prueba` el 3-sep a las 07:20 UTC** — mientras esta revisión estaba
+> en curso y con la recomendación expresa de **no** mergearlo ya puesta por escrito.
+>
+> **Lo que se midió abriendo el XML de los cinco:** cuentas, CLABE, tarjetas y RFC **sí** estaban quitados
+> —cero rastros, verificado— pero quedaron dentro **77 nombres completos de beneficiarios**, cada uno
+> **pegado al monto que cobra** (`relacion-pagos-sin-factura.xlsx`, hoja «General», columna O), y **nombres
+> de autor reales en los metadatos** (`docProps/core.xml`). El mismo PR **tachaba esos nombres en esta
+> prosa** y los subía crudos en el adjunto de al lado.
+>
+> 🔑 **La lección, que vale para todo el proyecto:** *un dato personal no se quita del texto, se quita del
+> **archivo**; y una limpieza que no se puede **volver a correr** no es una limpieza, es una afirmación.*
+> Un `.xlsx` es un ZIP de XML: la revisión tiene que mirar **las celdas y los metadatos** —ahí sobrevivió
+> el nombre del autor de la cotización— y no la prosa que lo acompaña.
+>
+> ⚠️ **Y en git no hay vuelta atrás**: lo que entra queda en el historial, y este repositorio es **público**.
+> ⛔ **Los archivos NO se retiran desde aquí**, aunque estén medidos y el diagnóstico esté cerrado: Daniel
+> lo dejó dicho esa misma noche (*«esperamos a mañana a Gabriel… ahorita déjalo así»*, §Post-F9.187(a)).
+> El pendiente tiene número: **fila 0.123**.
 
 ---
 
@@ -12237,7 +12332,8 @@ llevan el precio **× 1.16 exacto** (Borda Print 9 → 10.44; Rimabell 25 → 29
 
 ## (f) 🔴 EL TOTAL DE ESE ARCHIVO NO CUADRA — y la razón NO ESTÁ ESCRITA
 Suma de pagos programados **105,310.20**; el total dice **103,033.20**. Diferencia: **2,277 exactos** = el
-renglón de Viridiana Morales. Daniel: *«es porque le dimos un anticipo la semana pasada»*.
+renglón de un maquilero **cuyo nombre se omite: es una persona física**. Daniel: *«es porque le
+dimos un anticipo la semana pasada»*.
 🔑 **Pero la columna `ANTICIPOS PAGADOS` de ese renglón está VACÍA.** El anticipo **existe en la cabeza de
 alguien, no en el documento**. Textual: *«normalmente me mandan información **sin especificar bien qué es
 cada cosa**… muchas fallas»*.
@@ -12327,7 +12423,9 @@ proveedor; (2) **si no reconoce el formato, DECIRLO** en vez de llenar tres camp
 texto ⇒ el sistema lo rechaza y pide el original.
 
 ## (m) EL PRECOSTEO — F8 se construyó **sin haber visto una cotización real**
-Medido contra sus dos archivos (`Precosteo_Propuesta_Milano.xlsx` de Aurora y `Gaby_2026.xlsx` / `Niños_2026_Inv.xlsx` suyos):
+Medido contra sus dos archivos (`Precosteo_Propuesta_Milano.xlsx`, que **a Daniel le llega armado** —ver
+la pregunta abierta del encabezado sobre de quién viene—, y `Gaby_2026.xlsx` / `Niños_2026_Inv.xlsx`, que
+**sí arma él**):
 
 🔴 **La composición de los factores está mal.** Daniel divide **tres veces seguidas**
 (`costo/(1−margen)/(1−comisión)/(1−descuentos)`); el sistema **suma los últimos y divide una vez**. Con el
