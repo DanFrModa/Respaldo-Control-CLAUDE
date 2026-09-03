@@ -918,9 +918,9 @@ describe('⭐ consultarMetaPrometida: la meta que ve quien va a firmar, contra l
 });
 
 /**
- * 🔴🔴 **LA REJA DEL IMPORTE, contra la base.** `modelos.ver` abre la bandeja y **no se resta en
- * ningún escalón** de `prisma/seed.ts`: la tienen Ventas, Logística, Asistente y Secretarial —los
- * mismos a los que se les quitó `consultas.ver-importes` por decisión—. Publicar ahí el costo con el
+ * 🔴🔴 **LA REJA DEL IMPORTE, contra la base.** `modelos.ver` abre la bandeja y en
+ * `prisma/seed.ts` lo lleva **todo perfil menos `Basico`**: la tienen Ventas, Logística, Asistente
+ * y Secretarial —los mismos que NO llevan `consultas.ver-importes`, por decisión—. Publicar ahí el costo con el
  * que se cerró la mesa les enseñaría *«la información que vendí»* por la puerta de al lado.
  */
 describe('🔴 la META es dinero: la bandeja la oculta a quien no ve importes', () => {

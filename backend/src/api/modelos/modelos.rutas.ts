@@ -785,8 +785,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   // DESPUÉS de declarar un desenlace, o sea nunca en la primera firma, que es cuando se pregunta.
   //
   // Gate `modelos.aprobar-receta` (quien firma); el dominio exige además `consultas.ver-importes`
-  // porque es un importe. Los dos se cortan en el MISMO escalón del seed (Ventas), así que la
-  // pareja no cierra ninguna puerta que estuviera abierta. Sin permisos nuevos.
+  // porque es un importe. En el seed los dos los llevan EXACTAMENTE los mismos cuatro perfiles
+  // (Administrador, AdministracionDireccion, Directivo y Gerencial), así que la pareja no cierra
+  // ninguna puerta que estuviera abierta. Sin permisos nuevos.
   app.route({
     method: 'GET',
     url: '/modelos/:id/meta-prometida',

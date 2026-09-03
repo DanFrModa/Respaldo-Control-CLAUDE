@@ -1184,8 +1184,10 @@ async function adjuntarFotoPrincipal(
  * él** por diseño. Colgar la columna de ahí esconde exactamente lo que Daniel pidió **sin tocar el
  * reparto de roles y sin quitarle a nadie nada más**: el seed NO cambia y NO hace falta re-sembrar.
  *
- * Se exigen **los DOS** permisos, no sólo `costos.ver`: en la cascada del seed `costos.ver` ya
- * implica `consultas.ver-importes`, pero **los roles son datos editables** (`roles.administrar`), y
+ * Se exigen **los DOS** permisos, no sólo `costos.ver`: en el reparto del seed todo perfil que
+ * lleva `costos.ver` lleva también `consultas.ver-importes`, pero eso es un HECHO del reparto de
+ * hoy, no una regla —desde el 3-sep-2026 cada perfil lista sus permisos uno por uno y nada obliga a
+ * que vayan juntos—; y además **los roles son datos editables** (`roles.administrar`), y
  * un rol a la medida podría llevar `costos.ver` sin el de importes. Pedir los dos sólo puede
  * ESTRECHAR el conjunto, nunca ampliarlo: es un costo real (`costos.ver`) **y** es dinero
  * (`consultas.ver-importes`).

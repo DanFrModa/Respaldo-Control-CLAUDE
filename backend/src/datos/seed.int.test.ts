@@ -8,7 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { sembrar } from '../../prisma/seed.js';
+import { definirRoles, PERFILES_ACCESO_TOTAL, sembrar } from '../../prisma/seed.js';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO } from '../contrato/index.js';
 import { limpiarBaseDatos } from '../pruebas/contexto.js';
 import { crearClientePrisma, type PrismaClient } from './index.js';
@@ -150,25 +150,66 @@ describe('seed de fundación', () => {
     expect(rolAdmin._count.permisos).toBe(CATALOGO_PERMISOS.length);
   });
 
-  it('la cascada de roles respeta el orden de niveles del sistema viejo (doc 00 §2)', async () => {
-    const roles = await prisma.rol.findMany({
-      include: { _count: { select: { permisos: true } } },
+  // ⛔ AQUÍ ESTABA «la cascada de roles respeta el orden de niveles del sistema viejo», que exigía
+  // `logistica < ventas < gerencial < directivo < admin` y `Asistente === Logistica ===
+  // Secretarial`, por CONTEO. Se sustituye el 3-sep-2026, y no por gusto: **ese anidamiento es
+  // exactamente la invariante que Daniel abolió** al mandar quitar los permisos por cascada
+  // (*"puede haber alguien que tenga el permiso A pero no el B, y otra persona que tenga el B pero
+  // no el A"*). Pasaba sólo porque los conjuntos siguen anidados HOY; el día que se armen los
+  // perfiles con los puestos reales de los 23 usuarios, esta prueba se habría puesto roja **por
+  // tener razón**, y el arreglo obvio —relajarla— habría dejado el seed sin prueba de integración.
+  //
+  // Lo que va en su lugar es más fuerte y no opina sobre la FORMA del reparto: que el seed escriba
+  // en la base EXACTAMENTE lo que dice `definirRoles()`, rol por rol y clave por clave. Si mañana
+  // Ventas y Logística se cruzan sin contenerse, esto sigue valiendo.
+  it('cada rol de sistema queda en la BD con EXACTAMENTE lo que dice definirRoles()', async () => {
+    const definicion = definirRoles();
+    const filas = await prisma.rol.findMany({
+      where: { nombre: { in: definicion.map((rol) => rol.nombre) } },
+      select: {
+        nombre: true,
+        esSistema: true,
+        permisos: { select: { permiso: { select: { clave: true } } } },
+      },
     });
-    const cuenta = new Map(roles.map((r) => [r.nombre, r._count.permisos]));
-    const admin = cuenta.get('Administrador') ?? -1;
-    const directivo = cuenta.get('Directivo') ?? -1;
-    const gerencial = cuenta.get('Gerencial') ?? -1;
-    const ventas = cuenta.get('Ventas') ?? -1;
-    const logistica = cuenta.get('Logistica') ?? -1;
 
-    expect(cuenta.get('AdministracionDireccion')).toBe(admin);
-    expect(directivo).toBeLessThan(admin);
-    expect(gerencial).toBeLessThan(directivo);
-    expect(ventas).toBeLessThan(gerencial);
-    expect(logistica).toBeLessThan(ventas);
-    expect(cuenta.get('Asistente')).toBe(logistica);
-    expect(cuenta.get('Secretarial')).toBe(logistica);
-    expect(cuenta.get('Basico')).toBe(0);
+    expect(filas, 'faltan roles de sistema en la BD').toHaveLength(definicion.length);
+    const porNombre = new Map(filas.map((fila) => [fila.nombre, fila]));
+    for (const rol of definicion) {
+      const fila = porNombre.get(rol.nombre);
+      expect(fila, `no se sembró el rol ${rol.nombre}`).toBeDefined();
+      expect(fila?.esSistema, `${rol.nombre} tiene que quedar marcado como de sistema`).toBe(true);
+      // Igualdad EXACTA, y se puede: este archivo arranca de `limpiarBaseDatos`, así que no hay
+      // rastro previo. (`sembrarRoles` tiene una excepción documentada —nunca REVOCA las claves de
+      // gobierno—, pero eso sólo puede dejar de MÁS lo que alguien hubiera otorgado antes, y aquí
+      // no hubo antes. Si algún día esto falla con `usuarios.administrar`/`roles.administrar` de
+      // sobra en un rol, es esa excepción, no un defecto.)
+      const enBd = (fila?.permisos ?? []).map((rp) => rp.permiso.clave).sort();
+      expect(enBd, `${rol.nombre}: la BD no coincide con definirRoles()`).toEqual(
+        [...rol.permisos].sort(),
+      );
+    }
+  });
+
+  it('los dos perfiles de acceso total llevan el catálogo COMPLETO, y Basico va en cero', async () => {
+    // Los extremos, dichos aparte: son los dos que un reparto mal editado rompe primero, y ninguno
+    // de los dos depende de que los perfiles de en medio estén anidados.
+    const roles = await prisma.rol.findMany({
+      where: { nombre: { in: [...PERFILES_ACCESO_TOTAL, 'Basico'] } },
+      select: { nombre: true, permisos: { select: { permiso: { select: { clave: true } } } } },
+    });
+    const porNombre = new Map(roles.map((fila) => [fila.nombre, fila]));
+
+    for (const nombre of PERFILES_ACCESO_TOTAL) {
+      const claves = (porNombre.get(nombre)?.permisos ?? []).map((rp) => rp.permiso.clave).sort();
+      expect(claves, `${nombre} tiene que llevar el catálogo completo`).toEqual(
+        [...CLAVES_PERMISO].sort(),
+      );
+    }
+    expect(
+      porNombre.get('Basico')?.permisos ?? ['(falta el rol Basico)'],
+      'Basico existe para NO tener permisos',
+    ).toEqual([]);
   });
 });
 

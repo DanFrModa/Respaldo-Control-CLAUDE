@@ -524,8 +524,9 @@ export const CATALOGO_PERMISOS = [
   },
   // Motor de la RUTA VIVA por orden (Módulo 8, F5-E3, A4) — permisos NUEVOS de v2. Gobiernan la
   // programación (generar/re-generar/ajustar la ruta de una orden) y su consulta. Son OPERATIVOS
-  // (producción/IP los usa día a día): cascadean a los roles como los `produccion.*`, no se restan a
-  // los bajos. Distintos del catálogo configurable (`rc.catalogo-*`, que define las plantillas).
+  // (producción/IP los usa día a día): en `prisma/seed.ts` los llevan los mismos perfiles que los
+  // `produccion.*` — todos menos `Basico`. Distintos del catálogo configurable (`rc.catalogo-*`,
+  // que define las plantillas).
   {
     clave: 'rc.programar',
     modulo: 'rc',
@@ -540,7 +541,8 @@ export const CATALOGO_PERMISOS = [
   },
   // Captura de avance de la RUTA VIVA por orden (Módulo 8, F5-E4, A4) — permiso NUEVO de v2. Gobierna
   // marcar/revertir la fecha REAL de cumplimiento de un proceso y los ítems de su checklist. Es
-  // OPERATIVO (producción/IP lo usa día a día); cascadea a los roles como `rc.programar`/`produccion.*`.
+  // OPERATIVO (producción/IP lo usa día a día); en el seed lo llevan los mismos perfiles que
+  // `rc.programar`/`produccion.*` — todos menos `Basico`.
   // Además, el dominio exige que ALGUNO de los roles del usuario sea responsable del proceso
   // (`ProcesoDefRol`, N:M); el admin (`roles.administrar`) captura cualquier proceso.
   {
@@ -913,12 +915,15 @@ export const CATALOGO_PERMISOS = [
   // propósito (F8-E4, decisión (h)). Aprobar la **receta** es OTRA COSA —es trabajo de desarrollo
   // de producto, no una firma comercial— y Daniel lo repartió más ancho: *"los que tengan
   // facultad… de entrada Aurora podría hacerlo aparte de mí"*, y Aurora es Gerencial. Por eso
-  // este permiso lo CONSERVA Gerencial y se corta en Ventas hacia abajo (ver `prisma/seed.ts`),
-  // mientras `listas.aprobar` no se toca.
+  // este permiso lo llevan Administrador, AdministracionDireccion, Directivo y Gerencial (ver
+  // `prisma/seed.ts`), mientras `listas.aprobar` se queda en los tres primeros.
   //
-  // ⚠️ Y NO cascadea con `modelos.administrar`: ése se corta en Directivo (sólo Administrador y
-  // AdministracionDireccion administran catálogos), así que exigirlo además dejaría a Aurora
-  // fuera de justo lo que Daniel le encargó. Crear la versión es su ÚNICA puerta.
+  // ⚠️ Y NO se pide junto con `modelos.administrar`, que es un permiso SEPARADO: cuando esto se
+  // escribió, `modelos.administrar` no le llegaba a Gerencial (se repartía como los catálogos
+  // maestros), así que exigirlo además habría dejado a Aurora fuera de justo lo que Daniel le
+  // encargó. Desde §Post-F9.123 ella SÍ lo lleva —medido en `definirRoles()`—, pero siguen
+  // separados a propósito: son dos decisiones distintas y una no debe arrastrar a la otra.
+  // Crear la versión es su ÚNICA puerta.
   {
     clave: 'modelos.aprobar-receta',
     modulo: 'modelos',
@@ -1024,7 +1029,8 @@ export const CATALOGO_PERMISOS = [
   // confirmar descuenta los avíos del kardex; la tela solo se referencia, decisión (e)) y `cancelar`
   // (cancelación suave con motivo + reverso auditado de los avíos, D3). Mismo reparto que compras:
   // ver es lectura, administrar muta/confirma, cancelar es su propio permiso (acción que revierte
-  // movimientos de kardex). Operativos (no se restan a los roles bajos, como `compras.recibir`).
+  // movimientos de kardex). Operativos: en el seed los llevan los mismos perfiles que
+  // `compras.recibir` — todos menos `Basico`.
   {
     clave: 'notas.ver',
     modulo: 'notas',

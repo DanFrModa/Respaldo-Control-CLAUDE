@@ -12,8 +12,8 @@ import type { ClavePermiso } from '@/api/tipos';
  * permisos distintos, uno pintando la puerta del otro.
  *
  * 🔴 **HONESTIDAD SOBRE LO QUE ESTO ARREGLA HOY — medido, no supuesto** (29-ago-2026, corriendo
- * `definirRoles()` del seed): **ningún rol sembrado** tiene `listas.ver` sin `desarrollo.ver` — los
- * dos cascadean igual de amplio, hasta Secretarial. O sea que **hoy nadie se topa con la promesa
+ * `definirRoles()` del seed): **ningún rol sembrado** tiene `listas.ver` sin `desarrollo.ver` — a
+ * los dos los llevan exactamente los mismos perfiles, todos menos `Basico`. O sea que **hoy nadie se topa con la promesa
  * rota**, y decir lo contrario sería la clase de afirmación que este proyecto ya se ha quemado por
  * escribir sin ejecutar. Se mide igual, y por la razón de la casa: **los roles son DATOS editables y
  * el permiso es granular** — un rol a la medida con `listas.ver` y sin `desarrollo.ver` se crea desde

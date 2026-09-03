@@ -3,9 +3,9 @@
  *
  * 🔴 **Por qué este archivo nace ahora.** V1-E9p le añadió a la bandeja la columna `costoPrometido`
  * —*«la información que vendí»*, en palabras de Daniel— y la publicó bajo el permiso que abre la
- * bandeja, `modelos.ver`. Y **`modelos.ver` no se resta en ningún escalón de `prisma/seed.ts`**: la
- * tienen Ventas, Logística, Asistente y Secretarial, que son EXACTAMENTE los roles a los que se les
- * quitó `consultas.ver-importes` por decisión. El costo con el que se cerró la mesa les habría
+ * bandeja, `modelos.ver`. Y **`modelos.ver` lo lleva todo perfil menos `Basico` en
+ * `prisma/seed.ts`**: la tienen Ventas, Logística, Asistente y Secretarial, que son EXACTAMENTE los
+ * roles que NO llevan `consultas.ver-importes`, por decisión. El costo con el que se cerró la mesa les habría
  * llegado por la puerta de al lado.
  *
  * 🔑 **No es un juicio de diseño: es el mismo dato con dos rejas distintas.**

@@ -119,7 +119,8 @@ test.describe('Inicio de sesión', () => {
     // V1-E8r (§Post-F9.140): con «Recetas por revisar» son CINCO hijos, y las dos bandejas tienen
     // que distinguirse en el riel (`exact: true` ya lo garantiza: «revisar» ≠ «liberar»).
     // V1-E9p (§Post-F9.144(b)): SEIS con «Promesas incumplidas», que `admin` ve porque tiene
-    // `consultas.ver-importes` (de Ventas hacia abajo no aparece: sería un enlace muerto).
+    // `consultas.ver-importes`, que sólo llevan Administrador, AdministracionDireccion, Directivo
+    // y Gerencial (a los demás no aparece: sería un enlace muerto).
     for (const hijoDes of [
       'Modelos',
       'Recetas por revisar',
