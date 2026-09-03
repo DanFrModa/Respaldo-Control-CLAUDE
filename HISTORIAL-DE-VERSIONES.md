@@ -71,6 +71,55 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.094 · 3-sep-2026 · **en prueba** — Lo que enseñaron los archivos de Daniel queda escrito, y salen del repositorio cuatro nombres que no debían estar
+
+### Qué se puede hacer ahora que antes no
+
+⚠️ **Nada nuevo en pantalla: esta versión no toca el programa.** Cambia lo que está *escrito*, que es lo
+que decide qué se construye después.
+
+- Queda registrada la **sesión del 3 de septiembre**, en la que Daniel enseñó **cinco archivos reales
+  suyos** —la relación de pagos sin factura, el Excel semanal de producción, la antigüedad de saldos, la
+  cotización de la propuesta de un cliente que a él **le llega armada** y la lista de precios que él sí
+  arma— y **cada uno corrigió algo que
+  ninguna conversación había sacado**: que el pago con factura nace del banco y el pago sin factura de su
+  relación (son dos mundos), que el beneficiario casi nunca es el proveedor, que el IVA viaja escondido en
+  una columna llamada «BONOS / AJUSTES», que corte y empaque no son maquilas de ida y vuelta, y que la
+  fórmula del precio de lista del sistema **compone mal los factores**.
+- **Nueve pendientes nuevos, todos con número** (0.115–0.123), medidos contra el código y no prometidos a
+  ojo.
+- Y quedan registradas **las cuatro respuestas que Daniel dio esa noche antes de dormirse**: los archivos
+  expuestos esperan a Gabriel; **la fórmula del precio de lista no se toca** (*«me da igual el peso»*) —
+  aunque sigue viva la pantalla que sí pidió—; el permiso que concede de más **se arregla al ir a
+  producción**, no ahora; y la prioridad es **la cadena de pagos**.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Los cinco Excel NO quedaron guardados en el repositorio, aunque se había planeado que sí.** Se
+  intentó subirlos «limpios» y **la limpieza falló**: las cuentas, CLABE, tarjetas y RFC sí se habían
+  quitado —eso quedó en cero, verificado—, pero **seguían dentro los 77 nombres completos de los
+  beneficiarios, cada uno pegado al monto que cobra**, y los nombres de los autores en las propiedades de
+  los archivos. Se conserva **lo medido** de ellos (estructura, cantidades, precios, totales y la forma de
+  los cálculos), que es lo que sirve para construir.
+- **Se retiraron cuatro nombres de personas de la documentación**, y **tres de ellos llevan publicados
+  desde la 0.093**, en **dos** archivos: `DECISIONES.md` (dos nombres) y `HOJA-DE-RUTA.md` (tres, uno de
+  ellos que no estaba en el otro). Este repositorio es **público** y lo que entra a git **se queda en el
+  historial para siempre**.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **La exposición sigue viva y no se arregla con código** (fila **0.123**). Son **dos**: los cinco
+  archivos siguen publicados en la rama del PR #287, y los **tres nombres** siguen en el historial de
+  `prueba` (v0.093), que esta versión sólo saca de la copia actual. **De Gabriel:** cerrar ese PR, borrar
+  su rama y **pedirle a GitHub el purgado** —borrar la rama no basta, y hay que pedirlo por las dos cosas—.
+  **De Daniel:** decidir si el repositorio debe seguir siendo público.
+- ⏳ **Tres preguntas abiertas para Daniel**, todas sobre qué dato personal cabe en un repositorio público:
+  si se seudonimizan los **alias de proveedores persona física** («CESAR VICTORIA 1»); si se conservan los
+  **nombres de pila de empleadas junto a una valoración de su trabajo** (son cita textual suya, pero
+  identifican a alguien real); y si al citar un archivo se puede nombrar a quien lo manda. **Las tres
+  esperan** a que se resuelva lo de arriba, por instrucción suya.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.093 · 3-sep-2026 · **en prueba** — ⭐ El inventario de telas, listo para cargarse de cero
 
 ### Qué se puede hacer ahora que antes no

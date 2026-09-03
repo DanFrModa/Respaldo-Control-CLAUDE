@@ -12136,6 +12136,347 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.187) — LAS CUATRO DE LA NOCHE (3-sep-2026): Daniel contesta antes de dormirse
+
+> **Cómo nació.** El lead le entregó las cuatro decisiones que podían frenar el trabajo de la noche, cada
+> una con su default propuesto (regla de §6: todas de una vez, no de a gotas). Daniel contestó las cuatro
+> y se fue a dormir con la instrucción *«dale toda la noche… necesitamos enfocarnos en desarrollar la
+> mayor cantidad de renglones posibles, manteniendo las reglas que puso Gabriel»*.
+
+## (a) LOS ARCHIVOS EXPUESTOS: **esperar a Gabriel** — no se toca nada
+> *«Esperamos a mañana a Gabriel a ver qué dice. Ahorita déjalo así.»*
+
+⛔ **NO se ejecuta ninguna acción de remediación**: no se cierra el PR #287, no se borra su rama, no se
+pide el purgado a GitHub y no se cambia la visibilidad del repositorio. **Todo eso es de Gabriel** y
+espera a que él decida. La fila **0.123** queda ⬜ con esa nota.
+
+✅ **Lo que sí siguió** (es lo contrario de una acción de riesgo): la documentación entró **sin** los
+archivos y **retirando** los **cuatro** nombres de personas físicas —**tres** de ellos publicados desde
+la v0.093, y en **dos** archivos (`DECISIONES.md` §Post-F9.185 y `HOJA-DE-RUTA.md` fila 0.112)—.
+Dejarlos habría sido la decisión activa; quitarlos sólo reduce la exposición mientras Gabriel decide.
+⏳ **Sigue abierta** la pregunta de si los alias de proveedores persona física («CESAR VICTORIA 1») deben
+seudonimizarse en todo el repo.
+
+## (b) 🔽 LA FÓRMULA DEL PRECIO DE LISTA: **NO SE TOCA** (cierra la mitad de la fila 0.122)
+> *«Es irrelevante que haya un peso de diferencia. Déjalo así. **Me da igual**.»*
+
+El sistema **suma los factores y divide una vez**; Daniel divide **tres veces seguidas**. Con el redondeo
+al alza eso da **un peso arriba en 1 de cada 3-4 modelos** (medido: Milano 92.20 → él 167 / el sistema
+168; C&A 83.11 → él 136 / el sistema 137). **Queda como está, por decisión suya.**
+
+🔑 **Y es una decisión, no un olvido:** el helper `costos/precio-lista.ts` está aislado y es puro
+justamente para poder cambiarlo en una línea el día que haga falta. No hace falta.
+
+⚠️ **OJO — esto cierra la mitad de la fila 0.122, NO la fila entera.** Lo que Daniel descartó es **la
+aritmética**. Sigue vivo, y es lo valioso: **la FORMA de la pantalla** —nunca salir de la cuadrícula
+(*«me preguntan de un modelo mientras negocio otro»*), llegar tecleando el código, editar en celda con
+recálculo al instante, guardado continuo, el desglose de avíos en ventana emergente— y sobre todo **el
+margen del CONJUNTO ponderado por piezas mientras negocia**, que es lo que Excel no puede darle (medido
+en su archivo: 39.1 % calculado contra 33.3 % cerrado, sobre 39 modelos). **Confundir «me da igual el
+peso» con «me da igual la fila» perdería justo lo que sí pidió.**
+
+## (c) `roles.administrar`: **se arregla al ir a producción**, no ahora (fila 0.120)
+> *«Déjalo así por ahora. **Lo arreglamos cuando vayamos a producción.**»*
+
+Dar «administrar roles» concede hoy **de pasada** capturar cualquier proceso de Ruta Crítica, ver la
+bandeja completa y **editar una OC ya autorizada**, en 5 sitios del código. **Hoy no cambia nada** porque
+está dentro de `SOLO_ADMINISTRADOR`.
+
+⇒ La fila **0.120 se queda ⬜** y **entra al checklist de F10 (Migración + Go-live)**, que es cuando se
+reparten los permisos de verdad entre los 23 usuarios reales — el momento exacto en que el defecto
+dejaría de ser teórico. 📌 Cuando se haga: **leer los 5 sitios primero**; puede que cada uno necesite un
+permiso **distinto**, y meterlos bajo uno solo **repetiría el defecto con otro nombre**.
+
+## (d) LA PRIORIDAD DE LA NOCHE: **la cadena de pagos**
+> *«Está bien como propones. **Con temas de pagos**.»*
+
+Orden confirmado: **0.115** (el estado «revisado» que sólo manda en los cargos) → **0.110** (la
+facturación no puede quedar sin definir) → **0.112** (destinos de pago: beneficiario y varias cuentas).
+Es la cadena que desemboca en **0.113**, la corrida semanal que mata sus dos Excel.
+
+🔑 **Por qué 0.115 va primero y no es un rodeo:** cerrarla hace que **el anticipo que pidió en
+§Post-F9.186(h) salga gratis** —el mecanismo (`estadoRevision: capturado`) ya existe— y evita que el
+descuento por faltante de §Post-F9.185 baje el saldo desde el momento de proponerlo.
+
+---
+
+#### (Post-F9.186) — ⭐ LA NOCHE DE LOS ARCHIVOS REALES (3-sep-2026): cinco Excel de Daniel corrigen el plan
+
+> **Cómo nació esta sección.** Daniel subió **cinco archivos reales** —la relación de pagos sin factura, el
+> Excel semanal de maquilas de producción, la antigüedad de saldos, la cotización de la propuesta de un
+> cliente que a él le llega armada (⏳ **por confirmar con Daniel de quién le llega**: el archivo se
+> describió una vez como del cliente y otra como de Aurora, y **Aurora es la gerente general de la casa**,
+> no el cliente — cambia cómo se lee todo el punto (m)) y la
+> lista de precios que él arma—. **Cada uno corrigió algo que ninguna conversación había sacado.** Textual
+> suyo, al final: *«el me manda la información de referencia con **miles de errores**… por eso yo tengo que
+> ver lo que realmente se entregó»*.
+> 🔑 **La regla que deja esta noche: el proceso se puede contar; los ERRORES sólo aparecen en los datos.**
+>
+> ## ⛔ LOS CINCO ARCHIVOS **NO** VIVEN EN ESTE REPOSITORIO — y la razón importa
+>
+> Se intentó guardarlos aquí «limpios» (PR #287) y **la limpieza falló**: quitó cuentas, CLABE, tarjetas y
+> RFC —eso sí quedó en cero— pero **dejó intactos los 77 nombres completos de los beneficiarios**, cada uno
+> pegado al monto que cobra. El mismo PR **tachaba esos nombres en esta prosa** y los subía crudos en el
+> adjunto de al lado.
+>
+> 🔑 **La lección, que vale para todo el proyecto:** *un dato personal no se quita del texto, se quita del
+> **archivo**; y una limpieza que no se puede **volver a correr** no es una limpieza, es una afirmación.*
+> Un `.xlsx` es un ZIP de XML: la revisión tiene que mirar **las celdas y los metadatos** —ahí sobrevivió
+> el nombre del autor de la cotización— y no la prosa que lo acompaña.
+>
+> ⚠️ **Y en git no hay vuelta atrás**: lo que entra queda en el historial, y este repositorio es **público**.
+> Por eso los archivos se quedan fuera y **lo que se conserva es lo medido de ellos** —estructura,
+> cantidades, precios, totales y la forma de los cálculos—, que es justamente lo que sirve para construir.
+> El pendiente de remediación tiene número: **fila 0.123**.
+
+---
+
+## (a) 🔴 EL PAGO CON FACTURA NACE DEL BANCO; EL SIN FACTURA, DE LA RELACIÓN — **son dos mundos**
+> *«Prefiero que los pagos formales salgan del pago que esté en **el estado de cuenta**, no de lo que yo
+> pongo acá. Porque hay pagos que hago en la semana que no salen de esta relación: **de repente un martes me
+> piden pagar algo urgente**, me mandan la factura y se paga.»*
+> *«Son dos temas completamente distintos… Cuando es **sin IVA**, los pagos que va a tomar el sistema **sí
+> son los que definí en el archivo**. Cuando termino de definirlo, **los pagos se hacen tal cual**.»*
+
+| Mundo | De dónde NACE el pago | Por qué |
+|---|---|---|
+| **CON factura** | **El estado de cuenta del banco** | Llegan facturas toda la semana + urgentes ⇒ su relación es sólo un **estimado** |
+| **SIN factura** | **La relación que Daniel define** | **No es un estimado: es la INSTRUCCIÓN de pago.** Se ejecuta **tal cual** |
+
+🔴 **CORRIGE AL LEAD, dos veces.** Primero afirmó que *«si decides los pagos en el sistema, el pago ya quedó
+registrado; el estado de cuenta sólo confirma»* — **falso**: lo de la relación es una **intención**, y
+registrar desde ahí inventaría pagos que no ocurrieron y perdería los que sí. Luego **unificó los dos
+mundos** — también falso: en el lado sin factura la relación **sí** es autoritativa.
+
+⭐ **Consecuencias que esto dispara:**
+- **§Post-F9.184(f) / fila 0.110 deja de ser cosmética**: la marca con/sin factura **decide de dónde sale el
+  pago**. Un proveedor sin clasificar deja al sistema sin saber por cuál camino meterlo ⇒ **el pago se
+  pierde o se duplica**. **Es la bifurcación del mecanismo**, no una separación de vista.
+- **El cotejo bancario se vuelve FÁCIL**: la corrida produce **la lista esperada**; lo que sobre del cruce
+  son **exactamente los pagos ad-hoc** (el martes urgente), señalados para atribuir. ⚠️ Aun así:
+  **proponer, no aplicar en silencio** — dos pagos del mismo monto son ambiguos.
+
+## (b) LAS CUENTAS BANCARIAS — el beneficiario casi nunca es el proveedor
+De leer su archivo real (`08_28_26.xlsx`, ~150 beneficiarios): «CESAR VICTORIA 1» → *otra persona* · «LEOPOLDO DIAZ» → *otra persona* ·
+«ARTURO LOPEZ» → *otra persona* (nombres reales omitidos a propósito: son datos personales). **Daniel no lo había mencionado.**
+
+🔴 **Y el lead leyó mal el resto**: creyó que «CESAR VICTORIA 1/2/3» eran **tres proveedores**. Daniel:
+> *«Estaría bien poder tener **más de una cuenta**, definir una como **default**, pero tener las demás como
+> **historial de cuentas**, para poder **reutilizarlas**.»*
+**Es UN proveedor con TRES cuentas**, partido en tres renglones **porque Excel no sabe modelar otra cosa**.
+
+**Y la marca fiscal** (confirmado *«sí, cuentas bancarias»*):
+> *«Tendría **una cuenta Fiscal**, y podría tener **más de una cuenta no fiscal**.»*
+⇒ Cada cuenta lleva `esFiscal`. **Habilita una guarda que hoy no existe: un pago CON factura sólo puede
+salir a la cuenta FISCAL** — si sale a la cuenta personal de alguien, el pago y el comprobante dejan de
+corresponder. Lo sin factura se reparte libremente.
+🔑 **La misma marca gobierna las dos puntas: de dónde NACE el pago y a dónde PUEDE SALIR.**
+
+## (c) PARTIR UN PAGO = DOS PAGOS. No hay dispersión.
+> *«**Puedes meter los dos pagos por separado** en el estado de cuenta… **da lo mismo**. Pero sí debo
+> hacerlo con dos pagos al mismo proveedor la misma semana desde cuentas distintas. **Así debe salir en la
+> relación** para poder hacer las dos transferencias.»*
+
+**Un pago = una cuenta destino = UN renglón de la relación.** Estado de cuenta: dos pagos. Relación: dos
+renglones, cada uno con su banco, beneficiario y cuenta.
+⚠️ **NO colapsar por proveedor al armar el concentrado** — sería lo "ordenado" y **rompería las
+transferencias**. Se distinguen por **beneficiario + cuenta**; el alias («1», «2») se guarda con la cuenta.
+🔴 **El lead había advertido que dos pagos «no cuadrarían». ERA FALSO** — 30 + 20 da lo mismo que 50 en el
+saldo. **Era alarmismo**, y retirarlo **simplificó el diseño** (fuera el modelo de dispersión).
+
+## (d) CORTE, EMPAQUE Y REPARACIONES: **servicios sobre la orden**, no maquilas de ida y vuelta
+> *«En corte **no necesitas mandar y recibir mercancía**… sólo hay que poner **su cantidad y precio**, pero
+> **no va y viene**. Lo mismo el empaque… **el empaque no toca el inventario**. Y el corte es donde **nace
+> la cantidad**, pero no sale ni entra mercancía. **Simplemente sucede y ya.**»*
+> *«Hay otro dato importante: **las reparaciones**… quiero colgar de una orden la reparación que hizo el
+> maquilero y el precio. Ese es un **sobreprecio** importante de saber y costear, **porque son cosas que no
+> están cotizadas**.»*
+
+**SON TRES FORMAS DE PROVEEDOR, NO DOS:**
+| Forma | Cómo funciona | Ejemplos |
+|---|---|---|
+| **Maquila de ida y vuelta** | envío → recibo; **mueve WIP e inventario** | costura, estampado, bordado, lavado, aplicación |
+| **⭐ Servicio sobre la orden** | **cantidad + precio → cargo. NO mueve nada** | **corte, empaque, reparaciones** |
+| **Proveedor por estado de cuenta** | el monto nace de su cuenta | transportistas, etc. |
+
+⭐ **El modelo YA distinguía las dos primeras y nadie lo había usado para el pago**: `registrarCorte` crea
+`EtapaMovimiento(tipo=corte, **idTipoProceso=NULL**, idTercero=cortador)` y no toca inventario. Ese `NULL`
+**es** la marca de «no es maquila de ida y vuelta».
+🔴 **Falta:** corte **no escribe `precioPactado`** ⇒ sin precio **no nace el cargo**. **Empaque y
+reparaciones no existen** como acto.
+🔑 **Regla de C&A:** la cantidad del empaque **es propia, NO se deriva del recibo** — 1000 fabricadas / 990
+entregadas: se paga lo empacado y **las 10 restantes no se mueven, se quedan quietas en inventario**.
+⛔ **NO convertirlos en `TipoProceso`** — los metería al flujo de envío/recibo que él dice que NO son.
+⚠️ **Y la reparación NO es un décimo concepto de costo más**: si se suma como los demás **se diluye**. Debe
+marcarse **NO COTIZADA**, para poder decir *«esta orden costó X más de lo cotizado, y fue en reparaciones»*
+y responder **¿qué modelos y qué maquileros generan reparaciones?** — *un maquilero barato que siempre
+necesita reparación no es barato*.
+
+## (e) 🔴 EL IVA VIENE ESCONDIDO EN UNA COLUMNA QUE DICE «BONOS / AJUSTES»
+Medido en el Excel semanal de producción (`pagos_04_de_septiembre.xlsx`): los **dos** renglones `FACTURA`
+llevan el precio **× 1.16 exacto** (Borda Print 9 → 10.44; Rimabell 25 → 29). Los `REMISION`, nada.
+⇒ **No es un bono ni un ajuste: es el IVA**, y **el nombre de la columna miente**. En el sistema va
+**explícito**: si el proveedor factura, el pago lleva IVA **y se ve como IVA**.
+📌 `TIPO DE COBRO = REMISION | FACTURA` es la separación con/sin factura **ya viviendo en el proceso real**.
+
+## (f) 🔴 EL TOTAL DE ESE ARCHIVO NO CUADRA — y la razón NO ESTÁ ESCRITA
+Suma de pagos programados **105,310.20**; el total dice **103,033.20**. Diferencia: **2,277 exactos** = el
+renglón de un maquilero **cuyo nombre se omite: es una persona física**. Daniel: *«es porque le
+dimos un anticipo la semana pasada»*.
+🔑 **Pero la columna `ANTICIPOS PAGADOS` de ese renglón está VACÍA.** El anticipo **existe en la cabeza de
+alguien, no en el documento**. Textual: *«normalmente me mandan información **sin especificar bien qué es
+cada cosa**… muchas fallas»*.
+⇒ **Es EL argumento del proyecto, en su propio dato**: en el sistema el anticipo es **un movimiento**, el
+saldo **se netea solo**, y el número **carga su explicación**.
+
+## (g) ⭐ UN PASO DE SU PROCESO YA SOBRA — medido
+Daniel reteclea cantidad y precio *«para evitar algún error… en lugar de poner 100 ponen 1000 y ahí me
+aparece que recibió 900 prendas más de lo que le mandamos»*.
+🔴 **En v2 ese error es IMPOSIBLE**: `registrarReciboMaquila` **topa** el recibo contra lo pendiente, bajo
+lock (`produccion/recibos.ts:373, 746-747`). ⇒ **Su reteclear era la compensación de un defecto de Access.**
+Su paso pasa a ser **revisar y ajustar**. ⚠️ Lo que el tope NO caza y sí necesita sus ojos: **capturar de
+menos** y **el precio**.
+
+
+## (h) EL ANTICIPO ES UN ABONO, y lo SOLICITA producción
+> *«Es simplemente **un abono** y queda con **saldo negativo** el maquilero.»* ⇒ **NO hay amortización
+> contra trabajo futuro**: el saldo negativo se consume solo conforme entren sus cargos.
+> *«El encargado de producción debe poder **solicitarme un anticipo** para algún maquilero… que lo ponga y
+> al ver yo los pendientes me aparezca ese maquilero. **Si es muy complicado, por ahora por correo.**»*
+
+⭐ **NO hace falta el correo: el mecanismo ya existe.** `AbonoMaquilero` ya nace en `estadoRevision:
+capturado`. Producción captura → aparece en los pendientes de Daniel → él aprueba → saldo negativo.
+🔴 **PERO hay un defecto que lo impide hoy** (ver (i)).
+
+> *«Es importante que yo pueda ver **qué tiene el maquilero en su inventario** para decidir si le puedo dar
+> el monto que solicita.»*
+**Medido:** `consultarExistenciaMaquilero` **ya existe** y filtra por maquilero — pantalla **«En poder del
+maquilero»** (`/produccion/existencias-maquilero`). 🔴 **Pero da PIEZAS, no importe**: para decidir sobre
+30,000 pesos, *«5,000 prendas»* no sirve. **Es calculable** (`Σ enPoder × precioPactado`).
+📌 **Y el enlace va en la PANTALLA DE PAGOS** (decisión suya), no navegando a Producción — está marcada
+`subVista`, **por eso él no la conocía**.
+⚠️ **Dicho y aceptado:** ese respaldo **es una referencia, no una garantía** — lo del taller todavía no es
+suyo; si desaparece, el anticipo ya salió.
+
+## (i) 🔴 EL ESTADO «REVISADO» SÓLO MANDA EN LOS CARGOS — y está DUPLICADO
+Medido en **dos** implementaciones del saldo:
+- `esma/saldos.ts` — cargos `where { estado: 'validado' }` ✅; **abonos, pagos y descuentos: sin filtro** 🔴
+- `esma/saldos-todos.ts` (SQL) — cargos `AND "estado" = 'validado'` ✅; **los otros tres: sin filtro** 🔴
+
+⇒ **8 agregaciones, 6 mal.** Y como cada pantalla usa la suya, **arreglar un archivo pasaría en VERDE**.
+🔑 **El campo existe en los cuatro conceptos y sólo manda en uno**: un guardián que parece que cuida y no
+cuida. **Consecuencias vivas:** el anticipo de (h) **movería el saldo antes de que Daniel apruebe**, y el
+descuento por faltante de §Post-F9.185 **bajaría el saldo desde el momento de proponerlo**.
+
+## (j) LA ANTIGÜEDAD DE SALDOS DE LOS JUEVES
+> *«Este archivo lo necesito **todos los jueves**… ahí voy decidiendo qué vamos a pagar y lo voy
+> capturando. **Me gustaría que todo eso lo haga directo en el sistema.**»*
+
+✅ **Casi todo existe**: `Proveedor.diasCredito`, `calcularVencimiento(...)` ya se llama al registrar, aging
+con **cubetas configurables**, y los maquileros **entran a la cuenta** por `convivencia-esma.ts`. Sus cubetas
+(150/200/250) **se configuran**, no se programan.
+🔴 **El hueco — y CORRIGE al lead**, que había dicho *«los maquileros sin antigüedad está bien, a ellos les
+pagas cada semana»*: **su propio archivo lo desmiente** — **BORDA PRINT (maquilero de estampado con factura)
+lleva 8 días** y **BORDADOS COMPUTARIZADOS 30**. **Daniel SÍ los envejece**; el sistema les pone
+`fechaVencimiento: null` y los manda a una cubeta sin edad.
+🔒 **Y el plazo es SIEMPRE del proveedor**: *«las inconsistencias son **errores de Lupita**, no
+incongruencias del proveedor»* ⇒ **no hace falta plazo por documento**, y **la fecha se calcula sola**:
+otra clase de error que desaparece por construcción.
+📌 **Lupita no debería capturar nada**: las facturas entran por **importación de CFDI** (ya existe) y los
+pagos, por (a).
+
+## (k) ⭐ «NADIE ME FACTURA SI NO LE MANDO YO EL DOCUMENTO»
+> *«Lo que me gustaría implementar es que **nadie me facture si no le mando yo un documento con los datos
+> con los que me tiene que facturar**… no al revés. **Y eso debe salir del sistema.**»*
+
+**Invierte el flujo**: hoy el proveedor factura lo que cree y Daniel reconcilia; con esto **él dicta el
+contenido** y el CFDI sólo tiene que **coincidir**.
+✅ **Los datos fiscales YA EXISTEN** (`razonSocial`·`rfc`·`regimenFiscalSat`·`usoCfdiHabitual`·
+`codigoPostalExpedicion`) ⇒ **es un IMPRESO, no un módulo**. **El IVA va explícito**, no escondido como en (e).
+⚠️ **Proveedores sin RFC**: el documento **no se puede emitir** ⇒ **avisar cuál falta**, nunca inventarlo.
+📌 *Es lo que C&A le hace a él*: le mandan la orden con lo que van a pagar en vez de dejarlo facturar libre.
+
+## (l) LEER LA CONSTANCIA DE SITUACIÓN FISCAL
+> *«Que el sistema lea toda la información de su constancia… **El sistema no se equivocará porque es un PDF
+> y siempre es el mismo formato.**»* · *«Yo le pediré siempre a los proveedores que me la manden **en el PDF
+> original**. No escaneada ni impresa. **Si cambia el formato, te pido actualizarlo y listo.**»*
+
+✅ **El lugar de guardarla YA EXISTE**: `TipoArchivoProveedor` incluye **`CONSTANCIA`**.
+⚠️ **Su premisa es correcta a medias, y quedó dicho:** con el PDF original el texto se extrae **exacto**;
+pero **el riesgo no es leer mal una letra, es leer el CAMPO EQUIVOCADO** — una constancia escaneada no tiene
+texto, y **cuando el SAT cambia el formato un lector por posición no truena: devuelve el campo de al lado**.
+**Las dos condiciones, aceptadas:** (1) **mostrar lo leído antes de guardar** la primera vez de cada
+proveedor; (2) **si no reconoce el formato, DECIRLO** en vez de llenar tres campos y dejar dos vacíos.
+🔑 **Su plan de «si cambia me avisas» DEPENDE de la condición 2**: si el lector adivina, el formato cambia y
+**él nunca se entera**. ⭐ Y la regla del PDF original **se puede hacer cumplir sola**: un escaneado no tiene
+texto ⇒ el sistema lo rechaza y pide el original.
+
+## (m) EL PRECOSTEO — F8 se construyó **sin haber visto una cotización real**
+Medido contra sus dos archivos (`Precosteo_Propuesta_Milano.xlsx`, que **a Daniel le llega armado** —ver
+la pregunta abierta del encabezado sobre de quién viene—, y `Gaby_2026.xlsx` / `Niños_2026_Inv.xlsx`, que
+**sí arma él**):
+
+🔴 **La composición de los factores está mal.** Daniel divide **tres veces seguidas**
+(`costo/(1−margen)/(1−comisión)/(1−descuentos)`); el sistema **suma los últimos y divide una vez**. Con el
+redondeo al alza **no da lo mismo**: **Milano** 92.20 → él **167**, el sistema **168**; **C&A** 83.11 → él
+**136**, el sistema **137**. ⇒ **1 de cada 3-4 modelos sale un peso arriba**, en un precio ya negociado.
+⭐ **El código PREDIJO este momento**: `costos/precio-lista.ts:16-20` dice *«Daniel podría subir un Excel con
+la composición EXACTA… por eso este helper está AISLADO y es PURO: se cambia SOLO aquí, una línea»*.
+🔽 **Daniel lo relativizó**: *«no pasa nada que tenga un peso de diferencia, eso es lo de menos. **Justo la
+intención es que veas cómo se va trabajando**»* ⇒ **se arregla, pero NO sin su visto bueno**: cambiar la
+aritmética de un precio no se hace sin él delante.
+
+✅ **Lo que sí está bien**: los **cuatro factores** existen (`margenPct`·`descuentosPct`·`regaliasPct`·
+`costoVentasPct` = su comisión), **son por cliente** (C&A 35 %/5 % vs Milano 40 %/7 %, confirmado en sus
+archivos), el **redondeo al alza**, y **tela 1 + tela 2** con precio/consumo/costo.
+🔽 **El precio sugerido al público** —`(precio × 1.16)/(1 − margen cliente)`, verificado exacto— **no existe
+en el sistema**, pero Daniel lo bajó de prioridad: *«el precio correcto **no es el de venta**… lo común es
+precio de venta **de nosotros**»*.
+
+### La FORMA de la pantalla — **descarta el diseño obvio**
+> *«Tener **los modelos como en renglones** e ir jugando ahí mismo con cada uno.»* · *«Hay muchas cosas que
+> son cómodas manejándolo **como si fuera un Excel, viendo todo junto**.»* · *«Luego **me preguntan de un
+> modelo mientras estoy negociando otro**, y hay que tener la manera de verlo **muy rápida y fácil**.»*
+
+⛔ **Cuadrícula → clic → se abre su pantalla → regresas NO SIRVE**: abrir el modelo B **lo saca del A** y
+pierde lo que tenía a medias. **La negociación no es secuencial.**
+⇒ **Nunca salir de la cuadrícula** (el detalle se abre **encima o al lado**) · **llegar tecleando el
+código** · **editar en la celda con recálculo instantáneo** · **el estado sobrevive** · **guardar continuo**,
+no al final.
+⭐ **El desglose de avíos va en ventana emergente** (petición suya) *«con precios y total, para ver de dónde
+poder ajustar algún precio o quitar algo»*. **Los datos YA EXISTEN**: `PrecostoLinea` guarda avío,
+descripción, **`consumo` con 4 decimales** (su caja de cartón a 0.02 cabe), `precioUnit` e `importe`.
+
+### 🔴 EL PRECIO CERRADO NO ES EL CALCULADO — y a veces es MAYOR
+Su hoja lleva **`PRECIO ESTABLECIDO`** con **su propio margen recalculado**, aparte del `PRECIO` que sale de
+la fórmula. Medido en C&A: calculado **105** → cerró **103** · **160** → **155** · pero **136** → **139**,
+y en otro **121** → **139** (**+18**).
+🔑 **La fórmula NO es un techo: es un PUNTO DE PARTIDA.** Cede en unos y gana en otros, y **el margen real de
+cada modelo sólo se sabe después de negociar**.
+⇒ El sistema debe guardar **las DOS cosas** —lo que calculó y lo que se cerró— porque ahí está la respuesta a
+**«¿cuánto gané de verdad con este cliente?»**, que hoy no se puede contestar.
+⏳ **Por medir**: si F8 ya guarda el precio negociado con esa forma (tiene «negociación por versiones con
+acuerdos»), o si sólo guarda el calculado.
+
+### ⭐ Lo que Excel NO puede darle, y el sistema sí
+Excel **no sabe cuántas piezas lleva cada modelo** ⇒ Daniel **no ve a dónde va el conjunto** mientras
+negocia. Medido en su archivo de C&A: de **39 modelos cerrados**, el margen si hubiera cobrado lo calculado
+sería **39.1 %** y el del conjunto que cerró, **33.3 %** *(sin ponderar por volumen — y ahí está justo la
+trampa de mirarlo en Excel)*. **Cede en unos para ganar en otros** (hasta +18 pesos en uno), así que **el
+modelo suelto no dice nada**. ⇒ La pantalla debe mostrar, **mientras mueve un precio, en qué queda el
+conjunto ponderado por piezas** contra el margen que buscaba.
+
+## (n) 📌 TAREAS DE DANIEL PARA EL DÍA DE LA MIGRACIÓN (no del desarrollo)
+> *«Todo eso lo voy a hacer **en producción**… la información real la haremos hasta que esté en producción.»*
+> *«**Yo me encargo de ponerlo bien cuando hagamos la migración de datos reales.**»*
+
+Le tocan a él, con datos reales: **la modalidad de facturación** de cada proveedor (de ella depende por cuál
+camino entra cada pago) · los **datos fiscales + constancia** · las **cuentas bancarias con beneficiario y
+marca fiscal** · el **plazo de crédito**.
+⚠️ **Va al checklist de F10**, y obliga a que **el sistema tolere el dato ausente** hasta ese día.
+
+---
+
 #### (Post-F9.185) — ⭐ EL PROCESO DE PAGO SEMANAL, dictado por Daniel (3-sep-2026)
 
 > *«Es **una de las pantallas más importantes dentro del sistema**. Debe estar muy bien hecha.»*
@@ -12194,8 +12535,8 @@ De leer su Excel real (`08_28_26.xlsx`, 158 filas): la hoja «General» es un **
 `CUENTA`), y «Transfers Concentrado» es **la lista ejecutable** (sólo los que llevan monto, ordenados por
 monto). Totales de esa semana: **30,000 efectivo + 108,201 transferencia**.
 
-⭐ **El BENEFICIARIO casi nunca es el proveedor** — «CESAR VICTORIA 1» → *Lourdes Herrera López*;
-«ARTURO LOPEZ» → *Rosalina García*. **Daniel no lo había mencionado; salió de leer el archivo.**
+⭐ **El BENEFICIARIO casi nunca es el proveedor** — «CESAR VICTORIA 1» → *otra persona*;
+«ARTURO LOPEZ» → *otra persona*. **Daniel no lo había mencionado; salió de leer el archivo.**
 
 🔴 **Y el lead leyó mal el resto: «CESAR VICTORIA 1/2/3» NO son tres proveedores.** Daniel:
 > *«Estaría bien poder tener **más de una cuenta**, definir una como **default**, pero tener las demás como
