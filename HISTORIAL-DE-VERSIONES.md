@@ -71,6 +71,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.092 · 3-sep-2026 · **en prueba** — ⭐ La **ficha de arte** ya lleva la foto de lo que hay que estampar
+
+### Qué se puede hacer ahora que antes no
+
+**El maquilero de estampado ve QUÉ tiene que estampar, no sólo dónde.** La ficha que se le entrega
+describía la posición y las medidas, pero **el arte no aparecía por ningún lado**: había que mandarlo
+aparte —por correo o por WhatsApp— y confiar en que el que llegó era el bueno. Justo el papel que el
+proveedor tiene en la mano mientras trabaja era el que no traía la imagen.
+
+- ⭐ **La ficha ahora trae las fotos del arte de la orden**, con la principal al frente.
+- Son **las fotos que la OP eligió** —heredadas del desarrollo, propias, menos las que se quitaron—, que
+  es lo que se decidió en la 0.083. Aquí simplemente **llegan a quien las ejecuta**.
+
+### Qué cambió y puede sorprender
+
+- **Van hasta 4 fotos.** Si la orden tiene más, la ficha lleva 4 **y lo dice**: con 6 fotos el título dice
+  «4 de 6». No las esconde.
+- **Si una foto no se puede bajar, deja el hueco visible** en vez de desaparecerla — para que se note que
+  falta algo, en vez de creer que la orden sólo tenía dos.
+- **Una orden sin arte imprime exactamente igual que antes**, sin recuadro vacío.
+- Las fotos se acomodan solas —una fila si son pocas, dos si son más— para que **la ficha no se vaya a una
+  segunda página** por las imágenes.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **El impreso de la ORDEN sí tira fotos en silencio, y su conteo miente**: dice cuántas alcanzó a bajar,
+  no cuántas pide la orden. Es la fila **0.106** y **no se arregló aquí**. La ficha es ahora el ejemplo de
+  cómo debe hacerse.
+- 🔴 **El recibo de maquila de procesos de arte sigue sin foto** (fila **0.107**): el mismo hueco de este
+  arreglo, del otro lado.
+- ⚠️ **Verificación de Gabriel en `prueba`:** ver el PDF impreso de verdad — cómo se ve el hueco de una foto
+  que no bajó y que la hoja no se parta con 4 imágenes pesadas. Eso no se puede medir desde el código.
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.091 · 2-sep-2026 · **en prueba** — ⭐⭐ El **pack** ya se usa de punta a punta: nace del PDF, se captura, se ve y viaja
 
 ### Qué se puede hacer ahora que antes no

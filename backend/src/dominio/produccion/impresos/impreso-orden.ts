@@ -91,6 +91,13 @@ import { leerIdsFotosOcultasOrden } from '../fotos-ocultas-orden.js';
 // fotos subió ESTA orden. Lectura de BAJO NIVEL, sin permiso propio: la impresión ya está
 // autorizada y qué arte lleva la OP es parte del documento de la orden.
 import { leerArteOrdenParaImpreso, type ArteOrdenFotosImpreso } from '../fotos-arte-orden.js';
+import {
+  anteponerPrincipal,
+  descargarImagenComoDataUrl,
+  fotosArteDeLaOrden,
+  porRondas,
+  type DescargarImagen,
+} from './imagenes-impreso.js';
 import { obtenerOrden } from '../ordenes.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin red ni BD) ──────────────────────────────────
@@ -196,28 +203,11 @@ export interface DatosImpresoOrden {
 // ── Resolución de datos (lo único que toca BD/red) ──────────────────────────────────────────────
 
 /**
- * Baja los bytes de una imagen desde su URL GET prefirmada y los devuelve como data-URL, o `null`
- * si algo falla (best-effort, A1: una foto faltante NO trunca el impreso). Inyectable en tests.
+ * Descarga de imágenes del impreso. Vive en `imagenes-impreso.js` (la comparte con la FICHA DE
+ * ARTE); se RE-EXPORTA porque es parte de la superficie histórica de este módulo y sus tests la
+ * ejercitan desde aquí.
  */
-export type DescargarImagen = (url: string) => Promise<string | null>;
-
-/** Descarga real (Node 22 trae `fetch`/`Blob` globales). Cualquier fallo → `null` (best-effort). */
-export const descargarImagenComoDataUrl: DescargarImagen = async (url) => {
-  try {
-    const respuesta = await fetch(url);
-    if (!respuesta.ok) {
-      return null;
-    }
-    const tipo = respuesta.headers.get('content-type') ?? 'image/jpeg';
-    const buffer = Buffer.from(await respuesta.arrayBuffer());
-    if (buffer.length === 0) {
-      return null;
-    }
-    return `data:${tipo};base64,${buffer.toString('base64')}`;
-  } catch {
-    return null;
-  }
-};
+export { descargarImagenComoDataUrl, type DescargarImagen };
 
 /** Una tela COMPRADA para la orden: la tela del catálogo + el folio de la OC que la pidió. */
 export interface TelaCompradaOrden {
@@ -445,33 +435,22 @@ export async function armarDatosImpresoOrden(
     );
   }
 
-  // ARTES del MODELO: las fotos del arte del modelo. Presignar es una llamada a R2
-  // por arte → BEST-EFFORT **POR IMAGEN** (`allSettled`, no `all`): si la key de un arte truena,
-  // se pierde ESA imagen y las demás siguen saliendo (mismo criterio que la descarga de bytes).
-  // El arte llega ORDENADO (`leerArtesModelo`), así que su PRIMER renglón es el PRINCIPAL: se
-  // marca para que el tope de la rejilla jamás lo recorte (Daniel, jul-2026).
-  // ⚠️ El recorrido va sobre `bom.artes` —que llega ORDENADO por el `orden` del modelo— y NO sobre
-  // la receta: así el arte PRINCIPAL sigue siendo el primero del modelo y el tope de la rejilla
-  // jamás lo recorta (invariante de la pieza A, Daniel jul-2026). De ese orden se conservan solo
-  // los artes que ESTA orden lleva; desde V1-E3f la identidad es la TRAZA `idModeloArte` (el
-  // nombre del arte se retiró, §Post-F9.52 punto 1) y un arte puede traer VARIAS fotos.
-  const idsArteOrden = new Set(
-    receta.artes.flatMap((a) => (a.idModeloArte === null ? [] : [a.idModeloArte])),
-  );
-
+  // ARTES: presignar es una llamada a R2 por imagen → BEST-EFFORT **POR IMAGEN** (`allSettled`, no
+  // `all`): si la key de un arte truena, se pierde ESA imagen y las demás siguen saliendo (mismo
+  // criterio que la descarga de bytes). El orden y la marca de PRINCIPAL los fija
+  // `fotosArteDeLaOrden` —recorre `bom.artes`, ORDENADO por el `orden` del modelo, y conserva sólo
+  // los artes que ESTA orden lleva por su TRAZA `idModeloArte`—, así que el arte principal sigue
+  // siendo el primero del modelo y el tope de la rejilla jamás lo recorta (Daniel, jul-2026).
   /*
    * ⭐⭐ §Post-F9.177 — LO QUE **ESTA OP** DECIDIÓ SOBRE LAS FOTOS DEL ARTE, en su papel.
    *
-   * Daniel: *"la OP es de donde cuelgan las fotos directamente, no del desarrollo… y aplica para
-   * fotos de la prenda pero también del arte"*. Si la pantalla deja de enseñar una foto y el
-   * impreso la sigue imprimiendo, es *"añadí lo nuevo y dejé lo viejo debajo"* — el mismo defecto
-   * que la 0.082 tuvo que cerrar aquí para la prenda.
+   * La regla —de qué artes del modelo, menos las heredadas que la OP apagó, más las que la OP
+   * subió, más los artes agregados a mano— vive en `imagenes-impreso.ts` y la comparte con la
+   * FICHA DE ARTE (0.094): dos papeles de la misma orden no pueden decidir por separado cuál foto
+   * manda, o se separan en silencio a la primera corrección.
    *
-   * Dos cosas, y ninguna toca el arte del modelo (D3): las heredadas que este renglón APAGÓ no se
-   * imprimen (otra orden del mismo modelo las sigue imprimiendo), y las que ESTA OP subió sí.
-   *
-   * BEST-EFFORT como todo lo demás del bloque de imágenes: si la lectura truena, el papel sale con
-   * el arte del modelo tal cual —el comportamiento de antes de esta etapa—, nunca truncado.
+   * BEST-EFFORT como todo el bloque de imágenes: si la lectura de las decisiones truena, el papel
+   * sale con el arte del modelo tal cual —el comportamiento de antes de esa etapa—, nunca truncado.
    */
   let decisionesArte: ArteOrdenFotosImpreso[] = [];
   try {
@@ -482,56 +461,7 @@ export async function armarDatosImpresoOrden(
       error,
     );
   }
-  const decisionPorArteModelo = new Map(
-    decisionesArte.flatMap((d) => (d.idModeloArte === null ? [] : [[d.idModeloArte, d] as const])),
-  );
-
-  const artesBom = porRondas([
-    ...bom.artes
-      .filter((a) => idsArteOrden.has(a.id))
-      .map((a, i) => {
-        const decision = decisionPorArteModelo.get(a.id);
-        const apagadas = new Set(decision?.ocultas ?? []);
-        return [
-          // ⚠️ La marca de PRINCIPAL se pone ANTES de descartar las apagadas, y por eso una foto
-          // apagada se lleva la estrella consigo: ser principal es una decisión sobre una foto
-          // concreta, no un puesto que la siguiente herede (mismo criterio que la prenda arriba y
-          // que el arte principal sin foto). Si esta OP apagó la primera foto del primer arte, este
-          // papel sale SIN principal — y el tope de la rejilla se comporta como siempre.
-          //
-          // ⚠️⚠️ **`principal` NO significa aquí lo mismo que en la pantalla** (§Post-F9.177). En el
-          // papel la lleva UNA sola imagen de todo el bloque —la primerísima del PRIMER arte— y es
-          // una GARANTÍA: `recortarArtes` la antepone y el tope jamás la deja fuera. En la tira de
-          // la receta (`listarFotosArteOrden`) hay una por ARTE y es sólo un distintivo. Ninguna de
-          // las dos se hereda del modelo: el arte del modelo no tiene foto principal.
-          ...a.fotos
-            .map((foto, j) => ({
-              titulo: a.descripcion,
-              key: foto.key,
-              // Solo la PRIMERA foto del PRIMER arte es la principal (la que nunca se recorta).
-              principal: i === 0 && j === 0,
-              apagada: apagadas.has(foto.idFoto),
-            }))
-            .filter((foto) => !foto.apagada)
-            .map(({ titulo, key, principal }) => ({ titulo, key, principal })),
-          // Las que subió ESTA OP van detrás de las heredadas de su mismo arte, y NUNCA son la
-          // principal (esa la elige el dueño del modelo en su ficha, no la orden).
-          ...(decision?.propias ?? []).map((foto) => ({
-            titulo: a.descripcion,
-            key: foto.key,
-            principal: false,
-          })),
-        ];
-      }),
-    // ⭐ El arte AGREGADO A MANO (`idModeloArte` null) no está en el BOM del modelo, así que hasta
-    // hoy NO PODÍA salir en el papel con imagen: no había de quién heredarla ni dónde subírsela.
-    // Va al final, después de los artes del modelo, para no desplazar al principal de su sitio.
-    ...decisionesArte
-      .filter((d) => d.idModeloArte === null)
-      .map((d) =>
-        d.propias.map((foto) => ({ titulo: d.descripcion, key: foto.key, principal: false })),
-      ),
-  ]);
+  const artesBom = fotosArteDeLaOrden(bom.artes, receta.artes, decisionesArte);
   const presignados = await Promise.allSettled(
     artesBom.map(async (arte) => ({
       titulo: arte.titulo,
@@ -820,53 +750,18 @@ export const MAX_ARTES = 4;
 export const MAX_FOTOS = 3;
 
 /**
- * Pone al frente la imagen marcada como `principal` (si la hay), conservando el orden relativo de
- * las demás. Junto con el `slice` del tope es lo que garantiza que la foto principal del modelo y
- * el arte principal SIEMPRE se impriman y salgan PRIMERO, aunque el bloque se recorte (Daniel,
- * jul-2026). Pura y estable: sin principal (o si ya va al frente) devuelve el arreglo tal cual.
- *
- * ⚠️ En el pipeline REAL nunca mueve nada: el orden lo fija la BD (`leerFotosModelo` /
- * `leerBordadosBom` ya devuelven la principal en la posición 0) y `armarDatosImpresoOrden` solo la
- * MARCA. Esto es CINTURÓN (defensa en profundidad) por si mañana se reordena la entrada — p. ej. si
- * los adjuntos de la orden pasaran antes del arte del BOM, o si alguien arma los datos a mano.
+ * Anteponer la imagen PRINCIPAL antes de recortar. La regla vive en `imagenes-impreso.js` (la
+ * comparte con la ficha de arte); aquí se RE-EXPORTA porque `recortarArtes`/`recortarFotos` la
+ * documentan como su garantía.
  */
-export function anteponerPrincipal(imagenes: FotoImpreso[]): FotoImpreso[] {
-  const indice = imagenes.findIndex((imagen) => imagen.principal === true);
-  const principal = indice <= 0 ? undefined : imagenes[indice];
-  if (principal === undefined) {
-    return imagenes;
-  }
-  return [principal, ...imagenes.slice(0, indice), ...imagenes.slice(indice + 1)];
-}
+export { anteponerPrincipal };
 
 /**
- * ⭐ Reparte las fotos de VARIOS artes **por rondas**: primero la 1ª foto de cada arte, luego la 2ª
- * de cada uno, y así. Pura y estable (conserva el orden de los artes dentro de cada ronda).
- *
- * **Por qué existe** (V1-E3f, §Post-F9.52 punto 5): al pasar las fotos del arte a PLURAL, un arte
- * con 5 fotos se comía la rejilla entera —tope {@link MAX_ARTES}— y **sacaba del impreso a todos
- * los demás artes**. Antes no podía pasar: cada arte aportaba exactamente una imagen.
- *
- * **La decisión, dicha completa:** el papel del piso tiene que enseñar *qué artes lleva la prenda*,
- * no cinco ángulos de uno. Con las rondas, mientras quepan artes distintos NINGUNO se queda sin su
- * primera foto, y las fotos extra solo entran con el espacio que sobra. El arte PRINCIPAL sigue
- * garantizado: su primera foto va en la ronda 1, posición 0, y `recortarArtes` la antepone.
- * Lo que se recorta NO se esconde: el título de la sección dice cuántas se muestran del total y la
- * lista de texto "Arte" sigue enumerando todos los artes de la orden.
+ * ⭐ Reparto por rondas de las fotos de varios artes. La regla vive en `imagenes-impreso.ts`
+ * (la comparten el impreso de la ORDEN y la FICHA DE ARTE); aquí se RE-EXPORTA porque es parte de
+ * la superficie histórica de este módulo y su tope (`recortarArtes`) la documenta.
  */
-export function porRondas<T>(porArte: readonly (readonly T[])[]): T[] {
-  const maximo = porArte.reduce((max, fotos) => Math.max(max, fotos.length), 0);
-  const salida: T[] = [];
-  for (let ronda = 0; ronda < maximo; ronda += 1) {
-    for (const fotos of porArte) {
-      const foto = fotos[ronda];
-      if (foto !== undefined) {
-        salida.push(foto);
-      }
-    }
-  }
-  return salida;
-}
+export { porRondas };
 
 /**
  * Aplica el tope de la rejilla de ARTES: la principal al frente ({@link anteponerPrincipal}) y las
