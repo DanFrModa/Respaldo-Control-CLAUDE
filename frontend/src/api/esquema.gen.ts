@@ -1895,7 +1895,7 @@ export interface paths {
             asegurado?: boolean;
             obsPago?: string;
             /** @enum {string} */
-            modalidadFacturacion?: 'solo_con' | 'solo_sin' | 'ambos';
+            modalidadFacturacion: 'solo_con' | 'solo_sin' | 'ambos';
           };
         };
       };
@@ -2560,7 +2560,8 @@ export interface paths {
             notas?: string | null;
             asegurado?: boolean;
             obsPago?: string | null;
-            modalidadFacturacion?: ('solo_con' | 'solo_sin' | 'ambos') | null;
+            /** @enum {string} */
+            modalidadFacturacion?: 'solo_con' | 'solo_sin' | 'ambos';
           };
         };
       };
@@ -60260,10 +60261,7 @@ export interface paths {
               | 'descuento';
             /** @description Importe POSITIVO (≥ 0.01; el servidor le pone el signo según el origen). */
             importe: number;
-            /**
-             * @description ¿Movimiento fiscal (con CFDI)? Filtra la vista fiscal del contador.
-             * @default false
-             */
+            /** @description ¿Movimiento fiscal (con CFDI)? Si se omite, lo deriva la modalidad de facturación del proveedor (para un cliente, false). Filtra la vista fiscal del contador. */
             esFiscal?: boolean;
             /** @description UUID (folio fiscal) del CFDI. Único global; exige esFiscal=true. */
             uuidCfdi?: string;

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../../datos/index.js';
 import type { ServicioArchivos } from '../../comun/archivos.js';
+import type { EntradaCrearProveedor } from './proveedores.js';
 import {
   ErrorConflicto,
   ErrorNoEncontrado,
@@ -17,6 +18,7 @@ import {
   asignarAvioProveedor,
   crearContactoProveedor,
   crearProveedor,
+  crearProveedorMigrado,
   desactivarProveedor,
   listarAdjuntosProveedor,
   listarAviosDeProveedor,
@@ -116,7 +118,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     it('sin permiso no se puede ni leer ni escribir', async () => {
       const sinPermisos = sesionDePrueba();
       await expect(
-        crearProveedor(sinPermisos, { nombre: 'X', roles: [rolMaquila] }, bd()),
+        crearProveedor(
+          sinPermisos,
+          { modalidadFacturacion: 'solo_con', nombre: 'X', roles: [rolMaquila] },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarProveedores(sinPermisos, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarRolesProveedor(sinPermisos, {}, bd())).rejects.toBeInstanceOf(
@@ -127,7 +133,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     it('con solo lectura no se puede escribir', async () => {
       const soloVer = sesionDePrueba({ permisos: ['proveedores.ver'] });
       await expect(
-        crearProveedor(soloVer, { nombre: 'X', roles: [rolMaquila] }, bd()),
+        crearProveedor(
+          soloVer,
+          { modalidadFacturacion: 'solo_con', nombre: 'X', roles: [rolMaquila] },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarProveedores(soloVer, {}, bd())).resolves.toBeTruthy();
       await expect(listarRolesProveedor(soloVer, {}, bd())).resolves.toBeTruthy();
@@ -140,6 +150,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const proveedor = await crearProveedor(
         sesion,
         {
+          modalidadFacturacion: 'solo_con',
           nombre: 'Maquilas del Norte',
           telefono: '555-1234',
           roles: [rolMaquila, rolCorte],
@@ -190,7 +201,12 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const bloom = await crearProveedor(
         sesion,
-        { nombre: 'BLOOM TEXTIL', roles: [rolMaquila], nombreCorto: 'Bloom' },
+        {
+          modalidadFacturacion: 'solo_con',
+          nombre: 'BLOOM TEXTIL',
+          roles: [rolMaquila],
+          nombreCorto: 'Bloom',
+        },
         bd(),
       );
       expect(bloom.nombreCorto).toBe('Bloom');
@@ -200,14 +216,24 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       await expect(
         crearProveedor(
           sesion,
-          { nombre: 'BLOOM SUR', roles: [rolMaquila], nombreCorto: 'Bloom' },
+          {
+            modalidadFacturacion: 'solo_con',
+            nombre: 'BLOOM SUR',
+            roles: [rolMaquila],
+            nombreCorto: 'Bloom',
+          },
           bd(),
         ),
       ).rejects.toBeInstanceOf(ErrorConflicto);
       await expect(
         crearProveedor(
           sesion,
-          { nombre: 'BLOOM SUR', roles: [rolMaquila], nombreCorto: 'bLoOm' },
+          {
+            modalidadFacturacion: 'solo_con',
+            nombre: 'BLOOM SUR',
+            roles: [rolMaquila],
+            nombreCorto: 'bLoOm',
+          },
           bd(),
         ),
       ).rejects.toBeInstanceOf(ErrorConflicto);
@@ -223,7 +249,12 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       // Ya libre: otro proveedor SÍ lo puede tomar.
       const otro = await crearProveedor(
         sesion,
-        { nombre: 'BLOOM SUR', roles: [rolMaquila], nombreCorto: 'Blm' },
+        {
+          modalidadFacturacion: 'solo_con',
+          nombre: 'BLOOM SUR',
+          roles: [rolMaquila],
+          nombreCorto: 'Blm',
+        },
         bd(),
       );
       expect(otro.nombreCorto).toBe('Blm');
@@ -236,18 +267,64 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('exige al menos un rol (R15): alta sin roles → ErrorValidacion', async () => {
       await expect(
-        crearProveedor(sesionAdmin(), { nombre: 'Sin rol' }, bd()),
+        crearProveedor(
+          sesionAdmin(),
+          { modalidadFacturacion: 'solo_con', nombre: 'Sin rol' },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
       await expect(
-        crearProveedor(sesionAdmin(), { nombre: 'Sin rol', roles: [] }, bd()),
+        crearProveedor(
+          sesionAdmin(),
+          { modalidadFacturacion: 'solo_con', nombre: 'Sin rol', roles: [] },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    // ── ⭐ Fila 0.110: la modalidad de facturación es OBLIGATORIA ────────────────────────────
+    it('⭐ un alta SIN modalidad de facturación → ErrorValidacion (y NO crea nada, A2)', async () => {
+      // El `as` es a propósito y vale la pena explicarlo: el TIPO del contrato ya exige la
+      // modalidad, así que TypeScript solo rechaza esta llamada —media defensa, y gratis—. Pero un
+      // cliente HTTP no compila con TypeScript: el cuerpo puede llegar sin el campo. El cast fuerza
+      // ese caso para medir la otra mitad, la que de verdad protege: que el SERVIDOR lo rechace en
+      // tiempo de ejecución (A1, el backend es la autoridad).
+      await expect(
+        crearProveedor(
+          sesionAdmin(),
+          { nombre: 'Sin clasificar', roles: [rolMaquila] } as EntradaCrearProveedor,
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+      expect(await cliente.proveedor.count({ where: { nombre: 'Sin clasificar' } })).toBe(0);
+    });
+
+    it('⭐ el ETL SÍ puede crearlo sin modalidad, y queda legible (REGLA 0-B)', async () => {
+      // Access nunca hizo la pregunta: el histórico llega con el hueco A PROPÓSITO. El proveedor
+      // migrado se crea, se lee y se lista con normalidad; lo que no se puede es capturarle un
+      // movimiento nuevo hasta definirle la modalidad (eso lo corta `resolverConFactura`).
+      const migrado = await crearProveedorMigrado(
+        sesionAdmin(),
+        { nombre: 'Viejo de Access', roles: [rolMaquila] },
+        bd(),
+      );
+      expect(migrado.modalidadFacturacion).toBeNull();
+
+      const leido = await obtenerProveedor(sesionAdmin(), migrado.id, bd());
+      expect(leido.nombre).toBe('Viejo de Access');
+      expect(leido.modalidadFacturacion).toBeNull();
     });
 
     it('regla factura ⇒ RFC + régimen (regla de captura): falta RFC → ErrorValidacion', async () => {
       await expect(
         crearProveedor(
           sesionAdmin(),
-          { nombre: 'Factura sin RFC', roles: [rolMaquila], factura: true },
+          {
+            modalidadFacturacion: 'solo_con',
+            nombre: 'Factura sin RFC',
+            roles: [rolMaquila],
+            factura: true,
+          },
           bd(),
         ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
@@ -255,7 +332,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('rechaza un rol inexistente → ErrorValidacion (y NO crea el proveedor: A2)', async () => {
       await expect(
-        crearProveedor(sesionAdmin(), { nombre: 'Rol fantasma', roles: [999999] }, bd()),
+        crearProveedor(
+          sesionAdmin(),
+          { modalidadFacturacion: 'solo_con', nombre: 'Rol fantasma', roles: [999999] },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
       expect(await cliente.proveedor.count({ where: { nombre: 'Rol fantasma' } })).toBe(0);
     });
@@ -263,14 +344,26 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     it('no se puede asignar un rol DESACTIVADO → ErrorValidacion', async () => {
       await cliente.rolProveedor.update({ where: { id: rolEstampado }, data: { activo: false } });
       await expect(
-        crearProveedor(sesionAdmin(), { nombre: 'Con rol inactivo', roles: [rolEstampado] }, bd()),
+        crearProveedor(
+          sesionAdmin(),
+          { modalidadFacturacion: 'solo_con', nombre: 'Con rol inactivo', roles: [rolEstampado] },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
     });
 
     it('rechaza nombre duplicado, sin importar mayúsculas → ErrorConflicto', async () => {
-      await crearProveedor(sesionAdmin(), { nombre: 'Textiles SA', roles: [rolMaquila] }, bd());
+      await crearProveedor(
+        sesionAdmin(),
+        { modalidadFacturacion: 'solo_con', nombre: 'Textiles SA', roles: [rolMaquila] },
+        bd(),
+      );
       await expect(
-        crearProveedor(sesionAdmin(), { nombre: 'textiles sa', roles: [rolMaquila] }, bd()),
+        crearProveedor(
+          sesionAdmin(),
+          { modalidadFacturacion: 'solo_con', nombre: 'textiles sa', roles: [rolMaquila] },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorConflicto);
     });
   });
@@ -280,7 +373,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Taller', roles: [rolMaquila] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Taller', roles: [rolMaquila] },
         bd(),
       );
 
@@ -301,7 +394,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Taller', roles: [rolMaquila] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Taller', roles: [rolMaquila] },
         bd(),
       );
       await expect(
@@ -315,7 +408,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Taller', roles: [rolMaquila, rolCorte] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Taller', roles: [rolMaquila, rolCorte] },
         bd(),
       );
       await actualizarProveedor(sesion, { id: proveedor.id, telefono: '555' }, bd());
@@ -326,7 +419,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Prov', roles: [rolMaquila], diasCredito: 0 },
+        { modalidadFacturacion: 'solo_con', nombre: 'Prov', roles: [rolMaquila], diasCredito: 0 },
         bd(),
       );
 
@@ -345,7 +438,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('factura ⇒ RFC también aplica en edición', async () => {
       const sesion = sesionAdmin();
-      const proveedor = await crearProveedor(sesion, { nombre: 'Prov', roles: [rolMaquila] }, bd());
+      const proveedor = await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Prov', roles: [rolMaquila] },
+        bd(),
+      );
       await expect(
         actualizarProveedor(sesion, { id: proveedor.id, factura: true }, bd()),
       ).rejects.toBeInstanceOf(ErrorValidacion);
@@ -358,6 +455,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const proveedor = await crearProveedor(
         sesion,
         {
+          modalidadFacturacion: 'solo_con',
           nombre: 'Con datos',
           roles: [rolMaquila],
           telefono: '555-1234',
@@ -397,7 +495,12 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Prov vacío', roles: [rolMaquila], banco: 'BBVA' },
+        {
+          modalidadFacturacion: 'solo_con',
+          nombre: 'Prov vacío',
+          roles: [rolMaquila],
+          banco: 'BBVA',
+        },
         bd(),
       );
 
@@ -412,7 +515,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('sin cambio real es idempotente: no escribe bitácora', async () => {
       const sesion = sesionAdmin();
-      const proveedor = await crearProveedor(sesion, { nombre: 'Prov', roles: [rolMaquila] }, bd());
+      const proveedor = await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Prov', roles: [rolMaquila] },
+        bd(),
+      );
       const antes = await cliente.bitacora.count();
       await actualizarProveedor(sesion, { id: proveedor.id, nombre: 'Prov' }, bd());
       expect(await cliente.bitacora.count()).toBe(antes);
@@ -428,7 +535,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
   describe('desactivar / reactivar (borrado suave, PLANMAESTRO §4)', () => {
     it('desactiva con bitácora DESACTIVAR; el registro sigue existiendo', async () => {
       const sesion = sesionAdmin();
-      const proveedor = await crearProveedor(sesion, { nombre: 'Prov', roles: [rolMaquila] }, bd());
+      const proveedor = await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Prov', roles: [rolMaquila] },
+        bd(),
+      );
 
       const desactivado = await desactivarProveedor(sesion, proveedor.id, bd());
       expect(desactivado.activo).toBe(false);
@@ -441,7 +552,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('desactivar dos veces → ErrorConflicto', async () => {
       const sesion = sesionAdmin();
-      const proveedor = await crearProveedor(sesion, { nombre: 'Prov', roles: [rolMaquila] }, bd());
+      const proveedor = await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Prov', roles: [rolMaquila] },
+        bd(),
+      );
       await desactivarProveedor(sesion, proveedor.id, bd());
       await expect(desactivarProveedor(sesion, proveedor.id, bd())).rejects.toBeInstanceOf(
         ErrorConflicto,
@@ -450,7 +565,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('reactivar un proveedor desactivado funciona', async () => {
       const sesion = sesionAdmin();
-      const proveedor = await crearProveedor(sesion, { nombre: 'Prov', roles: [rolMaquila] }, bd());
+      const proveedor = await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Prov', roles: [rolMaquila] },
+        bd(),
+      );
       await desactivarProveedor(sesion, proveedor.id, bd());
       const reactivado = await reactivarProveedor(sesion, proveedor.id, bd());
       expect(reactivado.activo).toBe(true);
@@ -462,7 +581,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Prov', roles: [rolMaquila, rolCorte] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Prov', roles: [rolMaquila, rolCorte] },
         bd(),
       );
       const obtenido = await obtenerProveedor(sesion, proveedor.id, bd());
@@ -481,9 +600,21 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
   describe('listar (búsqueda + filtro por rol + paginación)', () => {
     it('filtra por rol (el único clasificador desde que se retiró el tipo, §Post-F9.56 punto 3)', async () => {
       const sesion = sesionAdmin();
-      await crearProveedor(sesion, { nombre: 'Telas con maquila', roles: [rolMaquila] }, bd());
-      await crearProveedor(sesion, { nombre: 'Solo corte', roles: [rolCorte] }, bd());
-      await crearProveedor(sesion, { nombre: 'Avíos y estampado', roles: [rolEstampado] }, bd());
+      await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Telas con maquila', roles: [rolMaquila] },
+        bd(),
+      );
+      await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Solo corte', roles: [rolCorte] },
+        bd(),
+      );
+      await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Avíos y estampado', roles: [rolEstampado] },
+        bd(),
+      );
 
       expect((await listarProveedores(sesion, { rol: rolCorte }, bd())).total).toBe(1);
       expect((await listarProveedores(sesion, { rol: rolMaquila }, bd())).total).toBe(1);
@@ -495,7 +626,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       await crearProveedor(
         sesion,
-        { nombre: 'Multi', roles: [rolMaquila, rolCorte, rolEstampado] },
+        {
+          modalidadFacturacion: 'solo_con',
+          nombre: 'Multi',
+          roles: [rolMaquila, rolCorte, rolEstampado],
+        },
         bd(),
       );
       const pagina = await listarProveedores(sesion, {}, bd());
@@ -504,9 +639,21 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('la busqueda ignora ACENTOS y mayusculas (R2 §4.4.1: "oscar" encuentra a "Oscar")', async () => {
       const sesion = sesionAdmin();
-      await crearProveedor(sesion, { nombre: 'Óscar Jiménez', roles: [rolMaquila] }, bd());
-      await crearProveedor(sesion, { nombre: 'Óscar Hernández', roles: [rolMaquila] }, bd());
-      await crearProveedor(sesion, { nombre: 'Rima Textil', roles: [rolMaquila] }, bd());
+      await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Óscar Jiménez', roles: [rolMaquila] },
+        bd(),
+      );
+      await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Óscar Hernández', roles: [rolMaquila] },
+        bd(),
+      );
+      await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Rima Textil', roles: [rolMaquila] },
+        bd(),
+      );
 
       // Sin acento encuentra a los acentuados; con acento también; y el filtro por rol coexiste.
       const sinAcento = await listarProveedores(sesion, { busqueda: 'oscar' }, bd());
@@ -525,10 +672,14 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('excluye inactivos por defecto', async () => {
       const sesion = sesionAdmin();
-      await crearProveedor(sesion, { nombre: 'Activo', roles: [rolMaquila] }, bd());
+      await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Activo', roles: [rolMaquila] },
+        bd(),
+      );
       const inactivo = await crearProveedor(
         sesion,
-        { nombre: 'Inactivo', roles: [rolMaquila] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Inactivo', roles: [rolMaquila] },
         bd(),
       );
       await desactivarProveedor(sesion, inactivo.id, bd());
@@ -555,6 +706,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const proveedor = await crearProveedor(
         sesion,
         {
+          modalidadFacturacion: 'solo_con',
           nombre: 'Taller con datos',
           roles: [rolMaquila],
           nombreCorto: 'TCD',
@@ -583,7 +735,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Sin datos de taller', roles: [rolMaquila] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Sin datos de taller', roles: [rolMaquila] },
         bd(),
       );
       expect(proveedor.nombreCorto).toBeNull();
@@ -595,7 +747,13 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Taller', roles: [rolMaquila], nombreCorto: 'OLD', asegurado: false },
+        {
+          modalidadFacturacion: 'solo_con',
+          nombre: 'Taller',
+          roles: [rolMaquila],
+          nombreCorto: 'OLD',
+          asegurado: false,
+        },
         bd(),
       );
 
@@ -625,6 +783,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const proveedor = await crearProveedor(
         sesion,
         {
+          modalidadFacturacion: 'solo_con',
           nombre: 'Taller a vaciar',
           roles: [rolMaquila],
           nombreCorto: 'XYZ',
@@ -655,6 +814,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const proveedor = await crearProveedor(
         sesion,
         {
+          modalidadFacturacion: 'solo_con',
           nombre: 'Taller intacto',
           roles: [rolMaquila],
           nombreCorto: 'INT',
@@ -679,9 +839,17 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     it('dos proveedores con corto null NO chocan (unicidad nullable)', async () => {
       const sesion = sesionAdmin();
       // Ambos sin nombreCorto: el índice único nullable trata los null como distintos.
-      await crearProveedor(sesion, { nombre: 'Sin corto A', roles: [rolMaquila] }, bd());
+      await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'Sin corto A', roles: [rolMaquila] },
+        bd(),
+      );
       await expect(
-        crearProveedor(sesion, { nombre: 'Sin corto B', roles: [rolMaquila] }, bd()),
+        crearProveedor(
+          sesion,
+          { modalidadFacturacion: 'solo_con', nombre: 'Sin corto B', roles: [rolMaquila] },
+          bd(),
+        ),
       ).resolves.toBeTruthy();
     });
 
@@ -693,7 +861,12 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       // única forma de comprobar que el índice existe de verdad.
       await crearProveedor(
         sesionAdmin(),
-        { nombre: 'Taller caja', roles: [rolMaquila], nombreCorto: 'TCD' },
+        {
+          modalidadFacturacion: 'solo_con',
+          nombre: 'Taller caja',
+          roles: [rolMaquila],
+          nombreCorto: 'TCD',
+        },
         bd(),
       );
 
@@ -720,13 +893,23 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       await crearProveedor(
         sesion,
-        { nombre: 'Taller uno', roles: [rolMaquila], nombreCorto: 'DUP' },
+        {
+          modalidadFacturacion: 'solo_con',
+          nombre: 'Taller uno',
+          roles: [rolMaquila],
+          nombreCorto: 'DUP',
+        },
         bd(),
       );
       await expect(
         crearProveedor(
           sesion,
-          { nombre: 'Taller dos', roles: [rolMaquila], nombreCorto: 'DUP' },
+          {
+            modalidadFacturacion: 'solo_con',
+            nombre: 'Taller dos',
+            roles: [rolMaquila],
+            nombreCorto: 'DUP',
+          },
           bd(),
         ),
       ).rejects.toBeInstanceOf(ErrorConflicto);
@@ -739,7 +922,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
   describe('contactos del proveedor (N por proveedor, puesto en TEXTO LIBRE)', () => {
     /** Crea un proveedor de prueba y devuelve su id. */
     async function prov(nombre = 'Taller con gente'): Promise<number> {
-      const p = await crearProveedor(sesionAdmin(), { nombre, roles: [rolMaquila] }, bd());
+      const p = await crearProveedor(
+        sesionAdmin(),
+        { modalidadFacturacion: 'solo_con', nombre, roles: [rolMaquila] },
+        bd(),
+      );
       return p.id;
     }
 
@@ -927,7 +1114,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const archivos = archivosFalsos();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Con docs', roles: [rolMaquila] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Con docs', roles: [rolMaquila] },
         bd(),
       );
 
@@ -968,7 +1155,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const archivos = archivosFalsos();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Con docs', roles: [rolMaquila] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Con docs', roles: [rolMaquila] },
         bd(),
       );
       await agregarAdjuntoProveedor(
@@ -995,7 +1182,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const archivos = archivosFalsos();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Con docs', roles: [rolMaquila] },
+        { modalidadFacturacion: 'solo_con', nombre: 'Con docs', roles: [rolMaquila] },
         bd(),
       );
       const subida = await agregarAdjuntoProveedor(
@@ -1014,8 +1201,16 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     it('quitar un adjunto que no es del proveedor → ErrorNoEncontrado', async () => {
       const sesion = sesionAdmin();
       const archivos = archivosFalsos();
-      const a = await crearProveedor(sesion, { nombre: 'A', roles: [rolMaquila] }, bd());
-      const b = await crearProveedor(sesion, { nombre: 'B', roles: [rolMaquila] }, bd());
+      const a = await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'A', roles: [rolMaquila] },
+        bd(),
+      );
+      const b = await crearProveedor(
+        sesion,
+        { modalidadFacturacion: 'solo_con', nombre: 'B', roles: [rolMaquila] },
+        bd(),
+      );
       const subida = await agregarAdjuntoProveedor(
         sesion,
         a.id,
@@ -1045,7 +1240,11 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
   describe('avíos que surte el proveedor (B17, R9)', () => {
     /** Crea un proveedor de prueba y devuelve su id. */
     async function crearProv(nombre = 'Etiquetas Sol'): Promise<number> {
-      const p = await crearProveedor(sesionAdmin(), { nombre, roles: [rolMaquila] }, bd());
+      const p = await crearProveedor(
+        sesionAdmin(),
+        { modalidadFacturacion: 'solo_con', nombre, roles: [rolMaquila] },
+        bd(),
+      );
       return p.id;
     }
 

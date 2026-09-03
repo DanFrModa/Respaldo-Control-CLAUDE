@@ -30,6 +30,8 @@ async function crearProveedor(page: Page, nombre: string): Promise<void> {
   // de proveedor del alta de tela se acota a ese rol (decisión P.2), así que un proveedor con
   // cualquier otro rol no aparecería en el combobox.
   await dialogo.getByRole('checkbox', { name: 'Telas' }).check();
+  // La modalidad de facturación es OBLIGATORIA (fila 0.110): sin elegirla el alta no se envía.
+  await dialogo.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
   await page.getByTestId('guardar-proveedor').click();
   await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();
 }

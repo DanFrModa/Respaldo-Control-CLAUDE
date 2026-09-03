@@ -72,7 +72,7 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
     notas: null,
     asegurado: null,
     obsPago: null,
-    modalidadFacturacion: null,
+    modalidadFacturacion: 'solo_con',
     roles: [],
     contactos: [],
     cantidadAdjuntos: 0,
@@ -94,6 +94,18 @@ describe('<DialogoProveedor>', () => {
     analizarConstanciaMutate.mockReset();
     subirAdjuntoMutate.mockReset();
   });
+
+  /**
+   * Elige la modalidad de facturación (fila 0.110). Es OBLIGATORIA, así que sin ella NINGÚN alta
+   * llega a enviarse: se llama en las pruebas que están midiendo OTRA regla, para que su fallo no
+   * se confunda con éste. Las pruebas que miden esta regla NO la llaman, a propósito.
+   */
+  async function elegirModalidad(
+    usuario: ReturnType<typeof userEvent.setup>,
+    valor: 'solo_con' | 'solo_sin' | 'ambos' = 'solo_con',
+  ): Promise<void> {
+    await usuario.selectOptions(screen.getByTestId('proveedor-modalidad-facturacion'), valor);
+  }
 
   it('en alta renderiza las secciones plegables y el selector de roles', () => {
     renderConProveedores(
@@ -139,6 +151,7 @@ describe('<DialogoProveedor>', () => {
     );
 
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin roles');
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     // No se llama a crear y se muestra el error de captura de roles.
@@ -158,6 +171,7 @@ describe('<DialogoProveedor>', () => {
     // Expande Fiscal y marca "¿Emite factura (CFDI)?" sin capturar RFC.
     await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
     await usuario.click(await screen.findByTestId('proveedor-factura'));
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     expect(crearMutate).not.toHaveBeenCalled();
@@ -181,6 +195,7 @@ describe('<DialogoProveedor>', () => {
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Nuevo Prov');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-2'));
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -207,6 +222,7 @@ describe('<DialogoProveedor>', () => {
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'BLOOM TEXTIL');
     await usuario.type(screen.getByTestId('proveedor-nombre-corto'), 'Bloom');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -233,6 +249,7 @@ describe('<DialogoProveedor>', () => {
     const campoCorto = screen.getByTestId('proveedor-nombre-corto');
     expect(campoCorto).toHaveValue('Bloom');
     await usuario.clear(campoCorto);
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
@@ -261,6 +278,7 @@ describe('<DialogoProveedor>', () => {
     await usuario.click(screen.getByRole('button', { name: 'Datos de taller' }));
     await usuario.click(await screen.findByTestId('proveedor-asegurado'));
     await usuario.type(screen.getByLabelText('Observaciones de pago'), 'paga viernes');
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -307,6 +325,7 @@ describe('<DialogoProveedor>', () => {
       />,
     );
 
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
@@ -342,6 +361,7 @@ describe('<DialogoProveedor>', () => {
     await usuario.click(screen.getByRole('button', { name: 'Contacto' }));
     const telefono = await screen.findByLabelText('Teléfono');
     await usuario.clear(telefono);
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
@@ -370,6 +390,7 @@ describe('<DialogoProveedor>', () => {
       />,
     );
 
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
@@ -394,6 +415,7 @@ describe('<DialogoProveedor>', () => {
 
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Nuevo');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -543,6 +565,7 @@ describe('<DialogoProveedor>', () => {
       await subirPdf(usuario);
       await usuario.click(await screen.findByTestId('usar-constancia'));
       await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await elegirModalidad(usuario);
       await usuario.click(screen.getByTestId('guardar-proveedor'));
 
       await waitFor(() => expect(subirAdjuntoMutate).toHaveBeenCalledTimes(1));
@@ -569,6 +592,7 @@ describe('<DialogoProveedor>', () => {
       );
       await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin constancia');
       await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await elegirModalidad(usuario);
       await usuario.click(screen.getByTestId('guardar-proveedor'));
 
       await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -726,6 +750,181 @@ describe('<DialogoProveedor>', () => {
         idContacto: 7,
         cuerpo: { activo: false },
       });
+    });
+  });
+  // ── ⭐ MODALIDAD DE FACTURACIÓN OBLIGATORIA (fila 0.110, §Post-F9.186(a)) ──────────────────────
+  //
+  // Daniel: *"es un campo **obligatorio** de llenar. A fuerzas hay que definir si es con, sin o
+  // ambas"*. No es cosmético: decide de dónde sale el pago del proveedor (§Post-F9.184(f)).
+  describe('modalidad de facturación: obligatoria al dar de alta y al editar', () => {
+    it('⭐ un ALTA sin elegir modalidad NO se envía, y lo dice', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+
+      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin clasificar');
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      // A propósito NO se llama a `elegirModalidad`.
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      expect(crearMutate).not.toHaveBeenCalled();
+      expect(
+        await screen.findByText(
+          'Indica cómo factura este proveedor: solo con, solo sin, o de las dos formas',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('elegida la modalidad, el alta la manda en el cuerpo', async () => {
+      const usuario = userEvent.setup();
+      crearMutate.mockImplementation(
+        (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Ambos' }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+
+      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Ambos');
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await elegirModalidad(usuario, 'ambos');
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+      const cuerpo = crearMutate.mock.calls[0]?.[0] as ProveedorCrear;
+      expect(cuerpo.modalidadFacturacion).toBe('ambos');
+    });
+
+    // ⚠️ REGLA 0-B: el proveedor MIGRADO (modalidad en null) se LEE con toda normalidad. Lo que no
+    // se puede es dejarlo así al guardar. Nada de auditar ni rellenar el dato viejo por detrás.
+    it('⭐ un proveedor MIGRADO sin modalidad se ABRE y se LEE sin que truene nada', () => {
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ nombre: 'Migrado de Access', modalidadFacturacion: null })}
+        />,
+      );
+
+      // La ficha abre, el nombre se ve, y el selector simplemente está sin elegir.
+      expect(screen.getByRole('heading', { name: 'Editar proveedor' })).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue('Migrado de Access');
+      expect(screen.getByTestId('proveedor-modalidad-facturacion')).toHaveValue('');
+    });
+
+    // ⚠️ Fila 0.124 (los DOS campos que contestan lo mismo): esta fila puso las dos preguntas en la
+    // misma pantalla, así que al menos la contradicción se ve. El aviso NO bloquea el guardado a
+    // propósito — bloquear sería inventar la regla que Daniel todavía no dictó.
+    it('avisa (sin bloquear) si dice que NO emite CFDI pero que sí factura', async () => {
+      const usuario = userEvent.setup();
+      crearMutate.mockImplementation(
+        (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Contradictorio' }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+
+      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Contradictorio');
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      // «¿Emite factura?» arranca APAGADA; elegir «solo con factura» es la contradicción.
+      await elegirModalidad(usuario, 'solo_con');
+      expect(await screen.findByTestId('aviso-facturacion-contradictoria')).toBeInTheDocument();
+
+      // …y aun así deja guardar: el aviso informa, no manda.
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+      await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    });
+
+    // ⭐ EL SENTIDO INVERSO — y es el CARO. Sus cargos por CFDI nacerían `esFiscal: true` (van por el
+    // banco) mientras sus capturas manuales de CxP nacen `false` (van por la relación). Es el caso
+    // que el TSDoc de `segmento-motor.ts` marca como el peor: degradar una factura timbrada, con el
+    // UUID ya consumido para siempre. Un aviso que viera sólo el otro sentido enseñaría que "sin
+    // aviso = consistente", que es mentira justo aquí.
+    it('⭐ avisa TAMBIÉN al revés: dice que SÍ emite CFDI pero que todo va sin factura', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+
+      // Enciende «¿Emite factura?» (vive en la sección Fiscal, plegada) y elige «solo sin factura».
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+      await usuario.click(await screen.findByTestId('proveedor-factura'));
+      await elegirModalidad(usuario, 'solo_sin');
+
+      const aviso = await screen.findByTestId('aviso-facturacion-contradictoria');
+      // Y el texto dice CUÁL de los dos sentidos es: un aviso que no distingue no sirve de guía.
+      expect(aviso).toHaveTextContent(/SÍ emite factura/);
+      expect(aviso).toHaveTextContent(/todo lo suyo va sin factura/);
+    });
+
+    it('y cada sentido trae su propio texto (no un genérico para los dos)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      // «¿Emite factura?» apagada + «solo con factura» = el otro sentido.
+      await elegirModalidad(usuario, 'solo_con');
+      expect(await screen.findByTestId('aviso-facturacion-contradictoria')).toHaveTextContent(
+        /NO emite factura/,
+      );
+    });
+
+    // Las dos combinaciones que NO son contradicción: si el aviso saltara aquí, sería ruido y la
+    // gente aprendería a ignorarlo — que es la otra forma de que un guardián deje de servir.
+    it('calla cuando NO hay contradicción (los dos casos legítimos)', async () => {
+      const usuario = userEvent.setup();
+      const { unmount } = renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      // No timbra + todo sin factura: coherente.
+      await elegirModalidad(usuario, 'solo_sin');
+      expect(screen.queryByTestId('aviso-facturacion-contradictoria')).not.toBeInTheDocument();
+      unmount();
+
+      // Timbra + «de las dos formas»: coherente (unas cosas con factura, otras no).
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+      await usuario.click(await screen.findByTestId('proveedor-factura'));
+      await elegirModalidad(usuario, 'ambos');
+      expect(screen.queryByTestId('aviso-facturacion-contradictoria')).not.toBeInTheDocument();
+    });
+
+    it('⭐ …pero GUARDARLO sin elegirla NO envía; al elegirla, sí', async () => {
+      const usuario = userEvent.setup();
+      actualizarMutate.mockImplementation(
+        (_args, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo());
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            modalidadFacturacion: null,
+            roles: [{ id: 1, codigo: 'maquila-costura', nombre: 'Maquila — costura' }],
+          })}
+        />,
+      );
+
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+      expect(actualizarMutate).not.toHaveBeenCalled();
+
+      await elegirModalidad(usuario, 'solo_sin');
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+      const args = actualizarMutate.mock.calls[0]?.[0] as {
+        cuerpo: { modalidadFacturacion?: string | null };
+      };
+      // Y nunca viaja como `null`: vaciarla es justo lo que el backend rechaza.
+      expect(args.cuerpo.modalidadFacturacion).toBe('solo_sin');
     });
   });
 });

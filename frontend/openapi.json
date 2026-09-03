@@ -4740,7 +4740,8 @@
                   }
                 },
                 "required": [
-                  "nombre"
+                  "nombre",
+                  "modalidadFacturacion"
                 ]
               }
             }
@@ -6351,18 +6352,11 @@
                     ]
                   },
                   "modalidadFacturacion": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "enum": [
-                          "solo_con",
-                          "solo_sin",
-                          "ambos"
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": "string",
+                    "enum": [
+                      "solo_con",
+                      "solo_sin",
+                      "ambos"
                     ]
                   }
                 }
@@ -154058,8 +154052,7 @@
                     "description": "Importe POSITIVO (≥ 0.01; el servidor le pone el signo según el origen)."
                   },
                   "esFiscal": {
-                    "default": false,
-                    "description": "¿Movimiento fiscal (con CFDI)? Filtra la vista fiscal del contador.",
+                    "description": "¿Movimiento fiscal (con CFDI)? Si se omite, lo deriva la modalidad de facturación del proveedor (para un cliente, false). Filtra la vista fiscal del contador.",
                     "type": "boolean"
                   },
                   "uuidCfdi": {

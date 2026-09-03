@@ -83,7 +83,12 @@ beforeEach(async () => {
   empresa = await crearEmpresaPrueba(cliente, 'Empresa Fiscal');
   otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa Fiscal');
   proveedor = await cliente.proveedor.create({
-    data: { nombre: 'Telas del Norte', diasCredito: 30, rfc: 'TNO900101AAA' },
+    data: {
+      modalidadFacturacion: 'solo_sin',
+      nombre: 'Telas del Norte',
+      diasCredito: 30,
+      rfc: 'TNO900101AAA',
+    },
   });
   clienteFr = await cliente.cliente.create({
     data: { nombre: 'Boutique Aurora', diasCredito: 15, rfc: 'BAU850505BBB' },

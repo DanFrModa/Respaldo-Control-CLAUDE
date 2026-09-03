@@ -411,6 +411,8 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
       .getByTestId('selector-roles-proveedor')
       .getByRole('checkbox', { name: 'Corte', exact: true })
       .check();
+    // La modalidad de facturación es OBLIGATORIA (fila 0.110): sin elegirla el alta no se envía.
+    await dialogoProveedor.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
     await page.getByTestId('guardar-proveedor').click();
     await expect(page.getByText(`Proveedor "${cortador}" creado.`)).toBeVisible();
 

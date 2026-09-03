@@ -70,7 +70,7 @@ beforeEach(async () => {
   otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa');
   clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Cliente Uno' } });
   proveedor = await cliente.proveedor.create({
-    data: { nombre: 'Proveedor Uno', diasCredito: 30 },
+    data: { modalidadFacturacion: 'solo_sin', nombre: 'Proveedor Uno', diasCredito: 30 },
   });
 });
 
@@ -792,5 +792,107 @@ describe('importe mínimo (D1)', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
     const filas = await cliente.movimientoTercero.count({ where: { idEmpresa: empresa.id } });
     expect(filas).toBe(0);
+  });
+});
+
+// ── ⭐ SEGMENTO con/sin factura DERIVADO por el motor (fila 0.110, §Post-F9.186(a)) ───────────────
+//
+// Lo que estas pruebas defienden NO es la función pura —eso ya lo cubre `segmento-motor.test.ts`—
+// sino que **el motor la LLAME de verdad**. Sin el positivo de abajo, cambiar la escritura a
+// `esFiscal: datos.esFiscal ?? false` deja `resolverEsFiscalMotor` de adorno y TODA la suite pasa
+// en verde: el mismo defecto que esta fila vino a cerrar, escondido un nivel más abajo.
+//
+// Por qué importa en dinero (Daniel, §Post-F9.184(f)): la marca con/sin factura decide de dónde
+// sale el pago del proveedor —CON factura, del estado de cuenta del BANCO; SIN factura, de la
+// RELACIÓN que él define y que se ejecuta tal cual—. Un movimiento sin clasificar deja al sistema
+// sin saber por cuál de los dos caminos meterlo: ese pago se pierde o se duplica.
+describe('el motor DERIVA el segmento con/sin factura de la modalidad del proveedor', () => {
+  /** Alta de proveedor con la modalidad que pida la prueba (incluida `null`, el migrado). */
+  async function proveedorConModalidad(
+    nombre: string,
+    modalidadFacturacion: 'solo_con' | 'solo_sin' | 'ambos' | null,
+  ): Promise<Proveedor> {
+    return cliente.proveedor.create({ data: { nombre, modalidadFacturacion } });
+  }
+
+  /** Alta de movimiento de proveedor por el motor, con o sin `esFiscal`. */
+  async function alta(idProveedor: number, esFiscal?: boolean) {
+    return registrarMovimientoTercero(
+      sesion(),
+      {
+        tipoTercero: 'proveedor',
+        idTercero: idProveedor,
+        fecha: '2026-09-03',
+        origen: 'factura_proveedor',
+        importe: 500,
+        ...(esFiscal === undefined ? {} : { esFiscal }),
+      },
+      bd(),
+    );
+  }
+
+  it('⭐ (b) POSITIVO: `solo_con` sin decir nada nace CON factura — la derivación OCURRE', async () => {
+    // ⚠️ Ésta es la prueba que impide que `resolverEsFiscalMotor` quede desconectado: con la
+    // escritura vieja (`datos.esFiscal ?? false`) el movimiento nacería `false` y esto fallaría.
+    const prov = await proveedorConModalidad('Siempre Factura SA', 'solo_con');
+    const mov = await alta(prov.id);
+
+    const enBd = await cliente.movimientoTercero.findUniqueOrThrow({
+      where: { id: mov.id },
+      select: { esFiscal: true },
+    });
+    expect(enBd.esFiscal).toBe(true);
+
+    // Y la BITÁCORA cuenta lo MISMO que la fila (A7). Es la rama gemela de esta misma función: el
+    // `esFiscal` se escribe en DOS sitios —la fila y el registro de auditoría— y con el valor sin
+    // resolver la auditoría diría "sin factura" de un movimiento que nació con ella. Una auditoría
+    // que contradice al dato es peor que no tenerla.
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'MovimientoTercero', idEntidad: String(mov.id), accion: 'CREAR' },
+    });
+    expect(bitacora.datos).toMatchObject({ esFiscal: true });
+  });
+
+  it('(b2) y `solo_sin` sin decir nada nace SIN factura (la otra mitad de la derivación)', async () => {
+    const prov = await proveedorConModalidad('Nunca Factura SA', 'solo_sin');
+    const mov = await alta(prov.id);
+
+    const enBd = await cliente.movimientoTercero.findUniqueOrThrow({
+      where: { id: mov.id },
+      select: { esFiscal: true },
+    });
+    expect(enBd.esFiscal).toBe(false);
+  });
+
+  it('⭐ (a) un proveedor SIN modalidad no admite el movimiento, y NO deja fila (A2)', async () => {
+    const migrado = await proveedorConModalidad('Migrado de Access', null);
+    await expect(alta(migrado.id)).rejects.toBeInstanceOf(ErrorValidacion);
+    expect(await cliente.movimientoTercero.count({ where: { idProveedor: migrado.id } })).toBe(0);
+  });
+
+  it('un proveedor `ambos` sin indicar el segmento tampoco pasa (nadie más puede decidirlo)', async () => {
+    const prov = await proveedorConModalidad('Las Dos Formas SA', 'ambos');
+    await expect(alta(prov.id)).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('lo que el llamador SÍ dice se respeta: el catálogo no degrada un movimiento marcado', async () => {
+    // La evidencia manda sobre el catálogo: es lo que protege a un CFDI real de un proveedor mal
+    // capturado como `solo_sin` (`cfdi-proveedor.ts` y `entradas-tela.ts` mandan `true` con su UUID).
+    const prov = await proveedorConModalidad('Mal Capturado SA', 'solo_sin');
+    const mov = await alta(prov.id, true);
+
+    const enBd = await cliente.movimientoTercero.findUniqueOrThrow({
+      where: { id: mov.id },
+      select: { esFiscal: true },
+    });
+    expect(enBd.esFiscal).toBe(true);
+  });
+
+  it('⚠️ REGLA 0-B: al proveedor migrado se le puede LEER el saldo, aunque no capturarle nada', async () => {
+    // Su ficha y su cuenta se consultan con toda normalidad: lo único vedado es el movimiento nuevo.
+    const migrado = await proveedorConModalidad('Migrado Legible', null);
+    await expect(
+      calcularSaldoTercero(sesion(), 'proveedor', migrado.id, bd()),
+    ).resolves.toMatchObject({ saldo: 0 });
   });
 });
