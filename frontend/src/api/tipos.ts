@@ -1236,6 +1236,26 @@ export type MovimientoTelaColor =
 /** Cuerpo de un ajuste de tela por color (`POST /api/inventarios/telas/color/ajustes`). */
 export type AjusteTelaColorCrear =
   paths['/api/inventarios/telas/color/ajustes']['post']['requestBody']['content']['application/json'];
+/**
+ * Cuerpo de un CONTEO físico de tela por color (fila 0.098): se manda LO CONTADO, no la diferencia
+ * — el servidor la calcula contra el saldo que lee bajo lock y la aplica como movimiento (D3).
+ */
+export type ConteoTelaColorCrear =
+  paths['/api/inventarios/telas/color/conteos']['post']['requestBody']['content']['application/json'];
+/** Resultado de un conteo: detalle teórico/contado/diferencia + los movimientos que lo aplicaron. */
+export type ConteoTelaColor =
+  paths['/api/inventarios/telas/color/conteos']['post']['responses']['201']['content']['application/json'];
+/** Un renglón del resultado del conteo. */
+export type ConteoTelaColorRenglon = ConteoTelaColor['renglones'][number];
+/** Saldos del sistema de varios tela+color en un almacén (Σ de movimientos, nunca la vista). */
+export type SaldosTelaColor =
+  paths['/api/inventarios/telas/color/saldos']['get']['responses']['200']['content']['application/json'];
+/** El saldo de UN color dentro de la respuesta. */
+export type SaldoTelaColor = SaldosTelaColor['saldos'][number];
+/** Parámetros de los saldos por color (querystring; los colores van separados por comas). */
+export type SaldosTelaColorQuery = NonNullable<
+  paths['/api/inventarios/telas/color/saldos']['get']['parameters']['query']
+>;
 /** Cuerpo de una salida de tela por color a orden. */
 export type SalidaTelaColorCrear =
   paths['/api/inventarios/telas/color/salidas-orden']['post']['requestBody']['content']['application/json'];

@@ -28,10 +28,15 @@
  */
 import {
   esquemaAjusteTelaColorCrear,
+  esquemaConteoTelaColorCrear,
+  esquemaSaldosTelaColorQuery,
   esquemaSalidaTelaColorCrear,
   esquemaTraspasoTelaColorCrear,
   esquemaMovimientoMaterialCancelarCuerpo,
+  type ConteoTelaColorRenglonSalida,
+  type ConteoTelaColorSalida,
   type MovimientoTelaColorSalida,
+  type SaldosTelaColorSalida,
   type TraspasoTelaColorSalida,
   type ExistenciasTelaColorLista,
   type ExistenciaTelaAgrupada,
@@ -49,6 +54,7 @@ import {
   bloquearTelaColor,
   cancelarMovimientoMaterial,
   existenciaTelaColorBloqueada,
+  existenciasTelaColorPorColor,
   registrarMovimientoTela as registrarMovimientoTelaMotor,
   registrarTraspasoTela as registrarTraspasoTelaMotor,
   type LineaMovimientoTela,
@@ -461,6 +467,467 @@ export async function ajustarInventarioTelaColor(
   }, bd);
 
   return obtenerMovimientoTelaColor(idMovimiento, idEmpresa, verImportes, bd);
+}
+
+// ── CONTEO FÍSICO por COLOR (capturar LO CONTADO, no la resta — fila 0.098) ──────────────────────
+//
+// Daniel: «capturar lo contado, con el saldo del sistema a la vista, y que el sistema calcule y
+// aplique la diferencia». La pantalla «Ajuste de telas por color» —con la que se va a INICIALIZAR
+// todo el inventario de telas el día del arranque— pedía la RESTA: una entrada o una salida con su
+// cantidad. Para ajustar había que ir a otra pantalla, ver la existencia, restar de cabeza y volver
+// con el signo correcto.
+//
+// El PATRÓN se copia del CONTEO CÍCLICO de producto terminado (`indicadores/inventario-ciclico.ts`,
+// F7-E5), que ya hace exactamente esto: lee el teórico bajo lock, captura lo CONTADO, calcula la
+// diferencia y la aplica como MOVIMIENTO de kardex (D3) — jamás una escritura de la existencia; y
+// agrupa los deltas del mismo signo en UN movimiento por almacén para no explotar el folio. Lo que
+// NO se reusa es su MOTOR: el del cíclico es de producto terminado (modelo×color×talla×orden, con
+// sus tablas, sus estados y su conteo ciego). Extenderlo a telas y avíos es otra fila (0.099).
+
+/** Lo que se contó de un color (la forma MÍNIMA que la aritmética necesita). */
+export interface LineaConteoBase {
+  idTelaColor: number;
+  contadoCuerpo: number;
+  contadoComplemento?: number | undefined;
+}
+
+/** El saldo del sistema de un color en el almacén, ya leído bajo lock. */
+export interface SaldoConteo {
+  cuerpo: number;
+  complemento: number;
+}
+
+/** Lo que sale de la aritmética del conteo: las dos patas + el detalle que se le devuelve al que contó. */
+export interface DeltasConteo {
+  /** FALTANTES (contado > sistema) → un solo movimiento de ENTRADA. */
+  entradas: LineaColorBase[];
+  /** Índice EN `lineas` de cada renglón de `entradas` (para amarrarle su `loteProveedor`/partida). */
+  indicesEntradas: number[];
+  /** SOBRANTES (contado < sistema) → un solo movimiento de SALIDA. */
+  salidas: LineaColorBase[];
+  /** Teórico vs contado vs diferencia, renglón por renglón (lo que se le enseña al usuario). */
+  renglones: ConteoTelaColorRenglonSalida[];
+}
+
+/**
+ * Escala decimal de `MovimientoDetTela.cantidad` / `cantidad_complemento` (`Decimal(14,4)`): la
+ * diferencia se redondea a ELLA antes de decidir si hay movimiento.
+ *
+ * ⚠️ El ruido NO viene del saldo: la Σ la hace Postgres con decimales EXACTOS y llega con 4
+ * decimales limpios. Nace aquí, en la RESTA en coma flotante de dos valores limpios —
+ * `130.1 − 100.2` da `29.89999999999999`, no `29.9`—, y sin redondear se aplicaría un movimiento
+ * con más decimales de los que la columna guarda… o, peor, un movimiento de 1e-15 cuando el conteo
+ * en realidad cuadraba: un renglón de kardex que no dice nada y un conteo que "no cuadra" para
+ * siempre.
+ */
+const ESCALA_CANTIDAD_TELA = 4;
+
+/** Redondea a la escala de la columna (evita el ruido de coma flotante de las Σ de decimales). */
+function aEscala(valor: number): number {
+  const factor = 10 ** ESCALA_CANTIDAD_TELA;
+  return Math.round(valor * factor) / factor;
+}
+
+/**
+ * ARITMÉTICA PURA del conteo (sin BD, sin sesión): diferencia = CONTADO − TEÓRICO por componente, y
+ * reparto en las dos patas.
+ *
+ * ⚠️ **Los CUATRO cuadrantes, porque cada componente decide su pata por separado.** Un movimiento
+ * tiene UNA dirección y el cuerpo y el complemento viajan en el MISMO renglón, así que un color
+ * cabe en las dos patas a la vez:
+ *
+ * |                        | complemento falta (+) | complemento cuadra (0) | complemento sobra (−) |
+ * |------------------------|-----------------------|------------------------|-----------------------|
+ * | **cuerpo falta (+)**   | sólo ENTRADA          | sólo ENTRADA           | ENTRADA + SALIDA      |
+ * | **cuerpo cuadra (0)**  | sólo ENTRADA          | ninguna                | sólo SALIDA           |
+ * | **cuerpo sobra (−)**   | ENTRADA + SALIDA      | sólo SALIDA            | sólo SALIDA           |
+ *
+ * Las dos diagonales cruzadas son SIMÉTRICAS y las dos existen: «sobra cuerpo / falta complemento»
+ * y su ESPEJO «cuadra o falta cuerpo / sobra complemento». Escribir sólo una era, literalmente, la
+ * trampa de la rama gemela: el reviewer quitó el disyuntor `difComplemento < 0` de la pata de
+ * salida y las 14 pruebas seguían verdes, porque ningún caso tenía un complemento sobrante sin un
+ * cuerpo sobrante que lo tapara.
+ *
+ * ⚠️ Telas SIN complemento: el complemento NO entra en la cuenta —ni siquiera para bajarlo a 0—.
+ * La pantalla no pide ese número, así que fabricar un movimiento con él sería inventar un dato que
+ * nadie contó. Si una fila vieja dejó ahí un saldo fantasma se TOLERA, no se compensa (REGLA 0-B).
+ */
+export function calcularDeltasConteo(
+  lineas: readonly LineaConteoBase[],
+  saldos: ReadonlyMap<number, SaldoConteo>,
+  colores: ReadonlyMap<number, ColorConTela>,
+): DeltasConteo {
+  const entradas: LineaColorBase[] = [];
+  const indicesEntradas: number[] = [];
+  const salidas: LineaColorBase[] = [];
+  const renglones: ConteoTelaColorRenglonSalida[] = [];
+
+  lineas.forEach((linea, indice) => {
+    const color = colores.get(linea.idTelaColor);
+    const saldo = saldos.get(linea.idTelaColor);
+    if (color === undefined || saldo === undefined) {
+      throw new ErrorNoEncontrado('TelaColor', linea.idTelaColor);
+    }
+    const llevaComplemento = color.nombreComplemento !== null;
+
+    const teoricoCuerpo = aEscala(saldo.cuerpo);
+    const contadoCuerpo = aEscala(linea.contadoCuerpo);
+    const teoricoComplemento = llevaComplemento ? aEscala(saldo.complemento) : 0;
+    const contadoComplemento = llevaComplemento ? aEscala(linea.contadoComplemento ?? 0) : 0;
+
+    const difCuerpo = aEscala(contadoCuerpo - teoricoCuerpo);
+    const difComplemento = aEscala(contadoComplemento - teoricoComplemento);
+
+    if (difCuerpo > 0 || difComplemento > 0) {
+      entradas.push({
+        idTelaColor: linea.idTelaColor,
+        cantidad: Math.max(difCuerpo, 0),
+        ...(llevaComplemento ? { cantidadComplemento: Math.max(difComplemento, 0) } : {}),
+      });
+      indicesEntradas.push(indice);
+    }
+    if (difCuerpo < 0 || difComplemento < 0) {
+      salidas.push({
+        idTelaColor: linea.idTelaColor,
+        cantidad: Math.max(-difCuerpo, 0),
+        ...(llevaComplemento ? { cantidadComplemento: Math.max(-difComplemento, 0) } : {}),
+      });
+    }
+
+    renglones.push({
+      idTelaColor: linea.idTelaColor,
+      idTela: color.idTela,
+      tela: color.nombreTela,
+      telaColor: color.nombreColor,
+      nombreComplemento: color.nombreComplemento,
+      teoricoCuerpo,
+      contadoCuerpo,
+      diferenciaCuerpo: difCuerpo,
+      teoricoComplemento,
+      contadoComplemento,
+      diferenciaComplemento: difComplemento,
+    });
+  });
+
+  return { entradas, indicesEntradas, salidas, renglones };
+}
+
+/** Tope de colores por consulta: la pantalla pide sus renglones de golpe, pero no es un volcado. */
+const MAX_COLORES_POR_CONSULTA = 500;
+
+/**
+ * Mayor valor que cabe en la columna: `TelaColor.id` es `Int` de Prisma = **int4** en Postgres.
+ * Un id por encima de esto NO es "un color que no existe": es un valor que la columna no puede
+ * ni comparar, y llega hasta el `findMany` para reventar en la capa de DATOS con un error que no
+ * es el 400 que le toca.
+ */
+const MAX_ID_INT4 = 2_147_483_647;
+
+/**
+ * Trocea la lista de colores del querystring (`"11,21,33"`) a ids DISTINTOS y ORDENADOS. Vive en el
+ * dominio, no en el esquema: el contrato declara un `string` porque eso es lo que viaja por la URL
+ * (y lo que el cliente generado sabe serializar), y aquí se valida lo que de verdad significa.
+ *
+ * ⚠️ **Los tres rechazos son DIAGNÓSTICOS DISTINTOS, y ninguno cita el número ya convertido.** El
+ * texto que se devuelve es SIEMPRE el que se tecleó (`p`), nunca `Number(p)`: en el caso de la
+ * precisión perdida son cosas distintas, y echarle en cara al usuario un número que él no escribió
+ * es justo el error que esta rama viene a evitar.
+ *
+ *  1. **No es un entero positivo** (`''`, `'x'`, `'-3'`, `'0'`, `'2.5'`) — la forma está mal.
+ *  2. **No se puede representar con exactitud** (`'9007199254740993'` → JavaScript lo convierte a
+ *     `…992` **sin avisar**, porque pasa de `Number.MAX_SAFE_INTEGER`). Es el peor de los tres: no
+ *     truena, MIENTE. Se caza con {@link Number.isSafeInteger} y se nombra aparte para que el
+ *     mensaje diga la verdad de lo que pasó.
+ *  3. **No cabe en la columna** (`'2147483648'`, int4 máx + 1). Éste es el que de verdad protege la
+ *     consulta —los tres casos lo superan—, pero por sí solo diagnosticaría mal el caso 2.
+ */
+export function idsDeColorPedidos(lista: string): number[] {
+  const partes = lista
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  if (partes.length === 0) {
+    throw new ErrorValidacion('Indica al menos un color de tela.');
+  }
+  for (const parte of partes) {
+    if (!/^\d+$/.test(parte) || Number(parte) <= 0) {
+      throw new ErrorValidacion(
+        'Los colores de tela van como ids enteros positivos separados por comas.',
+      );
+    }
+    const numero = Number(parte);
+    if (!Number.isSafeInteger(numero)) {
+      throw new ErrorValidacion(
+        `El color de tela «${parte}» es un número demasiado grande para manejarlo con exactitud.`,
+      );
+    }
+    if (numero > MAX_ID_INT4) {
+      throw new ErrorValidacion(`El color de tela «${parte}» está fuera del rango de ids válidos.`);
+    }
+  }
+  const ids = [...new Set(partes.map((p) => Number(p)))].sort((a, b) => a - b);
+  if (ids.length > MAX_COLORES_POR_CONSULTA) {
+    throw new ErrorValidacion(
+      `Demasiados colores en una sola consulta (máx ${String(MAX_COLORES_POR_CONSULTA)}).`,
+    );
+  }
+  return ids;
+}
+
+/** Parámetros de los saldos para el conteo (forma de dominio). */
+export type ParametrosSaldosTelaColor = z.input<typeof esquemaSaldosTelaColorQuery>;
+
+/**
+ * SALDOS del sistema de VARIOS tela-color en un almacén, por Σ DIRECTA de `MovimientoDetTela` —
+ * **NUNCA** la vista `existencia_tela_color` (D3/ADR-0010 §3) — en UNA sola consulta.
+ *
+ * Es la columna «Sistema» de la pantalla de conteo, y suma con la MISMA aritmética que
+ * {@link registrarConteoTelaColor} usa al aplicar la diferencia: el fragmento SQL vive UNA sola vez
+ * en `comun/kardex.ts` (`SUMAS_TELA_COLOR`), compartido por el lector bajo lock y por éste, para
+ * que no puedan divergir.
+ *
+ * 🔴 SIN LOCK, a propósito (corrección del reviewer). Un `pg_advisory_xact_lock` exclusivo aquí no
+ * añadía garantía —bajo Read Committed la Σ ya lee un snapshot consistente, y el lock se soltaba al
+ * commit de la propia lectura, o sea ANTES de que el usuario tecleara nada— y en cambio serializaba
+ * una consulta: cargar el inventario del arranque son cientos de renglones. Lo que de verdad impide
+ * "dos personas ajustando contra un saldo viejo" es que el delta se RECALCULA bajo lock al aplicar.
+ *
+ * Un color sin ningún movimiento devuelve `0/0` — **no se omite**: el `GROUP BY` no lo trae y el
+ * relleno a 0 lo pone de vuelta (ver el comentario del `map`). Permiso `inventario-telas.ver`;
+ * empresa activa (A9).
+ */
+export async function saldosTelaColorParaConteo(
+  sesion: SesionUsuario,
+  parametros: ParametrosSaldosTelaColor,
+  bd?: ContextoBd,
+): Promise<SaldosTelaColorSalida> {
+  verificarPermiso(sesion, 'inventario-telas.ver');
+  const filtros = validarEntrada(esquemaSaldosTelaColorQuery, parametros);
+  const idEmpresa = sesion.idEmpresaActiva;
+  const cliente = clienteLectura(bd);
+
+  const ids = idsDeColorPedidos(filtros.idTelaColor);
+
+  const colores = await cliente.telaColor.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      nombre: true,
+      tela: { select: { id: true, nombre: true, nombreComplemento: true } },
+    },
+  });
+  const porId = new Map(colores.map((c) => [c.id, c]));
+  for (const id of ids) {
+    if (!porId.has(id)) throw new ErrorNoEncontrado('TelaColor', id);
+  }
+
+  const existencias = await existenciasTelaColorPorColor(
+    cliente,
+    idEmpresa,
+    filtros.idAlmacen,
+    ids,
+  );
+  const porColor = new Map(existencias.map((e) => [e.idTelaColor, e]));
+
+  return {
+    idAlmacen: filtros.idAlmacen,
+    // ⚠️ SE RECORREN LOS `ids` PEDIDOS, no las filas que volvieron. El `GROUP BY` **omite** los
+    // colores sin NINGÚN movimiento, y en la pantalla del arranque «sin dato» y «cero» NO son lo
+    // mismo: un color que nunca se ha movido tiene que enseñar 0, no blanco ni `undefined`. Si esto
+    // se recorriera sobre `existencias`, los colores nuevos —justo los del arranque— desaparecerían
+    // del renglón en silencio.
+    saldos: ids.map((id) => {
+      const color = porId.get(id);
+      if (color === undefined) throw new ErrorNoEncontrado('TelaColor', id);
+      const existencia = porColor.get(id);
+      const llevaComplemento = color.tela.nombreComplemento !== null;
+      return {
+        idTelaColor: id,
+        idTela: color.tela.id,
+        tela: color.tela.nombre,
+        telaColor: color.nombre,
+        cuerpo: existencia?.cuerpo ?? 0,
+        // Una tela sin complemento no tiene complemento que enseñar (aunque una fila vieja hubiera
+        // dejado algo ahí): la pantalla no pide ese número y el conteo no lo mueve.
+        complemento: llevaComplemento ? (existencia?.complemento ?? 0) : 0,
+        nombreComplemento: color.tela.nombreComplemento,
+      };
+    }),
+  };
+}
+
+/** Datos de un conteo por color. */
+export type EntradaConteoTelaColor = z.input<typeof esquemaConteoTelaColorCrear>;
+
+/**
+ * Registra un CONTEO FÍSICO de tela POR COLOR: se captura LO CONTADO y el servidor calcula y aplica
+ * la DIFERENCIA. Todo en UNA transacción (A2):
+ *
+ *  1. Resuelve los colores y valida las reglas del complemento (`resolverColores`). Un color NO se
+ *     puede repetir: se cuenta UNA vez por almacén — dos renglones del mismo color se restarían dos
+ *     veces contra el MISMO teórico y podrían dejar la existencia en negativo.
+ *  2. Toma el lock de cada color (orden DETERMINISTA por `idTelaColor`, como
+ *     `validarNoNegativoTelaColor`, para no interbloquear con operaciones cruzadas) y lee su saldo
+ *     por Σ DIRECTA (`existenciaTelaColorBloqueada`), NUNCA la vista (D3).
+ *  3. Calcula los deltas ({@link calcularDeltasConteo}) y los aplica como MOVIMIENTOS de kardex:
+ *     uno de `ajuste-entrada` con todos los FALTANTES y uno de `ajuste-salida` con todos los
+ *     SOBRANTES (patrón `generarAjusteCiclico`). Un conteo que cuadra en todo NO escribe nada.
+ *
+ * La pata de ENTRADA crea UNA PARTIDA por renglón (la partida es la unidad de entrada: así el
+ * arranque desde cero —existencia 0, se cuenta X— nace con su partida y su lote del proveedor
+ * opcional). La de SALIDA no lleva partida.
+ *
+ * ⚠️ Por qué las salidas del conteo NO repiten la validación de `validarNoNegativoTelaColor`: la
+ * cantidad a sacar es `teórico − contado` con `contado ≥ 0` (Zod), o sea A LO MÁS EL TEÓRICO
+ * ENTERO, leído bajo el MISMO lock que esta transacción conserva hasta el commit. Frente a todo lo
+ * que TOMA ESE LOCK (otro conteo, una salida a orden, un traspaso), el resultado no puede quedar
+ * negativo; y el único hueco interno del razonamiento —el mismo color contado dos veces, dos restas
+ * contra el mismo teórico— lo cierra `resolverColores` en el paso 1.
+ *
+ * 🔴 Lo que ese lock NO cubre, y no es de esta función: `cancelarMovimientoMaterial` NO toma el
+ * lock del color y, por diseño, NO valida no-negativo (es un inverso de corrección). Una
+ * cancelación concurrente de una entrada puede, por tanto, dejar el saldo negativo — exactamente
+ * igual que puede hacerlo hoy contra `validarNoNegativoTelaColor`. Es una propiedad del módulo, no
+ * una que este conteo introduzca ni pueda arreglar por su cuenta.
+ *
+ * Motivo OBLIGATORIO (A7). Permiso `inventario-telas.mover` (A4). Empresa activa (A9).
+ */
+export async function registrarConteoTelaColor(
+  sesion: SesionUsuario,
+  entrada: EntradaConteoTelaColor,
+  bd?: ContextoBd,
+): Promise<ConteoTelaColorSalida> {
+  verificarPermiso(sesion, 'inventario-telas.mover');
+  const datos = validarEntrada(esquemaConteoTelaColorCrear, entrada);
+  const idEmpresa = sesion.idEmpresaActiva;
+  const verImportes = tienePermiso(sesion, 'telas.ver-totales');
+
+  const resultado = await enTransaccion(async (tx) => {
+    // El complemento capturado en una tela que no lo lleva se rechaza aquí (misma regla que el
+    // ajuste); los colores repetidos también — ver el aviso del no-negativo de arriba.
+    const colores = await resolverColores(
+      tx,
+      datos.lineas.map((l) => ({
+        idTelaColor: l.idTelaColor,
+        cantidad: l.contadoCuerpo,
+        cantidadComplemento: l.contadoComplemento,
+      })),
+    );
+
+    // Saldos BAJO LOCK, en orden determinista por idTelaColor (anti-deadlock).
+    const saldos = new Map<number, SaldoConteo>();
+    for (const idTelaColor of [...new Set(datos.lineas.map((l) => l.idTelaColor))].sort(
+      (a, b) => a - b,
+    )) {
+      await bloquearTelaColor(tx, idEmpresa, datos.idAlmacen, idTelaColor);
+      saldos.set(
+        idTelaColor,
+        await existenciaTelaColorBloqueada(tx, idEmpresa, datos.idAlmacen, idTelaColor),
+      );
+    }
+
+    const deltas = calcularDeltasConteo(datos.lineas, saldos, colores);
+
+    const almacen = await tx.almacen.findUnique({
+      where: { id: datos.idAlmacen },
+      select: { nombre: true },
+    });
+    if (almacen === null) {
+      throw new ErrorNoEncontrado('Almacen', datos.idAlmacen);
+    }
+
+    // Un conteo que cuadra en TODO no escribe movimiento: un kardex con renglones de 0 no dice
+    // nada y ensuciaría el folio.
+    if (deltas.entradas.length === 0 && deltas.salidas.length === 0) {
+      return {
+        almacen: almacen.nombre,
+        renglones: deltas.renglones,
+        idEntrada: null,
+        idSalida: null,
+      };
+    }
+
+    // ⚠️ Orden de folios (`comun/secuencias.ts`): PRIMERO las partidas (`partida-tela`), luego los
+    // movimientos — el MISMO orden que el ajuste, para no interbloquear transacciones cruzadas.
+    let idPartidaPorLinea: (number | null)[] | undefined;
+    if (deltas.entradas.length > 0) {
+      idPartidaPorLinea = [];
+      for (const indice of deltas.indicesEntradas) {
+        const linea = datos.lineas[indice];
+        // Un índice fuera de rango sólo puede venir de un error de programación en el reparto; se
+        // revienta en vez de caer a un `?? 0` que crearía la partida contra un color inexistente.
+        if (linea === undefined) {
+          throw new ErrorValidacion('Renglón de conteo inconsistente al crear su partida.');
+        }
+        const partida = await crearPartidaTela(tx, sesion, {
+          idEmpresa,
+          idTelaColor: linea.idTelaColor,
+          loteProveedor: linea.loteProveedor,
+          factura: datos.factura,
+          fecha: datos.fecha,
+        });
+        idPartidaPorLinea.push(partida.id);
+      }
+    }
+
+    const observaciones = `Conteo físico — ${datos.motivo}`;
+
+    let idSalida: number | null = null;
+    if (deltas.salidas.length > 0) {
+      const tipoSalida = await tipoPorCodigo(tx, COD_AJUSTE_SALIDA);
+      const mov = await registrarMovimientoTelaMotor(
+        sesion,
+        {
+          idEmpresa,
+          idTipoMov: tipoSalida.id,
+          idAlmacen: datos.idAlmacen,
+          fecha: aDateColumna(datos.fecha),
+          origenTipo: ORIGEN.conteoTela,
+          lineas: aLineasMotor(deltas.salidas, colores),
+          observaciones,
+        },
+        { tx },
+      );
+      idSalida = mov.id;
+    }
+
+    let idEntrada: number | null = null;
+    if (deltas.entradas.length > 0) {
+      const tipoEntrada = await tipoPorCodigo(tx, COD_AJUSTE_ENTRADA);
+      const mov = await registrarMovimientoTelaMotor(
+        sesion,
+        {
+          idEmpresa,
+          idTipoMov: tipoEntrada.id,
+          idAlmacen: datos.idAlmacen,
+          fecha: aDateColumna(datos.fecha),
+          origenTipo: ORIGEN.conteoTela,
+          lineas: aLineasMotor(deltas.entradas, colores, idPartidaPorLinea),
+          observaciones,
+        },
+        { tx },
+      );
+      idEntrada = mov.id;
+    }
+
+    return { almacen: almacen.nombre, renglones: deltas.renglones, idEntrada, idSalida };
+  }, bd);
+
+  return {
+    idAlmacen: datos.idAlmacen,
+    almacen: resultado.almacen,
+    fecha: datos.fecha,
+    sinDiferencias: resultado.idEntrada === null && resultado.idSalida === null,
+    renglones: resultado.renglones,
+    entrada:
+      resultado.idEntrada === null
+        ? null
+        : await obtenerMovimientoTelaColor(resultado.idEntrada, idEmpresa, verImportes, bd),
+    salida:
+      resultado.idSalida === null
+        ? null
+        : await obtenerMovimientoTelaColor(resultado.idSalida, idEmpresa, verImportes, bd),
+  };
 }
 
 /**

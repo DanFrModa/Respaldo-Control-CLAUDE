@@ -14,6 +14,10 @@
  *  (g) existencias agrupadas TELA PADRE → colores → almacenes (vista existencia_tela_color);
  *  (h) kardex cronológico con saldo corrido de los DOS componentes;
  *  (i) búsqueda de partidas por folio / lote del proveedor / factura;
+ *  (k) CONTEO físico (fila 0.098): se captura LO CONTADO y el servidor aplica la diferencia como
+ *      movimiento de kardex (faltante → entrada CON su partida, sobrante → salida), un conteo que
+ *      cuadra no escribe nada, contar CERO vacía, y el saldo que enseña la pantalla sale de la Σ de
+ *      movimientos (no de la vista);
  *  (j) REGRESIÓN EN AMBOS SENTIDOS: el flujo viejo por Lote sigue intacto y NO ve los movimientos
  *      nuevos (vista `existencia_tela` redefinida con `id_tela_color IS NULL` + filtro del
  *      `kardexTela` legado), y el flujo nuevo NO ve los del lote.
@@ -31,7 +35,9 @@ import {
   consultarExistenciasTelaColor,
   kardexTelaColor,
   listarPartidasTela,
+  registrarConteoTelaColor,
   registrarSalidaTelaColorAOrden,
+  saldosTelaColorParaConteo,
   traspasarTelaColor,
 } from './partidas-telas.js';
 import { ajustarInventarioTela, consultarExistenciasTela, kardexTela } from './telas.js';
@@ -542,5 +548,337 @@ describe('REGRESIÓN: el flujo viejo por Lote sigue intacto', () => {
     const nuevas = await consultarExistenciasTelaColor(sesion(), { idTela: telaFelpa.id }, bd());
     expect(nuevas.telas[0]?.totalCuerpo).toBe(100);
     expect(nuevas.telas[0]?.totalComplemento).toBe(40);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// (k) CONTEO FÍSICO por color — fila 0.098: se captura LO CONTADO, no la resta
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** El saldo de UN color (la consulta va por lotes; aquí sólo hace falta uno). */
+async function saldoDe(idTelaColor: number, idAlmacen: number = almA.id) {
+  const { saldos } = await saldosTelaColorParaConteo(
+    sesion(),
+    { idAlmacen, idTelaColor: String(idTelaColor) },
+    bd(),
+  );
+  const saldo = saldos[0];
+  if (saldo === undefined) throw new Error('la consulta de saldos no devolvió el color pedido');
+  return saldo;
+}
+
+describe('conteo por color: el servidor calcula y aplica la diferencia (D3)', () => {
+  it('FALTANTE → entrada por la diferencia CON su partida; la existencia queda en lo contado', async () => {
+    await entrarColor(colorMarino.id, 100, 40, { loteProveedor: 'L-INI' });
+
+    const conteo = await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Conteo físico de septiembre',
+        factura: 'F-CONTEO',
+        lineas: [
+          {
+            idTelaColor: colorMarino.id,
+            contadoCuerpo: 130,
+            contadoComplemento: 50,
+            loteProveedor: 'L-CONTEO',
+          },
+        ],
+      },
+      bd(),
+    );
+
+    expect(conteo.sinDiferencias).toBe(false);
+    expect(conteo.salida).toBeNull();
+    // Entra la DIFERENCIA (30 / 10), no lo contado (130 / 50).
+    expect(conteo.entrada?.renglones[0]?.cantidad).toBe(30);
+    expect(conteo.entrada?.renglones[0]?.cantidadComplemento).toBe(10);
+    expect(conteo.renglones[0]).toMatchObject({
+      teoricoCuerpo: 100,
+      contadoCuerpo: 130,
+      diferenciaCuerpo: 30,
+      diferenciaComplemento: 10,
+    });
+    // La pata de entrada creó SU partida (la partida es la unidad de entrada) con su lote.
+    expect(conteo.entrada?.renglones[0]?.loteProveedor).toBe('L-CONTEO');
+    const partidas = await cliente.partidaTela.findMany({ orderBy: { folio: 'asc' } });
+    expect(partidas.at(-1)?.factura).toBe('F-CONTEO');
+
+    // Y la existencia (Σ de movimientos) quedó EXACTAMENTE en lo contado.
+    const saldo = await saldoDe(colorMarino.id, almA.id);
+    expect(saldo.cuerpo).toBe(130);
+    expect(saldo.complemento).toBe(50);
+  });
+
+  it('SOBRANTE → salida por la diferencia (sin partida) y la existencia baja a lo contado', async () => {
+    await entrarColor(colorMarino.id, 100, 40);
+
+    const conteo = await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Conteo físico',
+        lineas: [{ idTelaColor: colorMarino.id, contadoCuerpo: 80, contadoComplemento: 25 }],
+      },
+      bd(),
+    );
+
+    expect(conteo.entrada).toBeNull();
+    expect(conteo.salida?.renglones[0]?.cantidad).toBe(20);
+    expect(conteo.salida?.renglones[0]?.cantidadComplemento).toBe(15);
+    // Las salidas no llevan partida (el consumo empareja por color).
+    expect(conteo.salida?.renglones[0]?.idPartida).toBeNull();
+
+    const saldo = await saldoDe(colorMarino.id, almA.id);
+    expect(saldo.cuerpo).toBe(80);
+    expect(saldo.complemento).toBe(25);
+  });
+
+  it('contar CERO vacía el color (y NO deja el inventario en negativo)', async () => {
+    await entrarColor(colorNegroLisa.id, 55);
+
+    const conteo = await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Ya no quedó nada',
+        lineas: [{ idTelaColor: colorNegroLisa.id, contadoCuerpo: 0 }],
+      },
+      bd(),
+    );
+    expect(conteo.salida?.renglones[0]?.cantidad).toBe(55);
+
+    const saldo = await saldoDe(colorNegroLisa.id, almA.id);
+    expect(saldo.cuerpo).toBe(0);
+  });
+
+  it('un conteo que CUADRA no escribe NINGÚN movimiento', async () => {
+    await entrarColor(colorMarino.id, 100, 40);
+    const antes = await cliente.movimiento.count();
+
+    const conteo = await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Conteo que cuadra',
+        lineas: [{ idTelaColor: colorMarino.id, contadoCuerpo: 100, contadoComplemento: 40 }],
+      },
+      bd(),
+    );
+
+    expect(conteo.sinDiferencias).toBe(true);
+    expect(conteo.entrada).toBeNull();
+    expect(conteo.salida).toBeNull();
+    expect(conteo.renglones[0]?.diferenciaCuerpo).toBe(0);
+    expect(await cliente.movimiento.count()).toBe(antes);
+  });
+
+  it('⭐ el MISMO color con cuerpo sobrante y complemento faltante genera LAS DOS patas', async () => {
+    await entrarColor(colorMarino.id, 100, 40);
+
+    const conteo = await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Sobró felpa y faltó cardigan',
+        lineas: [{ idTelaColor: colorMarino.id, contadoCuerpo: 90, contadoComplemento: 55 }],
+      },
+      bd(),
+    );
+
+    expect(conteo.salida?.renglones[0]?.cantidad).toBe(10);
+    expect(conteo.salida?.renglones[0]?.cantidadComplemento).toBe(0);
+    expect(conteo.entrada?.renglones[0]?.cantidad).toBe(0);
+    expect(conteo.entrada?.renglones[0]?.cantidadComplemento).toBe(15);
+
+    const saldo = await saldoDe(colorMarino.id, almA.id);
+    expect(saldo.cuerpo).toBe(90);
+    expect(saldo.complemento).toBe(55);
+  });
+
+  it('cuenta CADA ALMACÉN por su cuenta (el conteo de A no toca lo de B)', async () => {
+    await entrarColor(colorMarino.id, 100, 40);
+    await entrarColor(colorMarino.id, 70, 30, { idAlmacen: almB.id });
+
+    await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Conteo solo de A',
+        lineas: [{ idTelaColor: colorMarino.id, contadoCuerpo: 90, contadoComplemento: 40 }],
+      },
+      bd(),
+    );
+
+    const enA = await saldoDe(colorMarino.id, almA.id);
+    const enB = await saldoDe(colorMarino.id, almB.id);
+    expect(enA.cuerpo).toBe(90);
+    expect(enB.cuerpo).toBe(70);
+  });
+
+  it('rechaza el MISMO color repetido (dos restas contra el mismo saldo)', async () => {
+    await entrarColor(colorMarino.id, 100, 40);
+    await expect(
+      registrarConteoTelaColor(
+        sesion(),
+        {
+          idAlmacen: almA.id,
+          fecha: '2026-09-02',
+          motivo: 'Color repetido',
+          lineas: [
+            { idTelaColor: colorMarino.id, contadoCuerpo: 10 },
+            { idTelaColor: colorMarino.id, contadoCuerpo: 10 },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('rechaza contar complemento en una tela que NO lo lleva', async () => {
+    await expect(
+      registrarConteoTelaColor(
+        sesion(),
+        {
+          idAlmacen: almA.id,
+          fecha: '2026-09-02',
+          motivo: 'Complemento donde no hay',
+          lineas: [{ idTelaColor: colorNegroLisa.id, contadoCuerpo: 5, contadoComplemento: 3 }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  // ⚠️ RENOMBRADA (2ª ronda). Antes decía «…no de la vista» y NO podía demostrarlo:
+  // `existencia_tela_color` es un `CREATE VIEW` PLANO (migración 20260806130000_a2_partidas_telas),
+  // no materializado, así que se calcula al consultar y leerla devolvería EXACTAMENTE lo mismo. La
+  // prueba pasaba por la razón equivocada. Lo que este caso sí demuestra es que el saldo REFLEJA
+  // cada movimiento del color (incluidas las dos patas de un traspaso) y que reparte por almacén.
+  // Que la fuente sea la TABLA y no la vista lo vigila el guardián de SQL en `partidas-telas.test.ts`.
+  it('el saldo refleja cada movimiento del color, pata por pata y almacén por almacén', async () => {
+    await entrarColor(colorMarino.id, 100, 40);
+    await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-09-02',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 30, cantidadComplemento: 10 }],
+      },
+      bd(),
+    );
+    const enA = await saldoDe(colorMarino.id, almA.id);
+    expect(enA.cuerpo).toBe(70);
+    expect(enA.complemento).toBe(30);
+    expect(enA.nombreComplemento).toBe('Cardigan');
+    // Una tela SIN complemento lo reporta como null (la pantalla no pide ese número).
+    const lisa = await saldoDe(colorNegroLisa.id, almA.id);
+    expect(lisa.nombreComplemento).toBeNull();
+    expect(lisa.cuerpo).toBe(0);
+  });
+
+  it('⭐ ESPEJO: el cuerpo CUADRA y SOBRA complemento → sólo salida, y el cuerpo no se mueve', async () => {
+    // La gemela que sobrevivió a la 1ª ronda: sin este caso, quitar el disyuntor
+    // `difComplemento < 0` de la pata de salida dejaba las pruebas en verde.
+    await entrarColor(colorMarino.id, 100, 40);
+
+    const conteo = await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Sobró cardigan; la felpa cuadró',
+        lineas: [{ idTelaColor: colorMarino.id, contadoCuerpo: 100, contadoComplemento: 25 }],
+      },
+      bd(),
+    );
+
+    expect(conteo.entrada).toBeNull();
+    expect(conteo.salida?.renglones[0]?.cantidad).toBe(0);
+    expect(conteo.salida?.renglones[0]?.cantidadComplemento).toBe(15);
+
+    const saldo = await saldoDe(colorMarino.id, almA.id);
+    expect(saldo.cuerpo).toBe(100);
+    expect(saldo.complemento).toBe(25);
+  });
+
+  it('⭐ conteo MIXTO: la partida se crea para la línea que FALTA, con SU lote (no el de otra)', async () => {
+    // El amarre partida↔línea va por `datos.lineas[indice]`, y hasta ahora todos los casos tenían
+    // su única entrada en la línea 0: cambiarlo por `lineas[i]` habría pasado igual. Aquí la línea
+    // 0 SOBRA (va a la salida) y la 1 FALTA (va a la entrada) con su propio lote: si el amarre se
+    // corriera de índice, la partida nacería con el lote del renglón equivocado.
+    await entrarColor(colorMarino.id, 100, 40);
+    await entrarColor(colorNegroLisa.id, 50);
+
+    const conteo = await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Uno sobra y otro falta',
+        factura: 'F-MIXTO',
+        lineas: [
+          // Línea 0 → SOBRANTE (sale). Su `loteProveedor` no debe acabar en ninguna partida.
+          { idTelaColor: colorMarino.id, contadoCuerpo: 80, contadoComplemento: 40 },
+          // Línea 1 → FALTANTE (entra) y es la que crea partida, con SU lote.
+          { idTelaColor: colorNegroLisa.id, contadoCuerpo: 75, loteProveedor: 'L-B' },
+        ],
+      },
+      bd(),
+    );
+
+    expect(conteo.salida?.renglones[0]?.idTelaColor).toBe(colorMarino.id);
+    expect(conteo.salida?.renglones[0]?.cantidad).toBe(20);
+    // La ENTRADA es la lisa, con su lote y su factura — no el color de la línea 0.
+    expect(conteo.entrada?.renglones).toHaveLength(1);
+    expect(conteo.entrada?.renglones[0]?.idTelaColor).toBe(colorNegroLisa.id);
+    expect(conteo.entrada?.renglones[0]?.cantidad).toBe(25);
+    expect(conteo.entrada?.renglones[0]?.loteProveedor).toBe('L-B');
+
+    // Y en la BD la partida nueva quedó ligada al COLOR de la línea 1.
+    const ultima = await cliente.partidaTela.findFirst({ orderBy: { folio: 'desc' } });
+    expect(ultima?.idTelaColor).toBe(colorNegroLisa.id);
+    expect(ultima?.loteProveedor).toBe('L-B');
+    expect(ultima?.factura).toBe('F-MIXTO');
+  });
+
+  it('un color sin NINGÚN movimiento devuelve saldo 0, no se omite del renglón', async () => {
+    // El `GROUP BY` no lo trae; el relleno a 0 lo pone de vuelta. En el arranque «sin dato» y
+    // «cero» no son lo mismo.
+    const { saldos } = await saldosTelaColorParaConteo(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        idTelaColor: `${String(colorMarino.id)},${String(colorBlanco.id)}`,
+      },
+      bd(),
+    );
+    expect(saldos).toHaveLength(2);
+    expect(saldos.every((s) => s.cuerpo === 0 && s.complemento === 0)).toBe(true);
+  });
+
+  it('el conteo NO contamina el flujo LEGADO por lote (ni al revés)', async () => {
+    await entrarColor(colorMarino.id, 100, 40);
+    await registrarConteoTelaColor(
+      sesion(),
+      {
+        idAlmacen: almA.id,
+        fecha: '2026-09-02',
+        motivo: 'Conteo',
+        lineas: [{ idTelaColor: colorMarino.id, contadoCuerpo: 130, contadoComplemento: 40 }],
+      },
+      bd(),
+    );
+    // El kardex legado por lote sigue sin ver nada del flujo por color.
+    const legado = await kardexTela(sesion(), { idTela: telaFelpa.id }, bd());
+    expect(legado.renglones).toHaveLength(0);
   });
 });

@@ -123505,6 +123505,1203 @@
         }
       }
     },
+    "/api/inventarios/telas/color/saldos": {
+      "get": {
+        "summary": "Saldos del sistema de varios tela+color en un almacén (Σ de movimientos, D3)",
+        "tags": [
+          "inventario-telas"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idAlmacen",
+            "required": true,
+            "description": "Almacén del que se quieren los saldos (obligatorio)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "in": "query",
+            "name": "idTelaColor",
+            "required": true,
+            "description": "Ids de color de tela separados por comas (p. ej. \"11,21,33\")."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saldos del sistema de varios tela+color en un almacén (Σ de movimientos, D3).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idAlmacen": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "saldos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTelaColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "tela": {
+                            "type": "string"
+                          },
+                          "telaColor": {
+                            "type": "string"
+                          },
+                          "cuerpo": {
+                            "type": "number",
+                            "description": "Existencia del CUERPO (Σ de movimientos)."
+                          },
+                          "complemento": {
+                            "type": "number",
+                            "description": "Existencia del COMPLEMENTO (0 si la tela no lo lleva)."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cómo se llama el complemento (\"Cardigan\"), o null si la tela no lleva."
+                          }
+                        },
+                        "required": [
+                          "idTelaColor",
+                          "idTela",
+                          "tela",
+                          "telaColor",
+                          "cuerpo",
+                          "complemento",
+                          "nombreComplemento"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "idAlmacen",
+                    "saldos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Saldos del sistema de varios tela+color en un almacén (Σ de movimientos, D3)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventarios/telas/color/conteos": {
+      "post": {
+        "summary": "Registrar un conteo físico de tela por color (se captura lo contado; el sistema aplica la diferencia)",
+        "tags": [
+          "inventario-telas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idAlmacen": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "fecha": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "factura": {
+                    "description": "Factura/remisión de las partidas que cree el alta por faltante (opcional).",
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "lineas": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idTelaColor": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "contadoCuerpo": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "contadoComplemento": {
+                          "description": "Sólo en telas que llevan complemento; sin capturar se toma como 0.",
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "loteProveedor": {
+                          "description": "Lote del proveedor de la PARTIDA que se cree si el conteo da de ALTA (faltante).",
+                          "type": "string",
+                          "maxLength": 100
+                        }
+                      },
+                      "required": [
+                        "idTelaColor",
+                        "contadoCuerpo"
+                      ],
+                      "description": "Un renglón contado (lo que hay), no una diferencia."
+                    }
+                  }
+                },
+                "required": [
+                  "idAlmacen",
+                  "fecha",
+                  "motivo",
+                  "lineas"
+                ],
+                "description": "Conteo físico de tela por COLOR: se captura lo contado; el sistema aplica la diferencia."
+              }
+            }
+          },
+          "description": "Conteo físico de tela por COLOR: se captura lo contado; el sistema aplica la diferencia."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de un conteo físico de tela por color.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idAlmacen": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "almacen": {
+                      "type": "string"
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha (YYYY-MM-DD)."
+                    },
+                    "sinDiferencias": {
+                      "type": "boolean",
+                      "description": "true = el conteo cuadró y no se escribió movimiento."
+                    },
+                    "renglones": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTelaColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "tela": {
+                            "type": "string"
+                          },
+                          "telaColor": {
+                            "type": "string"
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Null = la tela no lleva complemento."
+                          },
+                          "teoricoCuerpo": {
+                            "type": "number",
+                            "description": "Saldo del sistema al aplicar (Σ de movimientos bajo lock)."
+                          },
+                          "contadoCuerpo": {
+                            "type": "number"
+                          },
+                          "diferenciaCuerpo": {
+                            "type": "number",
+                            "description": "contado − teórico (positiva = entra, negativa = sale)."
+                          },
+                          "teoricoComplemento": {
+                            "type": "number"
+                          },
+                          "contadoComplemento": {
+                            "type": "number"
+                          },
+                          "diferenciaComplemento": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "idTelaColor",
+                          "idTela",
+                          "tela",
+                          "telaColor",
+                          "nombreComplemento",
+                          "teoricoCuerpo",
+                          "contadoCuerpo",
+                          "diferenciaCuerpo",
+                          "teoricoComplemento",
+                          "contadoComplemento",
+                          "diferenciaComplemento"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "entrada": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "folio": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Folio consecutivo por empresa (A3)."
+                            },
+                            "idEmpresa": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "idTipoMov": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "tipoMov": {
+                              "type": "string"
+                            },
+                            "direccion": {
+                              "type": "string",
+                              "enum": [
+                                "entrada",
+                                "salida",
+                                "traspaso"
+                              ]
+                            },
+                            "idAlmacen": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "almacen": {
+                              "type": "string"
+                            },
+                            "fecha": {
+                              "type": "string",
+                              "description": "Fecha (YYYY-MM-DD)."
+                            },
+                            "origenTipo": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "origenId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Id del hecho de origen (p. ej. orden) o null."
+                            },
+                            "observaciones": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "cancelado": {
+                              "type": "boolean"
+                            },
+                            "idMovimientoInverso": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "renglones": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "idTela": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "tela": {
+                                    "type": "string",
+                                    "description": "Nombre de la tela."
+                                  },
+                                  "idTelaColor": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "telaColor": {
+                                    "type": "string",
+                                    "description": "Nombre del color de la tela."
+                                  },
+                                  "pantone": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "idPartida": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Partida de la entrada o null (salidas)."
+                                  },
+                                  "partidaFolio": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Folio de la partida o null."
+                                  },
+                                  "loteProveedor": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Lote del proveedor de la partida o null."
+                                  },
+                                  "cantidad": {
+                                    "type": "number",
+                                    "description": "Cantidad de CUERPO (≥ 0; el signo lo da la dirección)."
+                                  },
+                                  "cantidadComplemento": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Cantidad de COMPLEMENTO o null (la tela no lleva)."
+                                  },
+                                  "costoUnit": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Costo unitario del CUERPO o null (sin permiso de importes / sin precio)."
+                                  },
+                                  "costoUnitComplemento": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio)."
+                                  },
+                                  "importe": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento."
+                                  }
+                                },
+                                "required": [
+                                  "idTela",
+                                  "tela",
+                                  "idTelaColor",
+                                  "telaColor",
+                                  "pantone",
+                                  "idPartida",
+                                  "partidaFolio",
+                                  "loteProveedor",
+                                  "cantidad",
+                                  "cantidadComplemento",
+                                  "costoUnit",
+                                  "costoUnitComplemento",
+                                  "importe"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "totalCuerpo": {
+                              "type": "number",
+                              "description": "Suma de las cantidades de cuerpo (derivada)."
+                            },
+                            "totalComplemento": {
+                              "type": "number",
+                              "description": "Suma de las cantidades de complemento (derivada)."
+                            },
+                            "totalImporte": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Suma de importes o null (sin permiso)."
+                            },
+                            "creadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            "creadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "folio",
+                            "idEmpresa",
+                            "idTipoMov",
+                            "tipoMov",
+                            "direccion",
+                            "idAlmacen",
+                            "almacen",
+                            "fecha",
+                            "origenTipo",
+                            "origenId",
+                            "observaciones",
+                            "cancelado",
+                            "idMovimientoInverso",
+                            "renglones",
+                            "totalCuerpo",
+                            "totalComplemento",
+                            "totalImporte",
+                            "creadoEn",
+                            "creadoPorId"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Movimiento de inventario de tela por COLOR con sus renglones."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento de ENTRADA con los faltantes, o null si no hubo."
+                    },
+                    "salida": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "folio": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Folio consecutivo por empresa (A3)."
+                            },
+                            "idEmpresa": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "idTipoMov": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "tipoMov": {
+                              "type": "string"
+                            },
+                            "direccion": {
+                              "type": "string",
+                              "enum": [
+                                "entrada",
+                                "salida",
+                                "traspaso"
+                              ]
+                            },
+                            "idAlmacen": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "almacen": {
+                              "type": "string"
+                            },
+                            "fecha": {
+                              "type": "string",
+                              "description": "Fecha (YYYY-MM-DD)."
+                            },
+                            "origenTipo": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "origenId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Id del hecho de origen (p. ej. orden) o null."
+                            },
+                            "observaciones": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "cancelado": {
+                              "type": "boolean"
+                            },
+                            "idMovimientoInverso": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "renglones": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "idTela": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "tela": {
+                                    "type": "string",
+                                    "description": "Nombre de la tela."
+                                  },
+                                  "idTelaColor": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "telaColor": {
+                                    "type": "string",
+                                    "description": "Nombre del color de la tela."
+                                  },
+                                  "pantone": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "idPartida": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Partida de la entrada o null (salidas)."
+                                  },
+                                  "partidaFolio": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Folio de la partida o null."
+                                  },
+                                  "loteProveedor": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Lote del proveedor de la partida o null."
+                                  },
+                                  "cantidad": {
+                                    "type": "number",
+                                    "description": "Cantidad de CUERPO (≥ 0; el signo lo da la dirección)."
+                                  },
+                                  "cantidadComplemento": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Cantidad de COMPLEMENTO o null (la tela no lleva)."
+                                  },
+                                  "costoUnit": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Costo unitario del CUERPO o null (sin permiso de importes / sin precio)."
+                                  },
+                                  "costoUnitComplemento": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio)."
+                                  },
+                                  "importe": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento."
+                                  }
+                                },
+                                "required": [
+                                  "idTela",
+                                  "tela",
+                                  "idTelaColor",
+                                  "telaColor",
+                                  "pantone",
+                                  "idPartida",
+                                  "partidaFolio",
+                                  "loteProveedor",
+                                  "cantidad",
+                                  "cantidadComplemento",
+                                  "costoUnit",
+                                  "costoUnitComplemento",
+                                  "importe"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "totalCuerpo": {
+                              "type": "number",
+                              "description": "Suma de las cantidades de cuerpo (derivada)."
+                            },
+                            "totalComplemento": {
+                              "type": "number",
+                              "description": "Suma de las cantidades de complemento (derivada)."
+                            },
+                            "totalImporte": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Suma de importes o null (sin permiso)."
+                            },
+                            "creadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            "creadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "folio",
+                            "idEmpresa",
+                            "idTipoMov",
+                            "tipoMov",
+                            "direccion",
+                            "idAlmacen",
+                            "almacen",
+                            "fecha",
+                            "origenTipo",
+                            "origenId",
+                            "observaciones",
+                            "cancelado",
+                            "idMovimientoInverso",
+                            "renglones",
+                            "totalCuerpo",
+                            "totalComplemento",
+                            "totalImporte",
+                            "creadoEn",
+                            "creadoPorId"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Movimiento de inventario de tela por COLOR con sus renglones."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento de SALIDA con los sobrantes, o null si no hubo."
+                    }
+                  },
+                  "required": [
+                    "idAlmacen",
+                    "almacen",
+                    "fecha",
+                    "sinDiferencias",
+                    "renglones",
+                    "entrada",
+                    "salida"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de un conteo físico de tela por color."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventarios/telas/color/salidas-orden": {
       "post": {
         "summary": "Registrar una salida de tela por color ligada a una orden (cuerpo y complemento juntos; sin partida)",
@@ -126740,7 +127937,7 @@
     },
     "/api/inventarios/telas/impreso": {
       "get": {
-        "summary": "Imprimir el inventario de telas (PDF de existencias por tela × lote × almacén)",
+        "summary": "Imprimir el inventario de telas (PDF de existencias por tela × color × almacén)",
         "tags": [
           "inventario-telas"
         ],
@@ -126763,20 +127960,9 @@
               "maximum": 9007199254740991
             },
             "in": "query",
-            "name": "idLote",
+            "name": "idTelaColor",
             "required": false,
-            "description": "Filtra por un lote."
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "in": "query",
-            "name": "idColor",
-            "required": false,
-            "description": "Filtra por el color del lote."
+            "description": "Filtra por un color de tela."
           },
           {
             "schema": {
@@ -126791,12 +127977,44 @@
           },
           {
             "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idCategoria",
+            "required": false,
+            "description": "Filtra por el tipo/categoría de la tela."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idProveedor",
+            "required": false,
+            "description": "Filtra por el proveedor dueño de la tela."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 150
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Busca por nombre de tela/proveedor/color/pantone."
+          },
+          {
+            "schema": {
               "type": "string"
             },
             "in": "query",
             "name": "incluirCeros",
             "required": false,
-            "description": "Incluye filas con existencia 0. Por defecto se omiten."
+            "description": "Incluye colores con existencia 0. Por defecto se omiten."
           }
         ],
         "security": [

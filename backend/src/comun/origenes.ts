@@ -51,6 +51,14 @@ export const ORIGEN = {
   migracion: 'migracion',
   /** Ajuste de kardex PT generado por un inventario cíclico (F7-E5). El `origenId` es el id del cíclico. */
   ajusteCiclico: 'ajuste-ciclico',
+  /**
+   * Ajuste de kardex de TELA generado por un CONTEO FÍSICO por color (fila 0.098): la persona
+   * capturó lo CONTADO y el servidor aplicó la diferencia. Sin `origenId` (el conteo no es una
+   * entidad: es la captura que produjo estos movimientos). Se distingue del ajuste a mano
+   * (`movimiento-manual`) porque ahí la cantidad la decidió quien capturó, y aquí la calculó el
+   * sistema contra el saldo que leyó bajo lock.
+   */
+  conteoTela: 'conteo-tela',
 } as const;
 
 /** Discriminador válido de `Movimiento.origenTipo`. */
