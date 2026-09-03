@@ -102,7 +102,7 @@ no dependa de que alguien se acuerde.
 ### Qué sigue pendiente o roto
 
 - **La remediación de aquellos archivos sigue abierta** (fila **0.123**): es de Gabriel pedirle a GitHub el
-  purgado, y de Daniel decidir si el repositorio sigue siendo público.
+  purgado; **Daniel ya decidió ponerlo privado** mientras eso ocurre (§Post-F9.188(c)).
 - **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
 
 ## 0.096 · 3-sep-2026 · **en prueba** — Ningún proveedor puede quedarse sin decir si factura
@@ -213,8 +213,8 @@ que decide qué se construye después.
 - 🔴 **La exposición sigue viva y no se arregla con código** (fila **0.123**). **De Gabriel:** pedirle a
   GitHub el purgado —que ahora hay que pedirlo por **tres** sitios: los archivos en el historial de
   `prueba`, la rama del PR que los subió, y los tres nombres de la versión 0.093— y decidir si los
-  archivos se retiran de la copia actual. **Daniel ya decidió que el repositorio se pone privado**
-  mientras eso ocurre; ejecutarlo es de Gabriel.
+  archivos se retiran de la copia actual. **De Daniel:** decidir si el repositorio debe seguir siendo
+  público *(decidido después: privado — ver 0.097)*.
 - ⏳ **Tres preguntas abiertas para Daniel**, todas sobre qué dato personal cabe en un repositorio
   público: si se seudonimizan los **alias de proveedores persona física** («CESAR VICTORIA 1»); si se
   conservan los **nombres de pila de empleadas junto a una valoración de su trabajo** (son cita textual
