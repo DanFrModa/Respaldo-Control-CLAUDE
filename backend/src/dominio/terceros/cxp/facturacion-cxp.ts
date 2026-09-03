@@ -35,9 +35,9 @@ import { resolverConFactura } from '../../esma/facturacion.js';
 const ORIGENES_SIN_FACTURA: readonly OrigenMovimientoCxpClave[] = ['entrada_sin_factura'];
 
 /**
- * Resuelve si un movimiento de CxP es CON factura. Devuelve un `boolean` (no `null`) porque
- * `MovimientoTercero.esFiscal` no es nullable: cuando nadie definió nada, el movimiento nace SIN
- * factura, que es como se comportaba CxP hasta hoy (no cambia ningún saldo existente).
+ * Resuelve si un movimiento de CxP es CON factura. Devuelve siempre un `boolean` porque
+ * `MovimientoTercero.esFiscal` no es nullable — y desde la fila 0.110 tampoco hay ya un "sin
+ * definir" que convertir: `resolverConFactura` LANZA en vez de devolverlo.
  *
  * Reglas, en orden:
  *  1. **El origen manda sobre la modalidad.** Si el origen es sin-factura por definición, el
@@ -45,8 +45,10 @@ const ORIGENES_SIN_FACTURA: readonly OrigenMovimientoCxpClave[] = ['entrada_sin_
  *     rechaza con un mensaje que dice por qué (D3).
  *  2. **La modalidad manda sobre lo pedido** (regla de EsMa, reusada tal cual):
  *     `solo_con` → con factura · `solo_sin` → sin factura · `ambos` → EXIGE que se indique.
- *  3. Sin modalidad definida (los proveedores migrados, que nunca contestaron la pregunta) se
- *     respeta lo que se mandó; si tampoco se mandó, nace sin factura.
+ *  3. **Sin modalidad definida NO se captura** (fila 0.110, §Post-F9.186(a)): lanza
+ *     `ErrorValidacion` pidiendo que se defina primero en el catálogo. Antes se respetaba lo que
+ *     se hubiera mandado y, si no venía nada, el movimiento nacía SIN factura en silencio — que es
+ *     exactamente el caso que Daniel quiere partir en dos, porque decide de dónde sale el pago.
  */
 export function resolverSegmentoCxp(
   origen: OrigenMovimientoCxpClave,
@@ -62,7 +64,7 @@ export function resolverSegmentoCxp(
     }
     return false;
   }
-  return resolverConFactura(modalidad, solicitado) ?? false;
+  return resolverConFactura(modalidad, solicitado);
 }
 
 /**

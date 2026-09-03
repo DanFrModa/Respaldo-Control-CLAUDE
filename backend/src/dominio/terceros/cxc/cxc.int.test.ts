@@ -287,7 +287,7 @@ describe('cancelación (inverso auditado)', () => {
 
   it('la ruta de CxC NO cancela un movimiento que es de un PROVEEDOR (404)', async () => {
     const proveedor = await cliente.proveedor.create({
-      data: { nombre: 'Prov X', diasCredito: 0 },
+      data: { modalidadFacturacion: 'solo_sin', nombre: 'Prov X', diasCredito: 0 },
     });
     const movProv = await registrarMovimientoTercero(
       sesion(),

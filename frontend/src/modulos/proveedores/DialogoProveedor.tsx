@@ -7,9 +7,11 @@ import { toast } from 'sonner';
 import {
   type DatosProveedorFormulario,
   ETIQUETAS_METODO_PAGO,
+  ETIQUETAS_MODALIDAD_FACTURACION,
   ETIQUETAS_MONEDA,
   esquemaProveedorFormulario,
   METODOS_PAGO_PROVEEDOR,
+  MODALIDADES_FACTURACION,
   MONEDAS_PROVEEDOR,
   numeroOpcionalACuerpo,
   SIN_ELEGIR,
@@ -20,7 +22,7 @@ import {
   useRolesProveedor,
   useSubirAdjuntoProveedor,
 } from '@/api/proveedores';
-import type { MetodoPagoClave, MonedaClave } from '@/api/esquemas';
+import type { MetodoPagoClave, ModalidadFacturacionClave, MonedaClave } from '@/api/esquemas';
 import type { Proveedor, ProveedorCrear, ProveedorEditar } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import {
@@ -106,6 +108,9 @@ const VALORES_INICIALES: DatosProveedorFormulario = {
   // Datos de taller (fusión de terceros, D12/R15)
   asegurado: false,
   obsPago: '',
+  // Facturación (fila 0.110): arranca sin elegir A PROPÓSITO — el alta no se puede guardar hasta
+  // que se conteste, que es justo lo que Daniel pidió ("a fuerzas hay que definir…").
+  modalidadFacturacion: SIN_ELEGIR,
 };
 
 /** Lee un campo de texto opcional del proveedor para el formulario (`null` -> ''). */
@@ -148,7 +153,14 @@ function enumOpcional<T extends string>(valor: string): T | undefined {
  * un dato que se dejo vacio (un campo omitido en el PATCH no se tocaria, M1).
  */
 function aCuerpoFormulario(datos: DatosProveedorFormulario): ProveedorCrear {
-  const cuerpo: ProveedorCrear = { nombre: datos.nombre };
+  // ⭐ La modalidad de facturación va DESDE LA CONSTRUCCIÓN, no como un añadido después: el tipo
+  // generado del contrato la exige (fila 0.110), así que el compilador no deja armar el cuerpo sin
+  // ella. Que llegue con un valor válido lo garantiza el `.refine` del esquema del formulario —y el
+  // backend re-valida, que es la autoridad (A1)—.
+  const cuerpo: ProveedorCrear = {
+    nombre: datos.nombre,
+    modalidadFacturacion: datos.modalidadFacturacion as ModalidadFacturacionClave,
+  };
 
   // ── Textos opcionales (se omiten si vacios) ─────────────────────────────────
   const textos: Array<[keyof ProveedorCrear, string]> = [
@@ -255,6 +267,10 @@ function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
     // Enum-opcionales: "sin elegir" -> null (borrar).
     moneda: enumOpcional<MonedaClave>(datos.moneda) ?? null,
     metodoPago: enumOpcional<MetodoPagoClave>(datos.metodoPago) ?? null,
+    // Facturación (fila 0.110): NO lleva el `?? null` de los demás enums, porque vaciarla es
+    // justamente lo que el backend rechaza. Nunca llega vacía: el `.refine` del formulario corta
+    // antes de enviar.
+    modalidadFacturacion: datos.modalidadFacturacion as ModalidadFacturacionClave,
   };
 
   return cuerpo;
@@ -347,6 +363,10 @@ export function DialogoProveedor({
         // Datos de taller (fusión de terceros, D12/R15)
         asegurado: bandera(proveedor.asegurado),
         obsPago: texto(proveedor.obsPago),
+        // Facturación (fila 0.110). Un proveedor MIGRADO la trae en null y aquí se ve vacía: la
+        // ficha abre y se consulta con toda normalidad (REGLA 0-B). Lo único que cambia es que,
+        // para GUARDAR, hay que elegirla.
+        modalidadFacturacion: texto(proveedor.modalidadFacturacion),
       });
       setIdsRoles(proveedor.roles.map((rol) => rol.id));
     } else {
@@ -424,6 +444,41 @@ export function DialogoProveedor({
   // lo que faltaba es que la pantalla la OBEDEZCA. Esconder no es impedir: el backend sigue siendo
   // la autoridad (A1) y su regla `factura ⇒ RFC + régimen` se valida igual.
   const emiteFactura = formulario.watch('factura');
+  const modalidadElegida = formulario.watch('modalidadFacturacion');
+  /**
+   * ⚠️ AVISO de contradicción entre los DOS campos que hoy contestan lo mismo (fila 0.124).
+   *
+   * El sistema arrastra dos preguntas sobre facturación: `factura` (*"¿Emite factura (CFDI)?"*,
+   * §Post-F9.22, la que gobierna la entrada de tela y el CFDI) y `modalidadFacturacion` (la de EsMa
+   * y CxP, fila 0.110). Nada las ata entre sí, así que un proveedor puede quedar contestado de las
+   * dos formas a la vez y **sus pagos se parten según por qué puerta entraron**. Unificarlas es
+   * decisión de negocio pendiente (fila 0.124) y de radio mucho mayor: aquí NO se arregla.
+   *
+   * ⭐ SON DOS SENTIDOS, Y EL SEGUNDO ES EL CARO. Avisar de uno solo sería peor que no avisar: le
+   * enseñaría al usuario que "sin aviso = consistente", que es falso justo donde más duele.
+   *  • `factura=false` + `solo_con`/`ambos` → dice que no timbra y que aun así factura.
+   *  • `factura=true` + `solo_sin` → **el grave**: sus cargos por CFDI nacen `esFiscal: true` (van
+   *    por el banco) mientras sus capturas manuales de CxP nacen `false` (van por la relación). Es
+   *    el caso que el TSDoc de `dominio/terceros/segmento-motor.ts` señala como el más caro: un
+   *    proveedor mal capturado como `solo_sin` degradaría una factura timbrada **y el UUID queda
+   *    consumido para siempre**.
+   *
+   * Las combinaciones que NO son contradicción y por eso callan: `factura=true` + `ambos` (timbra,
+   * y unas cosas van con factura y otras no) y `factura=false` + `solo_sin` (no timbra, todo a mano).
+   *
+   * El aviso NO BLOQUEA el guardado a propósito, y no es pereza: bloquear chocaría de frente con la
+   * REGLA 0-B. Los proveedores migrados llegan sin modalidad; en cuanto alguien abra la ficha para
+   * poder guardarla, un bloqueo lo dejaría encerrado sin salida. Avisar informa; bloquear ata.
+   */
+  const avisoFacturacion: string | null =
+    emiteFactura === false && (modalidadElegida === 'solo_con' || modalidadElegida === 'ambos')
+      ? 'En «Fiscal» este proveedor está marcado como que NO emite factura (CFDI), pero aquí dice ' +
+        'que sí factura. Revisa cuál de las dos es la buena.'
+      : emiteFactura === true && modalidadElegida === 'solo_sin'
+        ? 'En «Fiscal» este proveedor está marcado como que SÍ emite factura (CFDI), pero aquí dice ' +
+          'que todo lo suyo va sin factura. Si de verdad timbra, sus facturas nacerían mal ' +
+          'clasificadas. Revisa cuál de las dos es la buena.'
+        : null;
 
   // §Post-F9.56 punto 7 — los datos de taller solo salen si el proveedor presta algún servicio.
   const esTaller = (rolesCatalogo.data ?? []).some(
@@ -532,6 +587,43 @@ export function DialogoProveedor({
                         {...registrar('razonSocial')}
                       />
                       <FieldError errors={[errors.razonSocial]} />
+                    </Field>
+
+                    {/* ⭐ MODALIDAD DE FACTURACIÓN — obligatoria (fila 0.110, §Post-F9.186(a)).
+                        Daniel: *"es un campo obligatorio de llenar. A fuerzas hay que definir si es
+                        con, sin o ambas"*. Va en GENERAL, no en Fiscal, a propósito: Fiscal y Pago
+                        son secciones PLEGADAS por defecto, y un campo obligatorio escondido detrás
+                        de un acordeón cerrado deja al usuario con un error que no puede ni ver.
+                        Además no es un dato del SAT: es de quién y cómo se le paga. */}
+                    <Field data-invalid={Boolean(errors.modalidadFacturacion)}>
+                      <FieldLabel htmlFor="proveedor-modalidad-facturacion" required>
+                        ¿Cómo factura?
+                      </FieldLabel>
+                      <SelectNativo
+                        id="proveedor-modalidad-facturacion"
+                        aria-invalid={Boolean(errors.modalidadFacturacion)}
+                        disabled={guardando}
+                        data-testid="proveedor-modalidad-facturacion"
+                        {...registrar('modalidadFacturacion')}
+                      >
+                        <option value={SIN_ELEGIR}>Elige una opción…</option>
+                        {MODALIDADES_FACTURACION.map((modalidad) => (
+                          <option key={modalidad} value={modalidad}>
+                            {ETIQUETAS_MODALIDAD_FACTURACION[modalidad]}
+                          </option>
+                        ))}
+                      </SelectNativo>
+                      <FieldDescription>
+                        Decide de dónde sale su pago: lo que va CON factura se paga desde el estado
+                        de cuenta del banco; lo que va SIN factura, desde la relación de pagos. Si
+                        maneja las dos, se elige movimiento por movimiento.
+                      </FieldDescription>
+                      {avisoFacturacion === null ? null : (
+                        <FieldDescription data-testid="aviso-facturacion-contradictoria">
+                          ⚠️ Ojo: {avisoFacturacion}
+                        </FieldDescription>
+                      )}
+                      <FieldError errors={[errors.modalidadFacturacion]} />
                     </Field>
                   </FieldGroup>
                 </AccordionContent>

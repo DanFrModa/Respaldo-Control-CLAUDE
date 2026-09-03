@@ -120,8 +120,14 @@ const camposEnriquecidos = {
     .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' })
     .optional(),
 
-  // ── Facturación EsMa (F6-E4/E5, decisión (h)) ────────────────────────────────
-  /** Modalidad de facturación de su cuenta de maquila (solo_con/solo_sin/ambos). */
+  // ── Facturación (F6-E4/E5 decisión (h); general del proveedor desde §Post-F9.57) ─
+  /**
+   * Modalidad de facturación del proveedor (solo_con/solo_sin/ambos).
+   *
+   * ⚠️ Aquí es `.optional()` porque este bloque lo comparten el ALTA, la EDICIÓN y la MIGRACIÓN, y
+   * cada una lo trata distinto. En el ALTA es **OBLIGATORIA** (fila 0.110): la sobrescribe
+   * {@link esquemaProveedorCrear}. Ver ahí el porqué.
+   */
   modalidadFacturacion: z
     .enum(MODALIDADES_FACTURACION, { error: 'La modalidad de facturación no es válida' })
     .optional(),
@@ -156,8 +162,12 @@ const camposEnriquecidosEditar = {
   // Fusión de terceros (D12/R15): `obsPago` se puede VACIAR (M1); `asegurado`
   // es bandera (omitir = no tocar), no se hace nullable (igual que `factura`).
   obsPago: camposEnriquecidos.obsPago.nullable(),
-  // Modalidad de facturación EsMa (enum): se puede VACIAR (null = "no definido").
-  modalidadFacturacion: camposEnriquecidos.modalidadFacturacion.nullable(),
+  // ⭐ Modalidad de facturación: **NO es nullable** (fila 0.110). Omitir = no tocar (así siguen
+  // funcionando los PATCH parciales: desactivar/reactivar un proveedor, o la fusión de roles del
+  // ETL). Pero mandar `null` —vaciarla— se RECHAZA: es el único campo del formulario que no se
+  // puede dejar sin definir, porque decide de dónde sale el pago del proveedor (§Post-F9.186(a)).
+  // Efecto en la pantalla: abrir y GUARDAR la ficha de un proveedor migrado obliga a elegirla.
+  modalidadFacturacion: camposEnriquecidos.modalidadFacturacion,
 } as const;
 
 // ── CONTACTOS del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1 / §Post-F9.57 punto 1) ──────────
@@ -308,7 +318,7 @@ export type AnalizarConstanciaSalida = z.infer<typeof esquemaAnalizarConstanciaS
  * fiscales/comerciales/operativos y la regla `factura ⇒ rfc + regimenFiscalSat`
  * (validada como regla de captura aquí; el dominio la repite, A1).
  */
-export const esquemaProveedorCrear = z
+const baseProveedorCrear = z
   .object({
     nombre: z
       .string({ error: 'El nombre es obligatorio' })
@@ -344,19 +354,73 @@ export const esquemaProveedorCrear = z
     roles: esquemaRolesIds.optional(),
     ...camposEnriquecidos,
   })
-  .refine(
-    // Regla de captura R15: si emite CFDI, exige RFC y régimen fiscal. Se valida
-    // sobre el payload de captura (no rompe filas migradas, que no mandan `factura`).
-    (datos) =>
-      datos.factura !== true || ((datos.rfc ?? '') !== '' && (datos.regimenFiscalSat ?? '') !== ''),
-    {
-      error: 'Si el proveedor factura, captura su RFC y su régimen fiscal',
-      path: ['rfc'],
-    },
-  );
+  .describe('Alta de proveedor (base compartida por la captura y la migración).');
 
-/** Datos validados de alta de proveedor. */
+/** Regla de captura R15, compartida por las dos variantes del alta: factura ⇒ RFC + régimen. */
+const reglaFacturaExigeRfcAlta = {
+  regla: (datos: {
+    factura?: boolean | undefined;
+    rfc?: string | undefined;
+    regimenFiscalSat?: string | undefined;
+  }): boolean =>
+    datos.factura !== true || ((datos.rfc ?? '') !== '' && (datos.regimenFiscalSat ?? '') !== ''),
+  opciones: {
+    error: 'Si el proveedor factura, captura su RFC y su régimen fiscal',
+    path: ['rfc'] as const,
+  },
+} as const;
+
+/**
+ * ALTA de proveedor (captura normal). Igual que la base, pero con la **modalidad de facturación
+ * OBLIGATORIA** (fila 0.110).
+ *
+ * ⭐ POR QUÉ ES OBLIGATORIA. Daniel (3-sep-2026, §Post-F9.186(a)): *"es un campo **obligatorio** de
+ * llenar. **A fuerzas hay que definir si es con, sin o ambas**"*. La marca con/sin factura decide
+ * **de dónde sale el pago** del proveedor: CON factura el pago nace del estado de cuenta del BANCO;
+ * SIN factura nace de la RELACIÓN que Daniel define y que se ejecuta tal cual (§Post-F9.184(f)). Un
+ * proveedor sin clasificar deja al sistema sin saber por cuál de los dos caminos meter su pago —y
+ * ese pago se pierde o se duplica—, así que la pregunta se hace **al darlo de alta**, no después.
+ *
+ * ⚠️ REGLA 0-B: esto NO toca a los proveedores que ya existen. Los migrados siguen consultándose,
+ * apareciendo en su estado de cuenta y en los reportes con la modalidad vacía; lo único que no se
+ * puede es **crear uno nuevo** sin ella (ni capturarle un movimiento hasta definírsela). La
+ * migración usa {@link esquemaProveedorCrearMigrado}.
+ */
+export const esquemaProveedorCrear = baseProveedorCrear
+  .extend({
+    modalidadFacturacion: z.enum(MODALIDADES_FACTURACION, {
+      error:
+        'Indica cómo factura este proveedor: solo con factura, solo sin factura, o de las dos formas',
+    }),
+  })
+  .refine(reglaFacturaExigeRfcAlta.regla, {
+    error: reglaFacturaExigeRfcAlta.opciones.error,
+    path: [...reglaFacturaExigeRfcAlta.opciones.path],
+  });
+
+/**
+ * ALTA en modo MIGRACIÓN: idéntica al alta normal salvo que la modalidad de facturación **puede
+ * faltar**. Uso EXCLUSIVO del ETL (`migracion/loaders/proveedores.ts`), **jamás desde una ruta
+ * REST** — el mismo patrón que `registrarMovimientoTerceroInterno` en el motor de terceros.
+ *
+ * Existe por la REGLA 0-B (`CLAUDE.md` §7): el sistema viejo nunca hizo esta pregunta, así que el
+ * histórico llega con el dato vacío **a propósito** y eso NO es un defecto. Daniel: *"yo me encargo
+ * de ponerlo bien cuando hagamos la migración de datos reales"*. Rellenarlo aquí con un valor
+ * inventado sería justo lo que la regla prohíbe.
+ */
+export const esquemaProveedorCrearMigrado = baseProveedorCrear.refine(
+  reglaFacturaExigeRfcAlta.regla,
+  {
+    error: reglaFacturaExigeRfcAlta.opciones.error,
+    path: [...reglaFacturaExigeRfcAlta.opciones.path],
+  },
+);
+
+/** Datos validados de alta de proveedor (captura normal: la modalidad viene siempre). */
 export type DatosProveedorCrear = z.infer<typeof esquemaProveedorCrear>;
+
+/** Datos validados de alta de proveedor en modo MIGRACIÓN (la modalidad puede faltar). */
+export type DatosProveedorCrearMigrado = z.infer<typeof esquemaProveedorCrearMigrado>;
 
 /**
  * Edición de proveedor: todos los campos del alta son opcionales (edición parcial)

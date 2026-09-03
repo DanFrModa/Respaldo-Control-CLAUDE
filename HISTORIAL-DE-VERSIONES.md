@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.096 · 3-sep-2026 · **en prueba** — Ningún proveedor puede quedarse sin decir si factura
+
+### Qué se puede hacer ahora que antes no
+
+**Dar de alta un proveedor diciendo cómo factura.** Suena obvio, y no lo era: **ese campo no existía en la
+pantalla**, así que **todo proveedor creado desde el sistema nacía sin clasificar**. No era que a alguien se
+le olvidara — es que no se podía poner.
+
+Y eso importa mucho más de lo que parece, porque **esa marca decide por dónde entra su pago**: lo que va con
+factura nace del estado de cuenta del banco; lo que va sin factura, de la relación que Daniel arma cada
+semana. **Un proveedor sin clasificar dejaba al sistema sin saber por cuál de los dos caminos meterlo.**
+
+- Ahora **es obligatorio** al dar de alta, y **no se puede vaciar** al editar.
+- Cuando el proveedor es de un solo tipo, **el sistema lo pone solo**; cuando es de los dos, **te obliga a
+  elegir en cada movimiento**.
+- Si el proveedor no tiene esa marca, **el sistema ya no guarda el movimiento a medias**: avisa.
+
+### Qué cambió y puede sorprender
+
+- **Hay un aviso nuevo cuando los dos campos de facturación se contradicen** — la casilla de *«¿emite
+  factura?»* y la de *«¿cómo factura?»*. **Avisa, pero deja guardar**: la regla de cuál manda todavía no
+  está tomada, y bloquear dejaría encerrados a los proveedores que vengan de Access.
+- **Los proveedores ya migrados se siguen leyendo y consultando sin problema**, aunque no tengan la marca.
+  Sólo no se les puede capturar un movimiento nuevo hasta que se les defina.
+- **Recibir de maquila sigue funcionando** con un maquilero migrado; lo que se detiene es **validar** ese
+  cargo, que es justo donde se decide por qué camino cobra.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Hay DOS campos contestando la misma pregunta** —«¿emite factura?» y «¿cómo factura?»— y **nada impide
+  que se contradigan**. Un proveedor así **partiría sus pagos por los dos caminos según por qué puerta
+  entraron**. Es la fila **0.124** y **necesita una decisión de Daniel**: si la modalidad ya dice «con, sin o
+  ambas», probablemente el sí/no sobra y debería derivarse.
+- **Sin migración de datos, sin permisos nuevos.**
+
 ## 0.095 · 3-sep-2026 · **en prueba** — Los permisos se declaran uno por uno
 
 ### Qué se puede hacer ahora que antes no

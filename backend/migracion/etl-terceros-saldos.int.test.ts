@@ -44,12 +44,22 @@ beforeEach(async () => {
 
   idP1 = (
     await cliente.proveedor.create({
-      data: { nombre: 'Telas del Norte', rfc: 'AAA010101AA1', diasCredito: 30 },
+      data: {
+        modalidadFacturacion: 'solo_sin',
+        nombre: 'Telas del Norte',
+        rfc: 'AAA010101AA1',
+        diasCredito: 30,
+      },
     })
   ).id;
   idP2 = (
     await cliente.proveedor.create({
-      data: { nombre: 'Proveedor Dos', rfc: 'BBB020202BB2', diasCredito: 0 },
+      data: {
+        modalidadFacturacion: 'solo_sin',
+        nombre: 'Proveedor Dos',
+        rfc: 'BBB020202BB2',
+        diasCredito: 0,
+      },
     })
   ).id;
   idC1 = (
@@ -162,7 +172,12 @@ describe('ETL de saldos iniciales F9-E6 (integración)', () => {
       data: { nombre: 'Coexistencia SA', paraIpt: true, paraEdr: true, favorita: false },
     });
     const provCoex = await cliente.proveedor.create({
-      data: { nombre: 'Proveedor Coex', rfc: 'COE010101AA1', diasCredito: 30 },
+      data: {
+        modalidadFacturacion: 'solo_sin',
+        nombre: 'Proveedor Coex',
+        rfc: 'COE010101AA1',
+        diasCredito: 30,
+      },
     });
 
     // Una CAPTURA normal (vía el motor) AVANZA la secuencia de ESA empresa → folio V (=1).

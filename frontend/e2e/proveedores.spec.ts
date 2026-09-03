@@ -55,6 +55,8 @@ test.describe('CRUD de Proveedores', () => {
     // El campo TIPO se retiró en V1-E3f pieza B (§Post-F9.56 punto 3): el rol lo cubre.
     // Crear exige >=1 rol (R15): marca el primero del selector (abierto por defecto).
     await dialogoAlta.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
+    // La modalidad de facturación es OBLIGATORIA (fila 0.110): sin elegirla el alta no se envía.
+    await dialogoAlta.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
     await page.getByTestId('guardar-proveedor').click();
 
     // El toast confirma y la fila aparece en la lista; la busqueda la aisla.
@@ -177,6 +179,8 @@ test.describe('Proveedor enriquecido (R15)', () => {
     await dialogo.getByLabel('RFC').fill('ABC120101T1A');
     await dialogo.getByLabel('Régimen fiscal (SAT)').fill('601');
 
+    // La modalidad de facturación es OBLIGATORIA (fila 0.110): sin elegirla el alta no se envía.
+    await dialogo.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
     await page.getByTestId('guardar-proveedor').click();
 
     // ── Aparece en la lista ─────────────────────────────────────────────────────
@@ -217,6 +221,8 @@ test.describe('Proveedor enriquecido (R15)', () => {
     const dialogoAlta = page.getByRole('dialog');
     await dialogoAlta.locator('#proveedor-nombre').fill(nombre);
     await dialogoAlta.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
+    // La modalidad de facturación es OBLIGATORIA (fila 0.110): sin elegirla el alta no se envía.
+    await dialogoAlta.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
     await page.getByTestId('guardar-proveedor').click();
     await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();
 
