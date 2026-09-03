@@ -682,7 +682,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             clave: 'inventario-telas-ajuste',
             titulo: 'Ajuste de telas por color',
             descripcion:
-              'Conteo físico / arranque desde cero por color: la entrada crea la partida',
+              'Conteo físico / arranque desde cero por color: se captura lo contado y el sistema aplica la diferencia',
             ruta: '/inventarios/telas/ajuste',
             icono: 'paquete',
             permisos: ['inventario-telas.mover'],
@@ -717,26 +717,25 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['inventario-telas.mover'],
             subVista: true,
           },
-          // Las vistas de "materiales" que sirven a las DOS dimensiones (telas por lote + avíos)
-          // cuelgan aquí: el flujo de telas es el dominante y duplicarlas bajo Avíos ensuciaría el
-          // menú (decisión del lead, R1). Ya solo son DOS: el ajuste se volvió solo-avíos el
-          // 13-ago-2026 y se mudó al grupo «Avíos».
+          // La ÚNICA vista de "materiales" que sigue colgando de «Telas»: el KARDEX. Sirve a las
+          // DOS dimensiones y su pata de tela SÍ SIGUE VIVA — es la única ventana que queda a los
+          // movimientos del flujo LEGADO por lote (el histórico migrado y lo que capture «Salida a
+          // orden por lote (legado)»), porque el kardex del inventario vigente va por COLOR y vive
+          // DENTRO de «Inventario de telas». Por eso NO se muda a «Avíos» como sus dos hermanas:
+          // esconderla de aquí sería quitarle la pantalla justo a quien la busca. Lo que sí se
+          // arregló (fila 0.098) es que MINTIERA: la pestaña dice «Telas (lote · legado)», explica
+          // de qué flujo habla y a dónde ir por el vigente, y el vacío ya no es mudo.
+          //
+          // Sus hermanas ya se fueron a «Avíos» al quedarse solo-avíos: el AJUSTE el 13-ago-2026 y
+          // el TRASPASO en la fila 0.098 (mismo criterio, mismo defecto).
           {
             clave: 'inventario-materiales-kardex',
             titulo: 'Kardex de materiales',
-            descripcion: 'Movimientos con saldo corrido por tela (lote) o por avío',
+            descripcion:
+              'Saldo corrido por avío, y el histórico LEGADO de telas por lote (el kardex vigente de una tela va por color)',
             ruta: '/inventarios/materiales/kardex',
             icono: 'almacen',
             permisos: ['inventario-telas.ver', 'inventario-avios.ver'],
-            subVista: true,
-          },
-          {
-            clave: 'inventario-materiales-traspasos',
-            titulo: 'Traspaso de materiales',
-            descripcion: 'Mueve tela (por lote) o avío entre almacenes en una sola operación',
-            ruta: '/inventarios/materiales/traspasos',
-            icono: 'paquete',
-            permisos: ['inventario-telas.mover', 'inventario-avios.mover'],
             subVista: true,
           },
         ],
@@ -782,6 +781,24 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             descripcion:
               'Ajuste / inventario físico de avíos (entrada o salida, motivo obligatorio)',
             ruta: '/inventarios/materiales/ajustes',
+            icono: 'paquete',
+            permisos: ['inventario-avios.mover'],
+            subVista: true,
+          },
+          {
+            // AQUÍ, bajo Avíos, desde la fila 0.098 — MISMO caso y MISMO criterio que «Ajuste de
+            // avíos» en agosto. Vivía bajo «Telas» como «Traspaso de materiales» porque servía a
+            // las dos dimensiones, pero su pestaña de TELAS estaba atada al motor LEGADO por lote
+            // —y la pantalla ARRANCABA en ella—, así que lo traspasado ahí no movía «Inventario de
+            // telas» (la vista `existencia_tela_color` excluye los renglones con
+            // `id_tela_color = NULL`). El traspaso de TELA se hace por color en «Traspaso de telas
+            // por color», hijo de «Telas», y así lo dictó Daniel (§Post-F9.32). Al quedarse SOLO
+            // con avíos, dejarlo colgando de «Telas» escondía la pantalla justo de quien la busca.
+            // Su gate se estrechó al permiso que de verdad usa (A4).
+            clave: 'inventario-materiales-traspasos',
+            titulo: 'Traspaso de avíos',
+            descripcion: 'Mueve avío entre almacenes en una sola operación (salida + entrada)',
+            ruta: '/inventarios/materiales/traspasos',
             icono: 'paquete',
             permisos: ['inventario-avios.mover'],
             subVista: true,
@@ -1605,18 +1622,28 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         // `existencia_tela_color` los excluye (`WHERE d."id_tela_color" IS NOT NULL`, migración
         // 20260806130000_a2_partidas_telas), así que traspasar por lote deja «Existencias de telas»
         // —el primer hijo de este mismo menú— sin moverse. Ofrecer solo el de lote era mandar al
-        // usuario al flujo muerto.
+        // usuario al flujo que YA NO OPERA. (Decía «al flujo muerto»: se precisó en la fila 0.098,
+        // porque esa misma dimensión legada es la que el KARDEX de aquí abajo sigue sirviendo — no
+        // está muerta, está jubilada para ESCRIBIR.)
         //
-        // + las DOS vistas de «materiales» que SÍ sirven a las dos dimensiones (12-ago-2026), AL
-        // FINAL porque son las de lote/avíos: kardex y traspaso (su gate es `inventario-telas.* |
-        // inventario-avios.*`). Cuelgan del padre «Telas» en el catálogo y `resolverEntradaRiel`
-        // solo admite hijos del MISMO padre, así que no se pueden colgar de Avíos. Hasta el
-        // 12-ago-2026 no tenían ENTRADA EN EL MENÚ ni enlace estable: solo ⌘K/URL o el hub
-        // `/inventarios` (`InventariosPagina`), que tampoco es entrada del riel. OJO al leer el
-        // menú: para TELAS el traspaso vigente es el de color; «Traspaso de materiales» está por
-        // los AVÍOS (su pata de tela es la legada por lote) — así lo fijó `DECISIONES.md
-        // §Post-F9.32`. La TERCERA vista de «materiales», el ajuste, se fue al padre «Avíos» el
-        // 13-ago-2026: ya es solo-avíos («Ajuste de avíos») y aquí no la encontraba quien la busca.
+        // + la ÚNICA vista de «materiales» que sigue aquí (12-ago-2026), AL FINAL porque es la de
+        // lote/avíos: el KARDEX (su gate es `inventario-telas.ver | inventario-avios.ver`). Cuelga
+        // del padre «Telas» en el catálogo y `resolverEntradaRiel` solo admite hijos del MISMO
+        // padre, así que no se puede colgar de Avíos. Hasta el 12-ago-2026 no tenía ENTRADA EN EL
+        // MENÚ ni enlace estable: solo ⌘K/URL o el hub `/inventarios` (`InventariosPagina`), que
+        // tampoco es entrada del riel. Se QUEDA aquí a propósito (fila 0.098): su pata de tela
+        // sigue VIVA —es la única ventana a los movimientos del flujo legado por lote— y moverla a
+        // «Avíos» se la escondería a quien la busca; lo que se arregló es que la pantalla dijera de
+        // qué flujo habla y a dónde ir por el kardex vigente (que va por COLOR, dentro de
+        // «Inventario de telas»).
+        //
+        // Las otras dos vistas de «materiales» ya se fueron al padre «Avíos» al quedarse solo-avíos:
+        // el AJUSTE el 13-ago-2026 y el TRASPASO en la fila 0.098. El criterio NO es «su pata de
+        // tela está muerta» —opera la MISMA dimensión legada que este kardex—, sino que aquéllas
+        // TIENEN REEMPLAZO VIGENTE dictado por Daniel (§Post-F9.32: el traspaso y el ajuste de tela
+        // se hacen POR COLOR) y este kardex no tiene ninguno: es la única ventana al histórico.
+        // OJO al leer el menú: para TELAS el traspaso vigente es el de COLOR — así lo fijó
+        // `DECISIONES.md §Post-F9.32`.
         tipo: 'padre',
         clave: 'telas',
         hijos: [
@@ -1627,22 +1654,27 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
           'inventario-telas-ajuste',
           'inventario-telas-traspaso',
           'inventario-materiales-kardex',
-          'inventario-materiales-traspasos',
         ],
       },
       {
         // Avíos es PADRE desplegable (Daniel, 12-ago-2026): como hoja colapsada solo navegaba a
         // Existencias y el «Catálogo de avíos» se quedaba sin ENTRADA EN EL MENÚ —igual que le pasó
         // al de telas en A2—; su único enlace era la tarjeta del hub `/catalogos`, que tampoco es
-        // entrada del riel. Van sus TRES hijos, que son todos los que tiene el padre: +«Ajuste de
-        // avíos» el 13-ago-2026, que colgaba de «Telas» cuando todavía servía a las dos dimensiones
-        // —al quedarse solo-avíos, ahí se escondía justo de quien la busca—. El KARDEX y el TRASPASO
-        // de avíos siguen en las vistas de «materiales» bajo el padre «Telas» (sirven a las dos
-        // dimensiones y `resolverEntradaRiel` solo admite hijos del MISMO padre); no hay pantalla de
-        // "movimientos de avíos" — los movimientos de avío se capturan por ese ajuste y ese traspaso.
+        // entrada del riel. Van sus CUATRO hijos, que son todos los que tiene el padre: +«Ajuste de
+        // avíos» el 13-ago-2026 y +«Traspaso de avíos» en la fila 0.098 — las dos colgaban de
+        // «Telas» cuando todavía servían a las dos dimensiones y, al quedarse solo-avíos, ahí se
+        // escondían justo de quien las busca. El KARDEX sigue en la vista de «materiales» bajo el
+        // padre «Telas» (sirve a las dos dimensiones —su pata de tela legada sigue viva— y
+        // `resolverEntradaRiel` solo admite hijos del MISMO padre); no hay pantalla de "movimientos
+        // de avíos" — los movimientos de avío se capturan por ese ajuste y ese traspaso.
         tipo: 'padre',
         clave: 'avios',
-        hijos: ['inventario-avios-existencias', 'catalogo-avios', 'inventario-materiales-ajustes'],
+        hijos: [
+          'inventario-avios-existencias',
+          'catalogo-avios',
+          'inventario-materiales-ajustes',
+          'inventario-materiales-traspasos',
+        ],
       },
       {
         // Compras es PADRE desplegable (pedido de Daniel, 11-ago-2026: «en Compras no hay un

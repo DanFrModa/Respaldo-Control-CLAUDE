@@ -1,5 +1,6 @@
 import { Ban } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import type { Avio } from '@/api/avios';
@@ -33,12 +34,27 @@ type Dimension = 'tela' | 'avio';
 /**
  * KARDEX de materiales (F4-E1, doc 04-Inventarios §B.4 — re-vestido R9 al estándar del grupo):
  * movimientos cronológicos con SALDO CORRIDO en card única (toolbar con combobox + conteo plano +
- * TABLA DENSA). Dos dimensiones en un riel segmentado (proto `.tabs`): TELAS (por tela; entradas,
- * salidas a orden visibles vía origen) y AVÍOS (por avío). Las salidas ligadas a orden muestran su
- * origen. Costos/importes solo si la sesión tiene `telas.ver-totales` (el backend ya los omite si
- * no — la UI no los asume). Consulta MÓVIL (tarjetas en móvil, tabla en escritorio).
- * `inventario-telas.ver`/`inventario-avios.ver` gobiernan el acceso. Permite CANCELAR un movimiento
- * (inverso auditado, D3) con `*.mover`.
+ * TABLA DENSA). Dos dimensiones en un riel segmentado (proto `.tabs`): TELAS POR LOTE (flujo
+ * LEGADO) y AVÍOS (por avío). Las salidas ligadas a orden muestran su origen. Costos/importes solo
+ * si la sesión tiene `telas.ver-totales` (el backend ya los omite si no — la UI no los asume).
+ * Consulta MÓVIL (tarjetas en móvil, tabla en escritorio). `inventario-telas.ver`/
+ * `inventario-avios.ver` gobiernan el acceso. Permite CANCELAR un movimiento (inverso auditado,
+ * D3) con `*.mover`.
+ *
+ * 🔴 LA PESTAÑA DE TELAS ES LA DEL FLUJO LEGADO POR LOTE, y hasta v0.097 no lo decía (fila 0.098).
+ * `kardexTela` filtra `idTelaColor: null` en el servidor, así que aquí SOLO salen los movimientos
+ * del flujo viejo: quien entraba buscando los movimientos de una tela del inventario VIGENTE se
+ * llevaba una pantalla vacía y muda. El kardex vigente va por COLOR y vive DENTRO de «Inventario
+ * de telas» (doble clic en el color).
+ *
+ * ⚠️ **Esta pestaña NO se retiró, y la razón NO es que las otras estuvieran «muertas».** Las tres
+ * —el ajuste (13-ago-2026), el traspaso (fila 0.098) y este kardex— operan la MISMA dimensión
+ * legada por lote, así que «muerta» no las distinguiría. Lo que las separa es si **tienen a dónde
+ * mandar al usuario**: aquéllas tienen reemplazo vigente dictado por Daniel (§Post-F9.32, por
+ * COLOR) y este kardex **no tiene ninguno** — es la única ventana a los movimientos por lote (el
+ * histórico migrado de Access y lo que capture «Salida a orden por lote (legado)»). Retirarlo no
+ * habría movido a nadie a otra pantalla: habría borrado la única. El criterio completo está escrito
+ * una sola vez, en `TraspasoMaterialesPagina.tsx`. Lo que aquí se arregló es que MINTIERA.
  */
 export function KardexMaterialesPagina(): React.JSX.Element {
   const [dimension, setDimension] = useState<Dimension>('tela');
@@ -50,15 +66,15 @@ export function KardexMaterialesPagina(): React.JSX.Element {
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Kardex de materiales
           </h1>
-          <p className="truncate text-[12.5px] text-muted-foreground">
-            Movimientos con saldo corrido por tela (lote) o por avío
+          <p className="text-[12.5px] text-muted-foreground">
+            Movimientos con saldo corrido por avío, o de telas del flujo LEGADO por lote
           </p>
         </div>
       </header>
 
       <PestanasSegmentadas<Dimension>
         opciones={[
-          { valor: 'tela', etiqueta: 'Telas', testid: 'kardex-mat-dim-tela' },
+          { valor: 'tela', etiqueta: 'Telas (lote · legado)', testid: 'kardex-mat-dim-tela' },
           { valor: 'avio', etiqueta: 'Avíos', testid: 'kardex-mat-dim-avio' },
         ]}
         valor={dimension}
@@ -79,7 +95,14 @@ function efectoRenglon(entrada: number, salida: number): string {
   return '0';
 }
 
-/** Kardex por TELA (card estándar: toolbar con combobox + tabla densa). */
+/**
+ * Kardex por TELA del flujo LEGADO POR LOTE (card estándar: toolbar con combobox + tabla densa).
+ *
+ * 🔴 Sólo ve los movimientos con `id_tela_color = NULL` (`kardexTela` los filtra en el servidor,
+ * reviewer A2 #1): el histórico migrado y lo que capture «Salida a orden por lote (legado)». Los
+ * del inventario VIGENTE por color no salen aquí — su kardex se abre dentro de «Inventario de
+ * telas». El aviso y los vacíos de abajo lo dicen: antes callaban (fila 0.098).
+ */
 function KardexTela(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-telas.mover');
@@ -90,133 +113,155 @@ function KardexTela(): React.JSX.Element {
   const cancelar = useCancelarTela();
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
-        <div className="w-64 [&_input]:h-8 [&_input]:text-sm">
-          <SelectorTela
-            idSeleccionado={tela?.id}
-            alSeleccionar={setTela}
-            alLimpiar={() => setTela(undefined)}
-          />
-        </div>
-        {/* Identidad VISIBLE de la tela consultada: nombre + descripción (el value del input no
+    <div className="space-y-3">
+      {/* Aviso PERMANENTE (no sólo cuando está vacío): esta pestaña habla del flujo viejo, y el
+          kardex que casi todo mundo viene a buscar está en otra pantalla. */}
+      <p className="text-[12.5px] text-muted-foreground" data-testid="kardex-tela-nota-legado">
+        Este kardex es del flujo <b>LEGADO por lote</b>. El kardex vigente de una tela va por{' '}
+        <b>color</b>: se abre en{' '}
+        <Link className="text-primary underline" to="/inventarios/telas/existencias">
+          Inventario de telas
+        </Link>
+        , con doble clic en el color.
+      </p>
+
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+          <div className="w-64 [&_input]:h-8 [&_input]:text-sm">
+            <SelectorTela
+              idSeleccionado={tela?.id}
+              alSeleccionar={setTela}
+              alLimpiar={() => setTela(undefined)}
+            />
+          </div>
+          {/* Identidad VISIBLE de la tela consultada: nombre + descripción (el value del input no
             es un nodo de texto; el kardex debe decir de QUÉ tela es). */}
-        {tela !== undefined ? (
-          <span className="truncate text-xs text-muted-foreground" data-testid="kardex-tela-sel">
-            <span className="font-medium text-foreground">{tela.nombre}</span>
-            {tela.descripcion !== null ? <> — {tela.descripcion}</> : null}
-          </span>
-        ) : null}
-        {tela !== undefined ? (
-          <span className="ml-auto text-xs text-faint">
-            {renglones.length.toLocaleString('es-MX')} renglones
-          </span>
-        ) : null}
-      </div>
+          {tela !== undefined ? (
+            <span className="truncate text-xs text-muted-foreground" data-testid="kardex-tela-sel">
+              <span className="font-medium text-foreground">{tela.nombre}</span>
+              {tela.descripcion !== null ? <> — {tela.descripcion}</> : null}
+            </span>
+          ) : null}
+          {tela !== undefined ? (
+            <span className="ml-auto text-xs text-faint">
+              {renglones.length.toLocaleString('es-MX')} renglones
+            </span>
+          ) : null}
+        </div>
 
-      {tela === undefined ? (
-        <p className="p-6 text-sm text-muted-foreground">
-          Busca una tela para ver su kardex (movimientos en orden, con el saldo por lote tras cada
-          uno).
-        </p>
-      ) : consulta.isError ? (
-        <p className="p-6 text-sm text-destructive" role="alert">
-          {consulta.error.message}
-        </p>
-      ) : consulta.isPending ? (
-        <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
-      ) : renglones.length === 0 ? (
-        <p className="p-6 text-sm text-muted-foreground">Esta tela no tiene movimientos.</p>
-      ) : (
-        <>
-          {/* Móvil: tarjetas. */}
-          <div className="space-y-3 p-3 md:hidden" data-testid="kardex-tela-tarjetas">
-            {renglones.map((r, i) => (
-              <div
-                key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
-                className="space-y-1 rounded-lg border bg-card p-3 text-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">
-                    #{r.folio} · {r.tipoMov}
-                  </span>
-                  {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
+        {tela === undefined ? (
+          <p className="p-6 text-sm text-muted-foreground">
+            Busca una tela para ver sus movimientos del flujo LEGADO por lote (en orden, con el
+            saldo por lote tras cada uno).
+          </p>
+        ) : consulta.isError ? (
+          <p className="p-6 text-sm text-destructive" role="alert">
+            {consulta.error.message}
+          </p>
+        ) : consulta.isPending ? (
+          <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
+        ) : renglones.length === 0 ? (
+          // 🔴 fila 0.098: este vacío era mudo («Esta tela no tiene movimientos») y era EL vacío que
+          // se llevaba cualquiera que buscara aquí los movimientos del inventario vigente.
+          <p className="p-6 text-sm text-muted-foreground" data-testid="kardex-tela-vacio">
+            Esta tela no tiene movimientos del flujo <b>LEGADO por lote</b>. Si la operas en el
+            inventario vigente, su kardex va por <b>color</b>:{' '}
+            <Link className="text-primary underline" to="/inventarios/telas/existencias">
+              ábrelo en Inventario de telas
+            </Link>{' '}
+            con doble clic en el color.
+          </p>
+        ) : (
+          <>
+            {/* Móvil: tarjetas. */}
+            <div className="space-y-3 p-3 md:hidden" data-testid="kardex-tela-tarjetas">
+              {renglones.map((r, i) => (
+                <div
+                  key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
+                  className="space-y-1 rounded-lg border bg-card p-3 text-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">
+                      #{r.folio} · {r.tipoMov}
+                    </span>
+                    {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {r.fecha} · {r.almacen} · Lote {r.loteClave ?? '(sin lote)'}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="num">{efectoRenglon(r.entrada, r.salida)}</span>
+                    <span className="num font-semibold">
+                      Saldo: {r.saldo.toLocaleString('es-MX')}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {r.fecha} · {r.almacen} · Lote {r.loteClave ?? '(sin lote)'}
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="num">{efectoRenglon(r.entrada, r.salida)}</span>
-                  <span className="num font-semibold">
-                    Saldo: {r.saldo.toLocaleString('es-MX')}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {/* Escritorio: tabla densa. */}
-          <div className="hidden overflow-x-auto md:block" data-testid="kardex-tela-tabla">
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Folio</TablaDensaHead>
-                  <TablaDensaHead>Fecha</TablaDensaHead>
-                  <TablaDensaHead>Movimiento</TablaDensaHead>
-                  <TablaDensaHead>Almacén</TablaDensaHead>
-                  <TablaDensaHead>Lote</TablaDensaHead>
-                  <TablaDensaHead numerica>Entrada</TablaDensaHead>
-                  <TablaDensaHead numerica>Salida</TablaDensaHead>
-                  <TablaDensaHead numerica>Saldo</TablaDensaHead>
-                  {puedeMover ? <TablaDensaHead /> : null}
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
-                {renglones.map((r, i) => (
-                  <TablaDensaFila
-                    key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
-                    className={r.cancelado ? 'opacity-60' : ''}
-                  >
-                    <TablaDensaCelda className="num font-medium">{r.folio}</TablaDensaCelda>
-                    <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
-                    <TablaDensaCelda>
-                      <span className="flex items-center gap-1.5">
-                        {r.tipoMov}
-                        {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
-                      </span>
-                    </TablaDensaCelda>
-                    <TablaDensaCelda>{r.almacen}</TablaDensaCelda>
-                    <TablaDensaCelda>{r.loteClave ?? '(sin lote)'}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>
-                      {r.entrada > 0 ? r.entrada.toLocaleString('es-MX') : '—'}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica>
-                      {r.salida > 0 ? r.salida.toLocaleString('es-MX') : '—'}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica className="font-semibold">
-                      {r.saldo.toLocaleString('es-MX')}
-                    </TablaDensaCelda>
-                    {puedeMover ? (
-                      <TablaDensaCelda className="text-right">
-                        {!r.cancelado ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setACancelar(r)}
-                            data-testid={`kardex-tela-cancelar-${r.idMovimiento}`}
-                          >
-                            <Ban className="size-4" aria-hidden />
-                          </Button>
-                        ) : null}
-                      </TablaDensaCelda>
-                    ) : null}
+            {/* Escritorio: tabla densa. */}
+            <div className="hidden overflow-x-auto md:block" data-testid="kardex-tela-tabla">
+              <TablaDensa>
+                <TablaDensaEncabezado>
+                  <TablaDensaFila>
+                    <TablaDensaHead>Folio</TablaDensaHead>
+                    <TablaDensaHead>Fecha</TablaDensaHead>
+                    <TablaDensaHead>Movimiento</TablaDensaHead>
+                    <TablaDensaHead>Almacén</TablaDensaHead>
+                    <TablaDensaHead>Lote</TablaDensaHead>
+                    <TablaDensaHead numerica>Entrada</TablaDensaHead>
+                    <TablaDensaHead numerica>Salida</TablaDensaHead>
+                    <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                    {puedeMover ? <TablaDensaHead /> : null}
                   </TablaDensaFila>
-                ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
-          </div>
-        </>
-      )}
+                </TablaDensaEncabezado>
+                <TablaDensaCuerpo>
+                  {renglones.map((r, i) => (
+                    <TablaDensaFila
+                      key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
+                      className={r.cancelado ? 'opacity-60' : ''}
+                    >
+                      <TablaDensaCelda className="num font-medium">{r.folio}</TablaDensaCelda>
+                      <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
+                      <TablaDensaCelda>
+                        <span className="flex items-center gap-1.5">
+                          {r.tipoMov}
+                          {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
+                        </span>
+                      </TablaDensaCelda>
+                      <TablaDensaCelda>{r.almacen}</TablaDensaCelda>
+                      <TablaDensaCelda>{r.loteClave ?? '(sin lote)'}</TablaDensaCelda>
+                      <TablaDensaCelda numerica>
+                        {r.entrada > 0 ? r.entrada.toLocaleString('es-MX') : '—'}
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica>
+                        {r.salida > 0 ? r.salida.toLocaleString('es-MX') : '—'}
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica className="font-semibold">
+                        {r.saldo.toLocaleString('es-MX')}
+                      </TablaDensaCelda>
+                      {puedeMover ? (
+                        <TablaDensaCelda className="text-right">
+                          {!r.cancelado ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setACancelar(r)}
+                              data-testid={`kardex-tela-cancelar-${r.idMovimiento}`}
+                            >
+                              <Ban className="size-4" aria-hidden />
+                            </Button>
+                          ) : null}
+                        </TablaDensaCelda>
+                      ) : null}
+                    </TablaDensaFila>
+                  ))}
+                </TablaDensaCuerpo>
+              </TablaDensa>
+            </div>
+          </>
+        )}
+      </div>
 
       <DialogoCancelarMaterial
         abierto={aCancelar !== null}

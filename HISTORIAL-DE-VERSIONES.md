@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.093 · 3-sep-2026 · **en prueba** — ⭐ El inventario de telas, listo para cargarse de cero
+
+### Qué se puede hacer ahora que antes no
+
+**Contar el inventario de telas diciendo lo que hay, no la diferencia.** La pantalla con la que se va a
+cargar el inventario completo al arrancar pedía *«¿cuánto sobra o falta?»* — o sea, obligaba a hacer la
+resta a mano contra un saldo que ni siquiera enseñaba. Ahora:
+
+- ⭐ **Se captura lo que se contó**, tal cual, y el sistema calcula la diferencia solo.
+- **Se ve el saldo del sistema al lado de lo contado**, color por color, para saber qué se está corrigiendo.
+- Si el conteo cuadra, **no se mueve nada**.
+- Una tela con cuerpo y complemento puede **sobrar de uno y faltar del otro** al mismo tiempo, y queda bien.
+
+**Y el impreso del inventario de telas ya imprime lo que estás viendo.** Antes el botón colgaba de una
+pantalla vieja que ya nadie usa, así que el papel salía con otros números. Ahora sale desglosado por tela,
+color y almacén, y **los totales del papel cuadran con los de la pantalla**.
+
+### Qué cambió y puede sorprender
+
+- **«Traspaso de materiales» ahora se llama «Traspaso de avíos»** y se movió al menú de Avíos. Su parte de
+  telas no servía —no movía el inventario que sí se usa— y **para telas ya existe «Traspaso de telas por
+  color»**, que es a donde te manda ahora.
+- **«Kardex de materiales» se queda donde está**, pero su pestaña de telas ahora dice claramente que es
+  **la vista del sistema viejo**, con un aviso y un enlace al kardex vigente. No se retiró **porque es la
+  única ventana a los movimientos que se migraron de Access** — esconderla habría borrado ese historial.
+- **Al cambiar de almacén se borra lo que llevabas capturado**, a propósito y con aviso: antes se podía
+  contar 80 colores contra una bodega y aplicarlos por error contra otra.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Pregunta abierta para Daniel:** hoy, si el conteo cuadra, **no queda ningún rastro de que se contó**.
+  «Esta bodega se contó y cuadró» y «a esta bodega no la ha mirado nadie» se ven igual.
+- **El conteo cíclico completo sigue siendo sólo de producto terminado** (fila 0.099).
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.092 · 3-sep-2026 · **en prueba** — ⭐ La **ficha de arte** ya lleva la foto de lo que hay que estampar
 
 ### Qué se puede hacer ahora que antes no

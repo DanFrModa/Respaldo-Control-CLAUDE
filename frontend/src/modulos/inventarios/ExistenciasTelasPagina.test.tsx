@@ -32,7 +32,6 @@ const existencias: ExistenciasTela = {
 
 vi.mock('@/api/inventario-materiales', () => ({
   useExistenciasTela: () => ({ data: existencias, isPending: false, isError: false, error: null }),
-  urlImpresoInventarioTelas: () => '/api/inventarios/telas/impreso',
 }));
 vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
@@ -66,11 +65,14 @@ describe('ExistenciasTelasPagina (F4-E1)', () => {
     expect(screen.getAllByText(/Cardigan/).length).toBeGreaterThan(0);
   });
 
-  it('ofrece el enlace para imprimir el PDF', () => {
+  // 🔴 fila 0.098: el botón «Imprimir PDF» vivía AQUÍ y el impreso leía ESTA consulta legada, así
+  // que el inventario de telas se imprimía prácticamente en blanco. El botón se fue a «Inventario
+  // de telas» (la pantalla que se usa); esta prueba vigila que no regrese.
+  it('NO ofrece imprimir: el impreso del inventario de telas vive en la pantalla por color', () => {
     renderConProveedores(<ExistenciasTelasPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver']),
     });
-    const enlace = screen.getByTestId('telas-imprimir');
-    expect(enlace.closest('a') ?? enlace).toHaveAttribute('href', '/api/inventarios/telas/impreso');
+    expect(screen.queryByTestId('telas-imprimir')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Imprimir PDF/i)).not.toBeInTheDocument();
   });
 });

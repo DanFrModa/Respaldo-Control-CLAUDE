@@ -11,7 +11,8 @@ import { z } from 'zod';
  *
  * ⚠️ CAMBIO DE B1 — las TELAS entran por COLOR/PARTIDA, no por lote. El inventario de telas opera
  * por TELA+COLOR desde la etapa A2 (§Post-F9.11) y arranca desde cero: recibir contra una OC por el
- * flujo viejo de `Lote` alimentaría un inventario muerto. Ahora cada renglón de TELA trae su bloque
+ * flujo viejo de `Lote` alimentaría el inventario LEGADO —el que la vista nueva no ve; «muerto» no,
+ * que su histórico se consulta (fila 0.098)—. Ahora cada renglón de TELA trae su bloque
  * `telaColor` (color + complemento + lote del proveedor) y el dominio crea SU PARTIDA. El bloque
  * `lote` (D5) queda SÓLO para consultar las recepciones históricas: ya no se acepta en la captura.
  * REGLA EXPLÍCITA del color: la línea de OC NO determina el color (la OC se pide por tela), así que

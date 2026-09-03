@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useTraspasarAvio, useTraspasarTela } from '@/api/inventario-materiales';
+import { useTraspasarAvio } from '@/api/inventario-materiales';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -11,34 +12,57 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
-import { CapturaRenglonesTela, type RenglonTela } from './CapturaRenglonesTela';
-import { PestanasSegmentadas } from './PestanasSegmentadas';
-
-type Dimension = 'tela' | 'avio';
 
 function hoy(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 /**
- * TRASPASO entre almacenes (F4-E1, doc 04-Inventarios §B.3 — Transferencia entre almacenes). Mueve
- * TELA (por lote) o AVÍO de un almacén ORIGEN a uno DESTINO (distintos), en UNA operación (el backend
- * la materializa como salida + entrada atómicas, A2). El servidor valida que el origen no quede
- * negativo (D3, bajo lock). Captura PC. `inventario-telas.mover`/`inventario-avios.mover` gobiernan.
+ * TRASPASO de AVÍOS entre almacenes (F4-E1, doc 04-Inventarios §B.3 — Transferencia entre
+ * almacenes). Mueve avío de un almacén ORIGEN a uno DESTINO (distintos) en UNA operación (el
+ * backend la materializa como salida + entrada atómicas, A2). El servidor valida que el origen no
+ * quede negativo (D3, bajo lock). Captura PC. Permiso `inventario-avios.mover`.
+ *
+ * 🔴 SOLO AVÍOS desde v0.098 (fila 0.098). Esta pantalla tenía además una pestaña de TELAS atada al
+ * motor LEGADO por lote —y ARRANCABA EN ELLA—, así que quien traspasaba tela desde aquí NO veía
+ * moverse «Inventario de telas»: los renglones se graban con `id_tela_color = NULL` y la vista
+ * `existencia_tela_color` los excluye (`WHERE d."id_tela_color" IS NOT NULL`, migración
+ * 20260806130000_a2_partidas_telas). Es EXACTAMENTE el defecto que el 13-ago-2026 se corrigió en
+ * «Ajuste de materiales» (hoy «Ajuste de avíos») y que aquí se dejó igual; se aplica el MISMO
+ * criterio: se retira, la pantalla se queda con lo vivo, se muda al menú de Avíos, su gate se
+ * estrecha al permiso que de verdad usa (A4) y deja un puntero a la pantalla vigente.
+ *
+ * ⚠️ LA RAZÓN EXACTA POR LA QUE ESTA PATA SE RETIRA Y LA DEL KARDEX NO — porque las dos operan la
+ * MISMA dimensión legada, así que «está muerta» no las distinguiría:
+ *
+ *  • **Este traspaso TIENE REEMPLAZO VIGENTE**, y lo dictó Daniel por su nombre: «El traspaso se
+ *    hace por color. No siempre hay un lote completo para traspasar» (`DECISIONES.md §Post-F9.32`).
+ *    Todo lo que se quiere hacer aquí se hace mejor en «Traspaso de telas por color». Dejarlo era
+ *    ofrecer, por defecto, el camino que Daniel descartó.
+ *  • **El kardex por lote NO tiene reemplazo**: es la ÚNICA ventana a los movimientos migrados de
+ *    Access (F4-E6 cargó Entradas/Salidas del sistema viejo como lotes `LEGACY-TELA-*`) y el kardex
+ *    por color no los ve. Retirarlo no habría movido a nadie a otra pantalla: habría borrado la
+ *    única. Por eso ése se queda, y sólo se le quitó la mentira.
+ *
+ * O sea: no se retira lo viejo por viejo, se retira lo que tiene a dónde mandar al usuario.
+ *
+ * El traspaso de TELA se hace por COLOR en «Traspaso de telas por color»
+ * (`/inventarios/telas/traspaso`) — lo dictó Daniel: «El traspaso se hace por color. No siempre hay
+ * un lote completo para traspasar» (`DECISIONES.md §Post-F9.32`). El endpoint legado por lote sigue
+ * vivo en el backend; para tocarlo hay que llamarlo a mano.
  */
 export function TraspasoMaterialesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
-  const [dimension, setDimension] = useState<Dimension>('tela');
-
-  const puedeTela = tienePermiso('inventario-telas.mover');
-  const puedeAvio = tienePermiso('inventario-avios.mover');
-  const puedeMover = dimension === 'tela' ? puedeTela : puedeAvio;
+  const puedeMover = tienePermiso('inventario-avios.mover');
+  // El puntero al traspaso de TELA se ofrece solo a quien puede mover tela — mismo criterio (y
+  // mismo permiso) que el enlace hermano de «Ajuste de avíos» (A4): mandar a una pantalla que le va
+  // a aparecer toda deshabilitada no es "explicar", es pasear al usuario.
+  const puedeMoverTela = tienePermiso('inventario-telas.mover');
 
   const [idAlmacenOrigen, setIdAlmacenOrigen] = useState<string>('');
   const [idAlmacenDestino, setIdAlmacenDestino] = useState<string>('');
   const [fecha, setFecha] = useState(hoy());
   const [observaciones, setObservaciones] = useState('');
-  const [renglonesTela, setRenglonesTela] = useState<RenglonTela[]>([]);
   const [renglonesAvio, setRenglonesAvio] = useState<RenglonAvio[]>([]);
 
   const almacenes = useAlmacenes({
@@ -47,72 +71,39 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const traspasarTela = useTraspasarTela();
   const traspasarAvio = useTraspasarAvio();
 
   const mismoAlmacen = idAlmacenOrigen !== '' && idAlmacenOrigen === idAlmacenDestino;
-  const totalTela = renglonesTela.reduce((s, r) => s + r.cantidad, 0);
   const totalAvio = renglonesAvio.reduce((s, r) => s + r.cantidad, 0);
-  const hayRenglones = dimension === 'tela' ? renglonesTela.length > 0 : renglonesAvio.length > 0;
-  const cargando = traspasarTela.isPending || traspasarAvio.isPending;
+  const cargando = traspasarAvio.isPending;
   const puedeGuardar =
     puedeMover &&
     idAlmacenOrigen !== '' &&
     idAlmacenDestino !== '' &&
     !mismoAlmacen &&
-    hayRenglones &&
+    renglonesAvio.length > 0 &&
     !cargando;
-
-  function limpiar(): void {
-    setRenglonesTela([]);
-    setRenglonesAvio([]);
-  }
 
   function guardar(): void {
     if (idAlmacenOrigen === '' || idAlmacenDestino === '') return;
-    const base = {
-      idAlmacenOrigen: Number(idAlmacenOrigen),
-      idAlmacenDestino: Number(idAlmacenDestino),
-      fecha,
-      ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
-    };
-    if (dimension === 'tela') {
-      traspasarTela.mutate(
-        {
-          ...base,
-          lineas: renglonesTela.map((r) => ({
-            idTela: r.idTela,
-            idLote: r.idLote,
-            cantidad: r.cantidad,
-          })),
+    traspasarAvio.mutate(
+      {
+        idAlmacenOrigen: Number(idAlmacenOrigen),
+        idAlmacenDestino: Number(idAlmacenDestino),
+        fecha,
+        ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
+        lineas: renglonesAvio.map((r) => ({ idAvio: r.idAvio, cantidad: r.cantidad })),
+      },
+      {
+        onSuccess: (t) => {
+          toast.success(
+            `Traspaso de avío guardado (salida #${t.salida.folio} → entrada #${t.entrada.folio}).`,
+          );
+          setRenglonesAvio([]);
         },
-        {
-          onSuccess: (t) => {
-            toast.success(
-              `Traspaso de tela guardado (salida #${t.salida.folio} → entrada #${t.entrada.folio}).`,
-            );
-            limpiar();
-          },
-          onError: (error) => toast.error(error.message),
-        },
-      );
-    } else {
-      traspasarAvio.mutate(
-        {
-          ...base,
-          lineas: renglonesAvio.map((r) => ({ idAvio: r.idAvio, cantidad: r.cantidad })),
-        },
-        {
-          onSuccess: (t) => {
-            toast.success(
-              `Traspaso de avío guardado (salida #${t.salida.folio} → entrada #${t.entrada.folio}).`,
-            );
-            limpiar();
-          },
-          onError: (error) => toast.error(error.message),
-        },
-      );
-    }
+        onError: (error) => toast.error(error.message),
+      },
+    );
   }
 
   return (
@@ -120,24 +111,23 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
-            Traspaso entre almacenes
+            Traspaso de avíos
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Mueve tela (por lote) o avío de un almacén a otro, en una sola operación
+            Mueve avío de un almacén a otro, en una sola operación
           </p>
         </div>
       </header>
 
-      <PestanasSegmentadas<Dimension>
-        opciones={[
-          { valor: 'tela', etiqueta: 'Telas', testid: 'traspaso-dim-tela' },
-          { valor: 'avio', etiqueta: 'Avíos', testid: 'traspaso-dim-avio' },
-        ]}
-        valor={dimension}
-        alCambiar={setDimension}
-        etiqueta="Tipo de material"
-        className="w-fit"
-      />
+      {puedeMoverTela ? (
+        <p className="text-[12.5px] text-muted-foreground" data-testid="traspaso-avios-nota-tela">
+          ¿Vas a traspasar <b>tela</b>? Se hace por color en{' '}
+          <Link className="text-primary underline" to="/inventarios/telas/traspaso">
+            Traspaso de telas por color
+          </Link>
+          : ahí sí se mueve «Inventario de telas».
+        </p>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -153,10 +143,7 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
               <SelectNativo
                 id="origen"
                 value={idAlmacenOrigen}
-                onChange={(e) => {
-                  setIdAlmacenOrigen(e.target.value);
-                  setRenglonesTela([]); // los lotes dependen del origen
-                }}
+                onChange={(e) => setIdAlmacenOrigen(e.target.value)}
                 disabled={!puedeMover}
                 data-testid="traspaso-origen"
               >
@@ -217,28 +204,16 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
 
           <div>
             <h3 className="mb-2 text-sm font-medium">Renglones a traspasar</h3>
-            {dimension === 'tela' ? (
-              <CapturaRenglonesTela
-                idAlmacen={idAlmacenOrigen === '' ? undefined : Number(idAlmacenOrigen)}
-                renglones={renglonesTela}
-                onChange={setRenglonesTela}
-                soloLectura={!puedeMover}
-              />
-            ) : (
-              <CapturaRenglonesAvio
-                renglones={renglonesAvio}
-                onChange={setRenglonesAvio}
-                soloLectura={!puedeMover}
-              />
-            )}
+            <CapturaRenglonesAvio
+              renglones={renglonesAvio}
+              onChange={setRenglonesAvio}
+              soloLectura={!puedeMover}
+            />
           </div>
 
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-muted-foreground">
-              Total a traspasar:{' '}
-              <strong>
-                {(dimension === 'tela' ? totalTela : totalAvio).toLocaleString('es-MX')}
-              </strong>
+              Total a traspasar: <strong>{totalAvio.toLocaleString('es-MX')}</strong>
             </span>
             <Button onClick={guardar} disabled={!puedeGuardar} data-testid="traspaso-guardar">
               {cargando ? 'Guardando…' : 'Guardar traspaso'}

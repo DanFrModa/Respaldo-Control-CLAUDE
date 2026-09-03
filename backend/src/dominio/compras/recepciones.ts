@@ -33,7 +33,9 @@
  *
  * ⚠️ CAMBIO DE B1 — LAS TELAS ENTRAN POR COLOR/PARTIDA. Hasta A2 esta recepción creaba un `Lote`
  * (D5) y movía el kardex por tela×lote. Con el inventario de telas reestructurado por TELA+COLOR
- * (§Post-F9.11) y arrancando DESDE CERO, seguir por lote alimentaba un inventario muerto: ahora
+ * (§Post-F9.11) y arrancando DESDE CERO, seguir por lote alimentaba el inventario LEGADO —el que
+ * `existencia_tela_color` no ve, no uno «muerto»: su histórico se sigue consultando en el kardex
+ * por lote (fila 0.098)—: ahora
  * cada línea de TELA exige su `telaColor` (color + complemento + lote del proveedor), crea SU
  * `PartidaTela` (motor compartido `dominio/inventarios/partidas-telas`) y registra la entrada por
  * color con su costo. El flujo de AVÍOS NO cambia. El `Lote` queda en cuarentena (legado).

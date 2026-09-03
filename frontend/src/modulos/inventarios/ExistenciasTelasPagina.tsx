@@ -1,8 +1,8 @@
-import { ChevronDown, ChevronRight, FileDown, Warehouse } from 'lucide-react';
+import { ChevronDown, ChevronRight, Warehouse } from 'lucide-react';
 import { useState } from 'react';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { urlImpresoInventarioTelas, useExistenciasTela } from '@/api/inventario-materiales';
+import { useExistenciasTela } from '@/api/inventario-materiales';
 import { useColores } from '@/api/colores';
 import type { Tela } from '@/api/telas';
 import type { ExistenciaTelaFila } from '@/api/tipos';
@@ -32,8 +32,8 @@ function claveFila(f: ExistenciaTelaFila): string {
 /**
  * EXISTENCIAS de TELAS (F4-E1, proto `vTelas` — re-vestido R9; D5). Tabla DENSA con la existencia por
  * tela×lote×almacén (Σ de movimientos, D3), filtros arriba (búsqueda de tela por combobox popover
- * `idTela` server-side, color, almacén, ceros), KPIs de vistazo, barra de totales al pie e IMPRESO
- * PDF (R9). Los COMPONENTES del lote (D5) se despliegan por fila
+ * `idTela` server-side, color, almacén, ceros), KPIs de vistazo y barra de totales al pie. Los
+ * COMPONENTES del lote (D5) se despliegan por fila
  * ("Felpa 100", "Cardigan 40"…). Consulta MÓVIL: tabla en escritorio, tarjetas apiladas en móvil.
  *
  * FIDELIDAD vs proto: el proto pinta KPIs de "Valor inventario" y "Por debajo de mínimo" y una columna
@@ -46,6 +46,12 @@ function claveFila(f: ExistenciaTelaFila): string {
  * ⚠️ VISTA LEGADA (etapa A2): el inventario NUEVO opera por TELA+COLOR con partidas
  * (`ExistenciasTelasColorPagina`, la entrada principal del menú). Esta vista por LOTE queda viva
  * SOLO para consultar el flujo viejo (ruta `/inventarios/telas/existencias-lote`).
+ *
+ * 🔴 SIN botón de imprimir, a propósito (v0.098): el botón «Imprimir PDF» vivía AQUÍ y el impreso
+ * leía esta consulta LEGADA, así que el inventario de telas se imprimía prácticamente EN BLANCO —y
+ * sin decirlo—. El botón se mudó a «Inventario de telas» (`ExistenciasTelasColorPagina`), que es la
+ * pantalla que se usa, y el impreso ahora lee SU consulta. Decisión de Daniel (fila 0.098): «mover
+ * el botón a la pantalla nueva y que imprima lo que ves ahí, y quitárselo a la vieja».
  */
 export function ExistenciasTelasPagina(): React.JSX.Element {
   const [tela, setTela] = useState<Tela | undefined>(undefined);
@@ -115,11 +121,6 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
             «Existencias de telas»
           </p>
         </div>
-        <Button asChild variant="outline" size="sm" data-testid="telas-imprimir">
-          <a href={urlImpresoInventarioTelas(filtros)} target="_blank" rel="noopener noreferrer">
-            <FileDown aria-hidden /> Imprimir PDF
-          </a>
-        </Button>
       </header>
 
       {/* ── KPIs ────────────────────────────────────────────────────────────── */}

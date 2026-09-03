@@ -322,12 +322,13 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
             // así que ofrecer solo aquél mandaba al usuario a un flujo que no mueve las
             // existencias que ve arriba.
             'inventario-telas-traspaso',
-            // +2 el 12-ago-2026: las vistas de «materiales» que sirven a las DOS dimensiones (tela
-            // por lote Y avío), AL FINAL. Cuelgan del padre «Telas» en el catálogo y el riel solo
-            // admite hijos del MISMO padre, así que no pueden ir bajo Avíos. Eran TRES: el ajuste
-            // se volvió solo-avíos y se mudó a «Avíos» el 13-ago-2026.
+            // +1 el 12-ago-2026, AL FINAL: la vista de «materiales» que sirve a las DOS dimensiones
+            // (tela por lote Y avío). Cuelga del padre «Telas» en el catálogo y el riel solo admite
+            // hijos del MISMO padre, así que no puede ir bajo Avíos. Eran TRES: el ajuste se volvió
+            // solo-avíos y se mudó a «Avíos» el 13-ago-2026, y el traspaso en la fila 0.098. El
+            // KARDEX se queda porque su pata de tela SIGUE VIVA (es la única ventana al histórico
+            // por lote), no porque sirva a dos dimensiones.
             'inventario-materiales-kardex',
-            'inventario-materiales-traspasos',
           ],
         },
         {
@@ -335,12 +336,15 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
           // avíos» no tenía ENTRADA EN EL MENÚ (mismo defecto que el catálogo de telas en A2).
           // +1 el 13-ago-2026: «Ajuste de avíos» (antes «Ajuste de materiales», bajo Telas): al
           // dejar de tocar tela, bajo Telas se escondía justo de quien la busca.
+          // +1 en la fila 0.098: «Traspaso de avíos» (antes «Traspaso de materiales», bajo Telas),
+          // por EXACTAMENTE la misma razón y con el mismo criterio.
           clave: 'avios',
           padre: true,
           hijos: [
             'inventario-avios-existencias',
             'catalogo-avios',
             'inventario-materiales-ajustes',
+            'inventario-materiales-traspasos',
           ],
         },
         {
@@ -513,32 +517,38 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
 
     const avios = entradaRiel('avios');
     expect(avios?.hijos, 'Avíos debe ser padre desplegable en el riel').toBeDefined();
-    // +«Ajuste de avíos» el 13-ago-2026: la pantalla dejó de tocar tela, así que su lugar es este
-    // padre. Bajo «Telas» (donde vivía como «Ajuste de materiales») se escondía de quien la busca.
+    // +«Ajuste de avíos» el 13-ago-2026 y +«Traspaso de avíos» en la fila 0.098: las dos pantallas
+    // dejaron de tocar tela, así que su lugar es este padre. Bajo «Telas» (donde vivían como
+    // «Ajuste/Traspaso de materiales») se escondían de quien las busca.
     expect(avios?.hijos?.map((h) => [h.clave, h.ruta])).toEqual([
       ['inventario-avios-existencias', '/inventarios/avios/existencias'],
       ['catalogo-avios', '/catalogos/avios'],
       ['inventario-materiales-ajustes', '/inventarios/materiales/ajustes'],
+      ['inventario-materiales-traspasos', '/inventarios/materiales/traspasos'],
     ]);
     // Gates HEREDADOS del catálogo, sin ensancharlos ni estrecharlos: el catálogo de avíos sigue
-    // "autenticado" como toda su familia (deuda de paridad front/back en `HOJA-DE-RUTA.md` §4).
+    // "autenticado" como toda su familia (deuda de paridad front/back en `HOJA-DE-RUTA.md` §4). El
+    // del traspaso se ESTRECHÓ en el catálogo al permiso que de verdad usa (era
+    // `inventario-telas.mover | inventario-avios.mover`), igual que se hizo con el ajuste.
     expect(avios?.hijos?.map((h) => h.permisos)).toEqual([
       ['inventario-avios.ver'],
       'autenticado',
       ['inventario-avios.mover'],
+      ['inventario-avios.mover'],
     ]);
 
-    // Las vistas de «materiales» que sirven a las DOS dimensiones (tela por lote Y avío) cuelgan
-    // del padre «Telas» en el catálogo y el riel solo admite hijos del MISMO padre: por eso van ahí
-    // y no bajo Avíos. El AJUSTE ya no está entre ellas (es solo-avíos y se mudó a «Avíos»).
+    // El KARDEX de «materiales» sigue colgando del padre «Telas» —su pata de tela por LOTE sigue
+    // viva: es la única ventana al histórico migrado y a «Salida a orden por lote (legado)»—, y el
+    // riel solo admite hijos del MISMO padre. El AJUSTE y el TRASPASO ya no están entre ellas: al
+    // quedarse solo-avíos se mudaron a «Avíos».
     const telas = entradaRiel('telas');
     const clavesTelas = telas?.hijos?.map((h) => h.clave) ?? [];
-    for (const clave of ['inventario-materiales-kardex', 'inventario-materiales-traspasos']) {
-      expect(clavesTelas, clave).toContain(clave);
-    }
-    expect(clavesTelas, 'el ajuste de avíos ya NO cuelga de Telas').not.toContain(
-      'inventario-materiales-ajustes',
+    expect(clavesTelas, 'el kardex de materiales sigue bajo Telas').toContain(
+      'inventario-materiales-kardex',
     );
+    for (const clave of ['inventario-materiales-ajustes', 'inventario-materiales-traspasos']) {
+      expect(clavesTelas, `${clave} ya NO cuelga de Telas`).not.toContain(clave);
+    }
     // …y el traspaso POR COLOR —el flujo VIGENTE de telas— tiene que estar, o el menú sólo ofrecería
     // el de lote, que graba `id_tela_color = NULL` y por tanto no mueve «Existencias de telas»
     // (vista `existencia_tela_color`). Daniel: «El traspaso se hace por color» (§Post-F9.32).

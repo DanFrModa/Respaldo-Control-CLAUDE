@@ -12136,6 +12136,198 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.185) — ⭐ EL PROCESO DE PAGO SEMANAL, dictado por Daniel (3-sep-2026)
+
+> *«Es **una de las pantallas más importantes dentro del sistema**. Debe estar muy bien hecha.»*
+
+## Cómo es HOY (Access + dos Excel)
+1. **Producción** le manda un Excel semanal con lo que se paga de maquilas: teclea **órdenes, cantidades,
+   precios e importes** entregados por cada maquilero.
+2. Daniel **entra a Access a revisar las entradas** de cada maquilero listado, donde están las cantidades
+   que la persona de recibos **realmente contó**.
+3. En su pantalla de pendientes, **selecciona cada orden y RETECLEA cantidad y precio**. Eso entra al
+   estado de cuenta como «recibo».
+4. Arma **otro Excel** con lo que cobra cada maquilero y **se lo pasa a finanzas** — **dos relaciones: con
+   factura y sin factura**.
+
+## ⭐ (a) UN PASO DE SU PROCESO YA SOBRA — y es un hallazgo, no una opinión
+Daniel retecleaba **para cazar errores**: *«me ha pasado que en lugar de poner 100 ponen 1000 y ahí me
+aparece que recibió 900 prendas más de lo que le mandamos»*.
+🔴 **En v2 ese error es IMPOSIBLE**: `registrarReciboMaquila` **topa** el recibo contra lo pendiente, bajo
+lock y con la misma aritmética que muestra la pantalla (`produccion/recibos.ts:373, 746-747, 1323-1328`).
+⇒ **Su reteclear era la compensación de un defecto de Access.** Su paso deja de ser *«recapturo todo por si
+acaso»* y pasa a ser lo que él mismo pidió: **revisar y ajustar** (precio, descuento por entregar mal).
+⚠️ **Lo que el tope NO caza y sí necesita sus ojos:** que capturen **de menos** (50 cuando llegaron 100) y
+**el precio** (el sistema no sabe si es el pactado o el renegociado esta semana).
+
+## (b) LA FRONTERA NO ES «MAQUILA VS. LO DEMÁS» — corrección suya
+> *«**Corte es parte de maquilas**, no de proveedores. Tengo proveedores de corte que **el monto a pagar
+> sale de una orden**, lo mismo que un maquilero. Y una **maquila de empaque** también… (recuerda que
+> definimos que los proveedores de maquila **pueden hacer distintos procesos**). **Transportistas y demás
+> proveedores sí salen del estado de cuenta.**»*
+
+| El monto nace de… | Quiénes | Módulo |
+|---|---|---|
+| **una ORDEN** | costura, arte, **corte**, **empaque**, cualquier proceso | EsMa |
+| **un ESTADO DE CUENTA** | transportistas y demás proveedores | CxP / terceros |
+
+## (c) CORTE Y EMPAQUE SON **SERVICIOS SOBRE LA ORDEN**, no maquilas de ida y vuelta
+> *«En corte **no necesitas mandar y recibir mercancía**. Mando tela y corta una cierta cantidad. Sólo hay
+> que poner **su cantidad y precio** para meterlo en la OP, pero **no va y viene**. Lo mismo el empaque…
+> **el empaque no toca el inventario**. Y el corte es donde **nace la cantidad**, pero no sale ni entra
+> mercancía. **Simplemente sucede y ya.**»*
+
+⇒ **Son TRES formas de proveedor, no dos**: maquila de ida y vuelta (mueve WIP) · **servicio sobre la orden
+(corte, empaque — sólo cantidad + precio → cargo, NO mueve nada)** · proveedor por estado de cuenta.
+
+⭐ **El modelo YA distinguía las dos primeras y nadie lo había usado para el pago**: `registrarCorte` crea
+`EtapaMovimiento(tipo=corte, **idTipoProceso=NULL**, idTercero=cortador)` y no toca inventario. Ese `NULL`
+**es** la marca de «no es maquila de ida y vuelta».
+🔴 **Falta:** corte **no escribe `precioPactado`** ⇒ sin precio no nace el cargo. **Empaque no existe.**
+🔑 **Regla de C&A:** la cantidad del empaque **es propia, NO se deriva del recibo** — 1000 fabricadas /
+990 entregadas: se paga lo empacado y **las 10 restantes no se mueven, se quedan quietas en inventario**.
+⛔ **NO convertirlos en `TipoProceso`** — los metería al flujo de envío/recibo que él dice que NO son.
+
+## (d) LAS CUENTAS BANCARIAS — y una corrección al lead
+De leer su Excel real (`08_28_26.xlsx`, 158 filas): la hoja «General» es un **directorio permanente** de
+~150 beneficiarios (`NOMBRE` · `PAGAR` efectivo · `DEPOSITO` transferencia · `BANCO` · **`BENEFICIARIO`** ·
+`CUENTA`), y «Transfers Concentrado» es **la lista ejecutable** (sólo los que llevan monto, ordenados por
+monto). Totales de esa semana: **30,000 efectivo + 108,201 transferencia**.
+
+⭐ **El BENEFICIARIO casi nunca es el proveedor** — «CESAR VICTORIA 1» → *Lourdes Herrera López*;
+«ARTURO LOPEZ» → *Rosalina García*. **Daniel no lo había mencionado; salió de leer el archivo.**
+
+🔴 **Y el lead leyó mal el resto: «CESAR VICTORIA 1/2/3» NO son tres proveedores.** Daniel:
+> *«Estaría bien poder tener **más de una cuenta**, definir una como **default**, pero tener las demás como
+> **historial de cuentas**, para incluso poder **reutilizarlas**. Y en ocasiones me pide el proveedor
+> **partir un pago grande en más de una cuenta**: 30 mil en una y 20 mil en la otra la misma semana.»*
+
+**Un proveedor con varias cuentas**, partido en tres renglones **porque Excel no sabe modelar otra cosa**.
+
+## (e) PARTIR UN PAGO = DOS PAGOS. No hay dispersión.
+> *«**Puedes meter los dos pagos por separado** en el estado de cuenta… **da lo mismo**. Pero **sí debo
+> hacerlo con dos pagos al mismo proveedor en la misma semana desde cuentas distintas. Así debe salir en la
+> relación** para poder hacer las dos transferencias.»*
+
+⇒ **Un pago = una cuenta destino = UN renglón de la relación.** Estado de cuenta: dos pagos. Relación: dos
+renglones, cada uno con su banco, beneficiario y cuenta.
+⚠️ **NO colapsar por proveedor al armar el concentrado** — sería lo "ordenado" y **rompería las
+transferencias**. Los dos renglones **no pueden decir ambos «César Victoria» a secas**: se distinguen por
+**beneficiario + cuenta**, y el **alias** («1», «2») se guarda con la cuenta.
+🔴 **El lead había advertido que dos pagos «no cuadrarían» con el estado de cuenta. ERA FALSO**: 30 + 20 da
+exactamente lo mismo que 50 en el saldo. Sólo se pierde saber que fueron una sola decisión, y Daniel dijo
+que eso da igual. **Era alarmismo, no un hallazgo** — y simplificó el diseño (fuera el modelo de dispersión).
+
+## (f) Lo que quiere, en una frase
+Ver **la lista de maquileros que entregaron esa semana** (la mete quien recibe), **validar él** lo que
+realmente se paga, **determinar ahí mismo** lo de cada uno, y que **finanzas lo consulte en el sistema**.
+**Cero Excel.** La relación sin factura junta **maquilas** + **otros proveedores** (los que hoy le pasa
+Lupita), en **efectivo o transferencia**, y la salida es *«una relación con todo lo que se paga… de todo lo
+que yo mismo definí»*. Acepta **dos relaciones si hicieran falta**.
+
+## (g) ⏳ Sigue abierto
+**Anticipos.** *«También debería tener la posibilidad de dar anticipos. Esa información me la va a pasar el
+encargado de producción.»* **NO existen hoy** como concepto (hay `abonos`, sin amortización contra trabajo
+futuro). Falta que Daniel precise si un anticipo es simplemente un abono o si necesita ver **cuánto le
+queda por amortizar**.
+
+⇒ **Filas: 0.112** (beneficiario y varias cuentas) · **0.113** (la corrida y el concentrado) ·
+**0.114** (corte y empaque como servicios sobre la orden).
+
+---
+
+#### (Post-F9.184) — ✅ Las respuestas de Daniel del **3-sep-2026** (versión **0.093**)
+
+Una tanda larga, en una sola sesión. Se agrupan aquí porque **varias se corrigen entre sí** y leerlas
+sueltas induce al error que ya cometió el lead.
+
+**(a) Ubicación del material — TEXTO LIBRE, sin catálogo** *(cierra la pregunta 11 del repaso de
+Inventarios; fila **0.103**)*.
+> *«De texto libre está bien. **Por ahora no un catálogo de posiciones** — si en algún momento se requiere
+> lo hacemos. Ahorita **ya quiero salir a producción de la manera más rápida posible sin perder lo que hoy
+> hacemos en Access**.»*
+
+⭐ **Esa última frase es una VARA DE MEDIR para toda la cola**, no un comentario: la pregunta por fila deja
+de ser *«¿es buena idea?»* y pasa a ser **«¿se pierde algo que hoy Access sí hace, si salimos sin esto?»**.
+Si se pierde ⇒ **paridad**, bloquea el arranque. Si no ⇒ **mejora**, se hace si es barata o espera.
+
+**(b) La salida que no es por OP — SÓLO INVENTARIO, y NO es un ajuste** *(cierra la pregunta 12; fila
+**0.104**)*.
+> *«Por ahora que toque **sólo inventarios**… pero **sí debe existir una salida de ambas cosas por otro
+> medio que sólo ajuste de inventario**. Es una realidad que a veces (pocas) sacamos materiales que no
+> tienen nada que ver con las OP. **Siempre autorizada sólo por mí. Nadie más.**»*
+
+⇒ **Tipo de movimiento propio, NO `ajuste-salida`.** Un ajuste dice *«conté y había menos»*; esto dice
+*«salió, y por esto»*. Meterlo como ajuste **haría irrecuperable la razón** dentro de un año.
+
+**(c) Los permisos NO se heredan en cascada** *(fila **0.105**)*.
+> *«Habíamos hablado que los permisos por cascada no son funcionales. Así lo hice en la primera versión que
+> hice en Access, y luego lo modifiqué por **permisos concretos**… puede haber alguien que tenga el permiso
+> A pero no el B, y otra persona que tenga el B pero no el A. Si se hace por cascada nos vamos a tener que
+> conformar con que **algunas personas accedan a cosas que no deberían**.»*
+
+Y dos precisiones suyas del mismo hilo:
+- **Los perfiles concretos se arman AL FINAL**: *«te voy a dar los puestos de todos los usuarios más
+  adelante para ir decidiendo uno por uno»*. ⇒ la fila construye **el mecanismo**, no el contenido.
+- **Un permiso suelto encima del perfil**: *«que una persona con el perfil X tenga esos permisos, pero
+  aparte le podría dar un permiso específico aunque esté fuera de su perfil»*. ⭐ **Ya se puede hoy**: un
+  usuario lleva **varios perfiles** y sus permisos efectivos son la **unión**.
+
+**(d) FALTANTE ≠ INCOMPLETA — y la definición es suya** *(filas **0.086** y **0.109**)*.
+> *«**Faltante** es cuando no entrego nada (ejemplo: de 1000 entrego 995 y faltan 5). **Incompleta** es
+> cuando regreso las 5 prendas sin confeccionar por algún motivo pero **no faltan, ahí están**. Las
+> faltantes **normalmente se las cobramos**. Las incompletas **no**.»*
+
+🔴 **CORRIGE UN DEFAULT DEL LEAD**, que había propuesto medir el umbral de calidad sobre
+*«segundas + incompletas»* razonando que lo que nunca vuelve *«merece su propio umbral por ser más
+grave»*. **Al revés en lo económico**: la faltante es la que **cuesta dinero** y es la que Daniel nombró
+literalmente junto a las segundas. ⇒ **el 2 % es `segundas + faltantes`**, tal como él lo dijo.
+📌 **Lección registrada:** *cuando el dueño usa dos palabras del negocio, la duda es **qué significan**, no
+cuál conviene.* La pregunta correcta era de una línea: **«¿qué es un faltante?»**.
+*(§Post-F9.136 decisión A ya había confundido los dos términos una vez — ver `incompletas.ts`. Es la
+segunda vez que este par engaña a alguien.)*
+
+**(e) Cobrar el faltante SALDA el pendiente** *(fila **0.109**)*.
+> *«Una vez que se determina cobrar el faltante al maquilero, **se debe descontar como prendas que aún
+> tiene por entregar**… si tiene faltantes de pocas prendas, **no sigan apareciendo siempre como pendiente
+> de entregar**… se va a hacer una lista grande si no las descontamos. Lo que tiene por entregar **deben
+> ser prendas que realmente va a entregar**. Lo que ya asumimos que se le cobra se le da una "entrada"
+> para borrarlo de ahí **(aunque obviamente no entra en el inventario ni en recibo)**.»*
+
+Y el diseño, cerrado con él en el mismo hilo:
+- **Se cierra POR ORDEN** (textual). El botón dice *«ya terminó de entregar»*, no *«cóbrale»*.
+- **Lo aprieta quien recibe, no Daniel**: *«ese cierre lo puede hacer la persona que recibe. No yo
+  necesariamente. Lo que sí debo ver yo muy claro es **lo que tengo pendiente por cobrar o por perdonar**»*.
+- **Saldar y cobrar van separados**: a veces se cierra y **no** se cobra (cortesía, culpa nuestra). Si el
+  descuento del pendiente dependiera del cobro, **esos casos se quedarían en la lista para siempre** — que
+  es justo el problema. Dos desenlaces, los dos limpian la lista: **cerrado y cobrado** · **cerrado y
+  perdonado**.
+- **El cargo vive en «Descuentos»**: *«en general con los proveedores de maquila hay un campo de
+  "Descuentos"… chance ahí podría vivir ese cargo»*. `DescuentoMaquilero` ya existe y **ya nace en estado
+  `capturado`** ⇒ el mecanismo de su visto bueno **ya está construido**.
+
+**(f) La facturación es OBLIGATORIA** *(fila **0.110**)*.
+> *«¿Sin segmentar permite las dos cosas? ¿Y es el default? Más bien que simplemente se marque lo que
+> aplica (con o sin factura)… **Y es un campo obligatorio de llenar. A fuerzas hay que definir si es con,
+> sin o ambas.**»*
+
+**(g) NINGUNA pantalla nueva para los pendientes** *(fila **0.111**)*.
+> *«**No quiero otra pantalla** para ver los pendientes.»* · *«Cada semana me pueda meter a algún lugar
+> donde estén todos los maquileros que tengan algo pendiente por pagar o por descontar y cada semana
+> terminar con esa lista, pagando las cuentas… **así es como pago realmente cada semana**.»*
+
+🔴 **Retira una propuesta del lead**, que iba a construir una bandeja nueva. **El estado de cuenta ya es una
+línea de tiempo unificada de los cuatro conceptos con la marca de "pendiente de revisión"**, y el tablero de
+saldos de todos los maquileros **también existe**. Lo que falta es **una columna**, no una pantalla.
+📌 **Lección:** *medir antes de **PROPONER**, no sólo antes de codear — una propuesta equivocada le cuesta a
+Daniel el trabajo de rechazarla.* **Él lo cachó antes que el lead.**
+
+**(h) ⏳ Queda pendiente de explicar, por petición suya:** el **proceso semanal de pago completo**, que
+incluye **anticipos** (hoy no existen como concepto; hay `abonos`, sin amortización contra trabajo futuro).
+Daniel: *«esa es una de las pantallas más importantes dentro del sistema. **Debe estar muy bien hecha**»*.
+
+---
+
 #### (Post-F9.183) — ⏳ PENDIENTE DE DANIEL: el pack **distingue mayúsculas** (2-sep-2026, versión **0.091**)
 
 > 📌 **No frena nada** (REGLA 0): está construido con su default y **Daniel sólo confirma o ajusta**.
