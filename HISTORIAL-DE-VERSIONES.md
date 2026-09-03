@@ -71,6 +71,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.097 · 3-sep-2026 · **en prueba** — La regla que faltaba: nadie mergea lo que otro está revisando
+
+### Qué se puede hacer ahora que antes no
+
+⚠️ **Nada nuevo en pantalla: esta versión no toca el programa.** Es una regla de trabajo, escrita para que
+no dependa de que alguien se acuerde.
+
+- Queda escrito en `CLAUDE.md` que **antes de mergear cualquier cambio hay que verificar que ninguna otra
+  sesión lo esté revisando**, con los pasos concretos: leer los comentarios del propio cambio, mirar qué
+  otras sesiones están trabajando el repositorio, y hacerlo **justo antes** de mergear y no una hora antes.
+
+### Qué cambió y puede sorprender
+
+- **Además entran cinco decisiones que Daniel tomó esa tarde**, cada una cerrando algo que la noche dejó
+  abierto: el maquilero con todo sin revisar **no desaparece** de la pantalla de pagos (sale con saldo 0 y
+  su pendiente); la cuenta fiscal del proveedor **queda libre**, no se fuerza a una sola; **el repositorio
+  se pone privado** mientras se pide el purgado; **los dos campos que se contradicen sobre si un proveedor
+  factura se corrigen** — y no nacieron de las dos sesiones en paralelo, ya existían de dos fases
+  distintas—; y **el precosteo lo arma Aurora**, no el cliente.
+- **Nace de algo que salió mal el mismo día.** Dos sesiones trabajaban a la vez. Una subió cinco archivos
+  reales presentándolos como limpios de datos sensibles; la otra los midió, **encontró 77 nombres de
+  personas pegados a lo que cobra cada una**, no los mergeó y lo dejó escrito. La primera **mergeó de todas
+  formas**, y esos datos entraron al repositorio, que es público.
+- 🔑 **Lo que se aprendió no es «hay que revisar mejor»:** la revisión funcionó y encontró el problema. Lo
+  que falló fue que **el aviso vivía en una conversación que la otra sesión no podía ver**. Por eso la regla
+  trae una segunda mitad: cuando se marca algo como «no mergear», **se escribe en el cambio mismo**, donde lo
+  ve quien va a mergearlo.
+
+### Qué sigue pendiente o roto
+
+- **La remediación de aquellos archivos sigue abierta** (fila **0.123**): es de Gabriel pedirle a GitHub el
+  purgado; **Daniel ya decidió ponerlo privado** mientras eso ocurre (§Post-F9.188(c)).
+- **Sin migración, sin permisos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.096 · 3-sep-2026 · **en prueba** — Ningún proveedor puede quedarse sin decir si factura
 
 ### Qué se puede hacer ahora que antes no
@@ -180,7 +214,7 @@ que decide qué se construye después.
   GitHub el purgado —que ahora hay que pedirlo por **tres** sitios: los archivos en el historial de
   `prueba`, la rama del PR que los subió, y los tres nombres de la versión 0.093— y decidir si los
   archivos se retiran de la copia actual. **De Daniel:** decidir si el repositorio debe seguir siendo
-  público.
+  público *(decidido después: privado — ver 0.097)*.
 - ⏳ **Tres preguntas abiertas para Daniel**, todas sobre qué dato personal cabe en un repositorio
   público: si se seudonimizan los **alias de proveedores persona física** («CESAR VICTORIA 1»); si se
   conservan los **nombres de pila de empleadas junto a una valoración de su trabajo** (son cita textual

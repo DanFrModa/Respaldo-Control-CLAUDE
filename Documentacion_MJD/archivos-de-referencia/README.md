@@ -11,7 +11,7 @@
 > | Números de cuenta (CLABE y tarjeta) | ✅ **fuera** — cero rastros |
 > | RFC | ✅ **fuera** — cero rastros |
 > | **Nombres de los beneficiarios** | 🔴 **DENTRO: 77 nombres completos de personas físicas**, cada uno **pegado al monto que cobra** (`relacion-pagos-sin-factura.xlsx`, hoja «General», columna O) |
-> | **Autores en los metadatos** | 🔴 **DENTRO** — `docProps/core.xml` de los cinco conserva nombres reales, incluido el de quien armó la cotización |
+> | **Autores en los metadatos** | 🔴 **DENTRO** — `docProps/core.xml` de los cinco conserva nombres reales de autor |
 >
 > ⛔ **Trátalos como datos personales**: no los reenvíes, no los adjuntes a un ticket, no los publiques y
 > no los copies fuera de aquí. **Este repositorio es público**, así que ya están expuestos; el pendiente
@@ -39,7 +39,7 @@ sacado** (el relato completo está en `DECISIONES.md` **§Post-F9.186**).
 | `relacion-pagos-sin-factura.xlsx` | Su directorio de ~150 beneficiarios + el concentrado de transferencias de la semana | Que **el beneficiario casi nunca es el proveedor**, y que «César Victoria 1/2/3» es **UN proveedor con TRES cuentas** |
 | `excel-semanal-de-produccion.xlsx` | Lo que su encargado le manda cada semana con las maquilas a pagar | El **IVA escondido** en una columna llamada «BONOS / AJUSTES», y un **total que no cuadra por 2,277** cuya razón no está escrita |
 | `antiguedad-de-saldos.xlsx` | El reporte de los jueves: saldo por factura de todos los proveedores con factura | Que **sí envejece a los maquileros** (Borda Print a 8 días), al revés de lo que el sistema supone |
-| `cotizacion-que-manda-el-cliente.xlsx` | El precosteo que le manda el cliente por temporada | La estructura real del costeo: tela 1 + tela 2, y los conceptos que él usa |
+| `cotizacion-que-manda-el-cliente.xlsx` | El precosteo de la propuesta de un cliente, **que arma Aurora** (el nombre del archivo quedó de antes de saberlo — §Post-F9.188(e)) | La estructura real del costeo: tela 1 + tela 2, y los conceptos que él usa |
 | `lista-de-precios-de-daniel.xlsx` | Donde **él juega en vivo** con los precios y se los devuelve al cliente | Que **la fórmula del sistema compone mal los factores** (un peso arriba en 1 de cada 3-4 modelos), y **cómo debe ser la pantalla** |
 
 ## Cómo usarlos

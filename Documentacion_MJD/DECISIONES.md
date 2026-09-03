@@ -12136,6 +12136,56 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.188) — LAS CINCO DE LA TARDE (3-sep-2026): Daniel despierta y contesta lo que la noche dejó abierto
+
+> **Cómo nació.** Daniel preguntó *«¿qué necesita de mí?»* y el lead le entregó cinco decisiones, cada una
+> con su propuesta (regla de §6). Contestó las cinco de una vez.
+
+## (a) ✅ LA BANDEJA DE CxP: el maquilero con todo sin revisar **NO desaparece** — sale con saldo 0 y su pendiente
+Con la fila 0.115 el saldo sólo suma lo **revisado**. Un maquilero cuyos movimientos estén **todos** sin
+revisar quedaría con saldo 0 y, con el corte viejo de la bandeja (`saldo ≠ 0`), **desaparecería** de la
+pantalla donde Daniel decide a quién paga. **Decisión:** que **no desaparezca**: aparece con el saldo en
+cero y la columna **«pendiente de tu decisión»** con su importe. ⇒ El corte de la bandeja de CxP pasa a
+`saldo ≠ 0 **o** pendiente ≠ 0`, el mismo criterio que **0.115 le pone al tablero de EsMa** (hoy ese
+tablero también corta sólo por `saldo ≠ 0`, `saldos-todos.ts`). *Va en 0.115.*
+
+## (b) ✅ LA CUENTA FISCAL: **libre**, no se fuerza a una sola por proveedor
+Daniel había dicho *«tendría una cuenta Fiscal»*; la fila 0.112 **no** lo forzó. **Decisión: se queda
+libre.** Un mismo RFC puede tener dos cuentas a su nombre, y forzarlo dejaría a Daniel sin poder capturar
+su realidad el día de la carga. La guarda futura (0.113) queda como *«el pago con factura sale a **una**
+cuenta fiscal»*, que es igual de correcta.
+
+## (c) ✅ EL REPOSITORIO: **se pone privado** mientras se pide el purgado
+Es la decisión (ii) de la fila **0.123**. **Decisión: privado**, mañana a primera hora, mientras Gabriel
+pide a GitHub el purgado. Es reversible y no cuesta nada. 📌 Dato que empeoró lo medido: la primera medición
+contó **77** nombres en una columna de un archivo; la revisión de los cinco `.xlsx` contó **~169 · ~174 · ~140 · ~29 · ~7** cadenas con forma de
+nombre (heurística Title-Case/MAYÚSCULAS de 2–4 palabras; un segundo conteo independiente dio 169 / 182 /
+156 / 30 / 8 — **el orden de magnitud es el dato, la cifra exacta se fijará con un script cuando se
+trabaje la 0.123**), más autores reales en los metadatos de cada uno. ⏳ Las
+decisiones (a)/(b)/(c) de 0.123 sobre qué dato personal cabe en la prosa **siguen abiertas**.
+
+## (d) 🔴 LOS DOS CAMPOS QUE CHOCAN SOBRE SI FACTURA: **SÍ se corrigen — es un error que existan** (fila 0.124)
+`Proveedor.factura` (booleano) y `Proveedor.modalidadFacturacion` (`solo_con` · `solo_sin` · `ambos`)
+**contestan la misma pregunta** y nada impide que se contradigan; un proveedor incoherente **parte sus pagos
+por los dos caminos** según por qué puerta entraron. Daniel: *«¿se va a corregir? Es un error que existan,
+¿no?»* — **sí, se corrige.**
+📌 **Y NO nació de las dos sesiones en paralelo**: los dos campos **ya existían antes de esta noche**
+(`schema.prisma` líneas 666 y 727 al arrancar el día) — vienen de **dos fases distintas** que resolvieron
+la misma pregunta por separado (el proveedor enriquecido de **F1-E1B/R15** puso `factura`; **EsMa F6-E4**,
+decisión (h), puso `modalidadFacturacion` — migración `20260701120000_f6_e4_esma_movimientos`). El PR #290 **los encontró**, no los creó; su aviso no bloqueante fue la mitigación
+correcta para no encerrar a los migrados.
+**Cómo se corrige (0.124):** **una sola verdad**, `modalidadFacturacion` —la rica—; `factura` deja de
+capturarse y se **deriva** de ella (`solo_sin` → false; `solo_con`/`ambos` → true) donde todavía se lea.
+⚠️ **REGLA 0-B**: sin backfill; lo migrado que sólo traiga `factura` **se tolera**.
+
+## (e) ✅ EL PRECOSTEO LO ARMA **AURORA**
+*«De Aurora. Ella debe de armar el precosteo.»* Cierra la contradicción de §Post-F9.186 (una vez «el
+cliente», otra «Aurora»): el `Precosteo_Propuesta_Milano.xlsx` **lo arma Aurora**, la gerente general.
+Consecuencia para (m): el hallazgo de que la fórmula compone mal los factores se mide contra **un documento
+interno**, no contra lo que manda el cliente — y la pantalla de la fila 0.122 es **para Aurora y Daniel**.
+
+---
+
 #### (Post-F9.187) — LAS CUATRO DE LA NOCHE (3-sep-2026): Daniel contesta antes de dormirse
 
 > **Cómo nació.** El lead le entregó las cuatro decisiones que podían frenar el trabajo de la noche, cada
@@ -12210,10 +12260,10 @@ descuento por faltante de §Post-F9.185 baje el saldo desde el momento de propon
 #### (Post-F9.186) — ⭐ LA NOCHE DE LOS ARCHIVOS REALES (3-sep-2026): cinco Excel de Daniel corrigen el plan
 
 > **Cómo nació esta sección.** Daniel subió **cinco archivos reales** —la relación de pagos sin factura, el
-> Excel semanal de maquilas de producción, la antigüedad de saldos, la cotización de la propuesta de un
-> cliente que a él le llega armada (⏳ **por confirmar con Daniel de quién le llega**: el archivo se
-> describió una vez como del cliente y otra como de Aurora, y **Aurora es la gerente general de la casa**,
-> no el cliente — cambia cómo se lee todo el punto (m)) y la
+> Excel semanal de maquilas de producción, la antigüedad de saldos, el precosteo de la propuesta de un
+> cliente **que arma Aurora** (✅ confirmado por Daniel el 3-sep, §Post-F9.188(e): *«ella debe de armar el
+> precosteo»* — la documentación lo había atribuido una vez al cliente y otra a Aurora, y **es de Aurora**,
+> la gerente general de la casa) y la
 > lista de precios que él arma—. **Cada uno corrigió algo que ninguna conversación había sacado.** Textual
 > suyo, al final: *«el me manda la información de referencia con **miles de errores**… por eso yo tengo que
 > ver lo que realmente se entregó»*.
@@ -12423,9 +12473,8 @@ proveedor; (2) **si no reconoce el formato, DECIRLO** en vez de llenar tres camp
 texto ⇒ el sistema lo rechaza y pide el original.
 
 ## (m) EL PRECOSTEO — F8 se construyó **sin haber visto una cotización real**
-Medido contra sus dos archivos (`Precosteo_Propuesta_Milano.xlsx`, que **a Daniel le llega armado** —ver
-la pregunta abierta del encabezado sobre de quién viene—, y `Gaby_2026.xlsx` / `Niños_2026_Inv.xlsx`, que
-**sí arma él**):
+Medido contra sus dos archivos (`Precosteo_Propuesta_Milano.xlsx`, **el precosteo que arma Aurora** —Daniel,
+§Post-F9.188(e)—, y `Gaby_2026.xlsx` / `Niños_2026_Inv.xlsx`, la lista de precios que **arma él**):
 
 🔴 **La composición de los factores está mal.** Daniel divide **tres veces seguidas**
 (`costo/(1−margen)/(1−comisión)/(1−descuentos)`); el sistema **suma los últimos y divide una vez**. Con el
