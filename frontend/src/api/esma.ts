@@ -365,7 +365,7 @@ export function useDesglosado(
   });
 }
 
-/** Saldos de todos los maquileros con saldo ≠ 0 (drill-down). */
+/** Saldos de los maquileros con saldo ≠ 0 —o con algo por revisar— (drill-down). */
 export function useSaldosTodos(
   query: EsMaSaldosTodosQuery = {},
 ): UseQueryResult<EsMaSaldosTodos, ErrorDeApi> {

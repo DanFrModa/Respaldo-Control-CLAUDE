@@ -1407,6 +1407,11 @@ export type EsMaSaldo =
 export type EsMaSaldoQuery = NonNullable<
   paths['/api/esma/maquileros/{id}/saldo']['get']['parameters']['query']
 >;
+/**
+ * Lo CAPTURADO que aún espera revisión y por eso NO entra al saldo (V1, fila 0.115). Viaja junto al
+ * saldo —y en cada fila del tablero— para que el dinero excluido se vea en vez de desaparecer.
+ */
+export type EsMaPendienteRevision = EsMaSaldo['pendienteRevision'];
 
 /** Conciliación EsMa vs recibos del periodo (`GET /api/esma/conciliacion`). */
 export type EsMaConciliacion =

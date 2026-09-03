@@ -101,7 +101,7 @@ export const rutasEstadoCuentaEsMa: FastifyPluginCallbackZod = (app, _opciones, 
     preHandler: app.conPermiso('esma.ver-pagos'),
     schema: {
       tags: ['esma'],
-      summary: 'Saldos de todos los maquileros activos con saldo ≠ 0 (drill-down)',
+      summary: 'Saldos de maquileros activos con saldo ≠ 0 o algo por revisar (drill-down)',
       security: SEGURIDAD_SESION,
       querystring: esquemaSaldosTodosQuery,
       response: { 200: esquemaSaldosTodosSalida, ...respuestasError },

@@ -12136,6 +12136,82 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.189) — LA CORRIDA SEMANAL, dictada por Daniel (3-sep-2026, tarde): ocho respuestas para la fila 0.113
+
+> **Cómo nació.** El analista de 0.113 midió el código y levantó quince preguntas de diseño; el lead las
+> juntó en ocho y se las llevó a Daniel de una vez, cada una con default (regla de §6). Contestó las ocho.
+
+## (a) ✅ LA CORRIDA SE GUARDA, y son DOS por semana: la de CON factura y la de SIN factura
+> *«Buen punto. No lo dije nunca. Pero debemos de guardar **cada corrida (la de con y sin factura) de manera
+> semanal**.»*
+⇒ Entidad persistida con ciclo (borrador → cerrada → ejecutada), **una por segmento y semana**. El
+concentrado del martes dice lo mismo que el del lunes. Es lo que hace posible el cotejo bancario después.
+
+## (b) ✅ EL MONTO LO TECLEA DANIEL — no se deriva de los recibos
+> *«Lo que teclee. **Yo voy decidiendo los montos a pagar de cada uno. Manualmente.**»*
+⇒ El renglón de la corrida lleva **monto libre**. El pago que nace de ahí NO exige aplicaciones a cargos
+(hoy `crearPagoMaquilero` exige ≥1 — la corrida necesita el pago **a cuenta**). El saldo y los recibos de
+la semana se enseñan **como referencia** al lado, nunca como el número que se paga.
+🔑 Corolario ya dicho en §Post-F9.186(h): el **anticipo** es un pago sin recibos — en EsMa el «abono» SUBE
+lo que se le debe al maquilero, el pago lo BAJA; un anticipo debe dejarlo en negativo ⇒ **es pago**.
+
+## (c) ✅ EFECTIVO O TRANSFERENCIA: default por proveedor, **cambiable por pago** — y un CATÁLOGO NUEVO
+> *«Podemos dejarlo como default de cada proveedor. Pero **con opción a cambiarlo**. De pronto un maquilero
+> me pide que le pague una semana en efectivo.»*
+⇒ `formaPago` default en el proveedor; cada renglón de la corrida lo puede cambiar. Con cuenta ⇒
+transferencia; en efectivo el beneficiario es el proveedor mismo.
+> *«También quiero dejar pagos para cosas que **no necesariamente están dadas de alta como proveedores**
+> (nóminas por fuera, gratificaciones, pago de algún servicio como agua, o cualquier otra cosa). Debería de
+> poder tener como **un catálogo de otras cosas que no son proveedores**.»*
+🔴 **Esto no existía en ninguna fila.** Nace la **0.125 — el catálogo de conceptos de pago que NO son
+proveedores** (nombre, rubro, forma de pago default, cuentas de pago con la misma forma que las del
+proveedor), **prerequisito** de la relación sin factura. ✅ **Daniel confirmó (misma tarde): «que sean un
+catálogo aparte, no proveedores»** — no tienen RFC, ni orden, ni estado de cuenta, y colarlos al catálogo de
+proveedores contaminaría CxP y los reportes fiscales.
+⭐ **Y con PREDETERMINADOS:** *«algunos de ellos quiero que se carguen por default en la relación, porque son
+conceptos que cada semana pago y no quiero que se me vaya a olvidar ponerlo (caja chica, nómina por fuera,
+etc.). De ese catálogo poder definir cuáles son los predeterminados para que **siempre se carguen en cero**
+para que yo le ponga la cantidad.»* ⇒ el concepto lleva la marca `predeterminado`; cada corrida nueva nace
+con esos renglones **en cero**, y los demás se agregan desde el catálogo cuando hagan falta.
+
+## (d) ✅ LA GUARDA FISCAL BLOQUEA
+> *«De acuerdo.»* ⇒ Un pago CON factura sólo sale a una cuenta **fiscal**; sin cuenta fiscal capturada, ese
+proveedor no se puede pagar con factura hasta tenerla (la corrida lo dice con su nombre). Lo SIN factura
+sale a cualquier cuenta.
+
+## (e) ✅ UNA SOLA RELACIÓN, **separada por rubro** — como su Excel
+> *«Misma relación pero separada por rubro. Así como mi archivo de Excel.»*
+⇒ Maquileros, otros proveedores, nóminas, servicios… **secciones de una misma corrida**, no módulos
+distintos. Cada renglón sabe de dónde viene (EsMa, CxP, catálogo de otros).
+
+## (f) ✅ EL PRODUCTO ES LA PANTALLA, no el Excel
+> *«Ni siquiera necesito el Excel. **Eso puede vivir en la pantalla y de ahí ir llenando la información de
+> pagos.** No necesito el Excel. Está bien poder generarlo por cualquier cosa, pero la idea es trabajarlo
+> ahí mismo.»*
+⇒ 0.113 es **una pantalla de trabajo** donde Daniel decide semana a semana (renglón por renglón, monto y
+forma de pago, con saldo y recibos de referencia al lado) y la cierra. El Excel/PDF del concentrado es una
+**salida secundaria**, para Lupita y para el banco — no el entregable.
+🔑 **Y Daniel dibujó la pantalla de la relación de remisiones (sin IVA):** *«me imagino que en la pantalla
+donde están los **saldos de todos los proveedores** con **un campo abierto a un lado** para capturar lo que
+se le va a pagar esa semana. Y en esa misma pantalla cargar por default estos conceptos que te comento,
+también con el campo a un lado para capturar lo que se le va a pagar. Y tener la posibilidad de cargar el
+concepto que necesito del catálogo de conceptos nuevo.»* ⇒ la corrida sin factura **ES el tablero de
+saldos con una columna de captura**, más los predeterminados del catálogo en cero, más «agregar concepto».
+No es una pantalla nueva desde cero: es el tablero de 0.115 con la columna «a pagar esta semana».
+
+## (g) ✅ PERMISOS NUEVOS
+> *«Correcto.»* ⇒ *armar y cerrar la corrida* (Daniel) y *ver la relación* (finanzas, sólo lectura).
+**Requiere `SEED_ON_START` al desplegar 0.113.**
+
+## (h) Fuera de 0.113, con número
+- **0.126 — el cotejo contra el estado de cuenta del banco** (lado con factura): 0.113 produce la lista
+  esperada; cruzarla es otra pieza. *(Era «0.125» en la propuesta del lead; corre un número porque el
+  catálogo de otros beneficiarios se numeró antes.)*
+- El **IVA explícito** en el renglón va con el documento «yo te digo qué facturarme» (**0.118**).
+- **Corte y empaque** como cargos pagables (**0.114**).
+
+---
+
 #### (Post-F9.188) — LAS CINCO DE LA TARDE (3-sep-2026): Daniel despierta y contesta lo que la noche dejó abierto
 
 > **Cómo nació.** Daniel preguntó *«¿qué necesita de mí?»* y el lead le entregó cinco decisiones, cada una

@@ -11,7 +11,9 @@
  *  (h) A4: deny-by-default de `cxp.ver`/`cxp.administrar`, y defensa en profundidad (el motor exige
  *      además `terceros.administrar` → falla cerrado sin él);
  *  (i) la cancelación de CxP es por inverso auditado y rechaza un movimiento que NO es de proveedor;
- *  (j) el estado de cuenta del proveedor delega al motor (incluye la convivencia EsMa).
+ *  (j) el estado de cuenta del proveedor delega al motor (incluye la convivencia EsMa);
+ *  (k) §Post-F9.188(a): el maquilero con TODO sin revisar NO desaparece de la bandeja (saldo 0 +
+ *      «por revisar» explicado); los KPIs siguen contando sólo saldo ≠ 0.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -456,6 +458,112 @@ describe('convivencia EsMa en la bandeja (cubeta maquila)', () => {
     // El saldo del renglón == el saldo del estado de cuenta (mismo total, sin doble conteo).
     const cuenta = await estadoCuentaProveedorCxp(sesion(), proveedor.id, {}, bd());
     expect(fila?.saldo).toBe(cuenta.saldo.saldo);
+  });
+
+  // ── (k) §Post-F9.188(a) — el maquilero con todo sin revisar NO desaparece ─────────────────────
+  //
+  // Al saldo sólo entra lo REVISADO (V1, fila 0.115). Un maquilero cuyos movimientos están TODOS
+  // capturados tiene saldo 0, y con el corte viejo (`saldo ≠ 0`) la bandeja lo hacía desaparecer —
+  // justo cuando alguien tiene que decidir sobre ese dinero. Daniel: no debe desaparecer.
+
+  /** Un movimiento PLANO de EsMa (abono/pago) en el estado de revisión que se pida. */
+  async function sembrarPlano(
+    concepto: 'abono' | 'pago',
+    idMaquilero: number,
+    monto: number,
+    estadoRevision: 'capturado' | 'revisado',
+  ): Promise<number> {
+    const data = {
+      idEmpresa: empresa.id,
+      idMaquilero,
+      monto,
+      fecha: new Date('2026-06-01T00:00:00Z'),
+      estadoRevision,
+    };
+    return concepto === 'abono'
+      ? (await cliente.abonoMaquilero.create({ data })).id
+      : (await cliente.pagoMaquilero.create({ data })).id;
+  }
+
+  /** Un maquilero limpio (sin nada en el motor). */
+  async function maquileroNuevo(nombre: string): Promise<number> {
+    return (await cliente.proveedor.create({ data: { modalidadFacturacion: 'ambos', nombre } })).id;
+  }
+
+  it('⭐ (k) el maquilero con TODO sin revisar SIGUE en la bandeja, con saldo 0 y su «por revisar»', async () => {
+    const idMaquilero = await maquileroNuevo('Maquila Todo Capturado');
+    await sembrarPlano('abono', idMaquilero, 400, 'capturado'); // no cuenta al saldo… todavía
+
+    const bandeja = await bandejaPorPagar(sesion(), { filtro: 'con-saldo' }, bd());
+    const fila = bandeja.filas.find((f) => f.idProveedor === idMaquilero);
+    // Antes esta fila no existía: saldo 0 → fuera de "con saldo" → el dinero desaparecía de CxP.
+    expect(fila).toBeDefined();
+    expect(fila).toMatchObject({ saldo: 0, maquila: 0 });
+    expect(fila?.maquilaPorRevisar).toEqual({
+      abonos: 400,
+      pagos: 0,
+      descuentos: 0,
+      neto: 400,
+      partidas: 1,
+    });
+    // Los KPIs NO lo cuentan como deuda (lo pendiente aún no se debe)… pero el resumen lo declara.
+    expect(bandeja.resumen.proveedoresConSaldo).toBe(0);
+    expect(bandeja.resumen.carteraTotal).toBe(0);
+    expect(bandeja.resumen.maquilaTotal).toBe(0);
+    expect(bandeja.resumen.maquilaPorRevisar).toMatchObject({ neto: 400, partidas: 1 });
+  });
+
+  it('(k) sigue visible aunque sus partidas capturadas NETEEN cero (manda el conteo, no el importe)', async () => {
+    const idMaquilero = await maquileroNuevo('Maquila Netea Cero');
+    await sembrarPlano('abono', idMaquilero, 250, 'capturado');
+    await sembrarPlano('pago', idMaquilero, 250, 'capturado');
+
+    const bandeja = await bandejaPorPagar(sesion(), { filtro: 'con-saldo' }, bd());
+    const fila = bandeja.filas.find((f) => f.idProveedor === idMaquilero);
+    expect(fila).toBeDefined();
+    expect(fila?.maquilaPorRevisar).toMatchObject({
+      abonos: 250,
+      pagos: 250,
+      neto: 0,
+      partidas: 2,
+    });
+  });
+
+  it('(k) al revisarse, la partida pasa del «por revisar» al saldo y el maquilero ya cuenta como deuda', async () => {
+    const idMaquilero = await maquileroNuevo('Maquila Ya Revisada');
+    const idAbono = await sembrarPlano('abono', idMaquilero, 400, 'capturado');
+    await cliente.abonoMaquilero.update({
+      where: { id: idAbono },
+      data: { estadoRevision: 'revisado' },
+    });
+
+    const bandeja = await bandejaPorPagar(sesion(), { filtro: 'con-saldo' }, bd());
+    const fila = bandeja.filas.find((f) => f.idProveedor === idMaquilero);
+    expect(fila).toMatchObject({ saldo: 400, maquila: 400 });
+    expect(fila?.maquilaPorRevisar.partidas).toBe(0);
+    expect(bandeja.resumen.proveedoresConSaldo).toBe(1);
+    expect(bandeja.resumen.maquilaPorRevisar.partidas).toBe(0);
+  });
+
+  it('(k) sin `consultas.ver-importes` el «por revisar» viaja en null, pero el CONTEO sí (y la fila también)', async () => {
+    const idMaquilero = await maquileroNuevo('Maquila Oculta');
+    await sembrarPlano('pago', idMaquilero, 90, 'capturado');
+
+    const bandeja = await bandejaPorPagar(
+      sesion(['cxp.ver', 'terceros.ver']),
+      { filtro: 'con-saldo' },
+      bd(),
+    );
+    const fila = bandeja.filas.find((f) => f.idProveedor === idMaquilero);
+    expect(fila).toBeDefined();
+    expect(fila?.maquilaPorRevisar).toEqual({
+      abonos: null,
+      pagos: null,
+      descuentos: null,
+      neto: null,
+      partidas: 1,
+    });
+    expect(bandeja.resumen.maquilaPorRevisar.partidas).toBe(1);
   });
 });
 

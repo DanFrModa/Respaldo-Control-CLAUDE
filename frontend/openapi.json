@@ -150979,7 +150979,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Σ abonos (o null)."
+                      "description": "Σ abonos revisados (o null)."
                     },
                     "totalPagos": {
                       "anyOf": [
@@ -150990,7 +150990,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Σ pagos (o null)."
+                      "description": "Σ pagos revisados (o null)."
                     },
                     "totalDescuentos": {
                       "anyOf": [
@@ -151001,7 +151001,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Σ descuentos (o null)."
+                      "description": "Σ descuentos revisados (o null)."
                     },
                     "saldo": {
                       "anyOf": [
@@ -151013,6 +151013,70 @@
                         }
                       ],
                       "description": "Saldo derivado (o null si se ocultan importes)."
+                    },
+                    "pendienteRevision": {
+                      "type": "object",
+                      "properties": {
+                        "abonos": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Σ abonos capturados sin revisar (o null)."
+                        },
+                        "pagos": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Σ pagos capturados sin revisar (o null)."
+                        },
+                        "descuentos": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Σ descuentos capturados sin revisar (o null)."
+                        },
+                        "neto": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                        },
+                        "partidas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                        }
+                      },
+                      "required": [
+                        "abonos",
+                        "pagos",
+                        "descuentos",
+                        "neto",
+                        "partidas"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Lo capturado que aún no se revisa: no suma al saldo, pero se ve."
                     }
                   },
                   "required": [
@@ -151023,7 +151087,8 @@
                     "totalAbonos",
                     "totalPagos",
                     "totalDescuentos",
-                    "saldo"
+                    "saldo",
+                    "pendienteRevision"
                   ],
                   "additionalProperties": false,
                   "description": "Saldo derivado de la cuenta de un maquilero."
@@ -152377,7 +152442,7 @@
     },
     "/api/esma/saldos": {
       "get": {
-        "summary": "Saldos de todos los maquileros activos con saldo ≠ 0 (drill-down)",
+        "summary": "Saldos de maquileros activos con saldo ≠ 0 o algo por revisar (drill-down)",
         "tags": [
           "esma"
         ],
@@ -152470,7 +152535,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Σ abonos (o null)."
+                            "description": "Σ abonos revisados (o null)."
                           },
                           "totalPagos": {
                             "anyOf": [
@@ -152481,7 +152546,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Σ pagos (o null)."
+                            "description": "Σ pagos revisados (o null)."
                           },
                           "totalDescuentos": {
                             "anyOf": [
@@ -152492,7 +152557,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Σ descuentos (o null)."
+                            "description": "Σ descuentos revisados (o null)."
                           },
                           "saldo": {
                             "anyOf": [
@@ -152504,6 +152569,70 @@
                               }
                             ],
                             "description": "Saldo derivado (o null si se ocultan importes)."
+                          },
+                          "pendienteRevision": {
+                            "type": "object",
+                            "properties": {
+                              "abonos": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Σ abonos capturados sin revisar (o null)."
+                              },
+                              "pagos": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Σ pagos capturados sin revisar (o null)."
+                              },
+                              "descuentos": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Σ descuentos capturados sin revisar (o null)."
+                              },
+                              "neto": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                              },
+                              "partidas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                              }
+                            },
+                            "required": [
+                              "abonos",
+                              "pagos",
+                              "descuentos",
+                              "neto",
+                              "partidas"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Lo capturado que aún no se revisa: no suma al saldo, pero se ve."
                           }
                         },
                         "required": [
@@ -152514,12 +152643,13 @@
                           "totalAbonos",
                           "totalPagos",
                           "totalDescuentos",
-                          "saldo"
+                          "saldo",
+                          "pendienteRevision"
                         ],
                         "additionalProperties": false,
                         "description": "Saldo de un maquilero en el tablero."
                       },
-                      "description": "Maquileros activos con saldo ≠ 0."
+                      "description": "Maquileros activos con saldo ≠ 0 o pendiente ≠ 0."
                     },
                     "totalSaldo": {
                       "anyOf": [
@@ -152531,12 +152661,24 @@
                         }
                       ],
                       "description": "Σ de los saldos (o null si se ocultan importes)."
+                    },
+                    "totalPendienteNeto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Σ del pendiente neto de todas las filas (o null si se ocultan importes)."
                     }
                   },
                   "required": [
                     "conFactura",
                     "filas",
-                    "totalSaldo"
+                    "totalSaldo",
+                    "totalPendienteNeto"
                   ],
                   "additionalProperties": false,
                   "description": "Saldos de todos los maquileros."
@@ -153735,7 +153877,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Σ abonos (o null)."
+                          "description": "Σ abonos revisados (o null)."
                         },
                         "totalPagos": {
                           "anyOf": [
@@ -153746,7 +153888,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Σ pagos (o null)."
+                          "description": "Σ pagos revisados (o null)."
                         },
                         "totalDescuentos": {
                           "anyOf": [
@@ -153757,7 +153899,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Σ descuentos (o null)."
+                          "description": "Σ descuentos revisados (o null)."
                         },
                         "saldo": {
                           "anyOf": [
@@ -153769,6 +153911,70 @@
                             }
                           ],
                           "description": "Saldo derivado (o null si se ocultan importes)."
+                        },
+                        "pendienteRevision": {
+                          "type": "object",
+                          "properties": {
+                            "abonos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ abonos capturados sin revisar (o null)."
+                            },
+                            "pagos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ pagos capturados sin revisar (o null)."
+                            },
+                            "descuentos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ descuentos capturados sin revisar (o null)."
+                            },
+                            "neto": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                            },
+                            "partidas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                            }
+                          },
+                          "required": [
+                            "abonos",
+                            "pagos",
+                            "descuentos",
+                            "neto",
+                            "partidas"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Lo capturado que aún no se revisa: no suma al saldo, pero se ve."
                         }
                       },
                       "required": [
@@ -153779,7 +153985,8 @@
                         "totalAbonos",
                         "totalPagos",
                         "totalDescuentos",
-                        "saldo"
+                        "saldo",
+                        "pendienteRevision"
                       ],
                       "additionalProperties": false,
                       "description": "Saldo derivado (all-time) + su desglose por concepto."
@@ -154830,7 +155037,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Σ abonos (o null)."
+                          "description": "Σ abonos revisados (o null)."
                         },
                         "totalPagos": {
                           "anyOf": [
@@ -154841,7 +155048,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Σ pagos (o null)."
+                          "description": "Σ pagos revisados (o null)."
                         },
                         "totalDescuentos": {
                           "anyOf": [
@@ -154852,7 +155059,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Σ descuentos (o null)."
+                          "description": "Σ descuentos revisados (o null)."
                         },
                         "saldo": {
                           "anyOf": [
@@ -154864,6 +155071,70 @@
                             }
                           ],
                           "description": "Saldo derivado (o null si se ocultan importes)."
+                        },
+                        "pendienteRevision": {
+                          "type": "object",
+                          "properties": {
+                            "abonos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ abonos capturados sin revisar (o null)."
+                            },
+                            "pagos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ pagos capturados sin revisar (o null)."
+                            },
+                            "descuentos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ descuentos capturados sin revisar (o null)."
+                            },
+                            "neto": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                            },
+                            "partidas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                            }
+                          },
+                          "required": [
+                            "abonos",
+                            "pagos",
+                            "descuentos",
+                            "neto",
+                            "partidas"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Lo capturado que aún no se revisa: no suma al saldo, pero se ve."
                         }
                       },
                       "required": [
@@ -154874,7 +155145,8 @@
                         "totalAbonos",
                         "totalPagos",
                         "totalDescuentos",
-                        "saldo"
+                        "saldo",
+                        "pendienteRevision"
                       ],
                       "additionalProperties": false,
                       "description": "Saldo derivado (all-time) + su desglose."
@@ -157374,7 +157646,7 @@
             "in": "query",
             "name": "filtro",
             "required": false,
-            "description": "con-saldo (saldo ≠ 0) | todos (con movimientos)."
+            "description": "con-saldo (saldo ≠ 0 o con maquila por revisar) | todos (con movimientos)."
           },
           {
             "schema": {
@@ -157497,6 +157769,70 @@
                               }
                             ],
                             "description": "Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte)."
+                          },
+                          "maquilaPorRevisar": {
+                            "type": "object",
+                            "properties": {
+                              "abonos": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Σ abonos capturados sin revisar (o null)."
+                              },
+                              "pagos": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Σ pagos capturados sin revisar (o null)."
+                              },
+                              "descuentos": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Σ descuentos capturados sin revisar (o null)."
+                              },
+                              "neto": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                              },
+                              "partidas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                              }
+                            },
+                            "required": [
+                              "abonos",
+                              "pagos",
+                              "descuentos",
+                              "neto",
+                              "partidas"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Maquila (EsMa) capturada y AÚN sin revisar: no suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a)."
                           }
                         },
                         "required": [
@@ -157509,12 +157845,13 @@
                           "d1a30",
                           "d31a60",
                           "mas60",
-                          "maquila"
+                          "maquila",
+                          "maquilaPorRevisar"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de la bandeja de cuentas por pagar (proveedor + saldo + aging + maquila)."
                       },
-                      "description": "Renglones de la página (saldo desc)."
+                      "description": "Renglones de la página (saldo desc): saldo ≠ 0 o con maquila por revisar."
                     },
                     "total": {
                       "type": "integer",
@@ -157592,6 +157929,70 @@
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
                           "description": "Proveedores con saldo ≠ 0."
+                        },
+                        "maquilaPorRevisar": {
+                          "type": "object",
+                          "properties": {
+                            "abonos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ abonos capturados sin revisar (o null)."
+                            },
+                            "pagos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ pagos capturados sin revisar (o null)."
+                            },
+                            "descuentos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ descuentos capturados sin revisar (o null)."
+                            },
+                            "neto": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                            },
+                            "partidas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                            }
+                          },
+                          "required": [
+                            "abonos",
+                            "pagos",
+                            "descuentos",
+                            "neto",
+                            "partidas"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Σ de la maquila capturada sin revisar en toda la cartera: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero no desaparece."
                         }
                       },
                       "required": [
@@ -157599,7 +158000,8 @@
                         "vencido",
                         "maquilaTotal",
                         "alCorrientePct",
-                        "proveedoresConSaldo"
+                        "proveedoresConSaldo",
+                        "maquilaPorRevisar"
                       ],
                       "additionalProperties": false,
                       "description": "KPIs sobre toda la cartera con saldo."

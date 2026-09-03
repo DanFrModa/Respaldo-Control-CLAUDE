@@ -14,6 +14,7 @@ import type { ContextoBd } from '../../../comun/transaccion.js';
 import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
 import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 import { estadoCuentaDesglosado } from '../estado-cuenta.js';
+import { pendienteDeRevisionPlano } from '../formula-saldo.js';
 import type { z } from 'zod';
 
 /** Dependencias inyectables (los tests inyectan un `estadoCuentaDesglosado` fake para no tocar BD). */
@@ -94,9 +95,15 @@ export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<B
     { header: 'Referencia', key: 'ref', width: 40 },
     { header: 'Importe', key: 'importe', width: 14 },
     { header: 'Facturación', key: 'factura', width: 12 },
+    // Rec. del reviewer: el agregado «Por revisar» del Resumen dice CUÁNTO se excluyó; esta columna
+    // dice CUÁLES partidas fueron. Sin ella, en el papel hay que adivinar.
+    { header: 'Revisión', key: 'revision', width: 14 },
   ];
   estilarEncabezado(movs.getRow(1));
   const factura = (v: boolean | null): string => (v === null ? '—' : v ? 'Con' : 'Sin');
+  /** Mismo criterio que la suma (formula-saldo.ts): o entró al saldo, o está esperando decisión. */
+  const revision = (e: 'capturado' | 'revisado'): string =>
+    pendienteDeRevisionPlano(e) ? 'Por revisar' : 'Revisado';
   for (const a of d.abonos) {
     movs.addRow({
       tipo: 'Abono',
@@ -104,6 +111,7 @@ export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<B
       ref: a.observaciones ?? '',
       importe: a.monto ?? '',
       factura: factura(a.conFactura),
+      revision: revision(a.estadoRevision),
     });
   }
   for (const dsc of d.descuentos) {
@@ -113,6 +121,7 @@ export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<B
       ref: dsc.observaciones ?? '',
       importe: dsc.monto ?? '',
       factura: factura(dsc.conFactura),
+      revision: revision(dsc.estadoRevision),
     });
   }
   for (const p of d.pagos) {
@@ -126,6 +135,7 @@ export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<B
       ref: folios || `Pago #${String(p.id)}`,
       importe: p.monto ?? '',
       factura: factura(p.conFactura),
+      revision: revision(p.estadoRevision),
     });
   }
 
@@ -169,6 +179,18 @@ export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<B
   resumen.addRow({ concepto: 'Total abonos', valor: d.saldo.totalAbonos ?? '' });
   resumen.addRow({ concepto: 'Total pagos', valor: d.saldo.totalPagos ?? '' });
   resumen.addRow({ concepto: 'Total descuentos', valor: d.saldo.totalDescuentos ?? '' });
+  // ANTES del saldo: es dinero que el detalle SÍ lista y el saldo NO cuenta (espera revisión). Sin
+  // este renglón la hoja no cuadraría y el total parecería más chico sin razón. Se imprime SIEMPRE
+  // (aunque sea 0) para que el archivo tenga la misma forma corrida tras corrida, y acompañado del
+  // CONTEO de partidas: los importes pueden netear cero y aun así haber partidas esperando decisión.
+  resumen.addRow({
+    concepto: 'Por revisar (no suma)',
+    valor: d.saldo.pendienteRevision.neto ?? '',
+  });
+  resumen.addRow({
+    concepto: 'Partidas por revisar',
+    valor: d.saldo.pendienteRevision.partidas,
+  });
   const filaSaldo = resumen.addRow({ concepto: 'Saldo', valor: d.saldo.saldo ?? '' });
   filaSaldo.font = { bold: true };
   // DESPUÉS del saldo y sin negrita: es información, no un renglón de la cuenta (§Post-F9.136).

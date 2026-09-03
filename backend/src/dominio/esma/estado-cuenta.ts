@@ -41,6 +41,12 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { incompletasDeMaquilero } from '../produccion/incompletas.js';
 
+import {
+  aporteCargoAlSaldo,
+  pendienteDeRevisionCargo,
+  pendienteDeRevisionPlano,
+  WHERE_CARGO_REVISADO,
+} from './formula-saldo.js';
 import { saldoDeMaquilero } from './saldos.js';
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
@@ -170,19 +176,14 @@ export async function estadoCuentaMaquilero(
   const movimientos: EstadoCuentaMovimiento[] = [];
 
   for (const c of cargos) {
-    const esValidado = c.estado === 'validado';
     const importeReal =
       c.cantidadReal === null || c.precioReal === null
         ? null
         : c.cantidadReal.toNumber() * c.precioReal.toNumber();
     // monto (signo +): validado con costo → importe real; sin costo → 0; propuesto → sin importe.
-    const monto = !esValidado
-      ? null
-      : c.sinCosto
-        ? oculto(0)
-        : importeReal === null
-          ? null
-          : oculto(importeReal);
+    // Quién aporta y cuánto lo decide la definición única (formula-saldo.ts), no este archivo.
+    const aporte = aporteCargoAlSaldo(c, importeReal);
+    const monto = aporte === null ? null : oculto(aporte);
     movimientos.push({
       concepto: 'cargo',
       id: c.id,
@@ -190,7 +191,9 @@ export async function estadoCuentaMaquilero(
       referencia: `Orden #${String(Number(c.orden.folio))} · ${c.tipoProceso.nombre}${c.sinCosto ? ' (sin costo)' : ''}`,
       monto,
       estadoRevision: c.estado,
-      pendienteRevision: c.estado === 'propuesto',
+      // La marca del renglón sale de la MISMA definición que la suma (formula-saldo.ts): así el
+      // detalle y el total no pueden volver a contradecirse (fila 0.115).
+      pendienteRevision: pendienteDeRevisionCargo(c),
     });
   }
 
@@ -202,7 +205,7 @@ export async function estadoCuentaMaquilero(
       referencia: a.observaciones ?? 'Abono',
       monto: oculto(a.monto.toNumber()),
       estadoRevision: a.estadoRevision,
-      pendienteRevision: a.estadoRevision === 'capturado',
+      pendienteRevision: pendienteDeRevisionPlano(a.estadoRevision),
     });
   }
 
@@ -215,7 +218,7 @@ export async function estadoCuentaMaquilero(
       // Descuento resta: signo negativo.
       monto: puedeVerImportes ? -redondear2(d.monto.toNumber()) : null,
       estadoRevision: d.estadoRevision,
-      pendienteRevision: d.estadoRevision === 'capturado',
+      pendienteRevision: pendienteDeRevisionPlano(d.estadoRevision),
     });
   }
 
@@ -234,7 +237,7 @@ export async function estadoCuentaMaquilero(
       // Pago resta: signo negativo.
       monto: puedeVerImportes ? -redondear2(p.monto.toNumber()) : null,
       estadoRevision: p.estadoRevision,
-      pendienteRevision: p.estadoRevision === 'capturado',
+      pendienteRevision: pendienteDeRevisionPlano(p.estadoRevision),
     });
   }
 
@@ -349,7 +352,9 @@ export async function estadoCuentaDesglosado(
     where: {
       idEmpresa,
       idMaquilero,
-      estado: 'validado',
+      // Los cargos YA REVISADOS, sin costo incluidos (salen con importe 0). El criterio no se
+      // escribe aquí: sale de la definición única, igual que el de la suma (fila 0.115).
+      ...WHERE_CARGO_REVISADO,
       ...factura,
       ...rangoCreado(filtros.desde, filtros.hasta),
     },

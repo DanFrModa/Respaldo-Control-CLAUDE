@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.099 · 3-sep-2026 · **en prueba** — ⭐ El saldo del maquilero ya sólo cuenta lo **revisado**, y lo que espera tu decisión se ve al lado
+
+### Qué se puede hacer ahora que antes no
+
+- **Un abono, pago o descuento capturado NO mueve el saldo hasta que se revisa.** Antes sólo los cargos
+  respetaban esa regla; los otros tres conceptos sumaban desde que se tecleaban. Eso es lo que permite que el
+  **anticipo** de un maquilero se capture desde producción y **espere tu visto bueno** sin tocar el saldo.
+- **El dinero que está sin revisar se ve**, no desaparece: junto al saldo aparece **«Por revisar»** con su
+  desglose, en el estado de cuenta, en el tablero de todos los maquileros, en la captura de movimientos y de
+  pagos, y en los impresos (PDF y Excel), que además marcan **qué renglones** están pendientes.
+- **En la bandeja de CxP, un maquilero con todo sin revisar NO desaparece** (decisión de Daniel): sale con
+  saldo 0 y su pendiente.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Todos los saldos de maquileros van a cambiar.** Lo que hay capturado hoy en `prueba` está sin revisar,
+  así que **deja de sumar** y aparece como «Por revisar». Es lo correcto y no se compensa: los datos de
+  prueba se limpian, no se arreglan.
+- **La fórmula del saldo ahora vive en un solo sitio.** Estaba escrita **cuatro veces** (dos de ellas en SQL) y
+  sólo una respetaba la revisión; arreglar una pasaba en verde. Ahora hay **una definición** de la que se
+  genera todo, y **una guardia** que se pone roja si alguien vuelve a escribir una suma con otro criterio —
+  probada creando una quinta copia a propósito.
+- En la cuenta corriente de proveedores (CxP), el renglón pendiente se muestra **sin importe** («—») y lo
+  explica en sus observaciones, para que la suma de renglones siga cuadrando con el saldo.
+- El **reporte de pagos semanales** sigue sumando todos los pagos del periodo sin mirar revisión — es otra
+  pregunta (salida de caja) y ahora lo dice en su código.
+
+### Qué sigue pendiente o roto
+
+- La **columna** «pendiente de tu decisión» en el tablero es la fila **0.111** (el corte del tablero ya llegó
+  con ésta).
+- **Sin migración, sin permisos nuevos, sin seed** ⇒ el despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.098 · 3-sep-2026 · **en prueba** — ⭐ El proveedor ya tiene **sus cuentas de pago**: beneficiario, varias cuentas, una por omisión y la marca fiscal
 
 ### Qué se puede hacer ahora que antes no

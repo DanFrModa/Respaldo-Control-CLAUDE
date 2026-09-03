@@ -344,8 +344,40 @@ export const esquemaSaldoQuery = z
 export type SaldoQuery = z.infer<typeof esquemaSaldoQuery>;
 
 /**
+ * PENDIENTE DE REVISIÓN de una cuenta de maquilero: lo que ya se capturó pero todavía no se revisa
+ * y por eso NO entra al saldo. Se publica junto al saldo para que el dinero excluido se vea (y se
+ * entienda que espera una decisión) en vez de desaparecer sin explicación.
+ *
+ * Los CARGOS `propuesto` no salen aquí: hasta que se validan no tienen importe (cantidad y precio
+ * reales son NULL). Su lugar es la cola de validación de cargos.
+ */
+export const esquemaPendienteRevisionEsMa = z
+  .object({
+    abonos: z.number().nullable().describe('Σ abonos capturados sin revisar (o null).'),
+    pagos: z.number().nullable().describe('Σ pagos capturados sin revisar (o null).'),
+    descuentos: z.number().nullable().describe('Σ descuentos capturados sin revisar (o null).'),
+    neto: z
+      .number()
+      .nullable()
+      .describe('Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null).'),
+    partidas: z
+      .number()
+      .int()
+      .describe(
+        'Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo ' +
+          'que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas).',
+      ),
+  })
+  .describe('Importes capturados que aún esperan revisión (fuera del saldo).');
+
+/** Forma del bloque de pendiente de revisión. */
+export type PendienteRevisionEsMa = z.infer<typeof esquemaPendienteRevisionEsMa>;
+
+/**
  * SALDO derivado de un maquilero (D3): `Σcargos + Σabonos − Σpagos − Σdescuentos`, con nulos = 0
- * (fórmula exacta de `EsMa_SaldosMaq` con ceronulo). Los importes salen en null si se ocultan.
+ * (fórmula exacta de `EsMa_SaldosMaq` con ceronulo). Los CUATRO conceptos cuentan sólo si ya están
+ * revisados; lo capturado sin revisar viaja aparte en `pendienteRevision`. Los importes salen en
+ * null si se ocultan.
  */
 export const esquemaSaldoSalida = z
   .object({
@@ -356,10 +388,13 @@ export const esquemaSaldoSalida = z
       .nullable()
       .describe('Segmento aplicado o null (todo junto).'),
     totalCargos: z.number().nullable().describe('Σ cargos validados no sin-costo (o null).'),
-    totalAbonos: z.number().nullable().describe('Σ abonos (o null).'),
-    totalPagos: z.number().nullable().describe('Σ pagos (o null).'),
-    totalDescuentos: z.number().nullable().describe('Σ descuentos (o null).'),
+    totalAbonos: z.number().nullable().describe('Σ abonos revisados (o null).'),
+    totalPagos: z.number().nullable().describe('Σ pagos revisados (o null).'),
+    totalDescuentos: z.number().nullable().describe('Σ descuentos revisados (o null).'),
     saldo: z.number().nullable().describe('Saldo derivado (o null si se ocultan importes).'),
+    pendienteRevision: esquemaPendienteRevisionEsMa.describe(
+      'Lo capturado que aún no se revisa: no suma al saldo, pero se ve.',
+    ),
   })
   .describe('Saldo derivado de la cuenta de un maquilero.');
 
@@ -686,22 +721,35 @@ export const esquemaSaldoTodosFila = z
     maquilero: z.string().describe('Nombre del maquilero.'),
     nombreCorto: z.string().nullable().describe('Campo corto del taller, o null.'),
     totalCargos: z.number().nullable().describe('Σ cargos validados no sin-costo (o null).'),
-    totalAbonos: z.number().nullable().describe('Σ abonos (o null).'),
-    totalPagos: z.number().nullable().describe('Σ pagos (o null).'),
-    totalDescuentos: z.number().nullable().describe('Σ descuentos (o null).'),
+    totalAbonos: z.number().nullable().describe('Σ abonos revisados (o null).'),
+    totalPagos: z.number().nullable().describe('Σ pagos revisados (o null).'),
+    totalDescuentos: z.number().nullable().describe('Σ descuentos revisados (o null).'),
     saldo: z.number().nullable().describe('Saldo derivado (o null si se ocultan importes).'),
+    pendienteRevision: esquemaPendienteRevisionEsMa.describe(
+      'Lo capturado que aún no se revisa: no suma al saldo, pero se ve.',
+    ),
   })
   .describe('Saldo de un maquilero en el tablero.');
 
 /** Forma de una fila del tablero de saldos. */
 export type SaldoTodosFila = z.infer<typeof esquemaSaldoTodosFila>;
 
-/** Tablero de saldos: maquileros activos con saldo ≠ 0. */
+/**
+ * Tablero de saldos: maquileros activos con saldo ≠ 0 **o** con algo pendiente de revisión (si sólo
+ * se cortara por saldo, el maquilero cuyo único movimiento está sin revisar quedaría invisible con
+ * saldo 0 — que es justo el que hay que ver).
+ */
 export const esquemaSaldosTodosSalida = z
   .object({
     conFactura: z.enum(['con', 'sin']).nullable().describe('Segmento aplicado o null.'),
-    filas: z.array(esquemaSaldoTodosFila).describe('Maquileros activos con saldo ≠ 0.'),
+    filas: z
+      .array(esquemaSaldoTodosFila)
+      .describe('Maquileros activos con saldo ≠ 0 o pendiente ≠ 0.'),
     totalSaldo: z.number().nullable().describe('Σ de los saldos (o null si se ocultan importes).'),
+    totalPendienteNeto: z
+      .number()
+      .nullable()
+      .describe('Σ del pendiente neto de todas las filas (o null si se ocultan importes).'),
   })
   .describe('Saldos de todos los maquileros.');
 

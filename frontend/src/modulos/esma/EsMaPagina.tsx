@@ -45,7 +45,8 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
   {
     clave: 'saldos',
     titulo: 'Saldos de maquileros',
-    descripcion: 'Los maquileros activos con saldo distinto de cero (con drill-down).',
+    descripcion:
+      'Los maquileros activos con saldo distinto de cero —o con partidas por revisar—, con drill-down.',
     ruta: '/esma/saldos',
     icono: Users,
     permiso: 'esma.ver-pagos',

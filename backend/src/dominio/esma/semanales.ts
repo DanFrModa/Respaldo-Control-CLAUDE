@@ -63,6 +63,12 @@ export async function pagosSemanales(
   const cliente = clienteLectura(bd);
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
 
+  // ⚠️ A PROPÓSITO SIN el filtro de revisión (V1, fila 0.115). Esta consulta responde "¿qué pagos se
+  // CAPTURARON esta semana?" —el corte de caja del que paga—, no "¿cuánto se le debe al maquilero?".
+  // Son dos preguntas distintas: al saldo sólo entra lo revisado (`formula-saldo.ts`), pero un pago
+  // recién capturado ya salió de la chequera y tiene que verse aquí el mismo día. Cada renglón trae
+  // su `estadoRevision`, así que quien lee la semana ve cuáles siguen sin autorizar.
+  // NO "arreglar" esto copiándole el criterio al saldo: cambiaría la pregunta.
   const pagos = await cliente.pagoMaquilero.findMany({
     where: { idEmpresa: sesion.idEmpresaActiva, ...rangoFecha(filtros.desde, filtros.hasta) },
     orderBy: [{ fecha: 'desc' }, { id: 'desc' }],

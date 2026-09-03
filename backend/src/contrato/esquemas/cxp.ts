@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { esquemaPendienteRevisionEsMa } from './esma.js';
 import { esquemaLimitesAging } from './terceros.js';
 
 /**
@@ -100,7 +101,10 @@ export type DatosMovimientoCxpCrear = z.infer<typeof esquemaMovimientoCxpCrear>;
 
 // ── Bandeja "por pagar" con antigüedad de saldos (aging) ────────────────────────────────────────────
 
-/** Chips del filtro de la bandeja: proveedores con saldo ≠ 0 (default) o todos con movimientos. */
+/**
+ * Chips del filtro de la bandeja: proveedores con saldo ≠ 0 —o con maquila por revisar, §Post-F9.188a—
+ * (default) o todos con movimientos.
+ */
 export const FILTROS_BANDEJA_CXP = ['con-saldo', 'todos'] as const;
 /** Clave del filtro de la bandeja. */
 export type FiltroBandejaCxpClave = (typeof FILTROS_BANDEJA_CXP)[number];
@@ -119,7 +123,7 @@ export const esquemaBandejaCxpQuery = z
     filtro: z
       .enum(FILTROS_BANDEJA_CXP)
       .default('con-saldo')
-      .describe('con-saldo (saldo ≠ 0) | todos (con movimientos).'),
+      .describe('con-saldo (saldo ≠ 0 o con maquila por revisar) | todos (con movimientos).'),
     busqueda: z
       .string()
       .trim()
@@ -156,6 +160,10 @@ export const esquemaBandejaCxpFila = z
       .number()
       .nullable()
       .describe('Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte).'),
+    maquilaPorRevisar: esquemaPendienteRevisionEsMa.describe(
+      'Maquila (EsMa) capturada y AÚN sin revisar: no suma al saldo, pero se ve. Es la razón por la ' +
+        'que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a).',
+    ),
   })
   .describe('Renglón de la bandeja de cuentas por pagar (proveedor + saldo + aging + maquila).');
 
@@ -191,6 +199,10 @@ export const esquemaResumenCxpSalida = z
         '% al corriente = (carteraMotor − vencido) ÷ carteraMotor (0–100); null si no hay cartera del motor.',
       ),
     proveedoresConSaldo: z.number().int().describe('Proveedores con saldo ≠ 0.'),
+    maquilaPorRevisar: esquemaPendienteRevisionEsMa.describe(
+      'Σ de la maquila capturada sin revisar en toda la cartera: NO suma a carteraTotal ni a ' +
+        'maquilaTotal (todavía no es deuda), pero no desaparece.',
+    ),
   })
   .describe('Resumen (KPIs) de cuentas por pagar.');
 
@@ -200,7 +212,9 @@ export type ResumenCxpSalida = z.infer<typeof esquemaResumenCxpSalida>;
 /** Bandeja de CxP: la página de proveedores + su resumen (KPIs) de vistazo. */
 export const esquemaBandejaCxpSalida = z
   .object({
-    filas: z.array(esquemaBandejaCxpFila).describe('Renglones de la página (saldo desc).'),
+    filas: z
+      .array(esquemaBandejaCxpFila)
+      .describe('Renglones de la página (saldo desc): saldo ≠ 0 o con maquila por revisar.'),
     total: z.number().int().describe('Total de proveedores que cumplen el filtro.'),
     pagina: z.number().int().describe('Página solicitada (1-based).'),
     porPagina: z.number().int().describe('Renglones por página.'),

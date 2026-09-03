@@ -43,6 +43,7 @@ const saldo = {
     totalPagos: null,
     totalDescuentos: null,
     saldo: null,
+    pendienteRevision: { abonos: null, pagos: null, descuentos: null, neto: null, partidas: 0 },
   },
   isPending: false,
   isError: false,
