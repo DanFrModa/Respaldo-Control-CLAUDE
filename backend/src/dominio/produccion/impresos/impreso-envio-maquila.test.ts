@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { ServicioArchivos } from '../../../comun/archivos.js';
+import { extraerTextoPdf } from '../../../comun/pdf-texto.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { EtapaSalida } from '../../../contrato/index.js';
 import type { FotoArteDeLaOrden } from './imagenes-impreso.js';
@@ -13,18 +14,24 @@ import type { FotoArteDeLaOrden } from './imagenes-impreso.js';
 import {
   armarDatosImpresoEnvio,
   armarDatosImpresoFichaArte,
-  altoDeLaTarjeta,
   armarTablaEtapa,
-  bloqueArteFicha,
   generarPdfEnvio,
   generarPdfFichaEstampado,
   queSeEntrega,
-  recortarFotosArte,
-  MAX_BYTES_FOTO_ARTE,
-  MAX_FOTOS_FICHA_ARTE,
   type DatosImpresoEnvio,
   type DatosImpresoFichaArte,
 } from './impreso-envio-maquila.js';
+// 0.107 — el bloque de arte se compartió con el RECIBO de maquila de arte; estas pruebas lo siguen
+// ejerciendo A TRAVÉS de la ficha (mismos casos, mismas aserciones), que es lo que sostiene que la
+// ficha no cambió al extraerlo.
+import {
+  altoDeLaTarjeta,
+  bloqueFotosArte as bloqueArteFicha,
+  recortarFotosArte,
+  AVISO_FOTO_FALTANTE,
+  MAX_BYTES_FOTO_ARTE,
+  MAX_FOTOS_ARTE as MAX_FOTOS_FICHA_ARTE,
+} from './bloque-fotos-arte.js';
 
 describe('armarTablaEtapa (F3-E2)', () => {
   it('proyecta la matriz a columnas (tallas) y filas (colores) con totales correctos', () => {
@@ -453,6 +460,20 @@ describe('bloqueArteFicha — qué se pinta y qué no', () => {
     expect(pintado).toContain('Espalda');
   });
 
+  // 0.107 — el aviso del hueco es lo ÚNICO que distingue los dos papeles del proveedor de arte, y
+  // en la ficha viaja por el valor POR OMISIÓN del bloque compartido. Sin esta prueba, voltear ese
+  // default deja las 180 en verde y la ficha empieza a pedir la foto «antes de dar por bueno lo
+  // recibido» —un momento que en la ficha aún no llegó—: los dos papeles se separan sin que nadie
+  // lo note, que es justo lo que compartir el bloque vino a impedir. La gemela del recibo vive en
+  // `impreso-recibo-maquila.test.ts`.
+  it('🔑 el HUECO de la FICHA dice ANTES DE PRODUCIR — no el aviso del recibo', () => {
+    const pintado = JSON.stringify(
+      bloqueArteFicha({ ...base, fotosArte: [{ titulo: 'Espalda', dataUrl: null }] }),
+    );
+    expect(pintado).toContain(AVISO_FOTO_FALTANTE.antesDeProducir);
+    expect(pintado).not.toContain(AVISO_FOTO_FALTANTE.antesDeCotejar);
+  });
+
   it('sin recorte el título no habla de recorte', () => {
     const bloque = bloqueArteFicha({ ...base, fotosArte: [{ titulo: 'Frente', dataUrl: PNG }] });
     expect(JSON.stringify(bloque)).toContain('Arte (imágenes)');
@@ -598,5 +619,29 @@ describe('generarPdfFichaEstampado — la foto entra de verdad en el PDF (0.094)
     });
     expect(paginasEnPdf(buffer)).toBe(1);
     expect(imagenesEnPdf(buffer) - membrete).toBe(2);
+  });
+
+  /**
+   * 🔑 EL ARTE VA ARRIBA, ANTES DE LAS CANTIDADES — la GEMELA de la prueba del recibo
+   * (`impreso-recibo-maquila.test.ts`). La ficha tenía el mismo hueco: intercambiar el bloque de
+   * arte con la tabla no ponía roja ni una prueba, aunque el SITIO es justo lo que hace que los dos
+   * papeles del proveedor de arte se lean igual.
+   *
+   * ⚠️ Se mide sobre el TEXTO del PDF (los flujos van comprimidos: en el Buffer crudo el rótulo no
+   * aparece y la aserción pasaría por construcción). Los títulos salen en MAYÚSCULAS porque
+   * `TituloSeccion` lleva `textTransform`.
+   */
+  it('🔑 el arte se pinta ARRIBA, antes de las cantidades (el mismo sitio que en el recibo)', async () => {
+    const buffer = await generarPdfFichaEstampado({
+      ...base,
+      fotosArte: [{ titulo: 'Frente', dataUrl: PNGS[0] }],
+    });
+    const texto = (await extraerTextoPdf(buffer)).join('\n');
+    const arte = texto.indexOf('ARTE (IMÁGENES)');
+    const cantidades = texto.indexOf('CANTIDADES (COLOR');
+    // Que los dos rótulos ESTÉN: dos `-1` compararían iguales y la prueba sería un verde vacío.
+    expect(arte).toBeGreaterThanOrEqual(0);
+    expect(cantidades).toBeGreaterThanOrEqual(0);
+    expect(arte).toBeLessThan(cantidades);
   });
 });
