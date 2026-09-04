@@ -91,6 +91,7 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
     diasCredito: null,
     moneda: null,
     formaPago: null,
+    formaPagoPreferida: null,
     metodoPago: null,
     banco: null,
     clabe: null,

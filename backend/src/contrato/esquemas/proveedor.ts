@@ -24,6 +24,16 @@ const esquemaRolesIds = z
   .refine((ids) => new Set(ids).size === ids.length, { error: 'Hay roles repetidos' });
 
 /** Campos fiscales/comerciales/operativos del proveedor (R15 §4), todos opcionales. */
+/**
+ * Cómo sale físicamente el dinero en la corrida semanal (0.113). Espejo del enum Prisma
+ * `FormaDePago`; se declara aquí —ARRIBA DEL TODO, antes de su primer uso— y no se importa de
+ * `concepto-pago.ts`: ese módulo importa de éste, y el ciclo dejaría uno de los dos sin
+ * inicializar (con la declaración más abajo el generador de OpenAPI truena con «Cannot access
+ * FORMAS_DE_PAGO_PROVEEDOR before initialization»: zona muerta temporal). `concepto-pago.ts` re-exporta la
+ * MISMA constante bajo `FORMAS_DE_PAGO`, así que la lista sigue siendo una sola.
+ */
+export const FORMAS_DE_PAGO_PROVEEDOR = ['efectivo', 'transferencia'] as const;
+
 const camposEnriquecidos = {
   // ── Fiscal ──────────────────────────────────────────────────────────────────
   factura: z.boolean({ error: '¿Factura? debe ser verdadero o falso' }).optional(),
@@ -77,6 +87,21 @@ const camposEnriquecidos = {
     .string()
     .trim()
     .max(50, { error: 'La forma de pago no puede tener más de 50 caracteres' })
+    .optional(),
+  /**
+   * ⭐ EFECTIVO o TRANSFERENCIA por omisión, para la corrida semanal (0.113; §Post-F9.189(c)):
+   * *«podemos dejarlo como default de cada proveedor, pero con opción a cambiarlo — de pronto un
+   * maquilero me pide que le pague una semana en efectivo»*. Cada renglón de la corrida lo puede
+   * cambiar; esto es sólo la sugerencia.
+   *
+   * ⚠️ NO confundir con `formaPago` (de arriba), que es TEXTO LIBRE con la clave del SAT para el
+   * CFDI ("03 — Transferencia") y quedó SUPERADO: ya no se captura en pantalla.
+   */
+  formaPagoPreferida: z
+    .enum(FORMAS_DE_PAGO_PROVEEDOR, {
+      error: 'La forma de pago debe ser efectivo o transferencia',
+    })
+    .nullable()
     .optional(),
   metodoPago: z.enum(METODOS_PAGO, { error: 'El método de pago debe ser PUE o PPD' }).optional(),
   banco: z
@@ -324,8 +349,14 @@ export function motivoCuentaInvalida(tipo: TipoCuentaPagoClave, cuenta: string):
   return null;
 }
 
-/** Campos comunes de una cuenta de pago (mismas reglas en alta y edición). */
-const camposCuentaPago = {
+/**
+ * Campos comunes de una cuenta de pago (mismas reglas en alta y edición).
+ *
+ * ⭐ **Se EXPORTA porque hay dos tablas de cuentas con la misma forma**: la del proveedor (0.112) y
+ * la del concepto de pago que no es proveedor (`concepto-pago.ts`, 0.125). Las reglas de captura son
+ * las mismas y se escriben UNA vez; el que difiere es el dueño, que va en la URL.
+ */
+export const camposCuentaPago = {
   /**
    * ⭐ A NOMBRE DE QUIÉN está la cuenta. Obligatorio, y **casi nunca es el proveedor**: por eso no
    * se deriva de él ni se deja vacío "porque se entiende".
@@ -746,7 +777,14 @@ export const esquemaProveedorSalida = z
     // ── Comercial / pago (E1B) ──────────────────────────────────────────────────
     diasCredito: z.number().int().nullable().describe('Días de crédito (null/0 = contado).'),
     moneda: z.string().nullable().describe('Moneda habitual (MXN/USD), o null.'),
-    formaPago: z.string().nullable().describe('Forma de pago, o null.'),
+    formaPago: z
+      .string()
+      .nullable()
+      .describe('Clave del SAT para el CFDI (SUPERADA por formaPagoPreferida), o null.'),
+    formaPagoPreferida: z
+      .enum(FORMAS_DE_PAGO_PROVEEDOR)
+      .nullable()
+      .describe('Efectivo o transferencia por omisión en la corrida semanal, o null.'),
     metodoPago: z.string().nullable().describe('Método de pago CFDI (PUE/PPD), o null.'),
     banco: z.string().nullable().describe('Banco, o null.'),
     clabe: z.string().nullable().describe('CLABE interbancaria, o null.'),

@@ -42,9 +42,6 @@
 import {
   esquemaProveedorCuentaPagoCrear,
   esquemaProveedorCuentaPagoEditarCuerpo,
-  motivoCuentaInvalida,
-  normalizarNumeroDeCuenta,
-  type TipoCuentaPagoClave,
 } from '../../contrato/index.js';
 import type { Prisma, ProveedorCuentaPago } from '../../datos/index.js';
 
@@ -60,6 +57,13 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import {
+  exigirCuentaValida,
+  MENSAJE_PROMOVER_RETIRADA,
+  mensajeCuentaDuplicada,
+  promoverExigeReactivar,
+  resolverJuegoDeDefault,
+} from './cuentas-pago-reglas.js';
 import { exigirProveedor } from './proveedores.js';
 
 /**
@@ -115,20 +119,6 @@ async function exigirCuentaDelProveedor(
 }
 
 /**
- * Valida el par EFECTIVO (tipo, número) con la MISMA función pura que usa el Zod del alta, y
- * devuelve el número ya normalizado (sólo dígitos). En la edición el par puede venir mitad del
- * cuerpo y mitad de la base: cambiar sólo el tipo de una CLABE a "tarjeta" tiene que revalidarse
- * contra el número guardado, y por eso esto vive aquí y no en el esquema.
- */
-function exigirCuentaValida(tipo: TipoCuentaPagoClave, cuenta: string): string {
-  const motivo = motivoCuentaInvalida(tipo, cuenta);
-  if (motivo !== null) {
-    throw new ErrorValidacion(motivo);
-  }
-  return normalizarNumeroDeCuenta(cuenta);
-}
-
-/**
  * Exige que el número no esté YA capturado en ese proveedor. Si choca con una RETIRADA lo dice: es
  * historial reutilizable, la salida es revivirla, no capturarla otra vez (D3).
  */
@@ -143,12 +133,7 @@ async function exigirCuentaLibre(
     select: { id: true, activo: true, beneficiario: true },
   });
   if (existente !== null) {
-    throw new ErrorConflicto(
-      existente.activo
-        ? `Este proveedor ya tiene esa cuenta registrada (a nombre de "${existente.beneficiario}").`
-        : `Este proveedor ya tuvo esa cuenta (a nombre de "${existente.beneficiario}"); está ` +
-            `retirada y puedes reactivarla en vez de capturarla de nuevo.`,
-    );
+    throw mensajeCuentaDuplicada('Este proveedor', existente);
   }
 }
 
@@ -375,8 +360,8 @@ export async function actualizarCuentaPagoProveedor(
       detalle.esFiscal = { de: actual.esFiscal, a: datos.esFiscal };
     }
 
-    const retira = datos.activo === false && actual.activo;
-    const revive = datos.activo === true && !actual.activo;
+    const juego = resolverJuegoDeDefault(actual, datos);
+    const { retira, revive } = juego;
     if (retira) {
       cambios.activo = false;
     } else if (revive) {
@@ -384,25 +369,18 @@ export async function actualizarCuentaPagoProveedor(
     }
 
     // ── La default ────────────────────────────────────────────────────────────────────────────
-    const eraDefault = actual.esDefault === true;
-    // Regla 1: retirar gana. Regla 2: revivir no promueve (una cuenta inactiva nunca es default,
-    // así que al revivir simplemente no se enciende nada).
-    const quiereDefault = retira ? false : (datos.esDefault ?? eraDefault);
-    let promueve = false;
-    let degrada = false;
-
-    if (quiereDefault && !eraDefault) {
-      if (!actual.activo && !revive) {
-        throw new ErrorValidacion(
-          'Esa cuenta está retirada: reactívala antes de dejarla como la cuenta por omisión.',
-        );
-      }
+    // Las TRES reglas que se cruzan (retirar gana · revivir no promueve · quitar la marca no
+    // promueve a nadie) las decide `cuentas-pago-reglas.ts`, compartido con el catálogo de
+    // conceptos de pago (0.125): una sola verdad para las dos tablas de cuentas.
+    const { promueve, degrada } = juego;
+    if (promoverExigeReactivar(actual, juego)) {
+      throw new ErrorValidacion(MENSAJE_PROMOVER_RETIRADA);
+    }
+    if (promueve) {
       await apagarDefaultActual(tx, sesion, idProveedor, idCuenta);
       cambios.esDefault = true;
-      promueve = true;
-    } else if (!quiereDefault && eraDefault) {
+    } else if (degrada) {
       cambios.esDefault = null;
-      degrada = true;
     }
 
     if (Object.keys(detalle).length === 0 && !retira && !revive && !promueve && !degrada) {

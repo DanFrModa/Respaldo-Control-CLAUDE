@@ -50,6 +50,7 @@ import {
   pendienteParaSalida,
   tieneSaldo,
   type PendienteRevision,
+  type SegmentoFactura,
 } from '../../esma/formula-saldo.js';
 import { aportesEsMaSaldoLote } from '../convivencia-esma.js';
 import { leerLimitesAging } from '../config-aging.js';
@@ -225,7 +226,7 @@ interface FilaAgregadoCxp {
  * Fila ya neteada: aging del MOTOR (4 cubetas) + la cubeta MAQUILA (aporte EsMa, SIN antigüedad) +
  * saldo combinado. Antes de ocultar importes.
  */
-interface FilaNeta extends CubetasAging {
+export interface FilaNeta extends CubetasAging {
   idProveedor: number;
   proveedor: string;
   nombreCorto: string | null;
@@ -254,8 +255,13 @@ async function agregarPorProveedor(
   cliente: ReturnType<typeof clienteLectura>,
   idEmpresa: number,
   limites: LimitesAging,
+  segmento?: SegmentoFactura,
 ): Promise<FilaAgregadoCxp[]> {
   const { d30, d60 } = limites;
+  // El SEGMENTO de CxP vive en `es_fiscal`, que es NOT NULL: aquí `= FALSE` sí es la mitad exacta
+  // (a diferencia de EsMa, donde `con_factura` es nullable — ver `formula-saldo.ts` §segmento).
+  const factura =
+    segmento === undefined ? Prisma.empty : Prisma.sql`AND m.es_fiscal = ${segmento === 'con'}`;
   const crudas = await cliente.$queryRaw<FilaAgregadoCxpCruda[]>(Prisma.sql`
     SELECT
       m.id_proveedor AS "idProveedor",
@@ -277,7 +283,7 @@ async function agregarPorProveedor(
       COALESCE(-SUM(m.monto) FILTER (WHERE m.monto < 0), 0)::numeric AS "creditos"
     FROM movimientos_tercero m
     JOIN proveedores p ON p.id = m.id_proveedor
-    WHERE m.id_empresa = ${idEmpresa} AND m.id_proveedor IS NOT NULL
+    WHERE m.id_empresa = ${idEmpresa} AND m.id_proveedor IS NOT NULL ${factura}
     GROUP BY m.id_proveedor, p.nombre, p.nombre_corto, p.dias_credito
   `);
   return crudas.map((f) => ({
@@ -371,49 +377,41 @@ function sumarPorRevisar(filas: FilaNeta[]): PendienteRevision {
 }
 
 /**
- * BANDEJA "por pagar": los proveedores con su saldo por pagar y su antigüedad (aging), + el resumen
- * (KPIs) de la cartera. La agregación y el aging son SERVER-SIDE (A1): la pantalla solo pinta
- * escalares. El resumen se calcula sobre TODA la cartera con saldo (no la página). Permiso `cxp.ver`.
- * Empresa activa (A9). Importes ocultables (`consultas.ver-importes`); el aging igual se ordena por el
- * saldo real (el ocultamiento solo afecta la salida, no el cálculo).
+ * ⭐ LA CARTERA COMBINADA POR PROVEEDOR: el aging del MOTOR (CxP) + la cubeta de MAQUILA (EsMa), en
+ * DOS agregados y nunca N+1. Es el universo de «a quién le debemos», y lo comparten la BANDEJA de
+ * CxP y la **corrida semanal de pagos** (fila 0.113), que es literalmente la pantalla que Daniel
+ * describió: *«en la pantalla donde están los saldos de todos los proveedores, con un campo abierto
+ * a un lado para capturar lo que se le va a pagar esa semana»*.
  *
- * CONVIVENCIA EsMa (D15, opción b): el saldo del proveedor INCLUYE su aporte de maquila (EsMa/F6), en
- * UNA sola consulta agregada (`aportesEsMaSaldoLote`, NUNCA N+1). Así (a) un maquilero con deuda EsMa
- * y 0 en el motor APARECE en la bandeja, (b) `carteraTotal`/`vencido`/`proveedoresConSaldo` son
- * veraces, y (c) la bandeja concuerda con el estado de cuenta del click. El aporte EsMa va en una
- * cubeta APARTE ("maquila", SIN antigüedad): los cargos EsMa no traen fecha de vencimiento por ítem
- * — el aging fino de maquila llegará cuando EsMa registre por el motor (E6/decisión posterior).
+ * Se extrajo de {@link bandejaPorPagar} para que la corrida NO escriba su propia versión: si el
+ * universo de la bandeja y el de la corrida se separaran, un proveedor podría aparecer en una y no
+ * en la otra — y el que no aparece en la corrida no cobra.
  *
- * ⭐ §Post-F9.188(a) (Daniel): un maquilero con TODO sin revisar NO desaparece de la bandeja. Su saldo
- * es 0 (al saldo sólo entra lo revisado, fila 0.115) pero la fila se queda, con su «por revisar»
- * explicado. Los KPIs siguen contando sólo saldo ≠ 0: lo pendiente todavía no es deuda.
+ * CONVIVENCIA EsMa (D15, opción b): el saldo del proveedor INCLUYE su aporte de maquila. Los
+ * proveedores con SOLO deuda EsMa (0 en el motor) también entran → bandeja == estado de cuenta.
+ *
+ * ⭐ El aporte EsMa trae DOS cosas por maquilero (fila 0.115 + §Post-F9.188a): el saldo —sólo lo
+ * REVISADO— y lo que sigue CAPTURADO sin revisar. Lo segundo no suma un centavo, pero decide si la
+ * fila se ve: un maquilero con TODO sin revisar tiene saldo 0 y, si se cortara sólo por saldo,
+ * DESAPARECERÍA justo cuando alguien tiene que decidir sobre ese dinero.
+ *
+ * `segmento` parte la cartera en la relación CON factura o la SIN factura (§Post-F9.189(a): son dos
+ * corridas por semana). Los dos criterios —`es_fiscal` en el motor, `con_factura` en EsMa— salen
+ * cada uno de su definición única; el de EsMa vive en `formula-saldo.ts` porque su columna es
+ * NULLABLE y el «sin factura» tiene que incluir lo migrado sin definir. **Sin `segmento` devuelve la
+ * vista operativa completa**, que es la que usa la bandeja.
+ *
+ * Sin permiso ni ocultamiento de importes: el que llama los aplica.
  */
-export async function bandejaPorPagar(
-  sesion: SesionUsuario,
-  parametros: z.input<typeof esquemaBandejaCxpQuery> = {},
-  bd?: ContextoBd,
-): Promise<BandejaCxpSalida> {
-  verificarPermiso(sesion, 'cxp.ver');
-  const filtros: BandejaCxpQuery = validarEntrada(esquemaBandejaCxpQuery, parametros);
-  const cliente = clienteLectura(bd);
-  const idEmpresa = sesion.idEmpresaActiva;
-  const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
-  const oculto = (v: number): number | null => (puedeVerImportes ? v : null);
+export async function carteraCombinadaPorProveedor(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+  limites: LimitesAging,
+  segmento?: SegmentoFactura,
+): Promise<FilaNeta[]> {
+  const crudas = await agregarPorProveedor(cliente, idEmpresa, limites, segmento);
+  const aportesEsMa = await aportesEsMaSaldoLote(cliente, idEmpresa, segmento);
 
-  // Límites de aging vigentes de la empresa (F9-E5/D15d: configurables); default 30/60.
-  const limites = await leerLimitesAging(cliente, idEmpresa);
-  // Motor: aging por proveedor. EsMa: aporte de maquila por proveedor (ambos en UN agregado c/u).
-  const crudas = await agregarPorProveedor(cliente, idEmpresa, limites);
-  // ⭐ El aporte EsMa trae DOS cosas por maquilero (fila 0.115 + §Post-F9.188a): el saldo —sólo lo
-  // REVISADO; el estado de revisión manda en los cuatro conceptos— y lo que sigue CAPTURADO sin
-  // revisar. Lo segundo no suma un centavo, pero decide si la fila se ve: un maquilero con TODO sin
-  // revisar tiene saldo 0 y, si la bandeja cortara sólo por saldo, DESAPARECERÍA justo cuando alguien
-  // tiene que decidir sobre ese dinero. Daniel lo dijo así: no debe desaparecer. Mismo corte que el
-  // tablero de EsMa (saldo ≠ 0 o partidas por revisar).
-  const aportesEsMa = await aportesEsMaSaldoLote(cliente, idEmpresa);
-
-  // Combinar por proveedor: netear el aging del motor y sumar la cubeta de maquila. Los proveedores
-  // con SOLO deuda EsMa (0 en el motor) también entran → bandeja == estado de cuenta.
   const porId = new Map<number, FilaNeta>();
   for (const f of crudas) {
     porId.set(f.idProveedor, netearFila(f));
@@ -453,8 +451,42 @@ export async function bandejaPorPagar(
       saldo: redondear2(aporte.saldo),
     });
   }
+  return [...porId.values()];
+}
 
-  const netas = [...porId.values()];
+/**
+ * BANDEJA "por pagar": los proveedores con su saldo por pagar y su antigüedad (aging), + el resumen
+ * (KPIs) de la cartera. La agregación y el aging son SERVER-SIDE (A1): la pantalla solo pinta
+ * escalares. El resumen se calcula sobre TODA la cartera con saldo (no la página). Permiso `cxp.ver`.
+ * Empresa activa (A9). Importes ocultables (`consultas.ver-importes`); el aging igual se ordena por el
+ * saldo real (el ocultamiento solo afecta la salida, no el cálculo).
+ *
+ * CONVIVENCIA EsMa (D15, opción b): el saldo del proveedor INCLUYE su aporte de maquila (EsMa/F6), en
+ * UNA sola consulta agregada (`aportesEsMaSaldoLote`, NUNCA N+1). Así (a) un maquilero con deuda EsMa
+ * y 0 en el motor APARECE en la bandeja, (b) `carteraTotal`/`vencido`/`proveedoresConSaldo` son
+ * veraces, y (c) la bandeja concuerda con el estado de cuenta del click. El aporte EsMa va en una
+ * cubeta APARTE ("maquila", SIN antigüedad): los cargos EsMa no traen fecha de vencimiento por ítem
+ * — el aging fino de maquila llegará cuando EsMa registre por el motor (E6/decisión posterior).
+ *
+ * ⭐ §Post-F9.188(a) (Daniel): un maquilero con TODO sin revisar NO desaparece de la bandeja. Su saldo
+ * es 0 (al saldo sólo entra lo revisado, fila 0.115) pero la fila se queda, con su «por revisar»
+ * explicado. Los KPIs siguen contando sólo saldo ≠ 0: lo pendiente todavía no es deuda.
+ */
+export async function bandejaPorPagar(
+  sesion: SesionUsuario,
+  parametros: z.input<typeof esquemaBandejaCxpQuery> = {},
+  bd?: ContextoBd,
+): Promise<BandejaCxpSalida> {
+  verificarPermiso(sesion, 'cxp.ver');
+  const filtros: BandejaCxpQuery = validarEntrada(esquemaBandejaCxpQuery, parametros);
+  const cliente = clienteLectura(bd);
+  const idEmpresa = sesion.idEmpresaActiva;
+  const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
+  const oculto = (v: number): number | null => (puedeVerImportes ? v : null);
+
+  // Límites de aging vigentes de la empresa (F9-E5/D15d: configurables); default 30/60.
+  const limites = await leerLimitesAging(cliente, idEmpresa);
+  const netas = await carteraCombinadaPorProveedor(cliente, idEmpresa, limites);
   // Dos cortes distintos, a propósito: `conSaldo` alimenta los KPIs (cartera, vencido, proveedores
   // CON SALDO — ahí un pendiente no es deuda todavía); `visibles` es lo que la tabla enseña con el
   // chip "con saldo": saldo ≠ 0 **o** algo por revisar (§Post-F9.188a — el que tiene todo sin

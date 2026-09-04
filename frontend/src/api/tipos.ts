@@ -2084,3 +2084,61 @@ export type DirectorioTercero = DirectorioTercerosPagina['datos'][number];
 export type DirectorioTercerosQuery = NonNullable<
   paths['/api/directorio-terceros']['get']['parameters']['query']
 >;
+
+// ── La corrida semanal de pagos (fila 0.113) y su catálogo de conceptos (0.125) ──────────────────
+
+/** Página de corridas (`GET /api/pagos/corridas`). */
+export type CorridasLista =
+  paths['/api/pagos/corridas']['get']['responses']['200']['content']['application/json'];
+/** El encabezado de una corrida (folio, semana, segmento, estado y totales). */
+export type CorridaResumen = CorridasLista['filas'][number];
+/** Filtros de la lista de corridas (querystring). */
+export type CorridasQuery = NonNullable<paths['/api/pagos/corridas']['get']['parameters']['query']>;
+/** Alta de una corrida (cuerpo). */
+export type CorridaCrear =
+  paths['/api/pagos/corridas']['post']['requestBody']['content']['application/json'];
+/** La PANTALLA DE TRABAJO: la corrida con sus secciones por rubro y sus bloqueos. */
+export type CorridaDetalle =
+  paths['/api/pagos/corridas/{id}']['get']['responses']['200']['content']['application/json'];
+/** Una sección (rubro) de la relación. */
+export type SeccionCorrida = CorridaDetalle['secciones'][number];
+/** Una fila de trabajo: un beneficiario con su referencia al lado y sus renglones. */
+export type FilaCorrida = SeccionCorrida['filas'][number];
+/** Un renglón capturado. */
+export type RenglonCorrida = FilaCorrida['renglones'][number];
+/** Una cuenta destino elegible. */
+export type CuentaDestino = FilaCorrida['cuentas'][number];
+/** Los totales de efectivo/transferencia (de la sección o de toda la corrida). */
+export type TotalesPago = SeccionCorrida['totales'];
+/** Cuerpo para capturar/reemplazar un renglón. */
+export type RenglonCorridaGuardar =
+  paths['/api/pagos/corridas/{id}/renglones']['post']['requestBody']['content']['application/json'];
+/** La relación ejecutable (`GET /api/pagos/corridas/{id}/concentrado`). */
+export type ConcentradoCorrida =
+  paths['/api/pagos/corridas/{id}/concentrado']['get']['responses']['200']['content']['application/json'];
+
+/** Página del catálogo de conceptos de pago (`GET /api/conceptos-pago`). */
+export type ConceptosPagoPagina =
+  paths['/api/conceptos-pago']['get']['responses']['200']['content']['application/json'];
+/** Un concepto de pago con sus cuentas. */
+export type ConceptoPago = ConceptosPagoPagina['datos'][number];
+/** Una cuenta de un concepto de pago. */
+export type ConceptoPagoCuenta = ConceptoPago['cuentas'][number];
+/** Filtros del catálogo (querystring). */
+export type ConceptosPagoQuery = NonNullable<
+  paths['/api/conceptos-pago']['get']['parameters']['query']
+>;
+/** Alta de un concepto de pago (cuerpo). */
+export type ConceptoPagoCrear =
+  paths['/api/conceptos-pago']['post']['requestBody']['content']['application/json'];
+/** Edición parcial de un concepto de pago (cuerpo). */
+export type ConceptoPagoEditar = NonNullable<
+  paths['/api/conceptos-pago/{id}']['patch']['requestBody']
+>['content']['application/json'];
+/** Alta de una cuenta de un concepto (cuerpo). */
+export type ConceptoPagoCuentaCrear =
+  paths['/api/conceptos-pago/{id}/cuentas']['post']['requestBody']['content']['application/json'];
+/** Edición parcial de una cuenta de un concepto (cuerpo). */
+export type ConceptoPagoCuentaEditar = NonNullable<
+  paths['/api/conceptos-pago/{id}/cuentas/{idCuenta}']['patch']['requestBody']
+>['content']['application/json'];

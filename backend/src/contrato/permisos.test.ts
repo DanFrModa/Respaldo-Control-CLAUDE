@@ -74,6 +74,10 @@ describe('catálogo de permisos', () => {
       // Desarrollo/Cotización (Módulo 15, F8-E1): conceptos de costo (R19), catálogo config admin-only.
       'concepto-costo.administrar',
       'concepto-costo.ver',
+      // Conceptos de pago que NO son proveedores (fila 0.125, §Post-F9.189(c)): nómina por fuera,
+      // servicios, caja chica. Catálogo maestro propio; `administrar` es admin-only.
+      'conceptos-pago.administrar',
+      'conceptos-pago.ver',
       // Costos (Módulo 6, F7-E1): costeo real por orden + lista de costos + márgenes (nivel ≤30).
       'costos.capturar',
       'costos.ver',
@@ -127,6 +131,10 @@ describe('catálogo de permisos', () => {
       'ordenes.administrar',
       'ordenes.cancelar',
       'ordenes.ver',
+      // La corrida semanal de pagos (fila 0.113, §Post-F9.189(g)): armarla/cerrarla/ejecutarla es
+      // de Daniel; verla es de finanzas (sólo lectura).
+      'pagos.corrida-armar',
+      'pagos.corrida-ver',
       // Pedidos (Módulo PEDIDOS, F2-E1): ver/administrar/importes + pedidos reales.
       'pedidos-reales.administrar',
       'pedidos.administrar',

@@ -562,7 +562,7 @@ function DetalleProveedor({
     p.diasCredito !== null ||
     p.limiteCredito !== null ||
     hayTexto(p.moneda) ||
-    hayTexto(p.formaPago) ||
+    p.formaPagoPreferida !== null ||
     hayTexto(p.metodoPago) ||
     p.cuentasPago.length > 0 ||
     hayTexto(p.condiciones);
@@ -645,7 +645,17 @@ function DetalleProveedor({
                 {etiquetaMoneda(p.moneda)}
               </CampoDetalle>
             ) : null}
-            <CampoTextoSiHay icono={Wallet} etiqueta="Forma de pago" valor={p.formaPago} />
+            {/*
+              La forma de pago POR OMISIÓN de la corrida semanal (0.113). El campo viejo
+              (`formaPago`, texto libre con la clave del SAT) quedó superado y ya no se enseña: dos
+              respuestas a la misma pregunta en la misma ficha es exactamente lo que la fila 0.124
+              vino a corregir en `factura`/`modalidadFacturacion`.
+            */}
+            {p.formaPagoPreferida !== null ? (
+              <CampoDetalle icono={Wallet} etiqueta="Forma de pago por omisión">
+                {p.formaPagoPreferida === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+              </CampoDetalle>
+            ) : null}
             {hayTexto(p.metodoPago) ? (
               <CampoDetalle icono={Wallet} etiqueta="Método de pago (CFDI)">
                 {etiquetaMetodoPago(p.metodoPago)}

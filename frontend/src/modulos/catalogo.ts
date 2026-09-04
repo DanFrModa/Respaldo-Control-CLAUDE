@@ -924,6 +924,15 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         permisos: 'autenticado',
       },
       {
+        clave: 'conceptos-pago',
+        titulo: 'Conceptos de pago',
+        descripcion:
+          'Lo que se paga cada semana y NO es un proveedor: nómina por fuera, servicios, caja chica (con sus cuentas)',
+        ruta: '/catalogos/conceptos-pago',
+        icono: 'billete',
+        permisos: ['conceptos-pago.ver'],
+      },
+      {
         clave: 'directorio-historico',
         titulo: 'Directorio histórico',
         descripcion:
@@ -938,6 +947,17 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
     clave: 'finanzas',
     titulo: 'Finanzas',
     entradas: [
+      // ⭐ La primera de Finanzas a propósito: es la pantalla que Daniel usa cada semana
+      // (§Post-F9.185: *«una de las pantallas más importantes dentro del sistema»*).
+      {
+        clave: 'corrida-pagos',
+        titulo: 'Corrida de pagos',
+        descripcion:
+          'La relación semanal: a quién se le paga y cuánto, con el saldo y lo recibido al lado como referencia (con factura y sin factura)',
+        ruta: '/pagos/corrida',
+        icono: 'billete',
+        permisos: ['pagos.corrida-ver'],
+      },
       {
         clave: 'cxc',
         titulo: 'Cuentas por cobrar',
@@ -1711,6 +1731,7 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
   {
     grupo: 'finanzas',
     entradas: [
+      { tipo: 'hoja', clave: 'corrida-pagos' },
       { tipo: 'hoja', clave: 'cxc' },
       { tipo: 'hoja', clave: 'cxp' },
       { tipo: 'hoja', clave: 'reportes-fiscales' },

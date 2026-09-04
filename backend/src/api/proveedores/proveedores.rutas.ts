@@ -98,6 +98,7 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
     diasCredito: proveedor.diasCredito,
     moneda: proveedor.moneda,
     formaPago: proveedor.formaPago,
+    formaPagoPreferida: proveedor.formaPagoPreferida,
     metodoPago: proveedor.metodoPago,
     banco: proveedor.banco,
     clabe: proveedor.clabe,

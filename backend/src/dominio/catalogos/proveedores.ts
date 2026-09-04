@@ -292,6 +292,7 @@ function datosEnriquecidosCrear(
   if (datos.diasCredito !== undefined) data.diasCredito = datos.diasCredito;
   if (datos.moneda !== undefined) data.moneda = datos.moneda;
   if (datos.formaPago !== undefined) data.formaPago = datos.formaPago;
+  if (datos.formaPagoPreferida !== undefined) data.formaPagoPreferida = datos.formaPagoPreferida;
   if (datos.metodoPago !== undefined) data.metodoPago = datos.metodoPago;
   if (datos.banco !== undefined) data.banco = datos.banco;
   if (datos.clabe !== undefined) data.clabe = datos.clabe;
@@ -321,6 +322,11 @@ const CAMPOS_TEXTO_EDITABLES = [
   'direccion',
   'moneda',
   'formaPago',
+  // ⚠️ `formaPagoPreferida` es un ENUM, no texto libre, y aun así va en esta lista a propósito: el
+  // bucle hace exactamente lo que necesita —omitir = no tocar, ''/null = borrar la preferencia— y
+  // así hereda el mismo renglón de bitácora que los demás campos (0.113). El Zod ya garantiza que
+  // el valor sólo pueda ser `efectivo`, `transferencia` o nulo.
+  'formaPagoPreferida',
   'metodoPago',
   'banco',
   'clabe',

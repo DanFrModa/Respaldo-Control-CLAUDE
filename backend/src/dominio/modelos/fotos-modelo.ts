@@ -70,8 +70,16 @@ const CARPETA_FOTOS = 'modelos';
  * | 20_546 | `modelos/nomenclatura.ts` (`NAMESPACE_LOCK_NUMERO_PRODUCCION`) | hash del prefijo |
  * | 20_547 | `modelos/versiones.ts` (`NAMESPACE_LOCK_VERSION`, V1-E7b) | hash de la RAÍZ |
  * | 20_548 | `modelos/nomenclatura.ts` (`NAMESPACE_LOCK_MODELO_POR_COLOR`, V1-E3) | idModeloDesarrollo |
+ * | 20_549 | `catalogos/proveedor-cuentas-pago.ts` (`NAMESPACE_LOCK_CUENTA_DEFAULT`, 0.112) | idProveedor |
+ * | 20_550 | `catalogos/conceptos-pago-cuentas.ts` (`NAMESPACE_LOCK_CUENTA_CONCEPTO`, 0.125) | idConcepto |
+ * | 20_551 | `pagos/corrida.ts` (`NAMESPACE_LOCK_CORRIDA`, 0.113) | idEmpresa |
  *
- * El siguiente libre es el 20_549.
+ * El siguiente libre es el 20_552.
+ *
+ * ⚠️ Las tres filas de arriba se agregaron en la fila 0.113: la 0.112 estrenó el 20_549 y **no
+ * actualizó esta tabla**, así que el puntero seguía anunciando el 20_549 como libre cuando ya
+ * estaba ocupado — dos locks con el mismo número se serializan entre sí sin que nadie entienda por
+ * qué. Si estrenas uno, actualiza AQUÍ.
  */
 const NAMESPACE_LOCK_FOTOS = 20_545;
 

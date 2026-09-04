@@ -32,8 +32,10 @@ import {
   saldoDeTotales,
   sqlCuenta,
   sqlPendiente,
+  sqlSegmentoFactura,
   tieneSaldo,
   type PendienteRevision,
+  type SegmentoFactura,
 } from './formula-saldo.js';
 import { ROLES_MAQUILA_ESMA } from './maquileros.js';
 
@@ -77,11 +79,15 @@ export async function saldosDeTodosMaquileros(
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
 
-  // Filtro de facturación (mismo para cargos y movimientos): solo cuando se segmenta.
+  // ⭐ Filtro de facturación (mismo para cargos y movimientos), pedido a la definición ÚNICA
+  // (`formula-saldo.ts` §segmento). Aquí decía `"con_factura" = false` para el segmento «sin», que
+  // dejaba FUERA los movimientos migrados sin definir — y `convivencia-esma.ts` los metía DENTRO.
+  // La misma pregunta con dos respuestas, con dinero en medio: un movimiento sin definir no salía
+  // en NINGUNA de las dos relaciones semanales de Daniel y nadie lo hubiera pagado nunca.
   const factura =
     filtros.conFactura === undefined
       ? Prisma.empty
-      : Prisma.sql`AND "con_factura" = ${filtros.conFactura === 'con'}`;
+      : Prisma.sql`AND ${sqlSegmentoFactura(filtros.conFactura)}`;
 
   // Los cuatro criterios salen de la definición ÚNICA (formula-saldo.ts): aquí no se escribe ninguno
   // a mano. Los movimientos planos traen las DOS sumas de un tiro (lo revisado y lo pendiente) con
@@ -243,7 +249,11 @@ export interface AporteEsMaLote {
 export async function saldosEsMaPorMaquilero(
   cliente: Tx | PrismaClient,
   idEmpresa: number,
+  segmento?: SegmentoFactura,
 ): Promise<Map<number, AporteEsMaLote>> {
+  // Sin segmento el fragmento es `(TRUE)`, neutro en un `AND`: la vista operativa (toda la cuenta)
+  // sigue siendo la de siempre. Con segmento parte la cartera en las dos relaciones de la semana.
+  const factura = Prisma.sql`AND ${sqlSegmentoFactura(segmento)}`;
   // Los cuatro criterios salen de la definición única (formula-saldo.ts). Los planos traen las DOS
   // sumas de un tiro (revisado → saldo; capturado → pendiente) y el conteo, con `FILTER`.
   const filas = await cliente.$queryRaw<SaldoEsMaLoteCruda[]>(Prisma.sql`
@@ -262,7 +272,7 @@ export async function saldosEsMaPorMaquilero(
     LEFT JOIN (
       SELECT "id_maquilero", SUM("cantidad_real" * "precio_real") AS "total"
       FROM "esma_cargo"
-      WHERE "id_empresa" = ${idEmpresa} AND ${sqlCuenta('cargo')}
+      WHERE "id_empresa" = ${idEmpresa} AND ${sqlCuenta('cargo')} ${factura}
       GROUP BY "id_maquilero"
     ) c ON c."id_maquilero" = p."id"
     LEFT JOIN (
@@ -271,7 +281,7 @@ export async function saldosEsMaPorMaquilero(
         SUM("monto") FILTER (WHERE ${sqlPendiente('abono')}) AS "pendiente",
         COUNT(*) FILTER (WHERE ${sqlPendiente('abono')})     AS "partidas"
       FROM "abono_maquilero"
-      WHERE "id_empresa" = ${idEmpresa}
+      WHERE "id_empresa" = ${idEmpresa} ${factura}
       GROUP BY "id_maquilero"
     ) a ON a."id_maquilero" = p."id"
     LEFT JOIN (
@@ -280,7 +290,7 @@ export async function saldosEsMaPorMaquilero(
         SUM("monto") FILTER (WHERE ${sqlPendiente('pago')}) AS "pendiente",
         COUNT(*) FILTER (WHERE ${sqlPendiente('pago')})     AS "partidas"
       FROM "pago_maquilero"
-      WHERE "id_empresa" = ${idEmpresa}
+      WHERE "id_empresa" = ${idEmpresa} ${factura}
       GROUP BY "id_maquilero"
     ) pg ON pg."id_maquilero" = p."id"
     LEFT JOIN (
@@ -289,7 +299,7 @@ export async function saldosEsMaPorMaquilero(
         SUM("monto") FILTER (WHERE ${sqlPendiente('descuento')}) AS "pendiente",
         COUNT(*) FILTER (WHERE ${sqlPendiente('descuento')})     AS "partidas"
       FROM "descuento_maquilero"
-      WHERE "id_empresa" = ${idEmpresa}
+      WHERE "id_empresa" = ${idEmpresa} ${factura}
       GROUP BY "id_maquilero"
     ) d ON d."id_maquilero" = p."id"
     WHERE c."id_maquilero" IS NOT NULL OR a."id_maquilero" IS NOT NULL

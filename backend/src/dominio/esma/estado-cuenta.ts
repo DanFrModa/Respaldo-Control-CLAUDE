@@ -46,6 +46,9 @@ import {
   pendienteDeRevisionCargo,
   pendienteDeRevisionPlano,
   WHERE_CARGO_REVISADO,
+  whereSegmentoFactura,
+  type SegmentoFactura,
+  type WhereSegmentoFactura,
 } from './formula-saldo.js';
 import { saldoDeMaquilero } from './saldos.js';
 
@@ -59,9 +62,17 @@ function redondear2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Cláusula `where` de facturación para un segmento (o `{}` si no se segmenta). */
-function conFacturaWhere(segmento: 'con' | 'sin' | undefined): { conFactura?: boolean } {
-  return segmento === undefined ? {} : { conFactura: segmento === 'con' };
+/**
+ * Cláusula `where` de facturación para un segmento (o `{}` si no se segmenta) — pedida a la
+ * definición ÚNICA (`formula-saldo.ts` §segmento).
+ *
+ * 🔴 Aquí decía `{ conFactura: segmento === 'con' }`, o sea `= false` para el segmento «sin». Como
+ * `conFactura` es NULLABLE, eso dejaba FUERA lo migrado del Access sin definir… mientras
+ * `convivencia-esma.ts` lo metía DENTRO. Dos respuestas para la misma pregunta, con dinero en
+ * medio. Ahora hay una sola: «sin factura» = `false` **o** sin definir.
+ */
+function conFacturaWhere(segmento: SegmentoFactura | undefined): WhereSegmentoFactura {
+  return whereSegmentoFactura(segmento);
 }
 
 /** Rango sobre una columna `@db.Date` (fecha del movimiento), inclusivo en ambos extremos. */
