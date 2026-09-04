@@ -107,6 +107,19 @@ export interface SaldosDelRecibo {
    * justamente lo que sólo esta condición puede cobrar. Por `claveCelda`. Condición (1).
    */
   devueltoTotal: ReadonlyMap<string, number>;
+  /**
+   * ⭐ V1 (fila 0.109) — FALTANTES ya SALDADOS al CERRAR la orden con ese maquilero, por
+   * `claveCeldaPack` y por `claveCelda`. No es mercancía devuelta: son las piezas que **nunca
+   * volvieron** y de las que ya se decidió qué pasó (se le cobraron o se le perdonaron).
+   *
+   * 🔴 CONSUMEN SALDO IGUAL QUE LO DEVUELTO, y por eso entran en el tope y no sólo en la vista: una
+   * vez cerrado, esas piezas **ya no se pueden recibir**. Si alguien las trae después, primero hay
+   * que DESHACER el cierre (acto inverso auditado, D3) y luego capturar el recibo — no colar un
+   * recibo que dejaría al maquilero saldado y con la mercancía contada dos veces.
+   */
+  saldadoPorPack: ReadonlyMap<string, number>;
+  /** Lo mismo, AGREGANDO todos los packs. Por `claveCelda`. Condición (1). */
+  saldadoTotal: ReadonlyMap<string, number>;
 }
 
 /** Un renglón de la captura que no cabe: por qué, cuánto pide y cuánto queda. */
@@ -171,6 +184,7 @@ export function excesosDelRecibo(
     const disponible = pendientePorCelda(
       saldos.enviadoTotal.get(clave) ?? 0,
       saldos.devueltoTotal.get(clave) ?? 0,
+      saldos.saldadoTotal.get(clave) ?? 0,
     );
     if (x.pide > disponible) {
       excesos.push({
@@ -190,6 +204,7 @@ export function excesosDelRecibo(
     const disponible = pendientePorCelda(
       saldos.enviadoPorPack.get(clave) ?? 0,
       saldos.devueltoPorPack.get(clave) ?? 0,
+      saldos.saldadoPorPack.get(clave) ?? 0,
     );
     if (c.devuelveAhora > disponible) {
       excesos.push({

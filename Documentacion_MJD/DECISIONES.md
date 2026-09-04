@@ -12204,6 +12204,28 @@ Daniel pegó el **Repaso de Finanzas** del 2-sep (fila 0.097: tres reglas, dos p
 
 ---
 
+#### (Post-F9.191) — CERRAR LA ORDEN CON EL MAQUILERO (fila 0.109, 4-sep-2026): las decisiones que se tomaron solas, con su default
+
+Construida de noche bajo la REGLA 0. Daniel ya había dicho lo esencial en §Post-F9.147 (*«ese faltante sí se le queda y se le quita a mano, normalmente descontándole esas prendas faltantes»*); lo que sigue son las decisiones de diseño que el encargo no fijaba y que quedan **con default, pendientes de que Daniel confirme o cambie**:
+
+1. **El cobro es un DESCUENTO al maquilero, no un cargo** (contra la letra del encargo, que decía «propone un `EsMaCargo`»). Se midió contra la definición única del saldo (`saldo = Σcargos + Σabonos − Σpagos − Σdescuentos`): un cargo **sube** lo que se le debe — le habríamos *pagado* las prendas que no devolvió, además de dejárselas. El descuento nace `capturado` (**propone, no cobra**), se ve en el estado de cuenta con la marca de «por revisar» de la 0.115 y se aprueba con el mismo flujo de revisión; sus observaciones las redacta el sistema (*«Faltante de la orden #… · Costura: N pza(s) que no se devolvieron»*).
+2. **Se puede cerrar más de una vez** la misma orden + maquilero + proceso: si después de cerrar se le envía más mercancía, ese saldo nuevo es un faltante nuevo con su propio acto y su propio descuento.
+3. **Cerrar no exige** que el tipo de proceso siga activo ni que el proveedor conserve su rol (el recibo sí lo exige): cerrar es limpieza sobre un saldo que ya existe, y bloquearlo porque cambió el catálogo dejaría ese pendiente vivo para siempre. La guarda real es más fuerte: **sin faltante derivado no hay cierre**.
+4. **Con/sin factura** sólo se pregunta cuando el proveedor está en modalidad «ambos»; el resto lo dicta su catálogo (regla de la 0.110). Sin modalidad capturada, el cierre lo dice con nombre y no sigue.
+5. **Órdenes migradas de Access sin precio pactado** (1,309 envíos): el cierre **salda igual** —el pendiente desaparece— pero **no propone cobro** y lo dice: el descuento se captura a mano en el estado de cuenta. No se inventa un precio (REGLA 0-B).
+6. **El descuento del maquilero ahora se puede cancelar** (marca con fecha, quién y motivo; nunca se borra, D3), y la definición única del saldo excluye los cancelados en sus dos criterios.
+7. **Deshacer un cierre** lo marca (fecha, quién, motivo) y cancela su descuento si aún estaba `capturado`; el pendiente vuelve a aparecer. Nada se borra.
+
+Queda un **gancho para la 0.061**: al cerrar y al deshacer se publica el evento `cierre-maquila-resuelto`; hoy nadie lo consume.
+
+**✅ DANIEL CONTESTÓ (4-sep, 06:40–06:50 UTC), y precisó el camino:** *«Los descuentos son mediante una nota de crédito si es que ya está la factura completa.»* Y aclaró: *«O sea, **lo ideal es que facture lo que es en total**. Por eso quedamos que **nosotros le vamos a dar un documento con el que va a facturar**. La nota de crédito es en **caso remoto** que ya haya hecho la factura y no pueda cancelarla.»*
+
+⇒ Tres cosas quedan decididas: (1) el **descuento** (punto 1) se confirma como figura interna del estado de cuenta; (2) **el camino normal** para el maquilero que factura es que facture **el total ya neto del faltante**, y eso lo garantiza **el documento «yo te digo qué facturarme»** (fila 0.118) llevando el descuento — lo que abre la pregunta de si la 0.118 vuelve a la V1 (estaba en fase 2 por criterio del lead, no de Daniel: ver §Post-F9.190); (3) la **nota de crédito** es el caso remoto: se numera (fila **0.141**) y se aparca a **fase 2**; mientras, si ocurre, el descuento queda «por revisar» y Daniel lo aprueba con motivo cuando tenga la nota de crédito en la mano.
+
+- **Aplica en:** la versión que cierra la fila 0.109. **Fecha:** 2026-09-04.
+
+---
+
 #### (Post-F9.190) — «YA QUIERO SALIR»: la caja chica y lo demás que vive en Excel se van a FASE 2 (Daniel, 4-sep-2026, madrugada)
 
 Al proponerle la fila **0.127** (el libro de caja chica con reposición calculada, nacido de leer su archivo semanal), Daniel cortó por lo sano:
@@ -12241,6 +12263,9 @@ Al proponerle la fila **0.127** (el libro de caja chica con reposición calculad
 Orden de trabajo: **finanzas primero** (0.124 → 0.114 → 0.111 → 0.117 → 0.121), los defectos (0.106 · 0.107) en cuanto haya hueco, **luego inventarios entero**, 0.061, y 0.120 al final. Las «varias cosas» de Excel para la fase 2 se numeran ⏸️ cuando Daniel las nombre.
 
 - **Aplica en:** la fila 0.127 nace aparcada y las cinco de fase 2 se aparcan en la versión que cierra 0.113. **Fecha:** 2026-09-04.
+
+
+**Ajuste del corte (4-sep, 06:55 UTC): la 0.118 VUELVE a la V1.** Estaba en fase 2 por criterio del lead («hoy se hace a mano»), no de Daniel. Al precisar él que el maquilero debe facturar *«lo que es en total»* porque *«nosotros le vamos a dar un documento con el que va a facturar»* (§Post-F9.191), ese documento pasó a ser el mecanismo normal de la 0.109 para los maquileros que facturan. Daniel: *«Está bien en la fase 1.»* Orden propuesto: tras 0.114, antes de 0.117. La fila 0.141 (nota de crédito, caso remoto) sí queda en fase 2.
 
 ---
 
@@ -12349,6 +12374,9 @@ Dos decisiones que el coder tomó solo — defaults puestos, pendientes de Danie
 **(j) Decisiones del lead en la revisión** (4-sep): la pantalla de trabajo muestra **toda la cartera del segmento** a propósito (no hay «agregar proveedor»; esconder = no cobrar), ordenada con lo que pide decisión primero; `pagos.corrida-ver` **implica** ver los saldos de la semana (no se exige `cxp.ver`/`esma.ver-pagos` aparte; razón escrita en el TSDoc del permiso); `corte`/`empaque` caen hoy en la sección de proveedores hasta la **0.114**.
 
 - **Aplica en:** versión **0.102** (filas 0.113 + 0.125; 0.127 nace aquí). **Fecha:** 2026-09-04.
+
+
+**(g-ter) ✅ Daniel confirmó los defaults de (g-bis) el 4-sep (06:40 UTC):** *«Sí. Las facturas son sólo transferencias.»* ⇒ en la relación CON factura se bloquea también el efectivo, tal como quedó construido en 0.102. Y añadió la regla de la nota de crédito para los descuentos a maquileros que ya facturaron (§Post-F9.191, fila 0.141).
 
 ---
 

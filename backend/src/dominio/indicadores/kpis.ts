@@ -382,13 +382,19 @@ function condicionesWip(idEmpresa: number, filtros: z.infer<typeof esquemaWipDom
   if (filtros.idModelo !== undefined) cond.push(Prisma.sql`w."id_modelo" = ${filtros.idModelo}`);
   if (filtros.soloPendientes) {
     // "Con algo pendiente" = alguna diferencia por etapa ≠ 0 (mismo criterio que `tienePendiente`).
-    // El "por recibir" RESTA las incompletas (V1-E8v, §Post-F9.147): la prenda incompleta ya volvió
-    // del taller, así que una orden entregada del todo —95 buenas + 5 incompletas de 100— deja de
-    // contar como pendiente. Sin esto, esas órdenes se quedaban abiertas para siempre.
+    // El "por recibir" RESTA las incompletas (V1-E8v, §Post-F9.147: la prenda incompleta ya volvió
+    // del taller) **y los faltantes SALDADOS** (V1, fila 0.109: nunca volvieron y ya se decidió que
+    // no vuelven). Sin las dos restas, esas órdenes se quedaban abiertas para siempre.
+    //
+    // 🔴 ESTE `WHERE` Y LAS DOS EXPRESIONES `porRecibir` DEL `SELECT` SON LA MISMA REGLA ESCRITA
+    // TRES VECES, y la fila 0.109 lo demostró: se actualizaron las dos del SELECT y se olvidó ésta,
+    // 60 líneas más arriba. El síntoma era una fila que se contradecía a sí misma — la orden salía
+    // en el listado de `soloPendientes` con «Por recibir» = 0 en su propia columna. Al tocar una,
+    // se tocan las tres (y su gemela de `resumen/resumen.ts::contarOrdenesAbiertas`).
     cond.push(Prisma.sql`(
       (w."pedido" - w."cortado") <> 0
       OR (w."cortado" - w."enviado") <> 0
-      OR (w."enviado" - w."recibido" - w."incompletas") <> 0
+      OR (w."enviado" - w."recibido" - w."incompletas" - w."faltantes_saldados") <> 0
       OR (w."recibido_costura" - w."entregado") <> 0
     )`);
   }
@@ -400,9 +406,11 @@ function condicionesWip(idEmpresa: number, filtros: z.infer<typeof esquemaWipDom
  * órdenes con su avance. Mismo criterio de derivación que el tablero WIP de F3-E5 (suma directa de
  * `etapa_movimiento_det`, D3/D4), pre-calculado en la vista `kpi_wip`. `indicadores.ver`.
  *
- * ⭐ El "por recibir" resta las PRENDAS INCOMPLETAS (V1-E8v, §Post-F9.147): ya volvieron del taller.
- * La vista trae la columna `incompletas` desde la migración
- * `20260830120000_la_incompleta_sale_del_transito` — el pendiente se deriva AL LEER, nunca se
+ * ⭐ El "por recibir" resta las PRENDAS INCOMPLETAS (V1-E8v, §Post-F9.147, ya volvieron del taller)
+ * y los FALTANTES SALDADOS al cerrar la orden con el maquilero (V1, fila 0.109: nunca volvieron y ya
+ * se decidió que no vuelven). La vista trae las dos columnas —`incompletas` desde
+ * `20260830120000_la_incompleta_sale_del_transito`, `faltantes_saldados` desde
+ * `20260903180000_cerrar_la_orden_con_el_maquilero`— y el pendiente se deriva AL LEER, nunca se
  * materializa, para que la fórmula viva en un solo lugar.
  */
 export async function kpisWip(
@@ -423,6 +431,7 @@ export async function kpisWip(
       enviado: number;
       recibido: number;
       incompletas: number;
+      faltantesSaldados: number;
       recibidoCostura: number;
       entregado: number;
       porCortar: number;
@@ -437,13 +446,15 @@ export async function kpisWip(
       COALESCE(SUM(w."enviado"), 0)::int          AS "enviado",
       COALESCE(SUM(w."recibido"), 0)::int         AS "recibido",
       COALESCE(SUM(w."incompletas"), 0)::int      AS "incompletas",
+      COALESCE(SUM(w."faltantes_saldados"), 0)::int AS "faltantesSaldados",
       COALESCE(SUM(w."recibido_costura"), 0)::int AS "recibidoCostura",
       COALESCE(SUM(w."entregado"), 0)::int        AS "entregado",
       COALESCE(SUM(w."pedido" - w."cortado"), 0)::int            AS "porCortar",
       COALESCE(SUM(w."cortado" - w."enviado"), 0)::int           AS "cortadoPorEnviar",
-      -- V1-E8v: las incompletas ya volvieron del taller (§Post-F9.147). MISMA regla que
+      -- V1-E8v: las incompletas ya volvieron del taller (§Post-F9.147). V1 fila 0.109: los
+      -- faltantes saldados nunca volvieron y ya se resolvieron. MISMA regla que
       -- \`pendientePorCelda\` (\`produccion/incompletas.ts\`), aquí en SQL sobre la vista.
-      COALESCE(SUM(w."enviado" - w."recibido" - w."incompletas"), 0)::int AS "porRecibir",
+      COALESCE(SUM(w."enviado" - w."recibido" - w."incompletas" - w."faltantes_saldados"), 0)::int AS "porRecibir",
       COALESCE(SUM(w."recibido_costura" - w."entregado"), 0)::int AS "porEntregar"
     FROM "kpi_wip" w
     WHERE ${where}
@@ -468,6 +479,7 @@ export async function kpisWip(
       enviado: number;
       recibido: number;
       incompletas: number;
+      faltantesSaldados: number;
       recibidoCostura: number;
       entregado: number;
       porCortar: number;
@@ -488,11 +500,12 @@ export async function kpisWip(
       w."enviado"           AS "enviado",
       w."recibido"          AS "recibido",
       w."incompletas"       AS "incompletas",
+      w."faltantes_saldados" AS "faltantesSaldados",
       w."recibido_costura"  AS "recibidoCostura",
       w."entregado"         AS "entregado",
       (w."pedido" - w."cortado")             AS "porCortar",
       (w."cortado" - w."enviado")            AS "cortadoPorEnviar",
-      (w."enviado" - w."recibido" - w."incompletas") AS "porRecibir",
+      (w."enviado" - w."recibido" - w."incompletas" - w."faltantes_saldados") AS "porRecibir",
       (w."recibido_costura" - w."entregado") AS "porEntregar"
     FROM "kpi_wip" w
     JOIN "clientes" c ON c."id" = w."id_cliente"
@@ -508,6 +521,7 @@ export async function kpisWip(
     enviado: 0,
     recibido: 0,
     incompletas: 0,
+    faltantesSaldados: 0,
     recibidoCostura: 0,
     entregado: 0,
     porCortar: 0,
@@ -531,6 +545,7 @@ export async function kpisWip(
       enviado: f.enviado,
       recibido: f.recibido,
       incompletas: f.incompletas,
+      faltantesSaldados: f.faltantesSaldados,
       recibidoCostura: f.recibidoCostura,
       entregado: f.entregado,
       porCortar: f.porCortar,

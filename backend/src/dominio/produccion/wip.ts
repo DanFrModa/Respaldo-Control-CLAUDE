@@ -8,7 +8,7 @@
  * Fórmulas del avance por orden (form `Proceso` del viejo; cada una excluye canceladas):
  *  • Por cortar          = pedido(orden) − cortado
  *  • Cortado por enviar  = cortado − enviado            (por proceso/TipoProceso, D8)
- *  • Por recibir         = enviado − recibido − incompletas   (por proceso/TipoProceso)
+ *  • Por recibir         = enviado − recibido − incompletas − faltantes saldados   (por proceso/TipoProceso)
  *  • Entregado a cliente = Σ entregas (etapa `entrega_cliente`)
  *  • Por entregar        = recibido(costura, procesos `generaEntradaPt`) − entregado a cliente
  *
@@ -50,10 +50,16 @@ import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { esquemaPaginacion, type Paginacion } from '../../comun/paginacion.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import {
+  saldadosPorOrden,
+  saldadosPorTercero,
+  totalSaldable,
+  totalSaldadoDeOrdenes,
+} from './faltantes-saldados.js';
 import { pendientePorCelda } from './incompletas.js';
 import { SIN_PACK, claveCeldaPack, normalizarPack } from './packs.js';
 import { armarBusquedaConSinonimos } from './ordenes.js';
@@ -264,6 +270,41 @@ async function sumarCeldasPorTercero(
 }
 
 /**
+ * El PRECIO PACTADO de cada maquilero en un proceso de la orden: el del ENVÍO vivo más reciente que
+ * lo traiga. Es la base del cobro que se PROPONDRÍA al cerrar la orden con él (V1, fila 0.109), y
+ * sale del mismo sitio que usa `cierre-maquila.ts` al cerrar de verdad: el envío, no la orden.
+ *
+ * `null` cuando ninguno de sus envíos trae precio — el caso del histórico migrado (1,309 envíos sin
+ * `precioPactado`). Ahí el cierre SALDA igual pero no propone cobro, y la pantalla lo dice con
+ * nombre en vez de enseñar un importe inventado.
+ */
+async function preciosPorTercero(
+  cliente: ClienteLectura,
+  idOrden: number,
+  idTipoProceso: number,
+): Promise<Map<number, number>> {
+  const envios = await cliente.etapaMovimiento.findMany({
+    where: {
+      idOrden,
+      idTipoProceso,
+      tipo: TipoEtapaMovimiento.envio_maquila,
+      canceladoEn: null,
+      idTercero: { not: null },
+      precioPactado: { not: null },
+    },
+    select: { idTercero: true, precioPactado: true },
+    orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
+  });
+  const precios = new Map<number, number>();
+  for (const e of envios) {
+    // El primero que aparece por tercero es el más reciente (el `orderBy` manda): no se pisa.
+    if (e.idTercero === null || e.precioPactado === null || precios.has(e.idTercero)) continue;
+    precios.set(e.idTercero, e.precioPactado.toNumber());
+  }
+  return precios;
+}
+
+/**
  * Pliega el agrupado por tercero en la matriz TOTAL del proceso (evita repetir la consulta).
  * `campo` elige qué se pliega: las piezas buenas o las prendas incompletas (V1-E8k).
  */
@@ -284,7 +325,7 @@ function plegarPorTercero(
 }
 
 /**
- * "Por recibir" de un proceso DESGLOSADO POR MAQUILERO: `enviado − buenas − incompletas` de cada
+ * "Por recibir" de un proceso DESGLOSADO POR MAQUILERO: `enviado − buenas − incompletas − faltantes saldados` de cada
  * tercero, por color×talla (V1-E8v, §Post-F9.147: la incompleta ya volvió, así que sale del
  * tránsito). Lo comparten el drill-down del WIP y los pendientes del recibo (`recibos.ts`) para
  * que las dos pantallas de recibo que existen ofrezcan y topen EXACTAMENTE lo mismo.
@@ -300,43 +341,48 @@ export async function pendientePorMaquilero(
   idOrden: number,
   idTipoProceso: number,
   meta: Map<string, MetaCelda>,
+  opciones: { ocultarPrecio: boolean },
 ): Promise<{
   porMaquilero: WipMaquileroPendiente[];
   enviado: Map<string, number>;
   recibido: Map<string, number>;
   /** Prendas INCOMPLETAS ya entregadas, por celda (V1-E8k). SÍ restan del pendiente (V1-E8v). */
   incompletas: Map<string, number>;
+  /** Faltantes ya SALDADOS por cierres vivos, por celda (V1, fila 0.109). También restan. */
+  saldados: Map<string, number>;
 }> {
-  const enviadoPorTercero = await sumarCeldasPorTercero(
-    cliente,
-    idOrden,
-    TipoEtapaMovimiento.envio_maquila,
-    idTipoProceso,
-  );
-  const recibidoPorTercero = await sumarCeldasPorTercero(
-    cliente,
-    idOrden,
-    TipoEtapaMovimiento.recibo_maquila,
-    idTipoProceso,
-  );
+  const [enviadoPorTercero, recibidoPorTercero, saldadoPorTercero, precioPorTercero] =
+    await Promise.all([
+      sumarCeldasPorTercero(cliente, idOrden, TipoEtapaMovimiento.envio_maquila, idTipoProceso),
+      sumarCeldasPorTercero(cliente, idOrden, TipoEtapaMovimiento.recibo_maquila, idTipoProceso),
+      saldadosPorTercero(cliente, idOrden, idTipoProceso),
+      preciosPorTercero(cliente, idOrden, idTipoProceso),
+    ]);
 
+  // Los terceros con envío, con recibo **o con cierre**: quien ya cerró no puede desaparecer del
+  // desglose, porque su historia (cuántas piezas se le saldaron) es parte de la trazabilidad.
   const terceros = new Set<number | null>([
     ...enviadoPorTercero.keys(),
     ...recibidoPorTercero.keys(),
+    ...saldadoPorTercero.keys(),
   ]);
   const porMaquilero = [...terceros].map((idTercero) => {
     const grupoEnviado = enviadoPorTercero.get(idTercero);
     const grupoRecibido = recibidoPorTercero.get(idTercero);
+    // `null` (histórico migrado sin tercero) nunca tiene cierres: no se le puede cerrar la orden a
+    // «Sin asignar» (a nadie se le cobra un faltante sin nombre), así que ahí el mapa va vacío.
+    const saldadoDelTercero = idTercero === null ? undefined : saldadoPorTercero.get(idTercero);
     const claves = new Set<string>([
       ...(grupoEnviado?.celdas.keys() ?? []),
       ...(grupoRecibido?.celdas.keys() ?? []),
+      ...(saldadoDelTercero?.keys() ?? []),
     ]);
-    const celdas = ordenarCeldas(
+    const celdasConPendiente = ordenarCeldas(
       [...claves].map((clave) => {
         const m = metaPara(meta, clave);
         return {
           ...m,
-          // PENDIENTE = enviado − buenas − incompletas, por la MISMA función que usa el tope de
+          // PENDIENTE = enviado − buenas − incompletas − faltantes saldados, por la MISMA función que usa el tope de
           // `registrarReciboMaquila` bajo lock (V1-E8v, §Post-F9.147). Es UN SOLO número: lo que el
           // maquilero todavía tiene y lo que todavía se le puede recibir son lo mismo desde que la
           // incompleta sale del tránsito. Lo que quede aquí cuando ya cerró su entrega es el
@@ -352,37 +398,80 @@ export async function pendientePorMaquilero(
           cantidad: pendientePorCelda(
             grupoEnviado?.celdas.get(clave) ?? 0,
             (grupoRecibido?.celdas.get(clave) ?? 0) + (grupoRecibido?.incompletas.get(clave) ?? 0),
+            // ⭐ V1 (fila 0.109): lo ya SALDADO al cerrar la orden con este maquilero sale del
+            // pendiente. Es lo que vuelve cobrable al faltante — mientras el faltante ERA el
+            // pendiente, cobrarlo no bajaba nada.
+            saldadoDelTercero?.get(clave) ?? 0,
           ),
           // Las incompletas viajan al lado, informativas: la trazabilidad de las cuatro cubetas que
           // pidió Daniel (enviado = primeras + segundas + faltantes + incompletas).
           incompletas: grupoRecibido?.incompletas.get(clave) ?? 0,
         };
       }),
-    )
+    );
+    const celdas = celdasConPendiente
       .filter((c) => c.cantidad !== 0 || c.incompletas !== 0)
       .map(({ ordenTalla: _o, ...resto }) => resto);
+    // ⭐⭐ LO QUE DE VERDAD SE PUEDE SALDAR, por la MISMA función que el servidor usa al CERRAR
+    // (`celdasSaldables`/`totalSaldable`, `faltantes-saldados.ts`): pliega por color×talla y se
+    // queda con lo positivo. NO es `totalPendiente` —la suma plana—, y la diferencia es dinero:
+    // con `+5` en una talla y `−5` en otra, la suma plana da 0 (el botón no aparecería nunca y la
+    // orden migrada nunca se podría cerrar) mientras hay 5 piezas que saldar; y con `+5` y `−3` da
+    // 2 mientras el descuento saldría por 5. Una celda no le presta saldo a otra.
+    const faltantesSaldables = totalSaldable(
+      celdasConPendiente.map((c) => ({
+        idColor: c.idColor,
+        idTalla: c.idTalla,
+        pendiente: c.cantidad,
+      })),
+    );
+    const faltantesSaldados = [...(saldadoDelTercero?.values() ?? [])].reduce((s, v) => s + v, 0);
+    const totalPendiente = pendientePorCelda(
+      [...(grupoEnviado?.celdas.values() ?? [])].reduce((s, v) => s + v, 0),
+      [...(grupoRecibido?.celdas.values() ?? [])].reduce((s, v) => s + v, 0) +
+        [...(grupoRecibido?.incompletas.values() ?? [])].reduce((s, v) => s + v, 0),
+      faltantesSaldados,
+    );
+    const precio = idTercero === null ? null : (precioPorTercero.get(idTercero) ?? null);
     return {
       idMaquilero: idTercero,
       maquilero: grupoEnviado?.nombre ?? grupoRecibido?.nombre ?? 'Sin asignar',
       celdas,
-      // Mismo derivado que las celdas, en total: enviado − buenas − incompletas (V1-E8v).
-      totalPendiente: pendientePorCelda(
-        [...(grupoEnviado?.celdas.values() ?? [])].reduce((s, v) => s + v, 0),
-        [...(grupoRecibido?.celdas.values() ?? [])].reduce((s, v) => s + v, 0) +
-          [...(grupoRecibido?.incompletas.values() ?? [])].reduce((s, v) => s + v, 0),
-      ),
+      // Mismo derivado que las celdas, en total: enviado − buenas − incompletas − saldado.
+      totalPendiente,
       totalIncompletas: [...(grupoRecibido?.incompletas.values() ?? [])].reduce((s, v) => s + v, 0),
+      faltantesSaldados,
+      faltantesSaldables,
+      // El precio va REDACTADO igual que en la cancelación de un recibo (R2 §4.4.3): quien recibe
+      // aprieta el botón de cerrar, y quien recibe no necesariamente ve precios de maquila.
+      precioFaltante: opciones.ocultarPrecio ? null : precio,
+      // El importe lo calcula el SERVIDOR (A1): que la confirmación multiplique por su cuenta sería
+      // la misma regla escrita en dos lados. Sin pendiente positivo no hay nada que proponer.
+      // 🔑 El importe se calcula sobre lo SALDABLE, no sobre `totalPendiente`: es el número que el
+      // servidor va a escribir en el descuento, y el que el usuario está aprobando.
+      importeFaltantePropuesto:
+        opciones.ocultarPrecio || precio === null || faltantesSaldables <= 0
+          ? null
+          : faltantesSaldables * precio,
     };
   });
   porMaquilero.sort((a, b) => a.maquilero.localeCompare(b.maquilero, 'es'));
 
   // Los totales del proceso se PLIEGAN de lo ya traído: sin esto serían dos consultas idénticas
   // más (el mismo rowset, solo que sin el join del tercero).
+  const saldados = new Map<string, number>();
+  for (const celdas of saldadoPorTercero.values()) {
+    for (const [clave, cantidad] of celdas) {
+      saldados.set(clave, (saldados.get(clave) ?? 0) + cantidad);
+    }
+  }
+
   return {
     porMaquilero,
     enviado: plegarPorTercero(enviadoPorTercero),
     recibido: plegarPorTercero(recibidoPorTercero),
     incompletas: plegarPorTercero(recibidoPorTercero, 'incompletas'),
+    saldados,
   };
 }
 
@@ -420,6 +509,12 @@ export interface TotalesOrden {
    * el pendiente por recibir aunque no se hayan producido ni inventariado.
    */
   incompletas: number;
+  /**
+   * Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109). Nunca
+   * volvieron del taller y ya se decidió que no vuelven (se cobraron o se perdonaron), así que
+   * salen del pendiente por recibir. Tercera cubeta con columna propia.
+   */
+  faltantesSaldados: number;
   recibidoCostura: number;
   entregado: number;
 }
@@ -437,12 +532,12 @@ export function pendientesDerivados(t: TotalesOrden): {
   return {
     porCortar: t.pedido - t.cortado,
     cortadoPorEnviar: t.cortado - t.enviado,
-    // enviado − buenas − incompletas (V1-E8v, §Post-F9.147: la incompleta ya volvió del taller y
+    // enviado − buenas − incompletas − faltantes saldados (V1-E8v, §Post-F9.147: la incompleta ya volvió del taller y
     // deja de estar en la maquila). Lo que queda es el FALTANTE, que se le cobra al maquilero.
     // ⭐ Por la MISMA función que todas las demás puertas, no por la fórmula escrita a mano: la
     // doctrina de la etapa es «guardas gemelas = la misma función, nunca un resumen suyo», y este
     // sitio era el único de TypeScript que la reescribía inline (hallazgo del reviewer).
-    porRecibir: pendientePorCelda(t.enviado, t.recibido + t.incompletas),
+    porRecibir: pendientePorCelda(t.enviado, t.recibido + t.incompletas, t.faltantesSaldados),
     porEntregar: t.recibidoCostura - t.entregado,
   };
 }
@@ -507,25 +602,38 @@ export async function agregadoWip(
     });
     return r._sum.cantidadIncompletas ?? 0;
   };
-  const [pedidoAgg, cortado, enviado, recibido, incompletas, recibidoCostura, entregado] =
-    await Promise.all([
-      cliente.ordenLineaTalla.aggregate({
-        where: { ordenLinea: { orden: where } },
-        _sum: { cantidad: true },
-      }),
-      sumaEtapa(TipoEtapaMovimiento.corte),
-      sumaEtapa(TipoEtapaMovimiento.envio_maquila),
-      sumaEtapa(TipoEtapaMovimiento.recibo_maquila),
-      sumaIncompletas(),
-      sumaEtapa(TipoEtapaMovimiento.recibo_maquila, { soloEntradaPt: true }),
-      sumaEtapa(TipoEtapaMovimiento.entrega_cliente),
-    ]);
+
+  const [
+    pedidoAgg,
+    cortado,
+    enviado,
+    recibido,
+    incompletas,
+    faltantesSaldados,
+    recibidoCostura,
+    entregado,
+  ] = await Promise.all([
+    cliente.ordenLineaTalla.aggregate({
+      where: { ordenLinea: { orden: where } },
+      _sum: { cantidad: true },
+    }),
+    sumaEtapa(TipoEtapaMovimiento.corte),
+    sumaEtapa(TipoEtapaMovimiento.envio_maquila),
+    sumaEtapa(TipoEtapaMovimiento.recibo_maquila),
+    sumaIncompletas(),
+    // Σ de la tercera cubeta sobre el MISMO universo filtrado (V1, fila 0.109). Va aparte porque
+    // no es una etapa: es su propia tabla, y su suma es una sola agregación en la base.
+    totalSaldadoDeOrdenes(cliente, where),
+    sumaEtapa(TipoEtapaMovimiento.recibo_maquila, { soloEntradaPt: true }),
+    sumaEtapa(TipoEtapaMovimiento.entrega_cliente),
+  ]);
   const t: TotalesOrden = {
     pedido: pedidoAgg._sum.cantidad ?? 0,
     cortado,
     enviado,
     recibido,
     incompletas,
+    faltantesSaldados,
     recibidoCostura,
     entregado,
   };
@@ -640,6 +748,7 @@ function totalesVacios(): TotalesOrden {
     enviado: 0,
     recibido: 0,
     incompletas: 0,
+    faltantesSaldados: 0,
     recibidoCostura: 0,
     entregado: 0,
   };
@@ -657,7 +766,7 @@ async function totalesDeOrdenes(
   if (idsOrden.length === 0) {
     return resultado;
   }
-  const [pedido, cortado, enviado, recibido, incompletas, recibidoCostura, entregado] =
+  const [pedido, cortado, enviado, recibido, incompletas, saldados, recibidoCostura, entregado] =
     await Promise.all([
       pedidoPorOrden(cliente, idsOrden),
       totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.corte),
@@ -666,6 +775,8 @@ async function totalesDeOrdenes(
       totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.recibo_maquila, {
         columna: 'cantidadIncompletas',
       }),
+      // Los faltantes saldados NO son una etapa: viven en su propia tabla (V1, fila 0.109).
+      saldadosPorOrden(cliente, idsOrden),
       totalesPorOrden(cliente, idsOrden, TipoEtapaMovimiento.recibo_maquila, {
         soloEntradaPt: true,
       }),
@@ -678,6 +789,7 @@ async function totalesDeOrdenes(
       enviado: enviado.get(id) ?? 0,
       recibido: recibido.get(id) ?? 0,
       incompletas: incompletas.get(id) ?? 0,
+      faltantesSaldados: saldados.get(id) ?? 0,
       recibidoCostura: recibidoCostura.get(id) ?? 0,
       entregado: entregado.get(id) ?? 0,
     });
@@ -716,6 +828,7 @@ function aFilaTablero(
     enviado: t.enviado,
     recibido: t.recibido,
     incompletas: t.incompletas,
+    faltantesSaldados: t.faltantesSaldados,
     recibidoCostura: t.recibidoCostura,
     entregado: t.entregado,
     porCortar: p.porCortar,
@@ -932,15 +1045,24 @@ export async function wipDeOrden(
   let enviadoCostura = 0;
   /** Σ de prendas INCOMPLETAS entregadas en la orden (todas sus maquilas). Cuarta cubeta. */
   let incompletasTotal = 0;
+  let faltantesSaldadosTotal = 0;
   for (const proc of procesos) {
     if (proc.idTipoProceso === null) continue;
     // Envío y recibo del proceso, DESGLOSADOS por maquilero y plegados a los totales del proceso:
     // una sola pasada por tipo de movimiento (el helper lo comparte con `pendientesPorRecibir`).
-    const { porMaquilero, enviado, recibido, incompletas } = await pendientePorMaquilero(
+    const { porMaquilero, enviado, recibido, incompletas, saldados } = await pendientePorMaquilero(
       cliente,
       idOrden,
       proc.idTipoProceso,
       meta,
+      {
+        // MISMA redacción que `pendientesPorRecibir` y que la cancelación de un recibo (R2 §4.4.3):
+        // la manda el PERMISO, no la pantalla. Redactarlo aquí «siempre, por si acaso» sonaba
+        // prudente y era un defecto: el panel de avance —donde vive el botón de cerrar la orden—
+        // lee el pendiente de ESTE endpoint, así que la confirmación habría enseñado el precio y el
+        // importe en blanco a TODO el mundo, incluido quien sí puede verlos.
+        ocultarPrecio: !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'),
+      },
     );
     const generaEntradaPt = proc.tipoProceso?.generaEntradaPt ?? false;
     const sumaRecibido = [...recibido.values()].reduce((s, v) => s + v, 0);
@@ -954,6 +1076,8 @@ export async function wipDeOrden(
     // Las incompletas de ESTE proceso, que restan del pendiente por recibir (V1-E8v) pero NUNCA
     // de `recibido` (no se produjeron: regla 1 de §Post-F9.136).
     incompletasTotal += [...incompletas.values()].reduce((s, v) => s + v, 0);
+    // La TERCERA cubeta (V1, fila 0.109): lo que ya se saldó al cerrar con cada maquilero.
+    faltantesSaldadosTotal += [...saldados.values()].reduce((s, v) => s + v, 0);
 
     const datosProceso = {
       idTipoProceso: proc.idTipoProceso,
@@ -980,12 +1104,13 @@ export async function wipDeOrden(
         [...enviado.values()].reduce((s, v) => s + v, 0),
     });
 
-    // enviado − recibido − incompletas a este proceso (V1-E8v, §Post-F9.147: la incompleta ya
+    // enviado − recibido − incompletas − faltantes saldados a este proceso (V1-E8v, §Post-F9.147: la incompleta ya
     // volvió del taller, así que sale del tránsito). MISMA función que el tope del guardado.
     const clavesRec = new Set<string>([
       ...enviado.keys(),
       ...recibido.keys(),
       ...incompletas.keys(),
+      ...saldados.keys(),
     ]);
     const celdasRecibir = ordenarCeldas(
       [...clavesRec].map((clave) => {
@@ -995,6 +1120,7 @@ export async function wipDeOrden(
           cantidad: pendientePorCelda(
             enviado.get(clave) ?? 0,
             (recibido.get(clave) ?? 0) + (incompletas.get(clave) ?? 0),
+            saldados.get(clave) ?? 0,
           ),
         };
       }),
@@ -1010,6 +1136,7 @@ export async function wipDeOrden(
         [...enviado.values()].reduce((s, v) => s + v, 0),
         [...recibido.values()].reduce((s, v) => s + v, 0) +
           [...incompletas.values()].reduce((s, v) => s + v, 0),
+        [...saldados.values()].reduce((s, v) => s + v, 0),
       ),
       porMaquilero,
     });
@@ -1061,7 +1188,12 @@ export async function wipDeOrden(
     // Sin ellas el drill-down enseñaba `enviado` y `recibido` y el hueco entre los dos no tenía
     // nombre: podían ser prendas en el taller o prendas perdidas, y son cosas distintas.
     incompletas: incompletasTotal,
-    pendientePorRecibir: pendientePorCelda(totalEnviado, recibidoTotal + incompletasTotal),
+    faltantesSaldados: faltantesSaldadosTotal,
+    pendientePorRecibir: pendientePorCelda(
+      totalEnviado,
+      recibidoTotal + incompletasTotal,
+      faltantesSaldadosTotal,
+    ),
     entregado: totalEntregado,
     porEntregar: recibidoCostura - totalEntregado,
     porCortar,
@@ -1085,7 +1217,7 @@ async function totalEtapa(
   return agregado._sum.cantidad ?? 0;
 }
 
-// ── Existencias en poder del maquilero (enviado − recibido − incompletas) ───────────────────────
+// ── Existencias en poder del maquilero (enviado − recibido − incompletas − faltantes saldados) ───────────────────────
 
 /**
  * Filtros de la consulta de EXISTENCIAS EN PODER DEL MAQUILERO EN DOMINIO (tipos nativos). La ruta
@@ -1111,7 +1243,7 @@ function claveGrupoMaquilero(
 
 /**
  * EXISTENCIAS EN PODER DEL MAQUILERO (form `MaqExis` del viejo): por maquilero × proceso × orden, lo
- * que el maquilero tiene pendiente de devolver = **enviado − buenas − incompletas** (Σ de
+ * que el maquilero tiene pendiente de devolver = **enviado − buenas − incompletas − faltantes saldados** (Σ de
  * `EtapaMovimientoDet`, etapas vivas). Solo devuelve filas con saldo ≠ 0. Filtros por
  * maquilero/proceso/orden. Filtra por la empresa activa (A9). La REUSA EsMa (esta cuenta es la base
  * del cargo/saldo del maquilero).
@@ -1172,7 +1304,7 @@ export async function consultarExistenciaMaquilero(
     },
   } satisfies Prisma.EtapaMovimientoDetSelect;
 
-  const [envios, recibos] = await Promise.all([
+  const [envios, recibos, cierres] = await Promise.all([
     cliente.etapaMovimientoDet.findMany({
       where: { etapaMov: { ...baseEtapa, tipo: TipoEtapaMovimiento.envio_maquila } },
       select: seleccion,
@@ -1180,6 +1312,23 @@ export async function consultarExistenciaMaquilero(
     cliente.etapaMovimientoDet.findMany({
       where: { etapaMov: { ...baseEtapa, tipo: TipoEtapaMovimiento.recibo_maquila } },
       select: seleccion,
+    }),
+    // ⭐ V1 (fila 0.109): los cierres VIVOS del mismo universo. Lo saldado deja de estar en poder
+    // del maquilero — ya se decidió que no vuelve—, que es justo lo que esta pantalla contesta.
+    cliente.cierreMaquilaOrden.findMany({
+      where: {
+        idEmpresa: sesion.idEmpresaActiva,
+        deshechoEn: null,
+        ...(filtros.idTipoProceso === undefined ? {} : { idTipoProceso: filtros.idTipoProceso }),
+        ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
+        ...(filtros.idOrden === undefined ? {} : { idOrden: filtros.idOrden }),
+      },
+      select: {
+        idMaquilero: true,
+        idTipoProceso: true,
+        idOrden: true,
+        detalles: { select: { cantidadFaltantes: true } },
+      },
     }),
   ]);
 
@@ -1194,6 +1343,7 @@ export async function consultarExistenciaMaquilero(
     enviado: number;
     recibido: number;
     incompletas: number;
+    faltantesSaldados: number;
   }
   const grupos = new Map<string, Acum>();
 
@@ -1214,6 +1364,7 @@ export async function consultarExistenciaMaquilero(
         enviado: 0,
         recibido: 0,
         incompletas: 0,
+        faltantesSaldados: 0,
       } satisfies Acum);
     grupos.set(clave, acum);
     return { clave, acum };
@@ -1231,6 +1382,16 @@ export async function consultarExistenciaMaquilero(
     // pero SÍ salieron del taller y por eso restan del saldo en poder (V1-E8v).
     r.acum.incompletas += fila.cantidadIncompletas ?? 0;
   }
+  // Los cierres NO nacen de una etapa, así que no pasan por `tomar` (que lee `EtapaMovimientoDet`):
+  // se acumulan sobre el MISMO grupo maquilero×proceso×orden. Si un cierre no encuentra grupo es
+  // porque su envío está cancelado o filtrado — no se inventa una fila con enviado 0, que saldría
+  // en negativo y diría que el maquilero «tiene» piezas de menos.
+  for (const c of cierres) {
+    const clave = claveGrupoMaquilero(c.idMaquilero, c.idTipoProceso, c.idOrden);
+    const acum = grupos.get(clave);
+    if (acum === undefined) continue;
+    acum.faltantesSaldados += c.detalles.reduce((s, d) => s + d.cantidadFaltantes, 0);
+  }
 
   const filas = [...grupos.values()]
     .map((g) => ({
@@ -1244,9 +1405,12 @@ export async function consultarExistenciaMaquilero(
       enviado: g.enviado,
       recibido: g.recibido,
       incompletas: g.incompletas,
+      faltantesSaldados: g.faltantesSaldados,
       // MISMA regla que `pendientePorCelda` (aquí en total, no por celda): lo que le queda al
-      // maquilero es lo que NO volvió — el faltante que se le cobra.
-      enPoder: pendientePorCelda(g.enviado, g.recibido + g.incompletas),
+      // maquilero es lo que NO volvió Y todavía se le espera. Lo ya SALDADO al cerrar la orden con
+      // él sale de aquí (V1, fila 0.109): esa deuda ya se resolvió —cobrada o perdonada— y seguir
+      // enseñándola sería la lista que nunca se vacía que esta fila vino a cerrar.
+      enPoder: pendientePorCelda(g.enviado, g.recibido + g.incompletas, g.faltantesSaldados),
     }))
     .filter((f) => f.enPoder !== 0)
     .sort(

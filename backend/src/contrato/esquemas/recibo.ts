@@ -269,7 +269,7 @@ export const esquemaReciboSalida = z
 /** Forma de un recibo tal como lo devuelve la API. */
 export type ReciboSalida = z.infer<typeof esquemaReciboSalida>;
 
-// ── Pendientes por recibir (derivados: enviado − recibido − incompletas, por orden+proceso) ──────
+// ── Pendientes por recibir (derivados: enviado − recibido − incompletas − faltantes saldados, por orden+proceso) ──────
 
 /**
  * Pendiente de UNA celda color×talla×PACK.
@@ -291,7 +291,7 @@ const esquemaPendienteRecibirCelda = z.object({
     .number()
     .int()
     .describe(
-      'Pendiente por recibir = enviado − buenas − incompletas (V1-E8v, §Post-F9.147). Es a la vez ' +
+      'Pendiente por recibir = enviado − buenas − incompletas − faltantes saldados (V1-E8v, §Post-F9.147). Es a la vez ' +
         'lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, ' +
         'calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` ' +
         '(`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v ' +
@@ -308,7 +308,7 @@ const esquemaPendienteRecibirCelda = z.object({
 });
 
 /**
- * Lo que UN maquilero tiene pendiente de devolver de un proceso (`enviado − buenas − incompletas`
+ * Lo que UN maquilero tiene pendiente de devolver de un proceso (`enviado − buenas − incompletas − faltantes saldados`
  * de ESE tercero). Es el MISMO desglose que el drill-down del WIP (`esquemas/wip.ts`), repetido aquí porque las dos
  * pantallas de recibo —el panel de avance y `/produccion/recibos`— tienen que ofrecer y topar
  * exactamente lo mismo: no se recibe de quien no recibió el corte (regla de Daniel, 28-jul-2026).
@@ -323,7 +323,7 @@ const esquemaPendienteRecibirMaquilero = z.object({
   celdas: z
     .array(esquemaPendienteRecibirCelda)
     .describe(
-      'enviado − buenas − incompletas de ESE maquilero, por color×talla (celdas con pendiente o ' +
+      'enviado − buenas − incompletas − faltantes saldados de ESE maquilero, por color×talla (celdas con pendiente o ' +
         'con incompletas entregadas).',
     ),
   totalPendiente: z
@@ -336,9 +336,42 @@ const esquemaPendienteRecibirMaquilero = z.object({
     .describe(
       'Prendas incompletas que ese maquilero ya entregó (SÍ cierran el pendiente, V1-E8v).',
     ),
+  faltantesSaldados: z
+    .number()
+    .int()
+    .describe(
+      'Piezas FALTANTES de ese maquilero ya SALDADAS al CERRAR la orden con él (V1, fila 0.109): ' +
+        'nunca volvieron y ya se decidió que no vuelven. Restan de `totalPendiente`.',
+    ),
+  faltantesSaldables: z
+    .number()
+    .int()
+    .describe(
+      'Las piezas que de VERDAD se pueden saldar hoy con ese maquilero: Σ del pendiente POSITIVO ' +
+        'por color×talla (V1, fila 0.109). Es el número exacto que el servidor escribirá al cerrar ' +
+        '—y por el que multiplicará el descuento—, y por eso es el que la pantalla debe enseñar y ' +
+        'usar para decidir si ofrece el botón. ⚠️ NO es `totalPendiente`: esa suma es plana y una ' +
+        'celda NEGATIVA (histórico migrado, o lo devuelto sin decir de qué pack era) la compensa. ' +
+        'Con +5 y −5 la suma plana da 0 —el botón no aparecería y esa orden nunca se podría ' +
+        'cerrar— habiendo 5 piezas que saldar; con +5 y −3 da 2 mientras el cobro saldría por 5.',
+    ),
+  precioFaltante: z
+    .number()
+    .nullable()
+    .describe(
+      'Precio pactado del envío vivo a ese maquilero, base del cobro que se propondría al cerrar. ' +
+        '`null` si el envío no lo trae o si falta `ordenes.ver-precio-real-maquila` (redactado).',
+    ),
+  importeFaltantePropuesto: z
+    .number()
+    .nullable()
+    .describe(
+      'Lo que se propondría cobrarle si se cerrara AHORA: `faltantesSaldables × precioFaltante`, ' +
+        'calculado en el servidor. `null` sin precio o sin permiso de verlo.',
+    ),
 });
 
-/** Pendiente por recibir de un proceso de maquila: enviado − recibido − incompletas a ESE proceso. */
+/** Pendiente por recibir de un proceso de maquila: enviado − recibido − incompletas − faltantes saldados a ESE proceso. */
 const esquemaPendienteRecibirProceso = z.object({
   idTipoProceso: z.number().int().describe('Id del tipo de proceso.'),
   tipoProceso: z.string().describe('Nombre del proceso.'),
@@ -355,7 +388,7 @@ const esquemaPendienteRecibirProceso = z.object({
   celdas: z
     .array(esquemaPendienteRecibirCelda)
     .describe(
-      'enviado − recibido − incompletas a este proceso, por color×talla. Se incluyen las celdas con ' +
+      'enviado − recibido − incompletas − faltantes saldados a este proceso, por color×talla. Se incluyen las celdas con ' +
         'pendiente **o** con incompletas entregadas (V1-E8v): una celda ya cerrada del todo —95 ' +
         'buenas + 5 incompletas de 100— viaja con pendiente 0 e incompletas 5, que es su historia.',
     ),
@@ -366,6 +399,10 @@ const esquemaPendienteRecibirProceso = z.object({
     .describe(
       'Prendas incompletas ya entregadas a este proceso (SÍ cierran el pendiente, V1-E8v).',
     ),
+  totalFaltantesSaldados: z
+    .number()
+    .int()
+    .describe('Piezas faltantes ya saldadas en este proceso al cerrar la orden (V1, fila 0.109).'),
   porMaquilero: z
     .array(esquemaPendienteRecibirMaquilero)
     .describe(
@@ -375,7 +412,7 @@ const esquemaPendienteRecibirProceso = z.object({
 
 /**
  * Pendientes por recibir DERIVADOS de una orden (form `Proceso` del viejo, sin acumuladores): por
- * cada proceso ya enviado a la orden, `enviado − buenas − incompletas` a ESE proceso, por
+ * cada proceso ya enviado a la orden, `enviado − buenas − incompletas − faltantes saldados` a ESE proceso, por
  * color×talla. Las etapas canceladas NO cuentan.
  */
 export const esquemaPendientesRecibir = z
@@ -384,7 +421,9 @@ export const esquemaPendientesRecibir = z
     folioOrden: z.number().int().describe('Folio de la orden.'),
     porRecibir: z
       .array(esquemaPendienteRecibirProceso)
-      .describe('enviado − buenas − incompletas, por proceso ya usado en la orden.'),
+      .describe(
+        'enviado − buenas − incompletas − faltantes saldados, por proceso ya usado en la orden.',
+      ),
   })
   .describe('Pendientes por recibir derivados de una orden (por proceso).');
 

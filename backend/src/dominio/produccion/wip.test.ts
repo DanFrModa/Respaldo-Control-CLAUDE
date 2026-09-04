@@ -13,6 +13,7 @@ const totales = (parcial: Partial<TotalesOrden> = {}): TotalesOrden => ({
   enviado: 0,
   recibido: 0,
   incompletas: 0,
+  faltantesSaldados: 0,
   recibidoCostura: 0,
   entregado: 0,
   ...parcial,

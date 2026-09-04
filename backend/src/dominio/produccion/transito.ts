@@ -29,7 +29,7 @@
  *    tiene explicación para la diferencia: están en tránsito).
  *
  * ⚠️ Quién tiene cada pieza NO lo dice el kardex (el tránsito es UN almacén, no uno por maquilero):
- * lo dice el WIP, que lleva el saldo POR TERCERO (`enviado − recibido − incompletas`, `wip.ts`
+ * lo dice el WIP, que lleva el saldo POR TERCERO (`enviado − recibido − incompletas − faltantes saldados`, `wip.ts`
  * `pendientePorMaquilero` / `consultarExistenciaMaquilero`). Cada capa hace su trabajo: el kardex
  * responde "¿cuántas piezas NO están en el piso?" y el WIP "¿a quién se las reclamo?". Por eso el
  * tránsito no necesita un almacén por tercero.

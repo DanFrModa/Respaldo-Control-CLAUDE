@@ -6,6 +6,11 @@ import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import {
+  useCerrarOrdenMaquila,
+  useCierresMaquila,
+  useDeshacerCierreMaquila,
+} from '@/api/cierre-maquila';
+import {
   CLAVE_ENTREGAS,
   useCancelarEntrega,
   useCrearEntrega,
@@ -29,7 +34,14 @@ import { CLAVE_ORDENES_CENTRO } from '@/api/ordenes-centro';
 import { useProveedores, useRolesProveedor } from '@/api/proveedores';
 import { CLAVE_RECIBOS, useCancelarRecibo, useCrearRecibo, urlImpresoRecibo } from '@/api/recibos';
 import { useTiposProceso } from '@/api/tipos-proceso';
-import type { EntregaHistorial, EtapaHistorial, TipoProceso, WipOrden } from '@/api/tipos';
+import type {
+  CierresMaquila,
+  EntregaHistorial,
+  EtapaHistorial,
+  PendientesRecibir,
+  TipoProceso,
+  WipOrden,
+} from '@/api/tipos';
 import { CLAVE_WIP, useWipOrden } from '@/api/wip';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
@@ -1119,7 +1131,8 @@ function CapturaMovimiento({
 
   // ── RECIBO: solo los maquileros a los que SÍ se les entregó ─────────────────────────────────
   // Regla de Daniel (28-jul-2026): *"no puedo recibir un corte de un maquilero diferente al que se
-  // lo entregué"*. El desglose `porMaquilero` (enviado − recibido − incompletas POR TERCERO) lo deriva el
+  // lo entregué"*. El desglose `porMaquilero` (enviado − recibido − incompletas − saldados POR
+  // TERCERO) lo deriva el
   // servidor (A1/B2); aquí NO se pivotea nada. El servidor además lo RE-VALIDA al guardar: esta
   // lista es la comodidad, no el candado. Se ofrecen solo los maquileros a los que TODAVÍA SE LES
   // PUEDE RECIBIR algo — que desde V1-E8v (§Post-F9.147) es EXACTAMENTE «los que aún deben piezas»:
@@ -1303,8 +1316,8 @@ function CapturaMovimiento({
     for (const c of delMaquilero.celdas) {
       // ⭐ CON LOS TENDIDOS REVUELTOS la referencia de la fila es el saldo AGREGADO del color×talla:
       // se SUMAN las celdas de todos los packs (incluida la de pack vacío, que sale NEGATIVA —lo ya
-      // devuelto sin atribuir—), y esa suma es exactamente `Σ enviado − Σ devuelto`, la condición
-      // (1) que el servidor topa para un renglón sin pack (`packs.ts::excesosDelRecibo`). Leer sólo
+      // devuelto sin atribuir—), y esa suma es exactamente `Σ enviado − Σ devuelto − Σ saldado`, la
+      // condición (1) que el servidor topa para un renglón sin pack (`packs.ts::excesosDelRecibo`). Leer sólo
       // el bucket de pack vacío habría dado un tope de 0 o negativo y la captura revuelta —la que
       // Daniel pidió que se pudiera hacer— habría quedado bloqueada siempre.
       const clave = sinDistinguirPack
@@ -1895,6 +1908,21 @@ function CapturaMovimiento({
           />
         </Field>
       </div>
+
+      {/* ⭐ CERRAR LA ORDEN CON ESTE MAQUILERO (V1, fila 0.109). Va AQUÍ, en la captura del recibo,
+          porque DANIEL pidió que *«lo apriete quien recibe»* — no en una pantalla nueva. */}
+      {esRecibo && procesoParaGuardar !== undefined ? (
+        <BloqueCierreMaquilero
+          idOrden={orden.id}
+          idTipoProceso={procesoParaGuardar.id}
+          maquilero={
+            idProveedor === null
+              ? null
+              : ((entradaRecibo?.porMaquilero ?? []).find((m) => m.idMaquilero === idProveedor) ??
+                null)
+          }
+        />
+      ) : null}
 
       {/* PRECIO PACTADO (envío y recibo) + FECHA COMPROMISO (envío): migrados de las pantallas
           retiradas en V1-E3a. Sin el precio, el cargo EsMa del recibo nace SIN precio y hay que
@@ -2645,6 +2673,368 @@ function TarjetaResumen({
  * motivo obligatorio. El backend conserva el movimiento como historial (D3) y, cuando movió
  * inventario (recibo y entrega), registra su INVERSO — nunca edita ni borra.
  */
+/** Un maquilero del desglose de pendientes (lo que la pantalla necesita para ofrecer el cierre). */
+type MaquileroPendiente = PendientesRecibir['porRecibir'][number]['porMaquilero'][number];
+
+/** Formatea un importe en pesos, o `—` si viene redactado (sin permiso de ver precios). */
+function pesos(valor: number | null): string {
+  return valor === null
+    ? '—'
+    : valor.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+}
+
+/**
+ * ⭐ CERRAR LA ORDEN CON UN MAQUILERO (V1, fila 0.109; DANIEL 3-sep-2026) — el botón y su
+ * confirmación, más la lista de lo ya cerrado con su DESHACER.
+ *
+ * Qué pidió Daniel: *«un botón de cerrar la orden»*, que **lo aprieta quien recibe**, que **salda
+ * siempre el pendiente** y que **PROPONE** el cobro esperando su visto bueno — *«nunca cobra
+ * solo»*. Dos desenlaces, y los dos limpian la lista: cobrado o perdonado.
+ *
+ * 🔑 AQUÍ NO SE CALCULA NADA. Las piezas a saldar (`faltantesSaldables`), el precio y el importe
+ * propuesto los manda el SERVIDOR ya derivados (A1/B2): la confirmación sólo los enseña. Si esta
+ * pantalla multiplicara por su cuenta, sería la misma regla escrita en dos lados — y el número que
+ * el usuario aprueba tiene que ser exactamente el que el servidor va a escribir.
+ */
+function BloqueCierreMaquilero({
+  idOrden,
+  idTipoProceso,
+  maquilero,
+}: {
+  idOrden: number;
+  idTipoProceso: number;
+  /** El maquilero elegido en la captura, o `null` si todavía no se elige ninguno. */
+  maquilero: MaquileroPendiente | null;
+}): React.JSX.Element | null {
+  const { tienePermiso } = useSesion();
+  const cierres = useCierresMaquila(idOrden);
+  const [abierto, setAbierto] = useState(false);
+  const [aDeshacer, setADeshacer] = useState<CierresMaquila['filas'][number] | null>(null);
+
+  const delProceso = (cierres.data?.filas ?? []).filter((c) => c.idTipoProceso === idTipoProceso);
+  const vivos = delProceso.filter((c) => !c.deshecho);
+  // 🔴 LA CONDICIÓN ES `faltantesSaldables`, NO `totalPendiente`. `totalPendiente` es una suma
+  // PLANA y una celda negativa la compensa: con +5 en una talla y −5 en otra da 0, el botón no
+  // aparecería y esa orden —del histórico migrado, que es el grueso de «la lista que nunca se
+  // vacía»— no se podría cerrar nunca; y con +5 y −3 diría 2 mientras el servidor saldaría 5. El
+  // número saldable lo deriva el SERVIDOR con la misma función que usa al escribir el cierre.
+  const puedeCerrar =
+    maquilero !== null && maquilero.idMaquilero !== null && maquilero.faltantesSaldables > 0;
+
+  if (!puedeCerrar && vivos.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-md border bg-panel px-3 py-2 text-sm" data-testid="cierre-maquila">
+      {puedeCerrar && maquilero !== null ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-muted">
+            A <strong className="text-fg">{maquilero.maquilero}</strong> le faltan{' '}
+            <strong className="text-fg">
+              {maquilero.faltantesSaldables.toLocaleString('es-MX')} pza(s)
+            </strong>{' '}
+            de esta orden. Si ya no las va a devolver, cierra la orden con él.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setAbierto(true)}
+            data-testid="cierre-maquila-abrir"
+          >
+            Cerrar la orden con este maquilero
+          </Button>
+        </div>
+      ) : null}
+
+      {vivos.length > 0 ? (
+        <ul className="mt-2 space-y-1 border-t pt-2" data-testid="cierre-maquila-lista">
+          {vivos.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-muted">
+                <strong className="text-fg">{c.maquilero}</strong>:{' '}
+                {c.piezasFaltantes.toLocaleString('es-MX')} pza(s) faltantes{' '}
+                {c.desenlace === 'cobrado' ? `cobradas (${pesos(c.importe)})` : 'perdonadas'} el{' '}
+                {c.fecha}
+                {c.desenlace === 'cobrado' && c.idDescuento === null
+                  ? ' · sin descuento propuesto: el envío no traía precio pactado'
+                  : c.descuentoRevisado
+                    ? ' · descuento ya revisado'
+                    : ' · descuento propuesto, esperando revisión'}
+              </span>
+              {tienePermiso('produccion.cancelar') ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setADeshacer(c)}
+                  disabled={c.descuentoRevisado}
+                  title={
+                    c.descuentoRevisado
+                      ? 'El descuento ya se revisó: ese importe ya está en el saldo del maquilero'
+                      : 'Deshacer el cierre (las piezas vuelven al pendiente)'
+                  }
+                  data-testid={`cierre-maquila-deshacer-${String(c.id)}`}
+                >
+                  Deshacer
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {maquilero !== null && maquilero.idMaquilero !== null ? (
+        <DialogoCerrarOrdenMaquilero
+          abierto={abierto}
+          alCerrar={() => setAbierto(false)}
+          idOrden={idOrden}
+          idTipoProceso={idTipoProceso}
+          maquilero={maquilero}
+        />
+      ) : null}
+      <DialogoDeshacerCierre cierre={aDeshacer} alCerrar={() => setADeshacer(null)} />
+    </div>
+  );
+}
+
+/** La confirmación del cierre: enseña QUÉ se salda y CUÁNTO se propone cobrar, antes de hacerlo. */
+function DialogoCerrarOrdenMaquilero({
+  abierto,
+  alCerrar,
+  idOrden,
+  idTipoProceso,
+  maquilero,
+}: {
+  abierto: boolean;
+  alCerrar: () => void;
+  idOrden: number;
+  idTipoProceso: number;
+  maquilero: MaquileroPendiente;
+}): React.JSX.Element {
+  const cerrar = useCerrarOrdenMaquila();
+  const [desenlace, setDesenlace] = useState<'cobrado' | 'perdonado'>('cobrado');
+  const [motivo, setMotivo] = useState('');
+  const [factura, setFactura] = useState('');
+
+  useEffect(() => {
+    if (abierto) {
+      setDesenlace('cobrado');
+      setMotivo('');
+      setFactura('');
+    }
+  }, [abierto]);
+
+  const sinMotivoAlPerdonar = desenlace === 'perdonado' && motivo.trim().length < 3;
+
+  function confirmar(): void {
+    if (maquilero.idMaquilero === null || sinMotivoAlPerdonar) return;
+    // El QUÉ se salda NO se manda: lo deriva el servidor bajo bloqueo (D3). Aquí sólo va la
+    // decisión (a quién, de qué proceso, cobrar o perdonar).
+
+    cerrar.mutate(
+      {
+        idOrden,
+        cuerpo: {
+          idMaquilero: maquilero.idMaquilero,
+          idTipoProceso,
+          fecha: hoy(),
+          desenlace,
+          ...(motivo.trim() === '' ? {} : { motivo: motivo.trim() }),
+          ...(factura === '' ? {} : { conFactura: factura === 'con' }),
+        },
+      },
+      {
+        onSuccess: (c) => {
+          toast.success(
+            c.desenlace === 'perdonado'
+              ? `Orden cerrada con ${c.maquilero}: ${String(c.piezasFaltantes)} pza(s) perdonadas.`
+              : c.idDescuento === null
+                ? `Orden cerrada con ${c.maquilero}. El envío no traía precio pactado: captura el descuento a mano en su estado de cuenta.`
+                : `Orden cerrada con ${c.maquilero}. Se propuso descontarle ${pesos(c.importe)} — nadie cobra hasta que se revise.`,
+          );
+          alCerrar();
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  return (
+    <Dialog open={abierto} onOpenChange={(a) => (a ? undefined : alCerrar())}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Cerrar la orden con {maquilero.maquilero}</DialogTitle>
+          <DialogDescription>
+            Se dan por perdidas las {maquilero.faltantesSaldables.toLocaleString('es-MX')} pza(s)
+            que nunca devolvió: dejan de aparecer como pendientes. El cobro sólo se PROPONE — no se
+            le cobra nada hasta que alguien lo revise en su estado de cuenta.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md bg-panel-2 px-3 py-2">
+            {/* Las TRES cifras salen del servidor, derivadas con la MISMA función que va a escribir
+                el cierre y el descuento (`faltantesSaldables`, `precioFaltante`,
+                `importeFaltantePropuesto`). Esta pantalla no multiplica ni suma nada: el número que
+                el usuario aprueba tiene que ser exactamente el que se va a guardar. */}
+            <dt className="text-muted">Piezas que se saldan</dt>
+            <dd className="text-right font-medium" data-testid="cierre-piezas">
+              {maquilero.faltantesSaldables.toLocaleString('es-MX')}
+            </dd>
+            <dt className="text-muted">Precio pactado</dt>
+            <dd className="text-right font-medium">{pesos(maquilero.precioFaltante)}</dd>
+            <dt className="text-muted">Se propondría cobrarle</dt>
+            <dd className="text-right font-medium" data-testid="cierre-importe">
+              {pesos(maquilero.importeFaltantePropuesto)}
+            </dd>
+          </dl>
+          {maquilero.precioFaltante === null ? (
+            <p className="text-xs text-warn">
+              El envío no trae precio pactado, así que no se puede proponer el cobro. La orden se
+              cierra igual y el descuento se captura a mano en el estado de cuenta del maquilero.
+            </p>
+          ) : null}
+          <Field>
+            <FieldLabel htmlFor="cierre-desenlace">¿Qué se hace con el faltante?</FieldLabel>
+            <SelectNativo
+              id="cierre-desenlace"
+              value={desenlace}
+              onChange={(e) =>
+                setDesenlace(e.target.value === 'perdonado' ? 'perdonado' : 'cobrado')
+              }
+              data-testid="cierre-desenlace"
+            >
+              <option value="cobrado">Cobrárselo (se propone el descuento)</option>
+              <option value="perdonado">Perdonárselo (no se le cobra nada)</option>
+            </SelectNativo>
+          </Field>
+          {desenlace === 'cobrado' ? (
+            <Field>
+              <FieldLabel htmlFor="cierre-factura">Con o sin factura</FieldLabel>
+              <SelectNativo
+                id="cierre-factura"
+                value={factura}
+                onChange={(e) => setFactura(e.target.value)}
+                data-testid="cierre-factura"
+              >
+                <option value="">Según el catálogo del proveedor</option>
+                <option value="con">Con factura</option>
+                <option value="sin">Sin factura</option>
+              </SelectNativo>
+              <p className="text-xs text-muted">
+                Sólo hace falta elegir cuando el maquilero factura de las dos formas.
+              </p>
+            </Field>
+          ) : null}
+          <Field data-invalid={sinMotivoAlPerdonar}>
+            <FieldLabel htmlFor="cierre-motivo">
+              Motivo {desenlace === 'perdonado' ? '(obligatorio)' : '(opcional)'}
+            </FieldLabel>
+            <Input
+              id="cierre-motivo"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder={
+                desenlace === 'perdonado' ? 'Por qué se le perdona el faltante' : 'Nota del cierre'
+              }
+              data-testid="cierre-motivo"
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={alCerrar} disabled={cerrar.isPending}>
+            Volver
+          </Button>
+          <Button
+            type="button"
+            onClick={confirmar}
+            disabled={cerrar.isPending || sinMotivoAlPerdonar}
+            data-testid="cierre-confirmar"
+          >
+            {cerrar.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+            Cerrar la orden
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** El DESHACER de un cierre: acto inverso auditado (D3), con su motivo obligatorio. */
+function DialogoDeshacerCierre({
+  cierre,
+  alCerrar,
+}: {
+  cierre: CierresMaquila['filas'][number] | null;
+  alCerrar: () => void;
+}): React.JSX.Element {
+  const deshacer = useDeshacerCierreMaquila();
+  const [motivo, setMotivo] = useState('');
+
+  useEffect(() => {
+    if (cierre !== null) setMotivo('');
+  }, [cierre]);
+
+  const sinMotivo = motivo.trim().length < 3;
+
+  function confirmar(): void {
+    if (cierre === null || sinMotivo) return;
+    deshacer.mutate(
+      { id: cierre.id, cuerpo: { motivo: motivo.trim() } },
+      {
+        onSuccess: () => {
+          toast.success(
+            `Cierre deshecho: las ${String(cierre.piezasFaltantes)} pza(s) vuelven a estar pendientes.`,
+          );
+          alCerrar();
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  return (
+    <Dialog open={cierre !== null} onOpenChange={(a) => (a ? undefined : alCerrar())}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Deshacer el cierre con {cierre?.maquilero ?? ''}</DialogTitle>
+          <DialogDescription>
+            Las piezas vuelven a estar pendientes y el descuento propuesto queda cancelado (se
+            conserva como historial, D3). Escribe el motivo.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <Field data-invalid={sinMotivo}>
+            <FieldLabel htmlFor="cierre-motivo-deshacer">Motivo</FieldLabel>
+            <Input
+              id="cierre-motivo-deshacer"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Por qué se deshace el cierre"
+              data-testid="cierre-motivo-deshacer"
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={alCerrar} disabled={deshacer.isPending}>
+            Volver
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={confirmar}
+            disabled={deshacer.isPending || sinMotivo}
+            data-testid="cierre-confirmar-deshacer"
+          >
+            {deshacer.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+            Deshacer el cierre
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DialogoCancelarMovimiento({
   movimiento,
   alCerrar,

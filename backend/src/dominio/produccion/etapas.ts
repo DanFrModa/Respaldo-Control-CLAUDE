@@ -919,6 +919,9 @@ export async function cancelarEtapaMovimiento(
         tipo: true,
         idOrden: true,
         idTipoProceso: true,
+        // El TERCERO del envío: desde V1 (fila 0.109) hace falta para ver si ese maquilero ya tiene
+        // un CIERRE vivo de esta orden+proceso (ver el guard de abajo).
+        idTercero: true,
         canceladoEn: true,
         folio: true,
         prendaTerminada: true,
@@ -982,6 +985,34 @@ export async function cancelarEtapaMovimiento(
         throw new ErrorConflicto(
           'No se puede cancelar el envío a maquila: la orden tiene recibos de este proceso vigentes. ' +
             'Cancélalos primero.',
+        );
+      }
+
+      // ⭐⭐ V1 (fila 0.109) — EL ENVÍO TAMBIÉN SOSTIENE LOS CIERRES, y el guard de arriba no los ve
+      // porque un cierre NO es un recibo: es el acto que da por perdidas las piezas que el maquilero
+      // nunca devolvió. El camino que esto cierra existe y no es raro: se le envían 100, no devuelve
+      // nada (⇒ CERO recibos vivos, el guard de arriba pasa), se cierra la orden cobrándole las 100…
+      // y entonces se cancela el envío. Quedaría `enviado = 0` con `saldado = 100`, o sea pendiente
+      // −100 en las CINCO puertas que derivan el pendiente, la orden de vuelta en ABIERTA, `kpi_wip`
+      // en negativo — y un `DescuentoMaquilero` cobrándole prendas de un envío que ya no existe.
+      // Es la «lección de la décima puerta» (§Post-F9.147) aplicada al lado que ESCRIBE: quien borra
+      // el minuendo tiene que mirar TODOS los sustraendos, no sólo el que conocía.
+      const cierresVivos = await tx.cierreMaquilaOrden.count({
+        where: {
+          idOrden: etapa.idOrden,
+          // El envío SIEMPRE trae proceso y tercero (lo exige `registrarEnvioMaquila`), pero el
+          // esquema los deja nullable porque el corte y la entrega no los llevan: si faltaran, se
+          // acota sólo por orden — MÁS conservador, nunca menos.
+          ...(etapa.idTipoProceso === null ? {} : { idTipoProceso: etapa.idTipoProceso }),
+          ...(etapa.idTercero === null ? {} : { idMaquilero: etapa.idTercero }),
+          deshechoEn: null,
+        },
+      });
+      if (cierresVivos > 0) {
+        throw new ErrorConflicto(
+          'No se puede cancelar el envío a maquila: la orden ya se CERRÓ con ese maquilero en este ' +
+            'proceso (sus faltantes están saldados, y puede haber un descuento propuesto). Deshaz ' +
+            'el cierre primero.',
         );
       }
 

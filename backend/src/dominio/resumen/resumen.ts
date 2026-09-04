@@ -191,12 +191,22 @@ async function contarOrdenesAbiertas(cliente: ClienteLectura, idEmpresa: number)
       LEFT JOIN "tipos_proceso" tp ON tp."id" = e."id_tipo_proceso"
       WHERE e."id_orden" = o."id" AND e."cancelado_en" IS NULL
     ) s
+    CROSS JOIN LATERAL (
+      -- ⭐ V1 (fila 0.109) — la TERCERA cubeta. Va en su propio LATERAL porque no vive en
+      -- \`etapa_movimiento_det\`: un cierre no es una etapa. Sólo cierres VIVOS (deshacerlo devuelve
+      -- las piezas al pendiente). Sin esto, una orden cuyo faltante ya se cobró seguiría contándose
+      -- como ABIERTA para siempre — que es literalmente lo que esta fila vino a cerrar.
+      SELECT COALESCE(SUM(cd."cantidad_faltantes"), 0)::int AS "faltantes_saldados"
+      FROM "cierre_maquila_orden" c
+      JOIN "cierre_maquila_orden_det" cd ON cd."id_cierre" = c."id"
+      WHERE c."id_orden" = o."id" AND c."deshecho_en" IS NULL
+    ) f
     WHERE o."id_empresa" = ${idEmpresa}
       AND o."estado" <> 'cancelada'
       AND (
         (s."pedido" - s."cortado") <> 0
         OR (s."cortado" - s."enviado") <> 0
-        OR (s."enviado" - s."recibido" - s."incompletas") <> 0
+        OR (s."enviado" - s."recibido" - s."incompletas" - f."faltantes_saldados") <> 0
         OR (s."recibido_costura" - s."entregado") <> 0
       )
   `);
@@ -204,14 +214,17 @@ async function contarOrdenesAbiertas(cliente: ClienteLectura, idEmpresa: number)
 }
 
 /**
- * Maquileros con saldo ≠ 0 en su poder (Σ `enviado − buenas − incompletas` POR TERCERO, etapas vivas
+ * Maquileros con saldo ≠ 0 en su poder (Σ `enviado − buenas − incompletas − faltantes saldados` POR TERCERO, etapas vivas
  * de órdenes vivas — mismo universo que `agregadoWip`). El "en N maquileros" del pie de la tarjeta
  * WIP.
  *
  * ⭐ Las INCOMPLETAS restan (V1-E8v, §Post-F9.147): ya volvieron del taller, así que el maquilero
  * que entregó 95 buenas + 5 incompletas de 100 NO tiene saldo en su poder y no debe contarse aquí.
- * Es la misma regla de `pendientePorCelda` (`produccion/incompletas.ts`), en SQL porque esta cuenta
- * se hace entera en la base.
+ * Y los FALTANTES SALDADOS también (V1, fila 0.109): nunca volvieron, pero ya se decidió qué pasó
+ * con ellos —se le cobraron o se le perdonaron— y el maquilero deja de deberlos. Es la misma regla
+ * de `pendientePorCelda` (`produccion/incompletas.ts`), en SQL porque esta cuenta se hace entera en
+ * la base: por eso los cierres entran como un `UNION ALL` con signo negativo, que es exactamente el
+ * tercer sumando de la resta.
  */
 async function contarMaquilerosConSaldo(
   cliente: ClienteLectura,
@@ -220,22 +233,33 @@ async function contarMaquilerosConSaldo(
   const [fila] = await cliente.$queryRaw<{ total: number }[]>(Prisma.sql`
     SELECT COUNT(*)::int AS "total"
     FROM (
-      SELECT e."id_tercero"
-      FROM "etapa_movimiento" e
-      JOIN "etapa_movimiento_det" d ON d."id_etapa_mov" = e."id"
-      JOIN "ordenes" o ON o."id" = e."id_orden"
-      WHERE e."id_empresa" = ${idEmpresa}
-        AND e."cancelado_en" IS NULL
-        AND e."id_tercero" IS NOT NULL
-        AND e."tipo" IN ('envio_maquila', 'recibo_maquila')
-        AND o."estado" <> 'cancelada'
-      GROUP BY e."id_tercero"
-      HAVING SUM(
-        CASE
-          WHEN e."tipo" = 'envio_maquila' THEN d."cantidad"
-          ELSE -(d."cantidad" + COALESCE(d."cantidad_incompletas", 0))
-        END
-      ) <> 0
+      SELECT m."id_tercero"
+      FROM (
+        SELECT
+          e."id_tercero" AS "id_tercero",
+          CASE
+            WHEN e."tipo" = 'envio_maquila' THEN d."cantidad"
+            ELSE -(d."cantidad" + COALESCE(d."cantidad_incompletas", 0))
+          END AS "saldo"
+        FROM "etapa_movimiento" e
+        JOIN "etapa_movimiento_det" d ON d."id_etapa_mov" = e."id"
+        JOIN "ordenes" o ON o."id" = e."id_orden"
+        WHERE e."id_empresa" = ${idEmpresa}
+          AND e."cancelado_en" IS NULL
+          AND e."id_tercero" IS NOT NULL
+          AND e."tipo" IN ('envio_maquila', 'recibo_maquila')
+          AND o."estado" <> 'cancelada'
+        UNION ALL
+        SELECT c."id_maquilero" AS "id_tercero", -cd."cantidad_faltantes" AS "saldo"
+        FROM "cierre_maquila_orden" c
+        JOIN "cierre_maquila_orden_det" cd ON cd."id_cierre" = c."id"
+        JOIN "ordenes" o ON o."id" = c."id_orden"
+        WHERE c."id_empresa" = ${idEmpresa}
+          AND c."deshecho_en" IS NULL
+          AND o."estado" <> 'cancelada'
+      ) m
+      GROUP BY m."id_tercero"
+      HAVING SUM(m."saldo") <> 0
     ) saldos
   `);
   return fila?.total ?? 0;

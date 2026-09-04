@@ -323,13 +323,13 @@
                               "type": "integer",
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991,
-                              "description": "Piezas en poder de maquila (enviado − recibido − incompletas, vivos; V1-E8v)."
+                              "description": "Piezas en poder de maquila (enviado − recibido − incompletas − faltantes saldados, vivos; V1-E8v)."
                             },
                             "maquileros": {
                               "type": "integer",
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991,
-                              "description": "Maquileros con saldo ≠ 0 en su poder (enviado − recibido − incompletas por tercero, V1-E8v)."
+                              "description": "Maquileros con saldo ≠ 0 en su poder (enviado − recibido − incompletas − faltantes saldados por tercero, V1-E8v)."
                             }
                           },
                           "required": [
@@ -142718,7 +142718,7 @@
     },
     "/api/produccion/ordenes/{id}/pendientes-recibir": {
       "get": {
-        "summary": "Pendientes por recibir de una orden (enviado − recibido − incompletas, por proceso)",
+        "summary": "Pendientes por recibir de una orden (enviado − recibido − incompletas − faltantes saldados, por proceso)",
         "tags": [
           "produccion"
         ],
@@ -142824,7 +142824,7 @@
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Pendiente por recibir = enviado − buenas − incompletas (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico."
+                                  "description": "Pendiente por recibir = enviado − buenas − incompletas − faltantes saldados (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico."
                                 },
                                 "incompletas": {
                                   "type": "integer",
@@ -142844,7 +142844,7 @@
                               ],
                               "additionalProperties": false
                             },
-                            "description": "enviado − recibido − incompletas a este proceso, por color×talla. Se incluyen las celdas con pendiente **o** con incompletas entregadas (V1-E8v): una celda ya cerrada del todo —95 buenas + 5 incompletas de 100— viaja con pendiente 0 e incompletas 5, que es su historia."
+                            "description": "enviado − recibido − incompletas − faltantes saldados a este proceso, por color×talla. Se incluyen las celdas con pendiente **o** con incompletas entregadas (V1-E8v): una celda ya cerrada del todo —95 buenas + 5 incompletas de 100— viaja con pendiente 0 e incompletas 5, que es su historia."
                           },
                           "totalPendiente": {
                             "type": "integer",
@@ -142857,6 +142857,12 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
                             "description": "Prendas incompletas ya entregadas a este proceso (SÍ cierran el pendiente, V1-E8v)."
+                          },
+                          "totalFaltantesSaldados": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas faltantes ya saldadas en este proceso al cerrar la orden (V1, fila 0.109)."
                           },
                           "porMaquilero": {
                             "type": "array",
@@ -142913,7 +142919,7 @@
                                         "type": "integer",
                                         "minimum": -9007199254740991,
                                         "maximum": 9007199254740991,
-                                        "description": "Pendiente por recibir = enviado − buenas − incompletas (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico."
+                                        "description": "Pendiente por recibir = enviado − buenas − incompletas − faltantes saldados (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico."
                                       },
                                       "incompletas": {
                                         "type": "integer",
@@ -142933,7 +142939,7 @@
                                     ],
                                     "additionalProperties": false
                                   },
-                                  "description": "enviado − buenas − incompletas de ESE maquilero, por color×talla (celdas con pendiente o con incompletas entregadas)."
+                                  "description": "enviado − buenas − incompletas − faltantes saldados de ESE maquilero, por color×talla (celdas con pendiente o con incompletas entregadas)."
                                 },
                                 "totalPendiente": {
                                   "type": "integer",
@@ -142946,6 +142952,40 @@
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
                                   "description": "Prendas incompletas que ese maquilero ya entregó (SÍ cierran el pendiente, V1-E8v)."
+                                },
+                                "faltantesSaldados": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Piezas FALTANTES de ese maquilero ya SALDADAS al CERRAR la orden con él (V1, fila 0.109): nunca volvieron y ya se decidió que no vuelven. Restan de `totalPendiente`."
+                                },
+                                "faltantesSaldables": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Las piezas que de VERDAD se pueden saldar hoy con ese maquilero: Σ del pendiente POSITIVO por color×talla (V1, fila 0.109). Es el número exacto que el servidor escribirá al cerrar —y por el que multiplicará el descuento—, y por eso es el que la pantalla debe enseñar y usar para decidir si ofrece el botón. ⚠️ NO es `totalPendiente`: esa suma es plana y una celda NEGATIVA (histórico migrado, o lo devuelto sin decir de qué pack era) la compensa. Con +5 y −5 la suma plana da 0 —el botón no aparecería y esa orden nunca se podría cerrar— habiendo 5 piezas que saldar; con +5 y −3 da 2 mientras el cobro saldría por 5."
+                                },
+                                "precioFaltante": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio pactado del envío vivo a ese maquilero, base del cobro que se propondría al cerrar. `null` si el envío no lo trae o si falta `ordenes.ver-precio-real-maquila` (redactado)."
+                                },
+                                "importeFaltantePropuesto": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Lo que se propondría cobrarle si se cerrara AHORA: `faltantesSaldables × precioFaltante`, calculado en el servidor. `null` sin precio o sin permiso de verlo."
                                 }
                               },
                               "required": [
@@ -142953,7 +142993,11 @@
                                 "maquilero",
                                 "celdas",
                                 "totalPendiente",
-                                "totalIncompletas"
+                                "totalIncompletas",
+                                "faltantesSaldados",
+                                "faltantesSaldables",
+                                "precioFaltante",
+                                "importeFaltantePropuesto"
                               ],
                               "additionalProperties": false
                             },
@@ -142970,11 +143014,12 @@
                           "celdas",
                           "totalPendiente",
                           "totalIncompletas",
+                          "totalFaltantesSaldados",
                           "porMaquilero"
                         ],
                         "additionalProperties": false
                       },
-                      "description": "enviado − buenas − incompletas, por proceso ya usado en la orden."
+                      "description": "enviado − buenas − incompletas − faltantes saldados, por proceso ya usado en la orden."
                     }
                   },
                   "required": [
@@ -143449,6 +143494,1397 @@
           }
         ],
         "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/produccion/ordenes/{id}/cierre-maquila": {
+      "post": {
+        "summary": "Cerrar la orden con un maquilero: salda su faltante y propone (o no) cobrárselo",
+        "tags": [
+          "produccion"
+        ],
+        "description": "Salda las piezas que ese maquilero nunca devolvió de ese proceso (derivadas en el servidor por suma directa bajo bloqueo) y, con `desenlace = cobrado`, PROPONE un descuento EsMa `capturado`: no cuenta al saldo hasta que alguien lo revise.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idMaquilero": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Maquilero con el que se cierra la orden (Proveedor)."
+                  },
+                  "idTipoProceso": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Proceso cuyo saldo se cierra (costura/estampado/…)."
+                  },
+                  "fecha": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                    "description": "Fecha del cierre (YYYY-MM-DD)."
+                  },
+                  "desenlace": {
+                    "type": "string",
+                    "enum": [
+                      "cobrado",
+                      "perdonado"
+                    ],
+                    "description": "`cobrado` propone el descuento; `perdonado` solo salda el pendiente."
+                  },
+                  "conFactura": {
+                    "description": "Con/sin factura del descuento propuesto. Solo hace falta cuando el maquilero factura de las DOS formas (`modalidadFacturacion = ambos`): ahí el movimiento no puede quedar ambiguo (F6-E4, decisión (h)). Con `solo_con`/`solo_sin` se ignora y manda el catálogo.",
+                    "type": "boolean"
+                  },
+                  "motivo": {
+                    "description": "Nota del cierre. OBLIGATORIA al perdonar.",
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "idMaquilero",
+                  "idTipoProceso",
+                  "fecha",
+                  "desenlace"
+                ],
+                "description": "Cierre de una orden con un maquilero: salda el faltante y propone (o no) cobrarlo."
+              }
+            }
+          },
+          "description": "Cierre de una orden con un maquilero: salda el faltante y propone (o no) cobrarlo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del recurso."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Cierre de una orden con un maquilero (V1, fila 0.109).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del cierre."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña (A9)."
+                    },
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Orden cerrada."
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "idMaquilero": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Maquilero con el que se cerró."
+                    },
+                    "maquilero": {
+                      "type": "string",
+                      "description": "Nombre del maquilero."
+                    },
+                    "idTipoProceso": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Proceso cuyo saldo se cerró."
+                    },
+                    "tipoProceso": {
+                      "type": "string",
+                      "description": "Nombre del proceso."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha del cierre (YYYY-MM-DD)."
+                    },
+                    "desenlace": {
+                      "type": "string",
+                      "enum": [
+                        "cobrado",
+                        "perdonado"
+                      ],
+                      "description": "`cobrado` (propuso descuento) o `perdonado`."
+                    },
+                    "piezasFaltantes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de piezas saldadas (derivado del detalle)."
+                    },
+                    "precioFaltante": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio pactado con el que se propuso el cobro, CONGELADO al cerrar. `null` si el envío no traía precio, si se perdonó, o si el usuario no puede ver precios reales de maquila."
+                    },
+                    "importe": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe propuesto (piezas × precio), o null. Redactado sin permiso de precios."
+                    },
+                    "idDescuento": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descuento EsMa propuesto por este cierre, o null. Con `desenlace = cobrado` y esto en `null`, el cierre SÍ saldó el faltante pero NO pudo proponer el cobro porque el envío no traía precio pactado (1,309 envíos migrados no lo traen): hay que capturar el descuento a mano en el estado de cuenta. Se dice con nombre en vez de inventar un precio."
+                    },
+                    "descuentoRevisado": {
+                      "type": "boolean",
+                      "description": "Si el descuento propuesto YA fue revisado (y por tanto ya movió el saldo del maquilero). Con esto en `true` el cierre ya NO se puede deshacer."
+                    },
+                    "motivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nota del cierre o null."
+                    },
+                    "deshecho": {
+                      "type": "boolean",
+                      "description": "Si el cierre está deshecho (las piezas volvieron al pendiente)."
+                    },
+                    "deshechoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se deshizo (ISO) o null."
+                    },
+                    "deshechoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo deshizo o null."
+                    },
+                    "motivoDeshacer": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del deshacer o null."
+                    },
+                    "celdas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del color."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color."
+                          },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / tendido de la celda; cadena vacía si no aplica."
+                          },
+                          "idTalla": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la talla."
+                          },
+                          "etiquetaTalla": {
+                            "type": "string",
+                            "description": "Etiqueta visible de la talla."
+                          },
+                          "cantidadFaltantes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas faltantes saldadas en esta celda."
+                          }
+                        },
+                        "required": [
+                          "idColor",
+                          "color",
+                          "pack",
+                          "idTalla",
+                          "etiquetaTalla",
+                          "cantidadFaltantes"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Las piezas saldadas, color×talla×pack."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Cuándo se cerró (ISO)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que cerró."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idEmpresa",
+                    "idOrden",
+                    "folioOrden",
+                    "idMaquilero",
+                    "maquilero",
+                    "idTipoProceso",
+                    "tipoProceso",
+                    "fecha",
+                    "desenlace",
+                    "piezasFaltantes",
+                    "precioFaltante",
+                    "importe",
+                    "idDescuento",
+                    "descuentoRevisado",
+                    "motivo",
+                    "deshecho",
+                    "deshechoEn",
+                    "deshechoPorId",
+                    "motivoDeshacer",
+                    "celdas",
+                    "creadoEn",
+                    "creadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Cierre de una orden con un maquilero (V1, fila 0.109)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/produccion/cierres-maquila/{id}/deshacer": {
+      "post": {
+        "summary": "Deshacer un cierre (acto inverso auditado): las piezas vuelven al pendiente",
+        "tags": [
+          "produccion"
+        ],
+        "description": "Marca el cierre como deshecho y CANCELA el descuento propuesto. Se rechaza (400) si ese descuento ya fue revisado: ese importe ya está en el saldo del maquilero.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "description": "Motivo del deshacer del cierre."
+              }
+            }
+          },
+          "description": "Motivo del deshacer del cierre."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del recurso."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cierre de una orden con un maquilero (V1, fila 0.109).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del cierre."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña (A9)."
+                    },
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Orden cerrada."
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "idMaquilero": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Maquilero con el que se cerró."
+                    },
+                    "maquilero": {
+                      "type": "string",
+                      "description": "Nombre del maquilero."
+                    },
+                    "idTipoProceso": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Proceso cuyo saldo se cerró."
+                    },
+                    "tipoProceso": {
+                      "type": "string",
+                      "description": "Nombre del proceso."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha del cierre (YYYY-MM-DD)."
+                    },
+                    "desenlace": {
+                      "type": "string",
+                      "enum": [
+                        "cobrado",
+                        "perdonado"
+                      ],
+                      "description": "`cobrado` (propuso descuento) o `perdonado`."
+                    },
+                    "piezasFaltantes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de piezas saldadas (derivado del detalle)."
+                    },
+                    "precioFaltante": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio pactado con el que se propuso el cobro, CONGELADO al cerrar. `null` si el envío no traía precio, si se perdonó, o si el usuario no puede ver precios reales de maquila."
+                    },
+                    "importe": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe propuesto (piezas × precio), o null. Redactado sin permiso de precios."
+                    },
+                    "idDescuento": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descuento EsMa propuesto por este cierre, o null. Con `desenlace = cobrado` y esto en `null`, el cierre SÍ saldó el faltante pero NO pudo proponer el cobro porque el envío no traía precio pactado (1,309 envíos migrados no lo traen): hay que capturar el descuento a mano en el estado de cuenta. Se dice con nombre en vez de inventar un precio."
+                    },
+                    "descuentoRevisado": {
+                      "type": "boolean",
+                      "description": "Si el descuento propuesto YA fue revisado (y por tanto ya movió el saldo del maquilero). Con esto en `true` el cierre ya NO se puede deshacer."
+                    },
+                    "motivo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nota del cierre o null."
+                    },
+                    "deshecho": {
+                      "type": "boolean",
+                      "description": "Si el cierre está deshecho (las piezas volvieron al pendiente)."
+                    },
+                    "deshechoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se deshizo (ISO) o null."
+                    },
+                    "deshechoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo deshizo o null."
+                    },
+                    "motivoDeshacer": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del deshacer o null."
+                    },
+                    "celdas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del color."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color."
+                          },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / tendido de la celda; cadena vacía si no aplica."
+                          },
+                          "idTalla": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la talla."
+                          },
+                          "etiquetaTalla": {
+                            "type": "string",
+                            "description": "Etiqueta visible de la talla."
+                          },
+                          "cantidadFaltantes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas faltantes saldadas en esta celda."
+                          }
+                        },
+                        "required": [
+                          "idColor",
+                          "color",
+                          "pack",
+                          "idTalla",
+                          "etiquetaTalla",
+                          "cantidadFaltantes"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Las piezas saldadas, color×talla×pack."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Cuándo se cerró (ISO)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que cerró."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idEmpresa",
+                    "idOrden",
+                    "folioOrden",
+                    "idMaquilero",
+                    "maquilero",
+                    "idTipoProceso",
+                    "tipoProceso",
+                    "fecha",
+                    "desenlace",
+                    "piezasFaltantes",
+                    "precioFaltante",
+                    "importe",
+                    "idDescuento",
+                    "descuentoRevisado",
+                    "motivo",
+                    "deshecho",
+                    "deshechoEn",
+                    "deshechoPorId",
+                    "motivoDeshacer",
+                    "celdas",
+                    "creadoEn",
+                    "creadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Cierre de una orden con un maquilero (V1, fila 0.109)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/produccion/ordenes/{id}/cierres-maquila": {
+      "get": {
+        "summary": "Cierres de una orden con sus maquileros (vivos primero, deshechos al final)",
+        "tags": [
+          "produccion"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del recurso."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cierres de una orden con sus maquileros.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Orden."
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "filas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del cierre."
+                          },
+                          "idEmpresa": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Empresa dueña (A9)."
+                          },
+                          "idOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Orden cerrada."
+                          },
+                          "folioOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de la orden."
+                          },
+                          "idMaquilero": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Maquilero con el que se cerró."
+                          },
+                          "maquilero": {
+                            "type": "string",
+                            "description": "Nombre del maquilero."
+                          },
+                          "idTipoProceso": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Proceso cuyo saldo se cerró."
+                          },
+                          "tipoProceso": {
+                            "type": "string",
+                            "description": "Nombre del proceso."
+                          },
+                          "fecha": {
+                            "type": "string",
+                            "description": "Fecha del cierre (YYYY-MM-DD)."
+                          },
+                          "desenlace": {
+                            "type": "string",
+                            "enum": [
+                              "cobrado",
+                              "perdonado"
+                            ],
+                            "description": "`cobrado` (propuso descuento) o `perdonado`."
+                          },
+                          "piezasFaltantes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Total de piezas saldadas (derivado del detalle)."
+                          },
+                          "precioFaltante": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio pactado con el que se propuso el cobro, CONGELADO al cerrar. `null` si el envío no traía precio, si se perdonó, o si el usuario no puede ver precios reales de maquila."
+                          },
+                          "importe": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe propuesto (piezas × precio), o null. Redactado sin permiso de precios."
+                          },
+                          "idDescuento": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descuento EsMa propuesto por este cierre, o null. Con `desenlace = cobrado` y esto en `null`, el cierre SÍ saldó el faltante pero NO pudo proponer el cobro porque el envío no traía precio pactado (1,309 envíos migrados no lo traen): hay que capturar el descuento a mano en el estado de cuenta. Se dice con nombre en vez de inventar un precio."
+                          },
+                          "descuentoRevisado": {
+                            "type": "boolean",
+                            "description": "Si el descuento propuesto YA fue revisado (y por tanto ya movió el saldo del maquilero). Con esto en `true` el cierre ya NO se puede deshacer."
+                          },
+                          "motivo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nota del cierre o null."
+                          },
+                          "deshecho": {
+                            "type": "boolean",
+                            "description": "Si el cierre está deshecho (las piezas volvieron al pendiente)."
+                          },
+                          "deshechoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se deshizo (ISO) o null."
+                          },
+                          "deshechoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del usuario que lo deshizo o null."
+                          },
+                          "motivoDeshacer": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Motivo del deshacer o null."
+                          },
+                          "celdas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idColor": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del color."
+                                },
+                                "color": {
+                                  "type": "string",
+                                  "description": "Nombre del color."
+                                },
+                                "pack": {
+                                  "type": "string",
+                                  "description": "PACK / tendido de la celda; cadena vacía si no aplica."
+                                },
+                                "idTalla": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la talla."
+                                },
+                                "etiquetaTalla": {
+                                  "type": "string",
+                                  "description": "Etiqueta visible de la talla."
+                                },
+                                "cantidadFaltantes": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Piezas faltantes saldadas en esta celda."
+                                }
+                              },
+                              "required": [
+                                "idColor",
+                                "color",
+                                "pack",
+                                "idTalla",
+                                "etiquetaTalla",
+                                "cantidadFaltantes"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Las piezas saldadas, color×talla×pack."
+                          },
+                          "creadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Cuándo se cerró (ISO)."
+                          },
+                          "creadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del usuario que cerró."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idEmpresa",
+                          "idOrden",
+                          "folioOrden",
+                          "idMaquilero",
+                          "maquilero",
+                          "idTipoProceso",
+                          "tipoProceso",
+                          "fecha",
+                          "desenlace",
+                          "piezasFaltantes",
+                          "precioFaltante",
+                          "importe",
+                          "idDescuento",
+                          "descuentoRevisado",
+                          "motivo",
+                          "deshecho",
+                          "deshechoEn",
+                          "deshechoPorId",
+                          "motivoDeshacer",
+                          "celdas",
+                          "creadoEn",
+                          "creadoPorId"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Cierre de una orden con un maquilero (V1, fila 0.109)."
+                      },
+                      "description": "Cierres de la orden."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folioOrden",
+                    "filas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Cierres de una orden con sus maquileros."
+                }
+              }
+            }
+          },
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {
@@ -145813,6 +147249,12 @@
                             "maximum": 9007199254740991,
                             "description": "Prendas INCOMPLETAS entregadas (V1-E8v, §Post-F9.147): volvieron del taller pero no se produjeron, no entraron a inventario y no se pagan. Van APARTE de `recibido` y RESTAN del pendiente por recibir — ya no están en la maquila. Cuarta cubeta de `enviado = primeras + segundas + faltantes + incompletas`."
                           },
+                          "faltantesSaldados": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109). Nunca volvieron del taller y ya no se esperan: salen del pendiente por recibir. Es la tercera cubeta con columna propia, junto a `recibido` e `incompletas`, y con ellas cierra `enviado = primeras + segundas + faltantes + incompletas`."
+                          },
                           "recibidoCostura": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -145841,7 +147283,7 @@
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "enviado − recibido − incompletas (total, todos los procesos). Es el FALTANTE: lo que el maquilero todavía tiene en su taller (V1-E8v)."
+                            "description": "enviado − recibido − incompletas − faltantes saldados (total, todos los procesos). Es lo que el maquilero todavía tiene en su taller y todavía se le espera. Lo saldado sale de aquí a propósito (V1, fila 0.109): ya se decidió que no vuelve."
                           },
                           "porEntregar": {
                             "type": "integer",
@@ -145865,6 +147307,7 @@
                           "enviado",
                           "recibido",
                           "incompletas",
+                          "faltantesSaldados",
                           "recibidoCostura",
                           "entregado",
                           "porCortar",
@@ -145910,6 +147353,12 @@
                           "maximum": 9007199254740991,
                           "description": "Σ prendas INCOMPLETAS entregadas (V1-E8v): volvieron, pero no se produjeron."
                         },
+                        "faltantesSaldados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109). Nunca volvieron del taller y ya no se esperan: salen del pendiente por recibir. Es la tercera cubeta con columna propia, junto a `recibido` e `incompletas`, y con ellas cierra `enviado = primeras + segundas + faltantes + incompletas`."
+                        },
                         "recibidoCostura": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -145938,7 +147387,7 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
-                          "description": "enviado − recibido − incompletas (piezas realmente en poder de maquila, V1-E8v)."
+                          "description": "enviado − recibido − incompletas − faltantes saldados (piezas realmente en poder de maquila y todavía esperadas)."
                         },
                         "porEntregar": {
                           "type": "integer",
@@ -145953,6 +147402,7 @@
                         "enviado",
                         "recibido",
                         "incompletas",
+                        "faltantesSaldados",
                         "recibidoCostura",
                         "entregado",
                         "porCortar",
@@ -146234,7 +147684,13 @@
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "enviado − recibido − incompletas: el FALTANTE, lo que el maquilero todavía tiene (y lo que se le cobra si ya cerró su entrega). Con `enviado`, `recibido` e `incompletas` cierra la trazabilidad que pidió Daniel: qué pasó con cada prenda que se mandó."
+                      "description": "enviado − recibido − incompletas − faltantes saldados: el FALTANTE VIVO, lo que el maquilero todavía tiene. Con `enviado`, `recibido`, `incompletas` y `faltantesSaldados` cierra la trazabilidad que pidió Daniel: qué pasó con cada prenda que se mandó."
+                    },
+                    "faltantesSaldados": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca volvieron y ya no se esperan. Con `recibido` e `incompletas` completa la trazabilidad de las cuatro cubetas."
                     },
                     "recibidoCostura": {
                       "type": "integer",
@@ -146606,13 +148062,47 @@
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Total pendiente de ese maquilero = enviado − buenas − incompletas (derivado; NEGATIVO si recibió sin envío). Es lo que TIENE y a la vez lo que todavía se le puede recibir."
+                                  "description": "Total pendiente de ese maquilero = enviado − buenas − incompletas − faltantes saldados (derivado; NEGATIVO si recibió sin envío). Es lo que TIENE y a la vez lo que todavía se le puede recibir."
                                 },
                                 "totalIncompletas": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
                                   "description": "Prendas incompletas que ya entregó (informativo; SÍ cierran el pendiente, V1-E8v)."
+                                },
+                                "faltantesSaldados": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Piezas FALTANTES de ese maquilero ya SALDADAS al cerrar la orden con él (V1, fila 0.109). Restan de `totalPendiente`: ya se decidió que no vuelven. Viajan aquí para que la celda cerrada siga contando su historia en vez de desaparecer."
+                                },
+                                "faltantesSaldables": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Las piezas que de VERDAD se pueden saldar hoy con ese maquilero: Σ del pendiente POSITIVO por color×talla (V1, fila 0.109). Es el número exacto que el servidor escribirá al cerrar —y por el que multiplicará el descuento—, y por eso es el que la pantalla debe enseñar y usar para decidir si ofrece el botón. ⚠️ NO es `totalPendiente`: esa suma es plana y una celda NEGATIVA (histórico migrado, o lo devuelto sin decir de qué pack era) la compensa. Con +5 y −5 la suma plana da 0 —el botón no aparecería y esa orden nunca se podría cerrar— habiendo 5 piezas que saldar; con +5 y −3 da 2 mientras el cobro saldría por 5."
+                                },
+                                "precioFaltante": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio pactado del envío vivo a ese maquilero, base del cobro que se PROPONDRÍA al cerrar (V1, fila 0.109). `null` si el envío no lo trae (histórico migrado) o si el usuario no tiene `ordenes.ver-precio-real-maquila` (redactado, R2 §4.4.3)."
+                                },
+                                "importeFaltantePropuesto": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Lo que se propondría cobrarle si se cerrara AHORA: `faltantesSaldables × precioFaltante`, calculado en el SERVIDOR para que la confirmación no re-derive la regla. `null` sin precio o sin permiso de verlo."
                                 }
                               },
                               "required": [
@@ -146620,11 +148110,15 @@
                                 "maquilero",
                                 "celdas",
                                 "totalPendiente",
-                                "totalIncompletas"
+                                "totalIncompletas",
+                                "faltantesSaldados",
+                                "faltantesSaldables",
+                                "precioFaltante",
+                                "importeFaltantePropuesto"
                               ],
                               "additionalProperties": false
                             },
-                            "description": "enviado − buenas − incompletas por MAQUILERO (todo tercero con envío o recibo vivo del proceso)."
+                            "description": "enviado − buenas − incompletas − faltantes saldados por MAQUILERO (todo tercero con envío o recibo vivo del proceso)."
                           }
                         },
                         "required": [
@@ -146640,7 +148134,7 @@
                         ],
                         "additionalProperties": false
                       },
-                      "description": "enviado − buenas − incompletas por proceso, color×talla, con desglose por maquilero."
+                      "description": "enviado − buenas − incompletas − faltantes saldados por proceso, color×talla, con desglose por maquilero."
                     },
                     "entregadoCeldas": {
                       "type": "array",
@@ -146706,6 +148200,7 @@
                     "recibido",
                     "incompletas",
                     "pendientePorRecibir",
+                    "faltantesSaldados",
                     "recibidoCostura",
                     "entregado",
                     "porEntregar",
@@ -146842,7 +148337,7 @@
     },
     "/api/produccion/existencias-maquilero": {
       "get": {
-        "summary": "Existencias del maquilero (enviado − recibido − incompletas, por orden y proceso)",
+        "summary": "Existencias del maquilero (enviado − recibido − incompletas − faltantes saldados, por orden y proceso)",
         "tags": [
           "produccion"
         ],
@@ -146888,7 +148383,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Existencias en poder del maquilero (enviado − recibido − incompletas).",
+            "description": "Existencias en poder del maquilero (enviado − recibido − incompletas − faltantes saldados).",
             "content": {
               "application/json": {
                 "schema": {
@@ -146960,11 +148455,17 @@
                             "maximum": 9007199254740991,
                             "description": "Prendas INCOMPLETAS que devolvió (V1-E8v): ya no las tiene, pero tampoco se produjeron."
                           },
+                          "faltantesSaldados": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas suyas ya SALDADAS al cerrar la orden con él (V1, fila 0.109): dejan de estar en su poder porque ya se decidió que no vuelven (se le cobraron o se le perdonaron)."
+                          },
                           "enPoder": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "enviado − recibido − incompletas (lo que el maquilero tiene de verdad)."
+                            "description": "enviado − recibido − incompletas − faltantes saldados (lo que el maquilero tiene de verdad y todavía se le espera)."
                           }
                         },
                         "required": [
@@ -146978,10 +148479,11 @@
                           "enviado",
                           "recibido",
                           "incompletas",
+                          "faltantesSaldados",
                           "enPoder"
                         ],
                         "additionalProperties": false,
-                        "description": "Existencia en poder de un maquilero (enviado − recibido − incompletas) por orden y proceso."
+                        "description": "Existencia en poder de un maquilero (enviado − recibido − incompletas − faltantes saldados) por orden y proceso."
                       },
                       "description": "Existencias en poder por maquilero × proceso × orden (saldo ≠ 0)."
                     },
@@ -146997,7 +148499,7 @@
                     "totalEnPoder"
                   ],
                   "additionalProperties": false,
-                  "description": "Existencias en poder del maquilero (enviado − recibido − incompletas)."
+                  "description": "Existencias en poder del maquilero (enviado − recibido − incompletas − faltantes saldados)."
                 }
               }
             }
@@ -220424,11 +221926,17 @@
                           "maximum": 9007199254740991,
                           "description": "Σ (cortado − enviado)."
                         },
+                        "faltantesSaldados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca volvieron y ya se decidió que no vuelven (se cobraron o se perdonaron). Restan del pendiente por recibir, igual que las incompletas."
+                        },
                         "porRecibir": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
-                          "description": "Σ (enviado − recibido − incompletas), V1-E8v."
+                          "description": "Σ (enviado − recibido − incompletas − faltantes saldados), V1-E8v + fila 0.109."
                         },
                         "porEntregar": {
                           "type": "integer",
@@ -220447,6 +221955,7 @@
                         "entregado",
                         "porCortar",
                         "cortadoPorEnviar",
+                        "faltantesSaldados",
                         "porRecibir",
                         "porEntregar"
                       ],
@@ -220544,11 +222053,17 @@
                             "maximum": 9007199254740991,
                             "description": "cortado − enviado."
                           },
+                          "faltantesSaldados": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca volvieron y ya se decidió que no vuelven (se cobraron o se perdonaron). Restan del pendiente por recibir, igual que las incompletas."
+                          },
                           "porRecibir": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "enviado − recibido − incompletas (V1-E8v)."
+                            "description": "enviado − recibido − incompletas − faltantes saldados (V1-E8v + fila 0.109)."
                           },
                           "porEntregar": {
                             "type": "integer",
@@ -220573,6 +222088,7 @@
                           "entregado",
                           "porCortar",
                           "cortadoPorEnviar",
+                          "faltantesSaldados",
                           "porRecibir",
                           "porEntregar"
                         ],

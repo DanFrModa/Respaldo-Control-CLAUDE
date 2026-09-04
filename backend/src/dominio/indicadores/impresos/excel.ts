@@ -287,9 +287,13 @@ export async function construirExcelKpisWip(datos: DatosExcelKpisWip): Promise<B
     { header: 'Cortado', key: 'cortado', width: 10 },
     { header: 'Enviado', key: 'enviado', width: 10 },
     { header: 'Recibido', key: 'recibido', width: 10 },
-    // Cuarta cubeta (V1-E8v, §Post-F9.147): sin ella la hoja no cuadra
-    // `enviado = recibido + incompletas + por recibir`.
+    // Las cubetas que NO son «recibido» (§Post-F9.147 + V1 fila 0.109). Sin las DOS, la hoja no
+    // cuadra: la identidad que hace legible este renglón es
+    //   `enviado = recibido + incompletas + saldados + por recibir`
+    // porque «Por recibir» resta las dos. Con un cierre vivo y sin la columna «Saldados», el lector
+    // ve un enviado que no le suma y no tiene dónde buscar la diferencia.
     { header: 'Incompletas', key: 'incompletas', width: 12 },
+    { header: 'Saldados', key: 'faltantesSaldados', width: 11 },
     { header: 'Entregado', key: 'entregado', width: 11 },
     { header: 'Por recibir', key: 'porRecibir', width: 12 },
     { header: 'Por entregar', key: 'porEntregar', width: 13 },
@@ -305,6 +309,7 @@ export async function construirExcelKpisWip(datos: DatosExcelKpisWip): Promise<B
       enviado: o.enviado,
       recibido: o.recibido,
       incompletas: o.incompletas,
+      faltantesSaldados: o.faltantesSaldados,
       entregado: o.entregado,
       porRecibir: o.porRecibir,
       porEntregar: o.porEntregar,
