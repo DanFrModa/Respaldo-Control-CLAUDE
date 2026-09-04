@@ -12136,6 +12136,46 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.190) — «YA QUIERO SALIR»: la caja chica y lo demás que vive en Excel se van a FASE 2 (Daniel, 4-sep-2026, madrugada)
+
+Al proponerle la fila **0.127** (el libro de caja chica con reposición calculada, nacido de leer su archivo semanal), Daniel cortó por lo sano:
+
+> *«Está bien hacer el desarrollo de la caja chica. Pero **ya no quiero entorpecer más la primera versión de
+> salida. Necesito ya empezar a operar con el sistema** y creo que ese tipo de desarrollos los podemos dejar
+> para una segunda etapa. Por ahora funciona con el archivo de la caja chica, que al final no va ligado a nada
+> de producción. Podemos implementar sin ese desarrollo. Para la fase dos hay varias cosas que quiero integrar
+> que hoy funcionan en Exceles. No es lo único. Pero **ya quiero salir**.»*
+
+**Lo que queda decidido:**
+
+1. **La fila 0.127 nace APARCADA** (⏸️, fase 2). En la V1 «caja chica» es lo que ya construyó la 0.113: un
+   concepto **predeterminado** del catálogo (0.125) que se carga en cero cada semana y al que Daniel le pone
+   el monto de la reposición a mano, mirando su archivo. Ese archivo sigue vivo y **no se importa**.
+2. **Criterio para todo lo que venga: lo que hoy funciona en un Excel y no toca producción NO entra en la
+   V1.** Se numera (para que exista, «nada pendiente existe sin número»), se marca ⏸️ y se lista en la
+   **fase 2**. Daniel dirá cuáles son esas «varias cosas»; no se le preguntan ahora, se recogen cuando las
+   nombre.
+3. **La V1 se cierra con lo que ya está en vuelo y con lo que bloquee operar**, no con todo lo numerado. El
+   corte concreto —qué filas ⬜ son V1 y cuáles fase 2— se le propone a Daniel con defaults, fila por fila,
+   y se registra aquí cuando conteste (REGLA 0: mientras tanto se sigue con lo que es claramente V1).
+
+**El corte, confirmado por Daniel (4-sep, 01:00 UTC).** Se le propuso fila por fila con defaults y contestó
+*«Sí. Y aún faltan los inventarios. Que ése **sí tiene que ir a fuerzas en la primera etapa**.»*
+
+| | Filas |
+|---|---|
+| **V1 — en vuelo** | 0.108 · 0.113 + 0.125 · 0.109 |
+| **V1 — bloquea operar o es un error** | 0.124 · 0.114 · 0.106 · 0.107 · 0.111 · 0.061 · 0.117 · 0.121 · 0.123 (Gabriel) · **al final** 0.120 y 0.116 (Daniel ya la había despriorizado: *«sólo estético, hazlo cuando ya no tenga pendientes»*) |
+| **V1 — INVENTARIOS, completo** (Daniel: *«a fuerzas»*) | 0.096 y todas sus hijas: 0.099 · 0.100 · 0.101 · 0.102 · 0.103 · 0.104 — **más lo que Daniel agregue** cuando se cierre finanzas (*«no te quiero dar nada de inventarios hasta terminar con finanzas»*, 3-sep) |
+| **Fase 2 — ⏸️** | 0.127 · 0.126 · 0.118 · 0.122 · 0.086 · **0.072** (Daniel preguntó qué era —corregir la receta en toda la familia de órdenes de una vez, saltando la ya cortada—, y al saber que el camino de a una ya existe: *«Ok. La 72 en la V2»*) · y 0.087, ya aparcada |
+| **V1 — rescatada por Daniel (4-sep, 01:25)** | **0.119** leer la constancia de situación fiscal: *«creo que es chico y va a ser bueno para dar de alta a los proveedores. Nos ahorra mucho tiempo en el kick off»* ⇒ entra, y **antes del arranque** (es para el alta masiva de proveedores) |
+
+Orden de trabajo: **finanzas primero** (0.124 → 0.114 → 0.111 → 0.117 → 0.121), los defectos (0.106 · 0.107) en cuanto haya hueco, **luego inventarios entero**, 0.061, y 0.120 al final. Las «varias cosas» de Excel para la fase 2 se numeran ⏸️ cuando Daniel las nombre.
+
+- **Aplica en:** la fila 0.127 nace aparcada y las cinco de fase 2 se aparcan en la versión que cierra 0.113. **Fecha:** 2026-09-04.
+
+---
+
 #### (Post-F9.189) — LA CORRIDA SEMANAL, dictada por Daniel (3-sep-2026, tarde): ocho respuestas para la fila 0.113
 
 > **Cómo nació.** El analista de 0.113 midió el código y levantó quince preguntas de diseño; el lead las
