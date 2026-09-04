@@ -183,6 +183,7 @@ export interface paths {
                 | 'inventario-avios.ver'
                 | 'inventario-avios.mover'
                 | 'esma.cargo-validar'
+                | 'esma.revisar'
                 | 'notas.ver'
                 | 'notas.administrar'
                 | 'notas.cancelar'

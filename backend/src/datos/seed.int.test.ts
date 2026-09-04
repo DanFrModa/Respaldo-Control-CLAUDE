@@ -224,6 +224,68 @@ describe('seed de fundación', () => {
     }
   });
 
+  /**
+   * ⭐ FILA 0.128 — **LA PREGUNTA QUE DECIDE SI HACE FALTA UNA MIGRACIÓN DE DATOS.**
+   *
+   * Daniel mandó quitarle a los perfiles operativos el permiso de validar cargos de maquila
+   * (§Post-F9.192(1): *«la validación sólo la doy yo»*). Quitarlo del seed sólo sirve si el seed
+   * **REVOCA**; si nada más agregara, `prueba` se quedaría con la liga vieja para siempre y el
+   * recorte necesitaría un `DELETE` a mano en una migración.
+   *
+   * Aquí se mide justo eso, con el caso peor: se le vuelve a PONER la liga a mano al rol (como la
+   * tiene hoy `prueba`, sembrada por la versión anterior) y se re-siembra. La liga tiene que
+   * desaparecer sola. Es lo que hace que `SEED_ON_START=true` baste como plan de despliegue.
+   *
+   * ⚠️ Sin esta prueba, `seed.int.test.ts` no lo cubría: su comprobación de roles arranca de
+   * `limpiarBaseDatos`, así que nunca hay una liga previa que sobre — y la excepción documentada de
+   * `sembrarRoles` (nunca revoca las claves de GOBIERNO) demuestra que "revocar o no" es una
+   * decisión real del código, no un accidente.
+   */
+  it('⭐ REVOCA lo que sobra: una liga rol-permiso puesta a mano desaparece al re-sembrar', async () => {
+    const gerencial = await prisma.rol.findUniqueOrThrow({
+      where: { nombre: 'Gerencial' },
+      select: { id: true },
+    });
+    const validar = await prisma.permiso.findUniqueOrThrow({
+      where: { clave: 'esma.cargo-validar' },
+      select: { id: true },
+    });
+
+    // Estado de partida: el rol NO lo tiene (el reparto de la 0.128 se lo quitó)…
+    const antes = await prisma.rolPermiso.count({
+      where: { idRol: gerencial.id, idPermiso: validar.id },
+    });
+    expect(antes, 'Gerencial ya no debe validar cargos de maquila (fila 0.128)').toBe(0);
+
+    // …se le pone a mano, como está hoy en la base de `prueba`, y se re-siembra.
+    await prisma.rolPermiso.create({
+      data: { idRol: gerencial.id, idPermiso: validar.id },
+    });
+    await sembrar(prisma);
+
+    const despues = await prisma.rolPermiso.count({
+      where: { idRol: gerencial.id, idPermiso: validar.id },
+    });
+    expect(
+      despues,
+      'el seed SINCRONIZA los roles de sistema: lo que ya no está en definirRoles() se borra',
+    ).toBe(0);
+  });
+
+  it('⭐ …y la contraparte: el permiso NUEVO de validar sí aterriza en el círculo del dueño', async () => {
+    // `esma.revisar` (fila 0.128) nace en esta versión: si el seed no lo sembrara, la pantalla se
+    // quedaría sin nadie que pueda autorizar partidas y el estado de cuenta se congelaría.
+    const conElPermiso = await prisma.rol.findMany({
+      where: { permisos: { some: { permiso: { clave: 'esma.revisar' } } } },
+      select: { nombre: true },
+    });
+    expect(conElPermiso.map((r) => r.nombre).sort()).toEqual([
+      'AdministracionDireccion',
+      'Administrador',
+      'Directivo',
+    ]);
+  });
+
   it('los dos perfiles de acceso total llevan el catálogo COMPLETO, y Basico va en cero', async () => {
     // Los extremos, dichos aparte: son los dos que un reparto mal editado rompe primero, y ninguno
     // de los dos depende de que los perfiles de en medio estén anidados.

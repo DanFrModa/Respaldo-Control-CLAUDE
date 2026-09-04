@@ -71,16 +71,25 @@ function esRevisable(
  * maquilero, la línea de tiempo unificada de los 4 conceptos con sus marcas de pendiente, la tarjeta
  * de saldo, botones para agregar cada concepto, "Duplicar partida", accesos al desglosado/PDF/Excel y
  * a las existencias en poder del maquilero. RESPONSIVE: tabla en escritorio, tarjetas en móvil; desde
- * el móvil se puede AUTORIZAR una partida pendiente (revisar, `esma.modificar`).
+ * el móvil se puede AUTORIZAR una partida pendiente (revisar, `esma.revisar`).
  *
  * Lectura de cuenta con `esma.ver-pagos` (el backend re-verifica, A1). Importes "—" sin
- * `consultas.ver-importes`. Revisar exige `esma.modificar`.
+ * `consultas.ver-importes`.
+ *
+ * ⭐ **DOS PERMISOS, NO UNO (fila 0.128 — Daniel, §Post-F9.192(1)):** *«La entrada la da la persona
+ * responsable de recibos o de producción. Pero la validación sólo la doy yo.»* CAPTURAR (los
+ * botones «Abono», «Descuento» y «Duplicar») es `esma.modificar`; AUTORIZAR (el botón «Autorizar»,
+ * el que mete la partida al saldo desde la 0.115) es **`esma.revisar`**. Quien no lo tiene NO ve el
+ * botón —no un botón que truena—: hasta la 0.127 los dos actos compartían permiso y el capturista
+ * se auto-autorizaba.
  */
 export function EstadoCuentaPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const { tienePermiso } = useSesion();
+  // CAPTURAR (abono/descuento/duplicar) ≠ AUTORIZAR (fila 0.128): dos permisos distintos.
   const puedeModificar = tienePermiso('esma.modificar');
+  const puedeRevisar = tienePermiso('esma.revisar');
   const puedePagar = tienePermiso('esma.ver-pagos');
   const verWip = tienePermiso('produccion.wip-ver');
 
@@ -314,7 +323,7 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                           ) : (
                             <Badge variant="secondary">Revisado</Badge>
                           )}
-                          {puedeModificar && m.pendienteRevision && esRevisable(m.concepto) ? (
+                          {puedeRevisar && m.pendienteRevision && esRevisable(m.concepto) ? (
                             <Button
                               type="button"
                               size="sm"
@@ -373,9 +382,7 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                                     <Copy aria-hidden /> Duplicar
                                   </Button>
                                 ) : null}
-                                {puedeModificar &&
-                                m.pendienteRevision &&
-                                esRevisable(m.concepto) ? (
+                                {puedeRevisar && m.pendienteRevision && esRevisable(m.concepto) ? (
                                   <Button
                                     type="button"
                                     size="sm"
