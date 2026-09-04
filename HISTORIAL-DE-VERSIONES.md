@@ -71,6 +71,29 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.112 · 4-sep-2026 · **en prueba** — **El recibo del proveedor de arte ya lleva la foto**
+
+### Qué se puede hacer ahora que antes no
+
+- El **recibo de maquila de un proceso de arte** (estampado, bordado, aplicación, lavado) sale con las **fotos
+  del arte de la orden**, igual que la ficha que se le manda al enviarlo. Antes sólo la ficha las llevaba: el
+  papel que el proveedor tiene en la mano al devolver la prenda iba sin ninguna imagen.
+- Cuando la orden no tiene fotos cargadas, el recibo lo **dice** en vez de dejar un hueco mudo. Y el aviso es
+  el suyo: en la ficha invita a pedirla antes de producir; en el recibo eso ya no aplica, y el texto lo refleja.
+- El **recibo de costura** sigue sin fotos: el arte no es lo suyo.
+
+### Qué cambió y puede sorprender
+
+- La regla de las fotos (cuántas caben, en qué orden, el tope de peso, qué hacer si una no se puede
+  descargar) **vive ahora en un solo sitio** que usan la ficha y el recibo. La ficha se comporta exactamente
+  igual que antes; lo que cambió es de dónde saca la regla.
+- Un recibo con observaciones muy largas, o que devuelve prendas de tránsito, puede irse a una segunda hoja.
+  Está medido y escrito, no disimulado.
+
+### Qué sigue pendiente o roto
+
+- Nada nuevo. Sin migración, sin permisos, sin re-seed.
+
 ## 0.111 · 4-sep-2026 · **en prueba** — **Validar es de Daniel**: capturar lo recibido es de quien recibe, y autorizarlo es otro permiso
 
 ### Qué se puede hacer ahora que antes no
