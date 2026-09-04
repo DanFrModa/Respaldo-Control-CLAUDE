@@ -385,3 +385,67 @@ export function pendienteParaSalida(
     partidas: p.partidas,
   };
 }
+
+// ── ⭐ EL SEGMENTO CON / SIN FACTURA, TAMBIÉN UNA SOLA VEZ (fila 0.113) ──────────────────────────
+//
+// El saldo de un maquilero se puede partir en dos: lo que se le paga CON factura y lo que se le paga
+// SIN ella. Daniel arma DOS relaciones de pago cada semana, una por segmento (§Post-F9.189(a)), así
+// que los dos segmentos tienen que ser una PARTICIÓN EXACTA: cada peso está en uno y sólo uno.
+//
+// 🔴 **Y no lo eran.** `conFactura` es NULLABLE (así quedaron los movimientos migrados del Access,
+// donde la pregunta jamás se hizo) y el criterio del segmento «sin» estaba escrito DOS VECES, con
+// dos respuestas distintas:
+//   • `esma/estado-cuenta.ts` y `esma/saldos.ts` → `conFactura = false` (los NULL quedaban FUERA);
+//   • `terceros/convivencia-esma.ts`             → `false OR null` (los NULL quedaban DENTRO).
+// El mismo maquilero, la misma pregunta, dos respuestas — y en medio, dinero: un movimiento sin
+// definir no salía en NINGUNA de las dos relaciones y nadie lo hubiera pagado nunca.
+//
+// **La verdad única es la de la partición: «sin factura» = `false` O SIN DEFINIR.** Es la que ya
+// razonó `convivencia-esma.ts` (el encabezado calcula `saldoSinFactura = saldo − saldoFiscal`, así
+// que si la lista dejara fuera los NULL el total y los renglones se contradirían), y es la que hace
+// que las dos corridas de la semana sumen el total.
+//
+// 🔴 **NO se escribe `{ not: true }`**, que es lo que parece natural: en lógica de tres valores
+// `NULL <> true` evalúa a NULL y la fila se descarta igual que con `= false`. La ÚNICA forma que
+// trae los NULL es la explícita.
+
+/** Los dos segmentos de facturación de un movimiento de EsMa. */
+export type SegmentoFactura = 'con' | 'sin';
+
+/** Forma de la cláusula Prisma del segmento (los cuatro modelos de EsMa comparten el campo). */
+export interface WhereSegmentoFactura {
+  conFactura?: boolean;
+  OR?: { conFactura: boolean | null }[];
+}
+
+/**
+ * Cláusula `where` de PRISMA del segmento de facturación, o `{}` si no se segmenta.
+ *
+ * `con` → `conFactura = true`. `sin` → `false` **o** sin definir (ver el bloque de arriba: es una
+ * partición, no un filtro cualquiera). Sirve para los cuatro modelos de EsMa (cargo, abono, pago y
+ * descuento comparten el campo `conFactura`).
+ */
+export function whereSegmentoFactura(segmento: SegmentoFactura | undefined): WhereSegmentoFactura {
+  if (segmento === undefined) {
+    return {};
+  }
+  if (segmento === 'con') {
+    return { conFactura: true };
+  }
+  return { OR: [{ conFactura: false }, { conFactura: null }] };
+}
+
+/**
+ * El MISMO criterio en SQL crudo, para intercalar en un `WHERE … AND ${…}`. Sale siempre entre
+ * paréntesis (el `OR` del segmento «sin» se comería la condición de al lado sin ellos — el mismo
+ * cuidado que {@link aSql}). Sin segmento devuelve `TRUE`, que es neutro en un `AND`.
+ */
+export function sqlSegmentoFactura(segmento: SegmentoFactura | undefined): Prisma.Sql {
+  if (segmento === undefined) {
+    return Prisma.sql`(TRUE)`;
+  }
+  if (segmento === 'con') {
+    return Prisma.sql`("con_factura" = TRUE)`;
+  }
+  return Prisma.sql`("con_factura" = FALSE OR "con_factura" IS NULL)`;
+}

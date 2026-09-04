@@ -55,6 +55,15 @@ export const MODULOS_PERMISO = {
   // pagos/abonos/descuentos/notas de crédito/entradas sin factura. `ver` (consulta, roles que ya ven
   // EsMa/terceros) y `administrar` (captura/cancelación, solo Administración/Dirección).
   cxp: 'Cuentas por pagar (Finanzas)',
+  // Catálogo de conceptos de pago que NO son proveedores (fila 0.125, §Post-F9.189(c)) — nóminas por
+  // fuera, gratificaciones, servicios, caja chica. Catálogo MAESTRO propio: NO se gobierna con
+  // `proveedores.*` porque Daniel fue explícito en que *«sean un catálogo aparte, no proveedores»*, y
+  // porque quien administra el padrón de proveedores no tiene por qué poder inventar destinos de pago.
+  'conceptos-pago': 'Conceptos de pago (no proveedores)',
+  // La corrida semanal de pagos (fila 0.113, §Post-F9.189(g)) — la relación con la que Daniel decide
+  // cada semana a quién se le paga y cuánto. `corrida-armar` la arma, cierra y ejecuta (él);
+  // `corrida-ver` la consulta (finanzas, sólo lectura).
+  pagos: 'Corrida semanal de pagos',
   // Cuentas por cobrar de clientes (Finanzas, Módulo 14, F9-E4) — el uso de negocio del motor de
   // terceros para el CLIENTE: bandeja "por cobrar" con aging, estado de cuenta e importación de CFDI de
   // ventas. `ver` (consulta, roles que ya ven EsMa/terceros) y `administrar` (captura/cancelación/
@@ -1191,6 +1200,53 @@ export const CATALOGO_PERMISOS = [
     modulo: 'cxc',
     descripcion:
       'Capturar/cancelar movimientos de cuentas por cobrar (cobros/abonos/descuentos/NC/cargos) e importar CFDI de venta (F9-E4)',
+  },
+
+  // ── Catálogo de conceptos de pago que no son proveedores (fila 0.125, A4) ──────────────────────
+  //    Daniel: *«quiero dejar pagos para cosas que no necesariamente están dadas de alta como
+  //    proveedores (nóminas por fuera, gratificaciones, pago de algún servicio como agua…). Debería
+  //    de poder tener como un catálogo de otras cosas que no son proveedores»* — *«que sean un
+  //    catálogo aparte, no proveedores»*. `ver` lo lleva quien arma o consulta la corrida (los
+  //    conceptos son renglones de la relación); `administrar` es de catálogo maestro: sólo el
+  //    administrador (dar de alta un destino de pago es dar de alta a dónde puede salir dinero).
+  {
+    clave: 'conceptos-pago.ver',
+    modulo: 'conceptos-pago',
+    descripcion:
+      'Consultar el catálogo de conceptos de pago que no son proveedores (nómina por fuera, servicios, caja chica) (0.125)',
+  },
+  {
+    clave: 'conceptos-pago.administrar',
+    modulo: 'conceptos-pago',
+    descripcion:
+      'Dar de alta y editar conceptos de pago que no son proveedores y sus cuentas/destinos (0.125)',
+  },
+
+  // ── La corrida semanal de pagos (fila 0.113, A4 — §Post-F9.189(g): *«correcto»*) ───────────────
+  //    DOS permisos, como pidió Daniel: *armar y cerrar la corrida* (él) y *ver la relación*
+  //    (finanzas, sólo lectura). Armar es decidir a quién se le paga y cuánto: es la decisión más
+  //    cara del sistema y no se reparte. Ver es lo que necesita quien hace las transferencias.
+  //    Deny-by-default (A4). ⚠️ Requiere `SEED_ON_START=true` al desplegar.
+  //    ⭐ RAZÓN DE DISEÑO (revisión de 0.113, R2): `pagos.corrida-ver` **NO exige además `cxp.ver`
+  //    ni `esma.ver-pagos`**, aunque la pantalla enseñe saldos de EsMa y de CxP al lado del campo de
+  //    captura. Es deliberado: la corrida ES la lista de saldos de la semana con una columna para
+  //    decidir — pedir los otros dos permisos no protegería nada (quien puede ver la relación ya ve
+  //    lo que se le paga a cada quien, que es el dato sensible) y sí dejaría a finanzas con una
+  //    pantalla a medias, llena de columnas en blanco, justo cuando tiene que ejecutar las
+  //    transferencias. Este permiso significa, por definición, «ver los saldos de la semana».
+  //    Lo que sigue gobernando el DINERO en pantalla es `consultas.ver-importes`: sin él, los
+  //    importes viajan en null igual que en el resto del sistema.
+  {
+    clave: 'pagos.corrida-ver',
+    modulo: 'pagos',
+    descripcion:
+      'Consultar las corridas semanales de pago y su relación ejecutable, con los saldos de la semana como referencia (finanzas, sólo lectura) (0.113)',
+  },
+  {
+    clave: 'pagos.corrida-armar',
+    modulo: 'pagos',
+    descripcion:
+      'Armar, cerrar y ejecutar la corrida semanal de pagos: decidir a quién se le paga y cuánto (0.113)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

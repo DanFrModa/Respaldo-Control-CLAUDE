@@ -97,7 +97,7 @@ const VALORES_INICIALES: DatosProveedorFormulario = {
   // Pago
   diasCredito: '',
   moneda: SIN_ELEGIR,
-  formaPago: '',
+  formaPagoPreferida: '',
   metodoPago: SIN_ELEGIR,
   limiteCredito: '',
   // Operativo
@@ -172,7 +172,7 @@ function aCuerpoFormulario(datos: DatosProveedorFormulario): ProveedorCrear {
     ['email', datos.email],
     ['direccion', datos.direccion],
     ['telefono', datos.telefono],
-    ['formaPago', datos.formaPago],
+    ['formaPagoPreferida', datos.formaPagoPreferida],
     ['condiciones', datos.condiciones],
     ['notas', datos.notas],
     // Datos de taller (fusión de terceros, D12/R15).
@@ -245,7 +245,7 @@ function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
     email: textoONull(datos.email),
     direccion: textoONull(datos.direccion),
     telefono: textoONull(datos.telefono),
-    formaPago: textoONull(datos.formaPago),
+    formaPagoPreferida: datos.formaPagoPreferida === '' ? null : datos.formaPagoPreferida,
     // `banco`/`clabe` YA NO viajan (0.112): el dato bancario vive en las CUENTAS del proveedor.
     // Omitirlos en el PATCH = "no tocar", así que lo ya capturado se queda donde está (REGLA 0-B:
     // lo viejo no se migra ni se repara — tampoco se borra de paso).
@@ -368,7 +368,7 @@ export function DialogoProveedor({
         // Pago
         diasCredito: numeroTexto(proveedor.diasCredito),
         moneda: texto(proveedor.moneda),
-        formaPago: texto(proveedor.formaPago),
+        formaPagoPreferida: proveedor.formaPagoPreferida ?? '',
         metodoPago: texto(proveedor.metodoPago),
         limiteCredito: numeroTexto(proveedor.limiteCredito),
         // Operativo
@@ -846,16 +846,32 @@ export function DialogoProveedor({
                       <FieldError errors={[errors.moneda]} />
                     </Field>
 
-                    <Field data-invalid={Boolean(errors.formaPago)}>
-                      <FieldLabel htmlFor="proveedor-forma-pago">Forma de pago</FieldLabel>
-                      <Input
+                    {/*
+                      ⭐ EFECTIVO o TRANSFERENCIA por omisión para la corrida semanal (0.113;
+                      §Post-F9.189(c)): *«podemos dejarlo como default de cada proveedor, pero con
+                      opción a cambiarlo»*. Cada renglón de la corrida lo puede cambiar.
+
+                      🔴 Sustituye al campo de TEXTO LIBRE anterior (la clave del SAT, "03 —
+                      Transferencia"), que contestaba la misma pregunta sin poder gobernar nada:
+                      dejar los dos capturables era repetir el defecto de `factura` /
+                      `modalidadFacturacion` (fila 0.124). El campo viejo sigue en la base y en el
+                      contrato (REGLA 0-B: lo viejo no se migra ni se repara), pero ya no se captura.
+                    */}
+                    <Field data-invalid={Boolean(errors.formaPagoPreferida)}>
+                      <FieldLabel htmlFor="proveedor-forma-pago">
+                        Forma de pago por omisión
+                      </FieldLabel>
+                      <SelectNativo
                         id="proveedor-forma-pago"
-                        aria-invalid={Boolean(errors.formaPago)}
+                        aria-invalid={Boolean(errors.formaPagoPreferida)}
                         disabled={guardando}
-                        placeholder="p. ej. 03 — Transferencia"
-                        {...registrar('formaPago')}
-                      />
-                      <FieldError errors={[errors.formaPago]} />
+                        {...registrar('formaPagoPreferida')}
+                      >
+                        <option value="">Sin preferencia</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                      </SelectNativo>
+                      <FieldError errors={[errors.formaPagoPreferida]} />
                     </Field>
 
                     <Field data-invalid={Boolean(errors.metodoPago)}>

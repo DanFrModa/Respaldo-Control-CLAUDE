@@ -203,6 +203,10 @@ export interface paths {
                 | 'cxp.administrar'
                 | 'cxc.ver'
                 | 'cxc.administrar'
+                | 'conceptos-pago.ver'
+                | 'conceptos-pago.administrar'
+                | 'pagos.corrida-ver'
+                | 'pagos.corrida-armar'
               )[];
             };
           };
@@ -1693,8 +1697,10 @@ export interface paths {
                 diasCredito: number | null;
                 /** @description Moneda habitual (MXN/USD), o null. */
                 moneda: string | null;
-                /** @description Forma de pago, o null. */
+                /** @description Clave del SAT para el CFDI (SUPERADA por formaPagoPreferida), o null. */
                 formaPago: string | null;
+                /** @description Efectivo o transferencia por omisión en la corrida semanal, o null. */
+                formaPagoPreferida: ('efectivo' | 'transferencia') | null;
                 /** @description Método de pago CFDI (PUE/PPD), o null. */
                 metodoPago: string | null;
                 /** @description Banco, o null. */
@@ -1913,6 +1919,7 @@ export interface paths {
             /** @enum {string} */
             moneda?: 'MXN' | 'USD';
             formaPago?: string;
+            formaPagoPreferida?: ('efectivo' | 'transferencia') | null;
             /** @enum {string} */
             metodoPago?: 'PUE' | 'PPD';
             banco?: string;
@@ -1969,8 +1976,10 @@ export interface paths {
               diasCredito: number | null;
               /** @description Moneda habitual (MXN/USD), o null. */
               moneda: string | null;
-              /** @description Forma de pago, o null. */
+              /** @description Clave del SAT para el CFDI (SUPERADA por formaPagoPreferida), o null. */
               formaPago: string | null;
+              /** @description Efectivo o transferencia por omisión en la corrida semanal, o null. */
+              formaPagoPreferida: ('efectivo' | 'transferencia') | null;
               /** @description Método de pago CFDI (PUE/PPD), o null. */
               metodoPago: string | null;
               /** @description Banco, o null. */
@@ -2215,8 +2224,10 @@ export interface paths {
               diasCredito: number | null;
               /** @description Moneda habitual (MXN/USD), o null. */
               moneda: string | null;
-              /** @description Forma de pago, o null. */
+              /** @description Clave del SAT para el CFDI (SUPERADA por formaPagoPreferida), o null. */
               formaPago: string | null;
+              /** @description Efectivo o transferencia por omisión en la corrida semanal, o null. */
+              formaPagoPreferida: ('efectivo' | 'transferencia') | null;
               /** @description Método de pago CFDI (PUE/PPD), o null. */
               metodoPago: string | null;
               /** @description Banco, o null. */
@@ -2450,8 +2461,10 @@ export interface paths {
               diasCredito: number | null;
               /** @description Moneda habitual (MXN/USD), o null. */
               moneda: string | null;
-              /** @description Forma de pago, o null. */
+              /** @description Clave del SAT para el CFDI (SUPERADA por formaPagoPreferida), o null. */
               formaPago: string | null;
+              /** @description Efectivo o transferencia por omisión en la corrida semanal, o null. */
+              formaPagoPreferida: ('efectivo' | 'transferencia') | null;
               /** @description Método de pago CFDI (PUE/PPD), o null. */
               metodoPago: string | null;
               /** @description Banco, o null. */
@@ -2664,6 +2677,7 @@ export interface paths {
             diasCredito?: number | null;
             moneda?: ('MXN' | 'USD') | null;
             formaPago?: string | null;
+            formaPagoPreferida?: ('efectivo' | 'transferencia') | null;
             metodoPago?: ('PUE' | 'PPD') | null;
             banco?: string | null;
             clabe?: string | null;
@@ -2719,8 +2733,10 @@ export interface paths {
               diasCredito: number | null;
               /** @description Moneda habitual (MXN/USD), o null. */
               moneda: string | null;
-              /** @description Forma de pago, o null. */
+              /** @description Clave del SAT para el CFDI (SUPERADA por formaPagoPreferida), o null. */
               formaPago: string | null;
+              /** @description Efectivo o transferencia por omisión en la corrida semanal, o null. */
+              formaPagoPreferida: ('efectivo' | 'transferencia') | null;
               /** @description Método de pago CFDI (PUE/PPD), o null. */
               metodoPago: string | null;
               /** @description Banco, o null. */
@@ -62622,6 +62638,3343 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conceptos-pago': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Catálogo de conceptos de pago que no son proveedores */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Filtra por nombre. */
+          busqueda?: string;
+          /** @description Filtra por rubro. */
+          rubro?: 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+          /** @description Incluye los conceptos retirados. */
+          incluirInactivos?: boolean;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página del catálogo de conceptos de pago. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                /** @description Id del concepto. */
+                id: number;
+                /** @description Cómo se llama en la relación. */
+                nombre: string;
+                /**
+                 * @description Sección de la relación donde cae.
+                 * @enum {string}
+                 */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                /** @description Efectivo o transferencia por omisión, o null (sin preferencia). */
+                formaPagoPreferida: ('efectivo' | 'transferencia') | null;
+                /** @description Verdadero si se carga solo, EN CERO, en cada corrida nueva. */
+                predeterminado: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirado del catálogo. */
+                activo: boolean;
+                /** @description Cuentas/destinos de pago. */
+                cuentas: {
+                  /** @description Id de la cuenta. */
+                  id: number;
+                  /** @description Id del concepto dueño de la cuenta. */
+                  idConcepto: number;
+                  /** @description A nombre de quién está la cuenta (el del depósito). */
+                  beneficiario: string;
+                  /** @description Banco, o null. */
+                  banco: string | null;
+                  /**
+                   * @description CLABE o tarjeta.
+                   * @enum {string}
+                   */
+                  tipoCuenta: 'clabe' | 'tarjeta';
+                  /** @description El número, sólo dígitos. */
+                  cuenta: string;
+                  /** @description Cómo se le llama en la relación de pago. */
+                  alias: string | null;
+                  /** @description Verdadero si a ella puede salir un pago CON factura. */
+                  esFiscal: boolean;
+                  /** @description Verdadero si es LA cuenta por omisión del concepto. */
+                  esDefault: boolean;
+                  /** @description Notas, o null. */
+                  notas: string | null;
+                  /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                  activo: boolean;
+                }[];
+              }[];
+              total: number;
+              pagina: number;
+              porPagina: number;
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Dar de alta un concepto de pago */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Alta de un concepto de pago que no es proveedor. */
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre: string;
+            /** @enum {string} */
+            rubro: 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+            formaPagoPreferida?: ('efectivo' | 'transferencia') | null;
+            predeterminado?: boolean;
+            notas?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Concepto de pago que no es proveedor. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del concepto. */
+              id: number;
+              /** @description Cómo se llama en la relación. */
+              nombre: string;
+              /**
+               * @description Sección de la relación donde cae.
+               * @enum {string}
+               */
+              rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+              /** @description Efectivo o transferencia por omisión, o null (sin preferencia). */
+              formaPagoPreferida: ('efectivo' | 'transferencia') | null;
+              /** @description Verdadero si se carga solo, EN CERO, en cada corrida nueva. */
+              predeterminado: boolean;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está retirado del catálogo. */
+              activo: boolean;
+              /** @description Cuentas/destinos de pago. */
+              cuentas: {
+                /** @description Id de la cuenta. */
+                id: number;
+                /** @description Id del concepto dueño de la cuenta. */
+                idConcepto: number;
+                /** @description A nombre de quién está la cuenta (el del depósito). */
+                beneficiario: string;
+                /** @description Banco, o null. */
+                banco: string | null;
+                /**
+                 * @description CLABE o tarjeta.
+                 * @enum {string}
+                 */
+                tipoCuenta: 'clabe' | 'tarjeta';
+                /** @description El número, sólo dígitos. */
+                cuenta: string;
+                /** @description Cómo se le llama en la relación de pago. */
+                alias: string | null;
+                /** @description Verdadero si a ella puede salir un pago CON factura. */
+                esFiscal: boolean;
+                /** @description Verdadero si es LA cuenta por omisión del concepto. */
+                esDefault: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                activo: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conceptos-pago/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener un concepto de pago con sus cuentas */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del concepto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Concepto de pago que no es proveedor. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del concepto. */
+              id: number;
+              /** @description Cómo se llama en la relación. */
+              nombre: string;
+              /**
+               * @description Sección de la relación donde cae.
+               * @enum {string}
+               */
+              rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+              /** @description Efectivo o transferencia por omisión, o null (sin preferencia). */
+              formaPagoPreferida: ('efectivo' | 'transferencia') | null;
+              /** @description Verdadero si se carga solo, EN CERO, en cada corrida nueva. */
+              predeterminado: boolean;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está retirado del catálogo. */
+              activo: boolean;
+              /** @description Cuentas/destinos de pago. */
+              cuentas: {
+                /** @description Id de la cuenta. */
+                id: number;
+                /** @description Id del concepto dueño de la cuenta. */
+                idConcepto: number;
+                /** @description A nombre de quién está la cuenta (el del depósito). */
+                beneficiario: string;
+                /** @description Banco, o null. */
+                banco: string | null;
+                /**
+                 * @description CLABE o tarjeta.
+                 * @enum {string}
+                 */
+                tipoCuenta: 'clabe' | 'tarjeta';
+                /** @description El número, sólo dígitos. */
+                cuenta: string;
+                /** @description Cómo se le llama en la relación de pago. */
+                alias: string | null;
+                /** @description Verdadero si a ella puede salir un pago CON factura. */
+                esFiscal: boolean;
+                /** @description Verdadero si es LA cuenta por omisión del concepto. */
+                esDefault: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                activo: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Editar, retirar o reactivar un concepto de pago */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del concepto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Edición parcial de un concepto de pago. */
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre?: string;
+            /** @enum {string} */
+            rubro?: 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+            formaPagoPreferida?: ('efectivo' | 'transferencia') | null;
+            predeterminado?: boolean;
+            notas?: string | null;
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Concepto de pago que no es proveedor. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del concepto. */
+              id: number;
+              /** @description Cómo se llama en la relación. */
+              nombre: string;
+              /**
+               * @description Sección de la relación donde cae.
+               * @enum {string}
+               */
+              rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+              /** @description Efectivo o transferencia por omisión, o null (sin preferencia). */
+              formaPagoPreferida: ('efectivo' | 'transferencia') | null;
+              /** @description Verdadero si se carga solo, EN CERO, en cada corrida nueva. */
+              predeterminado: boolean;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está retirado del catálogo. */
+              activo: boolean;
+              /** @description Cuentas/destinos de pago. */
+              cuentas: {
+                /** @description Id de la cuenta. */
+                id: number;
+                /** @description Id del concepto dueño de la cuenta. */
+                idConcepto: number;
+                /** @description A nombre de quién está la cuenta (el del depósito). */
+                beneficiario: string;
+                /** @description Banco, o null. */
+                banco: string | null;
+                /**
+                 * @description CLABE o tarjeta.
+                 * @enum {string}
+                 */
+                tipoCuenta: 'clabe' | 'tarjeta';
+                /** @description El número, sólo dígitos. */
+                cuenta: string;
+                /** @description Cómo se le llama en la relación de pago. */
+                alias: string | null;
+                /** @description Verdadero si a ella puede salir un pago CON factura. */
+                esFiscal: boolean;
+                /** @description Verdadero si es LA cuenta por omisión del concepto. */
+                esDefault: boolean;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                activo: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/conceptos-pago/{id}/cuentas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Cuentas/destinos de pago de un concepto */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Incluye las cuentas retiradas (historial reutilizable). */
+          incluirInactivas?: boolean;
+        };
+        header?: never;
+        path: {
+          /** @description Id del concepto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la cuenta. */
+              id: number;
+              /** @description Id del concepto dueño de la cuenta. */
+              idConcepto: number;
+              /** @description A nombre de quién está la cuenta (el del depósito). */
+              beneficiario: string;
+              /** @description Banco, o null. */
+              banco: string | null;
+              /**
+               * @description CLABE o tarjeta.
+               * @enum {string}
+               */
+              tipoCuenta: 'clabe' | 'tarjeta';
+              /** @description El número, sólo dígitos. */
+              cuenta: string;
+              /** @description Cómo se le llama en la relación de pago. */
+              alias: string | null;
+              /** @description Verdadero si a ella puede salir un pago CON factura. */
+              esFiscal: boolean;
+              /** @description Verdadero si es LA cuenta por omisión del concepto. */
+              esDefault: boolean;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+              activo: boolean;
+            }[];
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Agregar una cuenta/destino de pago a un concepto */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del concepto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Alta de una cuenta/destino de pago de un concepto. */
+      requestBody: {
+        content: {
+          'application/json': {
+            beneficiario: string;
+            banco?: string;
+            /** @enum {string} */
+            tipoCuenta: 'clabe' | 'tarjeta';
+            cuenta: string;
+            alias?: string;
+            esFiscal?: boolean;
+            notas?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Cuenta/destino de pago de un concepto. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la cuenta. */
+              id: number;
+              /** @description Id del concepto dueño de la cuenta. */
+              idConcepto: number;
+              /** @description A nombre de quién está la cuenta (el del depósito). */
+              beneficiario: string;
+              /** @description Banco, o null. */
+              banco: string | null;
+              /**
+               * @description CLABE o tarjeta.
+               * @enum {string}
+               */
+              tipoCuenta: 'clabe' | 'tarjeta';
+              /** @description El número, sólo dígitos. */
+              cuenta: string;
+              /** @description Cómo se le llama en la relación de pago. */
+              alias: string | null;
+              /** @description Verdadero si a ella puede salir un pago CON factura. */
+              esFiscal: boolean;
+              /** @description Verdadero si es LA cuenta por omisión del concepto. */
+              esDefault: boolean;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+              activo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conceptos-pago/{id}/cuentas/{idCuenta}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Editar, retirar, reactivar o dejar por omisión una cuenta del concepto */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del concepto. */
+          id: number;
+          /** @description Id de la cuenta. */
+          idCuenta: number;
+        };
+        cookie?: never;
+      };
+      /** @description Edición parcial de una cuenta/destino de pago de un concepto. */
+      requestBody: {
+        content: {
+          'application/json': {
+            beneficiario?: string;
+            banco?: string | null;
+            /** @enum {string} */
+            tipoCuenta?: 'clabe' | 'tarjeta';
+            cuenta?: string;
+            alias?: string | null;
+            esFiscal?: boolean;
+            notas?: string | null;
+            esDefault?: boolean;
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Cuenta/destino de pago de un concepto. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la cuenta. */
+              id: number;
+              /** @description Id del concepto dueño de la cuenta. */
+              idConcepto: number;
+              /** @description A nombre de quién está la cuenta (el del depósito). */
+              beneficiario: string;
+              /** @description Banco, o null. */
+              banco: string | null;
+              /**
+               * @description CLABE o tarjeta.
+               * @enum {string}
+               */
+              tipoCuenta: 'clabe' | 'tarjeta';
+              /** @description El número, sólo dígitos. */
+              cuenta: string;
+              /** @description Cómo se le llama en la relación de pago. */
+              alias: string | null;
+              /** @description Verdadero si a ella puede salir un pago CON factura. */
+              esFiscal: boolean;
+              /** @description Verdadero si es LA cuenta por omisión del concepto. */
+              esDefault: boolean;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+              activo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/pagos/corridas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Corridas semanales de pago (las de con factura y las de sin) */
+    get: {
+      parameters: {
+        query?: {
+          pagina?: number;
+          porPagina?: number;
+          /** @description Filtra el segmento (con factura / sin factura). */
+          conFactura?: 'con' | 'sin';
+          estado?: 'borrador' | 'cerrada' | 'ejecutada';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de corridas de pago. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              filas: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              total: number;
+              pagina: number;
+              porPagina: number;
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Abrir la corrida de la semana (carga los conceptos predeterminados en cero) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Alta de una corrida semanal de pagos. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Cualquier día de la semana a pagar (se normaliza al lunes). */
+            semana: string;
+            /** @description true = la relación CON factura; false = la relación SIN factura. */
+            conFactura: boolean;
+            notas?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description La pantalla de trabajo de una corrida de pagos. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado de una corrida semanal de pagos. */
+              corrida: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              };
+              secciones: {
+                /** @enum {string} */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                filas: {
+                  /** @enum {string} */
+                  origen: 'maquila' | 'proveedor' | 'concepto';
+                  idProveedor: number | null;
+                  idConcepto: number | null;
+                  /** @enum {string} */
+                  rubro:
+                    | 'maquila'
+                    | 'proveedores'
+                    | 'nomina'
+                    | 'servicios'
+                    | 'caja_chica'
+                    | 'otros';
+                  nombre: string;
+                  nombreCorto: string | null;
+                  /** @enum {string} */
+                  formaPagoSugerida: 'efectivo' | 'transferencia';
+                  idCuentaSugerida: number | null;
+                  /** @description Cuentas activas donde puede cobrar. */
+                  cuentas: {
+                    id: number;
+                    /** @description A nombre de quién va el depósito. */
+                    beneficiario: string;
+                    banco: string | null;
+                    /** @enum {string} */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description Últimos 4 dígitos de la cuenta. */
+                    ultimos4: string;
+                    /** @description Su "1", "2"… — lo que distingue un pago partido. */
+                    alias: string | null;
+                    /** @description A ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    esDefault: boolean;
+                  }[];
+                  puedeConFactura: boolean;
+                  /** @description Saldo a favor del beneficiario, o null. */
+                  saldo: number | null;
+                  /** @description Parte vencida del saldo (sólo CxP), o null. */
+                  vencido: number | null;
+                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  porRevisarNeto: number | null;
+                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  porRevisarPartidas: number;
+                  /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
+                  recibosSemanaImporte: number | null;
+                  /** @description Prendas recibidas esta semana (0 si no aplica). */
+                  recibosSemanaCantidad: number;
+                  renglones: {
+                    id: number;
+                    /** @enum {string} */
+                    origen: 'maquila' | 'proveedor' | 'concepto';
+                    idProveedor: number | null;
+                    idConcepto: number | null;
+                    /**
+                     * @description Sección de la relación (congelada al crear el renglón).
+                     * @enum {string}
+                     */
+                    rubro:
+                      | 'maquila'
+                      | 'proveedores'
+                      | 'nomina'
+                      | 'servicios'
+                      | 'caja_chica'
+                      | 'otros';
+                    /** @description Nombre con el que sale impreso (congelado). */
+                    nombre: string;
+                    /** @description Lo que se le paga (null si se ocultan importes). */
+                    monto: number | null;
+                    /** @enum {string} */
+                    formaPago: 'efectivo' | 'transferencia';
+                    /** @description Id de la cuenta destino, o null (efectivo). */
+                    idCuenta: number | null;
+                    /** @description A nombre de quién va (congelado). */
+                    beneficiario: string;
+                    banco: string | null;
+                    tipoCuenta: ('clabe' | 'tarjeta') | null;
+                    /** @description Últimos 4 dígitos de la cuenta, o null. */
+                    ultimos4: string | null;
+                    aliasCuenta: string | null;
+                    cuentaEsFiscal: boolean | null;
+                    /** @description La explicación del pago (lo que se está pagando). */
+                    concepto: string | null;
+                    /** @description Folios de remisiones/recibos que ampara. */
+                    referencia: string | null;
+                    idPagoMaquilero: number | null;
+                    idMovimientoTercero: number | null;
+                  }[];
+                  totalCapturado: number | null;
+                }[];
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
+              bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** La pantalla de trabajo: saldos y conceptos por rubro, con lo capturado */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description La pantalla de trabajo de una corrida de pagos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado de una corrida semanal de pagos. */
+              corrida: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              };
+              secciones: {
+                /** @enum {string} */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                filas: {
+                  /** @enum {string} */
+                  origen: 'maquila' | 'proveedor' | 'concepto';
+                  idProveedor: number | null;
+                  idConcepto: number | null;
+                  /** @enum {string} */
+                  rubro:
+                    | 'maquila'
+                    | 'proveedores'
+                    | 'nomina'
+                    | 'servicios'
+                    | 'caja_chica'
+                    | 'otros';
+                  nombre: string;
+                  nombreCorto: string | null;
+                  /** @enum {string} */
+                  formaPagoSugerida: 'efectivo' | 'transferencia';
+                  idCuentaSugerida: number | null;
+                  /** @description Cuentas activas donde puede cobrar. */
+                  cuentas: {
+                    id: number;
+                    /** @description A nombre de quién va el depósito. */
+                    beneficiario: string;
+                    banco: string | null;
+                    /** @enum {string} */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description Últimos 4 dígitos de la cuenta. */
+                    ultimos4: string;
+                    /** @description Su "1", "2"… — lo que distingue un pago partido. */
+                    alias: string | null;
+                    /** @description A ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    esDefault: boolean;
+                  }[];
+                  puedeConFactura: boolean;
+                  /** @description Saldo a favor del beneficiario, o null. */
+                  saldo: number | null;
+                  /** @description Parte vencida del saldo (sólo CxP), o null. */
+                  vencido: number | null;
+                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  porRevisarNeto: number | null;
+                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  porRevisarPartidas: number;
+                  /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
+                  recibosSemanaImporte: number | null;
+                  /** @description Prendas recibidas esta semana (0 si no aplica). */
+                  recibosSemanaCantidad: number;
+                  renglones: {
+                    id: number;
+                    /** @enum {string} */
+                    origen: 'maquila' | 'proveedor' | 'concepto';
+                    idProveedor: number | null;
+                    idConcepto: number | null;
+                    /**
+                     * @description Sección de la relación (congelada al crear el renglón).
+                     * @enum {string}
+                     */
+                    rubro:
+                      | 'maquila'
+                      | 'proveedores'
+                      | 'nomina'
+                      | 'servicios'
+                      | 'caja_chica'
+                      | 'otros';
+                    /** @description Nombre con el que sale impreso (congelado). */
+                    nombre: string;
+                    /** @description Lo que se le paga (null si se ocultan importes). */
+                    monto: number | null;
+                    /** @enum {string} */
+                    formaPago: 'efectivo' | 'transferencia';
+                    /** @description Id de la cuenta destino, o null (efectivo). */
+                    idCuenta: number | null;
+                    /** @description A nombre de quién va (congelado). */
+                    beneficiario: string;
+                    banco: string | null;
+                    tipoCuenta: ('clabe' | 'tarjeta') | null;
+                    /** @description Últimos 4 dígitos de la cuenta, o null. */
+                    ultimos4: string | null;
+                    aliasCuenta: string | null;
+                    cuentaEsFiscal: boolean | null;
+                    /** @description La explicación del pago (lo que se está pagando). */
+                    concepto: string | null;
+                    /** @description Folios de remisiones/recibos que ampara. */
+                    referencia: string | null;
+                    idPagoMaquilero: number | null;
+                    idMovimientoTercero: number | null;
+                  }[];
+                  totalCapturado: number | null;
+                }[];
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
+              bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Eliminar una corrida en BORRADOR (una cerrada no se borra jamás) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/renglones': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Capturar un renglón (a quién, cuánto y por dónde) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Un renglón de la relación: a quién (proveedor O concepto), cuánto, por dónde y por qué. El origen y el rubro los DERIVA el servidor del beneficiario. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Proveedor (origen maquila/proveedor). */
+            idProveedor?: number;
+            /** @description Concepto (origen concepto). */
+            idConcepto?: number;
+            /** @description Lo que se le paga esta semana. CERO es válido: se ve, pero no sale. */
+            monto: number;
+            /**
+             * @description Efectivo o transferencia.
+             * @enum {string}
+             */
+            formaPago: 'efectivo' | 'transferencia';
+            /** @description Cuenta destino (obligatoria si es transferencia; null si es efectivo). */
+            idCuenta?: number | null;
+            concepto?: string | null;
+            referencia?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description La pantalla de trabajo de una corrida de pagos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado de una corrida semanal de pagos. */
+              corrida: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              };
+              secciones: {
+                /** @enum {string} */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                filas: {
+                  /** @enum {string} */
+                  origen: 'maquila' | 'proveedor' | 'concepto';
+                  idProveedor: number | null;
+                  idConcepto: number | null;
+                  /** @enum {string} */
+                  rubro:
+                    | 'maquila'
+                    | 'proveedores'
+                    | 'nomina'
+                    | 'servicios'
+                    | 'caja_chica'
+                    | 'otros';
+                  nombre: string;
+                  nombreCorto: string | null;
+                  /** @enum {string} */
+                  formaPagoSugerida: 'efectivo' | 'transferencia';
+                  idCuentaSugerida: number | null;
+                  /** @description Cuentas activas donde puede cobrar. */
+                  cuentas: {
+                    id: number;
+                    /** @description A nombre de quién va el depósito. */
+                    beneficiario: string;
+                    banco: string | null;
+                    /** @enum {string} */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description Últimos 4 dígitos de la cuenta. */
+                    ultimos4: string;
+                    /** @description Su "1", "2"… — lo que distingue un pago partido. */
+                    alias: string | null;
+                    /** @description A ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    esDefault: boolean;
+                  }[];
+                  puedeConFactura: boolean;
+                  /** @description Saldo a favor del beneficiario, o null. */
+                  saldo: number | null;
+                  /** @description Parte vencida del saldo (sólo CxP), o null. */
+                  vencido: number | null;
+                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  porRevisarNeto: number | null;
+                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  porRevisarPartidas: number;
+                  /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
+                  recibosSemanaImporte: number | null;
+                  /** @description Prendas recibidas esta semana (0 si no aplica). */
+                  recibosSemanaCantidad: number;
+                  renglones: {
+                    id: number;
+                    /** @enum {string} */
+                    origen: 'maquila' | 'proveedor' | 'concepto';
+                    idProveedor: number | null;
+                    idConcepto: number | null;
+                    /**
+                     * @description Sección de la relación (congelada al crear el renglón).
+                     * @enum {string}
+                     */
+                    rubro:
+                      | 'maquila'
+                      | 'proveedores'
+                      | 'nomina'
+                      | 'servicios'
+                      | 'caja_chica'
+                      | 'otros';
+                    /** @description Nombre con el que sale impreso (congelado). */
+                    nombre: string;
+                    /** @description Lo que se le paga (null si se ocultan importes). */
+                    monto: number | null;
+                    /** @enum {string} */
+                    formaPago: 'efectivo' | 'transferencia';
+                    /** @description Id de la cuenta destino, o null (efectivo). */
+                    idCuenta: number | null;
+                    /** @description A nombre de quién va (congelado). */
+                    beneficiario: string;
+                    banco: string | null;
+                    tipoCuenta: ('clabe' | 'tarjeta') | null;
+                    /** @description Últimos 4 dígitos de la cuenta, o null. */
+                    ultimos4: string | null;
+                    aliasCuenta: string | null;
+                    cuentaEsFiscal: boolean | null;
+                    /** @description La explicación del pago (lo que se está pagando). */
+                    concepto: string | null;
+                    /** @description Folios de remisiones/recibos que ampara. */
+                    referencia: string | null;
+                    idPagoMaquilero: number | null;
+                    idMovimientoTercero: number | null;
+                  }[];
+                  totalCapturado: number | null;
+                }[];
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
+              bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/renglones/{idRenglon}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Reemplazar un renglón (monto, forma de pago o cuenta destino) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+          /** @description Id del renglón. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      /** @description Un renglón de la relación: a quién (proveedor O concepto), cuánto, por dónde y por qué. El origen y el rubro los DERIVA el servidor del beneficiario. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Proveedor (origen maquila/proveedor). */
+            idProveedor?: number;
+            /** @description Concepto (origen concepto). */
+            idConcepto?: number;
+            /** @description Lo que se le paga esta semana. CERO es válido: se ve, pero no sale. */
+            monto: number;
+            /**
+             * @description Efectivo o transferencia.
+             * @enum {string}
+             */
+            formaPago: 'efectivo' | 'transferencia';
+            /** @description Cuenta destino (obligatoria si es transferencia; null si es efectivo). */
+            idCuenta?: number | null;
+            concepto?: string | null;
+            referencia?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description La pantalla de trabajo de una corrida de pagos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado de una corrida semanal de pagos. */
+              corrida: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              };
+              secciones: {
+                /** @enum {string} */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                filas: {
+                  /** @enum {string} */
+                  origen: 'maquila' | 'proveedor' | 'concepto';
+                  idProveedor: number | null;
+                  idConcepto: number | null;
+                  /** @enum {string} */
+                  rubro:
+                    | 'maquila'
+                    | 'proveedores'
+                    | 'nomina'
+                    | 'servicios'
+                    | 'caja_chica'
+                    | 'otros';
+                  nombre: string;
+                  nombreCorto: string | null;
+                  /** @enum {string} */
+                  formaPagoSugerida: 'efectivo' | 'transferencia';
+                  idCuentaSugerida: number | null;
+                  /** @description Cuentas activas donde puede cobrar. */
+                  cuentas: {
+                    id: number;
+                    /** @description A nombre de quién va el depósito. */
+                    beneficiario: string;
+                    banco: string | null;
+                    /** @enum {string} */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description Últimos 4 dígitos de la cuenta. */
+                    ultimos4: string;
+                    /** @description Su "1", "2"… — lo que distingue un pago partido. */
+                    alias: string | null;
+                    /** @description A ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    esDefault: boolean;
+                  }[];
+                  puedeConFactura: boolean;
+                  /** @description Saldo a favor del beneficiario, o null. */
+                  saldo: number | null;
+                  /** @description Parte vencida del saldo (sólo CxP), o null. */
+                  vencido: number | null;
+                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  porRevisarNeto: number | null;
+                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  porRevisarPartidas: number;
+                  /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
+                  recibosSemanaImporte: number | null;
+                  /** @description Prendas recibidas esta semana (0 si no aplica). */
+                  recibosSemanaCantidad: number;
+                  renglones: {
+                    id: number;
+                    /** @enum {string} */
+                    origen: 'maquila' | 'proveedor' | 'concepto';
+                    idProveedor: number | null;
+                    idConcepto: number | null;
+                    /**
+                     * @description Sección de la relación (congelada al crear el renglón).
+                     * @enum {string}
+                     */
+                    rubro:
+                      | 'maquila'
+                      | 'proveedores'
+                      | 'nomina'
+                      | 'servicios'
+                      | 'caja_chica'
+                      | 'otros';
+                    /** @description Nombre con el que sale impreso (congelado). */
+                    nombre: string;
+                    /** @description Lo que se le paga (null si se ocultan importes). */
+                    monto: number | null;
+                    /** @enum {string} */
+                    formaPago: 'efectivo' | 'transferencia';
+                    /** @description Id de la cuenta destino, o null (efectivo). */
+                    idCuenta: number | null;
+                    /** @description A nombre de quién va (congelado). */
+                    beneficiario: string;
+                    banco: string | null;
+                    tipoCuenta: ('clabe' | 'tarjeta') | null;
+                    /** @description Últimos 4 dígitos de la cuenta, o null. */
+                    ultimos4: string | null;
+                    aliasCuenta: string | null;
+                    cuentaEsFiscal: boolean | null;
+                    /** @description La explicación del pago (lo que se está pagando). */
+                    concepto: string | null;
+                    /** @description Folios de remisiones/recibos que ampara. */
+                    referencia: string | null;
+                    idPagoMaquilero: number | null;
+                    idMovimientoTercero: number | null;
+                  }[];
+                  totalCapturado: number | null;
+                }[];
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
+              bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    /** Quitar un renglón de un BORRADOR */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+          /** @description Id del renglón. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description La pantalla de trabajo de una corrida de pagos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado de una corrida semanal de pagos. */
+              corrida: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              };
+              secciones: {
+                /** @enum {string} */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                filas: {
+                  /** @enum {string} */
+                  origen: 'maquila' | 'proveedor' | 'concepto';
+                  idProveedor: number | null;
+                  idConcepto: number | null;
+                  /** @enum {string} */
+                  rubro:
+                    | 'maquila'
+                    | 'proveedores'
+                    | 'nomina'
+                    | 'servicios'
+                    | 'caja_chica'
+                    | 'otros';
+                  nombre: string;
+                  nombreCorto: string | null;
+                  /** @enum {string} */
+                  formaPagoSugerida: 'efectivo' | 'transferencia';
+                  idCuentaSugerida: number | null;
+                  /** @description Cuentas activas donde puede cobrar. */
+                  cuentas: {
+                    id: number;
+                    /** @description A nombre de quién va el depósito. */
+                    beneficiario: string;
+                    banco: string | null;
+                    /** @enum {string} */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description Últimos 4 dígitos de la cuenta. */
+                    ultimos4: string;
+                    /** @description Su "1", "2"… — lo que distingue un pago partido. */
+                    alias: string | null;
+                    /** @description A ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    esDefault: boolean;
+                  }[];
+                  puedeConFactura: boolean;
+                  /** @description Saldo a favor del beneficiario, o null. */
+                  saldo: number | null;
+                  /** @description Parte vencida del saldo (sólo CxP), o null. */
+                  vencido: number | null;
+                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  porRevisarNeto: number | null;
+                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  porRevisarPartidas: number;
+                  /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
+                  recibosSemanaImporte: number | null;
+                  /** @description Prendas recibidas esta semana (0 si no aplica). */
+                  recibosSemanaCantidad: number;
+                  renglones: {
+                    id: number;
+                    /** @enum {string} */
+                    origen: 'maquila' | 'proveedor' | 'concepto';
+                    idProveedor: number | null;
+                    idConcepto: number | null;
+                    /**
+                     * @description Sección de la relación (congelada al crear el renglón).
+                     * @enum {string}
+                     */
+                    rubro:
+                      | 'maquila'
+                      | 'proveedores'
+                      | 'nomina'
+                      | 'servicios'
+                      | 'caja_chica'
+                      | 'otros';
+                    /** @description Nombre con el que sale impreso (congelado). */
+                    nombre: string;
+                    /** @description Lo que se le paga (null si se ocultan importes). */
+                    monto: number | null;
+                    /** @enum {string} */
+                    formaPago: 'efectivo' | 'transferencia';
+                    /** @description Id de la cuenta destino, o null (efectivo). */
+                    idCuenta: number | null;
+                    /** @description A nombre de quién va (congelado). */
+                    beneficiario: string;
+                    banco: string | null;
+                    tipoCuenta: ('clabe' | 'tarjeta') | null;
+                    /** @description Últimos 4 dígitos de la cuenta, o null. */
+                    ultimos4: string | null;
+                    aliasCuenta: string | null;
+                    cuentaEsFiscal: boolean | null;
+                    /** @description La explicación del pago (lo que se está pagando). */
+                    concepto: string | null;
+                    /** @description Folios de remisiones/recibos que ampara. */
+                    referencia: string | null;
+                    idPagoMaquilero: number | null;
+                    idMovimientoTercero: number | null;
+                  }[];
+                  totalCapturado: number | null;
+                }[];
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
+              bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/cerrar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cerrar la relación (aquí muerde la guarda fiscal, con nombre y apellido) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description La pantalla de trabajo de una corrida de pagos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado de una corrida semanal de pagos. */
+              corrida: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              };
+              secciones: {
+                /** @enum {string} */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                filas: {
+                  /** @enum {string} */
+                  origen: 'maquila' | 'proveedor' | 'concepto';
+                  idProveedor: number | null;
+                  idConcepto: number | null;
+                  /** @enum {string} */
+                  rubro:
+                    | 'maquila'
+                    | 'proveedores'
+                    | 'nomina'
+                    | 'servicios'
+                    | 'caja_chica'
+                    | 'otros';
+                  nombre: string;
+                  nombreCorto: string | null;
+                  /** @enum {string} */
+                  formaPagoSugerida: 'efectivo' | 'transferencia';
+                  idCuentaSugerida: number | null;
+                  /** @description Cuentas activas donde puede cobrar. */
+                  cuentas: {
+                    id: number;
+                    /** @description A nombre de quién va el depósito. */
+                    beneficiario: string;
+                    banco: string | null;
+                    /** @enum {string} */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description Últimos 4 dígitos de la cuenta. */
+                    ultimos4: string;
+                    /** @description Su "1", "2"… — lo que distingue un pago partido. */
+                    alias: string | null;
+                    /** @description A ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    esDefault: boolean;
+                  }[];
+                  puedeConFactura: boolean;
+                  /** @description Saldo a favor del beneficiario, o null. */
+                  saldo: number | null;
+                  /** @description Parte vencida del saldo (sólo CxP), o null. */
+                  vencido: number | null;
+                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  porRevisarNeto: number | null;
+                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  porRevisarPartidas: number;
+                  /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
+                  recibosSemanaImporte: number | null;
+                  /** @description Prendas recibidas esta semana (0 si no aplica). */
+                  recibosSemanaCantidad: number;
+                  renglones: {
+                    id: number;
+                    /** @enum {string} */
+                    origen: 'maquila' | 'proveedor' | 'concepto';
+                    idProveedor: number | null;
+                    idConcepto: number | null;
+                    /**
+                     * @description Sección de la relación (congelada al crear el renglón).
+                     * @enum {string}
+                     */
+                    rubro:
+                      | 'maquila'
+                      | 'proveedores'
+                      | 'nomina'
+                      | 'servicios'
+                      | 'caja_chica'
+                      | 'otros';
+                    /** @description Nombre con el que sale impreso (congelado). */
+                    nombre: string;
+                    /** @description Lo que se le paga (null si se ocultan importes). */
+                    monto: number | null;
+                    /** @enum {string} */
+                    formaPago: 'efectivo' | 'transferencia';
+                    /** @description Id de la cuenta destino, o null (efectivo). */
+                    idCuenta: number | null;
+                    /** @description A nombre de quién va (congelado). */
+                    beneficiario: string;
+                    banco: string | null;
+                    tipoCuenta: ('clabe' | 'tarjeta') | null;
+                    /** @description Últimos 4 dígitos de la cuenta, o null. */
+                    ultimos4: string | null;
+                    aliasCuenta: string | null;
+                    cuentaEsFiscal: boolean | null;
+                    /** @description La explicación del pago (lo que se está pagando). */
+                    concepto: string | null;
+                    /** @description Folios de remisiones/recibos que ampara. */
+                    referencia: string | null;
+                    idPagoMaquilero: number | null;
+                    idMovimientoTercero: number | null;
+                  }[];
+                  totalCapturado: number | null;
+                }[];
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
+              bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/ejecutar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Ejecutar: el dinero salió y nacen los movimientos en los estados de cuenta */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description La pantalla de trabajo de una corrida de pagos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado de una corrida semanal de pagos. */
+              corrida: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              };
+              secciones: {
+                /** @enum {string} */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                filas: {
+                  /** @enum {string} */
+                  origen: 'maquila' | 'proveedor' | 'concepto';
+                  idProveedor: number | null;
+                  idConcepto: number | null;
+                  /** @enum {string} */
+                  rubro:
+                    | 'maquila'
+                    | 'proveedores'
+                    | 'nomina'
+                    | 'servicios'
+                    | 'caja_chica'
+                    | 'otros';
+                  nombre: string;
+                  nombreCorto: string | null;
+                  /** @enum {string} */
+                  formaPagoSugerida: 'efectivo' | 'transferencia';
+                  idCuentaSugerida: number | null;
+                  /** @description Cuentas activas donde puede cobrar. */
+                  cuentas: {
+                    id: number;
+                    /** @description A nombre de quién va el depósito. */
+                    beneficiario: string;
+                    banco: string | null;
+                    /** @enum {string} */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description Últimos 4 dígitos de la cuenta. */
+                    ultimos4: string;
+                    /** @description Su "1", "2"… — lo que distingue un pago partido. */
+                    alias: string | null;
+                    /** @description A ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    esDefault: boolean;
+                  }[];
+                  puedeConFactura: boolean;
+                  /** @description Saldo a favor del beneficiario, o null. */
+                  saldo: number | null;
+                  /** @description Parte vencida del saldo (sólo CxP), o null. */
+                  vencido: number | null;
+                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  porRevisarNeto: number | null;
+                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  porRevisarPartidas: number;
+                  /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
+                  recibosSemanaImporte: number | null;
+                  /** @description Prendas recibidas esta semana (0 si no aplica). */
+                  recibosSemanaCantidad: number;
+                  renglones: {
+                    id: number;
+                    /** @enum {string} */
+                    origen: 'maquila' | 'proveedor' | 'concepto';
+                    idProveedor: number | null;
+                    idConcepto: number | null;
+                    /**
+                     * @description Sección de la relación (congelada al crear el renglón).
+                     * @enum {string}
+                     */
+                    rubro:
+                      | 'maquila'
+                      | 'proveedores'
+                      | 'nomina'
+                      | 'servicios'
+                      | 'caja_chica'
+                      | 'otros';
+                    /** @description Nombre con el que sale impreso (congelado). */
+                    nombre: string;
+                    /** @description Lo que se le paga (null si se ocultan importes). */
+                    monto: number | null;
+                    /** @enum {string} */
+                    formaPago: 'efectivo' | 'transferencia';
+                    /** @description Id de la cuenta destino, o null (efectivo). */
+                    idCuenta: number | null;
+                    /** @description A nombre de quién va (congelado). */
+                    beneficiario: string;
+                    banco: string | null;
+                    tipoCuenta: ('clabe' | 'tarjeta') | null;
+                    /** @description Últimos 4 dígitos de la cuenta, o null. */
+                    ultimos4: string | null;
+                    aliasCuenta: string | null;
+                    cuentaEsFiscal: boolean | null;
+                    /** @description La explicación del pago (lo que se está pagando). */
+                    concepto: string | null;
+                    /** @description Folios de remisiones/recibos que ampara. */
+                    referencia: string | null;
+                    idPagoMaquilero: number | null;
+                    idMovimientoTercero: number | null;
+                  }[];
+                  totalCapturado: number | null;
+                }[];
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
+              bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/concentrado': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** La relación ejecutable: sólo lo que lleva monto, por rubro y por monto */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description La relación ejecutable de una corrida (lo que se le manda a finanzas). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado de una corrida semanal de pagos. */
+              corrida: {
+                id: number;
+                folio: number;
+                /** @description Lunes de la semana pagada (AAAA-MM-DD). */
+                semana: string;
+                conFactura: boolean;
+                /** @enum {string} */
+                estado: 'borrador' | 'cerrada' | 'ejecutada';
+                notas: string | null;
+                cerradaEn: string | null;
+                ejecutadaEn: string | null;
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              };
+              /** @description Las secciones con monto (una sección sin nada que pagar no sale). */
+              secciones: {
+                /** @enum {string} */
+                rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
+                renglones: {
+                  /** @enum {string} */
+                  rubro:
+                    | 'maquila'
+                    | 'proveedores'
+                    | 'nomina'
+                    | 'servicios'
+                    | 'caja_chica'
+                    | 'otros';
+                  nombre: string;
+                  beneficiario: string;
+                  banco: string | null;
+                  tipoCuenta: ('clabe' | 'tarjeta') | null;
+                  /** @description El número completo (es para transferir), o null. */
+                  cuenta: string | null;
+                  aliasCuenta: string | null;
+                  /** @enum {string} */
+                  formaPago: 'efectivo' | 'transferencia';
+                  monto: number | null;
+                  concepto: string | null;
+                  referencia: string | null;
+                }[];
+                /** @description Totales de efectivo y transferencia (los de su relación semanal). */
+                totales: {
+                  /** @description Σ de lo que sale en efectivo. */
+                  efectivo: number | null;
+                  /** @description Σ de lo que sale por transferencia. */
+                  transferencia: number | null;
+                  total: number | null;
+                  /** @description Cuántos renglones CON monto (> 0) hay. */
+                  renglones: number;
+                };
+              }[];
+              /** @description El gran total de la corrida. */
+              totales: {
+                /** @description Σ de lo que sale en efectivo. */
+                efectivo: number | null;
+                /** @description Σ de lo que sale por transferencia. */
+                transferencia: number | null;
+                total: number | null;
+                /** @description Cuántos renglones CON monto (> 0) hay. */
+                renglones: number;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;

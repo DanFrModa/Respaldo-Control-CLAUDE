@@ -334,10 +334,13 @@ export const esquemaProveedorFormulario = z
       mensajeMax: 'Los días de crédito no pueden ser más de 365',
     }).describe('Días de crédito (vacío o 0 = contado).'),
     moneda: z.string(),
-    formaPago: z
-      .string()
-      .trim()
-      .max(50, { error: 'La forma de pago no puede tener más de 50 caracteres' }),
+    // ⭐ EFECTIVO o TRANSFERENCIA por omisión para la corrida semanal (0.113, §Post-F9.189(c)).
+    // Sustituye al TEXTO LIBRE con la clave del SAT ("03 — Transferencia"), que contestaba la
+    // misma pregunta sin poder gobernar nada; el campo viejo sigue en el contrato pero ya no se
+    // captura (REGLA 0-B: lo viejo no se migra ni se repara). '' = sin preferencia.
+    formaPagoPreferida: z.enum(['', 'efectivo', 'transferencia'], {
+      error: 'La forma de pago debe ser efectivo o transferencia',
+    }),
     metodoPago: z.string(),
     // `banco`/`clabe` YA NO se capturan aquí (0.112): el dato bancario vive en las CUENTAS del
     // proveedor (`ProveedorCuentaPago`), que tienen beneficiario, tipo (CLABE/tarjeta), marca

@@ -28,6 +28,8 @@ import { ListaCostosPagina } from '@/modulos/costos/ListaCostosPagina';
 import { ListaPreciosPagina } from '@/modulos/costos/ListaPreciosPagina';
 import { MargenesPagina } from '@/modulos/costos/MargenesPagina';
 import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
+import { ConceptosPagoPagina } from '@/modulos/pagos/ConceptosPagoPagina';
+import { CorridaPagosPagina } from '@/modulos/pagos/CorridaPagosPagina';
 import { CxpPagina } from '@/modulos/cxp/CxpPagina';
 import { EstadoCuentaProveedorPagina } from '@/modulos/cxp/EstadoCuentaProveedorPagina';
 import { ImportarCfdiPagina } from '@/modulos/cxp/ImportarCfdiPagina';
@@ -281,6 +283,9 @@ const router = createBrowserRouter([
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
           // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4), corazón contable (F6-E4) y la
           // experiencia de usuario del estado de cuenta (F6-E5). Rutas estáticas antes de cualquier :param.
+          // La corrida semanal de pagos (0.113) y su catálogo de conceptos (0.125).
+          { path: 'pagos/corrida', element: <CorridaPagosPagina /> },
+          { path: 'catalogos/conceptos-pago', element: <ConceptosPagoPagina /> },
           { path: 'esma', element: <EsMaPagina /> },
           { path: 'esma/estado-cuenta', element: <EstadoCuentaPagina /> },
           { path: 'esma/saldos', element: <SaldosMaquilerosPagina /> },

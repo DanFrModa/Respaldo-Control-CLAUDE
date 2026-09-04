@@ -148,3 +148,5 @@ Formato de entrada, ejemplos y cómo correr: `backend/migracion/README.md` (secc
   el desglose vive en el XML guardado en R2. Leerlo del XML para el reporte del contador es iteración
   posterior (documentado en el TSDoc de `reportes/`).
 - **UsuarioRol / usuarios reales** — dependen de F10 (go-live); no afectan el motor.
+
+> **Ver también:** `pagos-corrida.md` — la corrida semanal de pagos (0.113) y el catálogo de conceptos de pago (0.125), que es donde los saldos de CxP y EsMa se convierten en pagos.

@@ -215,6 +215,19 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
     clave: 'cxc.administrar',
     razon: 'Capturar y cancelar cuentas por cobrar e importar CFDI de venta (F9-E4).',
   },
+  {
+    clave: 'conceptos-pago.administrar',
+    razon:
+      'Catálogo maestro (ADR-0007): dar de alta un concepto de pago es dar de alta A DÓNDE puede ' +
+      'salir dinero fuera del padrón de proveedores (fila 0.125).',
+  },
+  {
+    clave: 'pagos.corrida-armar',
+    razon:
+      'Daniel la pidió para él (§Post-F9.189(g)): armar la corrida es decidir a quién se le paga y ' +
+      'cuánto. *«Yo voy decidiendo los montos a pagar de cada uno. Manualmente.»* Ver la relación ' +
+      'sí se reparte (`pagos.corrida-ver`); armarla no.',
+  },
   // ── La marcha atrás de la firma de compra ──
   {
     clave: 'compras.desautorizar',
@@ -255,6 +268,7 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   'compras.recibir',
   'compras.ver',
   'concepto-costo.ver',
+  'conceptos-pago.ver',
   'consultas.ver-importes',
   'costos.capturar',
   'costos.ver',
@@ -309,6 +323,7 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   'ordenes.ver',
   'ordenes.ver-costos',
   'ordenes.ver-precio-real-maquila',
+  'pagos.corrida-ver',
   'pedidos-reales.administrar',
   'pedidos.administrar',
   'pedidos.importes',
@@ -372,6 +387,7 @@ const GERENCIAL: readonly ClavePermiso[] = [
   'compras.recibir',
   'compras.ver',
   'concepto-costo.ver',
+  'conceptos-pago.ver',
   'consultas.ver-importes',
   'cxc.ver',
   'cxp.ver',
@@ -420,6 +436,7 @@ const GERENCIAL: readonly ClavePermiso[] = [
   'ordenes.precio-maquila',
   'ordenes.ver',
   'ordenes.ver-precio-real-maquila',
+  'pagos.corrida-ver',
   'pedidos-reales.administrar',
   'pedidos.administrar',
   'pedidos.importes',

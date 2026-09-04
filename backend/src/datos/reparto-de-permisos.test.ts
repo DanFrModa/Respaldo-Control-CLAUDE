@@ -426,9 +426,37 @@ describe('📸 equivalencia: voltear el seed de RESTA a SUMA no movió a nadie d
  * ve sueldos»*). Si además es exclusiva del administrador, va TAMBIÉN en `SOLO_ADMINISTRADOR` del
  * seed — son preguntas distintas: aquélla dice *quién la tiene*, ésta dice *que se decidió*.
  *
- * Hoy está vacía: desde la foto no ha nacido ningún permiso.
  */
-const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = [];
+const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = [
+  // ── La corrida semanal de pagos (fila 0.113) y su catálogo (0.125), §Post-F9.189(g) ────────
+  {
+    clave: 'pagos.corrida-armar',
+    razon:
+      'SÓLO el administrador (va también en SOLO_ADMINISTRADOR del seed). Daniel lo pidió para ' +
+      'él: armar la corrida es DECIDIR a quién se le paga y cuánto — *«yo voy decidiendo los ' +
+      'montos a pagar de cada uno. Manualmente»*. Es la decisión más cara del sistema.',
+  },
+  {
+    clave: 'pagos.corrida-ver',
+    razon:
+      'Directivo y Gerencial, los mismos que ya llevan `cxp.ver` y `esma.ver-pagos`: es la ' +
+      'consulta de la relación (finanzas la lee para hacer las transferencias). NO baja a Ventas ' +
+      'ni de ahí para abajo — la relación es la nómina de proveedores de la semana.',
+  },
+  {
+    clave: 'conceptos-pago.ver',
+    razon:
+      'Directivo y Gerencial, los mismos que ven la corrida: los conceptos son renglones de esa ' +
+      'relación y sin verlos la pantalla queda coja.',
+  },
+  {
+    clave: 'conceptos-pago.administrar',
+    razon:
+      'SÓLO el administrador (va también en SOLO_ADMINISTRADOR del seed): es un catálogo MAESTRO ' +
+      'y dar de alta un concepto es dar de alta A DÓNDE puede salir dinero fuera del padrón de ' +
+      'proveedores.',
+  },
+];
 
 describe('🆕 lo nacido DESPUÉS de la foto también se decide por escrito', () => {
   it('⭐ un permiso que no estaba en la foto tiene que estar declarado aquí', () => {

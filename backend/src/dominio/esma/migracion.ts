@@ -143,7 +143,7 @@ function datosMovimientoMigrado(
   idMaquilero: number;
   monto: number;
   fecha: Date;
-  conFactura: null;
+  conFactura: null; // segmento: no particiona (es el TIPO del valor que se escribe, no un filtro)
   estadoRevision: EstadoRevisionEsMa;
   observaciones: string | null;
   creadoPorId: string;
@@ -155,7 +155,9 @@ function datosMovimientoMigrado(
     monto: entrada.monto,
     fecha: entrada.fecha,
     // El viejo no tenía el flag de facturación: el movimiento migrado nace SIN definir (decisión h).
-    conFactura: null,
+    // Esto ESCRIBE el «sin definir» — es el origen de los NULL que el segmento «sin factura» tiene
+    // que incluir, no un filtro que los deje fuera.
+    conFactura: null, // segmento: no particiona (escribe el valor, no filtra)
     estadoRevision: entrada.estadoRevision,
     observaciones: entrada.observaciones ?? null,
     creadoPorId: sesion.id,

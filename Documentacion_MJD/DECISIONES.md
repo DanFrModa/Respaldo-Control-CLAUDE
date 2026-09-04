@@ -12136,6 +12136,58 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.193) — LAS DOCE RESPUESTAS DEL REPASO DE INVENTARIOS, textuales, y su mapa contra las filas (Daniel, 4-sep-2026, madrugada)
+
+Daniel pegó el **Repaso de Inventarios** del 2-sep (fila 0.096: cuatro cosas graves, lo que el Access hacía y aquí no está, ocho cosas flojas y doce decisiones con default) y debajo su respuesta: *«**Todo está correcto**… excepto la 11, sí quiero que haya un lugar donde está ubicado. Principalmente para telas y avíos, pero podríamos dejarlo también para producto terminado.»* Y sobre la 12: *«debería de haber manera de sacar por ejemplo una devolución, o una venta de avíos que ya no se usen, de alguna manera que no sea mediante la descarga o aplicación a una OP. Esto **autorizado siempre por mí**. Lo mismo en telas… el 99 % sale por medio de una OP pero deberíamos de tener la opción de sacar alguna venta o cualquier otra cosa.»* Con §Post-F9.190, **inventarios entra completo en la V1** («a fuerzas»). Se cruzó todo contra las filas 0.099–0.104: **ocho decisiones ya tenían fila; cuatro cosas no y ahora la tienen (0.136–0.139)**.
+
+| # | Decisión del repaso (default aceptado con «todo está correcto») | Dónde vive |
+|---|---|---|
+| 1 | Imprimir el inventario de telas desde la pantalla nueva (tela, color, cuerpo y complemento, por almacén) y quitar el botón de la vieja | **0.136** (nueva): junto con las dos pantallas del menú de Telas que hablan con el inventario muerto |
+| 2 | El traspaso de producto terminado lleva hoja impresa con el folio que ya existe | **0.100** |
+| 3 | Meter o sacar producto terminado a mano exige motivo, como telas y avíos | **0.100** (adenda) |
+| 4 | Al contar tela se captura **lo contado** con el saldo a la vista; el sistema calcula y aplica la diferencia | **0.099** (adenda: es **la pantalla del arranque**, la que carga el inventario de telas el día uno; hoy sin ninguna prueba automática) |
+| 5 | El conteo cíclico se extiende a telas y avíos | **0.099** |
+| 6 | Si el almacén se movió durante el conteo, avisar al generar el ajuste y dejar decidir; no bloquear | **0.099** (adenda) |
+| 7 | Las prendas viejas de Access «(sin especificar)» se quedan como están y salen sólo por conteo cíclico | **Sin fila a propósito**: no se construye nada (REGLA 0-B); queda escrito aquí |
+| 8 | Al sacar tela para una orden, avisar sin bloquear si se saca más de lo que la orden pide | **0.101** |
+| 9 | El aviso de «riesgo de tono» sólo cuando hay más de una partida del color, con la lista de partidas a la vista | **0.101** |
+| 10 | Consumo de tela por corte y por modelo | **0.102** |
+| 11 | Ubicación física en el almacén: **sí** (la única que cambió el default) | **0.103** (ya cerrada el 3-sep con sus palabras: texto libre, sin catálogo) |
+| 12 | Salida de avíos y telas que no es por OP (devolución, venta), autorizada sólo por Daniel | **0.104** (ya cerrada el 3-sep: en PT existe; en telas y avíos se construye; lo abre sólo él) |
+
+**Las «otras cosas» del repaso que no eran decisión y no tenían número:** **0.137** nadie verifica que el almacén sea del tipo correcto (se puede meter producto terminado en la bodega de telas) → validación en el dominio · **0.138** el kardex de producto terminado no se puede filtrar por fechas (con diez años cargados trae todo) y nadie midió el volumen de la consulta de existencias → filtro y medición · **0.139** ⏸️ «comprometido» y «disponible» en producto terminado no existen → **fase 2** (no bloquea operar; el pedido y la orden ya dicen qué está prometido). El conteo cíclico que **no incluye lo que el sistema cree que no tiene** va como adenda de **0.099** (poder anotar mercancía con existencia cero).
+
+**Lo que este repaso deja listo:** las filas de inventarios se construyen **cuando finanzas cierre** (§Post-F9.192(k)), en este orden propuesto: 0.136 (grave, arranque) → 0.099 (la pantalla del arranque) → 0.104 → 0.100 → 0.101 → 0.137 → 0.103 → 0.102 → 0.138 → 0.130 (venta de sobrantes de PT). Daniel ya no tiene preguntas abiertas de inventarios: **las doce están contestadas**.
+
+- **Aplica en:** las filas 0.136–0.139 y las adendas nacen en la versión que cierra 0.113. **Fecha:** 2026-09-04.
+
+---
+
+#### (Post-F9.192) — LAS OCHO RESPUESTAS DEL REPASO DE FINANZAS, textuales, y su mapa contra las filas (Daniel, 4-sep-2026, madrugada)
+
+Daniel pegó el **Repaso de Finanzas** del 2-sep (fila 0.097: tres reglas, dos pendientes, ocho decisiones con default) y **debajo sus respuestas**, pidiendo verificar *«que todo lo que te puse efectivamente esté mapeado»*. Se cruzó cada punto contra las filas nacidas del repaso (0.110–0.126) y contra lo ya entregado. **Cinco cosas no tenían fila y ahora la tienen (0.128–0.132); tres van a fase 2 (0.133–0.135).**
+
+| # | Pregunta del repaso (default) | Respuesta de Daniel, textual | Dónde vive |
+|---|---|---|---|
+| 1 | ¿Quién puede validar los cargos de maquila? (default: sólo Administrador y Administración/Dirección) | *«La entrada la da la persona responsable de recibos o de producción. Pero **la validación sólo la doy yo**. O sea, es un permiso para meter lo recibido y otro para validarlo.»* | **0.128** (nueva). 0.095 sólo cambió *cómo* se declaran los permisos, no quién valida; 0.115 hizo que sólo lo revisado sume. El reparto por puestos reales lo arma Daniel antes de producción (0.120) |
+| 2 | Avíos que NO facturan: ¿cuándo nace la deuda? (default: al recibir, por lo recibido × precio de la OC, como telas) | *«Sí, la persona que recibe (a partir de una OC) mete las cantidades y precios a los que está entregando (el precio debería de ser el de la OC, la cantidad puede variar un poco, por eso se mete a mano)… pero **es la misma entrada que se ocupa tanto para inventario como para su estado de cuenta**.»* | **0.129** (nueva). Hoy la recepción de avíos contra OC mueve inventario y no toca CxP |
+| 3 | Avíos que SÍ facturan: ¿al recibir o al llegar la factura? (default: cargo provisional al recibir, sustituido por la factura) | *«Lo ideal es recibir con la factura. Pero si no fuera el caso, está bien dejarla como pendiente. **Todo se recibe a partir de la OC. Tanto telas como avíos.**»* | **0.129** (misma fila: la recepción por OC es la única puerta, para telas y avíos) |
+| 4 | Los movimientos viejos sin marca con/sin: ¿dónde los pones? (default: «sin factura» en todas las pantallas) | *«Vamos a generar Exceles con estados de cuenta de los que tienen factura y de los que no tienen factura. Esos te los vamos a mandar por aparte. Tenemos que ver cómo va la info de SINUBE y de Access, pero eso lo mandamos después. **Todo el tema de inventarios va a ser irrelevante como haya llegado. No te metas en eso para hacerlo más fácil.** Los saldos y estado de cuenta los mandaremos aparte.»* | El criterio único ya entró con **0.113** («sin» = false o sin definir, en todas las pantallas). Los saldos reales llegan por **0.131** (nueva): la carga de apertura desde SUS archivos (Excel con/sin factura + SINUBE + XML), y lo viejo es basura (REGLA 0-B) |
+| 5 | ¿Los dos listados separados también en la bandeja de CxP? (default: selector Todos / Con / Sin con totales y antigüedad partidos) | *«Sí, está bien tu recomendación.»* | **0.132** (nueva). La corrida (0.113) ya vive por segmento; la **bandeja** sigue con un solo saldo revuelto |
+| 6 | ¿Tus clientes también tienen con y sin factura? (default: no aplica) | *«Mis clientes a los que llevo todo el proceso de producción, **todos van con factura**. Clientes que les llego a vender sin factura son sólo **calderos** que les vendo lo que sobra (normalmente segundas). Eso ahorita lo hacemos como **una salida aparte**… ¿Cómo lo propones hacer?… no sería necesario llevar todo el proceso sin factura. **Sólo registrar lo que sale del inventario para determinado cliente.**»* | **0.130** (nueva), con propuesta abajo. CxC se queda **sin** separación con/sin (confirmado) |
+| 7 | ¿Cuándo sacas el corte de SINUBE? | *«Te voy a mandar un archivo de SINUBE para que veas cómo va a salir la información de ese sistema… Estos datos son irrelevantes porque se van a borrar cuando empecemos con producción, pero para que veas la estructura de los archivos. Te mando también los XML para que los revises y veas que te cuadra todo.»* | **0.131** (nueva): revisar la estructura de los tres tipos de archivo contra el ETL de apertura (D15c) **antes** de que lleguen los reales |
+| 8 | ¿Capturas ya el RFC de FR Moda? | *«Sí. Te puedo subir la constancia de situación fiscal (que es como deberíamos de dar de alta a todos los clientes y proveedores, para que tengas la información de un documento oficial). **Esto por favor hay que tomarlo en cuenta. Para dar de alta un proveedor o cliente que factura, debemos de subir la constancia de situación fiscal.**»* | El RFC lo captura Daniel/Gabriel en Administración › Empresas (pendiente manual de 0.097). La constancia es **0.119** — y con esta respuesta la fila **crece**: no es «leer un PDF», es **la puerta de alta** de todo proveedor o cliente que factura, y también para **clientes** |
+
+**Lo que ya estaba mapeado y dónde:** la casilla de modalidad de facturación → **0.110 ✅** (v0.096) · las dos banderas que se contradicen → **0.124** · el cotejo de la factura del maquilero → **0.117** · la antigüedad → **0.121** · el «Ojo» de las dos cifras de «sin factura» → resuelto en **0.113**. **La puerta lateral** de la regla 1 (una «entrada sin factura» en CxP a un maquilero no pasa por validación) queda **aceptada**: ese permiso ya está restringido al círculo de Daniel, y 0.128 lo vuelve a mirar al repartir los permisos.
+
+**Tres cosas flojas del repaso que no tenían número y van a FASE 2** (criterio §Post-F9.190: hoy hay con qué operar): **0.133** el PDF del reporte fiscal se trunca en periodos largos (el Excel trae todo: para el contador manda el Excel) · **0.134** los pagos no se ligan a la orden de compra (no se sabe si una compra concreta ya se pagó) · **0.135** la fusión de EsMa dentro de Finanzas nunca ocurrió (el menú la marca «interina»; conviven dos vistas del mismo maquilero).
+
+**Propuesta para la 6 (venta de sobrantes y segundas a «calderos», sin factura) — ✅ CONFIRMADA por Daniel (4-sep, 01:35 UTC: *«Está bien tu propuesta para la venta de sobrantes»*):** una **salida de inventario de producto terminado por «venta directa»**: se elige el cliente (del catálogo; se puede marcar como *ocasional*), las piezas por color y talla, el precio unitario y **cómo se cobró** (efectivo / transferencia / «queda a deber»). Sale del kardex como movimiento inverso auditado (D3) con motivo «venta directa», imprime una nota de salida sencilla, y **no arranca pedido, orden ni proceso**. Si «queda a deber», nace un cargo en cuentas por cobrar del segmento sin factura; si se cobró en el acto, no toca CxC. Es el gemelo para producto terminado de la **0.104** (la salida de material que no es por OP), con el mismo candado: **la autoriza sólo Daniel**.
+
+- **Aplica en:** las filas 0.128–0.135 nacen en la versión que cierra 0.113. **Fecha:** 2026-09-04.
+
+---
+
 #### (Post-F9.190) — «YA QUIERO SALIR»: la caja chica y lo demás que vive en Excel se van a FASE 2 (Daniel, 4-sep-2026, madrugada)
 
 Al proponerle la fila **0.127** (el libro de caja chica con reposición calculada, nacido de leer su archivo semanal), Daniel cortó por lo sano:
@@ -12249,6 +12301,38 @@ No es una pantalla nueva desde cero: es el tablero de 0.115 con la columna «a p
   catálogo de otros beneficiarios se numeró antes.)*
 - El **IVA explícito** en el renglón va con el documento «yo te digo qué facturarme» (**0.118**).
 - **Corte y empaque** como cargos pagables (**0.114**).
+
+**(f-bis) UNA SOLA PANTALLA, por rubros** — pregunta de Daniel del 3-sep (noche):
+UNA SOLA PANTALLA, por rubros — pregunta de Daniel del 3-sep (noche)
+> *«Acuérdate que en esa relación van maquileros y proveedores sin factura y también los conceptos que
+> dijimos ahorita. No sé si en la misma pantalla sean las dos cosas. O vemos maquileros por un lado y
+> proveedores por otro, y después las juntamos en una sola?»*
+✅ **DANIEL DECIDIÓ** (*«de acuerdo, me encanta así todo junto»*): **una sola pantalla con secciones por rubro** (maquileros ·
+proveedores sin factura · conceptos del catálogo, y dentro de conceptos los rubros que Daniel defina).
+**Por qué:** la corrida ES la unión; los totales de efectivo y transferencia sólo tienen sentido sobre el
+conjunto; partirla en dos pantallas obliga a «juntarlas después» a mano — que es exactamente el paso de su
+Excel donde el total no cuadra (§Post-F9.186(f): los 2,277 que nadie sabía explicar). Lo que SÍ cambia por
+sección son las **columnas de referencia** (nunca el número que se paga): maquileros → saldo EsMa +
+pendiente por revisar + recibos de la semana; proveedores CxP → saldo + vencido (cubetas de la bandeja);
+conceptos → sin referencia, nacen en cero. La columna «a pagar esta semana» y el selector
+efectivo/transferencia son iguales en las tres. 📌 Si algún día quiere ver maquileros y proveedores por separado, se resuelve con **filtros/pestañas dentro de la
+misma corrida**, nunca con dos corridas.
+
+**(g-bis) Decisiones que el coder tomó solo — defaults puestos, pendientes de Daniel:**
+Dos decisiones que el coder tomó solo — defaults puestos, pendientes de Daniel 
+1. **`Proveedor.formaPago` (texto libre con clave del SAT) quedó SUPERADO** por el enum nuevo `formaPagoPreferida` (efectivo | transferencia): sigue en base y contrato (REGLA 0-B) pero ya no se captura ni se muestra. Añadir un segundo campo habría repetido el defecto de la 0.124 (dos campos para una pregunta). ⚠️ Riesgo: si el timbrado vía PAC (R14, futuro) necesita la clave SAT de forma de pago, se reabre ese día — hoy nadie la lee.
+2. **En la corrida CON factura, la guarda fiscal bloquea también el EFECTIVO** — lectura literal de «un pago con factura sólo sale a una cuenta fiscal». ⚠️ Riesgo: si Daniel a veces paga en efectivo a alguien que factura, ese renglón se traba. **Default: bloquear** (es lo que dijo); si Daniel quiere permitir efectivo con factura, es un cambio de una condición.
+3. `RubroPago` es un enum cerrado (6 valores: un rubro nuevo pide migración) — aceptable mientras los rubros sean los de su Excel.
+
+**(i) El archivo semanal de finanzas, medido** (3-sep, noche; el archivo NO entra al repo, sin nombres ni cuentas): una hoja «pagos a proveedores y compras en efectivo» = **la relación sin factura** (~37 renglones, todos los rubros mezclados: proveedores, «nómina por fuera <fecha>», compras en efectivo, servicios; cada uno con **concepto libre**, beneficiario + CLABE cuando es transferencia, columnas Factura/Remisión con importe, y **folios** en notas); pie con **tres totales que no cuadran entre sí** porque las columnas de clasificación no son excluyentes. ⇒ El sistema **cuadra por construcción**: un renglón = un monto = un segmento = una forma de pago; cada renglón lleva `concepto` y `referencia`; «nómina por fuera <fecha>» es un concepto del catálogo (0.125) con la fecha en el texto. Las otras dos hojas son **libros de caja chica** con importe fijo, gastos, saldo corriente y reposiciones ⇒ «caja chica» en la corrida **es la reposición**, no un gasto: hoy concepto predeterminado con monto a mano; el libro es la fila **0.127**.
+
+**(c-bis) Textual de Daniel sobre el catálogo** (3-sep, noche), para que no se pierda la frase: *«Que sean un catálogo aparte, no proveedores. Y algunos de ellos quiero que se cargue por default en la relación. Porque son conceptos que cada semana pago y no quiero que se me vaya a olvidar ponerlo (caja chica, nómina por fuera, etc). De ese catálogo poder definir cuáles son los predeterminados para que siempre se carguen en cero para que yo le ponga la cantidad.»* Y sobre su archivo semanal, al compartirlo: *«Ese archivo se va a reemplazar con la pantalla de saldos.»*
+
+**(k) El orden de trabajo lo fijó Daniel** (3-sep, tarde): *«No te quiero dar nada de inventarios hasta terminar con finanzas y los otros pendientes.»* ⇒ finanzas primero; inventarios se abre cuando finanzas cierre — y desde el 4-sep (§Post-F9.190) entra completo en la V1. Y sobre el método, dos veces el mismo día: *«por favor no frenes para tener mis respuestas. Tienes muchos pendientes que hacer»* (REGLA 0) y *«Checa bien las reglas de Gabriel. No estoy seguro si pueden haber dos coders al mismo tiempo. Chance solamente si hacen cosas completamente diferentes que no se toquen»* ⇒ se verificó la regla de Gabriel (un coder por ÁRBOL; en paralelo sólo en worktrees separados) y así se trabajó.
+
+**(j) Decisiones del lead en la revisión** (4-sep): la pantalla de trabajo muestra **toda la cartera del segmento** a propósito (no hay «agregar proveedor»; esconder = no cobrar), ordenada con lo que pide decisión primero; `pagos.corrida-ver` **implica** ver los saldos de la semana (no se exige `cxp.ver`/`esma.ver-pagos` aparte; razón escrita en el TSDoc del permiso); `corte`/`empaque` caen hoy en la sección de proveedores hasta la **0.114**.
+
+- **Aplica en:** versión **0.102** (filas 0.113 + 0.125; 0.127 nace aquí). **Fecha:** 2026-09-04.
 
 ---
 

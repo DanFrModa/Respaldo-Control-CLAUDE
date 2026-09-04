@@ -58,7 +58,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 107 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 109 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
     // (106 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
@@ -71,7 +71,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // la cola de la revisión de receta (§Post-F9.140); +1 en V1-E9p: «Promesas incumplidas», la
     // lista del DUEÑO con lo que se vendió y no se consiguió (§Post-F9.144(b)). Lo que cambia es
     // SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(107);
+    expect(MODULOS_MENU).toHaveLength(109);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -378,6 +378,9 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     {
       titulo: 'Finanzas',
       entradas: [
+        // ⭐ La PRIMERA de Finanzas (fila 0.113): es la pantalla que Daniel usa cada semana
+        // (§Post-F9.185: *«una de las pantallas más importantes dentro del sistema»*).
+        { clave: 'corrida-pagos', padre: false },
         { clave: 'cxc', padre: false },
         { clave: 'cxp', padre: false },
         { clave: 'reportes-fiscales', padre: false }, // F9-E5: reporte del contador (gate terceros.fiscal)

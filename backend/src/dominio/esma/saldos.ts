@@ -42,15 +42,19 @@ import {
   WHERE_PENDIENTE_ABONO,
   WHERE_PENDIENTE_DESCUENTO,
   WHERE_PENDIENTE_PAGO,
+  whereSegmentoFactura,
   type PendienteRevision,
+  type SegmentoFactura,
+  type WhereSegmentoFactura,
 } from './formula-saldo.js';
 
-/** Cláusula `where` de facturación para un segmento (o `{}` si no se segmenta). */
-function conFacturaWhere(segmento: 'con' | 'sin' | undefined): { conFactura?: boolean } {
-  if (segmento === undefined) {
-    return {};
-  }
-  return { conFactura: segmento === 'con' };
+/**
+ * Cláusula `where` de facturación para un segmento (o `{}` si no se segmenta) — pedida a la
+ * definición ÚNICA (`formula-saldo.ts` §segmento): «sin factura» = `false` **o** sin definir. Aquí
+ * decía `= false`, que dejaba fuera lo migrado sin definir (ver el TSDoc de la definición).
+ */
+function conFacturaWhere(segmento: SegmentoFactura | undefined): WhereSegmentoFactura {
+  return whereSegmentoFactura(segmento);
 }
 
 /** Desglose crudo del saldo de un maquilero (sin ocultar importes ni verificar permiso). */

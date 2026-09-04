@@ -21,7 +21,13 @@ import type { MovimientoTerceroSalida } from '../../contrato/index.js';
 import { type Tx } from '../../comun/transaccion.js';
 import type { PrismaClient } from '../../datos/index.js';
 
-import { aporteCargoAlSaldo, cuentaAlSaldoPlano } from '../esma/formula-saldo.js';
+import {
+  aporteCargoAlSaldo,
+  cuentaAlSaldoPlano,
+  whereSegmentoFactura,
+  type SegmentoFactura,
+  type WhereSegmentoFactura,
+} from '../esma/formula-saldo.js';
 import { calcularSaldoMaquilero, type SaldoMaquileroCalculado } from '../esma/saldos.js';
 import { saldosEsMaPorMaquilero, type AporteEsMaLote } from '../esma/saldos-todos.js';
 
@@ -70,33 +76,17 @@ function rangoCreado(
 }
 
 /**
- * Cláusula `where` del SEGMENTO de facturación sobre los movimientos EsMa (V1-E3f pieza B).
+ * Cláusula `where` del SEGMENTO de facturación sobre los movimientos EsMa — pedida a la definición
+ * ÚNICA (`formula-saldo.ts` §segmento).
  *
- * ⚠️ `EsMaCargo.conFactura` es NULLABLE ("sin definir": así quedaron los movimientos que migraron
- * del Access, donde la pregunta jamás se hizo). El segmento `sin` tiene que traer los `false`
- * **Y** los sin definir, porque los dos segmentos deben ser una PARTICIÓN EXACTA del saldo —es lo
- * que pidió Daniel (*"quisiera tener por separado los que son con factura y los sin factura"*)— y
- * porque el encabezado ya los cuenta ahí: `saldoSinFactura = saldo − saldoFiscal`. Si la lista los
- * dejara fuera, el total y los renglones se contradirían. Toca dinero.
- *
- * 🔴 **Por eso NO se usa `{ not: true }`, que es lo que parecía natural y estuvo aquí un rato.**
- * En lógica de tres valores `NULL <> true` evalúa a NULL, así que la fila se descarta igual que
- * con `= false`: **las dos formas son idénticas en efecto** y ninguna incluye los NULL. Verificado
- * en Postgres sobre `(true, false, NULL)`: `<> true` → 1 fila, `= false` → 1 fila, el OR → 2.
- * La única forma que sí los trae es la explícita.
- *
- * Es también la diferencia deliberada con la pantalla propia de EsMa (`esma/estado-cuenta.ts`, que
- * filtra `= false`): allí el segmento es un filtro de consulta; aquí es una partición que debe
- * cuadrar con un saldo.
+ * ⭐ Este archivo TENÍA la respuesta correcta (`false` **o** sin definir) y `esma/estado-cuenta.ts`
+ * y `esma/saldos.ts` tenían la otra (`= false`). El comentario de aquí llamaba a esa diferencia
+ * «deliberada» —allá un filtro de consulta, aquí una partición—, y no lo era: los dos segmentos son
+ * SIEMPRE una partición, porque Daniel arma DOS relaciones de pago por semana (§Post-F9.189(a)) y
+ * un movimiento que no cae en ninguna no se paga nunca. La fila 0.113 lo unificó: gana ésta.
  */
-function facturaWhere(segmento: 'todos' | 'con' | 'sin'): {
-  conFactura?: boolean;
-  OR?: { conFactura: boolean | null }[];
-} {
-  if (segmento === 'todos') return {};
-  if (segmento === 'con') return { conFactura: true };
-  // Explícito a propósito: `{ not: true }` NO trae los NULL (ver arriba).
-  return { OR: [{ conFactura: false }, { conFactura: null }] };
+function facturaWhere(segmento: 'todos' | 'con' | 'sin'): WhereSegmentoFactura {
+  return whereSegmentoFactura(segmento === 'todos' ? undefined : segmento);
 }
 
 /**
@@ -130,8 +120,9 @@ export async function aporteEsMaSaldo(
 export async function aportesEsMaSaldoLote(
   cliente: Tx | PrismaClient,
   idEmpresa: number,
+  segmento?: SegmentoFactura,
 ): Promise<Map<number, AporteEsMaLote>> {
-  return saldosEsMaPorMaquilero(cliente, idEmpresa);
+  return saldosEsMaPorMaquilero(cliente, idEmpresa, segmento);
 }
 
 /** Opciones de la proyección del detalle EsMa. */

@@ -68,6 +68,8 @@ import { rutasCuentaEsMa } from './api/esma/cuenta.rutas.js';
 import { rutasEstadoCuentaEsMa } from './api/esma/estado-cuenta.rutas.js';
 import { rutasTerceros } from './api/terceros/movimientos.rutas.js';
 import { rutasCxp } from './api/terceros/cxp.rutas.js';
+import { rutasConceptosPago } from './api/pagos/conceptos-pago.rutas.js';
+import { rutasCorridaPagos } from './api/pagos/corrida.rutas.js';
 import { rutasCfdi } from './api/terceros/cfdi.rutas.js';
 import { rutasCxc } from './api/terceros/cxc.rutas.js';
 import { rutasCfdiVentas } from './api/terceros/cfdi-ventas.rutas.js';
@@ -320,6 +322,9 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // bandeja "por pagar" con antigüedad de saldos (aging server-side), estado de cuenta (+ PDF) y
   // captura/cancelación de movimientos (cxp.ver / cxp.administrar; la vista fiscal exige terceros.fiscal).
   await app.register(rutasCxp, { prefix: '/api' });
+  // La corrida semanal de pagos y el catálogo de conceptos que no son proveedores (0.113 / 0.125).
+  await app.register(rutasConceptosPago, { prefix: '/api' });
+  await app.register(rutasCorridaPagos, { prefix: '/api' });
   // FINANZAS (Módulo 14, F9-E3) — Importación de CFDI de proveedores (R11): parser/validador CFDI 4.0,
   // previsualización con conciliación (proveedor por RFC + OC por total cercano) e importación
   // transaccional (XML en R2 + cargo FISCAL de CxP por el total del CFDI). Reusa cxp.administrar.

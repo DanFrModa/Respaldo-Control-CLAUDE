@@ -103,6 +103,7 @@ function proveedor(id: number, nombre: string, activo = true): Proveedor {
     diasCredito: null,
     moneda: null,
     formaPago: null,
+    formaPagoPreferida: null,
     metodoPago: null,
     banco: null,
     clabe: null,
@@ -341,7 +342,11 @@ describe('<ProveedoresPagina>', () => {
     completo.direccion = 'Av. Siempre Viva 123';
     completo.diasCredito = 30;
     completo.moneda = 'USD';
+    // 0.113: la forma de pago que la ficha enseña es la POR OMISIÓN de la corrida semanal
+    // (efectivo/transferencia). El `formaPago` viejo —texto libre con la clave del SAT— quedó
+    // superado y ya no se pinta: se deja poblado a propósito para comprobar que NO sale.
     completo.formaPago = '03 — Transferencia';
+    completo.formaPagoPreferida = 'transferencia';
     completo.metodoPago = 'PPD';
     // 0.112: el dato bancario ya no es `banco`/`clabe` del proveedor, son sus CUENTAS —cada una a
     // nombre de SU beneficiario, que casi nunca es el proveedor— con una marcada por omisión.
@@ -382,6 +387,12 @@ describe('<ProveedoresPagina>', () => {
     // Datos de pago (la moneda y el método se muestran con su etiqueta legible).
     expect(within(detalle).getByText('30 días')).toBeInTheDocument();
     expect(within(detalle).getByText('Dólar (USD)')).toBeInTheDocument();
+    // 0.113: la forma de pago que se enseña es la POR OMISIÓN de la corrida (efectivo/transferencia).
+    expect(within(detalle).getByText('Forma de pago por omisión')).toBeInTheDocument();
+    expect(within(detalle).getByText('Transferencia')).toBeInTheDocument();
+    // ⭐ Y el campo VIEJO (texto libre con la clave del SAT) NO sale, aunque esté poblado: dos
+    // respuestas a la misma pregunta en la misma ficha es el defecto que la fila 0.124 corrige.
+    expect(within(detalle).queryByText('03 — Transferencia')).not.toBeInTheDocument();
     // La cuenta se lee con su BENEFICIARIO y sus marcas (por omisión / fiscal).
     const cuentas = within(detalle).getByTestId('cuentas-pago-detalle');
     expect(within(cuentas).getByText('Fulana de Tal')).toBeInTheDocument();

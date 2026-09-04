@@ -141,6 +141,9 @@ model Empresa {
   /// Archivo histórico de órdenes del sistema viejo (§Post-F9.26, solo consulta).
   historicoOrdenesV1 HistoricoOrdenV1[]
 
+  /// Corridas semanales de pago de esta empresa (0.113, A9). Restrict.
+  corridasPago CorridaPago[]
+
   @@map("empresas")
 }
 
@@ -684,23 +687,33 @@ model Proveedor {
 
   // ── Comercial / pago (F1-E1B, R15 §4) ─────────────────────────────────────
   /// Condición de pago: días de crédito. null o 0 = contado (ver TSDoc del dominio).
-  diasCredito   Int?     @map("dias_credito")
+  diasCredito        Int?         @map("dias_credito")
   /// Moneda habitual: MXN o USD (validada en Zod).
-  moneda        String?
-  /// Forma de pago (transferencia/efectivo/cheque — clave o texto del SAT).
-  formaPago     String?  @map("forma_pago")
+  moneda             String?
+  /// ⚠️ SUPERADO por `formaPagoPreferida` (0.113). Es TEXTO LIBRE con la clave del SAT para el
+  /// CFDI ("03 — Transferencia") y nadie lo leía para decidir nada. La pregunta que Daniel hace
+  /// cada semana —*¿a éste le pago en efectivo o por transferencia?*— necesita DOS respuestas
+  /// posibles, no una cadena; dejar las dos capturables era repetir el defecto de
+  /// `factura`/`modalidadFacturacion` (fila 0.124). Se conserva por REGLA 0-B (lo viejo no se
+  /// migra ni se repara) pero YA NO SE CAPTURA en pantalla.
+  formaPago          String?      @map("forma_pago")
+  /// ⭐ Efectivo o transferencia, por omisión, para la corrida semanal (0.113; §Post-F9.189(c),
+  /// textual: *«podemos dejarlo como default de cada proveedor, pero con opción a cambiarlo — de
+  /// pronto un maquilero me pide que le pague una semana en efectivo»*). NULL = sin preferencia:
+  /// el renglón la deduce de si el proveedor tiene cuenta (con cuenta ⇒ transferencia).
+  formaPagoPreferida FormaDePago? @map("forma_pago_preferida")
   /// Método de pago del CFDI: PUE (una exhibición) o PPD (parcialidades/diferido).
-  metodoPago    String?  @map("metodo_pago")
+  metodoPago         String?      @map("metodo_pago")
   /// ⚠️ SUPERADO por `ProveedorCuentaPago` (0.112). Cabía UNA sola cuenta, sin beneficiario y sin
   /// distinguir CLABE de tarjeta, y la realidad de la relación de pago semanal de Daniel no cabe
   /// aquí: el beneficiario casi nunca es el proveedor y un mismo proveedor tiene VARIAS cuentas.
   /// Se conserva por REGLA 0-B (lo viejo no se migra ni se repara): ya NO se captura ni se lee en
   /// pantalla — quien quiera el dato bancario va a `cuentasPago`.
-  banco         String?
+  banco              String?
   /// ⚠️ SUPERADO por `ProveedorCuentaPago.cuenta` + `tipoCuenta` (0.112). Ver la nota de `banco`.
-  clabe         String?
+  clabe              String?
   /// Límite de crédito (opcional), para alertas de CxP en F8.
-  limiteCredito Decimal? @map("limite_credito") @db.Decimal(14, 2)
+  limiteCredito      Decimal?     @map("limite_credito") @db.Decimal(14, 2)
 
   // ── Operativo (F1-E1B): alimenta el MRP/Make-to-Order (R3/R7, F4) ─────────
   /// Tiempo de entrega típico en días (lead time).
@@ -740,6 +753,8 @@ model Proveedor {
   contactos               ProveedorContacto[]
   /// Cuentas/destinos de pago del proveedor (0.112): N cuentas con su BENEFICIARIO, una default.
   cuentasPago             ProveedorCuentaPago[]
+  /// Renglones de corrida semanal de pago que lo pagan (0.113). Restrict.
+  renglonesCorridaPago    RenglonCorridaPago[]
   /// Adjuntos del proveedor en R2 (F1-E1B: constancia, contrato…).
   archivos                ProveedorArchivo[]
   /// Avíos que surte este proveedor (F1-E3, R1, N:N vía `AvioProveedor`).
@@ -941,6 +956,10 @@ model ProveedorCuentaPago {
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
+
+  /// Renglones de corrida que salieron a esta cuenta (0.113). Restrict: una cuenta usada en un
+  /// pago no se borra (el borrado ya era suave de todas formas).
+  renglones RenglonCorridaPago[]
 
   /// UNA SOLA DEFAULT POR PROVEEDOR, garantizada por la base (ver el comentario del modelo).
   @@unique([idProveedor, esDefault])
@@ -4918,6 +4937,14 @@ model PagoMaquilero {
   /// Aplicaciones del pago a cargos concretos (decisión (g)). Cascade (el detalle vive con el pago).
   aplicaciones PagoAplicacion[]
 
+  /// Renglón de la corrida semanal que lo originó (0.113), si nació de una. Restrict.
+  ///
+  /// ⚠️ Relación **1-a-1 opcional**, no una lista: la FK del renglón lleva `@@unique`, así que a un
+  /// pago no le pueden apuntar dos renglones (es la defensa de la idempotencia en la base). Estuvo
+  /// declarada como `[]` y el cliente generado mentía: ofrecía un arreglo donde nunca puede haber
+  /// más de uno, e invitaba a escribir código que trata el caso imposible.
+  renglonCorrida RenglonCorridaPago?
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -5060,6 +5087,14 @@ model MovimientoTercero {
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
+
+  /// Renglón de la corrida semanal que lo originó (0.113), si nació de una. Restrict.
+  ///
+  /// ⚠️ Relación **1-a-1 opcional**, no una lista: la FK del renglón lleva `@@unique`, así que a un
+  /// pago no le pueden apuntar dos renglones (es la defensa de la idempotencia en la base). Estuvo
+  /// declarada como `[]` y el cliente generado mentía: ofrecía un arreglo donde nunca puede haber
+  /// más de uno, e invitaba a escribir código que trata el caso imposible.
+  renglonCorrida RenglonCorridaPago?
 
   @@unique([idEmpresa, folio])
   @@unique([uuidCfdi])
@@ -8936,4 +8971,357 @@ model RespaldoCorrida {
   @@index([iniciadoEn])
   @@index([estado, iniciadoEn])
   @@map("respaldo_corrida")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ⭐ LA CORRIDA SEMANAL DE PAGOS (fila 0.113) + EL CATÁLOGO DE CONCEPTOS QUE NO SON
+// PROVEEDORES (fila 0.125) — §Post-F9.185 y §Post-F9.189.
+//
+// Daniel, sobre la pantalla: *«Es una de las pantallas más importantes dentro del sistema.»*
+// Hoy el proceso vive en Excel: producción le pasa un archivo de maquilas, él decide A MANO
+// cuánto se le paga a cada quien, arma otro Excel —una relación CON factura y otra SIN— y se
+// lo manda a finanzas. *«Quiero automatizar todo ese proceso y quitar por completo todos los
+// reportes de Excel.»*
+//
+// Las cuatro decisiones que este modelo sostiene (§Post-F9.189):
+//  (a) LA CORRIDA SE GUARDA y son DOS por semana (con factura y sin factura), con ciclo
+//      `borrador → cerrada → ejecutada`: reimprimir el martes da lo mismo que el lunes.
+//  (b) EL MONTO LO TECLEA ÉL, renglón por renglón. NO se deriva de los recibos: el saldo y los
+//      recibos de la semana se enseñan como REFERENCIA al lado, nunca como el número que se paga.
+//  (c) EFECTIVO O TRANSFERENCIA con default por beneficiario y **cambiable en cada renglón**.
+//  (e) UNA SOLA RELACIÓN, separada por RUBRO — como su Excel.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Cómo sale físicamente el dinero (§Post-F9.189(c)). Sólo dos: es la separación con la que
+/// Daniel cierra su relación semanal (*«30,000 efectivo + 108,201 transferencia»*).
+///
+/// ⚠️ NO confundir con `Proveedor.formaPago`, que es TEXTO LIBRE con la clave del SAT para el
+/// CFDI ("03 — Transferencia"). Ése quedó SUPERADO por `Proveedor.formaPagoPreferida` (abajo):
+/// se conserva por REGLA 0-B pero ya no se captura.
+enum FormaDePago {
+  efectivo
+  transferencia
+
+  @@map("forma_de_pago")
+}
+
+/// Las SECCIONES de la relación de pago (§Post-F9.189(e): *«misma relación pero separada por
+/// rubro, así como mi archivo de Excel»*).
+///
+/// Los dos primeros se DERIVAN del proveedor (tiene rol de maquila o no) y por eso no se
+/// capturan en ningún lado; los otros cuatro son los que Daniel nombró para el catálogo de
+/// conceptos que no son proveedores: *«nóminas por fuera, gratificaciones, pago de algún
+/// servicio como agua, o cualquier otra cosa»* + *«caja chica»*.
+enum RubroPago {
+  /// Talleres: el monto nace de una ORDEN (EsMa). §Post-F9.185(b).
+  maquila
+  /// Transportistas y demás proveedores: el monto nace de un ESTADO DE CUENTA (CxP).
+  proveedores
+  /// Nómina por fuera y gratificaciones.
+  nomina
+  /// Servicios (agua, luz, teléfono…).
+  servicios
+  /// Caja chica.
+  caja_chica
+  /// Cualquier otra cosa que no encaje arriba.
+  otros
+
+  @@map("rubro_pago")
+}
+
+/// Ciclo de vida de una corrida (§Post-F9.189(a)).
+///
+/// `borrador` se trabaja (se teclean montos, se agregan conceptos); `cerrada` es la relación
+/// FINAL que se le manda a finanzas —ya no se edita (D3): si algo salió mal se hace OTRA
+/// corrida—; `ejecutada` es cuando el dinero salió y los movimientos ya viven en los estados
+/// de cuenta.
+enum EstadoCorridaPago {
+  borrador
+  cerrada
+  ejecutada
+
+  @@map("estado_corrida_pago")
+}
+
+/// De dónde viene un renglón de la corrida (§Post-F9.189(e): *«cada renglón sabe de dónde
+/// viene»*). Discrimina cuál FK está poblada — ver el CHECK de exclusividad de la migración,
+/// mismo patrón que `MovimientoTercero` (ADR-0017).
+enum OrigenRenglonPago {
+  /// Un maquilero: el pago nace como `PagoMaquilero` (EsMa).
+  maquila
+  /// Un proveedor NO maquilero: el pago nace como `MovimientoTercero` origen `pago` (CxP).
+  proveedor
+  /// Un concepto del catálogo de los que NO son proveedores: no toca ninguna cuenta corriente.
+  concepto
+
+  @@map("origen_renglon_pago")
+}
+
+/// ⭐ CONCEPTO DE PAGO QUE **NO** ES UN PROVEEDOR (fila 0.125; §Post-F9.189(c)).
+///
+/// Daniel: *«quiero dejar pagos para cosas que no necesariamente están dadas de alta como
+/// proveedores (nóminas por fuera, gratificaciones, pago de algún servicio como agua, o
+/// cualquier otra cosa). Debería de poder tener como un catálogo de otras cosas que no son
+/// proveedores»* — y confirmó: *«que sean un catálogo aparte, no proveedores»*.
+///
+/// **Por qué NO son proveedores:** no tienen RFC, ni orden, ni estado de cuenta; colarlos al
+/// catálogo de proveedores contaminaría CxP y los reportes fiscales del contador.
+///
+/// ⭐ `predeterminado` es suyo, textual: *«algunos de ellos quiero que se carguen por default
+/// en la relación, porque son conceptos que cada semana pago y no quiero que se me vaya a
+/// olvidar ponerlo (caja chica, nómina por fuera, etc.) … para que **siempre se carguen en
+/// cero** para que yo le ponga la cantidad»*.
+///
+/// GLOBAL, como todo catálogo maestro (A9/ADR-0007). Borrado SUAVE (`activo`, D3). SIN ETL:
+/// arranca en cero (nunca vivió en Access — vivía en un Excel).
+model ConceptoPago {
+  id     Int    @id @default(autoincrement())
+  /// Cómo lo llama Daniel en su relación ("Caja chica", "Nómina por fuera"). Único global.
+  nombre String @unique
+
+  /// Sección de la relación donde cae (§Post-F9.189(e)). Los rubros `maquila`/`proveedores`
+  /// NO son elegibles aquí: ésos los derivan los proveedores (lo valida el dominio).
+  rubro RubroPago
+
+  /// Forma de pago por omisión del concepto. NULL = sin preferencia (el renglón la pide).
+  /// Cambiable en cada renglón de la corrida (§Post-F9.189(c)).
+  formaPagoPreferida FormaDePago? @map("forma_pago_preferida")
+
+  /// ⭐ ¿Se carga solo, EN CERO, en cada corrida nueva? (ver el bloque del modelo).
+  predeterminado Boolean @default(false)
+
+  notas String?
+
+  /// Borrado SUAVE (D3): retirarlo lo saca de las corridas nuevas y conserva su historial.
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// Cuentas/destinos de pago del concepto — MISMA forma que `ProveedorCuentaPago`.
+  cuentas   ConceptoPagoCuenta[]
+  /// Renglones de corrida que lo pagan. Restrict (un concepto pagado no se borra).
+  renglones RenglonCorridaPago[]
+
+  @@index([rubro])
+  @@map("concepto_pago")
+}
+
+/// CUENTA / DESTINO DE PAGO de un concepto (fila 0.125). **Espejo de `ProveedorCuentaPago`**
+/// (0.112): mismos campos, mismas reglas y las MISMAS funciones puras de validación
+/// (`normalizarNumeroDeCuenta` / `motivoCuentaInvalida` del contrato) y de decisión
+/// (`dominio/catalogos/cuentas-pago-reglas.ts`, compartido con el proveedor).
+///
+/// **Por qué una tabla aparte y no la del proveedor:** un concepto NO es un proveedor
+/// (decisión de Daniel). Meterlo en `proveedor_cuenta_pago` obligaría a una FK nullable y a
+/// un CHECK polimórfico en una tabla que hoy Daniel está cargando a mano en `prueba` — se
+/// tocaría dato vivo para ahorrarse una tabla. Lo que NO se duplica son las REGLAS.
+///
+/// `es_default`: `true` en la cuenta por omisión y **NULL** en las demás (nunca `false`), para
+/// que `@@unique([idConcepto, esDefault])` garantice UNA sola default (los NULL son distintos
+/// entre sí en Postgres). Idéntico a `ProveedorCuentaPago` — ver su comentario para el detalle.
+model ConceptoPagoCuenta {
+  id         Int          @id @default(autoincrement())
+  idConcepto Int          @map("id_concepto")
+  concepto   ConceptoPago @relation(fields: [idConcepto], references: [id], onDelete: Cascade)
+
+  /// A NOMBRE DE QUIÉN está la cuenta: el nombre que va en la transferencia. Obligatorio.
+  beneficiario String
+  /// Banco del destino ("BBVA", "Banorte"…). Texto libre: no hay catálogo.
+  banco        String?
+  /// ¿El número es una CLABE o una tarjeta?
+  tipoCuenta   TipoCuentaPago @map("tipo_cuenta")
+  /// El número, SÓLO DÍGITOS (se normaliza al capturar). Único por concepto.
+  cuenta       String
+  /// Cómo se le llama en la relación ("la de siempre", "1", "2"…).
+  alias        String?
+
+  /// ¿Es la cuenta FISCAL? A ella —y sólo a ella— puede salir un pago CON factura.
+  esFiscal  Boolean  @default(false) @map("es_fiscal")
+  /// La cuenta POR OMISIÓN: `true` en una sola, NULL en las demás (ver el comentario del modelo).
+  esDefault Boolean? @map("es_default")
+
+  notas  String?
+  /// Borrado SUAVE (D3): retirarla la archiva; sigue siendo historial REUTILIZABLE.
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// Renglones de corrida que salieron a esta cuenta. Restrict (no se borra lo ya pagado).
+  renglones RenglonCorridaPago[]
+
+  /// UNA SOLA DEFAULT POR CONCEPTO, garantizada por la base.
+  @@unique([idConcepto, esDefault])
+  /// La misma cuenta no se captura dos veces en el mismo concepto.
+  @@unique([idConcepto, cuenta])
+  @@map("concepto_pago_cuenta")
+}
+
+/// ⭐ LA CORRIDA DE PAGOS DE LA SEMANA (fila 0.113; §Post-F9.189(a)).
+///
+/// Daniel: *«debemos de guardar **cada corrida (la de con y sin factura) de manera semanal**»*.
+/// Por eso `conFactura` NO es nullable: una corrida es de un segmento o del otro, nunca de los
+/// dos. Los dos segmentos son una PARTICIÓN EXACTA del saldo (ver `formula-saldo.ts` §segmento).
+///
+/// **NO hay unique de (empresa, semana, segmento):** una corrida CERRADA no se edita (D3) y se
+/// corrige haciendo OTRA — prohibirlo por la base dejaría a Daniel sin marcha atrás. Lo que sí
+/// se impide, en el dominio y bajo lock, es tener DOS BORRADORES abiertos del mismo segmento y
+/// la misma semana (eso no es una corrección: es un descuido que partiría la relación en dos).
+model CorridaPago {
+  id        Int     @id @default(autoincrement())
+  /// Empresa dueña de la corrida y de su folio (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia "corrida-pago"). NUNCA Max()+1.
+  folio     BigInt
+
+  /// LUNES de la semana que se paga (date-only, normalizado en el dominio). Dos corridas por
+  /// semana: la de con factura y la de sin factura.
+  semana     DateTime @db.Date
+  /// ⭐ El SEGMENTO de esta corrida. `true` = la relación CON factura (sus renglones sólo pueden
+  /// salir a cuentas fiscales, §Post-F9.189(d)); `false` = la relación SIN factura.
+  conFactura Boolean  @map("con_factura")
+
+  estado EstadoCorridaPago @default(borrador)
+  notas  String?           @db.Text
+
+  /// Cuándo y quién la CERRÓ (la relación quedó final y se le mandó a finanzas).
+  cerradaEn      DateTime? @map("cerrada_en")
+  cerradaPorId   String?   @map("cerrada_por_id")
+  /// Cuándo y quién la EJECUTÓ (el dinero salió; nacieron los movimientos en los estados de cuenta).
+  ejecutadaEn    DateTime? @map("ejecutada_en")
+  ejecutadaPorId String?   @map("ejecutada_por_id")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  renglones RenglonCorridaPago[]
+
+  @@unique([idEmpresa, folio])
+  @@index([idEmpresa, semana])
+  @@index([idEmpresa, estado])
+  @@map("corrida_pago")
+}
+
+/// ⭐ UN RENGLÓN DE LA RELACIÓN: a quién, cuánto y por dónde (fila 0.113).
+///
+/// **El `monto` lo TECLEA Daniel** (§Post-F9.189(b): *«yo voy decidiendo los montos a pagar de
+/// cada uno. Manualmente»*). No se deriva del saldo ni de los recibos: ésos van al lado, como
+/// referencia. Un renglón en CERO es normal y ESPERADO —así nacen los conceptos
+/// `predeterminado`— y simplemente NO sale en la relación ejecutable.
+///
+/// ⭐ **PARTIR UN PAGO SON DOS RENGLONES** (§Post-F9.185(e), textual: *«en ocasiones me pide el
+/// proveedor partir un pago grande en más de una cuenta: 30 mil en una y 20 mil en la otra la
+/// misma semana … así debe salir en la relación para poder hacer las dos transferencias»*).
+/// Por eso NO hay unique de (corrida, beneficiario): un mismo proveedor puede tener N renglones,
+/// cada uno con SU cuenta. **Jamás colapsarlos al imprimir** — rompería las transferencias.
+///
+/// ⭐ **LOS DATOS DEL DEPÓSITO SE CONGELAN AQUÍ.** El renglón guarda la FK a la cuenta (para el
+/// cotejo bancario de 0.126) **y una COPIA** del beneficiario, banco, número y alias. Si no se
+/// copiaran, editar o retirar una cuenta cambiaría lo que dice una corrida ya cerrada — y la
+/// promesa es justo la contraria: reimprimir el martes da lo mismo que el lunes. Mismo patrón
+/// que la receta CONGELADA de la orden.
+model RenglonCorridaPago {
+  id        Int         @id @default(autoincrement())
+  idCorrida Int         @map("id_corrida")
+  corrida   CorridaPago @relation(fields: [idCorrida], references: [id], onDelete: Cascade)
+
+  /// De dónde viene (discrimina cuál FK de abajo está poblada — CHECK en la migración).
+  origen              OrigenRenglonPago
+  /// Proveedor (maquilero o no), o NULL si el renglón es de un concepto. Restrict.
+  idProveedor         Int?              @map("id_proveedor")
+  proveedor           Proveedor?        @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  /// Concepto del catálogo, o NULL si el renglón es de un proveedor. Restrict.
+  ///
+  /// ⚠️ La RELACIÓN se llama `conceptoDelCatalogo` y no `concepto` porque `concepto` es el campo de
+  /// NEGOCIO —la explicación del pago en texto libre, la columna que finanzas lee— y ése es el
+  /// nombre que la gente usa. La entrada del catálogo es otra cosa: el «a quién/a qué» del renglón.
+  idConcepto          Int?              @map("id_concepto")
+  conceptoDelCatalogo ConceptoPago?     @relation(fields: [idConcepto], references: [id], onDelete: Restrict)
+
+  /// Sección de la relación. Se COPIA al crear el renglón (derivada de los roles del proveedor o
+  /// del concepto): los roles cambian, y una corrida cerrada no puede cambiar de forma después.
+  rubro  RubroPago
+  /// Nombre con el que sale impreso. Copiado también: si mañana renombran al proveedor, la
+  /// relación que finanzas ya tiene en la mano sigue diciendo lo mismo.
+  nombre String
+
+  /// ⭐ Lo que se le paga esta semana, TECLEADO. `>= 0` (CHECK): cero = «lo tengo a la vista y
+  /// esta semana no le pago», que es distinto de no tener renglón.
+  monto Decimal @db.Decimal(14, 2)
+
+  /// Efectivo o transferencia — el default viene del beneficiario y se puede cambiar aquí mismo.
+  formaPago FormaDePago @map("forma_pago")
+
+  // ── El destino, con FK (trazabilidad) + COPIA CONGELADA (reimpresión fiel) ──────────────
+  /// Cuenta del proveedor a la que sale, o NULL (efectivo, o todavía sin elegir). Restrict.
+  idCuentaProveedor Int?                 @map("id_cuenta_proveedor")
+  cuentaProveedor   ProveedorCuentaPago? @relation(fields: [idCuentaProveedor], references: [id], onDelete: Restrict)
+  /// Cuenta del concepto a la que sale, o NULL. Restrict.
+  idCuentaConcepto  Int?                 @map("id_cuenta_concepto")
+  cuentaConcepto    ConceptoPagoCuenta?  @relation(fields: [idCuentaConcepto], references: [id], onDelete: Restrict)
+
+  /// A nombre de quién va el depósito (COPIA). En efectivo se llena con el nombre del
+  /// beneficiario mismo (§Post-F9.189(c): *«sin cuenta ⇒ efectivo y el beneficiario es el
+  /// proveedor mismo»*).
+  beneficiario   String
+  /// Banco del destino (COPIA), o NULL.
+  banco          String?
+  /// CLABE o tarjeta (COPIA), o NULL si es efectivo.
+  tipoCuenta     TipoCuentaPago? @map("tipo_cuenta")
+  /// El número de cuenta (COPIA, sólo dígitos), o NULL si es efectivo.
+  numeroCuenta   String?         @map("numero_cuenta")
+  /// El alias de la cuenta (COPIA): es lo que distingue los dos renglones de un pago partido.
+  aliasCuenta    String?         @map("alias_cuenta")
+  /// ¿La cuenta era FISCAL cuando se armó el renglón? (COPIA). Es lo que la guarda fiscal exige
+  /// en una corrida CON factura (§Post-F9.189(d)).
+  cuentaEsFiscal Boolean?        @map("cuenta_es_fiscal")
+
+  /// ⭐ EL CONCEPTO: **la explicación del pago**, en texto libre. Es la columna «Concepto» del
+  /// archivo real que finanzas arma cada semana, y ahí lleva de 30 a 170 caracteres: sin eso
+  /// **quien ejecuta la transferencia no sabe qué está pagando**. Ejemplos de ese archivo:
+  /// «Nómina por fuera <fecha>», la compra que se pagó en efectivo, el servicio.
+  ///
+  /// Opcional en la base porque hay renglones que se explican solos (un maquilero con su recibo),
+  /// pero la pantalla lo pone al frente: es lo primero que se lee en la relación.
+  concepto String? @db.Text
+
+  /// Referencias cortas del renglón: los folios de las remisiones o recibos que ampara el pago
+  /// («7909 y 7888» en el archivo de finanzas). Texto libre, opcional.
+  referencia String?
+
+  // ── Lo que nació al EJECUTAR (idempotencia: un renglón paga UNA vez) ────────────────────
+  /// Pago EsMa creado al ejecutar (origen `maquila`), o NULL. Restrict.
+  idPagoMaquilero     Int?               @map("id_pago_maquilero")
+  pagoMaquilero       PagoMaquilero?     @relation(fields: [idPagoMaquilero], references: [id], onDelete: Restrict)
+  /// Movimiento de CxP creado al ejecutar (origen `proveedor`), o NULL. Restrict.
+  idMovimientoTercero Int?               @map("id_movimiento_tercero")
+  movimientoTercero   MovimientoTercero? @relation(fields: [idMovimientoTercero], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// ⭐ UNA vez y sólo una: el movimiento que nace al ejecutar es de ESTE renglón y de ningún otro.
+  /// Es la defensa de la idempotencia EN LA BASE (el dominio ya la sostiene con el estado de la
+  /// corrida). Los NULL son distintos entre sí en Postgres, así que los renglones sin ejecutar
+  /// conviven sin estorbarse.
+  @@unique([idPagoMaquilero])
+  @@unique([idMovimientoTercero])
+  @@index([idCorrida])
+  @@index([idProveedor])
+  @@index([idConcepto])
+  /// Las FKs `Restrict` hacia las cuentas necesitan su índice: sin él, comprobar o retirar una
+  /// cuenta obliga a recorrer entera una tabla que crece cada semana.
+  @@index([idCuentaProveedor])
+  @@index([idCuentaConcepto])
+  @@map("renglon_corrida_pago")
 }

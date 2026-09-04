@@ -71,6 +71,62 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.102 · 4-sep-2026 · **en prueba** — ⭐⭐ **La corrida semanal de pagos**: los dos Excel de los viernes ya viven en el sistema
+
+### Qué se puede hacer ahora que antes no
+
+- **Armar la relación de pagos de la semana en pantalla**, y no en Excel. Es **el tablero de saldos** con
+  **una columna abierta a un lado —«a pagar esta semana»—** donde Daniel teclea, renglón por renglón, cuánto
+  se le paga a cada uno. El saldo, lo que está por revisar y los recibos de la semana se ven al lado **como
+  referencia**; el número que se paga es el que él escribe.
+- **Dos corridas por semana, guardadas**: la de **con factura** y la de **sin factura**. Cada una tiene su
+  ciclo —borrador, cerrada, ejecutada— y reimprimirla el martes dice lo mismo que el lunes.
+- **Una sola relación, por rubros**: maquileros · proveedores sin factura · y **los conceptos que no son
+  proveedores** (nómina por fuera, caja chica, servicios…), que salen de un **catálogo nuevo**. Los que se
+  marcan como **predeterminados se cargan solos en cero** cada semana, para que no se olviden; los demás se
+  agregan desde el catálogo cuando hacen falta.
+- **Efectivo o transferencia**: viene por default de cada proveedor y **se puede cambiar en cada renglón**
+  (*«de pronto un maquilero me pide que le pague una semana en efectivo»*). Con cuenta destino es
+  transferencia; sin cuenta, efectivo.
+- **Un pago con factura sólo puede salir a una cuenta fiscal.** Si el proveedor no tiene ninguna capturada,
+  la corrida lo dice con su nombre y no deja cerrar ese renglón con factura.
+- **La relación ejecutable se ve en pantalla** —beneficiario, banco, cuenta completa, monto, concepto y
+  referencia, por rubro y con totales— para quien ejecuta las transferencias, y **antes de marcar la corrida
+  como pagada se confirma el conteo y los totales**: al ejecutar nacen los pagos de verdad.
+- **El concentrado se genera solo** —sólo los que llevan monto, ordenados por monto, totales separados de
+  efectivo y transferencia por rubro y gran total—, en Excel y PDF, **para finanzas y para el banco**. Ya no
+  hay columnas de fórmula que mantener.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Cambian saldos ya visibles en `prueba`:** los movimientos migrados de Access que no traían dicho si
+  eran con o sin factura **ahora entran al lado «sin factura»** del estado de cuenta y del tablero de
+  maquileros. Antes no salían en ninguno de los dos; es la corrección correcta, pero se nota.
+
+- **El pago ya no exige recibos**: se puede pagar «a cuenta» (y ése es el **anticipo**: un pago sin
+  recibos que deja al maquilero en negativo).
+- **Hay que decir si cada proveedor cobra en efectivo o por transferencia** (default nuevo). Los migrados
+  vienen sin ese dato: la corrida lo tolera y lo pide al primer pago.
+- **«Sin factura» ahora significa lo mismo en todas partes.** Convivían dos criterios (uno contaba los
+  movimientos sin definir, el otro no); quedó uno.
+- ⚠️ **Este despliegue necesita `SEED_ON_START`**: trae **cuatro permisos nuevos** —armar y cerrar la corrida, ver la
+  relación, y administrar y ver el catálogo de conceptos—. Sin eso, las dos pantallas no aparecen.
+
+### Qué sigue pendiente o roto
+
+- **El cotejo contra el estado de cuenta del banco** (lado con factura) es la fila **0.126**: la corrida
+  produce la lista esperada; cruzarla es otra pieza.
+- **El IVA explícito** en el renglón va con el documento «yo te digo qué facturarme» (**0.118**).
+- **Corte y empaque** como cargos pagables (**0.114**): mientras tanto, un cortador cae en la sección de
+  proveedores de la corrida, no en la de maquileros.
+- **El libro de caja chica con reposición** es la fila **0.127** (nueva): hoy «caja chica» entra como concepto
+  predeterminado con monto a mano.
+- **No existe marcha atrás de un pago de maquila** ya ejecutado (los de proveedores sí se cancelan): la
+  confirmación previa es la venda; la cancelación es otra fila.
+- **Dos decisiones esperan a Daniel, con default puesto:** en la relación con factura **también se bloquea el
+  efectivo** (sólo cuenta fiscal), y la clave del SAT de forma de pago del proveedor **dejó de capturarse**
+  (la sustituye efectivo/transferencia; se reabre si el timbrado la necesita).
+
 ## 0.101 · 4-sep-2026 · **en prueba** — Daniel cortó la primera versión: esto es lo que entra y esto es lo que espera a la fase 2
 
 ### Qué se puede hacer ahora que antes no

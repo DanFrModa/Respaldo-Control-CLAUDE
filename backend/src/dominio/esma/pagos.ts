@@ -259,3 +259,90 @@ export async function listarPagosMaquilero(
   const total = puedeVerImportes ? pagos.reduce((s, p) => s + p.monto.toNumber(), 0) : null;
   return { filas: pagos.map((p) => aPagoSalida(p, puedeVerImportes)), total };
 }
+
+/**
+ * ⭐ PAGO **A CUENTA** de un maquilero, SIN aplicaciones a cargos (fila 0.113).
+ *
+ * Existe porque la corrida semanal lo exige: §Post-F9.189(b), Daniel textual — *«yo voy decidiendo
+ * los montos a pagar de cada uno. Manualmente»*. El monto que teclea NO se deriva de los cargos y
+ * casi nunca los cubre exactamente, así que obligarlo a repartirlo entre cargos (lo que hace
+ * {@link crearPagoMaquilero}, decisión (g) de F6) volvería impracticable la pantalla más importante
+ * del sistema.
+ *
+ * 🔑 Y hay un caso donde NO hay a qué aplicar: el **ANTICIPO** (§Post-F9.186(h)). Un anticipo es un
+ * pago sin recibos, y en la convención de EsMa el «abono» SUBE lo que se le debe al maquilero
+ * mientras el pago lo BAJA — así que un anticipo tiene que ser un PAGO, y deja el saldo en negativo
+ * a propósito: es lo que le debemos a la casa hasta que trabaje.
+ *
+ * Qué se conserva de {@link crearPagoMaquilero}: el maquilero activo, la empresa (A9), el segmento
+ * de facturación por `resolverConFactura`, y la bitácora (A7). Qué NO aplica: el lock por maquilero
+ * y el tope de «prendas por pagar» —no hay aplicaciones que topar—, y por eso tampoco toca
+ * `cantidadPagada` ni el estatus `pagada` de ninguna orden: **este pago no dice que ningún cargo
+ * concreto quedó cubierto**, sólo que salió dinero.
+ *
+ * ⚠️ Nace `revisado` cuando quien lo crea así lo pide, y quien lo pide es la EJECUCIÓN de la
+ * corrida: el dinero ya salió y el saldo tiene que reflejarlo (el estado `capturado` existe para lo
+ * que otro capturó y Daniel todavía no ha decidido — aquí la decisión ES suya, y ejecutar es el
+ * acto de confirmarla).
+ *
+ * Sólo se llama DENTRO de una transacción del llamador (`tx`): el pago y el renglón de la corrida
+ * que lo apunta son un solo hecho atómico (A2).
+ */
+export async function crearPagoACuentaMaquilero(
+  tx: Tx,
+  sesion: SesionUsuario,
+  datos: {
+    idMaquilero: number;
+    monto: number;
+    fecha: string;
+    conFactura: boolean;
+    observaciones?: string | undefined;
+    estadoRevision: 'capturado' | 'revisado';
+    /** Referencia legible para la bitácora (p. ej. el folio de la corrida que lo originó). */
+    origenAuditoria: Record<string, unknown>;
+  },
+): Promise<{ id: number }> {
+  verificarPermiso(sesion, 'esma.ver-pagos');
+
+  const prov = await tx.proveedor.findUnique({
+    where: { id: datos.idMaquilero },
+    select: { activo: true, nombre: true, modalidadFacturacion: true },
+  });
+  if (prov === null) {
+    throw new ErrorNoEncontrado('Proveedor', datos.idMaquilero);
+  }
+  if (!prov.activo) {
+    throw new ErrorConflicto(`El proveedor "${prov.nombre}" está desactivado.`);
+  }
+  // Mismo resolvedor que el pago normal: la modalidad del proveedor manda y un proveedor sin
+  // modalidad definida NO se puede pagar (lanza con su mensaje, que dice qué hacer).
+  const conFactura = resolverConFactura(prov.modalidadFacturacion, datos.conFactura);
+
+  const pago = await tx.pagoMaquilero.create({
+    data: {
+      idEmpresa: sesion.idEmpresaActiva,
+      idMaquilero: datos.idMaquilero,
+      monto: datos.monto,
+      fecha: aDateColumna(datos.fecha),
+      conFactura,
+      estadoRevision: datos.estadoRevision,
+      ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+      ...datosCreacion(sesion),
+    },
+  });
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'PagoMaquilero',
+    idEntidad: pago.id,
+    accion: 'CREAR',
+    datos: {
+      idMaquilero: datos.idMaquilero,
+      monto: datos.monto,
+      conFactura,
+      aCuenta: true,
+      ...datos.origenAuditoria,
+    },
+  });
+
+  return { id: pago.id };
+}
