@@ -123,11 +123,13 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   });
   const idOcDeepLink = deepLinkOc?.idOrdenCompra ?? null;
 
+  // Solo almacenes de TELA: el documento de entrada mete tela, y el dominio exige que el destino sea de telas (fila 0.137).
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'TELA',
   });
   // Quien surte la tela: SOLO proveedores con el rol "vende-telas" (petición de Daniel, 7-ago-2026;
   // decisión P.2). Mismo criterio que Producción (Corte lista los de rol "corte"). El filtro lo

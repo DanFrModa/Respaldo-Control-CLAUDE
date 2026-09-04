@@ -65,11 +65,13 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
   const [observaciones, setObservaciones] = useState('');
   const [renglonesAvio, setRenglonesAvio] = useState<RenglonAvio[]>([]);
 
+  // Solo almacenes de AVIO: los DOS extremos del traspaso de avíos tienen que serlo (fila 0.137).
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'AVIO',
   });
   const traspasarAvio = useTraspasarAvio();
 

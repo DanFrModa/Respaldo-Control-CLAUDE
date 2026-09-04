@@ -112,11 +112,13 @@ export function RecepcionComprasPagina(): React.JSX.Element {
   const detalleOc = useOrdenCompra(idOc ?? undefined);
   const ocSeleccionada = detalleOc.data;
 
+  // Solo almacenes de AVIO: la tela ya no se recibe por aquí (§Post-F9.14), así que lo único que esta puerta mete al inventario son avíos (fila 0.137).
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'AVIO',
   });
   const recepciones = useRecepcionesDeOc(ocSeleccionada?.id);
   /**

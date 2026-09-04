@@ -76,9 +76,27 @@ vi.mock('@/api/compras-lineas-tela', () => ({
     }
   },
 }));
+/**
+ * Catálogo de mentiras con LOS TRES tipos de almacén (fila 0.137). El mock de `useAlmacenes` filtra
+ * por el `tipo` que pide la pantalla: si la pantalla se olvidara de pedirlo, los tres saldrían en el
+ * desplegable y la prueba lo cazaría — que es justo lo que se quiere fijar, y no un
+ * `toHaveBeenCalledWith` que solo mira la consulta.
+ */
+const ALMACENES_TODOS = [
+  { id: 3, nombre: 'Primeras', tipo: 'PT' },
+  { id: 2, nombre: 'Bodega Telas', tipo: 'TELA' },
+  { id: 7, nombre: 'Almacén de avíos', tipo: 'AVIO' },
+];
+
+/** Los del `tipo` pedido (o todos si la pantalla no filtra — el caso que la prueba caza). */
+function almacenesDelTipo(query: { tipo?: string } | undefined) {
+  const tipo = query?.tipo;
+  return tipo === undefined ? ALMACENES_TODOS : ALMACENES_TODOS.filter((a) => a.tipo === tipo);
+}
+
 vi.mock('@/api/almacenes', () => ({
-  useAlmacenes: () => ({
-    data: { datos: [{ id: 2, nombre: 'Bodega Telas' }], total: 1 },
+  useAlmacenes: (query: { tipo?: string } | undefined) => ({
+    data: { datos: almacenesDelTipo(query), total: almacenesDelTipo(query).length },
     isPending: false,
     isError: false,
   }),
@@ -180,6 +198,20 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     useEntradaTelaMock.mockReset();
     useEntradaTelaMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
     parametrosRuta.valor = {};
+  });
+
+  /**
+   * Fila 0.137 — el almacén DESTINO de una entrada de tela sólo puede ser de TELA; el desplegable
+   * ya no ofrece los de PT ni los de avíos (el dominio los rechaza con un 400 desde esta fila).
+   */
+  it('el almacén destino SOLO ofrece almacenes de TELA (fila 0.137)', () => {
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    const selector = within(screen.getByTestId('entrada-almacen'));
+    expect(selector.getByRole('option', { name: 'Bodega Telas' })).toBeInTheDocument();
+    expect(selector.queryByRole('option', { name: 'Primeras' })).not.toBeInTheDocument();
+    expect(selector.queryByRole('option', { name: 'Almacén de avíos' })).not.toBeInTheDocument();
   });
 
   it('manda cabecera + renglones (con precios y lote del proveedor) al guardar el borrador', async () => {

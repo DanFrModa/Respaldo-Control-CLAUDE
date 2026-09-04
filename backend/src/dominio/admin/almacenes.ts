@@ -136,6 +136,46 @@ async function exigirAlmacen(
   return almacen;
 }
 
+/** Cómo se llama en palabras del negocio lo que guarda cada tipo de almacén (para los mensajes). */
+const QUE_GUARDA: Record<Almacen['tipo'], string> = {
+  PT: 'producto terminado',
+  TELA: 'telas',
+  AVIO: 'avíos',
+};
+
+/**
+ * RECHAZA cambiarle el TIPO a un almacén que YA tiene movimientos de kardex (fila 0.137).
+ *
+ * El tipo no es una etiqueta: desde esta fila es la regla que decide qué se puede mover a cada
+ * almacén (`comun/almacenes.ts` → `exigirAlmacenDelTipo`). Si el tipo se pudiera cambiar con
+ * existencia adentro, la regla sería de mentiras —bastaría cambiar el tipo, guardar el movimiento
+ * y volver a cambiarlo— y, peor todavía, la mercancía YA guardada quedaría en un almacén cuyo tipo
+ * dice otra cosa: telas contadas en una bodega marcada de producto terminado, que ningún flujo
+ * podría volver a tocar.
+ *
+ * Se mira el KARDEX (`Movimiento`), que es donde vive la existencia (D3). Un almacén recién creado,
+ * o uno que nunca movió nada, sí puede corregir su tipo: es el caso legítimo (alguien lo dio de
+ * alta mal y lo arregla antes de estrenarlo).
+ *
+ * ⚠️ Efecto conocido y aceptado: un BORRADOR que apunte a este almacén sin haber movido kardex
+ * todavía (una entrada de tela o una nota de salida sin confirmar) puede quedar apuntando a un
+ * almacén cuyo tipo ya no le sirve. No hay nada que reparar: ese borrador se re-apunta desde su
+ * propia edición, que pasa por `exigirAlmacenDelTipo` y no deja guardar un almacén equivocado.
+ */
+async function exigirTipoCambiable(tx: Tx, actual: AlmacenConCortador): Promise<void> {
+  const movimiento = await tx.movimiento.findFirst({
+    where: { idAlmacen: actual.id },
+    select: { id: true },
+  });
+  if (movimiento !== null) {
+    throw new ErrorConflicto(
+      `El almacén "${actual.nombre}" ya tiene movimientos de inventario de ` +
+        `${QUE_GUARDA[actual.tipo]}: su tipo ya no se puede cambiar. Si de verdad hay que ` +
+        'separarlo, desactívalo y da de alta otro almacén con el tipo correcto.',
+    );
+  }
+}
+
 /**
  * Valida la liga almacén → CORTADOR (§Post-F9.13). Tres reglas, todas server-side (A4: la
  * pantalla solo esconde) y con mensajes que dicen QUÉ hacer, no solo que algo falló:
@@ -301,6 +341,13 @@ export async function actualizarAlmacen(
 
       if (!cambiaNombre && !cambiaTipo && !cambiaCortador && !reactiva && !desactiva) {
         return actual; // nada que guardar: idempotente, sin bitácora vacía
+      }
+
+      // Fila 0.137 — el tipo NO se cambia si el almacén ya movió inventario (si no, el guard de
+      // `exigirAlmacenDelTipo` sería puro adorno: se cambia el tipo, se guarda el movimiento en el
+      // almacén equivocado y se regresa el tipo a lo que estaba).
+      if (cambiaTipo) {
+        await exigirTipoCambiable(tx, actual);
       }
 
       // El cortador se valida contra el tipo QUE VA A QUEDAR, no contra el de antes.

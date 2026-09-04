@@ -54,6 +54,7 @@ import {
 import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -385,6 +386,11 @@ export async function registrarMovimientoPt(
       );
     }
 
+    // Fila 0.137 — el almacén tiene que ser de PT: existe, activo, de esta empresa (A9) y del TIPO
+    // del artículo que se mueve. Antes NADA de esto se validaba aquí: una entrada de producto
+    // terminado se guardaba tan campante en la bodega de telas (o en un almacén de otra empresa).
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'PT', idEmpresa);
+
     const celdas = aplanarYValidar(datos.lineas);
     // §Post-F9.40 — las órdenes elegidas deben ser de la empresa activa (A9), en entradas y salidas.
     await validarOrdenesDeLaEmpresa(tx, idEmpresa, celdas);
@@ -440,6 +446,11 @@ export async function registrarTraspasoPt(
   const { idSalida, idEntrada } = await enTransaccion(async (tx) => {
     const tipoSalida = await tipoPorCodigo(tx, COD_TRANSFERENCIA_SALIDA);
     const tipoEntrada = await tipoPorCodigo(tx, COD_TRANSFERENCIA_ENTRADA);
+    // Fila 0.137 — LOS DOS extremos deben ser de PT. Con el destino sin validar, un traspaso podía
+    // "mudar" producto terminado a la bodega de telas y ahí quedaba, contado como PT en un almacén
+    // que no es de PT.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacenOrigen, 'PT', idEmpresa);
+    await exigirAlmacenDelTipo(tx, datos.idAlmacenDestino, 'PT', idEmpresa);
     const celdas = aplanarYValidar(datos.lineas);
     // §Post-F9.40 — las órdenes elegidas deben ser de la empresa activa (A9). Las DOS patas del
     // traspaso llevan la MISMA orden: la pieza no pierde de qué producción es al cambiar de almacén.

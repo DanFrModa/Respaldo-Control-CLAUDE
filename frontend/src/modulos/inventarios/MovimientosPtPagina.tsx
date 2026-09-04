@@ -80,11 +80,13 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const tiposMov = useTiposMovimiento();
   const tiposCaptura = (tiposMov.data?.datos ?? []).filter((t) => t.direccion !== 'traspaso');
 
+  // Solo almacenes de PT: el dominio rechaza un movimiento de producto terminado contra una bodega de telas o de avíos (fila 0.137), así que el desplegable ni los ofrece.
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'PT',
   });
   const colores = useColores({
     pagina: 1,

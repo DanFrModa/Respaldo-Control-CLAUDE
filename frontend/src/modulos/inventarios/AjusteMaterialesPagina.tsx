@@ -49,11 +49,13 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
   const [motivo, setMotivo] = useState('');
   const [renglonesAvio, setRenglonesAvio] = useState<RenglonAvio[]>([]);
 
+  // Solo almacenes de AVIO: los avíos no se ajustan en una bodega de telas ni de PT (fila 0.137).
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'AVIO',
   });
   const tiposMov = useTiposMovimiento();
   const ajustarAvio = useAjustarAvio();

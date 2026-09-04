@@ -590,3 +590,136 @@ describe('Kardex (F3-E3)', () => {
     );
   });
 });
+
+describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => {
+  /**
+   * `Almacen.tipo` existe desde F3-E1, pero hasta la fila 0.137 NADIE lo verificaba al mover: el
+   * desplegable de la pantalla era el único filtro, así que una entrada de producto terminado se
+   * guardaba tan campante en la bodega de telas. Además, este servicio no validaba NADA del
+   * almacén (ni empresa ni activo): esos dos casos también se cubren aquí.
+   */
+  it('un movimiento manual de PT contra un almacén de TELA se RECHAZA (y no escribe nada)', async () => {
+    const bodegaTela = await cliente.almacen.create({
+      data: { nombre: 'Naucalpan', tipo: 'TELA' },
+    });
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tEntradaInicial.id,
+          idAlmacen: bodegaTela.id,
+          idModelo: modelo.id,
+          fecha: '2026-06-19',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+    // El guard corre ANTES de cualquier escritura: ni movimiento ni folio consumido.
+    expect(await cliente.movimiento.count()).toBe(0);
+  });
+
+  it('un traspaso de PT cuyo DESTINO es de TELA se RECHAZA (no deja media pata)', async () => {
+    await entrar(almPrimeras.id, 30);
+    const bodegaTela = await cliente.almacen.create({
+      data: { nombre: 'Naucalpan', tipo: 'TELA' },
+    });
+    const movimientosAntes = await cliente.movimiento.count();
+    await expect(
+      registrarTraspasoPt(
+        sesion(),
+        {
+          idAlmacenOrigen: almPrimeras.id,
+          idAlmacenDestino: bodegaTela.id,
+          idModelo: modelo.id,
+          fecha: '2026-06-20',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+    // Ninguna de las dos patas se escribió y la existencia del origen quedó intacta.
+    expect(await cliente.movimiento.count()).toBe(movimientosAntes);
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(30);
+  });
+
+  it('un traspaso de PT cuyo ORIGEN es de TELA se RECHAZA', async () => {
+    const bodegaTela = await cliente.almacen.create({
+      data: { nombre: 'Naucalpan', tipo: 'TELA' },
+    });
+    await expect(
+      registrarTraspasoPt(
+        sesion(),
+        {
+          idAlmacenOrigen: bodegaTela.id,
+          idAlmacenDestino: almPrimeras.id,
+          idModelo: modelo.id,
+          fecha: '2026-06-20',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+    expect(await cliente.movimiento.count()).toBe(0);
+  });
+
+  it('el almacén PRIVADO de OTRA empresa se RECHAZA aunque sea de PT (A9)', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa');
+    const ajeno = await cliente.almacen.create({
+      data: { nombre: 'Bodega ajena', tipo: 'PT', idEmpresa: otra.id },
+    });
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tEntradaInicial.id,
+          idAlmacen: ajeno.id,
+          idModelo: modelo.id,
+          fecha: '2026-06-19',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Bodega ajena" no es de esta empresa/);
+    expect(await cliente.movimiento.count()).toBe(0);
+  });
+
+  it('un almacén DESACTIVADO se RECHAZA aunque sea de PT', async () => {
+    const viejo = await cliente.almacen.create({
+      data: { nombre: 'Bodega vieja', tipo: 'PT', activo: false },
+    });
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tEntradaInicial.id,
+          idAlmacen: viejo.id,
+          idModelo: modelo.id,
+          fecha: '2026-06-19',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Bodega vieja" está desactivado/);
+    expect(await cliente.movimiento.count()).toBe(0);
+  });
+
+  it('EL CASO FELIZ NO CAMBIA: entrada y traspaso entre dos almacenes de PT siguen pasando', async () => {
+    await entrar(almPrimeras.id, 30);
+    await registrarTraspasoPt(
+      sesion(),
+      {
+        idAlmacenOrigen: almPrimeras.id,
+        idAlmacenDestino: almSegundas.id,
+        idModelo: modelo.id,
+        fecha: '2026-06-20',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(30);
+    expect(existencias.filas.find((f) => f.idAlmacen === almSegundas.id)?.existencia).toBe(10);
+  });
+});

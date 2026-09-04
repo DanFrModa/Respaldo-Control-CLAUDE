@@ -71,6 +71,44 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.104 · 4-sep-2026 · **en prueba** — Ningún movimiento puede caer en un almacén del tipo equivocado
+
+### Qué se puede hacer ahora que antes no
+
+- **El sistema ya no deja meter producto terminado en la bodega de telas, ni tela en la de avíos.** Antes lo
+  único que acotaba el almacén era el desplegable de la pantalla; por el API, o por un desplegable con
+  todos los tipos, cualquier movimiento podía caer en un almacén de otro tipo y nadie lo detenía. Ahora
+  cada entrada, salida, traspaso, ajuste, recepción de compra, nota de salida y conteo cíclico **exige que el
+  almacén sea del tipo del artículo** que mueve, y si no lo es lo dice con nombre: *«El almacén «X» es de
+  telas; este movimiento es de producto terminado»*.
+- **Un almacén que ya tiene movimientos no puede cambiar de tipo.** Sin eso la regla era adorno (cambiar el
+  tipo, guardar, regresarlo). Si un almacén nació con el tipo equivocado y ya se usó, se desactiva y se da
+  de alta otro con el tipo correcto; si todavía no tiene movimientos, sí se corrige.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Nace un almacén nuevo: «Almacén de avíos».** Ni la instalación ni la migración de Access creaban uno
+  (todos eran de producto terminado o de telas), así que el arranque lo siembra solo. Si los avíos se estaban
+  moviendo en un almacén de telas, **de aquí en adelante hay que usar el de avíos**: los ajustes y traspasos de
+  avíos, las recepciones de compra y las notas de salida ya no aceptan un almacén de telas (§Post-F9.194).
+- **Los desplegables de almacén ya sólo ofrecen los del tipo correcto** en las diez pantallas que antes
+  ofrecían todos.
+- Si en `prueba` había notas de salida o movimientos de avíos colgando de un almacén de telas, esos documentos
+  viejos mostrarán su almacén **en blanco** en el desplegable. Es lo esperado y **no se repara**: lo viejo se
+  limpia, no se arregla (REGLA 0-B).
+- Las cancelaciones no validan el tipo: el movimiento inverso es la forma de corregir y hereda el almacén
+  del original.
+
+### Qué sigue pendiente o roto
+
+- **Sin migración, sin permisos, sin cambio de contrato — pero el despliegue SÍ requiere `SEED_ON_START=true`**,
+  porque el almacén de avíos lo siembra el arranque.
+- La misma regla falta en los cuatro escritores de **producción** (recibo de maquila, entrega al cliente,
+  envío de prendas terminadas): entra en una segunda pasada cuando termine la fila 0.109, que tiene esos
+  archivos en la mano.
+- De paso, el reclasificador de calidad ya exige que los almacenes de primeras y segundas estén **activos**
+  (antes podía escribir en uno desactivado).
+
 ## 0.103 · 4-sep-2026 · **en prueba** — El impreso de la orden ya cuenta lo que la orden pide, y deja hueco donde falta una foto
 
 ### Qué se puede hacer ahora que antes no

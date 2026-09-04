@@ -574,14 +574,21 @@ async function tipoMovPorCodigo(tx: Tx, codigo: string): Promise<number> {
   return tipo.id;
 }
 
-/** Resuelve un almacén de PT por nombre (global o de la empresa activa). */
+/**
+ * Resuelve un almacén de PT por nombre: ACTIVO, del tipo correcto y global o de la empresa activa.
+ *
+ * El `activo: true` es de la fila 0.137 (hallazgo R4 del reviewer): faltaba, así que una
+ * reclasificación Primeras↔Segundas podía mover prendas a un almacén DESACTIVADO —el resto del
+ * sistema ya no lo ofrece ni lo acepta (`exigirAlmacen`), y la existencia habría quedado atrapada
+ * ahí sin forma de sacarla por los flujos normales. El tipo ya se exigía; el estado no.
+ */
 async function almacenPtPorNombre(tx: Tx, nombre: string, idEmpresa: number): Promise<number> {
   const almacen = await tx.almacen.findFirst({
-    where: { nombre, tipo: 'PT', OR: [{ idEmpresa: null }, { idEmpresa }] },
+    where: { nombre, tipo: 'PT', activo: true, OR: [{ idEmpresa: null }, { idEmpresa }] },
     select: { id: true },
   });
   if (almacen === null) {
-    throw new ErrorValidacion(`Falta el almacén de PT "${nombre}" (re-sembrar).`);
+    throw new ErrorValidacion(`Falta el almacén de PT "${nombre}" activo (re-sembrar).`);
   }
   return almacen.id;
 }

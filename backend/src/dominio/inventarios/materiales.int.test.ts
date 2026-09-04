@@ -50,6 +50,8 @@ let avioGenerico: Avio;
 let proveedor: Proveedor;
 let almA: Almacen;
 let almB: Almacen;
+let almAvioA: Almacen;
+let almAvioB: Almacen;
 let idTipoAjusteEntrada: number;
 let idTipoAjusteSalida: number;
 
@@ -84,6 +86,10 @@ beforeEach(async () => {
   proveedor = await cliente.proveedor.create({ data: { nombre: 'Textiles SA' } });
   almA = await cliente.almacen.create({ data: { nombre: 'Bodega A', tipo: 'TELA' } });
   almB = await cliente.almacen.create({ data: { nombre: 'Bodega B', tipo: 'TELA' } });
+  // Fila 0.137 — los avíos NO se mueven en un almacén de telas: el dominio exige que el tipo del
+  // almacén case con el del artículo, así que el bloque de avíos tiene los suyos.
+  almAvioA = await cliente.almacen.create({ data: { nombre: 'Avíos A', tipo: 'AVIO' } });
+  almAvioB = await cliente.almacen.create({ data: { nombre: 'Avíos B', tipo: 'AVIO' } });
   // Tipos de movimiento que el dominio resuelve por código.
   const tipos = await cliente.tipoMovimientoInventario.createManyAndReturn({
     data: [
@@ -414,7 +420,7 @@ describe('Avíos — multi-almacén (R4)', () => {
       sesion(PERM_AVIOS),
       {
         idTipoMov: idTipoAjusteEntrada,
-        idAlmacen: almA.id,
+        idAlmacen: almAvioA.id,
         fecha: '2026-06-20',
         motivo: 'conteo físico',
         lineas: [
@@ -444,7 +450,7 @@ describe('Avíos — multi-almacén (R4)', () => {
       sesion(PERM_AVIOS),
       {
         idTipoMov: idTipoAjusteEntrada,
-        idAlmacen: almA.id,
+        idAlmacen: almAvioA.id,
         fecha: '2026-06-20',
         motivo: 'conteo',
         lineas: [{ idAvio: avioCierre.id, cantidad: 500 }],
@@ -454,8 +460,8 @@ describe('Avíos — multi-almacén (R4)', () => {
     await traspasarAvio(
       sesion(PERM_AVIOS),
       {
-        idAlmacenOrigen: almA.id,
-        idAlmacenDestino: almB.id,
+        idAlmacenOrigen: almAvioA.id,
+        idAlmacenDestino: almAvioB.id,
         fecha: '2026-06-21',
         lineas: [{ idAvio: avioCierre.id, cantidad: 200 }],
       },
@@ -463,7 +469,7 @@ describe('Avíos — multi-almacén (R4)', () => {
     );
     const exisB = await consultarExistenciasAvio(
       sesion(PERM_AVIOS),
-      { idAvio: avioCierre.id, idAlmacen: almB.id },
+      { idAvio: avioCierre.id, idAlmacen: almAvioB.id },
       bd(),
     );
     expect(exisB.filas[0]?.existencia).toBe(200);
@@ -474,7 +480,7 @@ describe('Avíos — multi-almacén (R4)', () => {
         sesion(PERM_AVIOS),
         {
           idTipoMov: idTipoAjusteSalida,
-          idAlmacen: almA.id,
+          idAlmacen: almAvioA.id,
           fecha: '2026-06-21',
           motivo: 'salida',
           lineas: [{ idAvio: avioCierre.id, cantidad: 9999 }],
@@ -489,7 +495,7 @@ describe('Avíos — multi-almacén (R4)', () => {
       sesion(PERM_AVIOS),
       {
         idTipoMov: idTipoAjusteEntrada,
-        idAlmacen: almA.id,
+        idAlmacen: almAvioA.id,
         fecha: '2026-06-20',
         motivo: 'conteo',
         lineas: [{ idAvio: avioCierre.id, cantidad: 500 }],
@@ -500,7 +506,7 @@ describe('Avíos — multi-almacén (R4)', () => {
       sesion(PERM_AVIOS),
       {
         idTipoMov: idTipoAjusteSalida,
-        idAlmacen: almA.id,
+        idAlmacen: almAvioA.id,
         fecha: '2026-06-21',
         motivo: 'consumo',
         lineas: [{ idAvio: avioCierre.id, cantidad: 120 }],
@@ -524,7 +530,7 @@ describe('Avíos — multi-almacén (R4)', () => {
       sesion(PERM_AVIOS),
       {
         idTipoMov: idTipoAjusteEntrada,
-        idAlmacen: almA.id,
+        idAlmacen: almAvioA.id,
         fecha: '2026-06-20',
         motivo: 'conteo',
         lineas: [{ idAvio: avioCierre.id, cantidad: 500 }],
@@ -535,7 +541,7 @@ describe('Avíos — multi-almacén (R4)', () => {
       sesion(PERM_AVIOS),
       {
         idTipoMov: idTipoAjusteSalida,
-        idAlmacen: almA.id,
+        idAlmacen: almAvioA.id,
         fecha: '2026-06-21',
         motivo: 'consumo',
         lineas: [{ idAvio: avioCierre.id, cantidad: 200 }],
@@ -556,7 +562,7 @@ describe('Avíos — multi-almacén (R4)', () => {
       sesion(PERM_AVIOS),
       {
         idTipoMov: idTipoAjusteEntrada,
-        idAlmacen: almA.id,
+        idAlmacen: almAvioA.id,
         fecha: '2026-06-20',
         motivo: 'conteo',
         lineas: [{ idAvio: avioCierre.id, cantidad: 500 }],
@@ -566,8 +572,8 @@ describe('Avíos — multi-almacén (R4)', () => {
     const traspaso = await traspasarAvio(
       sesion(PERM_AVIOS),
       {
-        idAlmacenOrigen: almA.id,
-        idAlmacenDestino: almB.id,
+        idAlmacenOrigen: almAvioA.id,
+        idAlmacenDestino: almAvioB.id,
         fecha: '2026-06-21',
         lineas: [{ idAvio: avioCierre.id, cantidad: 200 }],
       },
@@ -581,12 +587,12 @@ describe('Avíos — multi-almacén (R4)', () => {
     ).rejects.toBeInstanceOf(ErrorConflicto);
     const enA = await consultarExistenciasAvio(
       sesion(PERM_AVIOS),
-      { idAvio: avioCierre.id, idAlmacen: almA.id },
+      { idAvio: avioCierre.id, idAlmacen: almAvioA.id },
       bd(),
     );
     const enB = await consultarExistenciasAvio(
       sesion(PERM_AVIOS),
-      { idAvio: avioCierre.id, idAlmacen: almB.id },
+      { idAvio: avioCierre.id, idAlmacen: almAvioB.id },
       bd(),
     );
     expect(enA.filas[0]?.existencia).toBe(300);
@@ -627,5 +633,126 @@ describe('Telas — ajuste con lote NULL (clave del kardex 0, IS NOT DISTINCT FR
     const renSinLote = kardex.renglones.find((r) => r.idLote === null);
     expect(renSinLote?.entrada).toBe(25);
     expect(renSinLote?.saldo).toBe(25);
+  });
+});
+
+describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => {
+  /**
+   * Espejo del bloque de PT en `movimientos-pt.int.test.ts`: hasta esta fila el tipo del almacén
+   * no lo miraba nadie, así que la tela entraba a un almacén de producto terminado y los avíos a
+   * uno de telas. Aquí se prueban los dos cruces que sí ofrece el catálogo real.
+   */
+  it('una ENTRADA de tela contra un almacén de PT se RECHAZA (y no escribe nada)', async () => {
+    const bodegaPt = await cliente.almacen.create({ data: { nombre: 'Primeras', tipo: 'PT' } });
+    const movimientosAntes = await cliente.movimiento.count();
+    const lotesAntes = await cliente.lote.count();
+    await expect(
+      ajustarInventarioTela(
+        sesion(PERM_TELAS),
+        {
+          idTipoMov: idTipoAjusteEntrada,
+          idAlmacen: bodegaPt.id,
+          fecha: '2026-06-20',
+          motivo: 'inventario inicial',
+          lote: {
+            idColor: colorRojo.id,
+            idProveedor: proveedor.id,
+            factura: 'F-100',
+            componentes: [{ idTela: telaFelpa.id, cantidad: 100 }],
+          },
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Primeras" es de producto terminado; este movimiento es de telas/);
+    // El guard corre antes de crear el lote y antes del movimiento: nada quedó a medias.
+    expect(await cliente.movimiento.count()).toBe(movimientosAntes);
+    expect(await cliente.lote.count()).toBe(lotesAntes);
+  });
+
+  it('un TRASPASO de tela cuyo destino es de PT se RECHAZA', async () => {
+    const idLote = await entrarLote(300, 0);
+    const bodegaPt = await cliente.almacen.create({ data: { nombre: 'Primeras', tipo: 'PT' } });
+    const movimientosAntes = await cliente.movimiento.count();
+    await expect(
+      traspasarTela(
+        sesion(PERM_TELAS),
+        {
+          idAlmacenOrigen: almA.id,
+          idAlmacenDestino: bodegaPt.id,
+          fecha: '2026-06-21',
+          lineas: [{ idTela: telaFelpa.id, idLote, cantidad: 50 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Primeras" es de producto terminado; este movimiento es de telas/);
+    expect(await cliente.movimiento.count()).toBe(movimientosAntes);
+  });
+
+  it('un AJUSTE de avíos contra un almacén de TELA se RECHAZA', async () => {
+    const movimientosAntes = await cliente.movimiento.count();
+    await expect(
+      ajustarInventarioAvio(
+        sesion(PERM_AVIOS),
+        {
+          idTipoMov: idTipoAjusteEntrada,
+          idAlmacen: almA.id, // 'Bodega A' es de TELA
+          fecha: '2026-06-20',
+          motivo: 'conteo físico',
+          lineas: [{ idAvio: avioCierre.id, cantidad: 500 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Bodega A" es de telas; este movimiento es de avíos/);
+    expect(await cliente.movimiento.count()).toBe(movimientosAntes);
+  });
+
+  it('un TRASPASO de avíos hacia un almacén de TELA se RECHAZA', async () => {
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-06-20',
+        motivo: 'conteo',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 500 }],
+      },
+      bd(),
+    );
+    const movimientosAntes = await cliente.movimiento.count();
+    await expect(
+      traspasarAvio(
+        sesion(PERM_AVIOS),
+        {
+          idAlmacenOrigen: almAvioA.id,
+          idAlmacenDestino: almB.id, // 'Bodega B' es de TELA
+          fecha: '2026-06-21',
+          lineas: [{ idAvio: avioCierre.id, cantidad: 100 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Bodega B" es de telas; este movimiento es de avíos/);
+    expect(await cliente.movimiento.count()).toBe(movimientosAntes);
+  });
+
+  it('EL CASO FELIZ NO CAMBIA: tela en almacén de TELA y avíos en almacén de AVIO', async () => {
+    const idLote = await entrarLote(300, 0);
+    expect(idLote).toBeGreaterThan(0);
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-06-20',
+        motivo: 'conteo',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 500 }],
+      },
+      bd(),
+    );
+    const exisAvio = await consultarExistenciasAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, idAlmacen: almAvioA.id },
+      bd(),
+    );
+    expect(exisAvio.filas[0]?.existencia).toBe(500);
   });
 });

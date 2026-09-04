@@ -46,6 +46,7 @@ import {
 import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -350,6 +351,9 @@ export async function ajustarInventarioTela(
   }
 
   const idMovimiento = await enTransaccion(async (tx) => {
+    // Fila 0.137 — el almacén del ajuste tiene que ser de TELA (además de existir, estar activo y
+    // ser de esta empresa, A9). Antes no se miraba nada de eso aquí.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     const tipo = await tipoPorId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
       throw new ErrorValidacion(
@@ -434,6 +438,8 @@ export async function registrarSalidaTelaAOrden(
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', datos.idOrden);
     }
+    // Fila 0.137 — la tela sale de un almacén de TELA, no de uno de PT ni de avíos.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     const tipo = await tipoPorCodigo(tx, COD_SALIDA_A_ORDEN);
 
     await validarNoNegativoTela(
@@ -493,6 +499,10 @@ export async function traspasarTela(
   const { idSalida, idEntrada } = await enTransaccion(async (tx) => {
     const tipoSalida = await tipoPorCodigo(tx, COD_TRANSFERENCIA_SALIDA);
     const tipoEntrada = await tipoPorCodigo(tx, COD_TRANSFERENCIA_ENTRADA);
+    // Fila 0.137 — LOS DOS extremos del traspaso deben ser de TELA (si no, la tela acabaría
+    // "existiendo" en un almacén de PT o de avíos).
+    await exigirAlmacenDelTipo(tx, datos.idAlmacenOrigen, 'TELA', idEmpresa);
+    await exigirAlmacenDelTipo(tx, datos.idAlmacenDestino, 'TELA', idEmpresa);
 
     await validarNoNegativoTela(
       tx,

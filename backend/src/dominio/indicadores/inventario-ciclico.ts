@@ -38,6 +38,7 @@ import {
 import { Prisma, type EstadoInventarioCiclico } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import {
   ErrorConflicto,
@@ -167,14 +168,11 @@ export async function crearInventarioCiclico(
   const idEmpresa = sesion.idEmpresaActiva;
 
   const idCreado = await enTransaccion(async (tx) => {
-    // Verifica que el almacén exista (FK lo cubriría, pero da un mensaje claro).
-    const almacen = await tx.almacen.findUnique({
-      where: { id: datos.idAlmacen },
-      select: { id: true },
-    });
-    if (almacen === null) {
-      throw new ErrorNoEncontrado('Almacen', datos.idAlmacen);
-    }
+    // El almacén debe existir (la FK lo cubriría, pero da un mensaje claro), estar ACTIVO, ser de
+    // esta empresa (A9) y —fila 0.137— ser de PT: el cíclico cuenta PRODUCTO TERMINADO (enumera
+    // `existencia_pt` y ajusta con movimientos de PT), así que contra un almacén de telas o de
+    // avíos no tenía nada que contar y el alta moría más abajo con "no hay existencias".
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'PT', idEmpresa);
 
     // Candidatos: artículos con existencia ≠ 0 en el almacén, en el alcance de modelos (la vista
     // `existencia_pt` agrega por …×orden×almacén; aquí SÍ se usa la vista — es una CONSULTA para
@@ -701,6 +699,10 @@ export async function generarAjusteCiclico(
         'Faltan renglones por contar: termina el conteo antes de generar el ajuste.',
       );
     }
+    // Fila 0.137 — el ajuste escribe movimientos de PT en el almacén CONGELADO al dar de alta el
+    // cíclico. Se re-valida aquí (activo + de esta empresa + de PT) por la misma razón que la nota
+    // de salida lo hace al confirmar: entre el alta y el cierre alguien pudo desactivar el almacén.
+    await exigirAlmacenDelTipo(tx, inv.idAlmacen, 'PT', idEmpresa);
 
     // Detalle contado (ya bajo el lock del encabezado).
     const detalles = await tx.inventarioCiclicoDet.findMany({

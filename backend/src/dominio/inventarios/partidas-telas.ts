@@ -48,6 +48,7 @@ import {
 import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -413,6 +414,9 @@ export async function ajustarInventarioTelaColor(
   const verImportes = tienePermiso(sesion, 'telas.ver-totales');
 
   const idMovimiento = await enTransaccion(async (tx) => {
+    // Fila 0.137 — el almacén del ajuste tiene que ser de TELA (además de existir, estar activo y
+    // ser de esta empresa, A9). Antes no se miraba nada de eso aquí.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     const tipo = await tipoPorId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
       throw new ErrorValidacion(
@@ -803,6 +807,9 @@ export async function registrarConteoTelaColor(
   const verImportes = tienePermiso(sesion, 'telas.ver-totales');
 
   const resultado = await enTransaccion(async (tx) => {
+    // Fila 0.137 — el conteo físico se hace SOBRE un almacén de TELA. Va lo primero: no tiene
+    // sentido tomar locks por color de un almacén que ni siquiera guarda tela.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     // El complemento capturado en una tela que no lo lleva se rechaza aquí (misma regla que el
     // ajuste); los colores repetidos también — ver el aviso del no-negativo de arriba.
     const colores = await resolverColores(
@@ -955,6 +962,8 @@ export async function registrarSalidaTelaColorAOrden(
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', datos.idOrden);
     }
+    // Fila 0.137 — la tela sale de un almacén de TELA, no de uno de PT ni de avíos.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     const tipo = await tipoPorCodigo(tx, COD_SALIDA_A_ORDEN);
     const colores = await resolverColores(tx, datos.lineas);
     await validarNoNegativoTelaColor(tx, idEmpresa, datos.idAlmacen, datos.lineas, colores);
@@ -1005,6 +1014,9 @@ export async function traspasarTelaColor(
   const { idSalida, idEntrada } = await enTransaccion(async (tx) => {
     const tipoSalida = await tipoPorCodigo(tx, COD_TRANSFERENCIA_SALIDA);
     const tipoEntrada = await tipoPorCodigo(tx, COD_TRANSFERENCIA_ENTRADA);
+    // Fila 0.137 — LOS DOS extremos del traspaso deben ser de TELA.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacenOrigen, 'TELA', idEmpresa);
+    await exigirAlmacenDelTipo(tx, datos.idAlmacenDestino, 'TELA', idEmpresa);
     const colores = await resolverColores(tx, datos.lineas);
     await validarNoNegativoTelaColor(tx, idEmpresa, datos.idAlmacenOrigen, datos.lineas, colores);
 

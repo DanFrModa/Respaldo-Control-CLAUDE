@@ -506,6 +506,35 @@ describe('Auditorías — reclasificación Primeras↔Segundas (kardex, D3)', ()
     expect(movs).toBe(2);
   });
 
+  /**
+   * Fila 0.137 (hallazgo R4) — `almacenPtPorNombre` exigía el TIPO pero no el ESTADO: con Segundas
+   * desactivado, la reclasificación seguía mandando prendas ahí. Ningún otro flujo acepta un
+   * almacén inactivo (`exigirAlmacen`), así que esa existencia quedaba atrapada sin forma de
+   * sacarla. Ahora la reclasificación se planta antes de mover nada.
+   */
+  it('NO reclasifica hacia un almacén DESACTIVADO (R4): se planta y no mueve kardex', async () => {
+    await sembrarExistenciaPrimeras(); // Primeras: CH 10, M 20.
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await cliente.almacen.update({ where: { id: almSegundas.id }, data: { activo: false } });
+    const movimientosAntes = await cliente.movimiento.count();
+
+    await expect(
+      reclasificar(
+        sesion(),
+        a.id,
+        {
+          sentido: 'a-segundas',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/Falta el almacén de PT "Segundas" activo/);
+
+    // Ni un movimiento, y la existencia de Primeras intacta.
+    expect(await cliente.movimiento.count()).toBe(movimientosAntes);
+    expect(await existenciaEnAlmacen(almPrimeras.id, tallaCH.id)).toBe(10);
+  });
+
   it('rechaza reclasificar más de lo que hay en el almacén origen (no-negativo, D3)', async () => {
     await sembrarExistenciaPrimeras(); // Primeras CH 10.
     const a = await crearAuditoria(sesion(), { idOrden }, bd());

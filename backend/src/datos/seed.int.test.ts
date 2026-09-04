@@ -110,6 +110,35 @@ describe('seed de fundación', () => {
     );
   });
 
+  /**
+   * Fila 0.137 — el guard `exigirAlmacenDelTipo` exige que el almacén sea del tipo del artículo, y
+   * los avíos se mueven en cuatro flujos (ajuste, traspaso, recepción de compra y notas de salida).
+   * El catálogo NO tenía ni un almacén de tipo AVIO —el viejo no los tenía y por eso ni el seed ni
+   * el ETL creaban uno—, así que sin esta siembra esos cuatro flujos rechazarían siempre.
+   *
+   * Ojo con la idempotencia: el almacén es GLOBAL (`idEmpresa = null`) y el `@@unique` de almacenes
+   * es `(idEmpresa, nombre)`, que en Postgres NO atrapa los NULL. Si el seed no verificara a mano
+   * antes de crear, la segunda corrida dejaría DOS y el dominio no sabría de cuál sacar.
+   */
+  it('siembra UN almacén global de AVÍOS y no lo duplica al re-sembrar (fila 0.137)', async () => {
+    // `sembrar` ya corrió DOS veces en el primer test de este describe.
+    const avios = await prisma.almacen.findMany({ where: { tipo: 'AVIO' } });
+    expect(avios).toHaveLength(1);
+    expect(avios[0]).toMatchObject({
+      nombre: 'Almacén de avíos',
+      tipo: 'AVIO',
+      idEmpresa: null,
+      activo: true,
+      esTransitoProceso: false,
+    });
+
+    // Una tercera corrida tampoco lo duplica (idempotencia explícita, no heredada del test 1).
+    await sembrar(prisma);
+    expect(await prisma.almacen.count({ where: { tipo: 'AVIO' } })).toBe(1);
+    // Y los de PT siguen siendo los 3 de siempre (el bloque nuevo no tocó el existente).
+    expect(await prisma.almacen.count({ where: { tipo: 'PT' } })).toBe(3);
+  });
+
   it('siembra los 8 géneros base (F1-E4) de forma idempotente', async () => {
     const generos = await prisma.genero.findMany({ select: { nombre: true } });
     const nombres = generos.map((g) => g.nombre).sort();

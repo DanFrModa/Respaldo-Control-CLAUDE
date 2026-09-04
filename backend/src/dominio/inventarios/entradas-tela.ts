@@ -75,7 +75,7 @@ import {
 import { EstatusEntradaTela, Prisma, type TipoDocumentoEntradaTela } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { exigirAlmacen } from '../../comun/almacenes.js';
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -540,7 +540,9 @@ async function validarCabeceraYLineas(
   if (tipoDocumento === 'factura') {
     exigirProveedorQueFactura(proveedor, 'capturar el documento como FACTURA');
   }
-  await exigirAlmacen(tx, idAlmacen, idEmpresa);
+  // Fila 0.137 — el almacén destino tiene que ser de TELA (además de existir, estar activo y ser de
+  // esta empresa, A9). Cubre alta, edición y confirmación: las tres pasan por este embudo.
+  await exigirAlmacenDelTipo(tx, idAlmacen, 'TELA', idEmpresa);
   // Los renglones REPETIDOS por tela+color SÍ se permiten: cada uno es su propia partida.
   return resolverColores(tx, lineas, { permitirRepetidos: true });
 }
