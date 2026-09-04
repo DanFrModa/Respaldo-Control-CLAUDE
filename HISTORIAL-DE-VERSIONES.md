@@ -71,6 +71,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.108 · 4-sep-2026 · **en prueba** — ⭐ **El documento para facturar**: «yo te digo qué facturarme», con el IVA a la vista
+
+### Qué se puede hacer ahora que antes no
+
+- Desde la **relación ejecutable** de una corrida semanal cerrada, cada pago por **transferencia** tiene su
+  botón para **generar la hoja con la que el proveedor nos debe facturar**: razón social, RFC, régimen y
+  código postal de los dos lados, uso del CFDI, concepto, forma y método de pago, moneda, y la tabla
+  **subtotal · IVA 16 % · total**. Sale en pantalla y en PDF para mandársela.
+- Un botón de la corrida completa imprime **una hoja por cada pago** y, delante, la hoja de **«no se
+  emitieron»**: a quién no se le puede pedir factura todavía y exactamente por qué (falta el RFC, falta el
+  régimen…). Es lo que Daniel pidió: nadie factura si no le mandamos nosotros el documento, no al revés.
+- En **Administración › Empresas** se capturan dos datos fiscales nuevos de FR Moda: **régimen fiscal** y
+  **código postal fiscal**, los que un CFDI 4.0 exige del receptor. El detalle de la empresa estrena la
+  sección «Ficha fiscal (con la que nos facturan)» y por fin muestra el RFC como RFC.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Hasta que se capturen el régimen y el CP fiscal de FR Moda, ningún documento se emite**, y la
+  pantalla lo dice con esas palabras. Las columnas nacen vacías (no se rellenan datos viejos).
+- **Un pago en efectivo no produce documento** («las facturas son sólo transferencias»), y un pago a un
+  concepto del catálogo tampoco. Una corrida en **borrador** tampoco: se cierra primero, porque en borrador
+  los montos todavía se mueven.
+- **Si falta un dato fiscal de cualquiera de los dos lados, el botón aparece deshabilitado** y al pasar el
+  ratón dice qué falta y de quién. Nunca se inventa un dato.
+- **El monto de la corrida se toma como el TOTAL con IVA** (lo que se transfiere), y el documento lo
+  desglosa hacia atrás. El uso de CFDI sale como **«G03» sugerido** cuando el proveedor no lo tiene
+  capturado. Ninguna retención se calcula.
+- **El documento no lleva número de cuenta**: se le manda al proveedor; los datos bancarios se quedan en la
+  relación ejecutable. Y el nombre del archivo PDF lleva folio y renglón, nunca el nombre del taller.
+- Los datos fiscales del proveedor se leen **al día**, no congelados: si cambió de régimen, el documento de
+  hoy lleva el de hoy.
+
+### Qué sigue pendiente o roto
+
+- **Decisiones de Daniel** (defaults ya construidos, se ajustan si dice lo contrario): que el monto es
+  total con IVA · sólo corridas cerradas o ejecutadas · «G03» sugerido · sin retenciones · tasa 16 %.
+- **Un documento por PAGO, no por orden**: el pago de maquila nace «a cuenta» y hoy no hay forma honesta de
+  desglosar cuánto de un pago corresponde a cada orden.
+- Falta la lectura automática de la constancia de situación fiscal (0.119), que es la que llenará estos
+  datos sin teclearlos.
+
 ## 0.107 · 4-sep-2026 · **en prueba** — ⭐ **Corte y empaque se pagan desde la orden**: son servicios, no maquilas de ida y vuelta
 
 ### Qué se puede hacer ahora que antes no
