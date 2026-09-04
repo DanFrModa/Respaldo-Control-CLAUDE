@@ -12136,6 +12136,27 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.197) — LA RECEPCIÓN CONTRA LA OC HACE NACER LA DEUDA (fila 0.129, 4-sep-2026): cuatro defaults del lead que Daniel confirma o ajusta
+
+**Contexto.** Daniel, §Post-F9.192 (2)(3): *«la persona que recibe (a partir de una OC) mete las cantidades y precios… el precio debería de ser el de la OC, la cantidad puede variar un poco, por eso se mete a mano… es la misma entrada que se ocupa tanto para inventario como para su estado de cuenta»* · *«Lo ideal es recibir con la factura. Pero si no fuera el caso, está bien dejarla como pendiente. Todo se recibe a partir de la OC. Tanto telas como avíos.»* El repaso midió que las telas ya lo hacían (la deuda nace al confirmar la entrada, en cuatro casos) y los avíos no: la recepción contra OC movía inventario y actualizaba la OC, pero nunca tocaba Cuentas por pagar.
+
+**Lo que se construyó:** la regla de «qué cargo nace de una entrada de mercancía» se sacó a **un solo sitio** (`terceros/cargo-de-entrada.ts`) y la usan las dos puertas: la entrada de tela (sin cambiar su comportamiento) y la recepción de avíos contra OC. La decisión es la de la 0.124: `emiteFactura(modalidadFacturacion)` — **sólo el proveedor marcado «sólo sin factura» genera el cargo no fiscal en el acto**; con factura, «ambos» o sin definir, la recepción queda **«factura pendiente»** y la deuda nace cuando el CFDI se importa en Finanzas. El precio por renglón se precarga de la OC y se puede corregir; el importe se calcula con lo capturado; el cargo nace en la misma transacción que el kardex; reversar la recepción cancela el cargo.
+
+**Cuatro defaults construidos (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿Los renglones LIBRES de la OC (un flete, una maquila suelta, algo sin catálogo) entran a la deuda? | **Sí**: no mueven inventario pero sí se deben, así que suman al cargo. | Se excluyen del importe en `importeDeRecepcion` (una condición). |
+| b | Proveedor que factura (o «ambos») ⇒ ¿nace un cargo provisional al recibir? | **No**: queda «factura pendiente» y la deuda nace con el CFDI, igual que en telas. Evita cobrar dos veces (provisional + factura). | Habría que diseñar el cargo provisional y su sustitución por el CFDI (alcance nuevo). |
+| c | Precio capturado distinto al de la OC | **Se acepta sin bloquear** (Daniel: «el precio debería de ser el de la OC», pero quien recibe lo puede corregir); se resalta en pantalla y la bitácora guarda los dos. | Bloquear o exigir permiso: una guarda en `recibirCompra`. |
+| d | Recepción sin número de factura/remisión | **El cargo nace igual**, con «(sin documento)» en la observación. | Exigir el número antes de crear el cargo. |
+
+**Cicatriz de proceso (lead):** la fila se construyó primero sobre `prueba` v0.105, que aún no tenía la 0.124 (estaba en PR), y el helper nació sobre la casilla `factura` retirada. Se corrigió fusionando la rama de la 0.124 antes de la revisión. Regla desde hoy: si una fila depende de otra que aún está en PR, su worktree se corta de la rama de esa PR o la fusiona enseguida.
+
+**Alcance nuevo (no entra):** ligar el CFDI importado en Finanzas con la recepción que lo originó; subir el XML desde la recepción de avíos (hoy sólo la entrada de tela sella CFDI).
+
+---
+
 #### (Post-F9.196) — EL DOCUMENTO PARA FACTURAR (fila 0.118, 4-sep-2026, madrugada): seis defaults del lead que Daniel confirma o ajusta, y la ficha fiscal de la empresa
 
 **Contexto.** Daniel (§Post-F9.186(k)): *«nadie me factura si no le mando yo un documento con los datos con los que me tiene que facturar… no al revés. Y eso debe salir del sistema»*; el 4-sep: *«lo ideal es que facture lo que es en total. Por eso quedamos que nosotros le vamos a dar un documento con el que va a facturar»* y *«las facturas son sólo transferencias»*. La fila volvió a la V1 por su decisión («Está bien en la fase 1», §190 adenda). Se construyó como **impreso por PAGO** sobre la corrida semanal (0.113): el pago de maquila nace «a cuenta» y el de proveedor es un movimiento de CxP sin aplicaciones, así que hoy no hay forma honesta de desglosar por orden.
