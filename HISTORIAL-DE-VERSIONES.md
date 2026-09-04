@@ -71,6 +71,35 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.101 · 4-sep-2026 · **en prueba** — Daniel cortó la primera versión: esto es lo que entra y esto es lo que espera a la fase 2
+
+### Qué se puede hacer ahora que antes no
+
+⚠️ **Nada nuevo en pantalla: esta versión es sólo de documentación.** Deja escrito, para que no se pierda, el
+corte que Daniel hizo de madrugada: *«ya no quiero entorpecer más la primera versión de salida. Necesito ya
+empezar a operar con el sistema»*.
+
+- **Lo que entra a fuerzas en la primera versión:** todo **inventarios** (el repaso completo, más lo que
+  Daniel agregue al cerrar finanzas), leer la **constancia de situación fiscal** (para dar de alta
+  proveedores rápido en el arranque), y las filas de finanzas y los defectos que bloquean operar.
+- **Lo que espera a la fase 2**, con nombre, número y sus palabras, en una sola tabla de `HOJA-DE-RUTA.md`
+  (*«Lo que espera a la fase 2»*): el libro de caja chica con reposición, el cotejo contra el estado de
+  cuenta del banco, el documento «yo te digo qué facturarme», el peso de diferencia del precio de lista,
+  las calificaciones de maquileros y corregir la receta en toda la familia de órdenes de una vez.
+
+### Qué cambió y puede sorprender
+
+- La **caja chica** se queda como está en la corrida semanal: un concepto que se carga solo cada semana y al
+  que Daniel le pone el monto a mano, mirando su archivo. El archivo sigue vivo y **no se importa**.
+- Las cosas que hoy funcionan en un Excel y no tocan producción **ya no se construyen para la primera
+  versión**; cuando Daniel nombre las que faltan, se numeran y se anotan en esa misma tabla.
+
+### Qué sigue pendiente o roto
+
+- Están a punto de entrar **la corrida semanal de pagos con el catálogo de conceptos** (aprobada, cerrando
+  remates) y **cerrar la orden con el maquilero** (en corrección).
+- Sin migración, sin permisos, sin seed ⇒ este despliegue **no** requiere `SEED_ON_START`.
+
 ## 0.100 · 3-sep-2026 · **en prueba** — El semáforo de pruebas ya no puede callarse cuando un paso muere a medias
 
 ### Qué se puede hacer ahora que antes no
