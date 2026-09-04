@@ -17,8 +17,16 @@
  * ── Cómo se bajan los bytes ────────────────────────────────────────────────────────────────────
  * {@link descargarImagenComoDataUrl} baja una imagen por su URL GET prefirmada y la devuelve como
  * data-URL, o `null` si algo falla. Vive aquí —y no en un impreso— porque la comparten todos.
+ *
+ * ── Cuántas caben y cómo se presignan (0.106) ───────────────────────────────────────────────────
+ * {@link recortarAlTope} (el tope + el conteo de lo que quedó fuera) y {@link presignarKeys} (el
+ * presign best-effort por imagen) también se comparten: nacieron en la ficha de arte (0.094) y la
+ * 0.106 los subió aquí al aplicar su misma cura al impreso de la orden. **El tope se aplica sobre
+ * lo que la orden PIDE, antes de presignar y de bajar** — si se aplicara después, el conteo
+ * hablaría de lo que se pudo traer y una imagen caída desaparecería del papel sin decirlo.
  */
 import { leerBom } from '../../modelos/bom-modelo.js';
+import type { ServicioArchivos } from '../../../comun/archivos.js';
 import type { clienteLectura } from '../../../comun/transaccion.js';
 import { leerArteOrdenParaImpreso, type ArteOrdenFotosImpreso } from '../fotos-arte-orden.js';
 import { leerRecetaParaImpreso } from '../receta-orden.js';
@@ -138,6 +146,59 @@ export function porRondas<T>(porArte: readonly (readonly T[])[]): T[] {
     }
   }
   return salida;
+}
+
+/**
+ * ⭐⭐ 0.106 — EL TOPE DE UN PAPEL, APLICADO SIEMPRE IGUAL: la imagen PRINCIPAL al frente
+ * ({@link anteponerPrincipal}) y las primeras `tope`; devuelve además **cuántas quedaron fuera**,
+ * que es lo que cada impreso pinta en su título. Como el tope es ≥ 1 y la principal quedó en la
+ * posición 0, la principal NUNCA se recorta. Pura y estable.
+ *
+ * ⚠️ **Se aplica sobre lo que la orden PIDE, ANTES de presignar y de bajar bytes.** Ésa es la mitad
+ * de la cura de la 0.106: recortar DESPUÉS de bajar hace que el conteo hable de lo que se pudo
+ * traer —no de lo que la prenda lleva— y que una imagen caída desaparezca dejando entrar a otra en
+ * su lugar. En un papel de PISO eso se produce mal: dice «3 artes» y la prenda lleva 5.
+ *
+ * Nació en la ficha de arte (0.094, `recortarFotosArte`) y la 0.106 lo subió aquí al necesitarlo
+ * también el impreso de la orden (`recortarFotos`/`recortarArtes`): un solo criterio de tope para
+ * los papeles de la misma orden.
+ */
+export function recortarAlTope<T extends { principal?: boolean }>(
+  imagenes: readonly T[],
+  tope: number,
+): { mostradas: T[]; ocultas: number } {
+  const mostradas = anteponerPrincipal(imagenes).slice(0, tope);
+  return { mostradas, ocultas: imagenes.length - mostradas.length };
+}
+
+/** Lo que devuelve {@link presignarKeys}: una URL por posición (o `null`) y el rastro del fallo. */
+export interface PresignadoLote {
+  /** URL GET prefirmada por posición; `null` = R2 rechazó ESA key → el papel pinta su hueco. */
+  urls: (string | null)[];
+  /** Cuántas keys se quedaron sin URL (el llamador lo LOGUEA con el contexto de su papel). */
+  fallos: number;
+  /** Motivo del primer fallo, para loguearlo; `undefined` si no hubo ninguno. */
+  primerMotivo: unknown;
+}
+
+/**
+ * Presigna un lote de keys de R2 **best-effort POR IMAGEN** (`allSettled`, nunca `all`): una key
+ * que R2 rechaza se queda en `null` y las demás siguen saliendo. Conserva la POSICIÓN de cada key,
+ * que es lo que permite casar cada URL con su rótulo sin corrimientos.
+ *
+ * No loguea: el mensaje lo pone quien llama, que es el único que sabe de qué papel se trata.
+ */
+export async function presignarKeys(
+  keys: readonly string[],
+  archivos: Pick<ServicioArchivos, 'urlDescarga'>,
+): Promise<PresignadoLote> {
+  const resultados = await Promise.allSettled(keys.map((key) => archivos.urlDescarga(key)));
+  const primerFallo = resultados.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  return {
+    urls: resultados.map((r) => (r.status === 'fulfilled' ? r.value : null)),
+    fallos: resultados.filter((r) => r.status === 'rejected').length,
+    primerMotivo: primerFallo?.reason,
+  };
 }
 
 /**

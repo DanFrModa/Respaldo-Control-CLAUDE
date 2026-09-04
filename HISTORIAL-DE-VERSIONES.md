@@ -71,6 +71,37 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.103 · 4-sep-2026 · **en prueba** — El impreso de la orden ya cuenta lo que la orden pide, y deja hueco donde falta una foto
+
+### Qué se puede hacer ahora que antes no
+
+- **El papel que va a piso dice la verdad.** El impreso de la orden contaba las fotos y los artes **sobre lo que
+  alcanzó a descargar**, no sobre lo que la orden pide: si un arte no bajaba, **desaparecía del papel sin
+  aviso** y la tercera y cuarta foto de otro arte ocupaban su lugar; el título decía «artes» a secas, como si
+  estuvieran todos. Ahora el título dice **«se muestran 4 de 6»** sobre lo pedido, y la foto que no llegó deja
+  **un hueco con marco del mismo tamaño y su rótulo**, en su posición. Nadie produce con menos artes de los que
+  la prenda lleva sin darse cuenta.
+- La **foto principal** sigue entrando siempre; si sus bytes no llegan, sale como hueco marcado en primer
+  lugar, no desaparece.
+
+### Qué cambió y puede sorprender
+
+- Cuando **todo está en su sitio, el impreso es exactamente el de siempre**: mismo orden, mismas imágenes,
+  una página.
+- **Las fotos del modelo ahora también avisan cuando se recortan** («Fotos del modelo: se muestran 3 de 8»),
+  pegado a la fila de fotos. Antes sólo lo decían los artes; se verá en casi toda orden cuyo modelo tenga más
+  de tres fotos.
+- Si se cae la foto principal, antes salían tres fotos (la cuarta subía a ocupar el lugar); ahora salen **un
+  hueco y dos fotos**. Es la misma regla que ya tenía la ficha de arte desde la 0.094.
+- El sistema ya **no descarga imágenes que iba a tirar**: el tope se aplica antes de bajar.
+
+### Qué sigue pendiente o roto
+
+- **Sin migración, sin permisos, sin seed, sin cambio del contrato** ⇒ el despliegue no requiere `SEED_ON_START`.
+- El impreso de la orden no tiene tope de peso por imagen (la ficha de arte sí, 12 MB) y la impresión por
+  lote acepta hasta cien órdenes de una vez: es la fila **0.140**, nueva. Este cambio ya bajó mucho ese
+  riesgo (de «todas las imágenes» a siete por orden como máximo).
+
 ## 0.102 · 4-sep-2026 · **en prueba** — ⭐⭐ **La corrida semanal de pagos**: los dos Excel de los viernes ya viven en el sistema
 
 ### Qué se puede hacer ahora que antes no
