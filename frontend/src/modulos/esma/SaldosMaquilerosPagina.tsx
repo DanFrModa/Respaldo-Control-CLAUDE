@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldLabel } from '@/components/ui/field';
 import { SelectNativo } from '@/components/ui/native-select';
 
-import { hayPendienteDeRevision, moneda, textoPorRevisar } from './comun';
+import { hayPendienteDeRevision, moneda, textoCargosPorValidar, textoPorRevisar } from './comun';
 
 /**
  * SALDOS DE TODOS LOS MAQUILEROS (F6-E5, ex `EsMa_SaldosMaq`): tabla de los maquileros ACTIVOS con
@@ -30,6 +30,16 @@ import { hayPendienteDeRevision, moneda, textoPorRevisar } from './comun';
  * (`saldo ≠ 0`) ni siquiera aparecería. Lleva SIEMPRE el conteo de partidas junto al importe
  * (`textoPorRevisar`, compartido con CxP): con los importes ocultos el neto se va en «—», y dos
  * partidas que netean cero se leerían como «$0.00» — en los dos casos parecería que no hay nada.
+ *
+ * ⭐ Y desde la fila 0.111 ese «por revisar» incluye los CARGOS SIN VALIDAR (los `propuesto`), que
+ * antes no se contaban en ningún lado: un maquilero con diez cargos esperando decisión y nada más
+ * tenía saldo 0, pendiente 0 y NO SALÍA en esta pantalla — justo lo que Daniel entra a revisar cada
+ * semana, y sin pantalla nueva (*«no quiero otra pantalla para ver los pendientes»*). Como el
+ * número de la columna creció, debajo va su desglose (`textoCargosPorValidar`): cuántos cargos,
+ * cuánto suman y cuántos no se pueden valuar por falta de precio.
+ *
+ * Se dice «cargos» y no «recibos» porque desde la 0.114 el CORTE y el EMPAQUE proponen el suyo sin
+ * generar recibo alguno (ver `textoCargosPorValidar` en `comun.ts`).
  */
 export function SaldosMaquilerosPagina(): React.JSX.Element {
   const navigate = useNavigate();
@@ -106,6 +116,16 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
                       {' '}
                       · por revisar <strong>{moneda(consulta.data.totalPendienteNeto)}</strong> (no
                       suma al saldo)
+                      {consulta.data.totalCargosPorValidar > 0 ? (
+                        <>
+                          , incluidos{' '}
+                          <strong>
+                            {consulta.data.totalCargosPorValidar}{' '}
+                            {consulta.data.totalCargosPorValidar === 1 ? 'cargo' : 'cargos'}
+                          </strong>{' '}
+                          por validar
+                        </>
+                      ) : null}
                     </>
                   ) : null}
                   .
@@ -134,6 +154,14 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
                         Por revisar {textoPorRevisar(f.pendienteRevision)} (no suma)
                       </p>
                     ) : null}
+                    {textoCargosPorValidar(f.pendienteRevision) === null ? null : (
+                      <p
+                        className="text-xs text-muted-foreground"
+                        data-testid="saldos-tarjeta-cargos"
+                      >
+                        {textoCargosPorValidar(f.pendienteRevision)}
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
@@ -150,7 +178,7 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
                       <TablaDensaHead numerica>Descuentos</TablaDensaHead>
                       <TablaDensaHead
                         numerica
-                        title="Capturado y aún sin revisar: no suma al saldo (§Post-F9.188a)"
+                        title="Capturado sin revisar + cargos sin validar: no suma al saldo (§Post-F9.188a)"
                       >
                         Por revisar
                       </TablaDensaHead>
@@ -181,6 +209,17 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
                           {hayPendienteDeRevision(f.pendienteRevision)
                             ? textoPorRevisar(f.pendienteRevision)
                             : ''}
+                          {/* El desglose de los cargos sin validar va DEBAJO y no en un tooltip: es
+                              la mitad nueva del número (fila 0.111) y sólo aparece en las filas que
+                              de verdad los tienen, así que no engorda la tabla. */}
+                          {textoCargosPorValidar(f.pendienteRevision) === null ? null : (
+                            <span
+                              className="block text-[11px] leading-tight"
+                              data-testid="saldos-cargos-por-validar"
+                            >
+                              {textoCargosPorValidar(f.pendienteRevision)}
+                            </span>
+                          )}
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica className="font-semibold">
                           {moneda(f.saldo)}

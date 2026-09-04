@@ -13,7 +13,9 @@
  *  (i) la cancelación de CxP es por inverso auditado y rechaza un movimiento que NO es de proveedor;
  *  (j) el estado de cuenta del proveedor delega al motor (incluye la convivencia EsMa);
  *  (k) §Post-F9.188(a): el maquilero con TODO sin revisar NO desaparece de la bandeja (saldo 0 +
- *      «por revisar» explicado); los KPIs siguen contando sólo saldo ≠ 0.
+ *      «por revisar» explicado); los KPIs siguen contando sólo saldo ≠ 0;
+ *  (l) V1 fila 0.111: ese «por revisar» incluye los RECIBOS SIN VALIDAR (cargos `propuesto`), con su
+ *      importe derivado — el maquilero que sólo tiene recibos esperando decisión también se ve.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -503,8 +505,11 @@ describe('convivencia EsMa en la bandeja (cubeta maquila)', () => {
       abonos: 400,
       pagos: 0,
       descuentos: 0,
+      cargos: 0,
       neto: 400,
       partidas: 1,
+      cargosPartidas: 0,
+      cargosSinPrecio: 0,
     });
     // Los KPIs NO lo cuentan como deuda (lo pendiente aún no se debe)… pero el resumen lo declara.
     expect(bandeja.resumen.proveedoresConSaldo).toBe(0);
@@ -560,10 +565,120 @@ describe('convivencia EsMa en la bandeja (cubeta maquila)', () => {
       abonos: null,
       pagos: null,
       descuentos: null,
+      cargos: null,
       neto: null,
       partidas: 1,
+      cargosPartidas: 0,
+      cargosSinPrecio: 0,
     });
     expect(bandeja.resumen.maquilaPorRevisar.partidas).toBe(1);
+  });
+
+  /**
+   * Siembra un cargo EsMa **PROPUESTO** (un recibo esperando validación) con su recibo y el precio
+   * de costura en la orden — la cantidad y el precio de referencia de los que sale el importe.
+   */
+  async function sembrarReciboSinValidar(
+    idMaquilero: number,
+    piezas: number,
+    precioOrden: number,
+  ): Promise<void> {
+    const tipoProceso = await cliente.tipoProceso.create({
+      data: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+    });
+    const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Cliente Recibo' } });
+    const pedido = await cliente.pedido.create({
+      data: { folio: 2n, idEmpresa: empresa.id, idCliente: clienteNegocio.id },
+    });
+    const modelo = await cliente.modelo.create({
+      data: { codigo: 'MOD-R', descripcion: 'Modelo recibo' },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: piezas, precio: 100 },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 2n,
+        idEmpresa: empresa.id,
+        idPedidoLinea: linea.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocio.id,
+        maquilaOrd: precioOrden,
+      },
+    });
+    const color = await cliente.color.create({ data: { nombre: 'Azul recibo' } });
+    const talla = await cliente.talla.create({ data: { etiqueta: 'G' } });
+    const recibo = await cliente.etapaMovimiento.create({
+      data: {
+        folio: 1n,
+        idEmpresa: empresa.id,
+        idOrden: orden.id,
+        tipo: 'recibo_maquila',
+        idTipoProceso: tipoProceso.id,
+        idTercero: idMaquilero,
+        fecha: new Date('2026-06-01T00:00:00Z'),
+        detalles: { create: { idColor: color.id, idTalla: talla.id, cantidad: piezas } },
+      },
+    });
+    await cliente.esMaCargo.create({
+      data: {
+        idEmpresa: empresa.id,
+        idEtapaRecibo: recibo.id,
+        idMaquilero,
+        idOrden: orden.id,
+        idTipoProceso: tipoProceso.id,
+        estado: 'propuesto',
+      },
+    });
+  }
+
+  it('⭐ (l) fila 0.111: el maquilero con SÓLO RECIBOS SIN VALIDAR está en la bandeja', async () => {
+    // Daniel (3-sep): *«cada semana me pueda meter a algún lugar donde estén todos los maquileros
+    // que tengan algo pendiente por pagar o por descontar»*. Un recibo sin validar es exactamente
+    // eso, y antes no lo contaba nadie: saldo 0, «por revisar» 0 y la fila NO existía.
+    const idMaquilero = await maquileroNuevo('Maquila Recibos Sin Validar');
+    await sembrarReciboSinValidar(idMaquilero, 10, 8);
+
+    const bandeja = await bandejaPorPagar(sesion(), { filtro: 'con-saldo' }, bd());
+    const fila = bandeja.filas.find((f) => f.idProveedor === idMaquilero);
+    expect(fila).toBeDefined();
+    expect(fila).toMatchObject({ saldo: 0, maquila: 0 });
+    expect(fila?.maquilaPorRevisar).toEqual({
+      abonos: 0,
+      pagos: 0,
+      descuentos: 0,
+      cargos: 80,
+      neto: 80,
+      partidas: 1,
+      cargosPartidas: 1,
+      cargosSinPrecio: 0,
+    });
+    // Sigue SIN ser deuda (nadie ha validado cuánto se le paga), pero el resumen lo declara.
+    expect(bandeja.resumen.carteraTotal).toBe(0);
+    expect(bandeja.resumen.maquilaPorRevisar).toMatchObject({
+      cargos: 80,
+      neto: 80,
+      partidas: 1,
+      cargosPartidas: 1,
+    });
+  });
+
+  it('(l) el resumen NO cuenta dos veces los recibos al sumar varias filas', async () => {
+    // `sumarPorRevisar` rearma el conteo desde sus dos mitades: si le pasara `partidas` ya sumado,
+    // `armarPendiente` volvería a sumar los cargos y el resumen enseñaría el doble.
+    const unoConRecibo = await maquileroNuevo('Maquila Recibo A');
+    await sembrarReciboSinValidar(unoConRecibo, 10, 8);
+    const otroConPlano = await maquileroNuevo('Maquila Plano B');
+    await sembrarPlano('abono', otroConPlano, 100, 'capturado');
+
+    const bandeja = await bandejaPorPagar(sesion(), { filtro: 'con-saldo' }, bd());
+    expect(bandeja.resumen.maquilaPorRevisar).toMatchObject({
+      abonos: 100,
+      cargos: 80,
+      neto: 180,
+      partidas: 2,
+      cargosPartidas: 1,
+    });
   });
 });
 

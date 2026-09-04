@@ -15,7 +15,11 @@ import {
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
-import { hayPendienteDeRevision, textoPorRevisar } from '@/modulos/esma/comun';
+import {
+  hayPendienteDeRevision,
+  textoCargosPorValidar,
+  textoPorRevisar,
+} from '@/modulos/esma/comun';
 import { useSesion } from '@/sesion/useSesion';
 
 import { celdaAging, moneda } from './comun';
@@ -49,6 +53,12 @@ const CHIPS: OpcionChip<'con-saldo' | 'todos'>[] = [
  * ni a la cartera, pero es la razón por la que un maquilero con saldo 0 sigue en la bandeja —Daniel
  * (§Post-F9.188a): el que tiene todo sin revisar NO debe desaparecer. El servidor decide quién se ve;
  * la pantalla sólo explica el porqué.
+ *
+ * ⭐ Desde la fila 0.111 ese «por revisar» también cuenta los CARGOS SIN VALIDAR del maquilero —el
+ * recibo de una maquila, o el corte/empaque de la orden (0.114)—, y la bandeja lo HEREDA sin
+ * filtrar nada por su cuenta: el número y el corte los arma el mismo agregado que alimenta el
+ * tablero de EsMa y la corrida semanal. El desglose («N cargos por validar · $X») viaja en el
+ * `title` de la celda.
  */
 export function CxpPagina(): React.JSX.Element {
   const navigate = useNavigate();
@@ -276,7 +286,7 @@ export function CxpPagina(): React.JSX.Element {
                       </TablaDensaHead>
                       <TablaDensaHead
                         numerica
-                        title="Maquila capturada y aún sin revisar: no suma al saldo (§Post-F9.188a)"
+                        title="Maquila capturada sin revisar + cargos sin validar: no suma al saldo (§Post-F9.188a)"
                       >
                         Por revisar
                       </TablaDensaHead>
@@ -314,7 +324,11 @@ export function CxpPagina(): React.JSX.Element {
                         <TablaDensaCelda numerica className="text-muted-foreground">
                           {celdaAging(f.maquila)}
                         </TablaDensaCelda>
-                        <TablaDensaCelda numerica className="text-muted-foreground">
+                        <TablaDensaCelda
+                          numerica
+                          className="text-muted-foreground"
+                          title={textoCargosPorValidar(f.maquilaPorRevisar) ?? undefined}
+                        >
                           {celdaPorRevisar(f.maquilaPorRevisar)}
                         </TablaDensaCelda>
                       </TablaDensaFila>

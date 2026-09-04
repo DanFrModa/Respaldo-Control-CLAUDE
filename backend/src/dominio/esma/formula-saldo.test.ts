@@ -33,6 +33,7 @@ import {
   netoPendiente,
   pendienteDeRevisionCargo,
   pendienteDeRevisionPlano,
+  pendienteParaSalida,
   saldoDeTotales,
   SIGNO_SALDO,
   sqlCuenta,
@@ -43,9 +44,11 @@ import {
   WHERE_CUENTA_DESCUENTO,
   WHERE_CUENTA_PAGO,
   WHERE_PENDIENTE_ABONO,
+  WHERE_PENDIENTE_CARGO,
   WHERE_PENDIENTE_DESCUENTO,
   WHERE_PENDIENTE_PAGO,
   type ConceptoSaldo,
+  type EntradaPendiente,
 } from './formula-saldo.js';
 
 /** Las cláusulas de Prisma por concepto, tal como las consume `saldos.ts`. */
@@ -56,12 +59,33 @@ const WHERE_CUENTA: Record<ConceptoSaldo, Record<string, unknown>> = {
   descuento: WHERE_CUENTA_DESCUENTO,
 };
 
-/** Las cláusulas de «pendiente» que existen en forma de Prisma (el cargo no tiene importe aún). */
+/**
+ * Las cláusulas de «pendiente» en forma de Prisma. Los CUATRO conceptos tienen la suya desde la fila
+ * 0.111: el cargo `propuesto` también espera una decisión (su importe se DERIVA, no se guarda).
+ */
 const WHERE_PENDIENTE: Record<string, Record<string, unknown>> = {
+  cargo: WHERE_PENDIENTE_CARGO,
   abono: WHERE_PENDIENTE_ABONO,
   pago: WHERE_PENDIENTE_PAGO,
   descuento: WHERE_PENDIENTE_DESCUENTO,
 };
+
+/**
+ * Entrada de `armarPendiente` en ceros: las pruebas parten de aquí y sobre-escriben SÓLO el campo
+ * que están midiendo, para que agregar un sumando mañana no obligue a tocar veinte llamadas.
+ */
+function entrada(parcial: Partial<EntradaPendiente> = {}): EntradaPendiente {
+  return {
+    abonos: 0,
+    pagos: 0,
+    descuentos: 0,
+    cargos: 0,
+    partidasPlanas: 0,
+    cargosPartidas: 0,
+    cargosSinPrecio: 0,
+    ...parcial,
+  };
+}
 
 /** `camelCase` → `snake_case`, la convención de columnas del esquema (`@map`). */
 function aColumna(campo: string): string {
@@ -180,6 +204,15 @@ describe('formula-saldo · el SQL y el Prisma salen del MISMO criterio', () => {
     expect(condicionesDe(sqlCuenta('cargo').sql)).toHaveLength(2);
     expect(sqlCuenta('cargo').sql).toContain('"sin_costo" = FALSE');
   });
+
+  it('el cargo PENDIENTE exige las mismas dos, cambiando sólo el estado (fila 0.111)', () => {
+    // El pendiente del cargo nació con una sola condición (`estado = 'propuesto'`). Lleva las DOS
+    // por el mismo motivo que el descuento lleva `cancelado_en IS NULL` en sus dos criterios: lo que
+    // no se le va a pagar al maquilero no es dinero esperando una decisión.
+    expect(condicionesDe(sqlPendiente('cargo').sql)).toHaveLength(2);
+    expect(sqlPendiente('cargo').sql).toContain('"sin_costo" = FALSE');
+    expect(sqlPendiente('cargo').sql).toContain(`"estado" = 'propuesto'`);
+  });
 });
 
 describe('formula-saldo · el renglón suelto dice lo mismo que la suma', () => {
@@ -202,9 +235,12 @@ describe('formula-saldo · el renglón suelto dice lo mismo que la suma', () => 
     expect(cuentaAlSaldoCargo({ estado: 'validado', sinCosto: true })).toBe(false);
     expect(cuentaAlSaldoCargo({ estado: 'propuesto', sinCosto: false })).toBe(false);
     expect(cuentaAlSaldoCargo({ estado: 'cancelado', sinCosto: false })).toBe(false);
-    expect(pendienteDeRevisionCargo({ estado: 'propuesto' })).toBe(true);
-    expect(pendienteDeRevisionCargo({ estado: 'validado' })).toBe(false);
-    expect(pendienteDeRevisionCargo({ estado: 'cancelado' })).toBe(false);
+    expect(pendienteDeRevisionCargo({ estado: 'propuesto', sinCosto: false })).toBe(true);
+    expect(pendienteDeRevisionCargo({ estado: 'validado', sinCosto: false })).toBe(false);
+    expect(pendienteDeRevisionCargo({ estado: 'cancelado', sinCosto: false })).toBe(false);
+    // Y la segunda condición (fila 0.111): una segunda SIN COSTO no se le va a pagar al maquilero,
+    // así que no es dinero esperando decisión — igual que un cargo cancelado no lo es.
+    expect(pendienteDeRevisionCargo({ estado: 'propuesto', sinCosto: true })).toBe(false);
   });
 
   it('el aporte de un cargo al detalle: importe si cuenta, 0 si es sin costo validado, null si no se sabe', () => {
@@ -258,38 +294,107 @@ describe('formula-saldo · signos y redondeo', () => {
   });
 
   it('el neto pendiente usa los MISMOS signos que el saldo', () => {
-    expect(netoPendiente({ abonos: 100, pagos: 30, descuentos: 20 })).toBe(50);
-    expect(netoPendiente({ abonos: 0, pagos: 40, descuentos: 0 })).toBe(-40);
-    expect(netoPendiente({ abonos: 0, pagos: 0, descuentos: 25 })).toBe(-25);
-    expect(netoPendiente({ abonos: 0, pagos: 0, descuentos: 0 })).toBe(0);
+    expect(netoPendiente({ abonos: 100, pagos: 30, descuentos: 20, cargos: 0 })).toBe(50);
+    expect(netoPendiente({ abonos: 0, pagos: 40, descuentos: 0, cargos: 0 })).toBe(-40);
+    expect(netoPendiente({ abonos: 0, pagos: 0, descuentos: 25, cargos: 0 })).toBe(-25);
+    expect(netoPendiente({ abonos: 0, pagos: 0, descuentos: 0, cargos: 0 })).toBe(0);
+    // ⭐ Y el CUARTO sumando (fila 0.111): un recibo sin validar es dinero que se le va a DEBER al
+    // maquilero, así que SUMA —con el signo del cargo, no con el del pago—. Si se restara, el
+    // maquilero con recibos pendientes se enseñaría en negativo, como si él debiera.
+    expect(netoPendiente({ abonos: 0, pagos: 0, descuentos: 0, cargos: 700 })).toBe(700);
+    expect(SIGNO_SALDO.cargo).toBe(1);
+    // Los cuatro juntos, con cada signo en su sitio: 700 + 100 − 30 − 20.
+    expect(netoPendiente({ abonos: 100, pagos: 30, descuentos: 20, cargos: 700 })).toBe(750);
   });
 
   it('«hay pendiente» se decide por el CONTEO de partidas, no por los importes', () => {
     // (a) Un abono y un pago capturados del mismo importe netean 0: con el neto, ese maquilero
     // desaparecería teniendo DOS partidas esperando decisión.
-    const neteanCero = armarPendiente(30, 30, 0, 2);
+    const neteanCero = armarPendiente(entrada({ abonos: 30, pagos: 30, partidasPlanas: 2 }));
     expect(neteanCero.neto).toBe(0);
     expect(hayPendiente(neteanCero)).toBe(true);
 
     // (b) Y los SUBTOTALES tampoco alcanzan: el ETL carga montos negativos a propósito ("saldo
     // anterior" del Access), así que +500 y −500 dejan el subtotal de abonos en 0 con dos partidas.
-    const seCancelanEntreSi = armarPendiente(0, 0, 0, 2);
+    const seCancelanEntreSi = armarPendiente(entrada({ partidasPlanas: 2 }));
     expect(seCancelanEntreSi.abonos).toBe(0);
     expect(seCancelanEntreSi.pagos).toBe(0);
     expect(seCancelanEntreSi.descuentos).toBe(0);
     expect(hayPendiente(seCancelanEntreSi)).toBe(true);
 
     // Y cuando de verdad no hay nada, dice que no.
-    expect(hayPendiente(armarPendiente(0, 0, 0, 0))).toBe(false);
+    expect(hayPendiente(armarPendiente(entrada()))).toBe(false);
+  });
+
+  it('⭐ un maquilero con SÓLO recibos sin validar tiene pendiente (fila 0.111)', () => {
+    // El hueco que esta fila vino a tapar: diez recibos esperando la decisión de Daniel y nada más.
+    // Saldo 0, tres importes planos en 0 — y con el pendiente viejo, `partidas` también 0: el
+    // maquilero era INVISIBLE en el tablero, en la bandeja de CxP y en la corrida.
+    const soloRecibos = armarPendiente(entrada({ cargos: 1200, cargosPartidas: 10 }));
+    expect(soloRecibos.partidas).toBe(10);
+    expect(soloRecibos.cargosPartidas).toBe(10);
+    expect(soloRecibos.neto).toBe(1200);
+    expect(hayPendiente(soloRecibos)).toBe(true);
+
+    // Y aunque NINGUNO se pueda valuar (sin precio de referencia), las partidas cuentan igual: el
+    // importe es 0 pero hay diez decisiones encima. Sin esto volvería a desaparecer.
+    const sinPrecio = armarPendiente(entrada({ cargosPartidas: 10, cargosSinPrecio: 10 }));
+    expect(sinPrecio.cargos).toBe(0);
+    expect(sinPrecio.neto).toBe(0);
+    expect(sinPrecio.cargosSinPrecio).toBe(10);
+    expect(hayPendiente(sinPrecio)).toBe(true);
+  });
+
+  it('⭐ el conteo total SUMA las dos mitades (planas + recibos) una sola vez', () => {
+    // `partidas` lo arma la fórmula, no quien llama: es lo que garantiza que los recibos entren en
+    // los TRES caminos (Prisma, el SQL del tablero y el del lote de CxP) sin que uno se olvide.
+    const mezcla = armarPendiente(
+      entrada({ abonos: 40, partidasPlanas: 3, cargos: 60, cargosPartidas: 2 }),
+    );
+    expect(mezcla.partidas).toBe(5);
+    expect(mezcla.cargosPartidas).toBe(2);
+    expect(mezcla.neto).toBe(100);
   });
 
   it('el bloque de pendiente redondea cada importe a 2 decimales y luego el neto', () => {
-    const p = armarPendiente(10.005, 0.001, 0, 3);
+    const p = armarPendiente(
+      entrada({ abonos: 10.005, pagos: 0.001, cargos: 0.004, partidasPlanas: 3 }),
+    );
     expect(p.abonos).toBe(10.01);
     expect(p.pagos).toBe(0);
     expect(p.descuentos).toBe(0);
+    // El importe de los cargos redondea igual que los otros tres (0.004 → 0.00).
+    expect(p.cargos).toBe(0);
     expect(p.neto).toBe(10.01);
     expect(p.partidas).toBe(3);
+  });
+
+  it('los importes se ocultan y los TRES conteos no (pendienteParaSalida)', () => {
+    const p = armarPendiente(
+      entrada({ abonos: 40, cargos: 60, partidasPlanas: 1, cargosPartidas: 2, cargosSinPrecio: 1 }),
+    );
+    expect(pendienteParaSalida(p, true)).toEqual({
+      abonos: 40,
+      pagos: 0,
+      descuentos: 0,
+      cargos: 60,
+      neto: 100,
+      partidas: 3,
+      cargosPartidas: 2,
+      cargosSinPrecio: 1,
+    });
+    // Sin `consultas.ver-importes`: los CUATRO importes en null, los tres conteos intactos — saber
+    // que hay dos recibos esperando decisión no es ver dinero.
+    expect(pendienteParaSalida(p, false)).toEqual({
+      abonos: null,
+      pagos: null,
+      descuentos: null,
+      cargos: null,
+      neto: null,
+      partidas: 3,
+      cargosPartidas: 2,
+      cargosSinPrecio: 1,
+    });
   });
 });
 
@@ -468,6 +573,9 @@ const NO_SON_EL_SALDO: Record<string, string> = {
 const CONSUMIDORES_DEL_SALDO = [
   'src/dominio/esma/saldos.ts',
   'src/dominio/esma/saldos-todos.ts',
+  // Valúa los cargos PROPUESTOS (fila 0.111) y trae su criterio de `sqlPendiente('cargo')`: es la
+  // subconsulta que el tablero y el lote de CxP intercalan, o sea la misma pregunta del saldo.
+  'src/dominio/esma/cargo-propuesto.ts',
   'src/dominio/esma/estado-cuenta.ts',
   'src/dominio/esma/orden-pagada.ts',
   'src/dominio/terceros/convivencia-esma.ts',

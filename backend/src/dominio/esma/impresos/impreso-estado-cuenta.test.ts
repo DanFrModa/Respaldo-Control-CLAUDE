@@ -81,7 +81,16 @@ function desglosadoDePrueba(): DesglosadoSalida {
       totalPagos: 0,
       totalDescuentos: 0,
       saldo: 80,
-      pendienteRevision: { abonos: 15, pagos: 0, descuentos: 0, neto: 15, partidas: 1 },
+      pendienteRevision: {
+        abonos: 15,
+        pagos: 0,
+        descuentos: 0,
+        cargos: 0,
+        neto: 15,
+        partidas: 1,
+        cargosPartidas: 0,
+        cargosSinPrecio: 0,
+      },
     },
   };
 }
@@ -167,19 +176,77 @@ describe('el pie del estado de cuenta declara lo que espera revisión', () => {
   it('⭐ la trae TAMBIÉN cuando los importes netean cero (el caso que el neto escondía)', () => {
     // Abono capturado de 500 y pago capturado de 500: el neto es 0, pero son DOS partidas que el
     // detalle lista y los totales excluyen. Guiarse por el neto dejaba la hoja sin explicación.
-    expect(etiquetas({ abonos: 500, pagos: 500, descuentos: 0, neto: 0, partidas: 2 })).toContain(
-      'Por revisar',
-    );
+    expect(
+      etiquetas({
+        abonos: 500,
+        pagos: 500,
+        descuentos: 0,
+        cargos: 0,
+        neto: 0,
+        partidas: 2,
+        cargosPartidas: 0,
+        cargosSinPrecio: 0,
+      }),
+    ).toContain('Por revisar');
     // Y hasta cuando los tres subtotales netean cero entre sí (montos negativos del ETL).
-    expect(etiquetas({ abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 2 })).toContain(
-      'Por revisar',
-    );
+    expect(
+      etiquetas({
+        abonos: 0,
+        pagos: 0,
+        descuentos: 0,
+        cargos: 0,
+        neto: 0,
+        partidas: 2,
+        cargosPartidas: 0,
+        cargosSinPrecio: 0,
+      }),
+    ).toContain('Por revisar');
+  });
+
+  it('⭐ la trae cuando lo único pendiente son RECIBOS SIN VALIDAR (fila 0.111)', () => {
+    // El pie se guía por el CONTEO de partidas, y desde la 0.111 ese conteo incluye los cargos
+    // `propuesto`. Un maquilero cuyo único pendiente son recibos tiene que verlo en el papel que
+    // se firma — es exactamente el caso que Daniel revisa cada semana.
+    expect(
+      etiquetas({
+        abonos: 0,
+        pagos: 0,
+        descuentos: 0,
+        cargos: 1200,
+        neto: 1200,
+        partidas: 3,
+        cargosPartidas: 3,
+        cargosSinPrecio: 0,
+      }),
+    ).toContain('Por revisar');
+    // Y también cuando NINGUNO se puede valuar: el importe es 0 pero hay tres decisiones encima.
+    expect(
+      etiquetas({
+        abonos: 0,
+        pagos: 0,
+        descuentos: 0,
+        cargos: 0,
+        neto: 0,
+        partidas: 3,
+        cargosPartidas: 3,
+        cargosSinPrecio: 3,
+      }),
+    ).toContain('Por revisar');
   });
 
   it('NO la trae cuando no hay nada esperando revisión (el 99 % de los estados de cuenta)', () => {
-    expect(etiquetas({ abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 0 })).not.toContain(
-      'Por revisar',
-    );
+    expect(
+      etiquetas({
+        abonos: 0,
+        pagos: 0,
+        descuentos: 0,
+        cargos: 0,
+        neto: 0,
+        partidas: 0,
+        cargosPartidas: 0,
+        cargosSinPrecio: 0,
+      }),
+    ).not.toContain('Por revisar');
   });
 
   it('cada renglón dice si es él el que está por revisar (en el papel no hay botón)', () => {

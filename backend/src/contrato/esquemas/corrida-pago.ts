@@ -214,11 +214,17 @@ export const esquemaFilaCorridaSalida = z
     porRevisarNeto: z
       .number()
       .nullable()
-      .describe('Neto capturado que aún NO suma al saldo (sólo maquila), o null.'),
+      .describe(
+        'Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin ' +
+          'revisar más el importe derivado de los cargos propuestos, o null.',
+      ),
     porRevisarPartidas: z
       .number()
       .int()
-      .describe('Cuántas partidas esperan revisión (0 si no aplica). NO es un importe.'),
+      .describe(
+        'Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es ' +
+          'un importe.',
+      ),
     recibosSemanaImporte: z
       .number()
       .nullable()

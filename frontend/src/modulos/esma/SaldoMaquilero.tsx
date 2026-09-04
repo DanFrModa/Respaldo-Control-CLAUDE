@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldLabel } from '@/components/ui/field';
 import { SelectNativo } from '@/components/ui/native-select';
 
-import { hayPendienteDeRevision, moneda, partidas } from './comun';
+import { hayPendienteDeRevision, moneda, partidas, textoCargosPorValidar } from './comun';
 
 /** Segmento de facturación del saldo: todo junto, solo con factura o solo sin factura. */
 type Segmento = '' | 'con' | 'sin';
@@ -20,6 +20,11 @@ type Segmento = '' | 'con' | 'sin';
  * debajo: el saldo sigue mandando y el pendiente lo acompaña, para que nadie vea un número más chico
  * sin entender por qué (V1, fila 0.115). Si los importes están ocultos, el aviso sigue apareciendo
  * con el CONTEO de partidas: saber que algo espera decisión no es ver dinero.
+ *
+ * Desde la fila 0.111 ese pendiente incluye los CARGOS SIN VALIDAR (los `propuesto`), que se
+ * desglosan aparte porque su importe no está capturado: se DERIVA de las piezas de la etapa y del
+ * precio de la orden, y a veces ni eso se puede (cargos «sin precio»). Se dice «cargos» y no
+ * «recibos» porque desde la 0.114 el corte y el empaque proponen el suyo sin generar recibo.
  */
 export function SaldoMaquilero({ idMaquilero }: { idMaquilero: number }): React.JSX.Element {
   const [segmento, setSegmento] = useState<Segmento>('');
@@ -79,12 +84,21 @@ export function SaldoMaquilero({ idMaquilero }: { idMaquilero: number }): React.
                     revisión en {partidas(saldo.pendienteRevision.partidas)}, que <b>no</b> entra al
                     saldo: abonos {moneda(saldo.pendienteRevision.abonos)} · pagos{' '}
                     {moneda(saldo.pendienteRevision.pagos)} · descuentos{' '}
-                    {moneda(saldo.pendienteRevision.descuentos)}. Se suma en cuanto se revise cada
+                    {moneda(saldo.pendienteRevision.descuentos)} · cargos por validar{' '}
+                    {moneda(saldo.pendienteRevision.cargos)}. Se suma en cuanto se revise cada
                     partida.
                   </>
                 )}
               </p>
             ) : null}
+            {textoCargosPorValidar(saldo.pendienteRevision) === null ? null : (
+              <p
+                className="mt-1 text-[12.5px] text-muted-foreground"
+                data-testid="saldo-cargos-por-validar"
+              >
+                {textoCargosPorValidar(saldo.pendienteRevision)}.
+              </p>
+            )}
           </>
         ) : null}
       </CardContent>

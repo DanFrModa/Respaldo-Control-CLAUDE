@@ -161,8 +161,10 @@ export const esquemaBandejaCxpFila = z
       .nullable()
       .describe('Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte).'),
     maquilaPorRevisar: esquemaPendienteRevisionEsMa.describe(
-      'Maquila (EsMa) capturada y AÚN sin revisar: no suma al saldo, pero se ve. Es la razón por la ' +
-        'que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a).',
+      'Maquila (EsMa) que aún espera una decisión: lo capturado sin revisar MÁS los cargos ' +
+        'propuestos (los que esperan que alguien fije cantidad y precio). No suma al saldo, pero ' +
+        'se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja ' +
+        '(§Post-F9.188a) — incluido el que sólo tiene cargos por validar (V1, fila 0.111).',
     ),
   })
   .describe('Renglón de la bandeja de cuentas por pagar (proveedor + saldo + aging + maquila).');
@@ -200,8 +202,9 @@ export const esquemaResumenCxpSalida = z
       ),
     proveedoresConSaldo: z.number().int().describe('Proveedores con saldo ≠ 0.'),
     maquilaPorRevisar: esquemaPendienteRevisionEsMa.describe(
-      'Σ de la maquila capturada sin revisar en toda la cartera: NO suma a carteraTotal ni a ' +
-        'maquilaTotal (todavía no es deuda), pero no desaparece.',
+      'Σ de la maquila que espera decisión en toda la cartera —lo capturado sin revisar MÁS los ' +
+        'cargos propuestos—: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero ' +
+        'no desaparece.',
     ),
   })
   .describe('Resumen (KPIs) de cuentas por pagar.');

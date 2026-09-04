@@ -59880,7 +59880,7 @@ export interface paths {
               totalDescuentos: number | null;
               /** @description Saldo derivado (o null si se ocultan importes). */
               saldo: number | null;
-              /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+              /** @description Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar. */
               pendienteRevision: {
                 /** @description Σ abonos capturados sin revisar (o null). */
                 abonos: number | null;
@@ -59888,10 +59888,16 @@ export interface paths {
                 pagos: number | null;
                 /** @description Σ descuentos capturados sin revisar (o null). */
                 descuentos: number | null;
-                /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                cargos: number | null;
+                /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                 neto: number | null;
-                /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                 partidas: number;
+                /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                cargosPartidas: number;
+                /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                cargosSinPrecio: number;
               };
             };
           };
@@ -60610,7 +60616,7 @@ export interface paths {
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
-                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                /** @description Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar. */
                 pendienteRevision: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -60618,16 +60624,24 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               }[];
               /** @description Σ de los saldos (o null si se ocultan importes). */
               totalSaldo: number | null;
               /** @description Σ del pendiente neto de todas las filas (o null si se ocultan importes). */
               totalPendienteNeto: number | null;
+              /** @description Σ de los cargos sin validar de todas las filas (conteo: NO se oculta). Lo agrega el servidor para que la pantalla no tenga que sumar la columna. */
+              totalCargosPorValidar: number;
             };
           };
         };
@@ -61222,7 +61236,7 @@ export interface paths {
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
-                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                /** @description Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar. */
                 pendienteRevision: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -61230,10 +61244,16 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               };
               /** @description Renglones del periodo, ordenados por fecha (fecha+id). */
@@ -61600,7 +61620,7 @@ export interface paths {
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
-                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                /** @description Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar. */
                 pendienteRevision: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -61608,10 +61628,16 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               };
             };
@@ -62792,7 +62818,7 @@ export interface paths {
                 mas60: number | null;
                 /** @description Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte). */
                 maquila: number | null;
-                /** @description Maquila (EsMa) capturada y AÚN sin revisar: no suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a). */
+                /** @description Maquila (EsMa) que aún espera una decisión: lo capturado sin revisar MÁS los cargos propuestos (los que esperan que alguien fije cantidad y precio). No suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a) — incluido el que sólo tiene cargos por validar (V1, fila 0.111). */
                 maquilaPorRevisar: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -62800,10 +62826,16 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               }[];
               /** @description Total de proveedores que cumplen el filtro. */
@@ -62826,7 +62858,7 @@ export interface paths {
                 alCorrientePct: number | null;
                 /** @description Proveedores con saldo ≠ 0. */
                 proveedoresConSaldo: number;
-                /** @description Σ de la maquila capturada sin revisar en toda la cartera: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero no desaparece. */
+                /** @description Σ de la maquila que espera decisión en toda la cartera —lo capturado sin revisar MÁS los cargos propuestos—: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero no desaparece. */
                 maquilaPorRevisar: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -62834,10 +62866,16 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               };
               /** @description Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas. */
@@ -65059,9 +65097,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -65308,9 +65346,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -65683,9 +65721,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -65956,9 +65994,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -66195,9 +66233,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -66445,9 +66483,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -66696,9 +66734,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;

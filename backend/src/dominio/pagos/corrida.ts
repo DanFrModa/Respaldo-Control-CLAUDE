@@ -460,6 +460,10 @@ export async function obtenerCorridaDetalle(
         esMaquila || neta === undefined
           ? null
           : oculto(redondear2(neta.d1a30 + neta.d31a60 + neta.mas60)),
+      // El «por revisar» viene ENTERO del mismo agregado que la bandeja de CxP: desde la fila 0.111
+      // incluye los RECIBOS SIN VALIDAR del maquilero (cargos `propuesto`) además de sus abonos,
+      // pagos y descuentos capturados. Aquí no se filtra ni se recalcula nada — si se recalculara,
+      // la corrida y la bandeja podrían decir cosas distintas del mismo maquilero.
       porRevisarNeto: esMaquila && neta !== undefined ? oculto(neta.maquilaPorRevisar.neto) : null,
       porRevisarPartidas: esMaquila && neta !== undefined ? neta.maquilaPorRevisar.partidas : 0,
       recibosSemanaImporte:
