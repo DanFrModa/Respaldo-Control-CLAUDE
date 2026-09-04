@@ -343,6 +343,25 @@ export function CorridaPagosPagina(): React.JSX.Element {
                 />
               ))}
 
+              {/*
+                ⭐ CERO SECCIONES: la corrida está abierta pero no hay a quién pagarle todavía —
+                nadie debe nada (ni EsMa ni CxP) y no hay conceptos que se carguen solos. Antes esto
+                pintaba LA NADA debajo del encabezado, y una corrida en blanco sin explicación se lee
+                como una pantalla rota. Lo destapó el CI: en su base recién sembrada no hay
+                movimientos ni conceptos, y el e2e se quedó esperando una sección que nunca podía
+                existir.
+              */}
+              {(detalle.data?.secciones ?? []).length === 0 ? (
+                <p
+                  className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground"
+                  data-testid="corrida-sin-filas"
+                >
+                  Todavía no hay a quién pagarle esta semana: nadie tiene saldo y no hay conceptos
+                  que se carguen solos. Agrega uno del catálogo, o captura primero los recibos y las
+                  facturas de la semana.
+                </p>
+              ) : null}
+
               {verRelacion ? (
                 <RelacionEjecutable idCorrida={idActivo} abierta={verRelacion} />
               ) : null}

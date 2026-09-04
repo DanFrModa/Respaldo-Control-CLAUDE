@@ -16,6 +16,18 @@ import { entrarComoAdmin } from './ayudas';
  * el despliegue: los cuatro permisos son nuevos y sin sembrarlos las rutas dan 403 y el menú no
  * pinta las entradas.
  */
+/**
+ * Un LUNES propio de esta corrida del CI, para que dos ejecuciones no se peleen por el mismo
+ * borrador (el dominio sólo admite uno por semana y segmento, y la base del e2e se comparte).
+ * Arranca en el lunes 4-ene-2027 y se aleja tantas semanas como diga el reloj: cae siempre en lunes
+ * porque se avanza de siete en siete.
+ */
+function semanaPropia(): string {
+  const LUNES_BASE = Date.UTC(2027, 0, 4);
+  const semanas = Math.floor(Date.now() / 60_000) % 500;
+  return new Date(LUNES_BASE + semanas * 7 * 86_400_000).toISOString().slice(0, 10);
+}
+
 test.describe('Corrida semanal de pagos (0.113)', () => {
   test('la pantalla carga y ofrece abrir la corrida de la semana', async ({ page }) => {
     await entrarComoAdmin(page);
@@ -34,9 +46,34 @@ test.describe('Corrida semanal de pagos (0.113)', () => {
     page,
   }) => {
     await entrarComoAdmin(page);
-    await page.goto('/pagos/corrida');
 
-    // Se abre la corrida SIN factura de la semana en curso (la fecha viene precargada al lunes).
+    // ⭐ SIEMBRA PRIMERO, y no es opcional. La base del CI está recién sembrada: no hay movimientos
+    // de EsMa ni de CxP, así que NADIE tiene saldo y la cartera viene vacía; y sin conceptos
+    // `predeterminado` tampoco hay filas de catálogo. Con cero filas el servidor devuelve cero
+    // secciones (`corrida.ts` filtra las vacías) y esta prueba esperaba una sección que en ese
+    // ambiente no podía existir — así se cayó en la primera corrida del CI.
+    //
+    // Un concepto predeterminado es la semilla más barata que hace aparecer una sección: se carga
+    // solo, en cero, en cada corrida nueva.
+    const concepto = `Caja chica ${Date.now().toString().slice(-6)}`;
+    await page.goto('/catalogos/conceptos-pago');
+    await expect(page.getByRole('heading', { name: 'Conceptos de pago' })).toBeVisible();
+    await page.getByTestId('concepto-nombre').fill(concepto);
+    await page.getByTestId('concepto-rubro').selectOption('caja_chica');
+    await page.getByTestId('concepto-predeterminado').check();
+    await page.getByTestId('concepto-guardar').click();
+    // Se busca por TEXTO dentro de la tabla, no con `getByRole('cell', { name })`: el nombre
+    // accesible de esa celda incluye el `aria-label` de la estrella del predeterminado, así que un
+    // match exacto por nombre no daría.
+    await expect(page.getByTestId('conceptos-tabla')).toContainText(concepto);
+
+    await page.goto('/pagos/corrida');
+    // ⭐ Una SEMANA PROPIA de esta corrida del CI, no la actual. El dominio impide dos BORRADORES
+    // del mismo segmento y semana, y la base del e2e se comparte entre specs y entre re-intentos:
+    // usar «esta semana» haría que el segundo intento chocara con el borrador del primero y la
+    // prueba se volviera intermitente. Con una semana derivada del reloj, cada corrida del CI
+    // trabaja en la suya.
+    await page.getByTestId('corrida-semana').fill(semanaPropia());
     await page.getByTestId('corrida-segmento').selectOption('sin');
     await page.getByTestId('corrida-abrir').click();
 
@@ -44,16 +81,18 @@ test.describe('Corrida semanal de pagos (0.113)', () => {
     await expect(page.getByTestId('corrida-totales')).toBeVisible();
     await expect(page.getByTestId('corrida-cerrar')).toBeVisible();
 
-    // ⭐ Lo que Daniel pidió: UNA pantalla con el campo abierto al lado de cada beneficiario. Si el
-    // ambiente trae maquileros con saldo, sale su sección; si no, al menos la de conceptos del
-    // catálogo (los predeterminados se cargan en cero). Lo que NO puede faltar es la columna.
-    const secciones = page.locator('[data-testid^="corrida-seccion-"]');
-    await expect(secciones.first()).toBeVisible();
+    // ⭐ Lo que Daniel pidió: UNA pantalla con el campo abierto al lado de cada beneficiario. El
+    // concepto sembrado garantiza su sección; si el ambiente además trae maquileros con saldo,
+    // saldrán las suyas. Lo que NO puede faltar es la columna de captura.
+    await expect(page.getByTestId('corrida-seccion-caja_chica')).toBeVisible();
+    await expect(page.getByTestId('corrida-sin-filas')).toHaveCount(0);
     await expect(
       page.getByRole('columnheader', { name: 'A pagar esta semana' }).first(),
     ).toBeVisible();
     // Y la columna del CONCEPTO, que es lo que finanzas lee para ejecutar el pago.
     await expect(page.getByRole('columnheader', { name: 'Concepto' }).first()).toBeVisible();
+    // El predeterminado se cargó SOLO y EN CERO, que es la razón de ser de la marca.
+    await expect(page.getByLabel(`A pagar a ${concepto}`)).toHaveValue('0');
   });
 
   test('el catálogo de conceptos de pago carga con su alta', async ({ page }) => {

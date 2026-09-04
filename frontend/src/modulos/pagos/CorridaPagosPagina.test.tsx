@@ -322,6 +322,30 @@ describe('un pago PARTIDO', () => {
   });
 });
 
+describe('⭐ una corrida SIN filas se explica (no se queda en blanco)', () => {
+  it('con cero secciones dice por qué está vacía', () => {
+    // 🔴 Lo destapó el CI: en su base recién sembrada no hay movimientos (ni EsMa ni CxP) ni
+    // conceptos predeterminados, así que el servidor devuelve CERO secciones. La pantalla pintaba
+    // la nada debajo del encabezado y se leía como rota — y el e2e se quedó esperando una sección
+    // que en ese ambiente no podía existir.
+    estado.detalle = {
+      data: { ...detalle, secciones: [] },
+      isPending: false,
+      isError: false,
+    };
+    pintar();
+    expect(screen.getByTestId('corrida-sin-filas')).toHaveTextContent(
+      /Todavía no hay a quién pagarle esta semana/i,
+    );
+  });
+
+  it('con secciones NO aparece el aviso de vacío', () => {
+    pintar();
+    expect(screen.queryByTestId('corrida-sin-filas')).not.toBeInTheDocument();
+    expect(screen.getByTestId('corrida-seccion-maquila')).toBeInTheDocument();
+  });
+});
+
 describe('⭐ la RELACIÓN EJECUTABLE (B5)', () => {
   /** Deja la corrida en `cerrada`, que es cuando finanzas la recibe. */
   function conCorridaCerrada(): void {
