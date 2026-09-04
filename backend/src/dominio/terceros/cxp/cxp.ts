@@ -56,7 +56,7 @@ import { aportesEsMaSaldoLote } from '../convivencia-esma.js';
 import { leerLimitesAging } from '../config-aging.js';
 import { type LimitesAging } from '../aging-comun.js';
 import { netearCubetas, type CubetasAging, type CubetasBrutas } from './aging.js';
-import { resolverSegmentoCxp } from './facturacion-cxp.js';
+import { resolverSegmentoCxp, segmentoCartera } from './facturacion-cxp.js';
 
 /** Redondeo monetario a 2 decimales. */
 function redondear2(n: number): number {
@@ -396,10 +396,11 @@ function sumarPorRevisar(filas: FilaNeta[]): PendienteRevision {
  * DESAPARECERÍA justo cuando alguien tiene que decidir sobre ese dinero.
  *
  * `segmento` parte la cartera en la relación CON factura o la SIN factura (§Post-F9.189(a): son dos
- * corridas por semana). Los dos criterios —`es_fiscal` en el motor, `con_factura` en EsMa— salen
- * cada uno de su definición única; el de EsMa vive en `formula-saldo.ts` porque su columna es
- * NULLABLE y el «sin factura» tiene que incluir lo migrado sin definir. **Sin `segmento` devuelve la
- * vista operativa completa**, que es la que usa la bandeja.
+ * corridas por semana — y, desde la fila 0.132, también dos listados de la BANDEJA). Los dos
+ * criterios —`es_fiscal` en el motor, `con_factura` en EsMa— salen cada uno de su definición única;
+ * el de EsMa vive en `formula-saldo.ts` porque su columna es NULLABLE y el «sin factura» tiene que
+ * incluir lo migrado sin definir. **Sin `segmento` devuelve la vista operativa completa** (el chip
+ * «Todos» de la bandeja).
  *
  * Sin permiso ni ocultamiento de importes: el que llama los aplica.
  */
@@ -471,6 +472,21 @@ export async function carteraCombinadaPorProveedor(
  * ⭐ §Post-F9.188(a) (Daniel): un maquilero con TODO sin revisar NO desaparece de la bandeja. Su saldo
  * es 0 (al saldo sólo entra lo revisado, fila 0.115) pero la fila se queda, con su «por revisar»
  * explicado. Los KPIs siguen contando sólo saldo ≠ 0: lo pendiente todavía no es deuda.
+ *
+ * ⭐ SEGMENTO CON / SIN FACTURA (fila 0.132, §Post-F9.192(5)). Daniel, sobre la bandeja del viernes
+ * («a quién le debo»): *«debería partirse en Con factura / Sin factura, con totales y antigüedad por
+ * separado, porque son dos relaciones de pago distintas»*. Con `segmento` la bandeja devuelve la
+ * cartera de ESA relación **y su resumen** —cartera, vencido, cubetas, proveedores con saldo y
+ * maquila por revisar son los del segmento, no los de la cartera completa—; por eso el segmento
+ * aplicado viaja de vuelta en la salida (una cartera parcial que se leyera como total sería peor que
+ * no partirla). `todos` deja la bandeja exactamente como estaba.
+ *
+ * El criterio NO se escribe aquí: el segmento sólo se traduce (`segmentoCartera`) y se le pasa a
+ * {@link carteraCombinadaPorProveedor}, que lo aplica en sus dos fuentes con la definición única de
+ * cada una (`es_fiscal`, NOT NULL, en el motor; `con_factura`, NULLABLE, en EsMa — donde el «sin»
+ * incluye lo migrado sin definir). Es la misma cartera que ya usa la corrida semanal de pagos (fila
+ * 0.113), así que la bandeja del segmento y la corrida del segmento no pueden divergir: el que no
+ * aparece en la corrida no cobra.
  */
 export async function bandejaPorPagar(
   sesion: SesionUsuario,
@@ -486,7 +502,18 @@ export async function bandejaPorPagar(
 
   // Límites de aging vigentes de la empresa (F9-E5/D15d: configurables); default 30/60.
   const limites = await leerLimitesAging(cliente, idEmpresa);
-  const netas = await carteraCombinadaPorProveedor(cliente, idEmpresa, limites);
+  // ⭐ El SEGMENTO viaja como PARÁMETRO a la cartera y NO se re-implementa aquí (fila 0.132): el
+  // criterio «con/sin» sale de la definición única de cada fuente. `todos` → `undefined` (no
+  // segmenta): las filas, el aging y los KPIs quedan cifra por cifra como estaban; la salida sólo
+  // gana el eco de `segmento`. Todo lo de abajo —los dos cortes, la búsqueda, el orden y la
+  // paginación— es el MISMO código para los tres segmentos: lo único que cambia es el universo del
+  // que parten.
+  const netas = await carteraCombinadaPorProveedor(
+    cliente,
+    idEmpresa,
+    limites,
+    segmentoCartera(filtros.segmento),
+  );
   // Dos cortes distintos, a propósito: `conSaldo` alimenta los KPIs (cartera, vencido, proveedores
   // CON SALDO — ahí un pendiente no es deuda todavía); `visibles` es lo que la tabla enseña con el
   // chip "con saldo": saldo ≠ 0 **o** algo por revisar (§Post-F9.188a — el que tiene todo sin
@@ -535,6 +562,7 @@ export async function bandejaPorPagar(
     porPagina: filtros.porPagina,
     totalPaginas: Math.max(1, Math.ceil(total / filtros.porPagina)),
     resumen,
+    segmento: filtros.segmento,
     limitesAging: { limite1: limites.d30, limite2: limites.d60 },
   };
 }

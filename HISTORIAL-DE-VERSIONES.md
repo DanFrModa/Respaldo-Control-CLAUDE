@@ -71,6 +71,31 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.109 · 4-sep-2026 · **en prueba** — **La bandeja de Cuentas por pagar en dos listados**: Todos · Con factura · Sin factura
+
+### Qué se puede hacer ahora que antes no
+
+- La bandeja del viernes («a quién le debo») tiene una **segunda fila de chips: Todos · Con factura · Sin
+  factura**. Al elegir una, **la tabla, los totales y la antigüedad se recalculan en el servidor sólo para
+  esa relación**: cartera, vencido, cubetas por días y proveedores con saldo. Son dos relaciones de pago
+  distintas (así se paga: una corrida con factura y otra sin), y ahora se ven por separado.
+- El segmento viaja en la dirección de la pantalla (`?segmento=sin`), así que se puede guardar como
+  marcador y abrir directo el viernes.
+- Al entrar desde la bandeja al **estado de cuenta** de un proveedor, la pantalla abre ya en la misma
+  relación que se estaba viendo, y su PDF sale en esa relación.
+
+### Qué cambió y puede sorprender
+
+- **«Sin factura» incluye lo que quedó sin definir** (lo migrado de Access sin modalidad y los cargos de
+  maquila sin marca de factura): es el mismo criterio único que ya usaban el estado de cuenta y la corrida
+  semanal, y **Con factura + Sin factura suma exactamente Todos** en cartera y maquila. El **vencido** se calcula
+  dentro de cada relación: un pago sin factura no rebaja lo vencido de la relación con factura (ni al revés).
+- «Todos» sigue siendo lo de siempre; los chips viejos «Con saldo / Todos» no cambian.
+
+### Qué sigue pendiente o roto
+
+- Nada nuevo. Sin migración, sin permisos, sin re-seed.
+
 ## 0.108 · 4-sep-2026 · **en prueba** — ⭐ **El documento para facturar**: «yo te digo qué facturarme», con el IVA a la vista
 
 ### Qué se puede hacer ahora que antes no
