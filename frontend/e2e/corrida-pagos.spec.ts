@@ -17,14 +17,23 @@ import { entrarComoAdmin } from './ayudas';
  * pinta las entradas.
  */
 /**
- * Un LUNES propio de esta corrida del CI, para que dos ejecuciones no se peleen por el mismo
- * borrador (el dominio sólo admite uno por semana y segmento, y la base del e2e se comparte).
- * Arranca en el lunes 4-ene-2027 y se aleja tantas semanas como diga el reloj: cae siempre en lunes
- * porque se avanza de siete en siete.
+ * Un LUNES propio de este INTENTO, para que dos ejecuciones no se peleen por el mismo borrador (el
+ * dominio sólo admite uno por semana y segmento, y la base del e2e se comparte entre specs y entre
+ * reintentos). Arranca en el lunes 4-ene-2027 y se aleja tantas semanas como diga la cuenta: cae
+ * siempre en lunes porque se avanza de siete en siete.
+ *
+ * 🔴 El reloj SOLO no basta, y por poco se cuela: con `Date.now() / 60_000` el número cambia una vez
+ * por minuto, pero un reintento de Playwright ocurre **segundos** después del fallo, así que el
+ * segundo intento caía en la MISMA semana y chocaba con el borrador que dejó el primero (409) —
+ * exactamente lo que esta función venía a evitar, y encima disfrazado de fallo del código.
+ *
+ * Por eso el offset lleva `test.info().retry`: el minuto separa una corrida del CI de la siguiente,
+ * y el número de intento separa los reintentos DENTRO de una corrida. Determinista, sin depender de
+ * cuánto tarde el reintento.
  */
 function semanaPropia(): string {
   const LUNES_BASE = Date.UTC(2027, 0, 4);
-  const semanas = Math.floor(Date.now() / 60_000) % 500;
+  const semanas = (Math.floor(Date.now() / 60_000) + test.info().retry) % 500;
   return new Date(LUNES_BASE + semanas * 7 * 86_400_000).toISOString().slice(0, 10);
 }
 

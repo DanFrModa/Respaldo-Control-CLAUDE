@@ -323,6 +323,44 @@ describe('un pago PARTIDO', () => {
 });
 
 describe('⭐ una corrida SIN filas se explica (no se queda en blanco)', () => {
+  /** Deja el detalle sin ninguna sección (lo que devuelve el servidor en una base sin movimientos). */
+  function sinSecciones(estadoCorrida: 'borrador' | 'cerrada' = 'borrador'): void {
+    estado.detalle = {
+      data: {
+        ...detalle,
+        corrida: { ...CORRIDA, estado: estadoCorrida },
+        secciones: [],
+      },
+      isPending: false,
+      isError: false,
+    };
+  }
+
+  it('⭐ a quien SÍ puede agregar, la invita a hacerlo', () => {
+    sinSecciones();
+    pintar();
+    expect(screen.getByTestId('corrida-sin-filas')).toHaveTextContent(/Agrega uno del catálogo/i);
+  });
+
+  it('⭐ a quien NO puede, sólo le explica el porqué (no la manda a un botón que no tiene)', () => {
+    // `AgregarConcepto` se pinta con `editable` (borrador + `pagos.corrida-armar`). Sin ese permiso
+    // la invitación sería un callejón sin salida.
+    sinSecciones();
+    pintar(['pagos.corrida-ver', 'consultas.ver-importes']);
+    const aviso = screen.getByTestId('corrida-sin-filas');
+    expect(aviso).toHaveTextContent(/no tiene renglones/i);
+    expect(aviso).not.toHaveTextContent(/Agrega uno del catálogo/i);
+  });
+
+  it('⭐ tampoco la invita si la corrida ya está CERRADA (aunque pueda armar)', () => {
+    // Cerrada no se edita (D3): el botón de agregar tampoco está.
+    sinSecciones('cerrada');
+    pintar();
+    expect(screen.getByTestId('corrida-sin-filas')).not.toHaveTextContent(
+      /Agrega uno del catálogo/i,
+    );
+  });
+
   it('con cero secciones dice por qué está vacía', () => {
     // 🔴 Lo destapó el CI: en su base recién sembrada no hay movimientos (ni EsMa ni CxP) ni
     // conceptos predeterminados, así que el servidor devuelve CERO secciones. La pantalla pintaba

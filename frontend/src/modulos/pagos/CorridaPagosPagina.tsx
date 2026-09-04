@@ -356,9 +356,15 @@ export function CorridaPagosPagina(): React.JSX.Element {
                   className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground"
                   data-testid="corrida-sin-filas"
                 >
-                  Todavía no hay a quién pagarle esta semana: nadie tiene saldo y no hay conceptos
-                  que se carguen solos. Agrega uno del catálogo, o captura primero los recibos y las
-                  facturas de la semana.
+                  {/*
+                    La invitación sólo va para quien PUEDE actuar: «agregar concepto» vive en
+                    `AgregarConcepto`, que se pinta con `editable` (borrador + `corrida-armar`).
+                    Decirle «agrega uno del catálogo» a finanzas —que sólo consulta— sería mandarla
+                    a buscar un botón que su pantalla no tiene.
+                  */}
+                  {editable
+                    ? 'Todavía no hay a quién pagarle esta semana: nadie tiene saldo y no hay conceptos que se carguen solos. Agrega uno del catálogo, o captura primero los recibos y las facturas de la semana.'
+                    : 'Esta corrida no tiene renglones: en esta semana nadie tiene saldo y no hay conceptos que se carguen solos.'}
                 </p>
               ) : null}
 
