@@ -51,6 +51,7 @@ import {
   type SegmentoFactura,
   type WhereSegmentoFactura,
 } from './formula-saldo.js';
+import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { saldoDeMaquilero } from './saldos.js';
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
@@ -159,6 +160,9 @@ export async function estadoCuentaMaquilero(
       precioReal: true,
       creadoEn: true,
       orden: { select: { folio: true } },
+      // 0.114: la etiqueta puede venir del proceso O del servicio (corte/empaque); se traen los dos
+      // y la redacta `etiquetaProcesoDelCargo`.
+      servicio: true,
       tipoProceso: { select: { nombre: true } },
     },
   });
@@ -208,7 +212,7 @@ export async function estadoCuentaMaquilero(
       concepto: 'cargo',
       id: c.id,
       fecha: c.creadoEn.toISOString().slice(0, 10),
-      referencia: `Orden #${String(Number(c.orden.folio))} · ${c.tipoProceso.nombre}${c.sinCosto ? ' (sin costo)' : ''}`,
+      referencia: `Orden #${String(Number(c.orden.folio))} · ${etiquetaProcesoDelCargo(c)}${c.sinCosto ? ' (sin costo)' : ''}`,
       monto,
       estadoRevision: c.estado,
       // La marca del renglón sale de la MISMA definición que la suma (formula-saldo.ts): así el
@@ -313,6 +317,9 @@ const seleccionCargoDesglosado = {
   precioReal: true,
   creadoEn: true,
   orden: { select: { folio: true, modelo: { select: { codigo: true, descripcion: true } } } },
+  // 0.114: proceso de maquila O servicio de la orden (corte/empaque); la etiqueta la redacta
+  // `etiquetaProcesoDelCargo`, nunca este archivo.
+  servicio: true,
   tipoProceso: { select: { nombre: true } },
 } satisfies Prisma.EsMaCargoSelect;
 
@@ -394,7 +401,7 @@ export async function estadoCuentaDesglosado(
       folioOrden: Number(c.orden.folio),
       codigoModelo: c.orden.modelo.codigo,
       descripcionModelo: c.orden.modelo.descripcion,
-      tipoProceso: c.tipoProceso.nombre,
+      tipoProceso: etiquetaProcesoDelCargo(c),
       cantidad,
       precio: precio === null ? null : puedeVerImportes ? precio : null,
       importe,
@@ -430,6 +437,7 @@ export async function estadoCuentaDesglosado(
               select: {
                 idOrden: true,
                 orden: { select: { folio: true } },
+                servicio: true,
                 tipoProceso: { select: { nombre: true } },
               },
             },
@@ -459,7 +467,7 @@ export async function estadoCuentaDesglosado(
       idCargo: ap.idCargo,
       idOrden: ap.cargo.idOrden,
       folioOrden: Number(ap.cargo.orden.folio),
-      tipoProceso: ap.cargo.tipoProceso.nombre,
+      tipoProceso: etiquetaProcesoDelCargo(ap.cargo),
       cantidad: ap.cantidad.toNumber(),
       importe: puedeVerImportes ? ap.importe.toNumber() : null,
     })),

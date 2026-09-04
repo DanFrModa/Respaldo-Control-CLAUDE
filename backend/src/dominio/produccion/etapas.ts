@@ -7,6 +7,14 @@
  * Sobre el motor de kardex: el corte NO toca el kardex PT (no es entrada/salida de existencia).
  * Escribe `EtapaMovimiento` (encabezado del WIP) + `EtapaMovimientoDet` (color×talla, D4).
  *
+ * ⭐ 0.114 — LOS DOS SERVICIOS SOBRE LA ORDEN. Aquí viven también el CORTE PAGABLE y el EMPAQUE, que
+ * Daniel separó del resto: *«en corte no necesitas mandar y recibir mercancía … no va y viene. Lo
+ * mismo el empaque… el empaque no toca el inventario»* y, aun así, *«el monto a pagar sale de una
+ * orden, lo mismo que un maquilero»*. Los dos comparten forma: `idTipoProceso = NULL` (esa NULL es
+ * la marca de "servicio sobre la orden"), cero kardex, sin envío ni recibo, precio por prenda en la
+ * etapa y un `EsMaCargo` con `servicio` en vez de proceso ({@link crearCargoDeServicio}). NO son
+ * `TipoProceso` a propósito: eso los metería al flujo de ida y vuelta que Daniel dice que no son.
+ *
  * ⭐ El ENVÍO **sí** toca el kardex desde V1-E4b (§Post-F9.61) cuando lo que se manda ya es PRODUCTO
  * TERMINADO (`prendaTerminada` — un estampado/lavado DESPUÉS de la costura, que Daniel ya hace hoy):
  * traspasa las prendas del almacén de origen al almacén de TRÁNSITO, y su recibo las devuelve. Sin
@@ -43,6 +51,7 @@
  */
 import {
   esquemaCorteCrear,
+  esquemaEmpaqueCrear,
   esquemaEnvioCrear,
   esquemaEtapaCancelarCuerpo,
   esquemaCorteSemanalQuery,
@@ -54,7 +63,7 @@ import {
   type SugerenciaCaptura,
   type CorteSemanalLista,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { ServicioOrden, TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
@@ -123,6 +132,13 @@ const MAPEO_PROCESO_A_ROL: Record<string, string> = {
 
 /** Rol de proveedor que debe tener el CORTADOR de un corte (D12/R15). */
 const ROL_CORTADOR = 'corte';
+
+/**
+ * Rol de proveedor que debe tener el EMPACADOR de un empaque (0.114). Daniel: *«y una maquila de
+ * empaque también»* — el empacador es un proveedor de servicio, igual que el cortador. El rol se
+ * siembra en `prisma/seed.ts` (`ROLES_PROVEEDOR_BASE`), así que `prueba` necesita `SEED_ON_START`.
+ */
+const ROL_EMPACADOR = 'empaque';
 
 /** El rol de proveedor requerido para un proceso de maquila, o el código tal cual si no hay mapeo. */
 function rolDelProceso(codigoProceso: string): string {
@@ -551,10 +567,106 @@ async function registrarEventoEtapaRc(
   await registrarEventoOutbox(tx, evento, VERSION_EVENTO_ETAPA_RC, datos.idEmpresa, datos);
 }
 
+/**
+ * ⭐ EL CARGO DE UN SERVICIO SOBRE LA ORDEN (0.114) — corte y empaque, en un solo lugar.
+ *
+ * Daniel puso los dos del lado de la maquila: *«corte es parte de maquilas, no de proveedores.
+ * Tengo proveedores de corte que el monto a pagar sale de una orden, lo mismo que un maquilero. Y
+ * una maquila de empaque también»*. Pero NO son maquila de ida y vuelta: no hay envío ni recibo, no
+ * se mueve inventario, *«simplemente sucede y ya»*. Así que el cargo nace de la etapa MISMA (corte /
+ * empaque), no de un recibo, y en vez de `idTipoProceso` lleva `servicio`.
+ *
+ * Es un calco deliberado de lo que hace `recibos.ts` al cerrar un recibo (mismo estado `propuesto`,
+ * misma liga por `idEtapaRecibo`, misma cantidad DERIVADA de los detalles al proyectar el cargo, y
+ * el mismo punto de control humano después): quien valida cargos ve una sola cola con las mismas
+ * columnas, sin aprender un concepto nuevo.
+ *
+ * La CANTIDAD no se guarda aquí (se deriva de `EtapaMovimientoDet` en `esma/cargos.ts`, D3) y el
+ * PRECIO propuesto sale del `precioPactado` de la etapa: la orden trae precios de MAQUILA
+ * (`maquilaOrd`/`aplicacionOrd`) que no son los de estos servicios y no se les presta.
+ *
+ * Corre DENTRO de la transacción de la etapa (A2): si la etapa hace rollback, el cargo no existe.
+ */
+async function crearCargoDeServicio(
+  tx: Tx,
+  sesion: SesionUsuario,
+  datos: {
+    idEmpresa: number;
+    idEtapa: number;
+    idOrden: number;
+    idTercero: number;
+    servicio: ServicioOrden;
+    totalPiezas: number;
+  },
+): Promise<void> {
+  // Puerta de cantidad 0, igual que el recibo: un cargo de 0 piezas sólo llenaría la cola de
+  // validación de renglones en $0. Hoy es inalcanzable —`aplanarYValidar` rechaza la captura sin
+  // ninguna pieza— y se conserva como defensa en profundidad, no como caso vivo.
+  if (datos.totalPiezas <= 0) {
+    return;
+  }
+  await tx.esMaCargo.create({
+    data: {
+      idEmpresa: datos.idEmpresa,
+      idEtapaRecibo: datos.idEtapa,
+      idMaquilero: datos.idTercero,
+      idOrden: datos.idOrden,
+      // Excluyentes por CHECK (`esma_cargo_proceso_o_servicio`): servicio SÍ, proceso NO.
+      idTipoProceso: null,
+      servicio: datos.servicio,
+      // cantidadReal/precioReal NULL mientras esté propuesto; lo propuesto se DERIVA de la etapa.
+      estado: 'propuesto',
+      ...datosCreacion(sesion),
+    },
+  });
+}
+
+/**
+ * CANCELA el cargo EsMa de una etapa de SERVICIO (corte/empaque, 0.114) junto con la etapa, dentro
+ * de su misma transacción (A2). Calco de `recibos.ts::cancelarReciboMaquila` (a):
+ *  • busca el cargo VIVO (no cancelado) ligado a la etapa;
+ *  • si ya está `validado`, exige `esma.cargo-validar` (A4) antes de tocarlo — es dinero
+ *    comprometido, y sin el permiso se rechaza la cancelación ENTERA (una sola transacción);
+ *  • lo pasa a `cancelado` (nunca lo borra, D3) y lo deja en la bitácora con su estado previo (A7).
+ *
+ * No-op si la etapa no tiene cargo: el corte de una orden capturada antes de 0.114 no lo tiene, y
+ * cancelarlo tiene que seguir funcionando igual.
+ */
+async function cancelarCargoDeServicio(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idEtapa: number,
+  motivo: string,
+): Promise<void> {
+  const cargo = await tx.esMaCargo.findFirst({
+    where: { idEtapaRecibo: idEtapa, estado: { not: 'cancelado' } },
+    select: { id: true, estado: true },
+  });
+  if (cargo === null) {
+    return;
+  }
+  if (cargo.estado === 'validado') {
+    // Permiso especial: cancelar una etapa cuyo cargo ya se validó (afecta el pago).
+    verificarPermiso(sesion, 'esma.cargo-validar');
+  }
+  await tx.esMaCargo.update({
+    where: { id: cargo.id },
+    data: { estado: 'cancelado', ...datosModificacion(sesion) },
+  });
+  await registrarBitacora(tx, sesion, {
+    entidad: 'EsMaCargo',
+    idEntidad: cargo.id,
+    accion: 'CANCELAR',
+    datos: { motivo, idEtapa, estadoPrevio: cargo.estado },
+  });
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────────────────
 
 /** Alta de corte: campos del esquema compartido. */
 export type EntradaRegistrarCorte = z.input<typeof esquemaCorteCrear>;
+/** Alta de empaque: campos del esquema compartido (0.114). */
+export type EntradaRegistrarEmpaque = z.input<typeof esquemaEmpaqueCrear>;
 /** Alta de envío: campos del esquema compartido. */
 export type EntradaRegistrarEnvio = z.input<typeof esquemaEnvioCrear>;
 
@@ -565,6 +677,13 @@ export type EntradaRegistrarEnvio = z.input<typeof esquemaEnvioCrear>;
  * cortador tenga el rol `corte` (D12/R15) y que cada color×talla pertenezca a la orden. Sobre-corte
  * LIBRE (decisión (f)): no bloquea por cortar más que lo pedido. Emite `corte-registrado`
  * post-commit (gancho RC F5).
+ *
+ * ⭐ 0.114 — EL CORTE SE PAGA. Daniel: *«en corte no necesitas mandar y recibir mercancía. Mando
+ * tela y corta una cierta cantidad. Sólo hay que poner su cantidad y precio para meterlo en la OP,
+ * pero no va y viene»*. Con eso el corte gana `precioPactado` y, en la MISMA transacción, su CARGO
+ * EsMa `propuesto` con `servicio: 'corte'` ({@link crearCargoDeServicio}) — para que el cortador se
+ * pueda pagar desde la orden como un maquilero, sin envío ni recibo de por medio. El corte SIGUE sin
+ * tocar el kardex: nace la cantidad, no entra ni sale mercancía.
  */
 export async function registrarCorte(
   sesion: SesionUsuario,
@@ -583,6 +702,7 @@ export async function registrarCorte(
     // de TOLERANCIA_SOBRE_CORTE). La pantalla AVISA cuánto excede; el servidor acepta.
 
     const folio = await siguienteFolio(tx, orden.idEmpresa, CLAVE_SECUENCIA_ETAPA);
+    const totalPiezas = celdas.reduce((s, c) => s + c.cantidad, 0);
     const etapa = await tx.etapaMovimiento.create({
       data: {
         folio,
@@ -591,6 +711,9 @@ export async function registrarCorte(
         tipo: TipoEtapaMovimiento.corte,
         idTercero: datos.idCortador,
         fecha: aDateColumna(datos.fecha),
+        // 0.114: el precio por prenda pactado con el cortador. Es la base del cargo EsMa del corte
+        // (`esma/cargos.ts` lo lee como precio propuesto). `null` explícito si no se capturó.
+        precioPactado: datos.precioPactado ?? null,
         ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
         detalles: {
           create: celdas.map((c) => ({
@@ -605,6 +728,16 @@ export async function registrarCorte(
       },
     });
 
+    // 0.114: el CARGO del cortador, en la misma tx que el corte (A2).
+    await crearCargoDeServicio(tx, sesion, {
+      idEmpresa: orden.idEmpresa,
+      idEtapa: etapa.id,
+      idOrden: datos.idOrden,
+      idTercero: datos.idCortador,
+      servicio: ServicioOrden.corte,
+      totalPiezas,
+    });
+
     await registrarBitacora(tx, sesion, {
       entidad: 'EtapaMovimiento',
       idEntidad: etapa.id,
@@ -615,7 +748,10 @@ export async function registrarCorte(
         idOrden: datos.idOrden,
         idCortador: datos.idCortador,
         celdas: celdas.length,
-        totalPiezas: celdas.reduce((s, c) => s + c.cantidad, 0),
+        totalPiezas,
+        // A7: el precio pactado es DINERO (nace un cargo con él) y por eso queda en la bitácora,
+        // igual que en el envío a maquila.
+        precioPactado: datos.precioPactado ?? null,
       },
     });
 
@@ -631,10 +767,114 @@ export async function registrarCorte(
     return etapa.id;
   }, bd);
 
-  // Quien capturo ve SU captura completa (el corte no lleva precio, pero el criterio es uniforme).
+  // Quien captura ve SU captura completa, precio incluido (desde 0.114 el corte SÍ lleva precio):
+  // acaba de teclearlo, y redactárselo en la respuesta sería esconderle lo que él mismo escribió.
   const salida = await obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
   dispararPublicacion(); // publica la fila del outbox tras el commit (best-effort; el barrido recupera).
   return salida;
+}
+
+/**
+ * ⭐ Registra un EMPAQUE de una orden (0.114) — el hermano del corte, y por las mismas razones.
+ *
+ * Daniel: *«lo mismo el empaque… el empaque no toca el inventario»* y *«una maquila de empaque
+ * también»* (o sea: se paga contra la orden, como un maquilero). De ahí sale todo el diseño:
+ *
+ *  • `EtapaMovimiento(tipo=empaque, idTipoProceso=NULL, idTercero=empacador)` + su matriz
+ *    color×talla (D4), en UNA transacción (A2), con folio atómico (A3) y bitácora (A7);
+ *  • **NO toca el kardex**: no hay entrada ni salida de existencia. Empacar no mueve mercancía de
+ *    almacén, sólo la prepara;
+ *  • **NO hay envío ni recibo**: por eso NO es un `TipoProceso` (convertirlo en uno lo metería al
+ *    flujo de ida y vuelta que Daniel dice que no es);
+ *  • **la cantidad es PROPIA y NO SE TOPA** contra lo recibido ni contra lo cortado. Es la regla de
+ *    C&A que dictó Daniel: se fabrican 1,000 y se empacan 990 — se paga lo empacado y las 10
+ *    restantes se quedan quietas en inventario. Mismo criterio que el sobre-corte LIBRE (decisión
+ *    (f)): la pantalla puede AVISAR que excede lo recibido, el servidor acepta;
+ *  • genera su CARGO EsMa `propuesto` con `servicio: 'empaque'` ({@link crearCargoDeServicio}).
+ *
+ * Valida que el empacador tenga el rol `empaque` (D12/R15) y que cada color×talla pertenezca a la
+ * orden. Permiso propio `produccion.empaque` (A4).
+ *
+ * 🔴 POR QUÉ NO EMITE EVENTO A LA RUTA CRÍTICA (medido, no olvidado). La RC **sí** tiene un proceso
+ * `empaque` (`TipoEventoProceso.empaque`), pero **ya tiene dueño**: lo completa el HITO de orden de
+ * tipo `empaque` (`ruta-critica/hitosOrden.ts` → `hito-orden-resuelto` → `reevaluarHito`). Los dos
+ * caminos miden cosas distintas: el hito pregunta *«¿hay un hito vivo?»* y esta etapa mediría
+ * *«¿se cubrió toda la matriz color×talla?»*. Engancharla al MISMO renglón pondría dos escritores
+ * con reglas distintas sobre el mismo `RutaOrdenRenglon`, y un empaque PARCIAL —990 de 1,000, que
+ * es justo el caso que Daniel describió— **des-completaría** un hito que alguien ya registró. Se
+ * deja fuera a propósito: un evento que rompe algo que hoy funciona es peor que ninguno. Si Daniel
+ * quiere que el empaque capturado cierre solo su proceso de RC, la decisión que falta es cuál de los
+ * dos manda (y con qué regla de completitud), y eso es una etapa aparte.
+ */
+export async function registrarEmpaque(
+  sesion: SesionUsuario,
+  entrada: EntradaRegistrarEmpaque,
+  bd?: ContextoBd,
+): Promise<EtapaSalida> {
+  verificarPermiso(sesion, 'produccion.empaque');
+  const datos = validarEntrada(esquemaEmpaqueCrear, entrada);
+
+  const idEtapa = await enTransaccion(async (tx) => {
+    const orden = await resolverOrden(tx, datos.idOrden, sesion.idEmpresaActiva);
+    const celdas = aplanarYValidar(datos.lineas, orden);
+    await exigirTerceroConRol(tx, datos.idEmpacador, ROL_EMPACADOR, 'Empaque');
+
+    // Sin tope: la cantidad del empaque es propia (ver el TSDoc). No se compara contra lo recibido
+    // ni contra lo cortado, y por eso tampoco hace falta bloquear las etapas de la orden.
+
+    const folio = await siguienteFolio(tx, orden.idEmpresa, CLAVE_SECUENCIA_ETAPA);
+    const totalPiezas = celdas.reduce((s, c) => s + c.cantidad, 0);
+    const etapa = await tx.etapaMovimiento.create({
+      data: {
+        folio,
+        idEmpresa: orden.idEmpresa,
+        idOrden: datos.idOrden,
+        tipo: TipoEtapaMovimiento.empaque,
+        idTercero: datos.idEmpacador,
+        fecha: aDateColumna(datos.fecha),
+        precioPactado: datos.precioPactado ?? null,
+        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        detalles: {
+          create: celdas.map((c) => ({
+            idColor: c.idColor,
+            idTalla: c.idTalla,
+            pack: c.pack,
+            cantidad: c.cantidad,
+          })),
+        },
+        ...datosCreacion(sesion),
+      },
+    });
+
+    await crearCargoDeServicio(tx, sesion, {
+      idEmpresa: orden.idEmpresa,
+      idEtapa: etapa.id,
+      idOrden: datos.idOrden,
+      idTercero: datos.idEmpacador,
+      servicio: ServicioOrden.empaque,
+      totalPiezas,
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'EtapaMovimiento',
+      idEntidad: etapa.id,
+      accion: 'CREAR',
+      datos: {
+        tipo: 'empaque',
+        folio: Number(folio),
+        idOrden: datos.idOrden,
+        idEmpacador: datos.idEmpacador,
+        celdas: celdas.length,
+        totalPiezas,
+        precioPactado: datos.precioPactado ?? null,
+      },
+    });
+
+    return etapa.id;
+  }, bd);
+
+  // Sin `dispararPublicacion()`: esta etapa NO escribe en el outbox (ver el TSDoc de arriba).
+  return obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
 }
 
 /**
@@ -891,14 +1131,31 @@ export async function registrarEnvioMaquila(
 }
 
 /**
- * CANCELA (suave) una etapa de corte o envío: setea `canceladoEn`/`canceladoPorId`/
+ * CANCELA (suave) una etapa de corte, envío o empaque: setea `canceladoEn`/`canceladoPorId`/
  * `motivoCancelacion` + bitácora `CANCELAR` (A7). La etapa NUNCA se borra ni se edita. Reglas:
  *  • solo etapas de la EMPRESA ACTIVA (A9);
  *  • no se puede re-cancelar una etapa ya cancelada;
  *  • no se puede cancelar un CORTE que tenga ENVÍOS VIVOS (no cancelados): primero se cancelan los
  *    envíos (si no, los pendientes quedarían incoherentes — enviar sin cortado);
  *  • espejo del anterior: no se puede cancelar un ENVÍO que tenga RECIBOS VIVOS de su orden+proceso
- *    (si no, quedaría recibido sin envío que lo sostenga — `recibido ≤ enviado` se rompe).
+ *    (si no, quedaría recibido sin envío que lo sostenga — `recibido ≤ enviado` se rompe);
+ *  • el EMPAQUE no tiene guard de dependencias: nada cuelga de él (no hay recibo de empaque, no
+ *    mueve inventario y su cantidad es propia). Se cancela solo.
+ *
+ * ⭐ 0.114 — Y ARRASTRA SU CARGO. Desde que el corte y el empaque generan un `EsMaCargo`
+ * ({@link crearCargoDeServicio}), cancelarlos sin tocar el cargo dejaría al cortador cobrando un
+ * corte que ya no existe. Se aplica EXACTAMENTE la misma regla que el recibo de maquila
+ * (`recibos.ts::cancelarReciboMaquila`, deliberadamente calcada para que quien opera no tenga que
+ * aprender dos comportamientos):
+ *  • cargo `propuesto` → se cancela junto con la etapa, en la misma transacción, con bitácora (A7);
+ *  • cargo `validado` → exige el permiso especial `esma.cargo-validar` (A4) antes de cancelarlo:
+ *    ese cargo ya es un compromiso de pago, así que deshacerlo es una decisión de quien valida
+ *    cargos, no de quien captura producción. Sin el permiso, la cancelación se rechaza entera (el
+ *    corte tampoco se cancela: es una sola transacción).
+ *
+ * ⚠️ El cargo se busca por `idEtapaRecibo` —que en corte/empaque apunta a ESTA etapa— y sólo entre
+ * los NO cancelados, para que re-cancelar no tropiece con el cargo que ya se canceló antes.
+ *
  * Las etapas canceladas NO cuentan en ninguna suma de pendientes ({@link sumarCeldas} filtra
  * `canceladoEn: null`).
  */
@@ -933,13 +1190,16 @@ export async function cancelarEtapaMovimiento(
     if (etapa.canceladoEn !== null) {
       throw new ErrorConflicto(`La etapa ${Number(etapa.folio)} ya está cancelada.`);
     }
-    // F3-E2 solo maneja corte y envío; recibo/entrega (con efectos de kardex) los cancela E4/E5.
+    // Esta operación cancela corte, envío y EMPAQUE (0.114); recibo/entrega (con efectos de kardex)
+    // los cancela su propio módulo (E4/E5), que además revierte el inventario.
     if (
       etapa.tipo !== TipoEtapaMovimiento.corte &&
-      etapa.tipo !== TipoEtapaMovimiento.envio_maquila
+      etapa.tipo !== TipoEtapaMovimiento.envio_maquila &&
+      etapa.tipo !== TipoEtapaMovimiento.empaque
     ) {
       throw new ErrorValidacion(
-        'Esta operación solo cancela cortes y envíos; los recibos y entregas se cancelan en su módulo.',
+        'Esta operación solo cancela cortes, envíos y empaques; los recibos y entregas se cancelan ' +
+          'en su módulo.',
       );
     }
 
@@ -1029,6 +1289,12 @@ export async function cancelarEtapaMovimiento(
       }
     }
 
+    // ⭐ 0.114 — EL CARGO DEL SERVICIO se va con la etapa (ver el TSDoc). Sólo aplica al corte y al
+    // empaque: el envío a maquila nunca generó cargo (el suyo nace en el RECIBO).
+    if (etapa.tipo === TipoEtapaMovimiento.corte || etapa.tipo === TipoEtapaMovimiento.empaque) {
+      await cancelarCargoDeServicio(tx, sesion, idEtapa, datos.motivo);
+    }
+
     await tx.etapaMovimiento.update({
       where: { id: idEtapa },
       data: {
@@ -1049,13 +1315,20 @@ export async function cancelarEtapaMovimiento(
     // OUTBOX (F5-E6, decisión (f)): la cancelación re-evalúa el proceso de la RC; si ya no está
     // cubierto, se des-completa y se recalcula el CPM. El consumidor sabe qué proceso por `tipoEtapa`
     // (+ `idTipoProceso` para envío costura/estampado).
-    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.etapaCancelada, {
-      idEmpresa: sesion.idEmpresaActiva,
-      idOrden: etapa.idOrden,
-      idEtapaMovimiento: etapa.id,
-      tipoEtapa: etapa.tipo,
-      idTipoProceso: etapa.idTipoProceso,
-    });
+    //
+    // El EMPAQUE se queda fuera a propósito (0.114): su alta tampoco emite, porque el proceso RC
+    // `empaque` ya lo gobierna el HITO de orden y meterle un segundo escritor lo rompería (el porqué
+    // completo está en el TSDoc de {@link registrarEmpaque}). Publicar aquí un evento que el
+    // consumidor ignora sería ruido con apariencia de contrato.
+    if (etapa.tipo !== TipoEtapaMovimiento.empaque) {
+      await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.etapaCancelada, {
+        idEmpresa: sesion.idEmpresaActiva,
+        idOrden: etapa.idOrden,
+        idEtapaMovimiento: etapa.id,
+        tipoEtapa: etapa.tipo,
+        idTipoProceso: etapa.idTipoProceso,
+      });
+    }
   }, bd);
 
   dispararPublicacion();
@@ -1091,7 +1364,7 @@ export async function obtenerEtapa(
 }
 
 /**
- * HISTORIAL de etapas (cortes Y envíos) de una orden de la empresa activa (A9): vivas y CANCELADAS
+ * HISTORIAL de etapas (cortes, envíos y empaques) de una orden de la empresa activa (A9): vivas y CANCELADAS
  * (las canceladas se conservan como historial, marcadas). Cada etapa trae su matriz color×talla y
  * su estado de cancelación (motivo + fecha). Es lo que las pantallas de captura muestran para
  * poder CANCELAR una etapa con motivo y ver el resultado. Ordenado por folio descendente (lo más
@@ -1119,6 +1392,10 @@ export async function listarEtapasOrden(
   const tipos: TipoEtapaMovimiento[] = [
     TipoEtapaMovimiento.corte,
     TipoEtapaMovimiento.envio_maquila,
+    // 0.114: el EMPAQUE viaja SIEMPRE en el historial (no cuelga de `incluirRecibos`, que existe
+    // para no cambiarle la respuesta a las pantallas viejas de recibos). Es una etapa nueva: nadie
+    // la esperaba ausente, y el panel de avance la necesita para pintar su lista y poder cancelarla.
+    TipoEtapaMovimiento.empaque,
   ];
   if (opciones.incluirRecibos === true) {
     tipos.push(TipoEtapaMovimiento.recibo_maquila);

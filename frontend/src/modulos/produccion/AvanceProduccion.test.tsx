@@ -30,6 +30,9 @@ const wipBase: WipOrden = {
   pendientePorRecibir: 600, // enviado 2500 − recibido 1900 − incompletas 0
   enviadoCostura: 1726,
   recibidoCostura: 1500,
+  // 0.114: Σ empacado (etapas de empaque vivas), publicado por el servidor. Es una cantidad PROPIA
+  // —aquí se empacaron 1,400 de las 1,500 recibidas— y no se deriva de ninguna otra cifra.
+  empacado: 1400,
   entregado: 900,
   porEntregar: 600, // recibidoCostura 1500 − entregado 900
   porCortar: [],
@@ -172,17 +175,34 @@ describe('pasosDesdeWip (totales del stepper derivados del servidor)', () => {
     expect(pendientesDesdeWip(migrado).aplicacion).toBe(0);
   });
 
-  it('la 6ª etapa es la ENTREGA A CLIENTE y sale del `entregado` del servidor (V1-E3a)', () => {
+  it('la ÚLTIMA etapa es la ENTREGA A CLIENTE y sale del `entregado` del servidor (V1-E3a)', () => {
     // Antes el stepper terminaba en "Recibo de Arte": el ciclo de la OP no cerraba visualmente y la
-    // entrega —que existe y funciona— no la enlazaba nada.
+    // entrega —que existe y funciona— no la enlazaba nada. Desde 0.114 son SIETE pasos (entró el
+    // empaque antes del cierre), así que se mira la última posición, no el índice 5 a pelo.
     const pasos = pasosDesdeWip(wipBase);
-    expect(pasos).toHaveLength(6);
-    expect(pasos[5]).toEqual({
+    expect(pasos).toHaveLength(7);
+    expect(pasos.at(-1)).toEqual({
       clave: 'entrega-cliente',
       etiqueta: 'Entrega a cliente',
       hecho: 900,
       total: 1726,
     });
+  });
+
+  it('⭐ el EMPAQUE es su propio paso y sale de `empacado` del servidor (0.114)', () => {
+    // La cantidad del empaque es PROPIA: no se deriva de lo recibido ni de lo entregado. El fixture
+    // trae 1,400 empacadas con 1,500 recibidas de costura y 900 entregadas — tres cifras distintas
+    // a propósito, para que un despeje accidental desde cualquiera de las otras dos falle aquí.
+    const pasos = pasosDesdeWip(wipBase);
+    const empaque = pasos.find((p) => p.clave === 'empaque');
+    expect(empaque).toEqual({
+      clave: 'empaque',
+      etiqueta: 'Empaque',
+      hecho: 1400,
+      total: 1726,
+    });
+    // Y va JUSTO ANTES del cierre del ciclo: se empaca lo que ya volvió, antes de mandarlo.
+    expect(pasos.map((p) => p.clave).slice(-2)).toEqual(['empaque', 'entrega-cliente']);
   });
 
   it('una orden sin movimientos queda toda en cero (etapas vacías)', () => {
@@ -198,6 +218,7 @@ describe('pasosDesdeWip (totales del stepper derivados del servidor)', () => {
       // dato del servidor: una orden sin movimientos tiene 0, y decir otra cosa era incoherente.
       enviadoCostura: 0,
       recibidoCostura: 0,
+      empacado: 0,
       entregado: 0,
       porEntregar: 0,
       porRecibir: [],

@@ -1449,8 +1449,10 @@ export {
 } from './esquemas/entrada-tela.js';
 
 // ── Etapas de producción: corte + envío a maquila (F3-E2; doc 03-Produccion) ──
+// + el EMPAQUE (0.114): servicio sobre la orden, hermano del corte (no toca inventario).
 export {
   esquemaCorteCrear,
+  esquemaEmpaqueCrear,
   esquemaEnvioCrear,
   esquemaEtapaCancelarCuerpo,
   esquemaEtapaSalida,
@@ -1462,6 +1464,7 @@ export {
   esquemaCorteSemanalQuery,
   esquemaCorteSemanalLista,
   type DatosCorteCrear,
+  type DatosEmpaqueCrear,
   type DatosEnvioCrear,
   type DatosEtapaCancelar,
   type DatosEtapaLineaEntrada,

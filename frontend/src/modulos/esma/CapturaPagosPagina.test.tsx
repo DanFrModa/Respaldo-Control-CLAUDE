@@ -38,6 +38,8 @@ function cargo(): CargoEsMaFila {
     idOrden: 1,
     folioOrden: 100,
     idTipoProceso: 3,
+    // 0.114: cargo de MAQUILA — lleva proceso y `servicio` en null (son excluyentes).
+    servicio: null,
     tipoProceso: 'Costura',
     cantidadPropuesta: 20,
     precioPropuesto: 8,

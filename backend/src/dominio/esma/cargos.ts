@@ -7,6 +7,13 @@
  * la CANTIDAD propuesta se DERIVA del recibo (piezas recibidas). El admin VALIDA el cargo fijando la
  * cantidad y el precio REALES (punto de control humano conservado de v1).
  *
+ * ⭐ 0.114 — TAMBIÉN NACEN CARGOS SIN MAQUILA. El CORTE y el EMPAQUE son *servicios sobre la orden*:
+ * Daniel dictó que *«en corte no necesitas mandar y recibir mercancía … simplemente sucede y ya»* y
+ * que aun así *«el monto a pagar sale de una orden, lo mismo que un maquilero»*. Esos cargos llevan
+ * `servicio` (`corte`/`empaque`) e `idTipoProceso` NULL —excluyentes, con CHECK en la BD— y su
+ * `idEtapaRecibo` apunta a la etapa de corte/empaque, de la que sale la cantidad propuesta igual que
+ * de un recibo. La ETIQUETA que ven las pantallas se redacta en `etiqueta-cargo.ts` (una sola copia).
+ *
  * Reglas de F6-E4:
  *  • PRECIO PROPUESTO de referencia (decisión (e)): el cargo se valúa con el precio de la ORDEN por
  *    tipo de proceso — `maquilaOrd` para COSTURA, `aplicacionOrd` para ESTAMPADO/APLICACIÓN (y demás
@@ -41,6 +48,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { resolverConFactura } from './facturacion.js';
 
 /** `include` para proyectar un cargo con sus nombres legibles, la cantidad recibida y los precios. */
@@ -77,8 +85,18 @@ function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
   );
 
   // (e) Precio de referencia por proceso: costura → maquilaOrd; estampado/aplicación/otros → aplicacionOrd.
-  const esCostura = c.tipoProceso.codigo === 'costura';
-  const precioOrden = esCostura ? c.orden.maquilaOrd : c.orden.aplicacionOrd;
+  //
+  // ⭐ 0.114 — un cargo de SERVICIO (corte/empaque) NO tiene precio en la orden y no se le inventa
+  // uno: la OP trae `maquilaOrd`/`aplicacionOrd`, que son precios de MAQUILA, y cobrarle al cortador
+  // el precio de la costura sería peor que no proponerle nada. Su referencia es el `precioPactado`
+  // que se tecleó en SU etapa — el mismo camino de fallback que ya usaban los recibos sin precio en
+  // la orden. Sin precio pactado, el cargo llega sin precio a la cola y quien valida lo teclea.
+  const precioOrden =
+    c.servicio !== null
+      ? null
+      : c.tipoProceso?.codigo === 'costura'
+        ? c.orden.maquilaOrd
+        : c.orden.aplicacionOrd;
   const precioPropuesto =
     precioOrden != null
       ? precioOrden.toNumber()
@@ -124,7 +142,9 @@ function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
     idOrden: c.idOrden,
     folioOrden: Number(c.orden.folio),
     idTipoProceso: c.idTipoProceso,
-    tipoProceso: c.tipoProceso.nombre,
+    servicio: c.servicio,
+    // UNA sola fuente para la etiqueta (`etiqueta-cargo.ts`): nombre del proceso, o Corte/Empaque.
+    tipoProceso: etiquetaProcesoDelCargo(c),
     cantidadPropuesta,
     precioPropuesto,
     importePropuesto,

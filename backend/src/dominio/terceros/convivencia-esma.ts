@@ -29,6 +29,7 @@ import {
   type SegmentoFactura,
   type WhereSegmentoFactura,
 } from '../esma/formula-saldo.js';
+import { etiquetaProcesoDelCargo } from '../esma/etiqueta-cargo.js';
 import { calcularSaldoMaquilero, type SaldoMaquileroCalculado } from '../esma/saldos.js';
 import { saldosEsMaPorMaquilero, type AporteEsMaLote } from '../esma/saldos-todos.js';
 
@@ -181,6 +182,9 @@ export async function proyectarMovimientosEsMa(
         creadoEn: true,
         creadoPorId: true,
         orden: { select: { folio: true } },
+        // 0.114: el cargo puede colgar de un proceso de maquila O de un servicio de la orden
+        // (corte/empaque). Se traen los dos y la etiqueta la redacta `etiquetaProcesoDelCargo`.
+        servicio: true,
         tipoProceso: { select: { nombre: true } },
       },
     }),
@@ -268,7 +272,7 @@ export async function proyectarMovimientosEsMa(
       monto,
       observaciones:
         c.observaciones ??
-        `Orden #${String(Number(c.orden.folio))} · ${c.tipoProceso.nombre}${c.sinCosto ? ' (sin costo)' : ''}`,
+        `Orden #${String(Number(c.orden.folio))} · ${etiquetaProcesoDelCargo(c)}${c.sinCosto ? ' (sin costo)' : ''}`,
       fecha: c.creadoEn.toISOString().slice(0, 10),
       creadoEn: c.creadoEn.toISOString(),
       creadoPorId: c.creadoPorId,

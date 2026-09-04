@@ -18,7 +18,7 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 
 const useOrden = vi.fn<() => unknown>();
 const useWipOrden = vi.fn<() => unknown>();
-const useProveedores = vi.fn<() => unknown>();
+const useProveedores = vi.fn<(...a: unknown[]) => unknown>();
 const navegar = vi.fn();
 
 vi.mock('@/api/ordenes', () => ({ useOrden: () => useOrden() }));
@@ -26,9 +26,17 @@ vi.mock('@/api/wip', () => ({ CLAVE_WIP: ['wip'], useWipOrden: () => useWipOrden
 // Los mocks incluyen `isError`/`refetch` porque el panel ofrece un AVISO REINTENTABLE de catálogos
 // (V1-E3a): sin `refetch` el botón "Reintentar" tronaría.
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => useProveedores(),
+  // ⚠️ Los argumentos se PASAN (misma lección que `useSugerenciaCaptura`, H2 del reviewer): la
+  // pantalla acota el catálogo por el ROL de la etapa, y con `() => useProveedores()` ese filtro
+  // quedaba invisible para los tests — se podía pedir el rol equivocado y todo seguía en verde.
+  useProveedores: (...a: unknown[]) => useProveedores(...a),
   useRolesProveedor: () => ({
-    data: [{ id: 9, codigo: 'maquila-costura', nombre: 'Costura' }],
+    data: [
+      { id: 9, codigo: 'maquila-costura', nombre: 'Costura' },
+      { id: 10, codigo: 'corte', nombre: 'Corte' },
+      // 0.114: el rol del EMPACADOR (lo siembra `ROLES_PROVEEDOR_BASE`).
+      { id: 11, codigo: 'empaque', nombre: 'Empaque' },
+    ],
     isError: false,
     refetch: vi.fn(),
   }),
@@ -59,6 +67,9 @@ vi.mock('@/api/tipos-proceso', () => ({
   }),
 }));
 const crearCorte = vi.fn();
+/** 0.114: el EMPAQUE (servicio sobre la orden, hermano del corte). */
+const crearEmpaque = vi.fn();
+const cancelarEmpaque = vi.fn();
 const crearEnvio = vi.fn();
 const crearRecibo = vi.fn();
 const cancelarEnvio = vi.fn();
@@ -73,8 +84,10 @@ vi.mock('@/api/etapas', () => ({
   // ni el servidor verificaban a QUÉ PROCESO se le pregunta.
   useSugerenciaCaptura: (...a: unknown[]) => useSugerenciaCaptura(...a),
   useCrearCorte: () => ({ mutate: crearCorte, isPending: false }),
+  useCrearEmpaque: () => ({ mutate: crearEmpaque, isPending: false }),
   useCrearEnvio: () => ({ mutate: crearEnvio, isPending: false }),
   useCancelarCorte: () => ({ mutate: vi.fn(), isPending: false }),
+  useCancelarEmpaque: () => ({ mutate: cancelarEmpaque, isPending: false }),
   useCancelarEnvio: () => ({ mutate: cancelarEnvio, isPending: false }),
   urlImpresoEnvio: (id: number) => `/api/produccion/envios/${id}/impreso`,
   urlFichaEstampado: (id: number) => `/api/produccion/envios/${id}/ficha-estampado`,
@@ -121,6 +134,8 @@ const { AvanceProduccion } = await import('./AvanceProduccion');
 const PERMISOS = [
   'produccion.wip-ver',
   'produccion.corte',
+  // 0.114: el empaque tiene permiso propio (es otro acto, otro proveedor y otro servicio).
+  'produccion.empaque',
   'produccion.envio',
   'produccion.recibo',
   // V1-E3a: la entrega a cliente es una etapa más del panel, gateada por su permiso de siempre (A4).
@@ -192,6 +207,8 @@ function wip(
     // NOVENA puerta): 10 enviadas al proceso de costura.
     enviadoCostura: 10,
     recibidoCostura: 0,
+    // 0.114: Σ empacado de la orden (etapas de empaque vivas). Nada empacado todavía.
+    empacado: 0,
     entregado: 0,
     porEntregar: 0,
     // `porCortar` trae SIEMPRE todas las celdas de la orden, ceros incluidos: el servidor lo arma
@@ -250,7 +267,7 @@ function pintar(props: { etapaInicial?: string } = {}): void {
       alCerrar={vi.fn()}
       {...(props.etapaInicial === undefined
         ? {}
-        : { etapaInicial: props.etapaInicial as 'corte' | 'recibo-aplicacion' })}
+        : { etapaInicial: props.etapaInicial as 'corte' | 'empaque' | 'recibo-aplicacion' })}
     />,
     { sesion: estadoSesionDePrueba([...PERMISOS]) },
   );
@@ -269,6 +286,8 @@ beforeEach(() => {
   useCierresMaquila.mockReturnValue({ data: { idOrden: 1, folioOrden: 5424, filas: [] } });
   navegar.mockReset();
   crearCorte.mockReset();
+  crearEmpaque.mockReset();
+  cancelarEmpaque.mockReset();
   crearEnvio.mockReset();
   crearRecibo.mockReset();
   // La cancelación responde OK por default (el panel reacciona en `onSuccess`).
@@ -1172,6 +1191,192 @@ describe('Captura del avance · el precio pactado y la fecha compromiso (migrado
     await usuario.type(screen.getByTestId('avance-matriz-celda'), '2');
     await usuario.click(screen.getByTestId('avance-guardar'));
     expect(crearRecibo.mock.calls[0]?.[0]).toMatchObject({ precioPactado: 3 });
+  });
+});
+
+describe('⭐ Captura del avance · CORTE Y EMPAQUE, servicios sobre la orden (0.114)', () => {
+  it('el CORTE manda su PRECIO por prenda (de ahí nace el cargo del cortador)', async () => {
+    // Daniel: *«sólo hay que poner su cantidad y precio para meterlo en la OP, pero no va y viene»*.
+    // Antes el bloque de precio se escondía en el corte porque el corte no generaba cargo.
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    // Y NO ofrece fecha compromiso: no hay a quién esperarle (no va y viene).
+    expect(screen.queryByTestId('avance-fecha-compromiso')).not.toBeInTheDocument();
+
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    await usuario.type(screen.getByTestId('avance-precio'), '3.5');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '10');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearCorte.mock.calls[0]?.[0]).toMatchObject({ idCortador: 99, precioPactado: 3.5 });
+  });
+
+  it('el precio del CORTE se captura SIN `ordenes.ver-precio-real-maquila` (igual que el envío)', async () => {
+    // MISMA regla que ya fijaba el envío: ese permiso gobierna la LECTURA (el backend redacta el
+    // campo al devolverlo), no la escritura. Esconderlo dejaría sin precio justo a los perfiles que
+    // capturan la producción diaria, y el cargo del cortador nacería sin precio.
+    const usuario = userEvent.setup();
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba(['produccion.wip-ver', 'produccion.corte']),
+    });
+    await abrirCaptura(usuario, 'corte');
+    expect(screen.getByTestId('avance-precio')).toBeInTheDocument();
+  });
+
+  it('el EMPAQUE es su propia etapa y manda `idEmpacador` + precio, sin proceso', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'empaque');
+
+    // No pide tipo de proceso: el empaque NO es maquila (esa es su marca).
+    expect(screen.queryByTestId('avance-tipo')).not.toBeInTheDocument();
+    // Ni almacén: no toca inventario.
+    expect(screen.queryByTestId('avance-almacen-primeras')).not.toBeInTheDocument();
+    // Ni fecha compromiso: no va y viene.
+    expect(screen.queryByTestId('avance-fecha-compromiso')).not.toBeInTheDocument();
+
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    await usuario.type(screen.getByTestId('avance-precio'), '1.25');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '9');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearEnvio).not.toHaveBeenCalled();
+    expect(crearCorte).not.toHaveBeenCalled();
+    const cuerpo = crearEmpaque.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo).toMatchObject({ idOrden: 1, idEmpacador: 99, precioPactado: 1.25 });
+    expect(cuerpo).not.toHaveProperty('idTipoProceso');
+    expect(cuerpo).not.toHaveProperty('fechaCompromiso');
+  });
+
+  it('el selector del EMPAQUE busca proveedores con rol `empaque` (no cortadores ni maquileros)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'empaque');
+    // El mock de roles mapea código→id (`empaque` = 11): lo que importa es que se pida ESE rol.
+    // Sin este candado, la captura podría ofrecer cortadores y el servidor rechazaría al guardar.
+    await waitFor(() => {
+      expect(useProveedores).toHaveBeenCalledWith(
+        expect.objectContaining({ rol: 11 }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('el selector del CORTE sigue pidiendo el rol `corte` (no se lo llevó el empaque)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    await waitFor(() => {
+      expect(useProveedores).toHaveBeenCalledWith(
+        expect.objectContaining({ rol: 10 }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('⭐ empacar MÁS de lo recibido AVISA pero NO bloquea (la cantidad es propia, regla C&A)', async () => {
+    // El caso de Daniel al revés y al derecho: se fabrican 1,000 y se empacan 990 —eso es normal—;
+    // y si alguien empaca de más, el servidor lo acepta igual. La pantalla sólo pone el número.
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0 }]),
+        recibidoCostura: 10,
+        empacado: 4,
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'empaque');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    // 4 ya empacadas + 9 = 13 sobre 10 recibidas ⇒ excede en 3.
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '9');
+
+    const aviso = screen.getByTestId('avance-aviso-empaque-excede');
+    expect(aviso).toHaveTextContent('3 pieza(s)');
+    expect(aviso).toHaveTextContent('Se permite');
+    // NO es el aviso destructivo del sobre-envío, y el botón sigue vivo.
+    expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+  });
+
+  it('empacar DENTRO de lo recibido no dice nada (el caso normal no se marca)', async () => {
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0 }]),
+        recibidoCostura: 10,
+        empacado: 0,
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'empaque');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '9');
+    expect(screen.queryByTestId('avance-aviso-empaque-excede')).not.toBeInTheDocument();
+  });
+
+  it('sin `produccion.empaque` la etapa se VE pero no ofrece capturar (A4)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba(['produccion.wip-ver', 'produccion.corte']),
+    });
+    await usuario.click(screen.getByTestId('avance-stepper-empaque'));
+    expect(screen.queryByTestId('avance-abrir-captura')).not.toBeInTheDocument();
+  });
+
+  it('el permiso del CORTE no abre el empaque, ni al revés', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba(['produccion.wip-ver', 'produccion.empaque']),
+    });
+    // Con SÓLO `produccion.empaque`: el empaque sí, el corte no.
+    await usuario.click(screen.getByTestId('avance-stepper-empaque'));
+    expect(screen.getByTestId('avance-abrir-captura')).toBeInTheDocument();
+    await usuario.click(screen.getByTestId('avance-stepper-corte'));
+    expect(screen.queryByTestId('avance-abrir-captura')).not.toBeInTheDocument();
+  });
+
+  it('el historial pinta el EMPAQUE en su etapa y lo deja cancelar', async () => {
+    useEtapasOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        etapas: [
+          {
+            id: 31,
+            folio: 12,
+            tipo: 'empaque',
+            idTipoProceso: null,
+            tipoProceso: null,
+            idTercero: 99,
+            tercero: 'Maquila del Sur',
+            fecha: '2026-09-04',
+            cancelado: false,
+            lineas: [],
+            totalPiezas: 9,
+            creadoPorNombre: 'Usuario de Prueba',
+            creadoEn: '2026-09-04T10:00:00.000Z',
+          },
+        ],
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar({ etapaInicial: 'empaque' });
+    expect(await screen.findByText('Maquila del Sur')).toBeInTheDocument();
+
+    await usuario.click(screen.getByTestId('avance-cancelar-movimiento'));
+    await usuario.type(screen.getByTestId('avance-motivo-cancelar'), 'Se recontó');
+    await usuario.click(screen.getByTestId('avance-confirmar-cancelar'));
+    // Va al endpoint del EMPAQUE, no al del corte ni al del envío.
+    expect(cancelarEmpaque).toHaveBeenCalledWith(
+      { id: 31, cuerpo: { motivo: 'Se recontó' } },
+      expect.anything(),
+    );
   });
 });
 
@@ -2080,6 +2285,7 @@ describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima pu
       pendientePorRecibir: 0, // 20 − 16 − 4
       enviadoCostura: 10,
       recibidoCostura: 8,
+      empacado: 0,
       entregado: 0,
       porEntregar: 8,
       porCortar: [{ ...celda, cantidad: 0 }],

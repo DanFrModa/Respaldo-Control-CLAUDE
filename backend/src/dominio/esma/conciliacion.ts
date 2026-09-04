@@ -26,6 +26,8 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
+
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
   return new Date(`${valor}T00:00:00.000Z`);
@@ -247,6 +249,10 @@ export async function conciliarEsMa(
       cantidadReal: true,
       orden: { select: { folio: true } },
       maquilero: { select: { nombre: true } },
+      // 0.114: un cargo puede colgar de un proceso de maquila O de un servicio de la orden.
+      // (Los de corte/empaque SÍ traen `idEtapaRecibo`, así que en la práctica no caen en esta
+      // lista de "cargos sin recibo" — pero el tipo lo admite y la etiqueta no se re-escribe aquí.)
+      servicio: true,
       tipoProceso: { select: { nombre: true } },
     },
     orderBy: { id: 'asc' },
@@ -258,7 +264,7 @@ export async function conciliarEsMa(
     idMaquilero: c.idMaquilero,
     maquilero: c.maquilero.nombre,
     idTipoProceso: c.idTipoProceso,
-    tipoProceso: c.tipoProceso.nombre,
+    tipoProceso: etiquetaProcesoDelCargo(c),
     cantidad: c.cantidadReal?.toNumber() ?? null,
   }));
 

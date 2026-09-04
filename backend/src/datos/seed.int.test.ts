@@ -92,13 +92,17 @@ describe('seed de fundación', () => {
   it('siembra los roles de proveedor base (F1-E1B, R15) de forma idempotente', async () => {
     const roles = await prisma.rolProveedor.findMany({ select: { codigo: true } });
     const codigos = roles.map((r) => r.codigo).sort();
-    // Fusión de terceros (D12/R15): el seed siembra 9 roles de servicio. `estampado` y
+    // Fusión de terceros (D12/R15): el seed siembra 10 roles de servicio. `estampado` y
     // `aplicacion` se sembraron por separado (el viejo `estampado-aplicacion` ya NO se
     // siembra; en BD fresca de CI no existe, así que no va en la lista esperada).
+    // fila 0.114: entró `empaque` — Daniel: *«y una maquila de empaque también»*. La lista se
+    // mantiene ESCRITA A MANO a propósito (no se compara contra la constante del seed): así,
+    // agregar un rol obliga a decirlo aquí en vez de que la prueba se auto-apruebe sola.
     expect(codigos).toEqual(
       [
         'maquila-costura',
         'corte',
+        'empaque',
         'estampado',
         'bordado',
         'lavado',

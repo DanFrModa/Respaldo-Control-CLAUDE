@@ -212,6 +212,17 @@ describe('el rubro de un proveedor (la sección de la relación)', () => {
     expect(rubroDeProveedor(['bordado'])).toBe('maquila');
   });
 
+  it('⭐ CORTE y EMPAQUE son maquila (0.114), no proveedores', () => {
+    // Es la frontera exacta que corrigió Daniel: *«corte es parte de maquilas, no de proveedores.
+    // Tengo proveedores de corte que el monto a pagar sale de una orden, lo mismo que un maquilero.
+    // Y una maquila de empaque también»*. Hasta la 0.113 los dos caían en «proveedores» porque
+    // `ROLES_MAQUILA_ESMA` no traía sus roles (así lo dejó anotado §Post-F9.189(j)).
+    expect(rubroDeProveedor(['corte'])).toBe('maquila');
+    expect(rubroDeProveedor(['empaque'])).toBe('maquila');
+    // Y un taller que corta Y vende tela sigue siendo maquila (basta UN rol de maquila).
+    expect(rubroDeProveedor(['vende-telas', 'corte'])).toBe('maquila');
+  });
+
   it('sin ningún rol de maquila cae en «proveedores»', () => {
     // *«Transportistas y demás proveedores sí salen del estado de cuenta.»*
     expect(rubroDeProveedor(['tela'])).toBe('proveedores');
