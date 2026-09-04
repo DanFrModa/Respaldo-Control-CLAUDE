@@ -670,7 +670,10 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
   });
 
   it('un TRASPASO de tela cuyo destino es de PT se RECHAZA', async () => {
-    const idLote = await entrarLote(300, 0);
+    // Los DOS componentes con cantidad > 0: el lote es multi-componente (D5) y el contrato exige
+    // `positive` en cada uno (`esquemaLoteComponenteEntrada`). Un 0 aquí muere en el Zod del ajuste,
+    // ANTES de llegar al guard que esta prueba quiere medir.
+    const idLote = await entrarLote(300, 100);
     const bodegaPt = await cliente.almacen.create({ data: { nombre: 'Primeras', tipo: 'PT' } });
     const movimientosAntes = await cliente.movimiento.count();
     await expect(
@@ -735,7 +738,8 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
   });
 
   it('EL CASO FELIZ NO CAMBIA: tela en almacén de TELA y avíos en almacén de AVIO', async () => {
-    const idLote = await entrarLote(300, 0);
+    // Mismo motivo que arriba: los dos componentes con cantidad > 0 (el contrato los exige).
+    const idLote = await entrarLote(300, 100);
     expect(idLote).toBeGreaterThan(0);
     await ajustarInventarioAvio(
       sesion(PERM_AVIOS),
