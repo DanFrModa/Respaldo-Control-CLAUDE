@@ -101,3 +101,38 @@ export function exigirProveedorQueFactura(
       `factura, corrige "¿Cómo factura?" en el catálogo de proveedores.`,
   );
 }
+
+/**
+ * ⭐ VIVE AQUÍ DESDE LA FILA 0.129 (venía de `inventarios/cfdi-entrada-tela.ts`). Se movió sin
+ * cambiarle una coma: es una regla del PROVEEDOR —como su vecina `exigirProveedorQueFactura`—, no
+ * de la entrada de tela, y desde aquí la puede usar también el cargo que nace de una recepción de
+ * compra (`terceros/cargo-de-entrada.ts`) sin que `terceros/` tenga que importar de `inventarios/`.
+ *
+ * Exige que el PROVEEDOR tenga su RFC capturado cuando hay un CFDI de por medio, y lo devuelve ya
+ * comprobado (para que quien llama compare sin volver a preguntar por el null).
+ *
+ * POR QUÉ NO BASTA CON *"si tiene RFC, que coincida"* (hallazgo de la revisión del 11-ago-2026): los
+ * **155 proveedores** que sobreviven a la depuración (§Post-F9.23) llegan del Access con **todo lo
+ * fiscal al 0 %** — el viejo nunca tuvo RFC. Con la comparación condicionada a *"si el proveedor
+ * tiene RFC"*, la regla "el emisor DEBE ser el proveedor" era un **NO-OP el día 1**: se leía el XML
+ * de *Textiles del Norte*, se elegía a mano a *Avíos del Centro* (rfc NULL), se confirmaba… y nacía
+ * un cargo **FISCAL** contra Avíos del Centro con el `rfcTercero` de Textiles del Norte. El contador
+ * veía un tercero cuyo nombre y RFC no coinciden, y el UUID quedaba consumido para siempre.
+ *
+ * Por eso, con CFDI, el RFC del proveedor **es obligatorio**: sin él no hay contra qué comprobar
+ * quién facturó, y una validación que no puede comprobar nada no debe dejar pasar (A4).
+ */
+export function exigirRfcDelProveedor(
+  proveedor: { nombre: string; rfc: string | null },
+  queSeIntento: string,
+): string {
+  const rfc = proveedor.rfc?.trim() ?? '';
+  if (rfc === '') {
+    throw new ErrorValidacion(
+      `No se puede ${queSeIntento}: el proveedor "${proveedor.nombre}" no tiene RFC capturado, así ` +
+        `que no hay contra qué comprobar quién emitió el comprobante. Captúrale el RFC en ` +
+        `Catálogos › Proveedores (es el mismo que trae el XML) y vuelve a intentarlo.`,
+    );
+  }
+  return rfc;
+}

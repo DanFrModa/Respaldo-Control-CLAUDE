@@ -40,6 +40,7 @@ import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
 import { faltantePorRecibir } from './tolerancia-recepcion.js';
 import { avisoDeDesvio, PCT_DESVIO_COMPRA_DEFECTO } from './desvio-de-compra.js';
 import { motivoDesgloseInvalido } from './desglose-por-medida.js';
+import { modalidadFactura } from '../terceros/facturacion-proveedor.js';
 import type {
   DatosCompraLineaEntrada,
   CompraSalida,
@@ -47,6 +48,7 @@ import type {
   ResumenCompras,
 } from '../../contrato/esquemas/compra.js';
 import type {
+  ModalidadFacturacion,
   OrdenCompra,
   OrdenCompraLinea,
   OrdenCompraLineaMedida,
@@ -131,7 +133,8 @@ const ESTATUS_EDITABLES_NORMAL: readonly string[] = ['borrador', 'pendiente_auto
  * nombre, orden ligada con folio, matriz con etiquetas) y órdenes ligadas (folio).
  */
 type OCConDetalle = OrdenCompra & {
-  proveedor: { nombre: string };
+  /** `modalidadFacturacion` (fila 0.129): lo que decide qué deuda nace al RECIBIR (fila 0.124). */
+  proveedor: { nombre: string; modalidadFacturacion: ModalidadFacturacion | null };
   direccionEntrega: { nombre: string; direccion: string } | null;
   lineas: (OrdenCompraLinea & {
     tela: { nombre: string; nombreComplemento: string | null } | null;
@@ -152,7 +155,10 @@ type OCConDetalle = OrdenCompra & {
 
 /** `include` estándar para traer la OC con todo su detalle (ordenado de forma estable). */
 const incluirDetalle = {
-  proveedor: { select: { nombre: true } },
+  // ⭐ Fila 0.129: la MODALIDAD viaja con el nombre porque la pantalla de recepción tiene que
+  // decir, ANTES de confirmar, si va a nacer un cargo o si la factura queda pendiente. Es
+  // `modalidadFacturacion` y no la casilla vieja: desde la fila 0.124 es la única que contesta.
+  proveedor: { select: { nombre: true, modalidadFacturacion: true } },
   direccionEntrega: { select: { nombre: true, direccion: true } },
   lineas: {
     orderBy: { id: 'asc' },
@@ -864,6 +870,7 @@ function aCompraSalida(
     estatus: oc.estatus,
     idProveedor: oc.idProveedor,
     proveedor: oc.proveedor.nombre,
+    modalidadFacturaProveedor: modalidadFactura(oc.proveedor.modalidadFacturacion),
     fecha: aFechaIso(oc.fecha),
     fechaEntrega: aFechaIso(oc.fechaEntrega),
     idDireccionEntrega: oc.idDireccionEntrega,

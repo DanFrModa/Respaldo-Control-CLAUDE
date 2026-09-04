@@ -1,11 +1,16 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ocDePrueba } from './fixtures';
 import { RecepcionComprasPagina } from './RecepcionComprasPagina';
+
+// El aviso de "captura un precio" es un toast: se mockea para poder MEDIRLO (si no, un guardado
+// bloqueado y uno silencioso se ven igual desde la prueba).
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const useOrdenCompraMock = vi.fn();
 const useAlmacenesMock = vi.fn();
@@ -116,6 +121,7 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
     useOcsRecibiblesMock.mockReset();
     recibirMutate.mockReset();
     reversarMutate.mockReset();
+    vi.mocked(toast.error).mockReset();
 
     // Dos OC abiertas del proveedor: con más de una NO hay auto-selección, así que cada prueba
     // elige la suya haciendo clic (que es lo que hace quien recibe).
@@ -505,6 +511,280 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
       expect(screen.getByTestId('rec-error-ocs')).toHaveTextContent('Falló la consulta');
       await usuario.click(screen.getByTestId('rec-reintentar-ocs'));
       expect(refetch).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * ⭐⭐ FILA 0.129 — RECIBIR HACE NACER LA CUENTA POR PAGAR.
+   *
+   * Daniel (§Post-F9.192): *"la persona que recibe mete las cantidades y precios… es la misma
+   * entrada que se ocupa tanto para inventario como para su estado de cuenta"* · *"lo ideal es
+   * recibir con la factura. Pero si no fuera el caso, está bien dejarla como pendiente"*.
+   *
+   * Lo que se mide aquí es que la pantalla DIGA lo que va a pasar con la deuda ANTES de confirmar,
+   * y que el precio que se ve sea el que viaja al servidor.
+   */
+  describe('fila 0.129 — el precio, el importe y la deuda', () => {
+    /** Un renglón de AVÍO de la OC (id 20), con el precio que se le pase. */
+    function lineaAvio(precio: number) {
+      return {
+        id: 20,
+        idTela: null,
+        tela: null,
+        nombreComplementoTela: null,
+        cantidadComplemento: null,
+        precioComplemento: null,
+        idAvio: 4,
+        avio: 'BOT-01 — Botón',
+        idAvioProveedor: null,
+        descripcionLibre: null,
+        idTelaColor: null,
+        telaColor: null,
+        idColorPrenda: null,
+        colorPrenda: null,
+        colorAvio: null,
+        medidas: [],
+        pantoneTelaColor: null,
+        cantidadSugerida: null,
+        avisoDesvio: null,
+        cantidad: 100,
+        unidad: 'pza',
+        precio,
+        subtotal: precio * 100,
+        idOrden: null,
+        folioOrden: null,
+        tallas: [],
+      };
+    }
+
+    /** Prepara la OC 1007 con un avío pendiente de 60 y la modalidad de factura que se pida. */
+    function prepararOc(
+      modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida',
+      precio = 2,
+    ): void {
+      useOrdenCompraMock.mockImplementation(
+        detalleDeOc(
+          ocDePrueba({
+            id: 7,
+            numCompra: 1007,
+            estatus: 'autorizada',
+            proveedor: 'Avíos del Centro',
+            modalidadFacturaProveedor,
+            lineas: [lineaAvio(precio)],
+          }),
+        ),
+      );
+      usePendientesMock.mockReturnValue({
+        data: [
+          {
+            idOrdenCompraLinea: 20,
+            tipo: 'avio',
+            cantidad: 100,
+            recibido: 40,
+            pendiente: 60,
+            cantidadComplemento: null,
+            recibidoComplemento: 0,
+            pendienteComplemento: 0,
+            surtido: false,
+          },
+        ],
+        isPending: false,
+        isFetching: false,
+      });
+    }
+
+    it('el precio arranca con el de la OC y el importe se ve por renglón y en el total', async () => {
+      prepararOc('sin-factura', 2);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      await usuario.click(screen.getByTestId('rec-incluir-20'));
+
+      expect(screen.getByTestId('rec-precio-20')).toHaveValue(2);
+      // 60 pendientes × $2 = $120: el dinero se ve ANTES de confirmar, no después.
+      expect(screen.getByTestId('rec-importe-20')).toHaveTextContent('$120.00');
+      expect(screen.getByTestId('rec-importe-total')).toHaveTextContent('$120.00');
+    });
+
+    it('corregir el precio recalcula el importe, lo marca como distinto y ESE precio es el que viaja', async () => {
+      prepararOc('sin-factura', 2);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      await usuario.click(screen.getByTestId('rec-incluir-20'));
+      await usuario.clear(screen.getByTestId('rec-precio-20'));
+      await usuario.type(screen.getByTestId('rec-precio-20'), '3');
+
+      expect(screen.getByTestId('rec-importe-20')).toHaveTextContent('$180.00');
+      // Se dice que NO es el precio de la orden (cambiar un precio es una decisión, no un descuido).
+      expect(screen.getByTestId('rec-importe-20')).toHaveTextContent('precio distinto al de la OC');
+
+      await usuario.selectOptions(screen.getByTestId('rec-almacen'), '1');
+      await usuario.click(screen.getByTestId('rec-guardar'));
+      // El renglón viaja con el precio CORREGIDO: lo que la pantalla dijo que se iba a deber es
+      // exactamente lo que el servidor va a cobrar.
+      const args = recibirMutate.mock.calls[0]?.[0] as {
+        cuerpo: { lineas: { idOrdenCompraLinea: number; cantidad: number; precioUnit: number }[] };
+      };
+      expect(args.cuerpo.lineas).toEqual([{ idOrdenCompraLinea: 20, cantidad: 60, precioUnit: 3 }]);
+    });
+
+    it('proveedor que NO factura: se avisa que nace el cargo, con su importe', async () => {
+      prepararOc('sin-factura', 2);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      await usuario.click(screen.getByTestId('rec-incluir-20'));
+
+      const aviso = screen.getByTestId('rec-aviso-deuda');
+      expect(aviso).toHaveTextContent('Nace un cargo SIN FACTURA por $120.00');
+      expect(aviso).toHaveTextContent('Avíos del Centro');
+    });
+
+    it('proveedor que SÍ factura: la deuda queda pendiente del CFDI (no nace cargo)', async () => {
+      prepararOc('factura', 2);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      await usuario.click(screen.getByTestId('rec-incluir-20'));
+
+      const aviso = screen.getByTestId('rec-aviso-deuda');
+      expect(aviso).toHaveTextContent('Factura pendiente');
+      expect(aviso).toHaveTextContent('CFDI');
+    });
+
+    it('proveedor SIN definir: se dice que falta capturarlo en su catálogo', async () => {
+      prepararOc('no-definida', 2);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      await usuario.click(screen.getByTestId('rec-incluir-20'));
+
+      expect(screen.getByTestId('rec-aviso-deuda')).toHaveTextContent(
+        'nadie ha capturado si este proveedor factura',
+      );
+    });
+
+    it('sin renglones marcados no se inventa ningún aviso de deuda', async () => {
+      prepararOc('sin-factura', 2);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      expect(screen.queryByTestId('rec-aviso-deuda')).not.toBeInTheDocument();
+    });
+
+    it('el historial etiqueta cada recepción según cómo quedó su deuda', async () => {
+      prepararOc('sin-factura', 2);
+      useRecepcionesDeOcMock.mockReturnValue({
+        data: {
+          recepciones: [
+            {
+              id: 1,
+              folio: 501,
+              fecha: '2026-09-04',
+              factura: 'REM-77',
+              almacen: 'Bodega',
+              lineas: [{ id: 1 }],
+              reversada: false,
+              importe: 120,
+              deuda: 'cargo-no-fiscal',
+            },
+            {
+              id: 2,
+              folio: 502,
+              fecha: '2026-09-05',
+              factura: null,
+              almacen: 'Bodega',
+              lineas: [{ id: 2 }],
+              reversada: false,
+              importe: 300,
+              deuda: 'factura-pendiente',
+            },
+            {
+              id: 3,
+              folio: 503,
+              fecha: '2026-09-06',
+              factura: null,
+              almacen: 'Bodega',
+              lineas: [{ id: 3 }],
+              reversada: true,
+              importe: 90,
+              // ⭐ RONDA 2: lo dice el SERVIDOR. La pantalla ya no esconde nada por su cuenta.
+              deuda: 'cancelada',
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+      });
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+
+      const historial = screen.getByTestId('rec-historial');
+      expect(historial).toHaveTextContent('Cargo $120.00');
+      expect(historial).toHaveTextContent('Factura pendiente');
+      // La REVERSADA no presume un cargo que ya se canceló — y no porque la pantalla la filtre,
+      // sino porque el servidor la clasificó `cancelada`: la etiqueta no tiene nada que pintar.
+      expect(historial).not.toHaveTextContent('Cargo $90.00');
+      expect(historial).toHaveTextContent('Reversada');
+    });
+
+    /**
+     * 🔴 VACÍO NO ES CERO (bloqueante de la revisión de la 0.129). `Number('')` es 0: un precio
+     * BORRADO pasaba la guarda entera y se mandaba como $0 en silencio — el avío entraba al kardex
+     * valuado a 0 y la recepción quedaba "sin importe" sin que nadie se enterara. Y no se arregla
+     * rechazando el 0: un cero TECLEADO (muestras, mercancía sin cargo) es legítimo.
+     */
+    it('un precio BORRADO no se manda como $0: se avisa y no se llama a recibir', async () => {
+      prepararOc('sin-factura', 2);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      await usuario.click(screen.getByTestId('rec-incluir-20'));
+      await usuario.clear(screen.getByTestId('rec-precio-20'));
+      await usuario.selectOptions(screen.getByTestId('rec-almacen'), '1');
+      await usuario.click(screen.getByTestId('rec-guardar'));
+
+      expect(recibirMutate).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Captura un precio para'));
+    });
+
+    it('un precio de CERO tecleado a propósito SÍ se manda (mercancía sin cargo)', async () => {
+      prepararOc('sin-factura', 2);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      await usuario.click(screen.getByTestId('rec-incluir-20'));
+      await usuario.clear(screen.getByTestId('rec-precio-20'));
+      await usuario.type(screen.getByTestId('rec-precio-20'), '0');
+      await usuario.selectOptions(screen.getByTestId('rec-almacen'), '1');
+      await usuario.click(screen.getByTestId('rec-guardar'));
+
+      const args = recibirMutate.mock.calls[0]?.[0] as {
+        cuerpo: { lineas: { idOrdenCompraLinea: number; cantidad: number; precioUnit: number }[] };
+      };
+      expect(args.cuerpo.lineas).toEqual([{ idOrdenCompraLinea: 20, cantidad: 60, precioUnit: 0 }]);
+      // Y la pantalla lo dice antes de confirmar: sin importe, no nace cargo.
+      expect(screen.getByTestId('rec-aviso-deuda')).toHaveTextContent('Sin importe');
     });
   });
 });

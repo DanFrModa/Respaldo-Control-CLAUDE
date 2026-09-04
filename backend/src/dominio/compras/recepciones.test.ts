@@ -5,7 +5,9 @@ import { EstatusOrdenCompra } from '../../datos/index.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   calcularEstatusRecepcion,
+  importeDeRecepcion,
   nombreMaterialDeLinea,
+  precioDelRenglon,
   recibirCompra,
   reversarRecepcion,
 } from './recepciones.js';
@@ -173,5 +175,57 @@ describe('⭐ V1-E8c — el nombre del renglón al RECIBIR lleva su color', () =
     expect(
       nombreMaterialDeLinea({ avio: null, tela: null, colorAvio: null, descripcionLibre: null }),
     ).toBe('(sin material)');
+  });
+});
+
+/**
+ * ⭐⭐ FILA 0.129 — EL PRECIO CON EL QUE NACE LA DEUDA, y el importe que se le va a deber.
+ *
+ * Daniel (§Post-F9.192): *"el precio debería de ser el de la OC, la cantidad puede variar un poco,
+ * por eso se mete a mano"*. Las dos funciones son PURAS a propósito: la regla del dinero se puede
+ * medir sin base de datos, que es donde antes se escondía.
+ */
+describe('Recepción unit — el precio del renglón (fila 0.129)', () => {
+  it('sin precio capturado manda el de la OC', () => {
+    expect(precioDelRenglon(12.5, undefined)).toBe(12.5);
+  });
+
+  it('con precio capturado manda el capturado (quien recibe ve la mercancía)', () => {
+    expect(precioDelRenglon(12.5, 13.75)).toBe(13.75);
+  });
+
+  it('un precio capturado de CERO se respeta: no se cae al de la OC', () => {
+    // El `?? ` importa: con `||` un 0 legítimo (mercancía sin cargo) se habría convertido en el
+    // precio de la OC y habría nacido una deuda que nadie pidió.
+    expect(precioDelRenglon(12.5, 0)).toBe(0);
+  });
+});
+
+describe('Recepción unit — lo que se le debe al proveedor (fila 0.129)', () => {
+  it('suma cantidad × precio de cada renglón', () => {
+    expect(
+      importeDeRecepcion([
+        { cantidad: 100, precio: 2.5 },
+        { cantidad: 10, precio: 1 },
+      ]),
+    ).toBe(260);
+  });
+
+  it('los renglones LIBRES también cuentan: no se inventarían, pero se pagan', () => {
+    // Un flete de $500 capturado como renglón libre pesa igual que un avío.
+    expect(importeDeRecepcion([{ cantidad: 1, precio: 500 }])).toBe(500);
+  });
+
+  it('un renglón sin precio aporta 0 (no se inventa ninguno)', () => {
+    expect(
+      importeDeRecepcion([
+        { cantidad: 100, precio: null },
+        { cantidad: 2, precio: 3 },
+      ]),
+    ).toBe(6);
+  });
+
+  it('sin renglones el importe es 0 (y arriba nadie registra una deuda de cero)', () => {
+    expect(importeDeRecepcion([])).toBe(0);
   });
 });
