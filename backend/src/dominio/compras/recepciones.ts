@@ -75,6 +75,23 @@
  * `recibida_parcial`. Cualquier otro estatus → `ErrorConflicto` (server-side, A4).
  *
  *
+ * ⭐⭐ **FILA 0.129 — RECIBIR HACE NACER LA CUENTA POR PAGAR.** Daniel (§Post-F9.192, 4-sep-2026):
+ *
+ *   > *"La persona que recibe (a partir de una OC) mete las cantidades y precios… el precio debería
+ *   > de ser el de la OC, la cantidad puede variar un poco, por eso se mete a mano… **es la misma
+ *   > entrada que se ocupa tanto para inventario como para su estado de cuenta**"* ·
+ *   > *"Lo ideal es recibir con la factura. Pero si no fuera el caso, está bien dejarla como
+ *   > pendiente. Todo se recibe a partir de la OC. **Tanto telas como avíos**."*
+ *
+ * Hasta esta fila, recibir movía el kardex y NADA MÁS: la deuda con el proveedor de avíos había que
+ * capturarla aparte en Finanzas, o no se capturaba. Ahora la misma entrada hace las dos cosas, con
+ * la MISMA regla que ya regía en la tela (`terceros/cargo-de-entrada.ts`, fuente única de los cuatro
+ * casos): proveedor que NO factura ⇒ cargo NO fiscal por Σ cantidad×precio (avíos **y** renglones
+ * libres); proveedor que factura (o sin definir) ⇒ no nace cargo y la recepción queda como *factura
+ * pendiente* —la deuda nacerá al importar el CFDI en Finanzas, que es quien trae el importe con
+ * impuestos—. El REVERSO cancela el cargo por su inverso auditado (D3). El PRECIO por renglón se
+ * puede corregir al recibir (default: el de la OC) y los dos números quedan en la bitácora.
+ *
  * §Post-F9.14 (decisión de Daniel, 7-ago-2026) — **la TELA ya no se recibe por aquí**: se recibe
  * capturando la FACTURA/REMISIÓN del proveedor (`dominio/inventarios/entradas-tela.ts`) con cada
  * renglón ligado a su renglón de OC; esa entrada crea la partida, mueve el kardex y llama a
@@ -88,7 +105,7 @@ import {
   type RecepcionSalida,
   type RecepcionesLista,
 } from '../../contrato/index.js';
-import type { Prisma } from '../../datos/index.js';
+import type { ModalidadFacturacion, Prisma } from '../../datos/index.js';
 import { EstatusOrdenCompra } from '../../datos/index.js';
 import { z } from 'zod';
 
@@ -124,6 +141,15 @@ import {
   renglonSurtido,
   type TipoRenglonCompra,
 } from './tolerancia-recepcion.js';
+import {
+  cargoDeEntradaDeProveedor,
+  claseDeDeuda,
+  REF_RECEPCION_COMPRA,
+} from '../terceros/cargo-de-entrada.js';
+import {
+  cancelarMovimientoTerceroInterno,
+  registrarMovimientoTerceroInterno,
+} from '../terceros/cuenta-terceros.js';
 /** Clave de la secuencia de folios de recepciones de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_RECEPCION = 'recepcion-compra';
 
@@ -212,6 +238,12 @@ type OCParaRecepcion = {
   numCompra: bigint;
   idEmpresa: number;
   idProveedor: number;
+  /** Fila 0.129: la MODALIDAD del proveedor decide QUÉ deuda nace al recibir (fila 0.124). */
+  proveedor: {
+    nombre: string;
+    rfc: string | null;
+    modalidadFacturacion: ModalidadFacturacion | null;
+  };
   estatus: string;
   lineas: OCLineaParaRecepcion[];
 };
@@ -229,6 +261,9 @@ const incluirRecepcion = {
           idTela: true,
           idAvio: true,
           descripcionLibre: true,
+          // ⭐ Fila 0.129: el precio con el que se PIDIÓ, para poder decir si el de la recepción
+          // es otro. Sin él, "se recibió a $12" no se puede contrastar con nada.
+          precio: true,
           // ⭐⭐ V1-E8c (§Post-F9.126): el color con el que se pidió el avío.
           colorAvio: true,
           tela: { select: { nombre: true } },
@@ -251,8 +286,52 @@ const incluirRecepcion = {
 
 type RecepcionConDetalle = Prisma.RecepcionCompraGetPayload<{ include: typeof incluirRecepcion }>;
 
-/** Proyecta una recepción (con detalle) a la forma del contrato. */
-function aRecepcionSalida(r: RecepcionConDetalle): RecepcionSalida {
+/**
+ * ⭐⭐ FILA 0.129 — EL PRECIO CON EL QUE SE RECIBE (función PURA, unit-testeable).
+ *
+ * Daniel (§Post-F9.192): *"el precio debería de ser el de la OC, la cantidad puede variar un poco,
+ * por eso se mete a mano"*. O sea: el de la OC MANDA por defecto, y quien recibe lo puede corregir
+ * cuando el proveedor mandó otro. No se bloquea la corrección —quien está frente a la mercancía es
+ * quien sabe—; lo que se hace es DEJARLA VER (en la salida) y DEJARLA AUDITADA (en la bitácora).
+ */
+export function precioDelRenglon(precioOc: number, capturado: number | undefined): number {
+  return capturado ?? precioOc;
+}
+
+/**
+ * ⭐⭐ FILA 0.129 — LO QUE ESTA RECEPCIÓN LE DEBE AL PROVEEDOR (función PURA, unit-testeable):
+ * Σ (cantidad recibida × precio), avíos **y renglones libres**.
+ *
+ * Los LIBRES cuentan a propósito: no mueven inventario (no son material de catálogo), pero se le
+ * pagan al proveedor igual que lo demás — dejarlos fuera haría nacer una deuda más chica que la
+ * mercancía que llegó. Un renglón sin precio aporta 0 (no se inventa ninguno).
+ *
+ * NO redondea: el redondeo a centavos lo hace `cargoDeEntradaDeProveedor`, en un solo lugar.
+ */
+export function importeDeRecepcion(
+  renglones: readonly { cantidad: number; precio: number | null }[],
+): number {
+  return renglones.reduce((suma, r) => suma + (r.precio === null ? 0 : r.cantidad * r.precio), 0);
+}
+
+/** El cargo de CxP que nació de una recepción, con lo único que la salida necesita saber de él. */
+interface CargoDeLaRecepcion {
+  id: number;
+  /** Cancelado por el reverso de la recepción, o a mano en Finanzas. Decide `deuda` (0.129 r2). */
+  cancelado: boolean;
+}
+
+/**
+ * Proyecta una recepción (con detalle) a la forma del contrato.
+ *
+ * El `cargo` (fila 0.129) lo resuelve el LLAMADOR —una consulta por documento, o una sola para toda
+ * la lista— porque no cuelga de la recepción por FK: se liga por `refTipo`/`refId` (referencia
+ * polimórfica del motor de terceros), igual que en la entrada de tela.
+ */
+function aRecepcionSalida(
+  r: RecepcionConDetalle,
+  cargo: CargoDeLaRecepcion | null,
+): RecepcionSalida {
   const lineas: RecepcionLineaSalida[] = r.lineas.map((l) => {
     const ocl = l.ordenCompraLinea;
     const tipo: 'tela' | 'avio' | 'libre' =
@@ -272,6 +351,12 @@ function aRecepcionSalida(r: RecepcionConDetalle): RecepcionSalida {
       cantidadRecibida: Number(l.cantidadRecibida),
       cantidadComplemento: aNumero(l.cantidadComplemento),
       costoUnit: aNumero(l.costoUnit),
+      // ⭐ Fila 0.129: el precio de la OC y si el de la recepción es OTRO. Se compara en centavos
+      // (los dos viven en columnas DECIMAL con 2 decimales) para no perseguir colas de binario.
+      precioOc: Number(ocl.precio),
+      precioDistintoOc:
+        l.costoUnit !== null &&
+        Math.round(Number(l.costoUnit) * 100) !== Math.round(Number(ocl.precio) * 100),
       // Flujo NUEVO por color (B1): la traza de la tela es la PARTIDA (color + lote del proveedor).
       idTelaColor: l.partida?.idTelaColor ?? null,
       telaColor: l.partida?.telaColor.nombre ?? null,
@@ -285,6 +370,13 @@ function aRecepcionSalida(r: RecepcionConDetalle): RecepcionSalida {
       folioMovimiento: l.movimiento === null ? null : Number(l.movimiento.folio),
     };
   });
+
+  const importe =
+    Math.round(
+      importeDeRecepcion(
+        lineas.map((l) => ({ cantidad: l.cantidadRecibida, precio: l.costoUnit })),
+      ) * 100,
+    ) / 100;
 
   return {
     id: r.id,
@@ -301,10 +393,59 @@ function aRecepcionSalida(r: RecepcionConDetalle): RecepcionSalida {
     reversadaEn: r.reversadaEn === null ? null : r.reversadaEn.toISOString(),
     reversadaPorId: r.reversadaPorId,
     motivoReverso: r.motivoReverso,
+    importe,
+    // La traza NO se pierde nunca: aunque el cargo esté cancelado, sigue apuntando a él (D3).
+    idMovimientoTercero: cargo?.id ?? null,
+    // La deuda se lee de los HECHOS (hay cargo, está cancelado, la recepción se reversó), nunca se
+    // re-deduce de la modalidad del proveedor: así una recepción vieja dice lo que de verdad tiene,
+    // sin repararla (REGLA 0-B). Y se decide AQUÍ, no en la pantalla: cualquier consumidor del API
+    // —un reporte, un export— tiene que leer lo mismo que ve quien está en la pantalla.
+    deuda: claseDeDeuda({
+      hayCargo: cargo !== null,
+      importe,
+      deEntradaTela: r.idEntradaTela !== null,
+      anulada: r.reversadaEn !== null,
+      cargoCancelado: cargo?.cancelado ?? false,
+    }),
     lineas,
     creadoEn: r.creadoEn.toISOString(),
     creadoPorId: r.creadoPorId,
   };
+}
+
+/**
+ * ⭐ FILA 0.129 — el CARGO de cuenta por pagar que nació de cada recepción, en UNA sola consulta
+ * (nunca una por fila). El cargo no cuelga por FK: se liga por `refTipo`/`refId` (referencia
+ * polimórfica del motor de terceros, ADR-0005), así que se busca por ahí.
+ *
+ * Devuelve TAMBIÉN los cancelados, CON su bandera: la recepción reversada conserva la traza de qué
+ * cargo generó —y la salida lo dice con `deuda: 'cancelada'`—, que es justo lo que hace auditable
+ * el reverso (D3).
+ *
+ * `idEmpresa` sella la lectura (A9): un `refId` es un entero y podría chocar con el de otra empresa.
+ */
+async function cargosDeRecepciones(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+  idsRecepcion: readonly number[],
+): Promise<Map<number, CargoDeLaRecepcion>> {
+  if (idsRecepcion.length === 0) {
+    return new Map();
+  }
+  const cargos = await cliente.movimientoTercero.findMany({
+    where: { idEmpresa, refTipo: REF_RECEPCION_COMPRA, refId: { in: [...idsRecepcion] } },
+    select: { id: true, refId: true, cancelado: true },
+    orderBy: { id: 'asc' },
+  });
+  const porRecepcion = new Map<number, CargoDeLaRecepcion>();
+  for (const cargo of cargos) {
+    // Una recepción tiene A LO SUMO un cargo (nace en su misma transacción y su id es nuevo), pero
+    // si alguna vez hubiera dos, manda el PRIMERO: el que de verdad nació de recibir.
+    if (cargo.refId !== null && !porRecepcion.has(cargo.refId)) {
+      porRecepcion.set(cargo.refId, { id: cargo.id, cancelado: cargo.cancelado });
+    }
+  }
+  return porRecepcion;
 }
 
 /** Obtiene una recepción (con detalle) de la empresa activa, o lanza (A9). */
@@ -313,14 +454,16 @@ async function obtenerRecepcion(
   idEmpresa: number,
   bd?: ContextoBd,
 ): Promise<RecepcionSalida> {
-  const r = await clienteLectura(bd).recepcionCompra.findFirst({
+  const cliente = clienteLectura(bd);
+  const r = await cliente.recepcionCompra.findFirst({
     where: { id: idRecepcion, idEmpresa },
     include: incluirRecepcion,
   });
   if (r === null) {
     throw new ErrorNoEncontrado('RecepcionCompra', idRecepcion);
   }
-  return aRecepcionSalida(r);
+  const cargos = await cargosDeRecepciones(cliente, idEmpresa, [r.id]);
+  return aRecepcionSalida(r, cargos.get(r.id) ?? null);
 }
 
 // ── Recálculo del estatus de la OC (R7) ──────────────────────────────────────────────────────────
@@ -493,6 +636,10 @@ export async function recibirCompra(
         numCompra: true,
         idEmpresa: true,
         idProveedor: true,
+        // ⭐ Fila 0.129: la MODALIDAD del proveedor decide si al recibir nace un cargo NO fiscal o
+        // si la deuda se queda esperando el CFDI (fila 0.124: `modalidadFacturacion` es la única
+        // que contesta). El RFC viaja para el cerrojo del camino fiscal.
+        proveedor: { select: { nombre: true, rfc: true, modalidadFacturacion: true } },
         estatus: true,
         lineas: {
           select: {
@@ -559,10 +706,23 @@ export async function recibirCompra(
 
     const tipoEntrada = await tipoPorCodigo(tx, COD_ENTRADA_RECEPCION);
     const materialesEvento: EventoMaterialRecibido['materiales'] = [];
+    /** Fila 0.129: lo que se va a deber por cada renglón, y los precios corregidos (bitácora). */
+    const renglonesCobrados: { cantidad: number; precio: number }[] = [];
+    const preciosCorregidos: { idOrdenCompraLinea: number; precioOc: number; recibido: number }[] =
+      [];
 
     for (const lineaEntrada of datos.lineas) {
       const ocl = lineasPorId.get(lineaEntrada.idOrdenCompraLinea) as OCLineaParaRecepcion;
-      const precio = Number(ocl.precio);
+      const precioOc = Number(ocl.precio);
+      // ⭐⭐ Fila 0.129 — manda el precio de la OC salvo que quien recibe lo haya corregido.
+      const precio = precioDelRenglon(precioOc, lineaEntrada.precioUnit);
+      if (Math.round(precio * 100) !== Math.round(precioOc * 100)) {
+        preciosCorregidos.push({
+          idOrdenCompraLinea: ocl.id,
+          precioOc,
+          recibido: precio,
+        });
+      }
 
       if (ocl.idTela !== null) {
         // §Post-F9.14 (decisión de Daniel, 7-ago-2026): la TELA ya NO se recibe desde aquí. Se
@@ -620,6 +780,7 @@ export async function recibirCompra(
             ...datosCreacion(sesion),
           },
         });
+        renglonesCobrados.push({ cantidad: lineaEntrada.cantidad, precio });
         materialesEvento.push({
           tipo: 'avio',
           id: ocl.idAvio,
@@ -635,15 +796,20 @@ export async function recibirCompra(
             `El renglón ${ocl.id} es una línea LIBRE (no es material de catálogo): no lleva color de tela.`,
           );
         }
-        // ── LIBRE: no es material de catálogo → NO mueve kardex. Solo se registra la cantidad.
+        // ── LIBRE: no es material de catálogo → NO mueve kardex. Se registra la cantidad y,
+        // desde la fila 0.129, TAMBIÉN su precio: un renglón libre (un flete, una maquila suelta)
+        // no se inventaría pero SÍ se paga, así que tiene que pesar en la cuenta por pagar. Antes
+        // el precio se perdía y la deuda nacía más chica que lo que de verdad llegó.
         await tx.recepcionCompraLinea.create({
           data: {
             idRecepcionCompra: recepcion.id,
             idOrdenCompraLinea: ocl.id,
             cantidadRecibida: lineaEntrada.cantidad,
+            costoUnit: precio,
             ...datosCreacion(sesion),
           },
         });
+        renglonesCobrados.push({ cantidad: lineaEntrada.cantidad, precio });
         materialesEvento.push({
           tipo: 'libre',
           id: null,
@@ -662,11 +828,66 @@ export async function recibirCompra(
       lineas: oc.lineas.map(aLineaParaEstatus),
     });
 
+    // ⭐⭐ FILA 0.129 — LA MISMA ENTRADA ALIMENTA EL INVENTARIO **Y** EL ESTADO DE CUENTA.
+    //
+    // Daniel (§Post-F9.192): *"es la misma entrada que se ocupa tanto para inventario como para su
+    // estado de cuenta"* · *"lo ideal es recibir con la factura. Pero si no fuera el caso, está
+    // bien dejarla como pendiente. Todo se recibe a partir de la OC. Tanto telas como avíos"*.
+    //
+    // La REGLA (los cuatro casos y el cerrojo del RFC) es la MISMA que la de la entrada de tela y
+    // vive en un solo sitio: `terceros/cargo-de-entrada.ts`. Por esta puerta NUNCA hay CFDI —los
+    // avíos no sellan XML aquí; su factura electrónica se importa en Finanzas—, así que en la
+    // práctica se resuelve en dos: proveedor que NO factura ⇒ cargo NO FISCAL inmediato; proveedor
+    // que factura (o sin definir) ⇒ no nace cargo y la recepción queda como *factura pendiente*.
+    //
+    // PERMISO: se usa la variante INTERNA del motor de terceros (§Post-F9.15 punto (a)): quien
+    // recibe tiene `compras.recibir` y el cargo nace como CONSECUENCIA de ese acto ya autorizado.
+    // Exigirle `terceros.administrar` obligaría a Finanzas a recapturar a mano cada entrada.
+    //
+    // IDEMPOTENCIA: la recepción se acaba de crear en ESTA transacción, así que su id es nuevo y no
+    // puede existir otro cargo con `refTipo`/`refId` apuntándole. Recibir dos veces contra la misma
+    // OC son DOS recepciones — dos hechos distintos — y cada una trae su propio cargo.
+    const importeACobrar = importeDeRecepcion(renglonesCobrados);
+    const cargo = cargoDeEntradaDeProveedor({
+      proveedor: {
+        id: oc.idProveedor,
+        nombre: oc.proveedor.nombre,
+        rfc: oc.proveedor.rfc,
+        modalidadFacturacion: oc.proveedor.modalidadFacturacion,
+      },
+      fecha: datos.fecha,
+      refTipo: REF_RECEPCION_COMPRA,
+      refId: recepcion.id,
+      folio: Number(folio),
+      // Recibir SIN el papel del proveedor está permitido (la mercancía ya llegó): el cargo se
+      // registra igual y lo dice, en vez de perderse por no tener número. Vacío cuenta como
+      // ausente: un número en blanco dejaría la observación con un hueco en medio.
+      numeroDocumento:
+        datos.factura === null || datos.factura === undefined || datos.factura === ''
+          ? '(sin documento)'
+          : datos.factura,
+      etiqueta: 'Recepción de compra',
+      cfdi: null,
+      importeCapturado: importeACobrar,
+    });
+    const idMovimientoTercero =
+      cargo === null ? null : (await registrarMovimientoTerceroInterno(sesion, cargo, { tx })).id;
+
     await registrarBitacora(tx, sesion, {
       entidad: 'RecepcionCompra',
       idEntidad: recepcion.id,
       accion: 'CREAR',
-      datos: { folio: Number(folio), idOrdenCompra: oc.id, renglones: datos.lineas.length },
+      datos: {
+        folio: Number(folio),
+        idOrdenCompra: oc.id,
+        renglones: datos.lineas.length,
+        // A7 — fila 0.129: cuánto se le va a deber, con qué cargo, y QUÉ PRECIOS se corrigieron
+        // (los dos números: el de la OC y el que se recibió). Un precio cambiado a mano sin rastro
+        // es exactamente lo que después nadie puede explicar.
+        importe: Math.round(importeACobrar * 100) / 100,
+        idMovimientoTercero,
+        ...(preciosCorregidos.length === 0 ? {} : { preciosCorregidos }),
+      },
     });
 
     // OUTBOX (ADR-0011): el evento se escribe en la MISMA tx que el hecho de negocio (atómico).
@@ -1058,6 +1279,7 @@ export async function reversarRecepcion(
       where: { id: idRecepcion, idEmpresa },
       select: {
         id: true,
+        folio: true,
         idOrdenCompra: true,
         reversadaEn: true,
         lineas: { select: { id: true, idMovimiento: true } },
@@ -1089,6 +1311,30 @@ export async function reversarRecepcion(
       }
     }
 
+    // ⭐⭐ FILA 0.129 — y la CUENTA POR PAGAR que nació al recibir se cancela por su INVERSO
+    // auditado (D3: nunca se edita ni se borra), exactamente igual que en `cancelarEntradaTela`. Si
+    // no se hiciera, quedaría un cargo vivo de una recepción reversada: le deberíamos al proveedor
+    // un material que se devolvió. El filtro (no cancelado, no es un inverso) hace el reverso
+    // idempotente frente a un cargo que Finanzas ya hubiera cancelado a mano.
+    const cargo = await tx.movimientoTercero.findFirst({
+      where: {
+        idEmpresa,
+        refTipo: REF_RECEPCION_COMPRA,
+        refId: idRecepcion,
+        cancelado: false,
+        idMovimientoInverso: null,
+      },
+      select: { id: true },
+    });
+    if (cargo !== null) {
+      await cancelarMovimientoTerceroInterno(
+        sesion,
+        cargo.id,
+        { motivo: `Reverso de la recepción ${Number(recepcion.folio)}: ${datos.motivo}` },
+        { tx },
+      );
+    }
+
     // Marca la recepción como reversada (SUAVE — nada se borra, A7).
     await tx.recepcionCompra.update({
       where: { id: idRecepcion },
@@ -1106,6 +1352,8 @@ export async function reversarRecepcion(
       datos: {
         motivo: datos.motivo,
         movimientosInvertidos: recepcion.lineas.filter((l) => l.idMovimiento !== null).length,
+        // A7 — fila 0.129: si había cargo, queda dicho cuál se canceló.
+        cargoCancelado: cargo?.id ?? null,
       },
     });
 
@@ -1184,7 +1432,15 @@ export async function listarRecepcionesDeOC(
     include: incluirRecepcion,
     orderBy: { folio: 'asc' },
   });
-  return { recepciones: recepciones.map(aRecepcionSalida) };
+  // Fila 0.129: los cargos de TODAS de un viaje (nada de una consulta por fila).
+  const cargos = await cargosDeRecepciones(
+    clienteLectura(bd),
+    idEmpresa,
+    recepciones.map((r) => r.id),
+  );
+  return {
+    recepciones: recepciones.map((r) => aRecepcionSalida(r, cargos.get(r.id) ?? null)),
+  };
 }
 
 /** Obtiene una recepción por id (de la empresa activa). Permiso `compras.ver`. */

@@ -87,10 +87,30 @@ export const esquemaRecepcionLineaEntrada = z
       .number({ error: 'La cantidad recibida es obligatoria' })
       .positive({ error: 'La cantidad recibida debe ser mayor que 0' })
       .describe(
-        'Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1). En TELA es ' +
-          'el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento ' +
-          '(se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de ' +
-          'entrada por factura/remisión (B1), que sí admite cuerpo 0.',
+        'Cantidad recibida en UNIDAD DE CONSUMO, la misma de la línea de OC (§Post-F9.97): no se ' +
+          'convierte nada. En TELA es el CUERPO y debe ser > 0: por esta vía NO se recibe una ' +
+          'entrega de SOLO complemento (se recibe contra lo pedido en la OC, que es cuerpo) — ese ' +
+          'caso va por el documento de entrada por factura/remisión (B1), que sí admite cuerpo 0.',
+      ),
+    /**
+     * ⭐⭐ FILA 0.129 — EL PRECIO CON EL QUE NACE LA DEUDA. Daniel (§Post-F9.192): *"la persona que
+     * recibe mete las cantidades y precios… **el precio debería de ser el de la OC**, la cantidad
+     * puede variar un poco, por eso se mete a mano"*.
+     *
+     * Si NO viene, manda el precio del renglón de OC (que es lo normal y lo que la pantalla
+     * precarga). Si viene DISTINTO se acepta —no se bloquea: el proveedor a veces manda otro precio
+     * y quien recibe es quien lo sabe—, se guarda en el renglón, va al kardex como costo (D1) y
+     * queda en la BITÁCORA junto al de la OC, para que la corrección se pueda auditar.
+     */
+    precioUnit: z
+      .number()
+      .nonnegative({ error: 'El precio no puede ser negativo' })
+      .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, {
+        error: 'El precio va con dos decimales como máximo',
+      })
+      .optional()
+      .describe(
+        'Precio por unidad de consumo con el que se recibe. Si se omite, el de la línea de OC.',
       ),
     telaColor: esquemaRecepcionTelaColorEntrada
       .optional()
@@ -147,6 +167,44 @@ export const esquemaRecepcionReversarCuerpo = z.object({
 /** Datos validados del cuerpo de reversar. */
 export type DatosRecepcionReversar = z.infer<typeof esquemaRecepcionReversarCuerpo>;
 
+/**
+ * ⭐⭐ FILA 0.129 — CÓMO QUEDÓ LA DEUDA de una recepción. Daniel (§Post-F9.192): *"lo ideal es
+ * recibir con la factura. Pero si no fuera el caso, está bien dejarla como pendiente"*.
+ *
+ *  • `cargo-no-fiscal`   — el proveedor NO factura: el cargo YA nació y está en su estado de cuenta.
+ *  • `factura-pendiente` — hay importe pero todavía no hay cargo: la deuda nacerá cuando se importe
+ *    el CFDI en Finanzas (mismo trato que la entrada de tela). ⚠️ Es también lo que se lee en las
+ *    recepciones ANTERIORES a esta fila, que nunca generaron cargo: describe lo que HAY, no lo que
+ *    hoy habría pasado (REGLA 0-B — lo viejo no se repara).
+ *  • `sin-importe`       — no hay nada que cobrar (renglones sin precio, o todo a 0).
+ *  • `en-entrada-de-tela` — la recepción la generó un documento de ENTRADA DE TELA por factura
+ *    (§Post-F9.14): su deuda vive ALLÁ, con su CFDI y su complemento, no aquí. Decirlo evita el
+ *    peor error de esta pantalla: creer que a esa factura le falta un cargo y capturarlo dos veces.
+ *  • `cancelada`         — la recepción se reversó (o su cargo se canceló en Finanzas): **ya no se
+ *    debe nada por ella**. `idMovimientoTercero` SIGUE apuntando al cargo que nació —es la traza
+ *    del reverso, D3—, pero la deuda está neteada por su inverso.
+ *
+ * ⚠️ QUIÉN DECIDE ESTO ES EL SERVIDOR, no la pantalla (hallazgo de la revisión de la 0.129). El
+ * campo decía `cargo-no-fiscal` en una recepción ya reversada y era el frontend el que lo tapaba
+ * («si está reversada, no pintes la etiqueta»): la regla vivía en la UI, así que cualquier otro
+ * consumidor del API —un reporte, otra pantalla, un export— leía una deuda que ya no existe.
+ */
+export const CLASES_DEUDA_RECEPCION = [
+  'cargo-no-fiscal',
+  'factura-pendiente',
+  'sin-importe',
+  'en-entrada-de-tela',
+  'cancelada',
+] as const;
+
+/** Cómo quedó la deuda de una recepción. Ver {@link CLASES_DEUDA_RECEPCION}. */
+export const esquemaDeudaRecepcion = z
+  .enum(CLASES_DEUDA_RECEPCION)
+  .describe('Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).');
+
+/** Clave de la clase de deuda de una recepción. */
+export type ClaseDeudaRecepcion = (typeof CLASES_DEUDA_RECEPCION)[number];
+
 // ── Salidas ──────────────────────────────────────────────────────────────────────────────────────
 
 /** Renglón de una recepción en la salida (con nombres y la traza al renglón de OC). */
@@ -174,7 +232,25 @@ export const esquemaRecepcionLineaSalida = z
       .number()
       .nullable()
       .describe('Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null.'),
-    costoUnit: z.number().nullable().describe('Costo por unidad de consumo, o null.'),
+    costoUnit: z
+      .number()
+      .nullable()
+      .describe(
+        'Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se ' +
+          'corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda.',
+      ),
+    precioOc: z
+      .number()
+      .describe(
+        '⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con ' +
+          'el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC.',
+      ),
+    precioDistintoOc: z
+      .boolean()
+      .describe(
+        '⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien ' +
+          'recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números.',
+      ),
     idTelaColor: z.number().int().nullable().describe('Color de tela recibido (B1), o null.'),
     telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
     idPartida: z.number().int().nullable().describe('Partida creada (telas, B1), o null.'),
@@ -215,6 +291,23 @@ export const esquemaRecepcionSalida = z
     reversadaEn: z.iso.datetime().nullable().describe('Fecha del reverso (ISO), o null.'),
     reversadaPorId: z.string().nullable().describe('Usuario que reversó, o null.'),
     motivoReverso: z.string().nullable().describe('Motivo del reverso, o null.'),
+    importe: z
+      .number()
+      .describe(
+        '⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × ' +
+          'precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las ' +
+          'recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: ' +
+          'la deuda de verdad (con complemento e impuestos) vive en ese documento.',
+      ),
+    idMovimientoTercero: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        '⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue ' +
+          'apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3).',
+      ),
+    deuda: esquemaDeudaRecepcion,
     lineas: z.array(esquemaRecepcionLineaSalida).describe('Renglones recibidos.'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que la creó.'),

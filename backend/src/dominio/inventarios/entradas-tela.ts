@@ -66,7 +66,6 @@ import {
   esquemaEntradaTelaActualizar,
   esquemaEntradaTelaCancelarCuerpo,
   esquemaEntradasTelaQuery,
-  type esquemaMovimientoTerceroCrear,
   type DatosEntradaTelaCrear,
   type EntradaTelaLineaSalida,
   type EntradaTelaSalida,
@@ -113,19 +112,22 @@ import {
 } from './partidas-telas.js';
 import { aDateColumna, aNumero, tipoPorCodigo } from './telas.js';
 import {
-  exigirRfcDelProveedor,
   exigirSelloCompatibleConProveedor,
   exigirUuidLibreEnEntradas,
   sellarCfdiEnEntrada,
   type SelloCfdi,
 } from './cfdi-entrada-tela.js';
-import { normalizarRfc } from '../terceros/cfdi/parser-cfdi.js';
 import { uuidYaImportado } from '../terceros/cfdi/cfdi-comun.js';
 import {
   cancelarMovimientoTerceroInterno,
   registrarMovimientoTerceroInterno,
 } from '../terceros/cuenta-terceros.js';
-import { exigirProveedorQueFactura, modalidadFactura } from '../terceros/facturacion-proveedor.js';
+import { exigirProveedorQueFactura } from '../terceros/facturacion-proveedor.js';
+import {
+  cargoDeEntradaDeProveedor,
+  REF_ENTRADA_TELA,
+  type CargoDeEntrada,
+} from '../terceros/cargo-de-entrada.js';
 
 /**
  * QUÉ HACER cuando el folio fiscal ya está ocupado en Cuentas por pagar. Es UNA sola frase, usada
@@ -149,11 +151,6 @@ const SALIDA_UUID_CONSUMIDO =
   'Ese folio fiscal ya quedó consumido y cancelar el movimiento en Finanzas NO lo libera. Para ' +
   'recibir la tela: CANCELA este borrador y vuelve a capturarlo SIN el XML (como remisión/captura ' +
   'a mano) — la deuda con el proveedor ya está registrada en Finanzas, así que no se pierde nada.';
-
-/** Origen del cargo de CxP que nace al confirmar una entrada con su CFDI (§Post-F9.21). */
-const ORIGEN_FACTURA_PROVEEDOR = 'factura_proveedor';
-/** Discriminador de la operación ligada al cargo: la entrada de tela que lo originó. */
-const REF_ENTRADA_TELA = 'entrada-tela';
 
 /** Clave de la secuencia de folios del documento de entrada (A3 — por empresa, jamás Max()+1). */
 export const CLAVE_SECUENCIA_ENTRADA_TELA = 'entrada-tela';
@@ -834,87 +831,26 @@ interface DocumentoParaCxP {
 }
 
 /**
- * ¿QUÉ CUENTA POR PAGAR nace al confirmar esta entrada? Los dos tipos de proveedor de Daniel
- * (§Post-F9.22) se contestan aquí, en un solo lugar:
+ * ¿QUÉ CUENTA POR PAGAR nace al confirmar esta entrada? La REGLA (los cuatro casos de Daniel y el
+ * cerrojo del RFC del emisor) vive en `terceros/cargo-de-entrada.ts` desde la fila 0.129, porque la
+ * comparten las DOS puertas por las que entra mercancía de un proveedor: esta (tela por
+ * factura/remisión) y la recepción de avíos contra la OC. Aquí sólo queda lo que es PROPIO de la
+ * tela: de dónde sale el importe capturado a mano.
  *
- *  • **Proveedor que FACTURA, con su CFDI capturado** → cargo **FISCAL** por el TOTAL del
- *    comprobante (con impuestos — NO la suma de renglones, que va sin IVA), respaldado con el XML.
- *  • **Proveedor que FACTURA, sin CFDI todavía** (llegó con remisión y la factura viene después) →
- *    NO se inventa cargo: se registrará con la factura, que es la que trae el importe bueno.
- *  • **Proveedor que NO factura** → nunca va a haber CFDI, así que esperar la factura sería no
- *    registrarle NUNCA la deuda. El cargo nace **NO FISCAL** por lo capturado a mano: la suma de
- *    cantidad×precio del cuerpo y del complemento. Sin IVA que sumar, esa suma ES lo que se le debe.
- *  • **Proveedor sin la modalidad definida** (los migrados de Access) → se trata como los que
- *    facturan: se espera su CFDI. Nada se inventa sobre un dato que nadie capturó.
+ * EL IMPORTE DE LA TELA = Σ (cuerpo × su precio) + (complemento × SU precio). El cardigan tiene
+ * precio propio (§Post-F9.11), así que un renglón de solo complemento también suma. Un renglón sin
+ * precio capturado aporta 0 — y si el documento entero suma menos de un centavo, no nace cargo (lo
+ * decide el módulo compartido, que es el que exige el mínimo del motor de terceros).
  *
- * Devuelve `null` cuando no hay nada que cobrar. En particular, un documento sin precios capturados
- * da importe 0 y NO genera cargo: registrar una deuda de cero sería ruido, y el motor de terceros
- * exige importe ≥ 0.01. Queda visible en el documento (los renglones sin precio se ven), no callado.
+ * ⭐ FILA 0.124 — QUIÉN CONTESTA "¿este proveedor factura?": `modalidadFacturacion`, y sólo ella
+ * (vía `emiteFactura`). La casilla `Proveedor.factura` quedó retirada como verdad; aquí se pasa la
+ * modalidad tal cual y el módulo compartido la interpreta.
  */
 function cargoDeCuentaPorPagar(
   documento: DocumentoParaCxP,
   idEntrada: number,
-): z.input<typeof esquemaMovimientoTerceroCrear> | null {
-  const fecha = documento.fecha.toISOString().slice(0, 10);
-  const comun = {
-    tipoTercero: 'proveedor',
-    idTercero: documento.idProveedor,
-    fecha,
-    origen: ORIGEN_FACTURA_PROVEEDOR,
-    refTipo: REF_ENTRADA_TELA,
-    refId: idEntrada,
-  } as const;
-
-  if (documento.uuidCfdi !== null && documento.totalCfdi !== null) {
-    // ÚLTIMO CERROJO antes de escribir un cargo FISCAL (A4, deny-by-default): el cargo viaja con el
-    // RFC del EMISOR como `rfcTercero`, así que el proveedor al que se le va a deber tiene que ser
-    // ese mismo. Las dos puertas de captura ya lo exigen (`sellarCfdiEnEntrada` al subir el XML y
-    // `exigirSelloCompatibleConProveedor` al editar el borrador); esto es la red por si mañana
-    // apareciera un tercer camino que selle un CFDI — un cargo fiscal a nombre de quien no facturó
-    // no se puede corregir: el UUID queda consumido para siempre.
-    // Y la red FALLA CERRADA (revisión del 11-ago-2026): si el cargo es fiscal pero no se sabe QUÉ
-    // RFC lo emitió, no hay nada que comparar — y una comprobación que no puede comprobar no debe
-    // dejar pasar (A4, deny-by-default). Hoy es inalcanzable (`rfcCfdi === null ⇒ totalCfdi === null`
-    // porque los dos los escribe el mismo sello), pero condicionar la validación a que el RFC exista
-    // convertía la última red en un colador el día que ese invariante se rompiera.
-    if (documento.rfcCfdi === null) {
-      throw new ErrorValidacion(
-        `La entrada ${String(documento.folio)} trae el total de la factura (UUID ${documento.uuidCfdi}) ` +
-          `pero no el RFC de quien la emitió: no se puede confirmar un cargo fiscal sin saber a ` +
-          `nombre de quién nace. Vuelve a subir el XML de la factura en el borrador.`,
-      );
-    }
-    const rfcProveedor = exigirRfcDelProveedor(
-      documento.proveedor,
-      'confirmar la entrada con su factura (CFDI)',
-    );
-    if (normalizarRfc(rfcProveedor) !== normalizarRfc(documento.rfcCfdi)) {
-      throw new ErrorValidacion(
-        `La factura de esta entrada la emitió el RFC ${documento.rfcCfdi}, pero el documento ` +
-          `está a nombre del proveedor "${documento.proveedor.nombre}" (RFC ${rfcProveedor}): ` +
-          `la cuenta por pagar nacería a nombre de quien no facturó.`,
-      );
-    }
-    return {
-      ...comun,
-      importe: documento.totalCfdi.toNumber(),
-      esFiscal: true,
-      uuidCfdi: documento.uuidCfdi,
-      // El RFC del EMISOR viaja al cargo igual que en una importación de CFDI de F9: es lo que el
-      // reporte fiscal del contador imprime. Sin él, la misma factura se veía distinta según por
-      // dónde hubiera entrado (con RFC desde Finanzas, con "—" desde el almacén de telas). Aquí ya
-      // no puede faltar: el cerrojo de arriba truena si es null.
-      rfcTercero: documento.rfcCfdi,
-      ...(documento.idArchivoCfdi === null ? {} : { idArchivoCfdi: documento.idArchivoCfdi }),
-      observaciones: `Entrada de tela ${String(documento.folio)} · factura ${documento.numeroDocumento}`,
-    };
-  }
-
-  if (modalidadFactura(documento.proveedor.modalidadFacturacion) !== 'sin-factura') {
-    return null;
-  }
-
-  const importe = documento.lineas.reduce((suma, l) => {
+): CargoDeEntrada | null {
+  const importeCapturado = documento.lineas.reduce((suma, l) => {
     const cuerpo = l.precioUnit === null ? 0 : l.cantidad.toNumber() * l.precioUnit.toNumber();
     const complemento =
       l.cantidadComplemento === null || l.precioUnitComplemento === null
@@ -922,18 +858,33 @@ function cargoDeCuentaPorPagar(
         : l.cantidadComplemento.toNumber() * l.precioUnitComplemento.toNumber();
     return suma + cuerpo + complemento;
   }, 0);
-  // Se redondea a centavos: el importe vive en DECIMAL(14,2) y cantidad×precio puede traer cola.
-  const aPagar = Math.round(importe * 100) / 100;
-  if (aPagar < 0.01) return null;
 
-  return {
-    ...comun,
-    importe: aPagar,
-    esFiscal: false,
-    observaciones:
-      `Entrada de tela ${String(documento.folio)} · ${documento.numeroDocumento} · ` +
-      `proveedor sin factura (importe capturado a mano)`,
-  };
+  return cargoDeEntradaDeProveedor({
+    proveedor: {
+      id: documento.idProveedor,
+      nombre: documento.proveedor.nombre,
+      rfc: documento.proveedor.rfc,
+      modalidadFacturacion: documento.proveedor.modalidadFacturacion,
+    },
+    fecha: documento.fecha.toISOString().slice(0, 10),
+    refTipo: REF_ENTRADA_TELA,
+    refId: idEntrada,
+    folio: Number(documento.folio),
+    numeroDocumento: documento.numeroDocumento,
+    etiqueta: 'Entrada de tela',
+    // El camino FISCAL exige las dos mitades del sello (UUID + total): con una sola no se sabe ni
+    // cuánto se debe ni a nombre de quién, así que se cae a los casos de captura a mano.
+    cfdi:
+      documento.uuidCfdi === null || documento.totalCfdi === null
+        ? null
+        : {
+            uuid: documento.uuidCfdi,
+            total: documento.totalCfdi.toNumber(),
+            rfc: documento.rfcCfdi,
+            idArchivo: documento.idArchivoCfdi,
+          },
+    importeCapturado,
+  });
 }
 
 /**
