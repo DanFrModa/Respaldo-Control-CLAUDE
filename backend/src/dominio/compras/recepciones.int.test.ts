@@ -86,7 +86,10 @@ beforeEach(async () => {
     data: { idTela: telaFelpa.id, nombre: 'Rojo' },
   });
   avioBoton = await cliente.avio.create({ data: { clave: 'BOT-01', descripcion: 'Botón' } });
-  almacen = await cliente.almacen.create({ data: { nombre: 'Bodega', tipo: 'TELA' } });
+  // Fila 0.137 — la recepción de compra mete AVÍOS al kardex (la tela ya no se recibe por aquí,
+  // §Post-F9.14), así que su almacén destino tiene que ser de AVIO. Antes decía 'TELA' y pasaba:
+  // nadie verificaba el tipo.
+  almacen = await cliente.almacen.create({ data: { nombre: 'Bodega', tipo: 'AVIO' } });
   // §Post-F9.18: toda OC nueva exige dirección de entrega del catálogo.
   direccionEntrega = await cliente.direccionEntrega.create({
     data: { nombre: 'Bodega', direccion: 'Av. Siempre Viva 123', favorita: true },
@@ -583,7 +586,7 @@ describe('Recepción (F4-E3) — B1: el almacén destino se valida por empresa (
     const otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa');
     // Almacén PRIVADO de la otra empresa (idEmpresa != la empresa de la sesión).
     const almacenAjeno = await cliente.almacen.create({
-      data: { nombre: 'Bodega ajena', tipo: 'TELA', idEmpresa: otraEmpresa.id },
+      data: { nombre: 'Bodega ajena', tipo: 'AVIO', idEmpresa: otraEmpresa.id },
     });
     const oc = await ocAvioAutorizada(100, 1);
     const idLineaOC = oc.lineas[0]!.id;
@@ -608,7 +611,7 @@ describe('Recepción (F4-E3) — B1: el almacén destino se valida por empresa (
 
   it('almacén desactivado → rechazado', async () => {
     const almacenInactivo = await cliente.almacen.create({
-      data: { nombre: 'Bodega vieja', tipo: 'TELA', activo: false },
+      data: { nombre: 'Bodega vieja', tipo: 'AVIO', activo: false },
     });
     const oc = await ocAvioAutorizada(50, 1);
     const idLineaOC = oc.lineas[0]!.id;

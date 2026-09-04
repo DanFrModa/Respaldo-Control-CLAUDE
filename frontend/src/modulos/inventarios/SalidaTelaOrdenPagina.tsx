@@ -60,11 +60,13 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
   const [observaciones, setObservaciones] = useState('');
   const [renglones, setRenglones] = useState<RenglonTela[]>([]);
 
+  // Solo almacenes de TELA: la tela sale de una bodega de telas (fila 0.137).
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'TELA',
   });
   const crear = useSalidaTelaAOrden();
 

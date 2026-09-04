@@ -12136,6 +12136,20 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.194) — EL ALMACÉN DEL TIPO CORRECTO (fila 0.137, 4-sep-2026): dos decisiones tomadas solas, con default, y una precondición de despliegue
+
+Del repaso de inventarios (§Post-F9.193, «otras cosas»): *nadie verifica que el almacén sea del tipo correcto*. Al construirlo se midió que **ninguno de los once escritores del dominio validaba el tipo** — ni uno — y salieron tres cosas que el encargo no fijaba:
+
+1. **Cambiar el tipo de un almacén que ya tiene movimientos se rechaza.** Sin esto la regla era adorno (cambiar el tipo, guardar, regresarlo) y dejaría mercancía en un almacén cuyo tipo dice otra cosa. Sin movimientos sí se corrige (el caso legítimo). Mensaje: *«desactívalo y da de alta otro almacén con el tipo correcto»*. **Default: así se queda.**
+2. **La recepción de compra con renglones libres** (servicios, cosas que no van al inventario) comparte el almacén del encabezado, que ahora se exige de avíos. Si algún día se quisiera recibir servicios contra otro almacén, la salida es un almacén por renglón, no relajar la regla. **Default: así se queda.**
+3. ⚠️ **PRECONDICIÓN: no existe ningún almacén de avíos.** Ni el seed de instalación (siembra tres de producto terminado) ni la migración de Access (que mapea los almacenes viejos a producto terminado o telas) crean uno. Si en `prueba` los avíos se mueven en un almacén tipado como telas, **ajuste/traspaso de avíos, recepción de compra y notas de salida empezarán a rechazar** con el mensaje de la regla. **Resuelto con el default (REGLA 0-B, lo viejo se tira, no se arregla) — el reviewer lo puso como bloqueante y con razón:** el seed crea de forma idempotente **un** almacén global «Almacén de avíos» activo de tipo AVIO (uno, no tres: el negocio no separa avíos por bodega), y de aquí en adelante se usa ése; el almacén viejo se deja como está, y si aún no tiene movimientos se le puede corregir el tipo desde Administración › Almacenes. Los diez desplegables de almacén quedaron filtrados por tipo en la misma versión. ⇒ **El deploy de esta versión requiere `SEED_ON_START=true`.** Daniel puede renombrar el almacén; lo que no se hace es auditar ni migrar los avíos que hoy cuelguen de un almacén de telas.
+
+Donde NO se puso la regla, a propósito: las **cancelaciones** (el inverso es el mecanismo de corrección, D3, y hereda el almacén del original) y el **ETL** (relaja validaciones por diseño). **Producción** (recibo de maquila, entrega al cliente, envío de prendas terminadas —que ya lo hacía a mano en un solo flujo—) va en una segunda pasada al cerrar la 0.109.
+
+- **Aplica en:** la versión que cierra la fila 0.137. **Fecha:** 2026-09-04.
+
+---
+
 #### (Post-F9.193) — LAS DOCE RESPUESTAS DEL REPASO DE INVENTARIOS, textuales, y su mapa contra las filas (Daniel, 4-sep-2026, madrugada)
 
 Daniel pegó el **Repaso de Inventarios** del 2-sep (fila 0.096: cuatro cosas graves, lo que el Access hacía y aquí no está, ocho cosas flojas y doce decisiones con default) y debajo su respuesta: *«**Todo está correcto**… excepto la 11, sí quiero que haya un lugar donde está ubicado. Principalmente para telas y avíos, pero podríamos dejarlo también para producto terminado.»* Y sobre la 12: *«debería de haber manera de sacar por ejemplo una devolución, o una venta de avíos que ya no se usen, de alguna manera que no sea mediante la descarga o aplicación a una OP. Esto **autorizado siempre por mí**. Lo mismo en telas… el 99 % sale por medio de una OP pero deberíamos de tener la opción de sacar alguna venta o cualquier otra cosa.»* Con §Post-F9.190, **inventarios entra completo en la V1** («a fuerzas»). Se cruzó todo contra las filas 0.099–0.104: **ocho decisiones ya tenían fila; cuatro cosas no y ahora la tienen (0.136–0.139)**.

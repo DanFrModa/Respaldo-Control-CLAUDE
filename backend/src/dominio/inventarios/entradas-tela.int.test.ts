@@ -278,6 +278,30 @@ describe('Entrada de tela (B1) — captura en borrador y folio atómico (A3/A9)'
     expect(await cliente.entradaTela.count()).toBe(0);
   });
 
+  /**
+   * Fila 0.137 — la entrada de tela por factura/remisión es LA puerta de la tela desde §Post-F9.14.
+   * Hasta esta fila su almacén destino solo se validaba por empresa/activo: un almacén de PRODUCTO
+   * TERMINADO pasaba y la tela quedaba "existiendo" en la bodega de prendas.
+   */
+  it('un almacén de PT como destino se rechaza: la tela va a un almacén de TELA', async () => {
+    const bodegaPt = await cliente.almacen.create({ data: { nombre: 'Primeras', tipo: 'PT' } });
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A-9',
+          idProveedor: proveedor.id,
+          fecha: '2026-08-06',
+          idAlmacen: bodegaPt.id,
+          lineas: [{ idTelaColor: colorMarino.id, cantidad: 10, idOrdenCompraLinea: lineaOcFelpa }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Primeras" es de producto terminado; este movimiento es de telas/);
+    expect(await cliente.entradaTela.count()).toBe(0);
+  });
+
   it('un almacén desactivado se rechaza (A9/B1)', async () => {
     const inactivo = await cliente.almacen.create({
       data: { nombre: 'Bodega vieja', tipo: 'TELA', activo: false },

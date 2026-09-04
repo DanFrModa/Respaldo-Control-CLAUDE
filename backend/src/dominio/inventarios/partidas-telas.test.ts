@@ -351,7 +351,12 @@ function clienteEspia(
       return Promise.resolve(1);
     },
     telaColor: { findMany: () => Promise.resolve([...coloresEspia]) },
-    almacen: { findUnique: () => Promise.resolve({ nombre: 'Bodega A' }) },
+    // El almacén sale ACTIVO, GLOBAL y de TELA: el conteo pasa por `exigirAlmacenDelTipo`
+    // (fila 0.137) antes de tocar nada, y este espía no está probando ese guard.
+    almacen: {
+      findUnique: () =>
+        Promise.resolve({ nombre: 'Bodega A', activo: true, idEmpresa: null, tipo: 'TELA' }),
+    },
   };
   return {
     tx: doble as unknown as Tx,

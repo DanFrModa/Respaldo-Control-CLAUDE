@@ -91,7 +91,14 @@ export function DialogoEditarNota({
   const esEdicion = nota !== undefined;
 
   // ── Catálogos para los selectores. ───────────────────────────────────────────
-  const almacenes = useAlmacenes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
+  // Solo almacenes de AVIO: la nota de salida es SOLO de avíos (§Post-F9.38) y el dominio exige
+  // que su almacén origen sea de ese tipo (fila 0.137).
+  const almacenes = useAlmacenes({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    tipo: 'AVIO',
+  });
   const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────

@@ -154,6 +154,52 @@ describe('CRUD patrón Almacenes (PLANMAESTRO §6 F0)', () => {
       });
     });
 
+    /**
+     * Fila 0.137 — el tipo del almacén es la regla que decide qué se puede mover a cada bodega
+     * (`exigirAlmacenDelTipo`). Si se pudiera cambiar con movimientos adentro, la regla sería puro
+     * adorno (cambiar el tipo → guardar → regresarlo) y la mercancía ya guardada quedaría en un
+     * almacén cuyo tipo dice otra cosa. Sin movimientos SÍ se corrige (test de arriba).
+     */
+    it('NO deja cambiar el tipo si el almacén ya tiene movimientos de kardex', async () => {
+      const sesion = sesionAdmin();
+      const almacen = await crearAlmacen(sesion, { nombre: 'Primeras', tipo: 'PT' }, bd());
+      const tipoMov = await cliente.tipoMovimientoInventario.create({
+        data: { codigo: 'inventario-inicial', nombre: 'Inventario Inicial', direccion: 'entrada' },
+      });
+      await cliente.movimiento.create({
+        data: {
+          folio: 1n,
+          idEmpresa: empresa.id,
+          idTipoMov: tipoMov.id,
+          idAlmacen: almacen.id,
+          fecha: new Date('2026-06-20T00:00:00.000Z'),
+          origenTipo: 'movimiento-manual',
+          idUsuario: 'usuario-prueba',
+          creadoPorId: 'usuario-prueba',
+          modificadoPorId: 'usuario-prueba',
+        },
+      });
+
+      await expect(
+        actualizarAlmacen(sesion, { id: almacen.id, tipo: 'TELA' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+      await expect(
+        actualizarAlmacen(sesion, { id: almacen.id, tipo: 'TELA' }, bd()),
+      ).rejects.toThrow(/"Primeras" ya tiene movimientos de inventario de producto terminado/);
+
+      // El almacén quedó como estaba (el rechazo es antes de escribir).
+      const vivo = await cliente.almacen.findUniqueOrThrow({ where: { id: almacen.id } });
+      expect(vivo.tipo).toBe('PT');
+
+      // Lo que NO toca el tipo sigue pasando aunque haya movimientos: renombrar y desactivar.
+      const renombrado = await actualizarAlmacen(
+        sesion,
+        { id: almacen.id, nombre: 'Primeras MJD' },
+        bd(),
+      );
+      expect(renombrado.nombre).toBe('Primeras MJD');
+    });
+
     it('sin cambio real es idempotente: no escribe bitácora', async () => {
       const sesion = sesionAdmin();
       const almacen = await crearAlmacen(sesion, { nombre: 'Bodega', tipo: 'PT' }, bd());

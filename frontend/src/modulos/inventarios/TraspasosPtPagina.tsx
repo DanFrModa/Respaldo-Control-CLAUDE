@@ -68,11 +68,13 @@ export function TraspasosPtPagina(): React.JSX.Element {
   // §Post-F9.40 — de qué ORDEN salen las piezas que se traspasan. `SIN_ORDEN` = bucket «sin orden».
   const [ordenBucket, setOrdenBucket] = useState<string>(SIN_ORDEN);
 
+  // Solo almacenes de PT: los DOS extremos del traspaso tienen que serlo (fila 0.137).
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'PT',
   });
   const colores = useColores({
     pagina: 1,

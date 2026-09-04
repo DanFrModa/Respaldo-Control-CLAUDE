@@ -92,7 +92,7 @@ import type { Prisma } from '../../datos/index.js';
 import { EstatusOrdenCompra } from '../../datos/index.js';
 import { z } from 'zod';
 
-import { exigirAlmacen } from '../../comun/almacenes.js';
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -522,7 +522,11 @@ export async function recibirCompra(
     }
     // B1/A9: el almacén destino debe existir, estar activo y ser global o de esta empresa (un
     // almacén privado de otra empresa, para esta sesión, no existe). ANTES de cualquier escritura.
-    await exigirAlmacen(tx, datos.idAlmacen, idEmpresa);
+    // Fila 0.137 — y ser de AVIO: desde §Post-F9.14 la TELA ya NO se recibe por aquí (se rechaza
+    // renglón por renglón más abajo), así que lo ÚNICO que esta puerta mete al kardex son avíos.
+    // Los renglones LIBRES no mueven inventario, pero viven en el mismo documento: el almacén del
+    // encabezado es uno solo y se pide del tipo de lo que sí se inventaría.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'AVIO', idEmpresa);
 
     const lineasPorId = new Map(oc.lineas.map((l) => [l.id, l]));
     // Un renglón de OC no se puede recibir dos veces EN LA MISMA recepción (sería ambiguo).

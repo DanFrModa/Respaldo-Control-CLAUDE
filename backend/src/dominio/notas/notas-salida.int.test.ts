@@ -58,6 +58,11 @@ let modeloId: number;
 let ordenId: number;
 let colorRojo: Color;
 let almacen: Almacen;
+/**
+ * Almacén de TELA (fila 0.137): la nota de salida vive en un almacén de AVÍOS, pero la tela que
+ * algunos casos referencian sale de un almacén de TELA — el dominio ya no acepta que sea el mismo.
+ */
+let almacenTela: Almacen;
 let telaFelpa: Tela;
 let avioBoton: Avio;
 let loteRojo: Lote;
@@ -78,10 +83,10 @@ async function existenciaAvio(idAvio: number): Promise<number> {
   return cliente.$transaction((tx) => existenciaAvioBloqueada(tx, empresa.id, almacen.id, idAvio));
 }
 
-/** Existencia de una tela/lote en el almacén (Σ movimientos, D3). */
+/** Existencia de una tela/lote en el almacén DE TELA (Σ movimientos, D3). */
 async function existenciaTela(idTela: number, idLote: number): Promise<number> {
   return cliente.$transaction((tx) =>
-    existenciaTelaBloqueada(tx, empresa.id, almacen.id, idTela, idLote),
+    existenciaTelaBloqueada(tx, empresa.id, almacenTela.id, idTela, idLote),
   );
 }
 
@@ -119,6 +124,7 @@ beforeEach(async () => {
   clienteNegocioId = clienteNegocio.id;
   colorRojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
   almacen = await cliente.almacen.create({ data: { nombre: 'Bodega', tipo: 'AVIO' } });
+  almacenTela = await cliente.almacen.create({ data: { nombre: 'Naucalpan', tipo: 'TELA' } });
   telaFelpa = await cliente.tela.create({ data: { nombre: 'Felpa', unidadMedida: 'M' } });
   avioBoton = await cliente.avio.create({
     data: { clave: 'BOT-01', descripcion: 'Botón', unidad: 'pza' },
@@ -171,7 +177,7 @@ async function sembrarTela(cantidad: number): Promise<void> {
         folio,
         idEmpresa: empresa.id,
         idTipoMov: tipoEntrada.id,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: new Date('2026-06-21T00:00:00.000Z'),
         origenTipo: 'movimiento-manual',
         idUsuario: 'usuario-prueba',
@@ -494,7 +500,7 @@ describe('Notas de salida (V1-E3b) — el ALTA rechaza la TELA (§Post-F9.38)', 
       sesion(PERM_TELAS),
       {
         idOrden: ordenId,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: '2026-06-21',
         lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 200 }],
       },
@@ -533,7 +539,7 @@ describe('Notas de salida (V1-E3b) — el ALTA rechaza la TELA (§Post-F9.38)', 
       sesion(PERM_TELAS),
       {
         idOrden: ordenId,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: '2026-06-21',
         lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 100 }],
       },
@@ -644,7 +650,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       sesion(PERM_TELAS),
       {
         idOrden: ordenId,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: '2026-06-21',
         lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 200 }],
       },
@@ -693,7 +699,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       sesion(PERM_TELAS),
       {
         idOrden: ordenId,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: '2026-06-21',
         lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 120 }],
       },
@@ -738,7 +744,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       sesion(PERM_TELAS),
       {
         idOrden: ordenId,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: '2026-06-21',
         lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 100 }],
       },
@@ -804,7 +810,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       sesion(PERM_TELAS),
       {
         idOrden: ordenId,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: '2026-06-21',
         lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 150 }],
       },
@@ -844,7 +850,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       sesion(PERM_TELAS),
       {
         idOrden: ordenId,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: '2026-06-21',
         lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 200 }],
       },
@@ -888,7 +894,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       sesion(PERM_TELAS),
       {
         idOrden: ordenId,
-        idAlmacen: almacen.id,
+        idAlmacen: almacenTela.id,
         fecha: '2026-06-21',
         lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 100 }],
       },

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -83,8 +83,28 @@ const TIPOS_MOV_OK = {
   refetch: vi.fn(),
 };
 
+/**
+ * Catálogo de mentiras con LOS TRES tipos de almacén (fila 0.137). El mock de `useAlmacenes` filtra
+ * por el `tipo` que pide la pantalla: si la pantalla se olvidara de pedirlo, los tres saldrían en el
+ * desplegable y la prueba lo cazaría — que es justo lo que se quiere fijar, y no un
+ * `toHaveBeenCalledWith` que solo mira la consulta.
+ */
+const ALMACENES_TODOS = [
+  { id: 3, nombre: 'Primeras', tipo: 'PT' },
+  { id: 5, nombre: 'Naucalpan', tipo: 'TELA' },
+  { id: 7, nombre: 'Almacén de avíos', tipo: 'AVIO' },
+];
+
+/** Los del `tipo` pedido (o todos si la pantalla no filtra — el caso que la prueba caza). */
+function almacenesDelTipo(query: { tipo?: string } | undefined) {
+  const tipo = query?.tipo;
+  return tipo === undefined ? ALMACENES_TODOS : ALMACENES_TODOS.filter((a) => a.tipo === tipo);
+}
+
 vi.mock('@/api/almacenes', () => ({
-  useAlmacenes: () => ({ data: { datos: [{ id: 3, nombre: 'Primeras' }] } }),
+  useAlmacenes: (query: { tipo?: string } | undefined) => ({
+    data: { datos: almacenesDelTipo(query) },
+  }),
 }));
 vi.mock('@/api/colores', () => ({
   useColores: () => ({ data: { datos: [{ id: 7, nombre: 'Rojo' }] } }),
@@ -123,6 +143,22 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     useTiposMovimientoMock.mockReturnValue(TIPOS_MOV_OK);
     useExistenciasPtMock.mockReset();
     useExistenciasPtMock.mockImplementation(existenciasPorConsulta);
+  });
+
+  /**
+   * Fila 0.137 — el desplegable de almacenes sólo ofrece los de PT. El filtro lo aplica el SERVIDOR
+   * (la pantalla pide la lista ya acotada): si se olvidara, el mock devolvería los tres tipos y la
+   * bodega de telas aparecería aquí — el mismo cruce que el dominio ya rechaza con un 400.
+   */
+  it('el desplegable de almacenes SOLO ofrece los de PT (fila 0.137)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const selector = within(screen.getByTestId('mov-almacen'));
+    expect(selector.getByRole('option', { name: 'Primeras' })).toBeInTheDocument();
+    expect(selector.queryByRole('option', { name: 'Naucalpan' })).not.toBeInTheDocument();
+    expect(selector.queryByRole('option', { name: 'Almacén de avíos' })).not.toBeInTheDocument();
   });
 
   it('avisa (reintentable) si falla un catálogo de la captura', () => {

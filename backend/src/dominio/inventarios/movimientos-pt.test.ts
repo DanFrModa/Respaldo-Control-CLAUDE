@@ -211,3 +211,67 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });
+
+/**
+ * `tx` de mentiras que resuelve los tipos de movimiento del traspaso y devuelve, para cada id de
+ * almacén, la fila que diga `porAlmacen` (o una de PT usable, si no está en el mapa). Sirve para
+ * pinchar el guard de tipo (fila 0.137) SIN Postgres: se corta en la primera lectura de almacén.
+ */
+function bdConAlmacenes(porAlmacen: Record<number, { nombre: string; tipo: string }>): {
+  bd: ContextoBd;
+  almacenesLeidos: number[];
+} {
+  const almacenesLeidos: number[] = [];
+  const tx = {
+    tipoMovimientoInventario: {
+      findUnique: vi.fn(({ where }: { where: { codigo: string } }) =>
+        Promise.resolve({
+          id: where.codigo === 'transferencia-salida' ? 1 : 2,
+          nombre: where.codigo,
+          direccion: where.codigo === 'transferencia-salida' ? 'salida' : 'entrada',
+          activo: true,
+        }),
+      ),
+    },
+    almacen: {
+      findUnique: vi.fn(({ where }: { where: { id: number } }) => {
+        almacenesLeidos.push(where.id);
+        const fila = porAlmacen[where.id] ?? { nombre: `Almacén ${String(where.id)}`, tipo: 'PT' };
+        return Promise.resolve({ ...fila, activo: true, idEmpresa: null });
+      }),
+    },
+  } as unknown as Tx;
+  return { bd: { tx }, almacenesLeidos };
+}
+
+describe('Traspaso de PT — el guard de TIPO cubre LAS DOS patas (fila 0.137)', () => {
+  const traspaso = {
+    idModelo: 1,
+    fecha: '2026-06-20',
+    lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+  };
+
+  it('el ORIGEN de TELA se rechaza', async () => {
+    const { bd } = bdConAlmacenes({ 1: { nombre: 'Naucalpan', tipo: 'TELA' } });
+    await expect(
+      registrarTraspasoPt(
+        sesionMover(),
+        { ...traspaso, idAlmacenOrigen: 1, idAlmacenDestino: 2 },
+        bd,
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+  });
+
+  it('el DESTINO de TELA se rechaza (el origen sí es de PT)', async () => {
+    // Éste es el que se cuela si alguien valida solo el origen: el destino no se lee nunca.
+    const { bd, almacenesLeidos } = bdConAlmacenes({ 2: { nombre: 'Naucalpan', tipo: 'TELA' } });
+    await expect(
+      registrarTraspasoPt(
+        sesionMover(),
+        { ...traspaso, idAlmacenOrigen: 1, idAlmacenDestino: 2 },
+        bd,
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+    expect(almacenesLeidos).toEqual([1, 2]);
+  });
+});

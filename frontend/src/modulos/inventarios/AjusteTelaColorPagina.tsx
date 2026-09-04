@@ -66,11 +66,13 @@ export function AjusteTelaColorPagina(): React.JSX.Element {
   const [renglones, setRenglones] = useState<RenglonTelaColor[]>([]);
   const [contados, setContados] = useState<RenglonConteoTelaColor[]>([]);
 
+  // Solo almacenes de TELA (fila 0.137). El conteo de CapturaConteoTelaColor hereda este mismo idAlmacen por props, así que queda cubierto de aquí.
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'TELA',
   });
   const tiposMov = useTiposMovimiento();
   const ajustar = useAjustarTelaColor();

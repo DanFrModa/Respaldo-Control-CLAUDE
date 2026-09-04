@@ -230,11 +230,13 @@ function DialogoAlta({
   alCerrar: () => void;
 }): React.JSX.Element {
   const crear = useCrearCiclico();
+  // Solo almacenes de PT: el cíclico cuenta producto terminado (fila 0.137).
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'PT',
   });
   const [idAlmacen, setIdAlmacen] = useState('');
   const [modelo, setModelo] = useState<Modelo | null>(null);

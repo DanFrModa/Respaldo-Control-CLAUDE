@@ -1356,6 +1356,44 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3f-bis. Almacén de AVÍOS (fila 0.137)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Nombre del ÚNICO almacén de AVÍOS que siembra el catálogo base. UNO, no tres: el sistema viejo
+ * no tenía almacenes de avíos (`IPT_Almacenes` era de PT y `Almacenes` de telas, por eso el ETL
+ * no crea ninguno de tipo AVIO), así que aquí no hay lista que copiar — hay un lugar donde poner
+ * los avíos. Si mañana hacen falta más, se dan de alta desde el catálogo.
+ */
+const ALMACEN_AVIOS_BASE = 'Almacén de avíos';
+
+/**
+ * Siembra el almacén de AVÍOS base (fila 0.137).
+ *
+ * ⚠️ POR QUÉ EXISTE ESTE SEED. Desde la fila 0.137 el dominio exige que el tipo del almacén case
+ * con el del artículo que se mueve (`comun/almacenes.ts` → `exigirAlmacenDelTipo`). Los avíos se
+ * mueven en CUATRO flujos —ajuste, traspaso, recepción de compra y notas de salida— y hasta hoy
+ * **el catálogo no tenía ni un almacén de tipo AVIO**: ni el seed (que sembraba 3 de PT) ni el ETL
+ * (`migracion/loaders/almacenes.ts`, que mapea a PT y TELA) creaban uno. Sin esta siembra, esos
+ * cuatro flujos rechazarían SIEMPRE, contra cualquier almacén del catálogo.
+ *
+ * Idempotente por `(nombre, tipo AVIO, global)`, con el mismo truco que {@link sembrarAlmacenesPt}:
+ * el `@@unique` de almacenes es `(idEmpresa, nombre)` y Postgres trata los NULL como distintos, así
+ * que un almacén GLOBAL no queda cubierto por el índice y hay que verificarlo a mano antes de crear.
+ */
+async function sembrarAlmacenAvios(prisma: PrismaClient): Promise<void> {
+  const existente = await prisma.almacen.findFirst({
+    where: { nombre: ALMACEN_AVIOS_BASE, tipo: 'AVIO', idEmpresa: null },
+    select: { id: true },
+  });
+  if (existente === null) {
+    await prisma.almacen.create({
+      data: { nombre: ALMACEN_AVIOS_BASE, tipo: 'AVIO', idEmpresa: null },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 3g. Reactivos del checklist de FICHAS CONFIABLES (F7-E4) — los 8 fijos del viejo
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1648,6 +1686,9 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarGeneros(prisma);
   await sembrarTiposMovimiento(prisma);
   await sembrarAlmacenesPt(prisma);
+  // Fila 0.137: el almacén de AVÍOS base. Sin él, el guard de tipo dejaría los cuatro flujos de
+  // avíos sin un solo almacén válido que elegir (el viejo no tenía almacenes de avíos).
+  await sembrarAlmacenAvios(prisma);
   // Fichas confiables (F7-E4): los 8 reactivos fijos del checklist del viejo (IP_InfConf), ahora
   // filas configurables (A6). Idempotente por clave.
   await sembrarReactivosFicha(prisma);
