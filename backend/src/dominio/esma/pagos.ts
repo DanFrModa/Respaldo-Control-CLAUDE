@@ -289,6 +289,23 @@ export async function listarPagosMaquilero(
  * que otro capturó y Daniel todavía no ha decidido — aquí la decisión ES suya, y ejecutar es el
  * acto de confirmarla).
  *
+ * ⭐⭐ **Y POR ESO EXIGE `esma.revisar` CUANDO NACE `revisado`** (fila 0.128). Hoy eso **no cierra
+ * ninguna puerta que no estuviera cerrada**: el único llamador es `ejecutarCorrida`
+ * (`dominio/pagos/corrida.ts`), que va bajo `pagos.corrida-armar` —un permiso *más estrecho todavía*, de `SOLO_ADMINISTRADOR` porque
+ * Daniel lo pidió para él (§Post-F9.189(g))—, así que quien llega aquí ya es el círculo del dueño.
+ * No es una puerta lateral: es la misma persona validando por otro camino.
+ *
+ * 🔑 Lo que cambia es DÓNDE VIVE LA GARANTÍA. Sin la línea, la única razón por la que esta función
+ * no acuña deuda validada a nombre de cualquiera es **quién resulta llamarla hoy** — y su guarda
+ * propia era `esma.ver-pagos`, que en el seed tienen los OCHO perfiles. Un segundo llamador (una
+ * pantalla de anticipos, un ETL, una corrida futura con otro permiso) heredaría el agujero sin que
+ * nada chistara, porque la protección estaría en el llamador y no en el acto. Con la línea, la
+ * regla de la fila 0.128 —*«nace `revisado` ⇒ es un acto de VALIDACIÓN»*— la impone la función que
+ * escribe el estado, que es donde se puede cumplir siempre. Defensa en profundidad, la convención
+ * de la casa (misma razón por la que CxP re-verifica al delegar en el motor de terceros).
+ *
+ * `capturado` sigue pidiendo sólo `esma.ver-pagos`: capturar un pago nunca fue validar.
+ *
  * Sólo se llama DENTRO de una transacción del llamador (`tx`): el pago y el renglón de la corrida
  * que lo apunta son un solo hecho atómico (A2).
  */
@@ -307,6 +324,12 @@ export async function crearPagoACuentaMaquilero(
   },
 ): Promise<{ id: number }> {
   verificarPermiso(sesion, 'esma.ver-pagos');
+  // Nace `revisado` ⇒ es un acto de VALIDACIÓN (fila 0.128), no sólo de captura. Ver el TSDoc:
+  // hoy no cierra nada nuevo —el único llamador va bajo `pagos.corrida-armar`—, pero deja la
+  // garantía DENTRO del acto en vez de depender de quién resulte llamarlo.
+  if (datos.estadoRevision === 'revisado') {
+    verificarPermiso(sesion, 'esma.revisar');
+  }
 
   const prov = await tx.proveedor.findUnique({
     where: { id: datos.idMaquilero },

@@ -113,6 +113,14 @@ export async function crearCargoEsMaMigrado(
 // para pagos, `RevisionPendienteP`; abonos/descuentos no lo traían → `revisado`, ya conciliados) y
 // `conFactura = null`. Siguen A2 (transacción) + A7 (bitácora, `operacion: 'migracion'`).
 // Idempotencia: el loader resuelve "ya existe" por su `MapeoMigracion` ANTES de llamar.
+//
+// ⚠️ POR QUÉ ESTE ARCHIVO **NO** EXIGE `esma.revisar` (fila 0.128), aunque escriba `revisado`
+// directo: es MODO MIGRACIÓN. No hay acto de negocio que autorizar — el movimiento **ya venía
+// revisado del sistema viejo**, y aquí sólo se transcribe ese hecho. Ninguna de estas funciones
+// está expuesta por el API: viven detrás de los loaders de `backend/migracion/`, que Gabriel corre
+// a mano contra la base, fuera de toda sesión de usuario (por eso tampoco verifican permisos las
+// demás funciones de este archivo). El día que un ETL se pueda disparar desde una pantalla, esto
+// deja de ser cierto y el permiso hay que exigirlo aquí.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Un movimiento plano EsMa histórico (abono/descuento/pago) a migrar. */

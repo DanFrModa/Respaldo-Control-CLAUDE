@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useBandejaPorPagar } from '@/api/cxp';
 import type { CxpBandejaFila, CxpBandejaQuery } from '@/api/tipos';
@@ -22,7 +22,7 @@ import {
 } from '@/modulos/esma/comun';
 import { useSesion } from '@/sesion/useSesion';
 
-import { celdaAging, moneda } from './comun';
+import { celdaAging, esSegmentoCxp, moneda, TITULOS_SEGMENTO_CXP, type SegmentoCxp } from './comun';
 
 /**
  * Celda «Por revisar» de una fila: vacía si no hay nada capturado sin revisar (el 99 % de las filas).
@@ -40,6 +40,17 @@ const CHIPS: OpcionChip<'con-saldo' | 'todos'>[] = [
 ];
 
 /**
+ * Chips del SEGMENTO con/sin factura (fila 0.132). Llevan `testid` PROPIO a propósito: el default de
+ * `ChipsFiltro` es `chip-{valor}`, y "todos" ya lo usa la fila de arriba — dos chips con el mismo
+ * testid harían fallar cualquier prueba que clickee "el" chip todos.
+ */
+const CHIPS_SEGMENTO: OpcionChip<SegmentoCxp>[] = [
+  { valor: 'todos', etiqueta: TITULOS_SEGMENTO_CXP.todos, testid: 'cxp-segmento-todos' },
+  { valor: 'con', etiqueta: TITULOS_SEGMENTO_CXP.con, testid: 'cxp-segmento-con' },
+  { valor: 'sin', etiqueta: TITULOS_SEGMENTO_CXP.sin, testid: 'cxp-segmento-sin' },
+];
+
+/**
  * CUENTAS POR PAGAR — bandeja "por pagar" (F9-E2; proto `vCxp`): los proveedores con su saldo por
  * pagar y su ANTIGÜEDAD de saldos (aging: corriente / 1–30 / 31–60 / +60 días) + la cubeta MAQUILA
  * (aporte EsMa, SIN antigüedad), + KPIs de vistazo (cartera total, vencido, % al corriente,
@@ -54,6 +65,14 @@ const CHIPS: OpcionChip<'con-saldo' | 'todos'>[] = [
  * (§Post-F9.188a): el que tiene todo sin revisar NO debe desaparecer. El servidor decide quién se ve;
  * la pantalla sólo explica el porqué.
  *
+ * ⭐ DOS LISTADOS, NO UNO (fila 0.132, §Post-F9.192(5)). Daniel: la bandeja del viernes *"debería
+ * partirse en Con factura / Sin factura, con totales y antigüedad por separado, porque son dos
+ * relaciones de pago distintas"*. La segunda fila de chips cambia el SEGMENTO, y con él la consulta
+ * entera: las filas, el aging y los KPIs los recalcula el SERVIDOR para esa relación (la pantalla NO
+ * parte nada; sumar aquí sería el pivote en cliente que este proyecto tiene prohibido). El segmento
+ * vive en la URL (`?segmento=con`) para que el viernes se abra directo el listado que toca, y viaja
+ * al estado de cuenta del proveedor al que se le hace clic: la pantalla del detalle abre en la MISMA
+ * relación, no en «todo» — que es lo que haría creer que se le debe de más.
  * ⭐ Desde la fila 0.111 ese «por revisar» también cuenta los CARGOS SIN VALIDAR del maquilero —el
  * recibo de una maquila, o el corte/empaque de la orden (0.114)—, y la bandeja lo HEREDA sin
  * filtrar nada por su cuenta: el número y el corte los arma el mismo agregado que alimenta el
@@ -62,14 +81,33 @@ const CHIPS: OpcionChip<'con-saldo' | 'todos'>[] = [
  */
 export function CxpPagina(): React.JSX.Element {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('cxp.administrar');
   const [filtro, setFiltro] = useState<'con-saldo' | 'todos'>('con-saldo');
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
+  // El SEGMENTO vive en la URL (no en `useState`) para que el listado del viernes se pueda abrir
+  // directo con un enlace; un valor inventado a mano cae en "todos" en vez de viajar al API.
+  const crudo = params.get('segmento');
+  const segmento: SegmentoCxp = esSegmentoCxp(crudo) ? crudo : 'todos';
+  const tituloSegmento = TITULOS_SEGMENTO_CXP[segmento];
+
+  function cambiarSegmento(valor: SegmentoCxp): void {
+    const siguientes = new URLSearchParams(params);
+    if (valor === 'todos') {
+      siguientes.delete('segmento'); // la cartera completa es el default: URL limpia.
+    } else {
+      siguientes.set('segmento', valor);
+    }
+    // `replace`: cambiar de relación no es navegar, y no debe llenar el botón "atrás".
+    setParams(siguientes, { replace: true });
+    setPagina(1);
+  }
 
   const query: CxpBandejaQuery = {
     filtro,
+    segmento,
     pagina,
     ...(busqueda.trim() === '' ? {} : { busqueda: busqueda.trim() }),
   };
@@ -81,8 +119,11 @@ export function CxpPagina(): React.JSX.Element {
   const l1 = datos?.limitesAging.limite1 ?? 30;
   const l2 = datos?.limitesAging.limite2 ?? 60;
 
+  // El detalle abre en la MISMA relación de pago que se está mirando: entrar desde "Sin factura" y
+  // ver el estado de cuenta completo haría creer que se le debe al proveedor más de lo que esa
+  // relación va a pagar. `segmento` es el mismo parámetro que ya recibe el estado de cuenta.
   function verEstadoCuenta(idProveedor: number): void {
-    void navigate('/cxp/estado-cuenta', { state: { idProveedor } });
+    void navigate('/cxp/estado-cuenta', { state: { idProveedor, segmento } });
   }
 
   // El % al corriente es SOLO sobre la cartera clasificable (la del motor); la maquila (EsMa) no tiene
@@ -159,41 +200,63 @@ export function CxpPagina(): React.JSX.Element {
         <Button
           type="button"
           size="sm"
-          onClick={() => void navigate('/cxp/estado-cuenta')}
+          onClick={() => void navigate('/cxp/estado-cuenta', { state: { segmento } })}
           data-testid="cxp-ir-estado-cuenta"
         >
           Estado de cuenta
         </Button>
       </header>
 
-      {/* ── KPIs ────────────────────────────────────────────────────────────── */}
+      {/* ── KPIs (del SEGMENTO elegido, no de la cartera completa) ──────────── */}
+      <h2
+        className="shrink-0 text-[12.5px] font-medium text-muted-foreground"
+        data-testid="cxp-titulo-kpis"
+      >
+        Cartera · {tituloSegmento}
+      </h2>
       <KpiTiles kpis={kpis} className="shrink-0" />
 
       {/* ── Card: filtros + tabla ───────────────────────────────────────────── */}
       <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0 lg:flex-1 lg:shrink">
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          <ChipsFiltro
-            opciones={CHIPS}
-            valor={filtro}
-            alCambiar={(v) => {
-              setFiltro(v);
-              setPagina(1);
-            }}
-            etiqueta="Filtrar proveedores"
-          />
-          <BuscadorToolbar
-            valor={busqueda}
-            alCambiar={(v) => {
-              setBusqueda(v);
-              setPagina(1);
-            }}
-            etiqueta="Buscar proveedor"
-            testid="cxp-busqueda"
-          />
-          <div className="ml-auto">
-            <span className="text-[12px] text-faint">
-              {(datos?.total ?? 0).toLocaleString('es-MX')} proveedores
-            </span>
+        <div className="flex shrink-0 flex-col gap-2 border-b px-3 py-2">
+          {/* Fila 1 — LA RELACIÓN DE PAGO (fila 0.132): parte la cartera en dos listados. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[13px] font-semibold" data-testid="cxp-titulo-tabla">
+              Proveedores por pagar · {tituloSegmento}
+            </h2>
+            <ChipsFiltro
+              className="ml-auto"
+              opciones={CHIPS_SEGMENTO}
+              valor={segmento}
+              alCambiar={cambiarSegmento}
+              etiqueta="Relación de pago (facturación)"
+            />
+          </div>
+          {/* Fila 2 — los filtros de siempre (saldo, búsqueda) DENTRO de esa relación. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <ChipsFiltro
+              opciones={CHIPS}
+              valor={filtro}
+              alCambiar={(v) => {
+                setFiltro(v);
+                setPagina(1);
+              }}
+              etiqueta="Filtrar proveedores"
+            />
+            <BuscadorToolbar
+              valor={busqueda}
+              alCambiar={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              etiqueta="Buscar proveedor"
+              testid="cxp-busqueda"
+            />
+            <div className="ml-auto">
+              <span className="text-[12px] text-faint">
+                {(datos?.total ?? 0).toLocaleString('es-MX')} proveedores
+              </span>
+            </div>
           </div>
         </div>
 
@@ -206,8 +269,11 @@ export function CxpPagina(): React.JSX.Element {
               {consulta.error.message}
             </p>
           ) : filas.length === 0 ? (
-            <p className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-              No hay proveedores para los filtros elegidos.
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="cxp-vacio"
+            >
+              No hay proveedores por pagar en «{tituloSegmento}» con los filtros elegidos.
             </p>
           ) : (
             <>

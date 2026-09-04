@@ -53,6 +53,9 @@ let folioEtapa = 0n;
 const PERMISOS: ClavePermiso[] = [
   'esma.ver-pagos',
   'esma.modificar',
+  // Autorizar una partida capturada es `esma.revisar` desde la fila 0.128 (capturar y validar
+  // dejaron de ser el mismo permiso). Estas pruebas revisan como paso de arreglo, así que lo llevan.
+  'esma.revisar',
   'consultas.ver-importes',
   'terceros.ver',
 ];

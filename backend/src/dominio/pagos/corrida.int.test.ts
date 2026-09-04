@@ -64,6 +64,9 @@ const PERM_TODOS: ClavePermiso[] = [
   'proveedores.ver',
   'proveedores.administrar',
   'esma.ver-pagos',
+  // Ejecutar la corrida acuña pagos que nacen `revisado`, y eso es VALIDAR (fila 0.128):
+  // `crearPagoACuentaMaquilero` lo exige dentro del acto, no sólo en el llamador.
+  'esma.revisar',
   'cxp.ver',
   'cxp.administrar',
   'terceros.ver',

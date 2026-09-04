@@ -4,6 +4,8 @@
  * `Control.2026!`, FR Moda). Cubren:
  *  - deny-by-default (A4): un usuario solo con `esma.ver-pagos` NO puede crear abonos/descuentos (403),
  *    pero SÍ ver el saldo y meter pagos;
+ *  - la separación CAPTURAR / VALIDAR de la fila 0.128: `esma.modificar` captura pero NO autoriza
+ *    (403 al revisar) y `esma.revisar` autoriza pero NO captura (403 al crear el abono);
  *  - alta de cada concepto (abono/descuento/pago) por HTTP con el admin;
  *  - ocultamiento de importes sin `consultas.ver-importes` (el saldo y los montos salen en null);
  *  - el recibo de pago responde 200 application/pdf.
@@ -321,9 +323,8 @@ describe('API EsMa — estado de cuenta (F6-E5)', () => {
     }
   });
 
-  it('deny-by-default: solo esma.ver-pagos NO puede revisar una partida (403); el admin sí (200)', async () => {
-    const admin = await cookieAdmin();
-    // El admin crea un abono para tener una partida que revisar.
+  /** Crea un abono con el admin y devuelve su id (una partida `capturado` que revisar). */
+  async function abonoParaRevisar(admin: string): Promise<number> {
     const abono = await app.inject({
       method: 'POST',
       url: '/api/esma/abonos',
@@ -331,7 +332,12 @@ describe('API EsMa — estado de cuenta (F6-E5)', () => {
       payload: { idMaquilero, monto: 30, fecha: '2026-07-01' },
     });
     expect(abono.statusCode).toBe(201);
-    const idAbono = abono.json<{ id: number }>().id;
+    return abono.json<{ id: number }>().id;
+  }
+
+  it('deny-by-default: solo esma.ver-pagos NO puede revisar una partida (403); el admin sí (200)', async () => {
+    const admin = await cookieAdmin();
+    const idAbono = await abonoParaRevisar(admin);
 
     const soloVer = await usuarioConPermisos(admin, 'soloverpagos', ['esma.ver-pagos']);
     const negado = await app.inject({
@@ -348,6 +354,64 @@ describe('API EsMa — estado de cuenta (F6-E5)', () => {
     });
     expect(ok.statusCode).toBe(200);
     expect(ok.json<{ estadoRevision: string }>().estadoRevision).toBe('revisado');
+  });
+
+  /**
+   * ⭐ FILA 0.128 — «un permiso para meter lo recibido y otro para validarlo» (Daniel,
+   * §Post-F9.192(1)). Por HTTP, que es donde vive el `preHandler`: quien CAPTURA abonos y
+   * descuentos (`esma.modificar`) ya no puede AUTORIZARLOS, y quien autoriza (`esma.revisar`) sí,
+   * aunque no pueda capturar. Hasta la 0.127 el mismo permiso hacía las dos cosas.
+   */
+  it('⭐ el que CAPTURA no AUTORIZA: esma.modificar da 403 al revisar y esma.revisar da 200', async () => {
+    const admin = await cookieAdmin();
+
+    // Quien captura: puede crear el abono (201) pero NO autorizarlo (403).
+    const capturista = await usuarioConPermisos(admin, 'capturaesma', [
+      'esma.modificar',
+      'esma.ver-pagos',
+    ]);
+    const suyo = await app.inject({
+      method: 'POST',
+      url: '/api/esma/abonos',
+      headers: { cookie: capturista },
+      payload: { idMaquilero, monto: 40, fecha: '2026-07-02' },
+    });
+    expect(suyo.statusCode, 'capturar sigue siendo de esma.modificar').toBe(201);
+    const idSuyo = suyo.json<{ id: number }>().id;
+
+    const autoAutorizar = await app.inject({
+      method: 'POST',
+      url: `/api/esma/movimientos/abono/${String(idSuyo)}/revisar`,
+      headers: { cookie: capturista },
+    });
+    expect(autoAutorizar.statusCode, 'nadie se auto-autoriza lo que capturó').toBe(403);
+
+    // Quien valida: autoriza esa misma partida (200) aunque NO tenga `esma.modificar`…
+    //
+    // ⚠️ NO SIMPLIFIQUES ESTA MITAD: es la ÚNICA aserción del repo que caza una ruta desalineada
+    // del dominio. El caso negativo de arriba seguiría en verde con el `preHandler` mal puesto
+    // —porque el dominio también lanza 403 y el HTTP se ve idéntico—; sólo el caso POSITIVO
+    // distingue «la ruta pide el permiso correcto» de «la ruta pide otro y el dominio la salva».
+    const validador = await usuarioConPermisos(admin, 'validaesma', [
+      'esma.revisar',
+      'esma.ver-pagos',
+    ]);
+    const autorizado = await app.inject({
+      method: 'POST',
+      url: `/api/esma/movimientos/abono/${String(idSuyo)}/revisar`,
+      headers: { cookie: validador },
+    });
+    expect(autorizado.statusCode).toBe(200);
+    expect(autorizado.json<{ estadoRevision: string }>().estadoRevision).toBe('revisado');
+
+    // …y sin `esma.modificar` NO puede capturar: la separación corta en los dos sentidos.
+    const capturaDelValidador = await app.inject({
+      method: 'POST',
+      url: '/api/esma/abonos',
+      headers: { cookie: validador },
+      payload: { idMaquilero, monto: 50, fecha: '2026-07-03' },
+    });
+    expect(capturaDelValidador.statusCode, 'validar no da permiso de capturar').toBe(403);
   });
 
   it('el desglosado responde 200 en PDF y en Excel con su content-type', async () => {

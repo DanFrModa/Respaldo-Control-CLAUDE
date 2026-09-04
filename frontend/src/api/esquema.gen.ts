@@ -183,6 +183,7 @@ export interface paths {
                 | 'inventario-avios.ver'
                 | 'inventario-avios.mover'
                 | 'esma.cargo-validar'
+                | 'esma.revisar'
                 | 'notas.ver'
                 | 'notas.administrar'
                 | 'notas.cancelar'
@@ -36278,6 +36279,11 @@ export interface paths {
                 idProveedor: number;
                 /** @description Nombre del proveedor (para la UI). */
                 proveedor: string;
+                /**
+                 * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+                 * @enum {string}
+                 */
+                modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
                 /** @description Fecha de emisión (YYYY-MM-DD), o null. */
                 fecha: string | null;
                 /** @description Fecha de entrega esperada, o null. */
@@ -36607,6 +36613,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -37002,6 +37013,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -37326,6 +37342,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -37697,6 +37718,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -37969,6 +37995,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -38241,6 +38272,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -38506,6 +38542,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -39522,6 +39563,20 @@ export interface paths {
                 reversadaPorId: string | null;
                 /** @description Motivo del reverso, o null. */
                 motivoReverso: string | null;
+                /** @description ⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento. */
+                importe: number;
+                /** @description ⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3). */
+                idMovimientoTercero: number | null;
+                /**
+                 * @description Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).
+                 * @enum {string}
+                 */
+                deuda:
+                  | 'cargo-no-fiscal'
+                  | 'factura-pendiente'
+                  | 'sin-importe'
+                  | 'en-entrada-de-tela'
+                  | 'cancelada';
                 /** @description Renglones recibidos. */
                 lineas: {
                   /** @description Id del renglón de recepción. */
@@ -39549,8 +39604,12 @@ export interface paths {
                   cantidadRecibida: number;
                   /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                   cantidadComplemento: number | null;
-                  /** @description Costo por unidad de consumo, o null. */
+                  /** @description Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda. */
                   costoUnit: number | null;
+                  /** @description ⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC. */
+                  precioOc: number;
+                  /** @description ⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números. */
+                  precioDistintoOc: boolean;
                   /** @description Color de tela recibido (B1), o null. */
                   idTelaColor: number | null;
                   /** @description Nombre del color de tela, o null. */
@@ -39689,8 +39748,10 @@ export interface paths {
             /** @description Renglones de OC que se reciben (parcial o total). */
             lineas: {
               idOrdenCompraLinea: number;
-              /** @description Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1). En TELA es el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento (se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de entrada por factura/remisión (B1), que sí admite cuerpo 0. */
+              /** @description Cantidad recibida en UNIDAD DE CONSUMO, la misma de la línea de OC (§Post-F9.97): no se convierte nada. En TELA es el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento (se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de entrada por factura/remisión (B1), que sí admite cuerpo 0. */
               cantidad: number;
+              /** @description Precio por unidad de consumo con el que se recibe. Si se omite, el de la línea de OC. */
+              precioUnit?: number;
               /** @description Color + complemento + lote del proveedor (OBLIGATORIO en líneas de tela, B1). */
               telaColor?: {
                 /** @description Color (hijo de la tela) que llegó. Se EXIGE: la OC no determina el color. */
@@ -39745,6 +39806,20 @@ export interface paths {
               reversadaPorId: string | null;
               /** @description Motivo del reverso, o null. */
               motivoReverso: string | null;
+              /** @description ⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento. */
+              importe: number;
+              /** @description ⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3). */
+              idMovimientoTercero: number | null;
+              /**
+               * @description Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).
+               * @enum {string}
+               */
+              deuda:
+                | 'cargo-no-fiscal'
+                | 'factura-pendiente'
+                | 'sin-importe'
+                | 'en-entrada-de-tela'
+                | 'cancelada';
               /** @description Renglones recibidos. */
               lineas: {
                 /** @description Id del renglón de recepción. */
@@ -39772,8 +39847,12 @@ export interface paths {
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo, o null. */
+                /** @description Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda. */
                 costoUnit: number | null;
+                /** @description ⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC. */
+                precioOc: number;
+                /** @description ⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números. */
+                precioDistintoOc: boolean;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
@@ -40395,6 +40474,20 @@ export interface paths {
               reversadaPorId: string | null;
               /** @description Motivo del reverso, o null. */
               motivoReverso: string | null;
+              /** @description ⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento. */
+              importe: number;
+              /** @description ⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3). */
+              idMovimientoTercero: number | null;
+              /**
+               * @description Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).
+               * @enum {string}
+               */
+              deuda:
+                | 'cargo-no-fiscal'
+                | 'factura-pendiente'
+                | 'sin-importe'
+                | 'en-entrada-de-tela'
+                | 'cancelada';
               /** @description Renglones recibidos. */
               lineas: {
                 /** @description Id del renglón de recepción. */
@@ -40422,8 +40515,12 @@ export interface paths {
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo, o null. */
+                /** @description Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda. */
                 costoUnit: number | null;
+                /** @description ⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC. */
+                precioOc: number;
+                /** @description ⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números. */
+                precioDistintoOc: boolean;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
@@ -40610,6 +40707,20 @@ export interface paths {
               reversadaPorId: string | null;
               /** @description Motivo del reverso, o null. */
               motivoReverso: string | null;
+              /** @description ⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento. */
+              importe: number;
+              /** @description ⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3). */
+              idMovimientoTercero: number | null;
+              /**
+               * @description Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).
+               * @enum {string}
+               */
+              deuda:
+                | 'cargo-no-fiscal'
+                | 'factura-pendiente'
+                | 'sin-importe'
+                | 'en-entrada-de-tela'
+                | 'cancelada';
               /** @description Renglones recibidos. */
               lineas: {
                 /** @description Id del renglón de recepción. */
@@ -40637,8 +40748,12 @@ export interface paths {
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo, o null. */
+                /** @description Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda. */
                 costoUnit: number | null;
+                /** @description ⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC. */
+                precioOc: number;
+                /** @description ⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números. */
+                precioDistintoOc: boolean;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
@@ -62770,7 +62885,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen */
+    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen, por segmento de facturación */
     get: {
       parameters: {
         query?: {
@@ -62782,6 +62897,8 @@ export interface paths {
           filtro?: 'con-saldo' | 'todos';
           /** @description Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas). */
           busqueda?: string;
+          /** @description todos = cartera completa; con = sólo lo CON factura (fiscal / con_factura); sin = sólo lo SIN factura, incluido lo sin definir. */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path?: never;
@@ -62789,7 +62906,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen). */
+        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -62846,7 +62963,7 @@ export interface paths {
               porPagina: number;
               /** @description Total de páginas. */
               totalPaginas: number;
-              /** @description KPIs sobre toda la cartera con saldo. */
+              /** @description KPIs sobre toda la cartera con saldo DEL SEGMENTO pedido (no de la cartera completa). */
               resumen: {
                 /** @description Cartera total por pagar (Σ saldos combinados: motor + maquila). */
                 carteraTotal: number | null;
@@ -62878,6 +62995,11 @@ export interface paths {
                   cargosSinPrecio: number;
                 };
               };
+              /**
+               * @description Segmento aplicado (todos/con/sin factura). Viaja de vuelta porque las filas Y el resumen son de ESE segmento: sin él, una cartera parcial se leería como la total.
+               * @enum {string}
+               */
+              segmento: 'todos' | 'con' | 'sin';
               /** @description Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas. */
               limitesAging: {
                 /** @description Fin de la 1ª cubeta vencida (días de atraso). */

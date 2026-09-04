@@ -4,8 +4,9 @@
  * movimiento (sin encabezado). Toda la lógica vive aquí (A1); las rutas delegan.
  *
  * Innegociables: A2 (cada alta en su transacción con bitácora), A4 (`esma.modificar` para capturar;
- * la LECTURA con `esma.ver-pagos`), A7 (bitácora), A9 (empresa activa). El `conFactura` se resuelve de
- * la modalidad del proveedor (decisión (h)). Los IMPORTES se ocultan en la lectura si falta
+ * `esma.revisar` para AUTORIZAR lo capturado —dos permisos, no uno, fila 0.128—; la LECTURA con
+ * `esma.ver-pagos`), A7 (bitácora), A9 (empresa activa). El `conFactura` se resuelve de la
+ * modalidad del proveedor (decisión (h)). Los IMPORTES se ocultan en la lectura si falta
  * `consultas.ver-importes` (server-side: el JSON no trae el monto).
  */
 import {
@@ -213,8 +214,21 @@ export async function listarDescuentosMaquilero(
  * REVISA (autoriza) una partida `capturado` → `revisado` (F6-E5; ex asteriscos `Rev`/`RevRec` del
  * `EsMa_EdoCta` viejo). Aplica a abonos, descuentos y pagos. En UNA transacción (A2) con bitácora
  * (A7). Idempotencia dura: si ya estaba `revisado`, lanza `ErrorConflicto` (409). Permiso
- * `esma.modificar` (A4); solo la empresa activa (A9). Es el "punto de control del admin" del viejo,
- * operable también desde el celular (E5 vista móvil).
+ * **`esma.revisar`** (A4); solo la empresa activa (A9). Es el "punto de control del admin" del
+ * viejo, operable también desde el celular (E5 vista móvil).
+ *
+ * ⭐⭐ **POR QUÉ SU PROPIO PERMISO, Y NO EL DE CAPTURAR** (fila 0.128, Daniel §Post-F9.192(1),
+ * 4-sep-2026): *«La entrada la da la persona responsable de recibos o de producción. Pero la
+ * validación sólo la doy yo. O sea, es un permiso para meter lo recibido y otro para validarlo.»*
+ *
+ * Hasta la 0.127 esto exigía `esma.modificar`, el MISMO permiso con el que se capturan los abonos
+ * y descuentos ({@link crearAbonoMaquilero}/{@link crearDescuentoMaquilero}). O sea: quien
+ * capturaba se auto-autorizaba, y el "punto de control" no controlaba nada. Y no es un matiz
+ * formal: desde la 0.115 **sólo lo revisado suma al saldo**, así que revisar es exactamente el
+ * acto de convertir un renglón capturado en deuda —o en pago— real. Ese acto es de Daniel.
+ *
+ * `esma.modificar` se quedó con lo que sí es capturar (abonos, descuentos y el override de "orden
+ * pagada"): capturar no es validar.
  */
 export async function revisarMovimiento(
   sesion: SesionUsuario,
@@ -222,7 +236,7 @@ export async function revisarMovimiento(
   id: number,
   bd?: ContextoBd,
 ): Promise<RevisionSalida> {
-  verificarPermiso(sesion, 'esma.modificar');
+  verificarPermiso(sesion, 'esma.revisar');
   const idEmpresa = sesion.idEmpresaActiva;
 
   const entidadBitacora =

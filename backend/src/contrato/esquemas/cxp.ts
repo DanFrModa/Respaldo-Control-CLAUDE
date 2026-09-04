@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { esquemaPendienteRevisionEsMa } from './esma.js';
-import { esquemaLimitesAging } from './terceros.js';
+import { esquemaLimitesAging, SEGMENTOS_FACTURACION } from './terceros.js';
 
 /**
  * Esquemas Zod de CxP — CUENTAS POR PAGAR de proveedores (Módulo 14, F9-E2; D12/D15/R10; doc
@@ -130,6 +130,22 @@ export const esquemaBandejaCxpQuery = z
       .max(120)
       .optional()
       .describe('Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas).'),
+    /**
+     * SEGMENTO con/sin factura de la bandeja (fila 0.132, §Post-F9.192(5)). Daniel: la relación de
+     * pago del viernes «debería partirse en Con factura / Sin factura, con totales y antigüedad por
+     * separado, porque son dos relaciones de pago distintas». NO es la `vista: fiscal` del estado de
+     * cuenta (ésa es la del CONTADOR y exige `terceros.fiscal`): el segmento es OPERATIVO y le basta
+     * `cxp.ver`. Es el MISMO vocabulario del estado de cuenta del proveedor y de la corrida semanal
+     * de pagos, y el criterio sale de la definición única de cada fuente (`es_fiscal` en el motor;
+     * `con_factura` de EsMa vía `formula-saldo.ts`, donde «sin» incluye lo migrado sin definir).
+     */
+    segmento: z
+      .enum(SEGMENTOS_FACTURACION)
+      .default('todos')
+      .describe(
+        'todos = cartera completa; con = sólo lo CON factura (fiscal / con_factura); sin = sólo lo ' +
+          'SIN factura, incluido lo sin definir.',
+      ),
   })
   .describe('Filtros y paginación de la bandeja de cuentas por pagar.');
 
@@ -174,7 +190,9 @@ export type BandejaCxpFila = z.infer<typeof esquemaBandejaCxpFila>;
 
 /**
  * Resumen (KPIs) de CxP calculado EN EL SERVIDOR (A1) sobre TODOS los proveedores con saldo ≠ 0 —
- * independiente de la página o el filtro de la tabla. `carteraTotal` = Σ saldos COMBINADOS (motor +
+ * independiente de la página, del filtro de la tabla y de la búsqueda, pero SÍ del `segmento`: con
+ * `con`/`sin` los KPIs son los de esa relación de pago (fila 0.132), que es justo el total que
+ * Daniel quiere ver por separado. `carteraTotal` = Σ saldos COMBINADOS (motor +
  * maquila EsMa) → el pasivo total a proveedores; `vencido` = Σ de las tres cubetas vencidas del motor;
  * `maquilaTotal` = Σ del aporte de maquila (EsMa) SIN antigüedad, mostrado APARTE. El `alCorrientePct`
  * se calcula SOLO sobre la cartera CLASIFICABLE (la del motor): `(carteraMotor − vencido) ÷
@@ -222,12 +240,20 @@ export const esquemaBandejaCxpSalida = z
     pagina: z.number().int().describe('Página solicitada (1-based).'),
     porPagina: z.number().int().describe('Renglones por página.'),
     totalPaginas: z.number().int().describe('Total de páginas.'),
-    resumen: esquemaResumenCxpSalida.describe('KPIs sobre toda la cartera con saldo.'),
+    resumen: esquemaResumenCxpSalida.describe(
+      'KPIs sobre toda la cartera con saldo DEL SEGMENTO pedido (no de la cartera completa).',
+    ),
+    segmento: z
+      .enum(SEGMENTOS_FACTURACION)
+      .describe(
+        'Segmento aplicado (todos/con/sin factura). Viaja de vuelta porque las filas Y el resumen ' +
+          'son de ESE segmento: sin él, una cartera parcial se leería como la total.',
+      ),
     limitesAging: esquemaLimitesAging.describe(
       'Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas.',
     ),
   })
-  .describe('Bandeja de cuentas por pagar (proveedores con aging + resumen).');
+  .describe('Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento.');
 
 /** Forma de la bandeja de CxP. */
 export type BandejaCxpSalida = z.infer<typeof esquemaBandejaCxpSalida>;

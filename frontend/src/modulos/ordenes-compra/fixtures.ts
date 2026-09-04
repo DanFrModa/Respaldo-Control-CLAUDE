@@ -12,6 +12,9 @@ export function ocDePrueba(sobrescribir: Partial<OrdenCompra> = {}): OrdenCompra
     estatus: 'borrador',
     idProveedor: 5,
     proveedor: 'Telas del Norte',
+    // ⭐ Fila 0.129: por defecto, el proveedor migrado al que nadie le preguntó si factura (es el
+    // caso más común hoy). Las pruebas que miden la deuda lo sobrescriben.
+    modalidadFacturaProveedor: 'no-definida',
     fecha: '2026-06-20',
     fechaEntrega: '2026-06-30',
     idDireccionEntrega: 7,
