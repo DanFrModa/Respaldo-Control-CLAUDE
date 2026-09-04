@@ -48,13 +48,18 @@ describe('esquemaProveedorCrear — la modalidad de facturación es OBLIGATORIA'
     ).toBe(false);
   });
 
-  it('sigue exigiendo RFC + régimen si el proveedor factura (la regla R15 no se perdió)', () => {
-    const r = esquemaProveedorCrear.safeParse({
+  // ⭐ FILA 0.124 — la casilla `factura` salió del contrato de escritura: la modalidad es la única
+  // que contesta si el proveedor factura, y con ella se fue la regla R15 `factura ⇒ RFC + régimen`
+  // (no se remapeó a propósito: habría bloqueado clasificar a los migrados, que no traen RFC).
+  it('⭐ `factura` ya no se captura: el alta la descarta y no exige RFC', () => {
+    const r = esquemaProveedorCrear.parse({
       ...ALTA_BASE,
       modalidadFacturacion: 'solo_con',
       factura: true,
     });
-    expect(r.success).toBe(false);
+    expect('factura' in r).toBe(false);
+    expect(r.modalidadFacturacion).toBe('solo_con');
+    expect(r.rfc).toBeUndefined();
   });
 });
 
@@ -72,9 +77,9 @@ describe('esquemaProveedorCrearMigrado — el ETL SÍ puede crear sin modalidad 
     expect(r.success).toBe(true);
   });
 
-  it('pero conserva las demás reglas de captura (factura ⇒ RFC + régimen)', () => {
-    const r = esquemaProveedorCrearMigrado.safeParse({ ...ALTA_BASE, factura: true });
-    expect(r.success).toBe(false);
+  it('⭐ y tampoco al ETL le acepta ya la casilla `factura` (fila 0.124)', () => {
+    const r = esquemaProveedorCrearMigrado.parse({ ...ALTA_BASE, factura: true });
+    expect('factura' in r).toBe(false);
   });
 });
 

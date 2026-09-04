@@ -2177,7 +2177,7 @@ hace falta `SEED_ON_START`.
 > todo tipo de proveedores (maquila, arte, avíos, servicios, telas, etc). Para los que no, todo se
 > tiene que meter manual."* — Daniel
 
-La casilla ya existía en el alta del proveedor (**"¿Emite factura (CFDI)?"**). Ahora **manda**.
+⚠️ **Actualizado en la 0.124:** aquella casilla del alta (*"¿Emite factura (CFDI)?"*) **desapareció** —contestaba lo mismo que la modalidad y podían decir cosas distintas—. Quien manda ahora, aquí y en todo el sistema, es la pregunta única **"¿Cómo factura?"** de la ficha del proveedor: *solo con factura* / *solo sin factura* / *de las dos formas*. Lo que sigue diciendo esta página vale igual; donde diga "no factura", léase **"solo sin factura"**.
 
 ### Cuando eliges un proveedor que NO factura
 

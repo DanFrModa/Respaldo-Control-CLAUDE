@@ -196,54 +196,31 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
     expect(datos.moneda).toBe('MXN');
   });
 
-  it('regla factura ⇒ exige RFC + régimen (alta)', () => {
-    expect(
-      esquemaProveedorCrear.safeParse({
-        modalidadFacturacion: 'solo_con',
-        nombre: 'X',
-        factura: true,
-      }).success,
-    ).toBe(false);
-    expect(
-      esquemaProveedorCrear.safeParse({
-        modalidadFacturacion: 'solo_con',
-        nombre: 'X',
-        factura: true,
-        rfc: 'ABC010101AB1',
-      }).success,
-    ).toBe(false); // falta régimen
-    expect(
-      esquemaProveedorCrear.safeParse({
-        modalidadFacturacion: 'solo_con',
-        nombre: 'X',
-        factura: true,
-        rfc: 'ABC010101AB1',
-        regimenFiscalSat: '601',
-      }).success,
-    ).toBe(true);
-    // factura falso/omitido NO exige nada (filas migradas)
+  // ⭐ FILA 0.124 — `factura` salió del contrato de ESCRITURA: la pregunta "¿este proveedor
+  // factura?" la contesta `modalidadFacturacion` y nadie más. El esquema no es estricto, así que un
+  // cliente viejo que lo siga mandando no truena: el dato se DESCARTA (que es lo que importa —
+  // nunca llega al `data` de Prisma ni puede volver a contradecir a la modalidad).
+  it('⭐ el alta DESCARTA `factura`: ya no se captura (fila 0.124)', () => {
+    const alta = esquemaProveedorCrear.parse({
+      modalidadFacturacion: 'solo_con',
+      nombre: 'X',
+      factura: true,
+      rfc: 'ABC010101AB1',
+      regimenFiscalSat: '601',
+    });
+    expect('factura' in alta).toBe(false);
+    // Y el alta sin RFC pasa: la regla R15 murió con la casilla (ver el TSDoc del esquema).
     expect(
       esquemaProveedorCrear.safeParse({ modalidadFacturacion: 'solo_con', nombre: 'X' }).success,
     ).toBe(true);
-    expect(
-      esquemaProveedorCrear.safeParse({
-        modalidadFacturacion: 'solo_con',
-        nombre: 'X',
-        factura: false,
-      }).success,
-    ).toBe(true);
   });
 
-  it('regla factura ⇒ RFC también en edición y en el cuerpo del PATCH', () => {
-    expect(esquemaProveedorEditar.safeParse({ id: 1, factura: true }).success).toBe(false);
-    expect(esquemaProveedorPatchCuerpo.safeParse({ factura: true }).success).toBe(false);
-    expect(
-      esquemaProveedorPatchCuerpo.safeParse({
-        factura: true,
-        rfc: 'ABC010101AB1',
-        regimenFiscalSat: '601',
-      }).success,
-    ).toBe(true);
+  it('⭐ la edición y el PATCH también lo descartan (fila 0.124)', () => {
+    const edicion = esquemaProveedorEditar.parse({ id: 1, factura: true });
+    expect('factura' in edicion).toBe(false);
+    const patch = esquemaProveedorPatchCuerpo.parse({ factura: true, rfc: 'ABC010101AB1' });
+    expect('factura' in patch).toBe(false);
+    expect(patch.rfc).toBe('ABC010101AB1');
   });
 
   it('valida CLABE (dígito de control), moneda y método de pago', () => {
@@ -426,11 +403,8 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
     ).toBe(false);
   });
 
-  it('edición: si se intenta vaciar el RFC con factura activa, la regla lo rechaza', () => {
-    // factura=true + rfc=null (vaciar) ⇒ falla la regla factura ⇒ RFC.
-    expect(
-      esquemaProveedorEditar.safeParse({ id: 1, factura: true, rfc: null, regimenFiscalSat: '601' })
-        .success,
-    ).toBe(false);
+  it('edición: vaciar el RFC se permite (la regla que lo ataba murió en la fila 0.124)', () => {
+    const r = esquemaProveedorEditar.parse({ id: 1, rfc: null, regimenFiscalSat: '601' });
+    expect(r.rfc).toBeNull();
   });
 });

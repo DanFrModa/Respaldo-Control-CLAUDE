@@ -36,7 +36,15 @@ export const FORMAS_DE_PAGO_PROVEEDOR = ['efectivo', 'transferencia'] as const;
 
 const camposEnriquecidos = {
   // ── Fiscal ──────────────────────────────────────────────────────────────────
-  factura: z.boolean({ error: '¿Factura? debe ser verdadero o falso' }).optional(),
+  //
+  // 🔴 AQUÍ YA NO ESTÁ `factura` (fila 0.124, Daniel 3-sep-2026 — §Post-F9.188(d): *"es un error
+  // que existan"*). La pregunta *"¿este proveedor factura?"* se contestaba DOS veces —esa bandera
+  // y `modalidadFacturacion`— y nada impedía que se contradijeran: un `factura=false` + `solo_con`
+  // mandaba su entrada de tela por el camino SIN factura y su captura de CxP por el camino CON
+  // factura, o sea **sus pagos partidos en dos según la puerta**. Hoy la contesta
+  // `modalidadFacturacion` (abajo) y donde aún haga falta el booleano se DERIVA con `emiteFactura`
+  // (`dominio/terceros/facturacion-proveedor.ts`). La columna sigue en la base como histórico
+  // (REGLA 0-B) y se sigue exponiendo DERIVADA en la salida, pero ya no se captura.
   rfc: z
     .string()
     .trim()
@@ -162,7 +170,7 @@ const camposEnriquecidos = {
  * Variante de EDICIÓN de los campos enriquecidos: los de texto/numéricos/enum
  * aceptan además `null` para poder VACIAR un dato ya capturado (M1). Semántica del
  * PATCH parcial: omitir el campo (`undefined`) = no tocar; mandar `null` = ponerlo a
- * null (borrar). Las banderas (`factura`/`retieneIva`/`retieneIsr`) NO se hacen
+ * null (borrar). Las banderas (`retieneIva`/`retieneIsr`) NO se hacen
  * nullable: el formulario siempre las manda como boolean y `undefined` basta para
  * "no tocar". `.nullable()` se aplica SOBRE el `.optional()` ya existente, así que
  * cada campo acepta `undefined | null | <valor válido>` conservando sus reglas.
@@ -185,7 +193,7 @@ const camposEnriquecidosEditar = {
   leadTimeDias: camposEnriquecidos.leadTimeDias.nullable(),
   notas: camposEnriquecidos.notas.nullable(),
   // Fusión de terceros (D12/R15): `obsPago` se puede VACIAR (M1); `asegurado`
-  // es bandera (omitir = no tocar), no se hace nullable (igual que `factura`).
+  // es bandera (omitir = no tocar), no se hace nullable (igual que las retenciones).
   obsPago: camposEnriquecidos.obsPago.nullable(),
   // ⭐ Modalidad de facturación: **NO es nullable** (fila 0.110). Omitir = no tocar (así siguen
   // funcionando los PATCH parciales: desactivar/reactivar un proveedor, o la fusión de roles del
@@ -534,9 +542,16 @@ export type AnalizarConstanciaSalida = z.infer<typeof esquemaAnalizarConstanciaS
  * Alta de proveedor (catálogo global F1-E1, ADR-0007: sin `idEmpresa`). El nombre
  * es la clave de negocio (único global); los demás datos son opcionales.
  *
- * F1-E1B (R15): agrega `roles` (multi-valor, ≥1 lo exige el dominio en alta), campos
- * fiscales/comerciales/operativos y la regla `factura ⇒ rfc + regimenFiscalSat`
- * (validada como regla de captura aquí; el dominio la repite, A1).
+ * F1-E1B (R15): agrega `roles` (multi-valor, ≥1 lo exige el dominio en alta) y los campos
+ * fiscales/comerciales/operativos.
+ *
+ * ⚠️ La regla de captura R15 —*"si el proveedor factura, captura su RFC y su régimen fiscal"*— ya
+ * NO existe (fila 0.124). Colgaba de `factura`, que salió del contrato de escritura, y **no se
+ * remapeó a `modalidadFacturacion` a propósito**: habría bloqueado justo el trabajo que abrió la
+ * fila 0.110 —ponerle la modalidad a los ~155 proveedores MIGRADOS, que llegan sin RFC A PROPÓSITO
+ * (REGLA 0-B: lo que falta se tolera, no se compensa)—. El RFC se sigue exigiendo donde de verdad
+ * decide dinero, y con mejor mensaje: al capturar un CFDI a su nombre (`exigirRfcDelProveedor`,
+ * `dominio/inventarios/cfdi-entrada-tela.ts`), que además corta la operación entera.
  */
 const baseProveedorCrear = z
   .object({
@@ -576,20 +591,6 @@ const baseProveedorCrear = z
   })
   .describe('Alta de proveedor (base compartida por la captura y la migración).');
 
-/** Regla de captura R15, compartida por las dos variantes del alta: factura ⇒ RFC + régimen. */
-const reglaFacturaExigeRfcAlta = {
-  regla: (datos: {
-    factura?: boolean | undefined;
-    rfc?: string | undefined;
-    regimenFiscalSat?: string | undefined;
-  }): boolean =>
-    datos.factura !== true || ((datos.rfc ?? '') !== '' && (datos.regimenFiscalSat ?? '') !== ''),
-  opciones: {
-    error: 'Si el proveedor factura, captura su RFC y su régimen fiscal',
-    path: ['rfc'] as const,
-  },
-} as const;
-
 /**
  * ALTA de proveedor (captura normal). Igual que la base, pero con la **modalidad de facturación
  * OBLIGATORIA** (fila 0.110).
@@ -606,17 +607,12 @@ const reglaFacturaExigeRfcAlta = {
  * puede es **crear uno nuevo** sin ella (ni capturarle un movimiento hasta definírsela). La
  * migración usa {@link esquemaProveedorCrearMigrado}.
  */
-export const esquemaProveedorCrear = baseProveedorCrear
-  .extend({
-    modalidadFacturacion: z.enum(MODALIDADES_FACTURACION, {
-      error:
-        'Indica cómo factura este proveedor: solo con factura, solo sin factura, o de las dos formas',
-    }),
-  })
-  .refine(reglaFacturaExigeRfcAlta.regla, {
-    error: reglaFacturaExigeRfcAlta.opciones.error,
-    path: [...reglaFacturaExigeRfcAlta.opciones.path],
-  });
+export const esquemaProveedorCrear = baseProveedorCrear.extend({
+  modalidadFacturacion: z.enum(MODALIDADES_FACTURACION, {
+    error:
+      'Indica cómo factura este proveedor: solo con factura, solo sin factura, o de las dos formas',
+  }),
+});
 
 /**
  * ALTA en modo MIGRACIÓN: idéntica al alta normal salvo que la modalidad de facturación **puede
@@ -628,13 +624,7 @@ export const esquemaProveedorCrear = baseProveedorCrear
  * de ponerlo bien cuando hagamos la migración de datos reales"*. Rellenarlo aquí con un valor
  * inventado sería justo lo que la regla prohíbe.
  */
-export const esquemaProveedorCrearMigrado = baseProveedorCrear.refine(
-  reglaFacturaExigeRfcAlta.regla,
-  {
-    error: reglaFacturaExigeRfcAlta.opciones.error,
-    path: [...reglaFacturaExigeRfcAlta.opciones.path],
-  },
-);
+export const esquemaProveedorCrearMigrado = baseProveedorCrear;
 
 /** Datos validados de alta de proveedor (captura normal: la modalidad viene siempre). */
 export type DatosProveedorCrear = z.infer<typeof esquemaProveedorCrear>;
@@ -652,8 +642,9 @@ export type DatosProveedorCrearMigrado = z.infer<typeof esquemaProveedorCrearMig
  * sin default.
  *
  * `roles`: si se omite, NO se tocan los roles existentes; si se manda (aunque sea []),
- * el dominio reemplaza el set — y exige ≥1 (no puede quedar en 0). La misma regla
- * `factura ⇒ rfc + régimen` aplica, pero solo cuando el payload trae `factura: true`.
+ * el dominio reemplaza el set — y exige ≥1 (no puede quedar en 0). La regla de captura R15
+ * (*factura ⇒ RFC + régimen*) desapareció con la casilla `factura` en la fila 0.124: ver el TSDoc
+ * del alta.
  */
 const baseProveedorEditar = z
   .object({
@@ -702,38 +693,16 @@ const baseProveedorEditar = z
       .positive({ error: 'El id del proveedor debe ser positivo' }),
   });
 
-/**
- * Regla de captura compartida por crear/editar: factura ⇒ RFC + régimen fiscal. En
- * edición rfc/régimen pueden llegar `null` (intento de vaciarlos); `?? ''` los trata
- * como ausentes, así que poner factura sin RFC —o vaciar el RFC con factura activa—
- * falla la regla (no se puede facturar sin RFC).
- */
-const reglaFacturaExigeRfc = (datos: {
-  factura?: boolean | null | undefined;
-  rfc?: string | null | undefined;
-  regimenFiscalSat?: string | null | undefined;
-}): boolean =>
-  datos.factura !== true || ((datos.rfc ?? '') !== '' && (datos.regimenFiscalSat ?? '') !== '');
-
-export const esquemaProveedorEditar = baseProveedorEditar.refine(reglaFacturaExigeRfc, {
-  error: 'Si el proveedor factura, captura su RFC y su régimen fiscal',
-  path: ['rfc'],
-});
+export const esquemaProveedorEditar = baseProveedorEditar;
 
 /** Datos validados de edición de proveedor. */
 export type DatosProveedorEditar = z.infer<typeof esquemaProveedorEditar>;
 
 /**
  * Cuerpo del PATCH de proveedor (la ruta REST recibe el `id` en la URL, no en el body).
- * Se deriva del esquema OBJETO base (antes del `.refine()`, que produce un efecto sin
- * `.omit()`), omitiendo `id` y re-aplicando la regla `factura ⇒ RFC`.
+ * Se deriva del esquema base omitiendo `id`.
  */
-export const esquemaProveedorPatchCuerpo = baseProveedorEditar
-  .omit({ id: true })
-  .refine(reglaFacturaExigeRfc, {
-    error: 'Si el proveedor factura, captura su RFC y su régimen fiscal',
-    path: ['rfc'],
-  });
+export const esquemaProveedorPatchCuerpo = baseProveedorEditar.omit({ id: true });
 
 /** Datos validados del cuerpo del PATCH de proveedor (sin `id`). */
 export type DatosProveedorPatchCuerpo = z.infer<typeof esquemaProveedorPatchCuerpo>;
@@ -764,7 +733,16 @@ export const esquemaProveedorSalida = z
     telefono: z.string().nullable().describe('Teléfono, o null.'),
     condiciones: z.string().nullable().describe('Condiciones comerciales (texto libre), o null.'),
     // ── Fiscal (E1B) ──────────────────────────────────────────────────────────
-    factura: z.boolean().nullable().describe('¿Emite CFDI? (formal/informal), o null.'),
+    /**
+     * ¿Emite CFDI? **DERIVADO** de `modalidadFacturacion` desde la fila 0.124 (`solo_con`/`ambos`
+     * ⇒ true · `solo_sin` ⇒ false · sin modalidad ⇒ null). Ya no se captura ni se lee de la
+     * columna homónima, que queda como histórico (REGLA 0-B): exponerla tal cual dejaría que la
+     * respuesta del API contradijera a la del catálogo — el defecto que esta fila cerró.
+     */
+    factura: z
+      .boolean()
+      .nullable()
+      .describe('¿Emite CFDI? DERIVADO de modalidadFacturacion (solo_sin ⇒ false), o null.'),
     rfc: z.string().nullable().describe('RFC, o null.'),
     regimenFiscalSat: z.string().nullable().describe('Régimen fiscal del SAT, o null.'),
     usoCfdiHabitual: z.string().nullable().describe('Uso de CFDI habitual, o null.'),

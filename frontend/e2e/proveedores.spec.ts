@@ -173,14 +173,14 @@ test.describe('Proveedor enriquecido (R15)', () => {
     // Recuerda el nombre del primer rol para filtrar luego por él.
     const nombrePrimerRol = (await selectorRoles.locator('label').first().innerText()).trim();
 
+    // La modalidad de facturación es OBLIGATORIA (fila 0.110) y desde la fila 0.124 es la ÚNICA
+    // pregunta de facturación: de ella depende que los campos fiscales se pidan (`solo_sin` no).
+    await dialogo.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
+
     // Expande "Fiscal" y captura RFC + régimen (forma de persona moral: 12 chars).
     await seccionDelDialogo(dialogo, 'Fiscal').click();
-    await dialogo.getByTestId('proveedor-factura').check();
     await dialogo.getByLabel('RFC').fill('ABC120101T1A');
     await dialogo.getByLabel('Régimen fiscal (SAT)').fill('601');
-
-    // La modalidad de facturación es OBLIGATORIA (fila 0.110): sin elegirla el alta no se envía.
-    await dialogo.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
     await page.getByTestId('guardar-proveedor').click();
 
     // ── Aparece en la lista ─────────────────────────────────────────────────────

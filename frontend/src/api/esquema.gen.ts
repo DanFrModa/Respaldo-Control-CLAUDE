@@ -1675,7 +1675,7 @@ export interface paths {
                 telefono: string | null;
                 /** @description Condiciones comerciales (texto libre), o null. */
                 condiciones: string | null;
-                /** @description ¿Emite CFDI? (formal/informal), o null. */
+                /** @description ¿Emite CFDI? DERIVADO de modalidadFacturacion (solo_sin ⇒ false), o null. */
                 factura: boolean | null;
                 /** @description RFC, o null. */
                 rfc: string | null;
@@ -1905,7 +1905,6 @@ export interface paths {
             telefono?: string;
             condiciones?: string;
             roles?: number[];
-            factura?: boolean;
             rfc?: string;
             regimenFiscalSat?: string;
             usoCfdiHabitual?: string;
@@ -1954,7 +1953,7 @@ export interface paths {
               telefono: string | null;
               /** @description Condiciones comerciales (texto libre), o null. */
               condiciones: string | null;
-              /** @description ¿Emite CFDI? (formal/informal), o null. */
+              /** @description ¿Emite CFDI? DERIVADO de modalidadFacturacion (solo_sin ⇒ false), o null. */
               factura: boolean | null;
               /** @description RFC, o null. */
               rfc: string | null;
@@ -2202,7 +2201,7 @@ export interface paths {
               telefono: string | null;
               /** @description Condiciones comerciales (texto libre), o null. */
               condiciones: string | null;
-              /** @description ¿Emite CFDI? (formal/informal), o null. */
+              /** @description ¿Emite CFDI? DERIVADO de modalidadFacturacion (solo_sin ⇒ false), o null. */
               factura: boolean | null;
               /** @description RFC, o null. */
               rfc: string | null;
@@ -2439,7 +2438,7 @@ export interface paths {
               telefono: string | null;
               /** @description Condiciones comerciales (texto libre), o null. */
               condiciones: string | null;
-              /** @description ¿Emite CFDI? (formal/informal), o null. */
+              /** @description ¿Emite CFDI? DERIVADO de modalidadFacturacion (solo_sin ⇒ false), o null. */
               factura: boolean | null;
               /** @description RFC, o null. */
               rfc: string | null;
@@ -2665,7 +2664,6 @@ export interface paths {
             condiciones?: string | null;
             roles?: number[];
             activo?: boolean;
-            factura?: boolean;
             rfc?: string | null;
             regimenFiscalSat?: string | null;
             usoCfdiHabitual?: string | null;
@@ -2711,7 +2709,7 @@ export interface paths {
               telefono: string | null;
               /** @description Condiciones comerciales (texto libre), o null. */
               condiciones: string | null;
-              /** @description ¿Emite CFDI? (formal/informal), o null. */
+              /** @description ¿Emite CFDI? DERIVADO de modalidadFacturacion (solo_sin ⇒ false), o null. */
               factura: boolean | null;
               /** @description RFC, o null. */
               rfc: string | null;

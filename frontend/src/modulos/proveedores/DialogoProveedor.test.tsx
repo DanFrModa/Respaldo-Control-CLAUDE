@@ -193,25 +193,38 @@ describe('<DialogoProveedor>', () => {
     expect(await screen.findByText('Elige al menos un rol o servicio.')).toBeInTheDocument();
   });
 
-  it('si marca ¿factura? y deja el RFC vacío, no envía y muestra el error', async () => {
+  /**
+   * ⭐ FILA 0.124 — la casilla *"¿Emite factura (CFDI)?"* se retiró (contestaba lo mismo que
+   * «¿Cómo factura?» y podían contradecirse), y con ella se fue la regla de captura
+   * `factura ⇒ RFC + régimen`. NO se remapeó a la modalidad a propósito: habría bloqueado
+   * clasificar a los proveedores MIGRADOS, que llegan sin RFC (REGLA 0-B). El RFC se exige donde
+   * decide dinero —al capturarle un CFDI—, no aquí.
+   */
+  it('⭐ un proveedor que factura se puede guardar SIN RFC (fila 0.124)', async () => {
     const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+        opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Factura sin RFC' }));
+      },
+    );
     renderConProveedores(
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Factura sin RFC');
-    // Elige un rol (para aislar la regla fiscal de la regla de roles).
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
-    // Expande Fiscal y marca "¿Emite factura (CFDI)?" sin capturar RFC.
+    await elegirModalidad(usuario, 'solo_con');
+    // Y la casilla vieja ya no existe: hay UNA sola pregunta de facturación en la pantalla.
     await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
-    await usuario.click(await screen.findByTestId('proveedor-factura'));
-    await elegirModalidad(usuario);
+    expect(screen.queryByTestId('proveedor-factura')).not.toBeInTheDocument();
+
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
-    expect(crearMutate).not.toHaveBeenCalled();
-    expect(
-      await screen.findByText('Si el proveedor factura, captura su RFC y su régimen fiscal'),
-    ).toBeInTheDocument();
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo.modalidadFacturacion).toBe('solo_con');
+    // El campo retirado NO viaja en el cuerpo (si volviera, volvería la contradicción).
+    expect('factura' in cuerpo).toBe(false);
   });
 
   it('crea un proveedor enviando los roles seleccionados inline', async () => {
@@ -461,13 +474,15 @@ describe('<DialogoProveedor>', () => {
     expect('diasCredito' in cuerpo).toBe(false);
   });
 
-  // ── §Post-F9.56 punto 4: la pantalla OBEDECE la bandera de factura ──────────
+  // ── §Post-F9.56 punto 4: la pantalla OBEDECE si el proveedor factura ────────
+  // ⭐ Fila 0.124: quien lo dice es la MODALIDAD (`solo_sin` = no factura), no una casilla aparte.
   describe('si no emite CFDI, no se piden datos fiscales (§Post-F9.56 punto 4)', () => {
-    it('con la casilla APAGADA esconde RFC, régimen, uso de CFDI y CP, y lo explica', async () => {
+    it('con «solo sin factura» esconde RFC, régimen, uso de CFDI y CP, y lo explica', async () => {
       const usuario = userEvent.setup();
       renderConProveedores(
         <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
       );
+      await elegirModalidad(usuario, 'solo_sin');
       await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
 
       expect(await screen.findByTestId('aviso-sin-cfdi')).toBeInTheDocument();
@@ -477,16 +492,32 @@ describe('<DialogoProveedor>', () => {
       expect(screen.queryByLabelText('CP de expedición')).not.toBeInTheDocument();
     });
 
-    it('al ENCENDERLA aparecen los campos fiscales', async () => {
+    it('con «solo con factura» (o «ambos») aparecen los campos fiscales', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await elegirModalidad(usuario, 'solo_con');
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+
+      expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
+      expect(screen.getByLabelText('Régimen fiscal (SAT)')).toBeInTheDocument();
+      expect(screen.queryByTestId('aviso-sin-cfdi')).not.toBeInTheDocument();
+
+      await elegirModalidad(usuario, 'ambos');
+      expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
+    });
+
+    // Mientras nadie conteste, los campos SE VEN: esconderlos antes de la respuesta obligaría a
+    // contestar en un orden que nadie pidió (y la modalidad ya es obligatoria para guardar).
+    it('sin modalidad elegida todavía, los campos fiscales se ven', async () => {
       const usuario = userEvent.setup();
       renderConProveedores(
         <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
       );
       await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
-      await usuario.click(await screen.findByTestId('proveedor-factura'));
 
       expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
-      expect(screen.getByLabelText('Régimen fiscal (SAT)')).toBeInTheDocument();
       expect(screen.queryByTestId('aviso-sin-cfdi')).not.toBeInTheDocument();
     });
   });
@@ -516,18 +547,25 @@ describe('<DialogoProveedor>', () => {
 
   // ── §Post-F9.55: la constancia PROPONE, la persona CONFIRMA ─────────────────
   describe('lector de la Constancia de Situación Fiscal', () => {
-    /** Propuesta de ejemplo con DOS regímenes (persona física). */
+    /**
+     * Propuesta de ejemplo con DOS regímenes (persona física).
+     *
+     * ⚠️ TODOS los datos son EVIDENTEMENTE SINTÉTICOS a propósito: nombre de relleno, el RFC
+     * GENÉRICO del SAT (`XAXX010101000`, el de "público en general") y un domicilio de mentira.
+     * Este repositorio es público y una constancia fiscal es justo el documento que amontona datos
+     * de una persona física: un fixture que *parezca* real acaba leyéndose como real.
+     */
     const PROPUESTA = {
       tipoPersona: 'fisica' as const,
-      rfc: 'MASD850101H29',
-      razonSocial: 'DANIELA MARTINEZ SOLIS',
-      curp: 'MASD850101HDFRRN04',
+      rfc: 'XAXX010101000',
+      razonSocial: 'FULANA DE TAL PÉREZ',
+      curp: 'XAXX010101MDFXXX00',
       regimenes: [
         { clave: '612', descripcion: 'Personas Físicas con Actividades Empresariales' },
         { clave: '626', descripcion: 'Régimen Simplificado de Confianza' },
       ],
-      codigoPostalExpedicion: '06600',
-      direccion: 'TAINE No. 412, Col. POLANCO, MIGUEL HIDALGO, C.P. 06600',
+      codigoPostalExpedicion: '00000',
+      direccion: 'CALLE FALSA No. 123, Col. DE PRUEBA, DEMARCACIÓN DE PRUEBA, C.P. 00000',
       advertencias: ['La constancia trae 2 regímenes: escoge cuál usar para el CFDI.'],
     };
 
@@ -556,13 +594,13 @@ describe('<DialogoProveedor>', () => {
 
       // Ya se ve la propuesta…
       expect(await screen.findByTestId('constancia-propuesta')).toBeInTheDocument();
-      expect(screen.getByTestId('constancia-rfc')).toHaveTextContent('MASD850101H29');
+      expect(screen.getByTestId('constancia-rfc')).toHaveTextContent('XAXX010101000');
       // …pero el formulario sigue INTACTO: el nombre no se llenó solo.
       expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue('');
 
       await usuario.click(screen.getByTestId('usar-constancia'));
       expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue(
-        'DANIELA MARTINEZ SOLIS',
+        'FULANA DE TAL PÉREZ',
       );
     });
 
@@ -579,10 +617,10 @@ describe('<DialogoProveedor>', () => {
       await usuario.selectOptions(selector, '626');
       await usuario.click(screen.getByTestId('usar-constancia'));
 
-      // Al confirmar enciende la casilla de factura, así que los campos fiscales ya se ven.
+      // Los campos fiscales se ven mientras la modalidad no diga «solo sin factura» (fila 0.124).
       await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
       expect(await screen.findByLabelText('Régimen fiscal (SAT)')).toHaveValue('626');
-      expect(screen.getByLabelText('RFC')).toHaveValue('MASD850101H29');
+      expect(screen.getByLabelText('RFC')).toHaveValue('XAXX010101000');
     });
 
     it('⭐ CONSERVA el PDF como adjunto CONSTANCIA al guardar (no se lee y se tira)', async () => {
@@ -590,7 +628,7 @@ describe('<DialogoProveedor>', () => {
       conPropuesta();
       crearMutate.mockImplementation(
         (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
-          opciones?.onSuccess?.(proveedorEjemplo({ id: 42, nombre: 'DANIELA MARTINEZ SOLIS' }));
+          opciones?.onSuccess?.(proveedorEjemplo({ id: 42, nombre: 'FULANA DE TAL PÉREZ' }));
         },
       );
       renderConProveedores(
@@ -633,7 +671,7 @@ describe('<DialogoProveedor>', () => {
       expect(subirAdjuntoMutate).not.toHaveBeenCalled();
     });
 
-    it('⭐ si NO se reconoció el régimen, NO enciende «emite factura» (no deja el alta trabada)', async () => {
+    it('⭐ la constancia NO contesta cómo factura: la modalidad se queda sin elegir (fila 0.124)', async () => {
       const usuario = userEvent.setup();
       // Formato que el lector no supo mapear: devuelve el texto crudo con clave ''.
       analizarConstanciaMutate.mockImplementation(
@@ -651,11 +689,13 @@ describe('<DialogoProveedor>', () => {
       await subirPdf(usuario);
       await usuario.click(await screen.findByTestId('usar-constancia'));
 
-      // La casilla queda apagada: con `factura` encendida y sin régimen, la regla de captura
-      // (`factura ⇒ RFC + régimen`) trabaría el guardado por un dato que el papel no traía.
+      // El papel prueba que está dado de alta en el SAT, NO que a nosotros nos facture siempre,
+      // nunca o de las dos formas (un taller registrado que nunca timbra es un caso real). Así que
+      // la modalidad la sigue eligiendo la persona, y mientras tanto los campos fiscales se ven.
+      expect(screen.getByTestId('proveedor-modalidad-facturacion')).toHaveValue('');
       await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
-      expect(await screen.findByTestId('proveedor-factura')).not.toBeChecked();
-      expect(screen.getByTestId('aviso-sin-cfdi')).toBeInTheDocument();
+      expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
+      expect(screen.queryByTestId('proveedor-factura')).not.toBeInTheDocument();
     });
 
     it('muestra las advertencias del papel sin bloquear el alta', async () => {
@@ -848,85 +888,45 @@ describe('<DialogoProveedor>', () => {
       expect(screen.getByTestId('proveedor-modalidad-facturacion')).toHaveValue('');
     });
 
-    // ⚠️ Fila 0.124 (los DOS campos que contestan lo mismo): esta fila puso las dos preguntas en la
-    // misma pantalla, así que al menos la contradicción se ve. El aviso NO bloquea el guardado a
-    // propósito — bloquear sería inventar la regla que Daniel todavía no dictó.
-    it('avisa (sin bloquear) si dice que NO emite CFDI pero que sí factura', async () => {
+    /**
+     * ⭐ FILA 0.124 — LA CONTRADICCIÓN YA NO PUEDE DARSE.
+     *
+     * Aquí vivían cuatro pruebas del aviso de contradicción: el sistema arrastraba DOS preguntas
+     * sobre facturación —`factura` (*"¿Emite factura (CFDI)?"*) y `modalidadFacturacion`— y nada
+     * las ataba, así que un proveedor podía quedar contestado de las dos formas a la vez y **sus
+     * pagos se partían según por qué puerta entraran**. El aviso avisaba; no podía hacer más.
+     *
+     * Esta fila quitó la segunda pregunta. Ya no hay nada que comparar, así que el aviso se fue con
+     * ella y en su lugar queda esta prueba: **en la pantalla hay UNA sola pregunta de facturación**.
+     * Si alguien volviera a poner la casilla, esto se pone rojo.
+     */
+    it('⭐ ya no hay dos preguntas que se puedan contradecir (fila 0.124)', async () => {
       const usuario = userEvent.setup();
       crearMutate.mockImplementation(
         (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
-          opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Contradictorio' }));
+          opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Sin contradicción' }));
         },
       );
       renderConProveedores(
         <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
       );
 
-      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Contradictorio');
+      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin contradicción');
       await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
-      // «¿Emite factura?» arranca APAGADA; elegir «solo con factura» es la contradicción.
       await elegirModalidad(usuario, 'solo_con');
-      expect(await screen.findByTestId('aviso-facturacion-contradictoria')).toBeInTheDocument();
 
-      // …y aun así deja guardar: el aviso informa, no manda.
+      // La casilla vieja no existe —ni con la sección Fiscal abierta— y por lo tanto tampoco el
+      // aviso que comparaba las dos respuestas.
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+      expect(screen.queryByTestId('proveedor-factura')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('aviso-facturacion-contradictoria')).not.toBeInTheDocument();
+
+      // Y lo que se guarda lleva UNA sola respuesta: la modalidad.
       await usuario.click(screen.getByTestId('guardar-proveedor'));
       await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
-    });
-
-    // ⭐ EL SENTIDO INVERSO — y es el CARO. Sus cargos por CFDI nacerían `esFiscal: true` (van por el
-    // banco) mientras sus capturas manuales de CxP nacen `false` (van por la relación). Es el caso
-    // que el TSDoc de `segmento-motor.ts` marca como el peor: degradar una factura timbrada, con el
-    // UUID ya consumido para siempre. Un aviso que viera sólo el otro sentido enseñaría que "sin
-    // aviso = consistente", que es mentira justo aquí.
-    it('⭐ avisa TAMBIÉN al revés: dice que SÍ emite CFDI pero que todo va sin factura', async () => {
-      const usuario = userEvent.setup();
-      renderConProveedores(
-        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
-      );
-
-      // Enciende «¿Emite factura?» (vive en la sección Fiscal, plegada) y elige «solo sin factura».
-      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
-      await usuario.click(await screen.findByTestId('proveedor-factura'));
-      await elegirModalidad(usuario, 'solo_sin');
-
-      const aviso = await screen.findByTestId('aviso-facturacion-contradictoria');
-      // Y el texto dice CUÁL de los dos sentidos es: un aviso que no distingue no sirve de guía.
-      expect(aviso).toHaveTextContent(/SÍ emite factura/);
-      expect(aviso).toHaveTextContent(/todo lo suyo va sin factura/);
-    });
-
-    it('y cada sentido trae su propio texto (no un genérico para los dos)', async () => {
-      const usuario = userEvent.setup();
-      renderConProveedores(
-        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
-      );
-      // «¿Emite factura?» apagada + «solo con factura» = el otro sentido.
-      await elegirModalidad(usuario, 'solo_con');
-      expect(await screen.findByTestId('aviso-facturacion-contradictoria')).toHaveTextContent(
-        /NO emite factura/,
-      );
-    });
-
-    // Las dos combinaciones que NO son contradicción: si el aviso saltara aquí, sería ruido y la
-    // gente aprendería a ignorarlo — que es la otra forma de que un guardián deje de servir.
-    it('calla cuando NO hay contradicción (los dos casos legítimos)', async () => {
-      const usuario = userEvent.setup();
-      const { unmount } = renderConProveedores(
-        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
-      );
-      // No timbra + todo sin factura: coherente.
-      await elegirModalidad(usuario, 'solo_sin');
-      expect(screen.queryByTestId('aviso-facturacion-contradictoria')).not.toBeInTheDocument();
-      unmount();
-
-      // Timbra + «de las dos formas»: coherente (unas cosas con factura, otras no).
-      renderConProveedores(
-        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
-      );
-      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
-      await usuario.click(await screen.findByTestId('proveedor-factura'));
-      await elegirModalidad(usuario, 'ambos');
-      expect(screen.queryByTestId('aviso-facturacion-contradictoria')).not.toBeInTheDocument();
+      const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(cuerpo.modalidadFacturacion).toBe('solo_con');
+      expect('factura' in cuerpo).toBe(false);
     });
 
     it('⭐ …pero GUARDARLO sin elegirla NO envía; al elegirla, sí', async () => {

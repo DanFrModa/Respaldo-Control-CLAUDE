@@ -41,6 +41,7 @@ import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../prue
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearOC, autorizarOC } from '../compras/ordenes-compra.js';
 import { lineasTelaPendientesDeProveedor } from '../compras/recepciones.js';
+import { registrarMovimientoCxp } from '../terceros/cxp/cxp.js';
 import { kardexTelaColor } from './partidas-telas.js';
 import {
   actualizarEntradaTela,
@@ -1333,5 +1334,66 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
     );
     expect(pendientesSin[0]!.idTelaColor).toBeNull();
     expect(pendientesSin[0]!.telaColor).toBeNull();
+  });
+});
+
+/**
+ * ⭐ UNA SOLA PREGUNTA DE FACTURACIÓN (fila 0.124, Daniel 3-sep-2026 — §Post-F9.188(d): *"es un
+ * error que existan"*).
+ *
+ * Aquí se mide lo que la fila vino a cerrar: **el mismo proveedor, pasado por las DOS puertas que
+ * clasifican su dinero** —la del almacén de telas (esta entrada) y la de la captura de CxP— tiene
+ * que caer del MISMO lado. Antes no: `factura` (bandera de F1-E1B) y `modalidadFacturacion`
+ * (F6-E4) contestaban lo mismo por separado, así que un proveedor podía entrar CON factura por una
+ * puerta y SIN factura por la otra, y sus pagos se partían en dos.
+ *
+ * Los dos casos usan a propósito el proveedor con los DOS campos en CONTRA, que es como están hoy
+ * los registros de `prueba`: lo que se comprueba es que la columna vieja ya **no manda nada**
+ * (REGLA 0-B: el dato viejo se queda donde está, no se repara ni se lee).
+ */
+describe('⭐ Facturación del proveedor: las dos puertas clasifican igual (fila 0.124)', () => {
+  const PERM_CXP: ClavePermiso[] = [...PERM, 'cxp.administrar', 'terceros.administrar'];
+
+  it('el que NUNCA factura queda SIN factura por las dos puertas (aunque la columna vieja diga que sí)', async () => {
+    await cliente.proveedor.update({
+      where: { id: proveedor.id },
+      // El caso "grave" que describía el aviso de la 0.110, ahora imposible de que decida nada.
+      data: { modalidadFacturacion: 'solo_sin', factura: true },
+    });
+
+    // Puerta 1 — el almacén: no se le puede capturar el documento como FACTURA.
+    await expect(capturarSimple()).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(capturarSimple()).rejects.toThrow(/¿Cómo factura\?/);
+
+    // Puerta 2 — CxP: su pago nace SIN factura (va por la relación, no por el banco).
+    const pago = await registrarMovimientoCxp(
+      sesion(PERM_CXP),
+      proveedor.id,
+      { fecha: '2026-08-06', origen: 'pago', importe: 500 },
+      bd(),
+    );
+    expect(pago.esFiscal).toBe(false);
+  });
+
+  it('el que factura SIEMPRE entra CON factura por las dos puertas (aunque la columna vieja diga que no)', async () => {
+    await cliente.proveedor.update({
+      where: { id: proveedor.id },
+      // El caso que midió la fila: `factura=false` + `solo_con`. Antes, la entrada de tela lo
+      // mandaba al camino SIN factura y la captura de CxP al camino CON factura.
+      data: { modalidadFacturacion: 'solo_con', factura: false },
+    });
+
+    // Puerta 1 — el almacén: SÍ se le captura el documento como FACTURA (antes lo rechazaba).
+    const entrada = await capturarSimple();
+    expect(entrada.tipoDocumento).toBe('factura');
+
+    // Puerta 2 — CxP: su pago nace CON factura (sale del estado de cuenta del banco).
+    const pago = await registrarMovimientoCxp(
+      sesion(PERM_CXP),
+      proveedor.id,
+      { fecha: '2026-08-06', origen: 'pago', importe: 500 },
+      bd(),
+    );
+    expect(pago.esFiscal).toBe(true);
   });
 });

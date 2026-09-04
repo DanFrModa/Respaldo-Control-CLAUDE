@@ -687,10 +687,17 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
 });
 
 describe('Proveedor que NO factura (§Post-F9.22)', () => {
-  /** Un tercero informal: da de alta con la casilla "¿Emite factura?" en NO. */
+  /**
+   * Un tercero informal: se da de alta con «¿Cómo factura?» en *solo sin factura*.
+   *
+   * 🔴 Fila 0.124 — la intención se expresa con `modalidadFacturacion: 'solo_sin'`, que es HOY la
+   * única fuente de verdad (`emiteFactura`). Antes esta fixture ponía `factura: false`: esa columna
+   * ya no la lee nadie, así que el proveedor quedaba como "modalidad sin definir" —que NO es lo
+   * mismo que "no factura"— y el dominio lo trataba como formal.
+   */
   async function proveedorInformal() {
     return cliente.proveedor.create({
-      data: { nombre: 'Talleres Don Chuy', factura: false },
+      data: { nombre: 'Talleres Don Chuy', modalidadFacturacion: 'solo_sin' },
     });
   }
 
@@ -846,13 +853,13 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
         bd(),
         archivosFalsos,
       ),
-    ).rejects.toThrow(/NO emite factura/);
+    ).rejects.toThrow(/NUNCA factura/);
     expect(await cliente.entradaTela.count()).toBe(0);
   });
 
   it('RECHAZA subirle un XML, aunque la pantalla lo hubiera dejado pasar', async () => {
     const informal = await cliente.proveedor.create({
-      data: { nombre: 'Informal con RFC', rfc: 'TNO850101BBB', factura: false },
+      data: { nombre: 'Informal con RFC', rfc: 'TNO850101BBB', modalidadFacturacion: 'solo_sin' },
     });
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: 'Café' },
@@ -880,7 +887,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
         bd(),
         archivosFalsos,
       ),
-    ).rejects.toThrow(/NO emite factura/);
+    ).rejects.toThrow(/NUNCA factura/);
     expect(await cliente.entradaTela.count()).toBe(0);
   });
 
@@ -889,7 +896,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
     // un cargo NO fiscal (por precios capturados) SIN el uuid en el `MovimientoTercero`, y Finanzas
     // podía importar después ese mismo CFDI — dos cargos por la misma factura.
     const informal = await cliente.proveedor.create({
-      data: { nombre: 'Informal con folio', factura: false },
+      data: { nombre: 'Informal con folio', modalidadFacturacion: 'solo_sin' },
     });
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: 'Verde' },
@@ -911,14 +918,14 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
         bd(),
         archivosFalsos,
       ),
-    ).rejects.toThrow(/NO emite factura/);
+    ).rejects.toThrow(/NUNCA factura/);
     expect(await cliente.entradaTela.count()).toBe(0);
   });
 
   it('leer un CFDI de un proveedor marcado "no factura" AVISA para corregir el catálogo', async () => {
     await cliente.proveedor.update({
       where: { id: proveedor.id },
-      data: { factura: false },
+      data: { modalidadFacturacion: 'solo_sin' },
     });
     const propuesta = await leerCfdiParaEntradaTela(
       sesion(),
@@ -932,7 +939,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
       },
       bd(),
     );
-    expect(propuesta.avisos.some((a) => /NO emite factura/.test(a))).toBe(true);
+    expect(propuesta.avisos.some((a) => /NUNCA factura/.test(a))).toBe(true);
   });
 });
 
@@ -1069,7 +1076,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
   it('editar tampoco puede dejársela a un proveedor que NO factura', async () => {
     const { entrada, idTelaColor, idOrdenCompraLinea } = await borradorConFactura();
     const informal = await cliente.proveedor.create({
-      data: { nombre: 'Talleres Don Chuy', factura: false },
+      data: { nombre: 'Talleres Don Chuy', modalidadFacturacion: 'solo_sin' },
     });
 
     await expect(
@@ -1086,7 +1093,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
         },
         bd(),
       ),
-    ).rejects.toThrow(/NO emite factura/);
+    ).rejects.toThrow(/NUNCA factura/);
   });
 
   it('editar CON un XML nuevo re-sella (y pasa por las MISMAS guardas del alta)', async () => {

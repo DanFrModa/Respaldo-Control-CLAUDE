@@ -55,6 +55,7 @@ import {
   listarCuentasPagoProveedor,
   type CuentaPagoProveedor,
 } from '../../dominio/catalogos/proveedor-cuentas-pago.js';
+import { emiteFactura } from '../../dominio/terceros/facturacion-proveedor.js';
 import {
   actualizarContactoProveedor,
   actualizarProveedor,
@@ -86,7 +87,11 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
     razonSocial: proveedor.razonSocial,
     telefono: proveedor.telefono,
     condiciones: proveedor.condiciones,
-    factura: proveedor.factura,
+    // ⭐ DERIVADO, no leído (fila 0.124): la única pregunta de facturación la contesta
+    // `modalidadFacturacion`. La columna `factura` sigue en la base como histórico (REGLA 0-B) pero
+    // ya nadie la escribe ni la lee, así que exponerla tal cual dejaría que la respuesta del API se
+    // contradijera con la del catálogo — el defecto que esta fila vino a cerrar.
+    factura: emiteFactura(proveedor.modalidadFacturacion),
     rfc: proveedor.rfc,
     regimenFiscalSat: proveedor.regimenFiscalSat,
     usoCfdiHabitual: proveedor.usoCfdiHabitual,

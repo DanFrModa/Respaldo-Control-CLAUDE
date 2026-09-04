@@ -72,7 +72,12 @@ import {
   type EntradaTelaSalida,
   type EntradasTelaPagina,
 } from '../../contrato/index.js';
-import { EstatusEntradaTela, Prisma, type TipoDocumentoEntradaTela } from '../../datos/index.js';
+import {
+  EstatusEntradaTela,
+  Prisma,
+  type ModalidadFacturacion,
+  type TipoDocumentoEntradaTela,
+} from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
@@ -526,7 +531,7 @@ async function validarCabeceraYLineas(
   exigirRenglonesConOrdenDeCompra(lineas);
   const proveedor = await tx.proveedor.findUnique({
     where: { id: idProveedor },
-    select: { id: true, activo: true, nombre: true, factura: true },
+    select: { id: true, activo: true, nombre: true, modalidadFacturacion: true },
   });
   if (proveedor === null) {
     throw new ErrorNoEncontrado('Proveedor', idProveedor);
@@ -620,7 +625,7 @@ export async function crearEntradaTela(
     // (`exigirSelloCompatibleConProveedor`); el alta se había quedado sin esta puerta.
     const proveedor = await lectura.proveedor.findUnique({
       where: { id: datos.idProveedor },
-      select: { nombre: true, factura: true },
+      select: { nombre: true, modalidadFacturacion: true },
     });
     // Si no existe, `validarCabeceraYLineas` truena enseguida con mejor mensaje (mismo criterio que
     // `exigirSelloCompatibleConProveedor`).
@@ -815,7 +820,11 @@ interface DocumentoParaCxP {
   totalCfdi: Prisma.Decimal | null;
   rfcCfdi: string | null;
   idArchivoCfdi: string | null;
-  proveedor: { nombre: string; rfc: string | null; factura: boolean | null };
+  proveedor: {
+    nombre: string;
+    rfc: string | null;
+    modalidadFacturacion: ModalidadFacturacion | null;
+  };
   lineas: readonly {
     cantidad: Prisma.Decimal;
     cantidadComplemento: Prisma.Decimal | null;
@@ -835,7 +844,7 @@ interface DocumentoParaCxP {
  *  • **Proveedor que NO factura** → nunca va a haber CFDI, así que esperar la factura sería no
  *    registrarle NUNCA la deuda. El cargo nace **NO FISCAL** por lo capturado a mano: la suma de
  *    cantidad×precio del cuerpo y del complemento. Sin IVA que sumar, esa suma ES lo que se le debe.
- *  • **Proveedor sin la casilla definida** (los migrados de Access) → se trata como los que
+ *  • **Proveedor sin la modalidad definida** (los migrados de Access) → se trata como los que
  *    facturan: se espera su CFDI. Nada se inventa sobre un dato que nadie capturó.
  *
  * Devuelve `null` cuando no hay nada que cobrar. En particular, un documento sin precios capturados
@@ -901,7 +910,7 @@ function cargoDeCuentaPorPagar(
     };
   }
 
-  if (modalidadFactura(documento.proveedor.factura) !== 'sin-factura') {
+  if (modalidadFactura(documento.proveedor.modalidadFacturacion) !== 'sin-factura') {
     return null;
   }
 
@@ -996,9 +1005,10 @@ async function confirmarEnTransaccion(
         totalCfdi: true,
         rfcCfdi: true,
         idArchivoCfdi: true,
-        // §Post-F9.22 — y la bandera del catálogo decide SI el cargo es fiscal o no. El `rfc` va
+        // §Post-F9.22 — y la modalidad del catálogo decide SI el cargo es fiscal o no (fila
+        // 0.124: una sola pregunta, `modalidadFacturacion`). El `rfc` va
         // para el cerrojo final: el cargo fiscal no puede nacer a nombre de quien no facturó.
-        proveedor: { select: { nombre: true, rfc: true, factura: true } },
+        proveedor: { select: { nombre: true, rfc: true, modalidadFacturacion: true } },
         lineas: {
           orderBy: { id: 'asc' },
           select: {

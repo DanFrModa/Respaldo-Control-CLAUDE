@@ -154,7 +154,6 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
           nombre: 'Maquilas del Norte',
           telefono: '555-1234',
           roles: [rolMaquila, rolCorte],
-          factura: true,
           rfc: 'MNO010101AB1',
           regimenFiscalSat: '601',
           usoCfdiHabitual: 'G03',
@@ -173,7 +172,6 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
       expect(proveedor).toMatchObject({
         nombre: 'Maquilas del Norte',
-        factura: true,
         rfc: 'MNO010101AB1',
         regimenFiscalSat: '601',
         diasCredito: 30,
@@ -315,19 +313,21 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       expect(leido.modalidadFacturacion).toBeNull();
     });
 
-    it('regla factura ⇒ RFC + régimen (regla de captura): falta RFC → ErrorValidacion', async () => {
-      await expect(
-        crearProveedor(
-          sesionAdmin(),
-          {
-            modalidadFacturacion: 'solo_con',
-            nombre: 'Factura sin RFC',
-            roles: [rolMaquila],
-            factura: true,
-          },
-          bd(),
-        ),
-      ).rejects.toBeInstanceOf(ErrorValidacion);
+    // ⭐ Fila 0.124: la regla `factura ⇒ RFC + régimen` colgaba de la casilla `factura`, que se
+    // retiró del contrato de escritura. NO se remapeó a la modalidad A PROPÓSITO: habría bloqueado
+    // justo el trabajo que abrió la 0.110 —ponerle la modalidad a los proveedores MIGRADOS, que
+    // llegan sin RFC A PROPÓSITO (REGLA 0-B: lo que falta se tolera, no se compensa)—. El RFC se
+    // sigue exigiendo donde decide dinero: al capturar un CFDI a su nombre (`exigirRfcDelProveedor`).
+    it('⭐ el que factura se puede dar de alta SIN RFC, y la columna vieja no se escribe', async () => {
+      const p = await crearProveedor(
+        sesionAdmin(),
+        { modalidadFacturacion: 'solo_con', nombre: 'Factura sin RFC', roles: [rolMaquila] },
+        bd(),
+      );
+      expect(p.modalidadFacturacion).toBe('solo_con');
+      expect(p.rfc).toBeNull();
+      // La única respuesta a "¿factura?" vive en la modalidad: el alta NO toca la columna histórica.
+      expect(p.factura).toBeNull();
     });
 
     it('rechaza un rol inexistente → ErrorValidacion (y NO crea el proveedor: A2)', async () => {
@@ -436,16 +436,26 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       expect(bitacora.datos).toMatchObject({ diasCredito: { de: 0, a: 45 } });
     });
 
-    it('factura ⇒ RFC también aplica en edición', async () => {
+    // ⭐ Fila 0.124: la edición ya no captura `factura` —salió del contrato— y tampoco la repara.
+    it('⭐ editar la modalidad no toca la columna histórica `factura` (REGLA 0-B)', async () => {
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { modalidadFacturacion: 'solo_con', nombre: 'Prov', roles: [rolMaquila] },
+        { modalidadFacturacion: 'solo_sin', nombre: 'Prov', roles: [rolMaquila] },
         bd(),
       );
-      await expect(
-        actualizarProveedor(sesion, { id: proveedor.id, factura: true }, bd()),
-      ).rejects.toBeInstanceOf(ErrorValidacion);
+      // Un registro con el valor viejo ya cargado, como los que hay en `prueba`.
+      await cliente.proveedor.update({ where: { id: proveedor.id }, data: { factura: false } });
+
+      const editado = await actualizarProveedor(
+        sesion,
+        { id: proveedor.id, modalidadFacturacion: 'solo_con' },
+        bd(),
+      );
+
+      expect(editado.modalidadFacturacion).toBe('solo_con');
+      // Ni se pisa ni se "arregla": el dato viejo se queda donde está y nadie lo lee.
+      expect(editado.factura).toBe(false);
     });
 
     // M1: en edición, mandar `null` en un campo opcional ya capturado lo BORRA
