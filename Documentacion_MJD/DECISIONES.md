@@ -12136,6 +12136,25 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.199) — LO PENDIENTE DE LA DECISIÓN SE VE JUNTO AL SALDO (fila 0.111, 4-sep-2026): qué cuenta como «por revisar» y cómo se valúa
+
+**Contexto.** Daniel, 3-sep: *«cada semana me pueda meter a algún lugar donde estén todos los maquileros que tengan algo pendiente por pagar o por descontar»* · *«**no quiero otra pantalla** para ver los pendientes»* · *«es una de las pantallas más importantes del sistema, debe estar muy bien hecha»*. El tablero ya existía y desde la 0.115 tenía su columna «Por revisar», pero **sólo contaba abonos, descuentos y pagos capturados**: los **cargos `propuesto`** —los recibos de maquila (y, desde la 0.114, los cortes y empaques) que esperan que él fije cantidad y precio— no contaban en ninguna de las tres puertas. Un maquilero con diez recibos sin validar y nada más tenía saldo cero, pendiente cero y era **invisible**, que es exactamente el trabajo que hay que decidir cada semana.
+
+**Lo que se construyó:** el criterio de «¿qué cargo espera decisión?» vive en la definición única del saldo (`formula-saldo.ts`: `estado = 'propuesto'` **y** `sin_costo = FALSE`), y la **valuación** en un solo módulo nuevo (`esma/cargo-propuesto.ts`), en sus dos formas —TypeScript y SQL agregada— derivadas de la misma constante. El precio de referencia es el de la orden por proceso (costura `maquilaOrd`, el resto `aplicacionOrd`) con caída al `precioPactado` de la etapa; un **cargo de servicio** (corte o empaque, fila 0.114) se valúa **sólo** con su propio `precioPactado`, porque la orden no tiene precio de corte ni de empaque. Las tres puertas leen del mismo agregado: tablero, bandeja de CxP y corrida semanal.
+
+**Decisiones del lead (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido |
+|---|---|---|
+| a | ¿El importe por revisar suma al saldo? | **No**: el saldo sigue siendo sólo lo revisado; lo pendiente se enseña al lado, con su conteo. |
+| b | ¿Un cargo `sinCosto` (segundas que no se pagan) cuenta como pendiente? | **No**: ni como partida ni como importe. |
+| c | ¿Qué pasa con un cargo propuesto **sin precio**? | Cuenta como **partida** y se declara aparte que no se puede valuar (nunca vale cero ni desaparece). |
+| d | ¿En qué relación cae un cargo propuesto al partir por segmento? | En la **sin factura**: su `conFactura` es NULL hasta que se valida, y ése es el criterio único de siempre. |
+
+**Hallazgo medido durante la construcción:** al agregado en lote que alimenta la bandeja de CxP le faltaba incluir a los proveedores que sólo tienen cargos propuestos; sin ese arreglo, el maquilero con sólo recibos por validar **nunca** habría aparecido en Cuentas por pagar, ni siquiera con la columna nueva.
+
+---
+
 #### (Post-F9.198) — VALIDAR ES DE DANIEL (fila 0.128, 4-sep-2026): un permiso nuevo, cinco perfiles sin validar, y cuatro defaults que Daniel confirma o ajusta
 
 **Contexto.** Daniel, §Post-F9.192 (1): *«la entrada la da la persona responsable de recibos o de producción. Pero **la validación sólo la doy yo**. O sea, es un permiso para meter lo recibido y otro para validarlo»*. El repaso midió que validar cargos (`esma.cargo-validar`) y revisar partidas (que colgaba de `esma.modificar`, el mismo permiso que capturar) se sembraban en TODOS los perfiles: cualquiera podía convertir un recibo en deuda fijando el precio.
