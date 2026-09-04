@@ -62858,7 +62858,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen */
+    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen, por segmento de facturación */
     get: {
       parameters: {
         query?: {
@@ -62870,6 +62870,8 @@ export interface paths {
           filtro?: 'con-saldo' | 'todos';
           /** @description Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas). */
           busqueda?: string;
+          /** @description todos = cartera completa; con = sólo lo CON factura (fiscal / con_factura); sin = sólo lo SIN factura, incluido lo sin definir. */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path?: never;
@@ -62877,7 +62879,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen). */
+        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -62928,7 +62930,7 @@ export interface paths {
               porPagina: number;
               /** @description Total de páginas. */
               totalPaginas: number;
-              /** @description KPIs sobre toda la cartera con saldo. */
+              /** @description KPIs sobre toda la cartera con saldo DEL SEGMENTO pedido (no de la cartera completa). */
               resumen: {
                 /** @description Cartera total por pagar (Σ saldos combinados: motor + maquila). */
                 carteraTotal: number | null;
@@ -62954,6 +62956,11 @@ export interface paths {
                   partidas: number;
                 };
               };
+              /**
+               * @description Segmento aplicado (todos/con/sin factura). Viaja de vuelta porque las filas Y el resumen son de ESE segmento: sin él, una cartera parcial se leería como la total.
+               * @enum {string}
+               */
+              segmento: 'todos' | 'con' | 'sin';
               /** @description Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas. */
               limitesAging: {
                 /** @description Fin de la 1ª cubeta vencida (días de atraso). */
@@ -67022,6 +67029,7 @@ export interface paths {
                 /** @enum {string} */
                 rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
                 renglones: {
+                  id: number;
                   /** @enum {string} */
                   rubro:
                     | 'maquila'
@@ -67042,6 +67050,42 @@ export interface paths {
                   monto: number | null;
                   concepto: string | null;
                   referencia: string | null;
+                  facturacion: {
+                    /** @description ¿Se puede emitir el documento para facturar de este renglón? */
+                    facturable: boolean;
+                    motivo:
+                      | (
+                          | 'sinFactura'
+                          | 'concepto'
+                          | 'proveedorNoLegible'
+                          | 'efectivo'
+                          | 'sinMonto'
+                          | 'estado'
+                          | 'faltantes'
+                        )
+                      | null;
+                    motivoTexto: string | null;
+                    faltantes: {
+                      /**
+                       * @description De quién falta el dato.
+                       * @enum {string}
+                       */
+                      quien: 'proveedor' | 'empresa';
+                      /**
+                       * @description Qué dato falta.
+                       * @enum {string}
+                       */
+                      campo:
+                        | 'razonSocial'
+                        | 'rfc'
+                        | 'regimenFiscalSat'
+                        | 'codigoPostalExpedicion'
+                        | 'codigoPostalFiscal'
+                        | 'usoCfdiHabitual';
+                      /** @description El aviso, con el nombre de quien tiene el hueco. */
+                      texto: string;
+                    }[];
+                  };
                 }[];
                 /** @description Totales de efectivo y transferencia (los de su relación semanal). */
                 totales: {
@@ -67067,6 +67111,439 @@ export interface paths {
             };
           };
         };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Los datos con los que el proveedor debe facturar este pago (o por qué no se emite) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+          /** @description Id del renglón. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description El documento para facturar de un renglón, o el motivo por el que no se emite. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              facturable: boolean;
+              /** @description Por qué no se emite, o null. */
+              motivo:
+                | (
+                    | 'sinFactura'
+                    | 'concepto'
+                    | 'proveedorNoLegible'
+                    | 'efectivo'
+                    | 'sinMonto'
+                    | 'estado'
+                    | 'faltantes'
+                  )
+                | null;
+              /** @description El porqué, en palabras, o null. */
+              motivoTexto: string | null;
+              /** @description Los datos fiscales que faltan (vacío si no es ése el problema). */
+              faltantes: {
+                /**
+                 * @description De quién falta el dato.
+                 * @enum {string}
+                 */
+                quien: 'proveedor' | 'empresa';
+                /**
+                 * @description Qué dato falta.
+                 * @enum {string}
+                 */
+                campo:
+                  | 'razonSocial'
+                  | 'rfc'
+                  | 'regimenFiscalSat'
+                  | 'codigoPostalExpedicion'
+                  | 'codigoPostalFiscal'
+                  | 'usoCfdiHabitual';
+                /** @description El aviso, con el nombre de quien tiene el hueco. */
+                texto: string;
+              }[];
+              documento: {
+                idCorrida: number;
+                idRenglon: number;
+                /** @description Folio de la corrida (por empresa). */
+                folioCorrida: number;
+                /** @description Lunes de la semana que se paga (AAAA-MM-DD). */
+                semana: string;
+                /** @description A nombre de quién se factura (la empresa activa, A9). */
+                receptor: {
+                  /** @description Nombre legal con el que se timbra. */
+                  razonSocial: string;
+                  rfc: string;
+                  /** @description Clave del régimen fiscal del SAT. */
+                  regimenFiscalSat: string;
+                  /** @description CP: del domicilio fiscal (receptor) o de expedición (emisor). */
+                  codigoPostal: string;
+                };
+                /** @description Quién va a emitir la factura (el proveedor). */
+                emisor: {
+                  /** @description Nombre legal con el que se timbra. */
+                  razonSocial: string;
+                  rfc: string;
+                  /** @description Clave del régimen fiscal del SAT. */
+                  regimenFiscalSat: string;
+                  /** @description CP: del domicilio fiscal (receptor) o de expedición (emisor). */
+                  codigoPostal: string;
+                };
+                nombreProveedor: string;
+                /** @description Clave del uso de CFDI que declara el receptor (p. ej. G03). */
+                usoCfdi: string;
+                /** @description true = el proveedor no lo tiene capturado y va el default G03, marcado como tal. */
+                usoCfdiSugerido: boolean;
+                /** @description Qué se está pagando (el del renglón, o uno armado por rubro). */
+                concepto: string;
+                /** @description Folios de remisiones/recibos que ampara, o null. */
+                referencia: string | null;
+                /** @description Clave del SAT de la forma de pago (03 = transferencia). */
+                formaPagoSat: string;
+                formaPagoTexto: string;
+                /** @description Clave del SAT del método de pago (PUE). */
+                metodoPagoSat: string;
+                metodoPagoTexto: string;
+                /** @description Moneda del comprobante (MXN). */
+                moneda: string;
+                /** @description Base gravable. */
+                subtotal: number;
+                /** @description IVA trasladado (explícito, nunca escondido en el total). */
+                iva: number;
+                /** @description La tasa como se imprime («16 %»). */
+                tasaIvaTexto: string;
+                /** @description Lo que se transfiere. subtotal + iva === total, al centavo. */
+                total: number;
+              } | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion.pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Documento para facturar de UN pago (PDF) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+          /** @description Id del renglón. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/documentos-facturacion.pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Documentos para facturar de TODA la corrida, con la hoja de los que no se emitieron */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
         /** @description Respuesta de error de la API. */
         400: {
           headers: {
@@ -111587,6 +112064,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -111713,6 +112194,8 @@ export interface paths {
             nombre: string;
             razonSocial?: string;
             rfc?: string;
+            regimenFiscalSat?: string;
+            codigoPostalFiscal?: string;
             identificador?: string;
             /** @default false */
             favorita?: boolean;
@@ -111739,6 +112222,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -111891,6 +112378,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -112032,6 +112523,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -112162,6 +112657,8 @@ export interface paths {
             nombre?: string;
             razonSocial?: string;
             rfc?: string;
+            regimenFiscalSat?: string;
+            codigoPostalFiscal?: string;
             identificador?: string;
             favorita?: boolean;
             paraIpt?: boolean;
@@ -112186,6 +112683,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */

@@ -53,6 +53,17 @@ const esquemaCrearEmpresa = z.object({
     .max(13)
     .refine((v) => v === '' || esRfcValido(v), 'El RFC no tiene una forma válida.')
     .optional(),
+  /**
+   * ⭐ Régimen fiscal del SAT de esta empresa como RECEPTOR (fila 0.118). Validación SUAVE (largo),
+   * igual que la del proveedor: el catálogo del SAT no vive aquí. '' = no capturado.
+   */
+  regimenFiscalSat: z.string().trim().max(10).optional(),
+  /** ⭐ CP del DOMICILIO FISCAL del receptor (fila 0.118). '' = no capturado; si viene, 5 dígitos. */
+  codigoPostalFiscal: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\d{5}$/.test(v), 'El código postal debe tener 5 dígitos.')
+    .optional(),
   /** Identificador corto para folios e impresos (viejo: `Identificador`). */
   identificador: z.string().trim().max(20).optional(),
   favorita: z.boolean().default(false),
@@ -120,6 +131,15 @@ const esquemaConfiguracion = z
 
 export type EntradaConfiguracionEmpresa = z.input<typeof esquemaConfiguracion>;
 
+/**
+ * Texto opcional del formulario → columna: `undefined` o `''` se guardan como NULL. Vaciar el campo
+ * en la pantalla es la forma de BORRARLO, y guardar `''` dejaría una empresa «con régimen fiscal»
+ * cuyo régimen es la cadena vacía — que a la hora de emitir el documento no se distingue de tenerlo.
+ */
+function vacioEsNulo(valor: string | undefined): string | null {
+  return valor === undefined || valor === '' ? null : valor;
+}
+
 /** Busca la empresa o lanza `ErrorNoEncontrado`. */
 async function exigirEmpresa(tx: Tx, id: number): Promise<Empresa> {
   const empresa = await tx.empresa.findUnique({ where: { id } });
@@ -167,6 +187,8 @@ export async function crearEmpresa(
           nombre: datos.nombre,
           razonSocial: datos.razonSocial ?? null,
           rfc: datos.rfc === undefined || datos.rfc === '' ? null : datos.rfc,
+          regimenFiscalSat: vacioEsNulo(datos.regimenFiscalSat),
+          codigoPostalFiscal: vacioEsNulo(datos.codigoPostalFiscal),
           identificador: datos.identificador ?? null,
           favorita: datos.favorita,
           paraIpt: datos.paraIpt,
@@ -233,6 +255,12 @@ export async function actualizarEmpresa(
           ...(datos.nombre === undefined ? {} : { nombre: datos.nombre }),
           ...(datos.razonSocial === undefined ? {} : { razonSocial: datos.razonSocial }),
           ...(datos.rfc === undefined ? {} : { rfc: datos.rfc === '' ? null : datos.rfc }),
+          ...(datos.regimenFiscalSat === undefined
+            ? {}
+            : { regimenFiscalSat: vacioEsNulo(datos.regimenFiscalSat) }),
+          ...(datos.codigoPostalFiscal === undefined
+            ? {}
+            : { codigoPostalFiscal: vacioEsNulo(datos.codigoPostalFiscal) }),
           ...(datos.identificador === undefined ? {} : { identificador: datos.identificador }),
           ...(datos.favorita === undefined ? {} : { favorita: datos.favorita }),
           ...(datos.paraIpt === undefined ? {} : { paraIpt: datos.paraIpt }),

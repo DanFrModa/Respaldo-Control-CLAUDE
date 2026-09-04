@@ -23,6 +23,7 @@
 import { z } from 'zod';
 
 import { FORMAS_DE_PAGO, RUBROS_PAGO } from './concepto-pago.js';
+import { esquemaFacturabilidadRenglon } from './documento-facturacion.js';
 import { TIPOS_CUENTA_PAGO } from './proveedor.js';
 
 /** Ciclo de vida de una corrida. Espejo del enum Prisma `EstadoCorridaPago`. */
@@ -346,6 +347,12 @@ export type CorridasQuery = z.infer<typeof esquemaCorridasQuery>;
  */
 export const esquemaConcentradoRenglon = z
   .object({
+    /**
+     * ⭐ El id del renglón. Viaja desde la fila 0.118 porque la relación ejecutable dejó de ser sólo
+     * una lista para mirar: de cada renglón sale ahora **el documento para facturar**, y sin su id
+     * no hay a qué apuntar el botón.
+     */
+    id: z.number().int(),
     rubro: z.enum(RUBROS_PAGO),
     nombre: z.string(),
     beneficiario: z.string(),
@@ -358,6 +365,14 @@ export const esquemaConcentradoRenglon = z
     /** La explicación del pago: la columna que finanzas lee para ejecutar la transferencia. */
     concepto: z.string().nullable(),
     referencia: z.string().nullable(),
+    /**
+     * ⭐ ¿De este renglón sale el DOCUMENTO PARA FACTURAR (fila 0.118)? Viaja resuelto en el
+     * concentrado —y no en una llamada por renglón— para que la pantalla pinte los N botones de una
+     * relación de 40 renglones sin 40 peticiones. Cuando `facturable` es `false`, `motivoTexto` y
+     * `faltantes` dicen exactamente qué falta y de quién, que es lo que Daniel pidió: *«hay que
+     * AVISAR cuál falta, nunca inventarlo»*.
+     */
+    facturacion: esquemaFacturabilidadRenglon,
   })
   .describe('Un renglón de la relación ejecutable.');
 

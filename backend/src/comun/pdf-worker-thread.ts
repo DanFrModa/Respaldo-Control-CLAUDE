@@ -100,6 +100,14 @@ const REGISTRO_PDF = {
   'esma-recibo-pago': async () =>
     (await import('../dominio/esma/impresos/impreso-recibo-pago.js')).generarPdfReciboPago,
 
+  // ── Pagos (el documento para facturar, fila 0.118) ───────────────────────────
+  'documento-facturacion': async () =>
+    (await import('../dominio/pagos/impresos/impreso-documento-facturacion.js'))
+      .generarPdfDocumentoFacturacion,
+  'documentos-facturacion-corrida': async () =>
+    (await import('../dominio/pagos/impresos/impreso-documento-facturacion.js'))
+      .generarPdfDocumentosCorrida,
+
   // ── Indicadores (tableros directivos + hoja de conteo) ───────────────────────
   'kpis-rc': async () => (await import('../dominio/indicadores/impresos/pdf.js')).generarPdfKpisRc,
   'kpis-calidad': async () =>

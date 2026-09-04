@@ -18,6 +18,18 @@ test.describe('CxP — cuentas por pagar (F9-E2)', () => {
     await expect(page.getByTestId('kpi-cartera')).toBeVisible();
     await expect(page.getByTestId('kpi-vencido')).toBeVisible();
     await expect(page.getByTestId('chip-con-saldo')).toBeVisible();
+    // Fila 0.132: los dos listados de Daniel (Con factura / Sin factura) están en la barra.
+    await expect(page.getByTestId('cxp-segmento-con')).toBeVisible();
+    await expect(page.getByTestId('cxp-segmento-sin')).toBeVisible();
+  });
+
+  test('la relación de pago se abre DIRECTO por la URL (?segmento=)', async ({ page }) => {
+    await entrarComoAdmin(page);
+    await page.goto('/cxp?segmento=sin');
+
+    // El chip llega ya elegido: el enlace del viernes abre el listado que toca, sin clics.
+    await expect(page.getByTestId('cxp-segmento-sin')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('cxp-titulo-tabla')).toContainText('Sin factura');
   });
 
   test('el estado de cuenta del proveedor abre con su selector', async ({ page }) => {

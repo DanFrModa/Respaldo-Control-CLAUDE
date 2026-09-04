@@ -160707,7 +160707,7 @@
     },
     "/api/cxp/por-pagar": {
       "get": {
-        "summary": "Proveedores por pagar con su antigüedad de saldos (aging) + resumen",
+        "summary": "Proveedores por pagar con su antigüedad de saldos (aging) + resumen, por segmento de facturación",
         "tags": [
           "cxp"
         ],
@@ -160759,6 +160759,21 @@
             "name": "busqueda",
             "required": false,
             "description": "Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas)."
+          },
+          {
+            "schema": {
+              "default": "todos",
+              "type": "string",
+              "enum": [
+                "todos",
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "segmento",
+            "required": false,
+            "description": "todos = cartera completa; con = sólo lo CON factura (fiscal / con_factura); sin = sólo lo SIN factura, incluido lo sin definir."
           }
         ],
         "security": [
@@ -160768,7 +160783,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen).",
+            "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento.",
             "content": {
               "application/json": {
                 "schema": {
@@ -161106,7 +161121,16 @@
                         "maquilaPorRevisar"
                       ],
                       "additionalProperties": false,
-                      "description": "KPIs sobre toda la cartera con saldo."
+                      "description": "KPIs sobre toda la cartera con saldo DEL SEGMENTO pedido (no de la cartera completa)."
+                    },
+                    "segmento": {
+                      "type": "string",
+                      "enum": [
+                        "todos",
+                        "con",
+                        "sin"
+                      ],
+                      "description": "Segmento aplicado (todos/con/sin factura). Viaja de vuelta porque las filas Y el resumen son de ESE segmento: sin él, una cartera parcial se leería como la total."
                     },
                     "limitesAging": {
                       "type": "object",
@@ -161139,10 +161163,11 @@
                     "porPagina",
                     "totalPaginas",
                     "resumen",
+                    "segmento",
                     "limitesAging"
                   ],
                   "additionalProperties": false,
-                  "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen)."
+                  "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento."
                 }
               }
             }
@@ -172708,6 +172733,11 @@
                             "items": {
                               "type": "object",
                               "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "rubro": {
                                   "type": "string",
                                   "enum": [
@@ -172806,9 +172836,94 @@
                                       "type": "null"
                                     }
                                   ]
+                                },
+                                "facturacion": {
+                                  "type": "object",
+                                  "properties": {
+                                    "facturable": {
+                                      "type": "boolean",
+                                      "description": "¿Se puede emitir el documento para facturar de este renglón?"
+                                    },
+                                    "motivo": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "sinFactura",
+                                            "concepto",
+                                            "proveedorNoLegible",
+                                            "efectivo",
+                                            "sinMonto",
+                                            "estado",
+                                            "faltantes"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "motivoTexto": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "faltantes": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "quien": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proveedor",
+                                              "empresa"
+                                            ],
+                                            "description": "De quién falta el dato."
+                                          },
+                                          "campo": {
+                                            "type": "string",
+                                            "enum": [
+                                              "razonSocial",
+                                              "rfc",
+                                              "regimenFiscalSat",
+                                              "codigoPostalExpedicion",
+                                              "codigoPostalFiscal",
+                                              "usoCfdiHabitual"
+                                            ],
+                                            "description": "Qué dato falta."
+                                          },
+                                          "texto": {
+                                            "type": "string",
+                                            "description": "El aviso, con el nombre de quien tiene el hueco."
+                                          }
+                                        },
+                                        "required": [
+                                          "quien",
+                                          "campo",
+                                          "texto"
+                                        ],
+                                        "additionalProperties": false,
+                                        "description": "Un dato fiscal que falta para poder emitir el documento."
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "facturable",
+                                    "motivo",
+                                    "motivoTexto",
+                                    "faltantes"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
+                                "id",
                                 "rubro",
                                 "nombre",
                                 "beneficiario",
@@ -172819,7 +172934,8 @@
                                 "formaPago",
                                 "monto",
                                 "concepto",
-                                "referencia"
+                                "referencia",
+                                "facturacion"
                               ],
                               "additionalProperties": false,
                               "description": "Un renglón de la relación ejecutable."
@@ -172949,6 +173065,814 @@
               }
             }
           },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion": {
+      "get": {
+        "summary": "Los datos con los que el proveedor debe facturar este pago (o por qué no se emite)",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idRenglon",
+            "required": true,
+            "description": "Id del renglón."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El documento para facturar de un renglón, o el motivo por el que no se emite.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "facturable": {
+                      "type": "boolean"
+                    },
+                    "motivo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sinFactura",
+                            "concepto",
+                            "proveedorNoLegible",
+                            "efectivo",
+                            "sinMonto",
+                            "estado",
+                            "faltantes"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué no se emite, o null."
+                    },
+                    "motivoTexto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El porqué, en palabras, o null."
+                    },
+                    "faltantes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "quien": {
+                            "type": "string",
+                            "enum": [
+                              "proveedor",
+                              "empresa"
+                            ],
+                            "description": "De quién falta el dato."
+                          },
+                          "campo": {
+                            "type": "string",
+                            "enum": [
+                              "razonSocial",
+                              "rfc",
+                              "regimenFiscalSat",
+                              "codigoPostalExpedicion",
+                              "codigoPostalFiscal",
+                              "usoCfdiHabitual"
+                            ],
+                            "description": "Qué dato falta."
+                          },
+                          "texto": {
+                            "type": "string",
+                            "description": "El aviso, con el nombre de quien tiene el hueco."
+                          }
+                        },
+                        "required": [
+                          "quien",
+                          "campo",
+                          "texto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Un dato fiscal que falta para poder emitir el documento."
+                      },
+                      "description": "Los datos fiscales que faltan (vacío si no es ése el problema)."
+                    },
+                    "documento": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "idCorrida": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "idRenglon": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "folioCorrida": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Folio de la corrida (por empresa)."
+                            },
+                            "semana": {
+                              "type": "string",
+                              "description": "Lunes de la semana que se paga (AAAA-MM-DD)."
+                            },
+                            "receptor": {
+                              "type": "object",
+                              "properties": {
+                                "razonSocial": {
+                                  "type": "string",
+                                  "description": "Nombre legal con el que se timbra."
+                                },
+                                "rfc": {
+                                  "type": "string"
+                                },
+                                "regimenFiscalSat": {
+                                  "type": "string",
+                                  "description": "Clave del régimen fiscal del SAT."
+                                },
+                                "codigoPostal": {
+                                  "type": "string",
+                                  "description": "CP: del domicilio fiscal (receptor) o de expedición (emisor)."
+                                }
+                              },
+                              "required": [
+                                "razonSocial",
+                                "rfc",
+                                "regimenFiscalSat",
+                                "codigoPostal"
+                              ],
+                              "additionalProperties": false,
+                              "description": "A nombre de quién se factura (la empresa activa, A9)."
+                            },
+                            "emisor": {
+                              "type": "object",
+                              "properties": {
+                                "razonSocial": {
+                                  "type": "string",
+                                  "description": "Nombre legal con el que se timbra."
+                                },
+                                "rfc": {
+                                  "type": "string"
+                                },
+                                "regimenFiscalSat": {
+                                  "type": "string",
+                                  "description": "Clave del régimen fiscal del SAT."
+                                },
+                                "codigoPostal": {
+                                  "type": "string",
+                                  "description": "CP: del domicilio fiscal (receptor) o de expedición (emisor)."
+                                }
+                              },
+                              "required": [
+                                "razonSocial",
+                                "rfc",
+                                "regimenFiscalSat",
+                                "codigoPostal"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Quién va a emitir la factura (el proveedor)."
+                            },
+                            "nombreProveedor": {
+                              "type": "string"
+                            },
+                            "usoCfdi": {
+                              "type": "string",
+                              "description": "Clave del uso de CFDI que declara el receptor (p. ej. G03)."
+                            },
+                            "usoCfdiSugerido": {
+                              "type": "boolean",
+                              "description": "true = el proveedor no lo tiene capturado y va el default G03, marcado como tal."
+                            },
+                            "concepto": {
+                              "type": "string",
+                              "description": "Qué se está pagando (el del renglón, o uno armado por rubro)."
+                            },
+                            "referencia": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Folios de remisiones/recibos que ampara, o null."
+                            },
+                            "formaPagoSat": {
+                              "type": "string",
+                              "description": "Clave del SAT de la forma de pago (03 = transferencia)."
+                            },
+                            "formaPagoTexto": {
+                              "type": "string"
+                            },
+                            "metodoPagoSat": {
+                              "type": "string",
+                              "description": "Clave del SAT del método de pago (PUE)."
+                            },
+                            "metodoPagoTexto": {
+                              "type": "string"
+                            },
+                            "moneda": {
+                              "type": "string",
+                              "description": "Moneda del comprobante (MXN)."
+                            },
+                            "subtotal": {
+                              "type": "number",
+                              "description": "Base gravable."
+                            },
+                            "iva": {
+                              "type": "number",
+                              "description": "IVA trasladado (explícito, nunca escondido en el total)."
+                            },
+                            "tasaIvaTexto": {
+                              "type": "string",
+                              "description": "La tasa como se imprime («16 %»)."
+                            },
+                            "total": {
+                              "type": "number",
+                              "description": "Lo que se transfiere. subtotal + iva === total, al centavo."
+                            }
+                          },
+                          "required": [
+                            "idCorrida",
+                            "idRenglon",
+                            "folioCorrida",
+                            "semana",
+                            "receptor",
+                            "emisor",
+                            "nombreProveedor",
+                            "usoCfdi",
+                            "usoCfdiSugerido",
+                            "concepto",
+                            "referencia",
+                            "formaPagoSat",
+                            "formaPagoTexto",
+                            "metodoPagoSat",
+                            "metodoPagoTexto",
+                            "moneda",
+                            "subtotal",
+                            "iva",
+                            "tasaIvaTexto",
+                            "total"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El documento con el que el proveedor debe facturar (fila 0.118)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "facturable",
+                    "motivo",
+                    "motivoTexto",
+                    "faltantes",
+                    "documento"
+                  ],
+                  "additionalProperties": false,
+                  "description": "El documento para facturar de un renglón, o el motivo por el que no se emite."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion.pdf": {
+      "get": {
+        "summary": "Documento para facturar de UN pago (PDF)",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idRenglon",
+            "required": true,
+            "description": "Id del renglón."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/documentos-facturacion.pdf": {
+      "get": {
+        "summary": "Documentos para facturar de TODA la corrida, con la hoja de los que no se emitieron",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {
@@ -274363,6 +275287,28 @@
                         ],
                         "description": "RFC fiscal de la empresa (F9-E3), o null."
                       },
+                      "regimenFiscalSat": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                      },
+                      "codigoPostalFiscal": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                      },
                       "identificador": {
                         "anyOf": [
                           {
@@ -274441,6 +275387,8 @@
                       "nombre",
                       "razonSocial",
                       "rfc",
+                      "regimenFiscalSat",
+                      "codigoPostalFiscal",
                       "identificador",
                       "favorita",
                       "paraIpt",
@@ -274631,6 +275579,13 @@
                     "type": "string",
                     "maxLength": 13
                   },
+                  "regimenFiscalSat": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "codigoPostalFiscal": {
+                    "type": "string"
+                  },
                   "identificador": {
                     "type": "string",
                     "maxLength": 20
@@ -274699,6 +275654,28 @@
                         }
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
+                    },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
                     },
                     "identificador": {
                       "anyOf": [
@@ -274778,6 +275755,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -275007,6 +275986,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -275085,6 +276086,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -275274,6 +276277,13 @@
                     "type": "string",
                     "maxLength": 13
                   },
+                  "regimenFiscalSat": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "codigoPostalFiscal": {
+                    "type": "string"
+                  },
                   "identificador": {
                     "type": "string",
                     "maxLength": 20
@@ -275353,6 +276363,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -275431,6 +276463,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -275658,6 +276692,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -275736,6 +276792,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
