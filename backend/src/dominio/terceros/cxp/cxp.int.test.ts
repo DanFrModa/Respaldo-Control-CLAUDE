@@ -13,7 +13,10 @@
  *  (i) la cancelación de CxP es por inverso auditado y rechaza un movimiento que NO es de proveedor;
  *  (j) el estado de cuenta del proveedor delega al motor (incluye la convivencia EsMa);
  *  (k) §Post-F9.188(a): el maquilero con TODO sin revisar NO desaparece de la bandeja (saldo 0 +
- *      «por revisar» explicado); los KPIs siguen contando sólo saldo ≠ 0.
+ *      «por revisar» explicado); los KPIs siguen contando sólo saldo ≠ 0;
+ *  (m) fila 0.132: la BANDEJA partida en las dos relaciones de pago (con/sin factura) — filas,
+ *      antigüedad y KPIs son los del segmento; la CARTERA y la MAQUILA parten exacto
+ *      (`con + sin = todos`) y el VENCIDO se netea DENTRO de cada relación, a propósito.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -826,5 +829,228 @@ describe('segmentación con/sin factura sobre movimientos de EsMa (conFactura NU
       bd(),
     );
     expect(fiscal.total).toBe(1);
+  });
+});
+
+// ── (m) ⭐⭐ LA BANDEJA, PARTIDA EN DOS RELACIONES DE PAGO (fila 0.132, §Post-F9.192(5)) ───────────
+//
+// Daniel, sobre la bandeja del viernes ("a quién le debo"): *«debería partirse en Con factura / Sin
+// factura, con totales y ANTIGÜEDAD por separado, porque son dos relaciones de pago distintas»*.
+//
+// Aquí se mide contra Postgres lo que el doble de `bandeja-segmento.test.ts` no puede medir: que los
+// DOS criterios reales —`es_fiscal` (NOT NULL) en el motor y `con_factura` (NULLABLE) en EsMa— parten
+// la MISMA cartera sin que se caiga un peso. El maquilero con `con_factura = null` es el caso que
+// obliga: si el segmento "sin" lo dejara fuera, ese dinero no saldría en NINGUNA de las dos
+// relaciones y nadie lo pagaría nunca.
+//
+// ⚠️ Y aquí se fija el límite de esa suma: **parten exacto la CARTERA y la MAQUILA, NO el vencido**.
+// El neteo de créditos (`aging-comun.ts`) corre DENTRO del universo agregado, así que un pago sin
+// factura no rejuvenece una deuda facturada — que es lo correcto, y lo que el último `it` protege.
+describe('bandeja de CxP partida por segmento (con/sin factura)', () => {
+  /** Siembra un CARGO EsMa validado para `idMaquilero`, con la marca de factura que se le pida. */
+  async function cargoEsMaDe(
+    idMaquilero: number,
+    conFactura: boolean | null,
+    importe: number,
+  ): Promise<void> {
+    const tipoProceso = await cliente.tipoProceso.upsert({
+      where: { codigo: 'costura' },
+      update: {},
+      create: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+    });
+    const clienteNegocio = await cliente.cliente.create({
+      data: { nombre: `Cliente Seg ${String(importe)}` },
+    });
+    const pedido = await cliente.pedido.create({
+      data: { folio: BigInt(importe), idEmpresa: empresa.id, idCliente: clienteNegocio.id },
+    });
+    const modelo = await cliente.modelo.create({
+      data: { codigo: `MOD-SEG-${String(importe)}`, descripcion: 'Modelo' },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: 1, precio: importe },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: BigInt(importe),
+        idEmpresa: empresa.id,
+        idPedidoLinea: linea.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocio.id,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+      },
+    });
+    await cliente.esMaCargo.create({
+      data: {
+        idEmpresa: empresa.id,
+        idMaquilero,
+        idOrden: orden.id,
+        idTipoProceso: tipoProceso.id,
+        estado: 'validado',
+        cantidadReal: 1,
+        precioReal: importe,
+        conFactura,
+      },
+    });
+  }
+
+  /**
+   * El escenario, con las DOS cubetas distintas a propósito (es la mitad "antigüedad por separado"):
+   *  • proveedor (Hilaturas, 5 días de crédito): 1,000 CON factura fechado hace 50 días (atraso 45 →
+   *    cubeta 31–60) y 400 SIN factura de hoy (corriente). El MISMO proveedor en las dos relaciones.
+   *  • maquilero: 300 de maquila EsMa con `con_factura` SIN DEFINIR → cuenta como "sin".
+   */
+  async function sembrarLasDosRelaciones(): Promise<number> {
+    await registrarMovimientoTercero(
+      sesion(),
+      {
+        tipoTercero: 'proveedor',
+        idTercero: proveedor.id,
+        fecha: hace(50),
+        origen: 'factura_proveedor',
+        importe: 1000,
+        esFiscal: true,
+      },
+      bd(),
+    );
+    // `entrada_sin_factura` es SIN factura por definición del origen (nunca fiscal).
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'entrada_sin_factura', importe: 400 },
+      bd(),
+    );
+    const maquilero = await cliente.proveedor.create({
+      data: { modalidadFacturacion: 'ambos', nombre: 'Maquilas del Sur' },
+    });
+    await cargoEsMaDe(maquilero.id, null, 300);
+    return maquilero.id;
+  }
+
+  it('sin segmento la bandeja es la de siempre: la cartera COMPLETA', async () => {
+    const idMaquilero = await sembrarLasDosRelaciones();
+    const todos = await bandejaPorPagar(sesion(), {}, bd());
+
+    expect(todos.segmento).toBe('todos');
+    expect(todos.filas.find((f) => f.idProveedor === proveedor.id)).toMatchObject({
+      corriente: 400,
+      d31a60: 1000,
+      saldo: 1400,
+    });
+    expect(todos.filas.find((f) => f.idProveedor === idMaquilero)).toMatchObject({ maquila: 300 });
+    expect(todos.resumen).toMatchObject({ carteraTotal: 1700, maquilaTotal: 300, vencido: 1000 });
+  });
+
+  it('⭐ `con` trae SÓLO lo fiscal: sin la maquila sin definir, y con su propia antigüedad', async () => {
+    const idMaquilero = await sembrarLasDosRelaciones();
+    const con = await bandejaPorPagar(sesion(), { segmento: 'con' }, bd());
+
+    expect(con.segmento).toBe('con');
+    // El mismo proveedor, pero sólo con lo que se le paga CON factura (y en su cubeta, la 31–60).
+    expect(con.filas.find((f) => f.idProveedor === proveedor.id)).toMatchObject({
+      corriente: 0,
+      d31a60: 1000,
+      saldo: 1000,
+    });
+    // El maquilero sin definir NO pertenece a esta relación.
+    expect(con.filas.find((f) => f.idProveedor === idMaquilero)).toBeUndefined();
+    expect(con.resumen).toMatchObject({
+      carteraTotal: 1000,
+      maquilaTotal: 0,
+      vencido: 1000,
+      alCorrientePct: 0, // todo lo de esta relación está vencido
+      proveedoresConSaldo: 1,
+    });
+  });
+
+  it('⭐ `sin` trae el no-fiscal del motor Y la maquila SIN DEFINIR (que no se cae de las dos)', async () => {
+    const idMaquilero = await sembrarLasDosRelaciones();
+    const sin = await bandejaPorPagar(sesion(), { segmento: 'sin' }, bd());
+
+    expect(sin.segmento).toBe('sin');
+    expect(sin.filas.find((f) => f.idProveedor === proveedor.id)).toMatchObject({
+      corriente: 400,
+      d31a60: 0,
+      saldo: 400,
+    });
+    // 🔴 El caso que obliga a que "sin" incluya lo migrado sin definir.
+    expect(sin.filas.find((f) => f.idProveedor === idMaquilero)).toMatchObject({ maquila: 300 });
+    expect(sin.resumen).toMatchObject({
+      carteraTotal: 700, // 400 del motor + 300 de maquila
+      maquilaTotal: 300,
+      vencido: 0,
+      alCorrientePct: 100, // nada vencido en esta relación
+      proveedoresConSaldo: 2,
+    });
+  });
+
+  it('⭐ con + sin = todos en CARTERA y MAQUILA (ningún peso fuera de las dos relaciones)', async () => {
+    await sembrarLasDosRelaciones();
+    const todos = await bandejaPorPagar(sesion(), {}, bd());
+    const con = await bandejaPorPagar(sesion(), { segmento: 'con' }, bd());
+    const sin = await bandejaPorPagar(sesion(), { segmento: 'sin' }, bd());
+
+    expect((con.resumen.carteraTotal ?? 0) + (sin.resumen.carteraTotal ?? 0)).toBe(
+      todos.resumen.carteraTotal,
+    );
+    expect((con.resumen.maquilaTotal ?? 0) + (sin.resumen.maquilaTotal ?? 0)).toBe(
+      todos.resumen.maquilaTotal,
+    );
+    // 🔴 El VENCIDO NO se suma así, y es a propósito: el neteo de créditos (`aging-comun.ts`) ocurre
+    // DENTRO del universo agregado, así que un pago de una relación no rejuvenece la deuda de la
+    // otra. Lo fija el `it` de abajo; aquí no se afirma para no volver a escribir una invariante
+    // que sólo se cumple cuando la muestra no tiene créditos (que era el caso de esta siembra).
+  });
+
+  it('⭐ un pago SIN factura NO baja el vencido de «Con factura» (el neteo es por relación)', async () => {
+    // 1,000 CON factura, vencido +60 días (crédito 5 → atraso 90) y un pago de 400 SIN factura al
+    // MISMO proveedor. El pago abona su cuenta, pero no es dinero que haya cubierto esa factura.
+    await registrarMovimientoTercero(
+      sesion(),
+      {
+        tipoTercero: 'proveedor',
+        idTercero: proveedor.id,
+        fecha: hace(95),
+        origen: 'factura_proveedor',
+        importe: 1000,
+        esFiscal: true,
+      },
+      bd(),
+    );
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'pago', importe: 400, esFiscal: false },
+      bd(),
+    );
+
+    const todos = await bandejaPorPagar(sesion(), {}, bd());
+    const con = await bandejaPorPagar(sesion(), { segmento: 'con' }, bd());
+    const sin = await bandejaPorPagar(sesion(), { segmento: 'sin' }, bd());
+
+    // La CARTERA sí parte exacto: 1,000 + (−400) = 600.
+    expect(con.resumen.carteraTotal).toBe(1000);
+    expect(sin.resumen.carteraTotal).toBe(-400);
+    expect(todos.resumen.carteraTotal).toBe(600);
+
+    // 🔴 El VENCIDO no: en «Con factura» siguen debiéndose los 1,000 atrasados, ENTEROS. Si el pago
+    // sin factura los rejuveneciera, la relación de pago del viernes enseñaría 600 de vencido y se
+    // pagaría de menos una factura que lleva 90 días esperando.
+    expect(con.resumen.vencido).toBe(1000);
+    expect(sin.resumen.vencido).toBe(0); // un abono suelto no crea deuda vencida
+    expect(todos.resumen.vencido).toBe(600); // en la vista COMBINADA el pago sí netea
+    // Y la diferencia es EXACTAMENTE el pago (1,000 vs 600 + 400): se afirma en positivo a
+    // propósito — un `.not.toBe` pasaría solo si los tres viajaran vacíos.
+    expect((con.resumen.vencido ?? 0) + (sin.resumen.vencido ?? 0)).toBe(
+      (todos.resumen.vencido ?? 0) + 400,
+    );
+  });
+
+  it('un segmento inventado se rechaza (no se degrada a la cartera completa)', async () => {
+    await expect(
+      // @ts-expect-error — fuera del enum del contrato (lo valida Zod).
+      bandejaPorPagar(sesion(), { segmento: 'fiscal' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });

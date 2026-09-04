@@ -62305,7 +62305,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen */
+    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen, por segmento de facturación */
     get: {
       parameters: {
         query?: {
@@ -62317,6 +62317,8 @@ export interface paths {
           filtro?: 'con-saldo' | 'todos';
           /** @description Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas). */
           busqueda?: string;
+          /** @description todos = cartera completa; con = sólo lo CON factura (fiscal / con_factura); sin = sólo lo SIN factura, incluido lo sin definir. */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path?: never;
@@ -62324,7 +62326,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen). */
+        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -62375,7 +62377,7 @@ export interface paths {
               porPagina: number;
               /** @description Total de páginas. */
               totalPaginas: number;
-              /** @description KPIs sobre toda la cartera con saldo. */
+              /** @description KPIs sobre toda la cartera con saldo DEL SEGMENTO pedido (no de la cartera completa). */
               resumen: {
                 /** @description Cartera total por pagar (Σ saldos combinados: motor + maquila). */
                 carteraTotal: number | null;
@@ -62401,6 +62403,11 @@ export interface paths {
                   partidas: number;
                 };
               };
+              /**
+               * @description Segmento aplicado (todos/con/sin factura). Viaja de vuelta porque las filas Y el resumen son de ESE segmento: sin él, una cartera parcial se leería como la total.
+               * @enum {string}
+               */
+              segmento: 'todos' | 'con' | 'sin';
               /** @description Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas. */
               limitesAging: {
                 /** @description Fin de la 1ª cubeta vencida (días de atraso). */

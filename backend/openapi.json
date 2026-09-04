@@ -159213,7 +159213,7 @@
     },
     "/api/cxp/por-pagar": {
       "get": {
-        "summary": "Proveedores por pagar con su antigüedad de saldos (aging) + resumen",
+        "summary": "Proveedores por pagar con su antigüedad de saldos (aging) + resumen, por segmento de facturación",
         "tags": [
           "cxp"
         ],
@@ -159265,6 +159265,21 @@
             "name": "busqueda",
             "required": false,
             "description": "Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas)."
+          },
+          {
+            "schema": {
+              "default": "todos",
+              "type": "string",
+              "enum": [
+                "todos",
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "segmento",
+            "required": false,
+            "description": "todos = cartera completa; con = sólo lo CON factura (fiscal / con_factura); sin = sólo lo SIN factura, incluido lo sin definir."
           }
         ],
         "security": [
@@ -159274,7 +159289,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen).",
+            "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento.",
             "content": {
               "application/json": {
                 "schema": {
@@ -159612,7 +159627,16 @@
                         "maquilaPorRevisar"
                       ],
                       "additionalProperties": false,
-                      "description": "KPIs sobre toda la cartera con saldo."
+                      "description": "KPIs sobre toda la cartera con saldo DEL SEGMENTO pedido (no de la cartera completa)."
+                    },
+                    "segmento": {
+                      "type": "string",
+                      "enum": [
+                        "todos",
+                        "con",
+                        "sin"
+                      ],
+                      "description": "Segmento aplicado (todos/con/sin factura). Viaja de vuelta porque las filas Y el resumen son de ESE segmento: sin él, una cartera parcial se leería como la total."
                     },
                     "limitesAging": {
                       "type": "object",
@@ -159645,10 +159669,11 @@
                     "porPagina",
                     "totalPaginas",
                     "resumen",
+                    "segmento",
                     "limitesAging"
                   ],
                   "additionalProperties": false,
-                  "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen)."
+                  "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento."
                 }
               }
             }
