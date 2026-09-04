@@ -78,13 +78,29 @@ const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'O
 /** Renglones por página (tabla densa de operación). */
 const POR_PAGINA = 50;
 
-/** Chip de estatus derivado de la fila (proto `opEstatus`): corte 0/parcial/completo o cancelada. */
+/**
+ * Chip de estatus derivado de la fila (proto `opEstatus`): corte 0/parcial/completo, o el FINAL de
+ * la orden cuando ya lo tiene.
+ *
+ * ⭐ **Los dos finales ganan sobre el avance del corte, y por la misma razón (0.061).** Una orden
+ * `cancelada` nunca se produjo; una `cerrada` terminó su vida administrativa y su costo quedó
+ * congelado. En los dos casos, pintar «Cortada» o «En proceso» —lo que salía antes para la
+ * cerrada— diría que la orden sigue en juego, **en la pantalla desde la que se opera a diario**.
+ * La decisión dice que el estado es «el espejo visible» del cierre; éste es el espejo que más se
+ * mira, y era el único donde no se veía.
+ *
+ * Se distinguen por TONO, no sólo por texto: `crit` para la cancelada (algo salió mal) y `neutro`
+ * para la cerrada (es el final NORMAL), igual que el badge de la ficha.
+ */
 export function estatusDeFila(fila: Pick<OrdenCentro, 'estado' | 'cantOrdenada' | 'cantCortada'>): {
   tono: TonoEstado;
   texto: string;
 } {
   if (fila.estado === 'cancelada') {
     return { tono: 'crit', texto: 'Cancelada' };
+  }
+  if (fila.estado === 'cerrada') {
+    return { tono: 'neutro', texto: 'Cerrada' };
   }
   if (fila.cantCortada === 0) {
     return { tono: 'neutro', texto: 'Sin cortar' };
@@ -459,8 +475,12 @@ export function CentroOrdenesPagina(): React.JSX.Element {
 
   const total = consulta.data?.total ?? 0;
   const totalPaginas = consulta.data?.totalPaginas ?? 1;
+  // Cuántas de la página siguen EN JUEGO. ⭐ 0.061: la orden CERRADA no lo está — terminó su vida
+  // administrativa—, así que se excluye igual que la cancelada. Sin esto el contador la seguía
+  // sumando como abierta, que es la misma ceguera al estado nuevo que tenía el chip.
   const abiertas = filas.filter(
-    (f) => estatusDeFila(f).texto !== 'Cortada' && f.estado !== 'cancelada',
+    (f) =>
+      estatusDeFila(f).texto !== 'Cortada' && f.estado !== 'cancelada' && f.estado !== 'cerrada',
   ).length;
 
   function reiniciarPagina(): void {
@@ -1299,9 +1319,12 @@ function DetalleCentroOrden({
       ? estatusDeFila(fila)
       : orden.estado === 'cancelada'
         ? { tono: 'crit' as TonoEstado, texto: 'Cancelada' }
-        : orden.estado === 'completa'
-          ? { tono: 'info' as TonoEstado, texto: 'Completa' }
-          : { tono: 'neutro' as TonoEstado, texto: 'Capturada' };
+        : // 0.061: la CERRADA también es un final, y aquí tampoco se veía.
+          orden.estado === 'cerrada'
+          ? { tono: 'neutro' as TonoEstado, texto: 'Cerrada' }
+          : orden.estado === 'completa'
+            ? { tono: 'info' as TonoEstado, texto: 'Completa' }
+            : { tono: 'neutro' as TonoEstado, texto: 'Capturada' };
   const referencia = orden.referencias[0]?.valor ?? fila?.pedidoCliente ?? null;
 
   return (

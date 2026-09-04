@@ -50,7 +50,8 @@ import type {
   WipOrden,
   WipTotales,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { esquemaEstadoOrden } from '../../contrato/esquemas/orden.js';
+import { TipoEtapaMovimiento, type EstadoOrden, type Prisma } from '../../datos/index.js';
 
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { esquemaPaginacion, type Paginacion } from '../../comun/paginacion.js';
@@ -492,7 +493,8 @@ const esquemaTableroWipDominio = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(200).optional(),
   idModelo: z.number().int().positive().optional(),
   idCliente: z.number().int().positive().optional(),
-  estado: z.enum(['capturada', 'completa', 'cancelada']).optional(),
+  // El esquema del CONTRATO, no una copia de sus valores (0.061 agregó `cerrada`).
+  estado: esquemaEstadoOrden.optional(),
   soloPendientes: z.boolean().default(false),
   ordenarPor: z.enum(['folio', 'fecha', 'fechaEntrega']).default('folio'),
   direccion: z.enum(['asc', 'desc']).default('desc'),
@@ -806,7 +808,8 @@ function aFilaTablero(
   fila: {
     id: number;
     folio: bigint;
-    estado: 'capturada' | 'completa' | 'cancelada';
+    /** Estado de la orden: el TIPO del enum, NUNCA una copia literal de sus valores (0.061). */
+    estado: EstadoOrden;
     fecha: Date | null;
     fechaEntrega: Date | null;
     idModelo: number;

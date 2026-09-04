@@ -288,4 +288,30 @@ describe('estatusDeFila (chip del centro, proto opEstatus)', () => {
       'En proceso',
     );
   });
+
+  // ── ⭐ 0.061 — el otro FINAL también gana sobre el avance del corte ──
+  it('⭐ CERRADA gana al avance del corte: no se pinta «Cortada» ni «En proceso»', () => {
+    // El defecto que cerró esta prueba: una orden cerrada se pintaba igual que una viva en la
+    // pantalla desde la que se opera a diario, mientras el sistema entero le negaba la captura.
+    expect(estatusDeFila({ estado: 'cerrada', cantOrdenada: 10, cantCortada: 10 })).toEqual({
+      tono: 'neutro',
+      texto: 'Cerrada',
+    });
+    expect(estatusDeFila({ estado: 'cerrada', cantOrdenada: 10, cantCortada: 4 }).texto).toBe(
+      'Cerrada',
+    );
+    expect(estatusDeFila({ estado: 'cerrada', cantOrdenada: 10, cantCortada: 0 }).texto).toBe(
+      'Cerrada',
+    );
+  });
+
+  it('y se distingue de la CANCELADA por el tono: neutro (final normal) vs crit (algo falló)', () => {
+    // La rama gemela: sin ella, pintar las dos igual también pasaría la prueba de arriba.
+    expect(estatusDeFila({ estado: 'cerrada', cantOrdenada: 10, cantCortada: 10 }).tono).toBe(
+      'neutro',
+    );
+    expect(estatusDeFila({ estado: 'cancelada', cantOrdenada: 10, cantCortada: 10 }).tono).toBe(
+      'crit',
+    );
+  });
 });

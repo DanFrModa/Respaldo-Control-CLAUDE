@@ -461,6 +461,18 @@ export type OrdenCopiarMatriz =
 /** Cuerpo de cancelacion de orden (`POST /api/ordenes/{id}/cancelar`). */
 export type OrdenCancelar =
   paths['/api/ordenes/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/**
+ * Cuerpo de CERRAR una orden (`POST /api/ordenes/{id}/cerrar`) — 0.061. Motivo OPCIONAL: cerrar es
+ * el final normal de una orden (deja de admitir captura y congela su costo), no una excepcion.
+ */
+export type OrdenCerrar =
+  paths['/api/ordenes/{id}/cerrar']['post']['requestBody']['content']['application/json'];
+/**
+ * Cuerpo de REABRIR una orden cerrada (`POST /api/ordenes/{id}/reabrir`) — 0.061. Motivo
+ * OBLIGATORIO: es el acto inverso auditado (D3) y devuelve el costo a calculo vivo.
+ */
+export type OrdenReabrir =
+  paths['/api/ordenes/{id}/reabrir']['post']['requestBody']['content']['application/json'];
 /** Cuerpo del set COMPLETO de referencias D7 (`PUT /api/ordenes/{id}/referencias`). */
 export type OrdenReferencias =
   paths['/api/ordenes/{id}/referencias']['put']['requestBody']['content']['application/json'];

@@ -631,6 +631,8 @@ export {
   esquemaOrdenMatrizCuerpo,
   esquemaOrdenCopiarMatrizCuerpo,
   esquemaOrdenCancelarCuerpo,
+  esquemaOrdenCerrarCuerpo,
+  esquemaOrdenReabrirCuerpo,
   esquemaOrdenReferenciaEntrada,
   esquemaOrdenReferenciasCuerpo,
   esquemaOrdenComentarioCuerpo,
@@ -652,6 +654,8 @@ export {
   type DatosOrdenMatriz,
   type DatosOrdenCopiarMatriz,
   type DatosOrdenCancelar,
+  type DatosOrdenCerrar,
+  type DatosOrdenReabrir,
   type DatosOrdenReferenciaEntrada,
   type DatosOrdenReferencias,
   type DatosOrdenComentario,
@@ -1758,6 +1762,7 @@ export {
 // ── Costos: motor de costeo (Módulo 6, F7-E1; doc 06-Costos-y-EDR; D1/D2) ──
 export {
   esquemaBaseProrrateo,
+  esquemaMotivoSinUnitario,
   esquemaPreCostoModelo,
   esquemaListaPreciosQuery,
   esquemaListaPreciosFila,
@@ -1775,6 +1780,7 @@ export {
   esquemaMargenPedidoFila,
   esquemaMargenesSalida,
   type BaseProrrateo,
+  type MotivoSinUnitario,
   type PreCostoModelo,
   type ListaPreciosQuery,
   type ListaPreciosSalida,

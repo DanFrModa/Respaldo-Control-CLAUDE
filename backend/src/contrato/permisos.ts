@@ -274,6 +274,12 @@ export const CATALOGO_PERMISOS = [
     modulo: 'ordenes',
     descripcion: 'Cancelar (suave) una orden de producción con su motivo',
   },
+  {
+    clave: 'ordenes.cerrar',
+    modulo: 'ordenes',
+    descripcion:
+      'CERRAR una orden de producción (deja de admitir captura y CONGELA su costo unitario) y reabrirla — acto explícito y auditado (0.061)',
+  },
 
   // ── Clientes / Proveedores ───────────────────────────────────────────────────
   {

@@ -37,7 +37,7 @@ import type {
   TableroPedidosMesFila,
 } from '../../contrato/esquemas/orden-consulta.js';
 import { esquemaEstadoOrden } from '../../contrato/esquemas/orden.js';
-import type { Prisma } from '../../datos/index.js';
+import type { EstadoOrden, Prisma } from '../../datos/index.js';
 
 import {
   armarPagina,
@@ -81,7 +81,8 @@ const seleccionLigera = {
 type FilaLigera = {
   id: number;
   folio: bigint;
-  estado: 'capturada' | 'completa' | 'cancelada';
+  /** Estado de la orden: el TIPO del enum, NUNCA una copia literal de sus valores (0.061). */
+  estado: EstadoOrden;
   fecha: Date | null;
   fechaEntrega: Date | null;
   creadoEn: Date;

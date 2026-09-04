@@ -217,6 +217,51 @@ describe('Listado de modelos — costoActual (R9, criterio F7)', () => {
     expect((await filaListado()).costoActual).toBeNull();
   });
 
+  // ── ⭐⭐ 0.061 — esta columna es el CUARTO publicador del unitario, y se saltaba el congelado ──
+  it('⭐ (c) si la orden del último costeo está CERRADA, usa su divisor CONGELADO', async () => {
+    // 900 / 300 cortadas = 3.00, y se cierra la orden con ese divisor.
+    const idOrden = await crearOrdenCosteada(1, 900, 300);
+    await cliente.orden.update({
+      where: { id: idOrden },
+      data: { estado: 'cerrada', cerradaEn: new Date('2026-07-15T00:00:00.000Z') },
+    });
+    await cliente.costoOrden.update({
+      where: { idOrden },
+      data: { cantidadBaseCongelada: 300, congeladoEn: new Date('2026-07-15T00:00:00.000Z') },
+    });
+    expect((await filaListado()).costoActual).toBe(3);
+
+    // Llega MÁS CORTE por un camino que no pasa por la guarda: el divisor vivo pasaría a 600 y la
+    // columna diría 1.50 — contradiciendo a la ficha de esa MISMA orden, que enseña 3.00.
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 777n,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'corte',
+        fecha: new Date('2026-07-20T00:00:00.000Z'),
+        detalles: { create: [{ idColor: colorRojo.id, idTalla: tallaCH.id, cantidad: 300 }] },
+      },
+    });
+    expect((await filaListado()).costoActual).toBe(3);
+  });
+
+  it('⭐ (c) y con la orden ABIERTA el mismo corte SÍ mueve la columna (rama gemela)', async () => {
+    const idOrden = await crearOrdenCosteada(1, 900, 300);
+    expect((await filaListado()).costoActual).toBe(3);
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 778n,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'corte',
+        fecha: new Date('2026-07-20T00:00:00.000Z'),
+        detalles: { create: [{ idColor: colorRojo.id, idTalla: tallaCH.id, cantidad: 300 }] },
+      },
+    });
+    expect((await filaListado()).costoActual).toBe(1.5);
+  });
+
   /**
    * ⚠️ Esta prueba EXISTÍA con el título *«SIN `consultas.ver-importes` el costo viene null (candado
    * de importes de F7)»*, que nombraba el candado que §Post-F9.137 RETIRÓ. Era cierta bajo la regla

@@ -9,17 +9,32 @@ import { z } from 'zod';
  *  • Pre-costo por modelo = receta `paraPreCosto` × precios de catálogo + maquila del modelo. El
  *    arte entra UNA vez por modelo, SIN cantidad. La REGALÍA NO es componente del costo.
  *  • Costo real por orden = componentes en DOBLE juego teórico (`*Calc`) / guardado (`*Cost`);
- *    `costoTotal` = Σ de los GUARDADOS. Costo unitario = `costoTotal` ÷ base de prorrateo (default
- *    `cortado` = piezas cortadas).
+ *    `costoTotal` = Σ de los GUARDADOS. Costo unitario = `costoTotal` ÷ base de prorrateo. Desde
+ *    0.061 el default es `recibido` (piezas recibidas de costura); hasta esa versión fue `cortado`.
  *  • Precio sugerido (lista de precios): utilidad + regalías SOBRE LA VENTA, redondeo AL ALZA.
  */
 
 // ── Base de prorrateo (D2) ──────────────────────────────────────────────────────────────────────
 
-/** Base sobre la que se divide el costo total para el unitario (D2). */
+/**
+ * Base sobre la que se divide el costo total para el unitario (D2).
+ *
+ * ⭐ **El DEFAULT es `recibido` desde 0.061** (§Post-F9.154(b), DANIEL 30-ago-2026). Era `cortado`.
+ * Textual: *«Las 10 faltantes se las voy a cobrar al maquilero… esas las sacaría de la ecuación. Y
+ * las segundas también se venden a un Saldero. Las únicas que se pierden por completo son las
+ * incompletas.»* ⇒ primeras y segundas SÍ entran al divisor (se venden); faltantes NO (se cobran
+ * en EsMa) e incompletas TAMPOCO (son la merma). `recibido` es exactamente esa cuenta: Σ de
+ * `EtapaMovimientoDet.cantidad` (= primeras + segundas) de los recibos de procesos que meten a PT.
+ * Descartó dividir entre las cortadas porque **escondería el costo de la merma**.
+ *
+ * ⚠️ Imprecisión DECLARADA y no corregida: el cobro al maquilero por el faltante NO reduce el costo
+ * de la orden — vive en EsMa, que es otra cuenta.
+ */
 export const esquemaBaseProrrateo = z
   .enum(['cortado', 'recibido', 'vendido'])
-  .describe('Base de prorrateo del costo unitario (cortado=CantCorte, recibido=costura, vendido).');
+  .describe(
+    'Base de prorrateo del costo unitario (cortado=CantCorte, recibido=costura [DEFAULT], vendido).',
+  );
 
 /** Base de prorrateo del costo unitario. */
 export type BaseProrrateo = z.infer<typeof esquemaBaseProrrateo>;
@@ -316,14 +331,49 @@ export const esquemaCostoRealOrdenSalida = esquemaCostoRealResumen
 /** Forma del desglose del costo real de materiales. */
 export type CostoRealOrdenSalida = z.infer<typeof esquemaCostoRealOrdenSalida>;
 
+/**
+ * POR QUÉ no hay costo unitario, cuando no lo hay (0.061 — §Post-F9.154(b)/(c)). Nació al pasar el
+ * divisor a `recibido`: hasta el primer recibo de costura la base es 0 y el unitario sale `null`, y
+ * un `null` pelón hacía que la pantalla dijera «—» sin distinguir *«todavía no hay piezas
+ * recibidas»* de *«esta orden no tiene costo capturado»* o de *«no tienes permiso de ver importes»*.
+ * El motivo lo dicta el SERVIDOR (con la regla, A1) para que ninguna pantalla lo invente.
+ */
+export const esquemaMotivoSinUnitario = z
+  .enum(['sin-base', 'sin-costo', 'sin-importes'])
+  .describe(
+    'Por qué no hay unitario: sin-base = la base de prorrateo todavía es 0 (p. ej. aún no hay ' +
+      'piezas recibidas); sin-costo = la orden no tiene costo capturado; sin-importes = falta el ' +
+      'permiso `consultas.ver-importes`.',
+  );
+
+/** Por qué no hay costo unitario (o null cuando sí lo hay). */
+export type MotivoSinUnitario = z.infer<typeof esquemaMotivoSinUnitario>;
+
 /** El costo unitario y la base usada para calcularlo. */
 const esquemaCostoUnitario = z.object({
-  base: esquemaBaseProrrateo.describe('Base usada (cortado por defecto).'),
+  base: esquemaBaseProrrateo.describe('Base usada (`recibido` por defecto desde 0.061).'),
   cantidadBase: z.number().int().describe('Piezas de la base (divisor).'),
   costoUnitario: z
     .number()
     .nullable()
-    .describe('costoTotal ÷ cantidadBase, o null si la base es 0 o sin importes.'),
+    .describe('costoTotal ÷ cantidadBase, o null si la base es 0, no hay costo, o sin importes.'),
+  motivoSinUnitario: esquemaMotivoSinUnitario
+    .nullable()
+    .describe('Por qué `costoUnitario` es null; null cuando SÍ hay unitario.'),
+  textoSinUnitario: z
+    .string()
+    .nullable()
+    .describe(
+      'La frase que la pantalla debe mostrar en lugar del unitario (p. ej. "Aún no hay piezas ' +
+        'recibidas…"). La redacta el servidor; null cuando sí hay unitario.',
+    ),
+  congeladoEn: z.iso
+    .datetime()
+    .nullable()
+    .describe(
+      'Cuándo se CONGELÓ este unitario al cerrar la orden (0.061). Con valor, `cantidadBase` y ' +
+        '`costoUnitario` NO se recalculan: son los del cierre. null = se calcula en vivo.',
+    ),
 });
 
 /**
@@ -349,6 +399,12 @@ export const esquemaCostoOrdenSalida = z
       .nullable()
       .describe('Costo guardado (o null si no se ha costeado).'),
     unitario: esquemaCostoUnitario.describe('Costo unitario y su base.'),
+    ordenCerrada: z
+      .boolean()
+      .describe(
+        '⭐ 0.061: la ORDEN está CERRADA — no admite captura de costo y su unitario está ' +
+          'congelado. La pantalla lo usa para no ofrecer campos que el servidor va a rechazar.',
+      ),
   })
   .describe('Costo de una orden: teórico + real de compras + guardado + cantidades + unitario.');
 
@@ -359,8 +415,11 @@ export type CostoOrdenSalida = z.infer<typeof esquemaCostoOrdenSalida>;
  * Cuerpo para GUARDAR/ajustar el costo de una orden (PUT).
  *
  * SEMÁNTICA DE LOS CAMPOS OPCIONALES (26-jul-2026): **omitir = CONSERVAR** lo ya guardado (o caer al
- * valor propuesto si es el primer costeo); **`null` = BORRAR** el componente. `baseProrrateo` es la
- * ÚNICA excepción: tiene default, así que omitirla la manda a `cortado`.
+ * valor propuesto si es el primer costeo); **`null` = BORRAR** el componente.
+ *
+ * ⭐ **`baseProrrateo` YA NO es la excepción (0.061).** Hasta esa versión traía `.default('cortado')`
+ * y omitirla PISABA la base de una orden ya costeada; hoy es `.optional()` sin default y sigue la
+ * misma regla que todos: omitir CONSERVA la guardada y, en el primer costeo, cae a `recibido`.
  */
 export const esquemaCostoOrdenGuardarCuerpo = z
   .object({
@@ -405,10 +464,11 @@ export const esquemaCostoOrdenGuardarCuerpo = z
       .optional()
       .describe('Descripción de otros. OMITIR = conservar lo ya guardado. `null` = borrar.'),
     baseProrrateo: esquemaBaseProrrateo
-      .default('cortado')
+      .optional()
       .describe(
-        'Base de prorrateo. ÚNICA EXCEPCIÓN a "omitir = conservar": tiene default, así que ' +
-          'OMITIRLA la deja en `cortado` y con ello cambia el costo unitario. Mándala siempre.',
+        'Base de prorrateo. OMITIR = conservar la ya guardada (y, en el PRIMER costeo, `recibido`). ' +
+          'Hasta 0.061 traía `.default("cortado")`, así que un PUT que la omitiera PISABA la base ' +
+          'de una orden ya costeada y le cambiaba el unitario sin que nadie lo pidiera.',
       ),
     observaciones: z
       .string()
@@ -420,7 +480,8 @@ export const esquemaCostoOrdenGuardarCuerpo = z
   })
   .describe(
     'Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un ' +
-      'componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default).',
+      'componente lo CONSERVA; mandar `null` lo borra. Desde 0.061 eso vale TAMBIÉN para ' +
+      '`baseProrrateo` (ya no tiene default): omitirla conserva la guardada.',
   );
 
 /** Cuerpo para guardar el costo de una orden. */
@@ -465,6 +526,13 @@ export const esquemaListaCostosFila = z.object({
   cortado: z.number().int().describe('Piezas cortadas.'),
   costoTotal: z.number().nullable().describe('Costo total guardado (o null sin importes).'),
   costoUnitario: z.number().nullable().describe('Costo unitario (o null sin importes / base 0).'),
+  motivoSinUnitario: esquemaMotivoSinUnitario
+    .nullable()
+    .describe('Por qué `costoUnitario` es null; null cuando SÍ hay unitario (0.061).'),
+  textoSinUnitario: z
+    .string()
+    .nullable()
+    .describe('La frase a mostrar en lugar del unitario; null cuando sí hay unitario (0.061).'),
   baseProrrateo: esquemaBaseProrrateo.describe('Base de prorrateo guardada.'),
 });
 

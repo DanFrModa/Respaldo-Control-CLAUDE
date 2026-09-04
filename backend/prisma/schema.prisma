@@ -3273,10 +3273,35 @@ model PedidoRealLinea {
 /// ⚠️ `capturada` NO significa "sin matriz" (26-jul-2026): una orden con su matriz completa sigue
 /// `capturada` mientras le falte la receta o el arte. Lo que sí es paridad con `Ordenes.FechaDet`
 /// del viejo es la columna `fechaCompletada`, no este estado.
+///
+/// ⭐⭐ `cerrada` ES DE 0.061 (§Post-F9.154(c), DANIEL 30-ago-2026: *«¿en qué momento se define que
+/// ya se cerró el costo? ¿O va cambiando?»*) Y ES LA ÚNICA QUE NO SE DERIVA. La ponen y la quitan
+/// DOS ACTOS EXPLÍCITOS con permiso propio (`ordenes.cerrar`): `cerrarOrden` y `reabrirOrden`
+/// (`dominio/produccion/cierre-orden.ts`). Cerrar deja la orden en solo-lectura y **CONGELA su
+/// costo unitario**; reabrir lo devuelve a cálculo vivo.
+///
+/// 🔑 **`cerrada` NO redefine ni sustituye a `completa`, y NO SE DEBE COLGAR NADA DE `completa`.**
+/// Son dos preguntas distintas: `completa` dice *«¿la CAPTURA está completa?»* (tallas + receta
+/// liberada + arte) y `cerrada` dice *«¿esta orden ya terminó su vida administrativa?»*. Una orden
+/// puede cerrarse estando `capturada` (le faltó el arte y ya nadie lo va a poner) y una `completa`
+/// puede seguir abierta durante meses. Al REABRIR, el estado derivado se recalcula desde los
+/// requisitos, así que no se pierde nada: `completa` siempre se puede volver a computar del dato.
+///
+/// 🔑 **Y NO SE CONFUNDE CON `CierreMaquilaOrden`** (fila 0.109), que cierra la orden **con UN
+/// maquilero de UN proceso** y salda su pendiente. Ése es por tercero (una orden tiene varios) y no
+/// cabe en una bandera por orden; éste es de la ORDEN ENTERA y no habla de nadie en particular. Se
+/// puede cerrar la orden sin haber cerrado con ningún maquilero, y al revés.
+///
+/// ⚠️ Consecuencia para quien toque el motor del estado: `cerrada`, igual que `cancelada`, es
+/// INTOCABLE para los recálculos por requisitos (`requisitos-orden.ts`: `cambiosEstadoPorRequisitos`
+/// y `realinearEstadoOrdenes` la respetan explícitamente). Quien agregue un tercer recálculo tiene
+/// que respetarla también, o el cierre se borraría solo. La verdad autoritativa de "está cerrada" es
+/// la columna `Orden.cerradaEn`, no este enum: el enum es su espejo visible.
 enum EstadoOrden {
   capturada
   completa
   cancelada
+  cerrada
 
   @@map("estado_orden")
 }
@@ -3375,6 +3400,24 @@ model Orden {
   fechaCompletada DateTime?   @map("fecha_completada")
   /// Motivo de la cancelación suave (viejo: `MotivoCancelada`; `OrdCancelada` → estado=cancelada).
   motivoCancelada String?     @map("motivo_cancelada") @db.Text
+
+  // ── ⭐⭐ CIERRE DE LA ORDEN (0.061 — §Post-F9.154(c)) ────────────────────────────────
+  // El acto explícito con el que la orden termina su vida administrativa: deja de admitir
+  // captura (etapas y costos) y su costo unitario queda CONGELADO. Nunca es automático — un
+  // cierre por "100% entregado" no funcionaría, porque los faltantes se cobran y las
+  // incompletas se merman, así que una orden que perdió piezas NUNCA llega al 100% y su costo
+  // no se congelaría jamás. Lo hacen `cerrarOrden`/`reabrirOrden` con el permiso
+  // `ordenes.cerrar` (`dominio/produccion/cierre-orden.ts`), en transacción y con bitácora.
+  /// CUÁNDO se cerró. **Es la verdad autoritativa de "esta orden está cerrada"**; `estado =
+  /// cerrada` es su espejo visible (para el badge y los filtros). NULL = abierta. Reabrir la
+  /// vuelve a NULL: el historial de cierres y reaperturas vive en la Bitácora (A7), que es
+  /// donde D3 lo pide — no se edita ni se borra ningún hecho, se agrega el acto inverso.
+  cerradaEn       DateTime?   @map("cerrada_en")
+  /// QUIÉN la cerró. Sin FK física (mismo criterio que `creadoPorId`/`modificadoPorId`, ADR-0005).
+  cerradaPorId    String?     @map("cerrada_por_id")
+  /// Motivo del cierre, OPCIONAL (a diferencia del de la cancelación, que es obligatorio: cerrar
+  /// es el final normal de una orden, no una excepción que haya que justificar).
+  motivoCierre    String?     @map("motivo_cierre") @db.Text
 
   // El código de barra de la orden (viejo: `UPC`) fue ELIMINADO (decisión Gabriel 16-jun-2026):
   // los códigos de barra están en retiro; la columna no se conserva ni se migra.
@@ -4478,13 +4521,16 @@ model EtapaMovimientoDet {
   ///   • NO cuenta como producida (de 100 mandadas con 95 buenas + 5 incompletas, la orden produjo
   ///     95) ⇒ **queda FUERA de `cantidad`**, que sigue siendo `primeras + segundas`;
   ///   • NO entra a ningún inventario (el kardex de PT se arma de `primeras`/`segundas`, no de aquí)
-  ///     — *"se pierden esas prendas"*;
+  ///     — *"se pierden esas prendas"*. ⭐ Y desde 0.061 (§Post-F9.154(a)) tampoco se QUEDAN en el
+  ///     almacén de TRÁNSITO cuando el envío sacó prenda terminada: SALEN solas como **merma**
+  ///     (tipo `merma-incompletas`) en la transacción del recibo, y cancelarlo lo revierte. Antes
+  ///     se atoraban ahí para siempre. No es retroactivo (REGLA 0-B). Ver `dominio/produccion/transito.ts`;
   ///   • NO se paga (el cargo EsMa deriva su cantidad de `cantidad`, que no la incluye).
   ///
   /// 🔴 PERO SÍ CIERRA EL PENDIENTE POR RECIBIR (V1-E8v, §Post-F9.147). DANIEL: *"Al registrarlas
   /// como incompletas entregadas, dejan de estar en la maquila. El ya termino de entregar las 100…
   /// ya no quedan como pendientes de entregar"*. La prenda YA VOLVIÓ del taller, así que sale del
-  /// tránsito. ⚠️ Esto CORRIGE el encuadre de V1-E8k, que dejaba el pendiente abierto *"porque los
+  /// pendiente (y desde 0.061, también del almacén de tránsito: ver arriba). ⚠️ Esto CORRIGE el encuadre de V1-E8k, que dejaba el pendiente abierto *"porque los
   /// faltantes se los cobro"* — razonamiento que **confundía la INCOMPLETA (volvió) con el FALTANTE
   /// (nunca volvió)**. Lo que se le cobra es el faltante. La invariante que manda:
   ///     enviado = primeras + segundas + faltantes + incompletas
@@ -7340,11 +7386,20 @@ model Auditor {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Base de prorrateo del costo unitario de la orden (D2): sobre qué cantidad se
-/// divide el `costoTotal` para obtener el costo por prenda. `cortado` (DEFAULT,
-/// confirmado por Daniel: tela ÷ prendas cortadas = `CantCorte` del viejo);
-/// `recibido` = piezas recibidas de costura (prenda terminada, `generaEntradaPt`);
-/// `vendido` = piezas entregadas a cliente. Las tres se DERIVAN por suma directa de
+/// divide el `costoTotal` para obtener el costo por prenda. `cortado` = piezas
+/// cortadas (`CantCorte` del viejo); `recibido` (⭐ **DEFAULT desde 0.061**) = piezas
+/// recibidas de costura (prenda terminada, `generaEntradaPt`); `vendido` = piezas
+/// entregadas a cliente. Las tres se DERIVAN por suma directa de
 /// `EtapaMovimientoDet` (nunca un acumulador — D3/D4).
+///
+/// ⭐ EL DEFAULT PASÓ DE `cortado` A `recibido` (0.061 — §Post-F9.154(b), DANIEL
+/// 30-ago-2026): *«Las 10 faltantes se las voy a cobrar al maquilero… esas las
+/// sacaría de la ecuación. Y las segundas también se venden a un Saldero. Las únicas
+/// que se pierden por completo son las incompletas.»* ⇒ primeras y segundas SÍ entran
+/// al divisor (se venden), faltantes NO (se cobran en EsMa) e incompletas TAMPOCO (son
+/// la merma). Descartó dividir entre las CORTADAS porque escondería el costo de la
+/// merma. ⚠️ El cambio es SÓLO HACIA ADELANTE: la migración NO reescribe ni una fila
+/// existente (REGLA 0-B) — el `@default` gobierna las filas NUEVAS.
 enum BaseProrrateo {
   cortado
   recibido
@@ -7399,8 +7454,37 @@ model CostoOrden {
   /// guardar (nunca se edita a mano ni suma los teóricos). NULLABLE hasta el primer guardado.
   costoTotal Decimal? @map("costo_total") @db.Decimal(14, 2)
 
-  /// Base de prorrateo del costo unitario (D2). Default `cortado` (= `CantCorte`).
-  baseProrrateo BaseProrrateo @default(cortado) @map("base_prorrateo")
+  /// Base de prorrateo del costo unitario (D2). Default `recibido` desde 0.061 (antes
+  /// `cortado`); ver el TSDoc del enum `BaseProrrateo`. Las filas que ya existían
+  /// CONSERVAN su valor: la migración no reescribe nada (REGLA 0-B).
+  baseProrrateo BaseProrrateo @default(recibido) @map("base_prorrateo")
+
+  // ── ⭐⭐ COSTO CONGELADO AL CERRAR LA ORDEN (0.061 — §Post-F9.154(c)) ────────────────
+  // DANIEL: *«¿en qué momento se define que ya se cerró el costo? ¿O va cambiando?»* Hasta
+  // 0.061 IBA CAMBIANDO: el DINERO se persistía (`costoTotal`), pero la CANTIDAD del divisor se
+  // re-sumaba de las etapas en CADA lectura. Con el divisor en `cortado` casi no se notaba (el
+  // corte pasa una vez); con `recibido` el unitario habría quedado vivo hasta el último recibo.
+  // Al CERRAR la orden se persisten las dos mitades y toda lectura posterior devuelve ESO.
+  //
+  // 🔑 Por qué existen si el cierre ya bloquea la captura: **defensa en profundidad**. El
+  // bloqueo depende de que cada puerta de escritura llame a la guarda; el congelado no depende
+  // de nadie — un camino sin guardar (un ETL, un script, una puerta nueva que se olvide) podría
+  // mover las cantidades, y aun así el costo de la orden cerrada seguiría diciendo lo mismo.
+  // Además hace AUDITABLE el número: se ve con qué divisor se cerró, aunque hoy coincida.
+  /// Piezas de la base de prorrateo EN EL MOMENTO DEL CIERRE (el divisor congelado). NULL
+  /// mientras la orden esté abierta o si nunca se cerró.
+  cantidadBaseCongelada  Int?      @map("cantidad_base_congelada")
+  /// `costoTotal ÷ cantidadBaseCongelada` congelado al cerrar. 4 decimales (el unitario se
+  /// redondea a 2 al publicarlo, igual que el calculado en vivo; congelarlo con más precisión
+  /// evita que el redondeo se acumule). NULL si al cerrar no había costo o la base era 0 — un
+  /// cierre NO inventa un costo que no existía.
+  costoUnitarioCongelado Decimal?  @map("costo_unitario_congelado") @db.Decimal(14, 4)
+  /// CUÁNDO se congeló (el instante del último cierre).
+  congeladoEn            DateTime? @map("congelado_en")
+  /// CUÁNDO se descongeló (la última reapertura). D3: reabrir **NO borra** el congelado, lo
+  /// MARCA — así queda la constancia de con qué números se había cerrado. El congelado está EN
+  /// VIGOR cuando la orden está cerrada (`Orden.cerradaEn != null`), no por esta columna.
+  descongeladoEn         DateTime? @map("descongelado_en")
 
   observaciones String? @db.Text
 

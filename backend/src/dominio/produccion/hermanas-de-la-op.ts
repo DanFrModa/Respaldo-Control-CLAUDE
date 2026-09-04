@@ -93,9 +93,12 @@
  * `etl-pedidos-ordenes.int.test.ts` — *«la orden migrada nace con SU receta congelada, LIBERADA y
  * sin precios»*.
  *
- * **La consecuencia, que es lo grave:** `EstadoOrden` **no tiene estado de cerrada**
- * (`capturada|completa|cancelada`), así que una OP entregada en 2019 **sigue en el grupo y VOTA,
- * para siempre**. Un modelo con N órdenes históricas —las N con la MISMA copia, la del día del
+ * **La consecuencia, que es lo grave:** este módulo agrupa por «NO cancelada», así que una OP
+ * entregada en 2019 **sigue en el grupo y VOTA, para siempre**. (⚠️ Desde 0.061 `EstadoOrden` SÍ
+ * tiene un estado `cerrada` —y `Orden.cerradaEn`—, pero **este módulo todavía no lo usa**: el
+ * filtro sigue siendo «no cancelada». O sea que el hecho cambió y el comportamiento no. Quien vaya
+ * a acotar el grupo algún día ya tiene la palanca: excluir las CERRADAS, que es exactamente «las
+ * que ya terminaron».) Un modelo con N órdenes históricas —las N con la MISMA copia, la del día del
  * ETL— más una OP nueva creada después de que el BOM evolucionó da **N contra 1**, y la señalada
  * sería **la nueva y correcta**. Eso **invierte** el aviso que Daniel pidió. Y de paso duplicaría
  * uno que ya existe: *«el modelo se movió»* es literalmente lo que reporta la comparación VERTICAL.
@@ -847,11 +850,13 @@ function claveArte(f: { idModeloArte: number | null; descripcion: string }): str
  *  2. **todas** las órdenes NO CANCELADAS de esos linajes (las hermanas),
  *  3-5. las tres tablas de receta congelada de ese conjunto, de un tirón.
  *
- * ⚠️ **«No cancelada» NO es «viva», y la palabra importa:** `EstadoOrden` es
- * `capturada|completa|cancelada` — **no existe un estado de CERRADA**, así que una OP entregada en
- * 2019 sigue en el conjunto para siempre. Decirle «vivas» a este filtro fue justo lo que escondió
- * que el histórico VOTABA (ver {@link OrdenParaComparar.escritaPorLaMigracion}); quien acote esto
- * algún día, que lo haga por el ESTADO, no cambiando la palabra.
+ * ⚠️ **«No cancelada» NO es «viva», y la palabra importa:** el filtro de aquí sólo deja fuera las
+ * CANCELADAS, así que una OP entregada en 2019 sigue en el conjunto para siempre. Decirle «vivas»
+ * a este filtro fue justo lo que escondió que el histórico VOTABA (ver
+ * {@link OrdenParaComparar.escritaPorLaMigracion}); quien acote esto algún día, que lo haga por el
+ * ESTADO, no cambiando la palabra. **Desde 0.061 esa palanca ya existe** (`cerrada` /
+ * `Orden.cerradaEn`) y este módulo, a propósito, TODAVÍA NO LA USA: acotar el grupo es una decisión
+ * de negocio aparte, no un efecto colateral de que el estado se haya creado.
  *
  * El tamaño de lo que se trae lo manda el nº de LINAJES distintos de la página, no el de filas: en
  * el peor caso son las recetas de las OP vivas de esos modelos, unas decenas de renglones por OP.

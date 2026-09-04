@@ -136,8 +136,15 @@ export function ListaCostosPagina(): React.JSX.Element {
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
-                      <span>
-                        Unitario <b className="num text-foreground">{moneda(f.costoUnitario)}</b>
+                      {/* 0.061: sin unitario, la frase la manda el SERVIDOR — la misma que la
+                          ficha de costeo (p. ej. "Aún no hay piezas recibidas…"). */}
+                      <span title={f.textoSinUnitario ?? undefined}>
+                        Unitario{' '}
+                        <b className="num text-foreground">
+                          {f.costoUnitario === null && f.motivoSinUnitario === 'sin-base'
+                            ? 'sin base aún'
+                            : moneda(f.costoUnitario)}
+                        </b>
                       </span>
                       <span>
                         Cortado{' '}
@@ -185,7 +192,12 @@ export function ListaCostosPagina(): React.JSX.Element {
                         <TablaDensaCelda numerica className="font-medium">
                           {moneda(f.costoTotal)}
                         </TablaDensaCelda>
-                        <TablaDensaCelda numerica>{moneda(f.costoUnitario)}</TablaDensaCelda>
+                        {/* 0.061: idem — el motivo lo dicta el servidor, no esta tabla. */}
+                        <TablaDensaCelda numerica title={f.textoSinUnitario ?? undefined}>
+                          {f.costoUnitario === null && f.motivoSinUnitario === 'sin-base'
+                            ? 'sin base aún'
+                            : moneda(f.costoUnitario)}
+                        </TablaDensaCelda>
                       </TablaDensaFila>
                     ))}
                   </TablaDensaCuerpo>

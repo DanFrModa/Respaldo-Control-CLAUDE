@@ -4,13 +4,15 @@
  *
  *  1. **Valida** la entrada con los esquemas Zod COMPARTIDOS de `src/contrato`.
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
- *     `ordenes.ver` para leer, `ordenes.administrar` para mutar, `ordenes.cancelar` para cancelar.
+ *     `ordenes.ver` para leer, `ordenes.administrar` para mutar, `ordenes.cancelar` para cancelar
+ *     y `ordenes.cerrar` para CERRAR/REABRIR la orden (0.061: congela y descongela su costo).
  *  3. **Delega** a los servicios de dominio (`dominio/produccion/ordenes.ts`).
  *
  * Endpoints: `GET /ordenes` (listado/búsqueda combinada, incl. valor de OrdenReferencia D7),
  * `GET /ordenes/:id`, `POST /ordenes` (crear desde renglón de pedido), `PUT /ordenes/:id`
  * (encabezado), `PUT /ordenes/:id/matriz` (colores × tallas), `POST /ordenes/:id/copiar-matriz`,
- * `POST /ordenes/:id/cancelar` (motivo obligatorio), `PUT /ordenes/:id/referencias` (D7),
+ * `POST /ordenes/:id/cancelar` (motivo obligatorio), `POST /ordenes/:id/cerrar` (motivo opcional)
+ * y `POST /ordenes/:id/reabrir` (motivo obligatorio) — 0.061, `PUT /ordenes/:id/referencias` (D7),
  * `POST /ordenes/:id/comentarios`. NO hay rutas de UPC (decisión Gabriel 16-jun-2026).
  * Rediseño R2 (§4.4.3): `GET /ordenes/:id/precios` (resumen, `ordenes.ver`; montos reales solo con
  * `ordenes.ver-precio-real-maquila`), `PATCH /ordenes/:id/precios` (capturar precio real,
@@ -30,6 +32,7 @@ import {
   esquemaHabilitacionOrden,
   esquemaListarOrdenes,
   esquemaOrdenCancelarCuerpo,
+  esquemaOrdenCerrarCuerpo,
   esquemaOrdenComentarioCuerpo,
   esquemaOrdenCopiarMatrizCuerpo,
   esquemaOrdenCrear,
@@ -38,6 +41,7 @@ import {
   esquemaOrdenPrecioEventosLista,
   esquemaOrdenPreciosPatchCuerpo,
   esquemaOrdenPreciosSalida,
+  esquemaOrdenReabrirCuerpo,
   esquemaOrdenReferenciasCuerpo,
   esquemaOrdenSalida,
   esquemaOrdenesPagina,
@@ -55,6 +59,7 @@ import {
   listarOrdenes,
   obtenerOrden,
 } from '../../dominio/produccion/ordenes.js';
+import { cerrarOrden, reabrirOrden } from '../../dominio/produccion/cierre-orden.js';
 import {
   actualizarPreciosOrden,
   listarEventosPrecioOrden,
@@ -229,6 +234,46 @@ export const rutasOrdenes: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return cancelarOrden(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐⭐ CERRAR la orden (0.061): deja de admitir captura y CONGELA su costo unitario. Motivo
+  // OPCIONAL (cerrar es el final normal de una orden). Permiso PROPIO `ordenes.cerrar`.
+  app.route({
+    method: 'POST',
+    url: '/ordenes/:id/cerrar',
+    preHandler: app.conPermiso('ordenes.cerrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Cerrar una orden (deja de admitir captura y congela su costo unitario)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaOrdenCerrarCuerpo,
+      response: { 200: esquemaOrdenSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cerrarOrden(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐⭐ REABRIR una orden cerrada (0.061): acto INVERSO auditado (D3) — el costo vuelve a
+  // calcularse en vivo y lo congelado queda marcado. Motivo OBLIGATORIO. Mismo permiso.
+  app.route({
+    method: 'POST',
+    url: '/ordenes/:id/reabrir',
+    preHandler: app.conPermiso('ordenes.cerrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Reabrir una orden cerrada (el costo vuelve a calcularse en vivo)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaOrdenReabrirCuerpo,
+      response: { 200: esquemaOrdenSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return reabrirOrden(sesion, request.params.id, request.body);
     },
   });
 

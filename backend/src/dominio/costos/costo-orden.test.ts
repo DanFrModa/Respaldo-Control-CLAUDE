@@ -2,13 +2,20 @@
  * Tests UNITARIOS de las fórmulas PURAS del costo de orden (F7-E1; D1/D2):
  *  • `teoricoPorPrenda` — receta paraCosto × precios vigentes + procesos (arte UNA vez, nulos→0).
  *  • `cantidadDeBase`   — elige la cantidad de la base de prorrateo (cortado/recibido/vendido).
+ *  • `unitarioODeuda`   — el unitario, o el MOTIVO y la FRASE de por qué no lo hay (0.061).
  * El flujo con BD (guardar, rechazo de noCostear, unitario, lista) vive en `costo-orden.int.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 
 import { Prisma } from '../../datos/index.js';
 
-import { cantidadDeBase } from './cantidades.js';
+import {
+  BASE_PRORRATEO_DEFAULT,
+  baseProrrateoAGuardar,
+  cantidadDeBase,
+  divisorCongelado,
+  unitarioODeuda,
+} from './cantidades.js';
 import { teoricoPorPrenda } from './costo-orden.js';
 
 const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
@@ -243,7 +250,7 @@ describe('V1-E3d — el costeo NO se mueve al sacar el arte del catálogo', () =
 
 describe('cantidadDeBase (base de prorrateo)', () => {
   const c = { pedido: 100, cortado: 80, recibido: 60, vendido: 40 };
-  it('cortado (default) usa CantCorte', () => {
+  it('cortado usa CantCorte', () => {
     expect(cantidadDeBase(c, 'cortado')).toBe(80);
   });
   it('recibido usa las piezas recibidas de costura', () => {
@@ -251,5 +258,126 @@ describe('cantidadDeBase (base de prorrateo)', () => {
   });
   it('vendido usa las piezas entregadas a cliente', () => {
     expect(cantidadDeBase(c, 'vendido')).toBe(40);
+  });
+});
+
+// ── 0.061 · El DIVISOR pasó a `recibido` y la división entre cero se REDACTA ────────────────────
+
+describe('BASE_PRORRATEO_DEFAULT (0.061 — §Post-F9.154(b))', () => {
+  it('es `recibido`, no `cortado`', () => {
+    // DANIEL: las faltantes se le cobran al maquilero y las incompletas son merma; primeras y
+    // segundas SÍ se venden ⇒ el divisor son las RECIBIDAS. Dividir entre las cortadas escondería
+    // el costo de la merma.
+    expect(BASE_PRORRATEO_DEFAULT).toBe('recibido');
+  });
+
+  it('el default apunta a las piezas RECIBIDAS de la orden, no a las cortadas', () => {
+    // Amarra la constante con la aritmética: si alguien cambia una sin la otra, esto truena.
+    const c = { pedido: 100, cortado: 80, recibido: 60, vendido: 40 };
+    expect(cantidadDeBase(c, BASE_PRORRATEO_DEFAULT)).toBe(60);
+  });
+});
+
+describe('unitarioODeuda (0.061): el unitario, o POR QUÉ no lo hay', () => {
+  it('con base y costo, divide', () => {
+    const u = unitarioODeuda(1200, 60, 'recibido', true);
+    expect(u.costoUnitario).toBe(20);
+    expect(u.motivoSinUnitario).toBeNull();
+    expect(u.textoSinUnitario).toBeNull();
+  });
+
+  it('base en 0 ⇒ `sin-base` y la frase NOMBRA las piezas recibidas', () => {
+    // Es el caso que nace con el divisor nuevo: hasta el primer recibo de costura la base es 0.
+    const u = unitarioODeuda(1200, 0, 'recibido', true);
+    expect(u.costoUnitario).toBeNull();
+    expect(u.motivoSinUnitario).toBe('sin-base');
+    expect(u.textoSinUnitario).toContain('piezas recibidas');
+    expect(u.textoSinUnitario).toContain('recibo de costura');
+  });
+
+  it('la frase de `sin-base` habla de la base QUE SE USÓ, no siempre de recibidas', () => {
+    expect(unitarioODeuda(10, 0, 'cortado', true).textoSinUnitario).toContain('piezas cortadas');
+    expect(unitarioODeuda(10, 0, 'vendido', true).textoSinUnitario).toContain(
+      'piezas entregadas al cliente',
+    );
+  });
+
+  it('sin costo capturado ⇒ `sin-costo` (y NO se confunde con la base en 0)', () => {
+    const u = unitarioODeuda(null, 60, 'recibido', true);
+    expect(u.motivoSinUnitario).toBe('sin-costo');
+    expect(u.textoSinUnitario).toContain('costo capturado');
+  });
+
+  it('la BASE EN CERO gana sobre la falta de costo (es lo que el usuario puede resolver)', () => {
+    expect(unitarioODeuda(null, 0, 'recibido', true).motivoSinUnitario).toBe('sin-base');
+  });
+
+  it('sin `consultas.ver-importes` ⇒ `sin-importes`, y el motivo NO filtra dinero', () => {
+    const u = unitarioODeuda(1200, 60, 'recibido', false);
+    expect(u.costoUnitario).toBeNull();
+    expect(u.motivoSinUnitario).toBe('sin-importes');
+    expect(u.textoSinUnitario).not.toContain('1200');
+  });
+
+  it('una base NEGATIVA se trata como 0 (nunca produce un unitario negativo)', () => {
+    // El histórico migrado puede dar restas negativas; el divisor jamás debe pasar de ahí.
+    expect(unitarioODeuda(1200, -5, 'recibido', true).motivoSinUnitario).toBe('sin-base');
+  });
+});
+
+// ── 0.061 · La base que se GUARDA: omitir CONSERVA, no pisa ────────────────────────────────────
+
+describe('baseProrrateoAGuardar (0.061): omitir la base NO la pisa', () => {
+  it('lo que manda el usuario gana', () => {
+    expect(baseProrrateoAGuardar('vendido', 'cortado')).toBe('vendido');
+  });
+
+  it('⭐ OMITIRLA conserva la GUARDADA (el defecto que 0.061 cerró)', () => {
+    // Hasta 0.061 el Zod traía `.default("cortado")`: un PUT que omitiera el campo reescribía la
+    // base de una orden ya costeada y le cambiaba el unitario sin que nadie lo pidiera. Con el
+    // default nuevo (`recibido`) eso habría reescrito el histórico — justo lo que la REGLA 0-B
+    // prohíbe. Esta es la prueba de que ya no pasa.
+    expect(baseProrrateoAGuardar(undefined, 'cortado')).toBe('cortado');
+    expect(baseProrrateoAGuardar(undefined, 'vendido')).toBe('vendido');
+  });
+
+  it('en el PRIMER costeo (nada guardado) cae al default nuevo, `recibido`', () => {
+    expect(baseProrrateoAGuardar(undefined, null)).toBe('recibido');
+    expect(baseProrrateoAGuardar(undefined, undefined)).toBe(BASE_PRORRATEO_DEFAULT);
+  });
+});
+
+// ── 0.061 · El corazón: cuándo el divisor está CONGELADO ────────────────────────────────────────
+
+describe('divisorCongelado (0.061): el divisor de una orden CERRADA no se recalcula', () => {
+  const CERRADA = { cerradaEn: new Date('2026-09-03T18:00:00.000Z') };
+  const ABIERTA = { cerradaEn: null };
+  const CONGELADO = {
+    congeladoEn: new Date('2026-09-03T18:00:00.000Z'),
+    cantidadBaseCongelada: 80,
+  };
+
+  it('⭐ cerrada + sellada ⇒ devuelve el divisor del cierre (y ya no se re-suma)', () => {
+    expect(divisorCongelado(CERRADA, CONGELADO)).toBe(80);
+  });
+
+  it('ABIERTA ⇒ null aunque traiga un congelado viejo (el de un cierre ya reabierto)', () => {
+    // D3: reabrir NO borra el congelado, lo MARCA. Si esto devolviera el número, una orden
+    // reabierta seguiría enseñando el costo del cierre anterior — el costo NO volvería a lo vivo.
+    expect(divisorCongelado(ABIERTA, CONGELADO)).toBeNull();
+  });
+
+  it('cerrada SIN fila de costo ⇒ null (un cierre no costea lo que no estaba costeado)', () => {
+    expect(divisorCongelado(CERRADA, null)).toBeNull();
+  });
+
+  it('cerrada con costo pero SIN sello ⇒ null (no se inventa un divisor)', () => {
+    expect(divisorCongelado(CERRADA, { congeladoEn: null, cantidadBaseCongelada: 80 })).toBeNull();
+  });
+
+  it('un divisor congelado en CERO se respeta como cero, no se confunde con "no hay"', () => {
+    // Se cerró una orden sin recibos: el divisor congelado es 0 y el unitario quedó NULL. Si esto
+    // devolviera null, la lectura volvería a re-sumar en vivo y el costo se descongelaría solo.
+    expect(divisorCongelado(CERRADA, { ...CONGELADO, cantidadBaseCongelada: 0 })).toBe(0);
   });
 });

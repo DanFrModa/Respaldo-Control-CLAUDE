@@ -370,6 +370,116 @@ describe('consultas por mes / año', () => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ 0.061 — EL COSTO DE VENTA DEL EDR RESPETA EL CONGELADO DE LA ORDEN CERRADA.
+//
+// El EDR es uno de los CINCO publicadores del costo unitario, y era uno de los TRES que se lo
+// saltaban (con el listado de modelos y los márgenes por pedido; la ficha y la lista lo respetaban
+// desde el principio). No es teórico: `recibido` se deriva de los
+// recibos de procesos con `generaEntradaPt`, bandera que se edita desde el CRUD «Tipos de proceso»,
+// así que el divisor VIVO de una orden cerrada puede moverse un martes cualquiera. Con eso, el EDR
+// de un mes ya cerrado decía un costo y la ficha de la MISMA orden decía otro.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+describe('⭐ 0.061 — el costo del EDR usa el divisor CONGELADO de la orden cerrada', () => {
+  it('🔴 cerrada: el costo NO se mueve aunque cambien las cantidades derivadas', async () => {
+    // cortado 30, costoTotal 600 → unitario 20; vendido 20 → costo de venta 400.
+    const { idOrden } = await sembrarVenta({
+      idEmpresa: empresa.id,
+      precio: 100,
+      cortado: 30,
+      vendido: 20,
+      costoTotal: 600,
+    });
+    // Se CIERRA la orden con esos números (se congela el divisor 30 que valía entonces).
+    await cliente.orden.update({
+      where: { id: idOrden },
+      data: { estado: 'cerrada', cerradaEn: new Date('2026-06-30T00:00:00.000Z') },
+    });
+    await cliente.costoOrden.update({
+      where: { idOrden },
+      data: { cantidadBaseCongelada: 30, congeladoEn: new Date('2026-06-30T00:00:00.000Z') },
+    });
+
+    // Y AHORA se mueve la cantidad derivada por un camino que NO pasa por la guarda (es justo el
+    // escenario contra el que el congelado es defensa en profundidad): más corte en la orden.
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 9001n,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'corte',
+        fecha: new Date('2026-06-20T00:00:00.000Z'),
+        detalles: { create: [{ idColor, idTalla, cantidad: 30 }] },
+      },
+    });
+
+    const edr = await generarEdrMes(sesion(), 2026, 6, bd());
+    // Con el congelado: 600 / 30 = 20 por prenda → 20 × 20 vendidas = 400 de COSTO DE VENTA.
+    // SIN él, el divisor vivo sería 60 y el costo caería a 200: la mitad, en el Estado de
+    // Resultados, por haber capturado un corte después de cerrar.
+    expect(edr.totalLineas).toBe(1);
+    expect(edr.costo).toBe(400);
+    expect(edr.lineasSinCosto).toBe(0);
+  });
+
+  it('ABIERTA: el mismo movimiento SÍ mueve el costo (la rama gemela)', async () => {
+    // Sin esta prueba, un congelado que se aplicara SIEMPRE también pasaría la de arriba.
+    const { idOrden } = await sembrarVenta({
+      idEmpresa: empresa.id,
+      precio: 100,
+      cortado: 30,
+      vendido: 20,
+      costoTotal: 600,
+    });
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 9002n,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'corte',
+        fecha: new Date('2026-06-20T00:00:00.000Z'),
+        detalles: { create: [{ idColor, idTalla, cantidad: 30 }] },
+      },
+    });
+
+    const edr = await generarEdrMes(sesion(), 2026, 6, bd());
+    expect(edr.costo).toBe(200); // 600 / 60 vivas = 10 × 20 vendidas
+  });
+
+  it('REABIERTA vuelve a lo vivo aunque conserve el congelado como historia (D3)', async () => {
+    const { idOrden } = await sembrarVenta({
+      idEmpresa: empresa.id,
+      precio: 100,
+      cortado: 30,
+      vendido: 20,
+      costoTotal: 600,
+    });
+    // Cerrada y luego REABIERTA: `cerradaEn` vuelve a NULL y el congelado queda MARCADO, no borrado.
+    await cliente.costoOrden.update({
+      where: { idOrden },
+      data: {
+        cantidadBaseCongelada: 30,
+        congeladoEn: new Date('2026-06-30T00:00:00.000Z'),
+        descongeladoEn: new Date('2026-07-01T00:00:00.000Z'),
+      },
+    });
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 9003n,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'corte',
+        fecha: new Date('2026-06-20T00:00:00.000Z'),
+        detalles: { create: [{ idColor, idTalla, cantidad: 30 }] },
+      },
+    });
+
+    const edr = await generarEdrMes(sesion(), 2026, 6, bd());
+    // El congelado viejo NO está en vigor: la orden está abierta otra vez.
+    expect(edr.costo).toBe(200);
+  });
+});
+
 describe('permisos', () => {
   it('generar exige edr.capturar', async () => {
     await expect(generarEdrMes(sesion(['edr.ver']), 2026, 6, bd())).rejects.toThrow();

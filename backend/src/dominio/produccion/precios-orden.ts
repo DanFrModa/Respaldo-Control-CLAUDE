@@ -38,6 +38,9 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+// ⭐ 0.061: la guarda ÚNICA de la orden CERRADA.
+import { exigirOrdenAbierta } from './cierre-orden.js';
+
 /** Fila cruda de un evento con sus nombres (proveedor incluido). */
 interface EventoCrudo {
   id: number;
@@ -176,7 +179,15 @@ export async function actualizarPreciosOrden(
 
     const orden = await tx.orden.findFirst({
       where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
-      select: { id: true, folio: true, estado: true, maquilaOrd: true, aplicacionOrd: true },
+      select: {
+        id: true,
+        folio: true,
+        estado: true,
+        // 0.061: la guarda de la orden CERRADA mira esta columna, no el estado.
+        cerradaEn: true,
+        maquilaOrd: true,
+        aplicacionOrd: true,
+      },
     });
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', idOrden);
@@ -184,6 +195,9 @@ export async function actualizarPreciosOrden(
     if (orden.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se le pueden capturar precios.');
     }
+    // ⭐ 0.061: el precio de maquila ES un componente del costo. Sobre una orden CERRADA —cuyo
+    // unitario quedó congelado— no se captura: primero se reabre (queda auditado). Guarda ÚNICA.
+    exigirOrdenAbierta(orden, 'le pueden capturar precios');
     if (datos.idProveedor != null) {
       await exigirProveedorActivo(tx, datos.idProveedor);
     }

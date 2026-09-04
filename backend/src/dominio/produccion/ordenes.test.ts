@@ -61,6 +61,12 @@ function bdParaCrear(origenModelo: 'desarrollo' | 'produccion' = 'produccion'): 
     noCostear: false,
     fechaCompletada: new Date('2026-06-16T00:00:00Z'),
     motivoCancelada: null,
+    // 0.061: la orden del stub está ABIERTA. ⚠️ No se puede omitir: la guarda del cierre
+    // (`exigirOrdenAbierta`) mira esta columna y trata «no viene» como CERRADA, a propósito —
+    // falla del lado seguro. Un doble que la calle estaría mintiendo sobre el dato.
+    cerradaEn: null,
+    cerradaPorId: null,
+    motivoCierre: null,
     ocCliente: null,
     tallasV1: null,
     maquilaOrd: null,
