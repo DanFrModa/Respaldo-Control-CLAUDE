@@ -1099,7 +1099,7 @@ Cierra la petición que quedó abierta en §Post-F9.15 (*"desde que demos entrad
 
 > *"Recuerda que en algún momento hablamos que tenemos dos tipos de proveedores. Los que nos facturan y los que no facturan. Esto aplica para todo tipo de proveedores (maquila, arte, avíos, servicios, telas, etc). Entonces todo esto aplica para los proveedores que manejan facturas. Pero para los que no (eso se define desde que se da de alta el proveedor) todo se tiene que meter manual."*
 
-La bandera ya existía desde **F1-E1B** (R15 §4): `Proveedor.factura`, capturada en el alta con la casilla *"¿Emite factura (CFDI)?"* y con la regla `factura ⇒ RFC + régimen fiscal`. Lo que faltaba es que esa casilla **MANDARA** en el flujo. Esta decisión la vuelve la que decide el camino, y lo hace en **un solo lugar** del dominio (`terceros/facturacion-proveedor.ts`) para que no se conteste distinto en cada módulo — la distinción es del **tercero**, no del documento.
+La bandera ya existía desde **F1-E1B** (R15 §4): `Proveedor.factura`, capturada en el alta con la casilla *"¿Emite factura (CFDI)?"* y con la regla `factura ⇒ RFC + régimen fiscal`. Lo que faltaba es que esa casilla **MANDARA** en el flujo. **⚠️ Superado por la fila 0.124 (§Post-F9.188(d)):** esa casilla **ya no se captura ni existe la regla `factura ⇒ RFC + régimen`** — contestaba lo mismo que `modalidadFacturacion` y podían contradecirse. Hoy la única pregunta es la **modalidad de facturación** y `factura` se **DERIVA** de ella (`solo_sin ⇒ false` · `solo_con`/`ambos` ⇒ `true` · sin modalidad ⇒ `null`); todo lo demás de esta decisión sigue vigente tal cual, solo cambia **de qué campo sale la respuesta**. Esta decisión la vuelve la que decide el camino, y lo hace en **un solo lugar** del dominio (`terceros/facturacion-proveedor.ts`) para que no se conteste distinto en cada módulo — la distinción es del **tercero**, no del documento.
 
 **Los tres estados (y por qué son tres, no dos):**
 
@@ -1120,7 +1120,7 @@ El **NULL no es "no factura"**: son los proveedores que venían **migrados de Ac
 5. **El que SÍ factura, pero todavía sin CFDI** (llegó con remisión y la factura viene después) sigue como en §Post-F9.21: **no se inventa cargo**, se registrará con la factura, que es la que trae el importe bueno.
 
 - **Aplica en:** SIN migración, SIN permisos nuevos, SIN seed → **no requiere `SEED_ON_START`**.
-- **Pendiente de captura (Daniel):** revisar la casilla *"¿Emite factura (CFDI)?"* de los proveedores migrados — mientras esté en NULL se comportan como formales.
+- **Pendiente de captura (Daniel):** ~~revisar la casilla *"¿Emite factura (CFDI)?"* de los proveedores migrados~~ → **absorbido por la modalidad de facturación** (filas 0.110 y 0.124): la casilla se retiró y lo que hay que capturarles es *"¿Cómo factura?"*, que además es **obligatoria** desde la 0.110. Mientras la modalidad esté en NULL siguen comportándose como formales. **No hay casilla que revisar.**
 - **Fecha:** 2026-08-10.
 
 #### (Post-F9.23) — Depurar el catálogo de proveedores: solo los de 2025-2026 (DANIEL, 10-ago-2026)
@@ -1145,7 +1145,7 @@ El **NULL no es "no factura"**: son los proveedores que venían **migrados de Ac
 - **Un movimiento sin fecha legible NO declara vivo a nadie**, y el `0` del viejo (su nulo) nunca revive: preferimos dejar fuera a un dudoso —se da de alta en un minuto— que arrastrar de vuelta la basura que se está depurando.
 - **El análisis y la carga comparten el módulo**, para que no puedan discrepar.
 
-**"Corregirlos porque les falta mucha información" — qué falta exactamente.** De los 155 que se quedan: nombre 100 %, teléfono 72 %, razón social 55 %, contacto 52 %, condiciones 51 %, tipo (T/H/S) 37 %, dirección 25 %. Y **todo lo fiscal y comercial está al 0 %**, porque **el Access nunca lo tuvo**: `¿Emite factura (CFDI)?` (§Post-F9.22), RFC, régimen fiscal, uso de CFDI, CP de expedición, retenciones, email, días de crédito, moneda, forma/método de pago, banco/CLABE y lead time. Esa captura es **manual e inevitable**. Para hacerla llevadera, `migracion/analisis/proveedores-depuracion.ts` escribe un **CSV con los 155 y las columnas vacías** por llenar (no toca la BD; se corre con `ETL_PROVEEDORES_DESDE=2025 npx tsx migracion/analisis/proveedores-depuracion.ts`).
+**"Corregirlos porque les falta mucha información" — qué falta exactamente.** De los 155 que se quedan: nombre 100 %, teléfono 72 %, razón social 55 %, contacto 52 %, condiciones 51 %, tipo (T/H/S) 37 %, dirección 25 %. Y **todo lo fiscal y comercial está al 0 %**, porque **el Access nunca lo tuvo**: `¿Cómo factura?` (§Post-F9.22, y fila 0.124: la columna del CSV cambió con la casilla), RFC, régimen fiscal, uso de CFDI, CP de expedición, retenciones, email, días de crédito, moneda, forma/método de pago, banco/CLABE y lead time. Esa captura es **manual e inevitable**. Para hacerla llevadera, `migracion/analisis/proveedores-depuracion.ts` escribe un **CSV con los 155 y las columnas vacías** por llenar (no toca la BD; se corre con `ETL_PROVEEDORES_DESDE=2025 npx tsx migracion/analisis/proveedores-depuracion.ts`).
 
 **⚠️ CONSECUENCIA QUE HAY QUE CONFIRMAR CON GABRIEL (no la decide este cambio):** el catálogo depurado **solo alcanza para migrar historia de 2025-2026**. Los ETL de F3-E6 (producción), F4-E6 (compras/notas) y F5-E7 (RC) hoy cargan el histórico **completo**, y esas filas apuntan a los ~897 terceros depurados. **O la migración entera se acota a 2025-2026** —que es lo que Daniel entiende que decidió Gabriel, y lo que ya vale para los consumos de tela (§Post-F9.11 punto 5, *"2025-2026, ~400 órdenes"*)— **o esos ETL se quedan sin proveedor** y omitirían masivamente. Mientras no se confirme, la depuración **está apagada por default**.
 
@@ -12427,6 +12427,9 @@ capturarse y se **deriva** de ella (`solo_sin` → false; `solo_con`/`ambos` →
 cliente», otra «Aurora»): el `Precosteo_Propuesta_Milano.xlsx` **lo arma Aurora**, la gerente general.
 Consecuencia para (m): el hallazgo de que la fórmula compone mal los factores se mide contra **un documento
 interno**, no contra lo que manda el cliente — y la pantalla de la fila 0.122 es **para Aurora y Daniel**.
+
+
+**(d-bis) CORREGIDO en la fila 0.124 (v0.106, 4-sep):** una sola verdad, `modalidadFacturacion`; la casilla `factura` dejó de capturarse y se deriva de la modalidad en todos los consumidores (entrada de tela, CFDI, CxP, EsMa, corrida). La columna se conserva como histórico (REGLA 0-B, sin backfill).
 
 ---
 

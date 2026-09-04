@@ -666,8 +666,18 @@ model Proveedor {
   condiciones String?
 
   // ── Fiscal (F1-E1B, R15 §4): lo que el CFDI necesita ───────────────────────
-  /// ¿Emite CFDI? Define formal (true) vs informal (false/null). Si es true, la
-  /// regla de captura exige `rfc` + `regimenFiscalSat` (relajada para migrados).
+  /// ⚠️ HISTÓRICO — YA NO SE CAPTURA NI SE LEE (fila 0.124, Daniel 3-sep-2026, §Post-F9.188(d):
+  /// *"es un error que existan"*). Nació en F1-E1B/R15 como *"¿Emite CFDI?"*, y acabó contestando
+  /// la MISMA pregunta que `modalidadFacturacion` (abajo) sin que nada las atara: un proveedor
+  /// `factura=false` + `solo_con` mandaba su entrada de tela por el camino SIN factura y su captura
+  /// de CxP por el camino CON factura — **sus pagos partidos en dos según la puerta**.
+  ///
+  /// Hoy la única respuesta es `modalidadFacturacion`, y el booleano se DERIVA de ella con
+  /// `emiteFactura` (`dominio/terceros/facturacion-proveedor.ts`): `solo_sin` ⇒ false ·
+  /// `solo_con`/`ambos` ⇒ true · sin modalidad ⇒ null. La columna se conserva por REGLA 0-B (lo
+  /// viejo no se migra ni se repara): nadie la escribe, y el `factura` que sale en la API es el
+  /// derivado, no ésta. Con la casilla se fue también su regla de captura (`factura ⇒ RFC +
+  /// régimen`): el RFC se exige donde decide dinero, al capturar un CFDI a su nombre.
   factura                Boolean?
   /// RFC del tercero (persona física 13 / moral 12), validado en Zod si viene.
   rfc                    String?
@@ -741,9 +751,15 @@ model Proveedor {
 
   /// Modalidad de facturación del maquilero para su cuenta EsMa (F6-E4, decisión (h)):
   /// `solo_con` factura siempre, `solo_sin` nunca, `ambos` opera de las dos formas (y en
-  /// ese caso su estado de cuenta se segmenta en dos, E5). NULLABLE: los proveedores ya
-  /// migrados no lo traen (default sensato en el dominio: se deriva de `factura` en la UI;
-  /// null se trata como "no definido" y exige elegir con-factura por movimiento). Ver enum.
+  /// ese caso su estado de cuenta se segmenta en dos, E5).
+  ///
+  /// ⭐ Desde la fila 0.124 es la **ÚNICA** pregunta de facturación del proveedor: además de EsMa,
+  /// CxP y la corrida de pagos, de ella salen la entrada de tela y el CFDI (que antes leían
+  /// `factura`, arriba). Obligatoria en el alta desde la fila 0.110.
+  ///
+  /// NULLABLE: los proveedores ya migrados no la traen (REGLA 0-B, hueco a propósito); `null` se
+  /// trata como "no definido" —se leen con normalidad, pero no se les captura un movimiento nuevo
+  /// hasta definirla (`resolverConFactura` lo corta)—. Ver enum.
   modalidadFacturacion ModalidadFacturacion? @map("modalidad_facturacion")
 
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).

@@ -106,7 +106,7 @@ const CAMPOS_VIEJOS = [
  * 0 % por definición): se listan para que quede claro que la captura es TODA manual.
  */
 const CAMPOS_NUEVOS = [
-  '¿Emite factura (CFDI)?',
+  '¿Cómo factura? (solo con / solo sin / de las dos formas)',
   'RFC',
   'Régimen fiscal (SAT)',
   'Uso de CFDI',

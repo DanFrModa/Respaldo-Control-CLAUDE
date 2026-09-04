@@ -346,7 +346,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const editable = puedeMover && noEditable === null;
 
   // El proveedor ya capturado se RESPETA aunque no traiga el rol "vende-telas" (documento viejo o
-  // proveedor al que le falta la casilla): el combobox lo sigue MOSTRANDO por su nombre en vez de
+  // proveedor al que le faltan roles): el combobox lo sigue MOSTRANDO por su nombre en vez de
   // desaparecer y perder el dato en silencio.
   const listaProveedores = proveedores.data?.datos ?? [];
   // Nombre a MOSTRAR del proveedor que NO eligió el usuario en el combobox. Con búsqueda
@@ -363,10 +363,12 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             (propuesta.proveedor ?? undefined)
           : undefined;
 
-  // §Post-F9.22 — los dos tipos de proveedor (Daniel, 10-ago-2026): el que factura y el que no. La
-  // casilla vive en el catálogo del proveedor y aquí decide el camino. `undefined` (proveedor sin
-  // elegir, o fuera de la lista cargada) = no se sabe: se deja el flujo completo, no se esconde nada
-  // por una duda.
+  // §Post-F9.22 — los dos tipos de proveedor (Daniel, 10-ago-2026): el que factura y el que no.
+  // ⭐ Fila 0.124: quien lo dice es la pregunta única «¿Cómo factura?» (`modalidadFacturacion`) del
+  // catálogo; el `factura` que llega en la respuesta del API es su DERIVADO (`solo_sin` ⇒ false),
+  // no un campo capturable aparte. Aquí decide el camino. `undefined`/`null` (proveedor sin elegir,
+  // fuera de la lista cargada, o migrado sin modalidad) = no se sabe: se deja el flujo completo, no
+  // se esconde nada por una duda.
   // El proveedor que ELIGIÓ el usuario llega COMPLETO desde el combobox, así que su bandera se
   // conoce siempre (antes sólo si caía entre los 100 de la página cargada). Para los ids que NO
   // vienen de elegir —deep-link de la OC, CFDI leído, edición— se sigue resolviendo contra la
@@ -377,8 +379,8 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
       : listaProveedores.find((p) => String(p.id) === idProveedor);
   const proveedorSinFactura = proveedorResuelto?.factura === false;
 
-  // El que no factura no ampara con factura: su documento es remisión. Se corrige aquí para que la
-  // pantalla no mande al servidor algo que este va a rechazar.
+  // El que NUNCA factura (modalidad `solo_sin`) no ampara con factura: su documento es remisión. Se
+  // corrige aquí para que la pantalla no mande al servidor algo que este va a rechazar.
   useEffect(() => {
     if (proveedorSinFactura) setTipoDocumento('remision');
   }, [proveedorSinFactura]);

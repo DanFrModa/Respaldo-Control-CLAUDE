@@ -278,7 +278,6 @@ function datosEnriquecidosCrear(
   if (datos.razonSocial !== undefined) data.razonSocial = datos.razonSocial;
   if (datos.telefono !== undefined) data.telefono = datos.telefono;
   if (datos.condiciones !== undefined) data.condiciones = datos.condiciones;
-  if (datos.factura !== undefined) data.factura = datos.factura;
   if (datos.rfc !== undefined) data.rfc = datos.rfc;
   if (datos.regimenFiscalSat !== undefined) data.regimenFiscalSat = datos.regimenFiscalSat;
   if (datos.usoCfdiHabitual !== undefined) data.usoCfdiHabitual = datos.usoCfdiHabitual;
@@ -335,8 +334,14 @@ const CAMPOS_TEXTO_EDITABLES = [
   'obsPago',
 ] as const;
 
-/** Campos BOOLEANOS editables (no nullables: el formulario los manda como boolean). */
-const CAMPOS_BOOL_EDITABLES = ['factura', 'retieneIva', 'retieneIsr', 'asegurado'] as const;
+/**
+ * Campos BOOLEANOS editables (no nullables: el formulario los manda como boolean).
+ *
+ * ⚠️ `factura` YA NO está (fila 0.124): la pregunta *"¿este proveedor factura?"* la contesta
+ * `modalidadFacturacion` y nada más. La columna sigue en la base como histórico (REGLA 0-B) pero
+ * ninguna edición la escribe; donde hace falta el booleano se DERIVA con `emiteFactura`.
+ */
+const CAMPOS_BOOL_EDITABLES = ['retieneIva', 'retieneIsr', 'asegurado'] as const;
 
 /** Campos NUMÉRICOS enteros editables (nullables: `null` = borrar el dato). */
 const CAMPOS_NUM_EDITABLES = ['diasCredito', 'leadTimeDias'] as const;
@@ -423,8 +428,14 @@ function aplicarEnriquecidosEditar(
 /**
  * Crea un proveedor (catálogo global) con sus roles en UNA transacción (A2). Reglas:
  * permiso `proveedores.administrar`; nombre único global → `ErrorConflicto`; **≥1 rol**
- * (R15); si `factura=true` exige RFC + régimen (regla de captura, validada en el
- * esquema); **`modalidadFacturacion` OBLIGATORIA** (fila 0.110, ver abajo); nace activo;
+ * (R15); **`modalidadFacturacion` OBLIGATORIA** (fila 0.110, ver abajo); nace activo;
+ *
+ * ⚠️ Ya NO exige RFC + régimen al que factura (fila 0.124). Esa regla colgaba de la casilla
+ * `factura`, que se retiró; NO se remapeó a la modalidad a propósito, porque habría bloqueado justo
+ * el trabajo que abrió la fila 0.110 —ponerle la modalidad a los proveedores MIGRADOS, que llegan
+ * sin RFC a propósito (REGLA 0-B: lo que falta se tolera, no se compensa)—. El RFC se sigue
+ * exigiendo donde de verdad hace falta y con mejor mensaje: al capturar un CFDI a su nombre
+ * (`exigirRfcDelProveedor`, `dominio/inventarios/cfdi-entrada-tela.ts`).
  * auditoría y bitácora en la misma transacción (A7).
  *
  * ⭐ LA MODALIDAD DE FACTURACIÓN SE PREGUNTA AL DAR DE ALTA. Daniel (3-sep-2026,
@@ -439,7 +450,7 @@ function aplicarEnriquecidosEditar(
  * @example
  * const p = await crearProveedor(sesion, {
  *   nombre: "Maquilas SA", roles: [1, 2], modalidadFacturacion: "solo_con",
- *   factura: true, rfc: "MSA010101AB1", regimenFiscalSat: "601", diasCredito: 30,
+ *   rfc: "MSA010101AB1", regimenFiscalSat: "601", diasCredito: 30,
  * });
  */
 export async function crearProveedor(

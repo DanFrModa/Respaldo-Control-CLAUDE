@@ -83,7 +83,6 @@ const VALORES_INICIALES: DatosProveedorFormulario = {
   nombreCorto: '',
   razonSocial: '',
   // Fiscal
-  factura: false,
   rfc: '',
   regimenFiscalSat: '',
   usoCfdiHabitual: '',
@@ -141,7 +140,7 @@ function enumOpcional<T extends string>(valor: string): T | undefined {
  * Traduce la captura del formulario al cuerpo del API. Reglas:
  *   - `nombre` siempre va.
  *   - Los textos opcionales vacios se OMITEN (el backend los deja como null/sin cambio).
- *   - Las banderas (factura, retenciones) viajan siempre como boolean.
+ *   - Las banderas (retenciones, asegurado) viajan siempre como boolean.
  *   - Los numericos opcionales se convierten con `numeroOpcionalACuerpo` (vacio -> se omite).
  *   - Los enum-opcionales (moneda/metodoPago) se omiten si "sin elegir".
  *   - `roles` se inyecta aparte (estado local del dialogo); aqui solo se arman los
@@ -186,7 +185,8 @@ function aCuerpoFormulario(datos: DatosProveedorFormulario): ProveedorCrear {
   }
 
   // ── Banderas (siempre viajan) ───────────────────────────────────────────────
-  cuerpo.factura = datos.factura;
+  // ⚠️ `factura` ya NO viaja (fila 0.124): salió del contrato de escritura. Quien conteste
+  // *"¿este proveedor factura?"* es `modalidadFacturacion`, que va arriba desde la construcción.
   cuerpo.retieneIva = datos.retieneIva;
   cuerpo.retieneIsr = datos.retieneIsr;
   // Datos de taller (fusión de terceros, D12/R15).
@@ -229,7 +229,7 @@ function textoONull(valor: string): string | null {
  * alta, los campos opcionales que quedan VACIOS viajan como `null` para BORRAR el dato
  * (M1): en un PATCH parcial, un campo OMITIDO no se tocaria, así que omitirlo nunca
  * permitiría vaciar un valor ya capturado. `nombre` y `tipo` siempre van; las banderas
- * (factura/retenciones) viajan como boolean; los numericos/enum opcionales vacios van
+ * (retenciones/asegurado) viajan como boolean; los numericos/enum opcionales vacios van
  * como `null`. Los `roles` los inyecta el `enviar` (estado local, nunca `[]`).
  */
 function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
@@ -253,8 +253,8 @@ function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
     notas: textoONull(datos.notas),
     // Datos de taller (fusión de terceros, D12/R15): texto opcional vacio -> null (borrar).
     obsPago: textoONull(datos.obsPago),
-    // Banderas: siempre viajan como boolean.
-    factura: datos.factura,
+    // Banderas: siempre viajan como boolean. `factura` NO está (fila 0.124): la columna vieja se
+    // queda como histórico y ninguna edición la toca (REGLA 0-B).
     retieneIva: datos.retieneIva,
     retieneIsr: datos.retieneIsr,
     asegurado: datos.asegurado,
@@ -288,8 +288,8 @@ function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
  * - Los adjuntos necesitan el id del proveedor, asi que solo se montan en edicion;
  *   en alta se muestra un aviso para guardar primero.
  *
- * La validacion de captura es solo UX (incl. factura ⇒ RFC + regimen): el backend
- * re-valida y es la autoridad (A1). Al guardar con exito cierra y avisa con un toast.
+ * La validacion de captura es solo UX: el backend re-valida y es la autoridad (A1). Al guardar con
+ * exito cierra y avisa con un toast.
  */
 export function DialogoProveedor({
   abierto,
@@ -354,7 +354,6 @@ export function DialogoProveedor({
         nombreCorto: texto(proveedor.nombreCorto),
         razonSocial: texto(proveedor.razonSocial),
         // Fiscal
-        factura: bandera(proveedor.factura),
         rfc: texto(proveedor.rfc),
         regimenFiscalSat: texto(proveedor.regimenFiscalSat),
         usoCfdiHabitual: texto(proveedor.usoCfdiHabitual),
@@ -458,46 +457,20 @@ export function DialogoProveedor({
   const { errors } = formulario.formState;
   const registrar = formulario.register;
 
-  // §Post-F9.56 punto 4 — Daniel: *"si no emite CFDI, no debe pedir RFC"*. La bandera ya existía;
-  // lo que faltaba es que la pantalla la OBEDEZCA. Esconder no es impedir: el backend sigue siendo
-  // la autoridad (A1) y su regla `factura ⇒ RFC + régimen` se valida igual.
-  const emiteFactura = formulario.watch('factura');
   const modalidadElegida = formulario.watch('modalidadFacturacion');
   /**
-   * ⚠️ AVISO de contradicción entre los DOS campos que hoy contestan lo mismo (fila 0.124).
+   * §Post-F9.56 punto 4 — Daniel: *"si no emite CFDI, no debe pedir RFC"*. Los datos fiscales solo
+   * se piden a quien factura.
    *
-   * El sistema arrastra dos preguntas sobre facturación: `factura` (*"¿Emite factura (CFDI)?"*,
-   * §Post-F9.22, la que gobierna la entrada de tela y el CFDI) y `modalidadFacturacion` (la de EsMa
-   * y CxP, fila 0.110). Nada las ata entre sí, así que un proveedor puede quedar contestado de las
-   * dos formas a la vez y **sus pagos se parten según por qué puerta entraron**. Unificarlas es
-   * decisión de negocio pendiente (fila 0.124) y de radio mucho mayor: aquí NO se arregla.
+   * ⭐ Se DERIVA de la modalidad (fila 0.124), que es la única pregunta que queda: `solo_sin` es el
+   * único que no factura. Mientras la modalidad no se elija —y en el alta arranca sin elegir— los
+   * campos fiscales SE VEN: esconderlos antes de la respuesta obligaría a contestar en un orden que
+   * nadie pidió, y la modalidad ya es obligatoria para guardar (fila 0.110).
    *
-   * ⭐ SON DOS SENTIDOS, Y EL SEGUNDO ES EL CARO. Avisar de uno solo sería peor que no avisar: le
-   * enseñaría al usuario que "sin aviso = consistente", que es falso justo donde más duele.
-   *  • `factura=false` + `solo_con`/`ambos` → dice que no timbra y que aun así factura.
-   *  • `factura=true` + `solo_sin` → **el grave**: sus cargos por CFDI nacen `esFiscal: true` (van
-   *    por el banco) mientras sus capturas manuales de CxP nacen `false` (van por la relación). Es
-   *    el caso que el TSDoc de `dominio/terceros/segmento-motor.ts` señala como el más caro: un
-   *    proveedor mal capturado como `solo_sin` degradaría una factura timbrada **y el UUID queda
-   *    consumido para siempre**.
-   *
-   * Las combinaciones que NO son contradicción y por eso callan: `factura=true` + `ambos` (timbra,
-   * y unas cosas van con factura y otras no) y `factura=false` + `solo_sin` (no timbra, todo a mano).
-   *
-   * El aviso NO BLOQUEA el guardado a propósito, y no es pereza: bloquear chocaría de frente con la
-   * REGLA 0-B. Los proveedores migrados llegan sin modalidad; en cuanto alguien abra la ficha para
-   * poder guardarla, un bloqueo lo dejaría encerrado sin salida. Avisar informa; bloquear ata.
+   * Espejo exacto de `admiteCfdi` en el backend (`dominio/terceros/facturacion-proveedor.ts`), que
+   * es la autoridad (A1).
    */
-  const avisoFacturacion: string | null =
-    emiteFactura === false && (modalidadElegida === 'solo_con' || modalidadElegida === 'ambos')
-      ? 'En «Fiscal» este proveedor está marcado como que NO emite factura (CFDI), pero aquí dice ' +
-        'que sí factura. Revisa cuál de las dos es la buena.'
-      : emiteFactura === true && modalidadElegida === 'solo_sin'
-        ? 'En «Fiscal» este proveedor está marcado como que SÍ emite factura (CFDI), pero aquí dice ' +
-          'que todo lo suyo va sin factura. Si de verdad timbra, sus facturas nacerían mal ' +
-          'clasificadas. Revisa cuál de las dos es la buena.'
-        : null;
-
+  const emiteFactura = modalidadElegida !== 'solo_sin';
   // §Post-F9.56 punto 7 — los datos de taller solo salen si el proveedor presta algún servicio.
   const esTaller = (rolesCatalogo.data ?? []).some(
     (rol) => idsRoles.includes(rol.id) && ROLES_DE_TALLER.has(rol.codigo),
@@ -537,14 +510,12 @@ export function DialogoProveedor({
                   shouldDirty: true,
                 });
                 formulario.setValue('regimenFiscalSat', regimen, { shouldDirty: true });
-                // Si trae RFC **y** régimen, es un proveedor que timbra: la casilla se enciende
-                // para que los campos fiscales que se acaban de llenar SE VEAN (§Post-F9.56 punto
-                // 4). Se exigen LOS DOS porque la regla de captura es `factura ⇒ RFC + régimen`:
-                // encenderla con el régimen vacío dejaría el formulario bloqueado por un dato que
-                // el papel no traía — justo lo contrario de "degradar con gracia" (§Post-F9.55).
-                if (propuesta.rfc !== '' && regimen !== '') {
-                  formulario.setValue('factura', true, { shouldDirty: true });
-                }
+                // ⚠️ La constancia YA NO contesta "¿factura?" (fila 0.124). Antes encendía la
+                // casilla `factura` para que los campos fiscales recién llenados se vieran; hoy esa
+                // pregunta es la MODALIDAD, y la constancia no puede contestarla: estar dado de alta
+                // en el SAT no dice si a NOSOTROS nos factura siempre, nunca o de las dos formas
+                // (un taller registrado que nunca timbra es un caso real de Daniel). Se deja como
+                // la elija la persona; mientras no la elija, los campos fiscales se ven igual.
                 // El nombre solo se propone si está vacío: nunca se pisa lo que ya se capturó.
                 if (formulario.getValues('nombre').trim() === '' && propuesta.razonSocial !== '') {
                   formulario.setValue('nombre', propuesta.razonSocial, { shouldDirty: true });
@@ -632,15 +603,11 @@ export function DialogoProveedor({
                         ))}
                       </SelectNativo>
                       <FieldDescription>
-                        Decide de dónde sale su pago: lo que va CON factura se paga desde el estado
-                        de cuenta del banco; lo que va SIN factura, desde la relación de pagos. Si
-                        maneja las dos, se elige movimiento por movimiento.
+                        La ÚNICA pregunta de facturación del proveedor: decide de dónde sale su pago
+                        —lo que va CON factura se paga desde el estado de cuenta del banco; lo que
+                        va SIN factura, desde la relación de pagos— y también si se le puede
+                        capturar un CFDI. Si maneja las dos, se elige movimiento por movimiento.
                       </FieldDescription>
-                      {avisoFacturacion === null ? null : (
-                        <FieldDescription data-testid="aviso-facturacion-contradictoria">
-                          ⚠️ Ojo: {avisoFacturacion}
-                        </FieldDescription>
-                      )}
                       <FieldError errors={[errors.modalidadFacturacion]} />
                     </Field>
                   </FieldGroup>
@@ -673,13 +640,11 @@ export function DialogoProveedor({
                 <AccordionTrigger>Fiscal</AccordionTrigger>
                 <AccordionContent>
                   <FieldGroup>
-                    <Casilla
-                      id="proveedor-factura"
-                      etiqueta="¿Emite factura (CFDI)?"
-                      registrar={registrar}
-                      campo="factura"
-                      deshabilitado={guardando}
-                    />
+                    {/* 🔴 AQUÍ ESTABA la casilla *"¿Emite factura (CFDI)?"* (fila 0.124). Se
+                        retiró: contestaba la MISMA pregunta que «¿Cómo factura?» (sección General)
+                        y nada impedía que se contradijeran — un proveedor podía quedar dicho de las
+                        dos formas y sus pagos se partían según por qué puerta entraran. La única
+                        respuesta vive ahora en la modalidad; lo de abajo se deriva de ella. */}
 
                     {/* §Post-F9.56 punto 4: si NO emite CFDI, los datos fiscales no se piden.
                         Daniel: *"si no emite CFDI, no debe pedir RFC"*. */}
@@ -703,7 +668,8 @@ export function DialogoProveedor({
                             {...registrar('rfc')}
                           />
                           <FieldDescription>
-                            Obligatorio si el proveedor emite factura.
+                            Sin RFC no se le puede capturar una factura (CFDI): el sistema no
+                            tendría contra qué comprobar quién facturó.
                           </FieldDescription>
                           <FieldError errors={[errors.rfc]} />
                         </Field>
@@ -853,9 +819,10 @@ export function DialogoProveedor({
 
                       🔴 Sustituye al campo de TEXTO LIBRE anterior (la clave del SAT, "03 —
                       Transferencia"), que contestaba la misma pregunta sin poder gobernar nada:
-                      dejar los dos capturables era repetir el defecto de `factura` /
-                      `modalidadFacturacion` (fila 0.124). El campo viejo sigue en la base y en el
-                      contrato (REGLA 0-B: lo viejo no se migra ni se repara), pero ya no se captura.
+                      dejar los dos capturables era repetir el defecto que `factura` /
+                      `modalidadFacturacion` arrastraban y que la fila 0.124 ya cerró. El campo viejo
+                      sigue en la base (REGLA 0-B: lo viejo no se migra ni se repara), pero ya no se
+                      captura.
                     */}
                     <Field data-invalid={Boolean(errors.formaPagoPreferida)}>
                       <FieldLabel htmlFor="proveedor-forma-pago">
@@ -1089,7 +1056,7 @@ function Casilla({
   id: string;
   etiqueta: string;
   registrar: UseFormRegister<DatosProveedorFormulario>;
-  campo: 'factura' | 'retieneIva' | 'retieneIsr' | 'asegurado';
+  campo: 'retieneIva' | 'retieneIsr' | 'asegurado';
   deshabilitado: boolean;
 }): React.JSX.Element {
   return (

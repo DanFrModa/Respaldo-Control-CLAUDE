@@ -332,7 +332,10 @@ describe('<ProveedoresPagina>', () => {
   it('muestra los datos enriquecidos (fiscal/pago/operativo) y el conteo de adjuntos', async () => {
     const usuario = userEvent.setup();
     const completo = proveedor(5, 'Proveedor Completo');
-    completo.factura = true;
+    // ⭐ Fila 0.124: la ÚNICA pregunta de facturación es la modalidad. `factura` se deja poblado —y
+    // en CONTRA— a propósito: la ficha ya no lo lee (columna histórica, REGLA 0-B).
+    completo.modalidadFacturacion = 'ambos';
+    completo.factura = false;
     completo.rfc = 'PCO010101AB1';
     completo.regimenFiscalSat = '601';
     completo.usoCfdiHabitual = 'G03';
@@ -380,6 +383,10 @@ describe('<ProveedoresPagina>', () => {
     expect(within(detalle).getByText('Fiscal')).toBeInTheDocument();
     expect(within(detalle).getByText('Pago')).toBeInTheDocument();
     expect(within(detalle).getByText('Operativo')).toBeInTheDocument();
+    // ⭐ La facturación se lee de la MODALIDAD, y la fila vieja ya no existe (fila 0.124).
+    expect(within(detalle).getByText('¿Cómo factura?')).toBeInTheDocument();
+    expect(within(detalle).getByText('De las dos formas (con y sin factura)')).toBeInTheDocument();
+    expect(within(detalle).queryByText('¿Emite factura (CFDI)?')).not.toBeInTheDocument();
     // Datos fiscales.
     expect(within(detalle).getByText('PCO010101AB1')).toBeInTheDocument();
     expect(within(detalle).getByText('601')).toBeInTheDocument();

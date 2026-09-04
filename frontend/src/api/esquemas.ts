@@ -259,8 +259,13 @@ export function esClabeValida(clabe: string): boolean {
  * Operativo). Los numéricos se capturan como texto (patron `numeroOpcional`) y los
  * enum-opcionales como string ("" = sin elegir); `aCuerpo` del dialogo convierte.
  *
- * Refleja las reglas del backend (factura ⇒ RFC + régimen; RFC/CLABE válidos),
- * pero es SOLO UX: el servidor re-valida y es la autoridad (A1).
+ * Refleja las reglas del backend (RFC/CLABE válidos, modalidad de facturación obligatoria), pero
+ * es SOLO UX: el servidor re-valida y es la autoridad (A1).
+ *
+ * ⚠️ Sin `factura` desde la fila 0.124: la pregunta *"¿este proveedor factura?"* la contesta
+ * `modalidadFacturacion` y nadie más. Con la casilla se fue también la regla de captura
+ * `factura ⇒ RFC + régimen` (el backend tampoco la tiene ya): el RFC se exige donde de verdad
+ * decide dinero —al capturarle un CFDI—, no al clasificar a un proveedor migrado que nunca lo tuvo.
  */
 export const esquemaProveedorFormulario = z
   .object({
@@ -284,7 +289,6 @@ export const esquemaProveedorFormulario = z
       .trim()
       .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
     // ── Fiscal ──────────────────────────────────────────────────────────────────
-    factura: z.boolean(),
     rfc: z
       .string()
       .trim()
@@ -388,11 +392,6 @@ export const esquemaProveedorFormulario = z
      */
     modalidadFacturacion: z.string(),
   })
-  .refine(
-    // Regla de captura R15 (espejo del backend): si emite CFDI, exige RFC + régimen.
-    (datos) => !datos.factura || (datos.rfc !== '' && datos.regimenFiscalSat !== ''),
-    { error: 'Si el proveedor factura, captura su RFC y su régimen fiscal', path: ['rfc'] },
-  )
   .refine(
     // Fila 0.110: la modalidad de facturación no puede quedar sin elegir.
     (datos) => (MODALIDADES_FACTURACION as readonly string[]).includes(datos.modalidadFacturacion),

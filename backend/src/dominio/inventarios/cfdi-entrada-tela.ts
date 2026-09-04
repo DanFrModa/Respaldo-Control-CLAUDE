@@ -265,7 +265,7 @@ export async function leerCfdiParaEntradaTela(
 
   const proveedor = await cliente.proveedor.findFirst({
     where: { rfc: { equals: parsed.emisorRfc, mode: 'insensitive' } },
-    select: { id: true, nombre: true, activo: true, factura: true },
+    select: { id: true, nombre: true, activo: true, modalidadFacturacion: true },
   });
   if (proveedor === null) {
     // OJO CON LO QUE SE ACONSEJA AQUÍ (revisión del 11-ago-2026): *"elige el proveedor a mano"* —lo
@@ -284,14 +284,15 @@ export async function leerCfdiParaEntradaTela(
     avisos.push(`El proveedor "${proveedor.nombre}" está desactivado en el catálogo.`);
   }
   // §Post-F9.22 — contradicción entre el catálogo y la realidad: el proveedor está marcado como que
-  // NO factura, pero acaba de mandar un CFDI. AQUÍ solo se AVISA (leer no escribe nada, y el XML es
-  // prueba de que sí timbra): guardar la entrada con esa factura sí lo rechaza. Se pide corregir el
-  // catálogo en vez de corregirlo solos, porque la casilla la define quien da de alta al proveedor.
-  if (proveedor !== null && !admiteCfdi(proveedor.factura)) {
+  // NUNCA factura, pero acaba de mandar un CFDI. AQUÍ solo se AVISA (leer no escribe nada, y el XML
+  // es prueba de que sí timbra): guardar la entrada con esa factura sí lo rechaza. Se pide corregir
+  // el catálogo en vez de corregirlo solos, porque la modalidad la define quien da de alta al
+  // proveedor (fila 0.124: `modalidadFacturacion` es la única que contesta esta pregunta).
+  if (proveedor !== null && !admiteCfdi(proveedor.modalidadFacturacion)) {
     avisos.push(
-      `El proveedor "${proveedor.nombre}" está dado de alta como que NO emite factura, pero este ` +
-        `CFDI es suyo. Corrige la casilla "¿Emite factura (CFDI)?" en el catálogo de proveedores: ` +
-        `si no, no vas a poder guardar la entrada con esta factura.`,
+      `El proveedor "${proveedor.nombre}" está dado de alta como que NUNCA factura, pero este ` +
+        `CFDI es suyo. Corrige "¿Cómo factura?" en el catálogo de proveedores: si no, no vas a ` +
+        `poder guardar la entrada con esta factura.`,
     );
   }
 
@@ -422,7 +423,7 @@ export async function sellarCfdiEnEntrada(
   // quien no facturó. Se valida aquí porque el proveedor lo elige la pantalla, no el XML.
   const proveedor = await cliente.proveedor.findUnique({
     where: { id: datos.idProveedor },
-    select: { nombre: true, rfc: true, factura: true },
+    select: { nombre: true, rfc: true, modalidadFacturacion: true },
   });
   // §Post-F9.22 — el que NO factura no puede traer factura. Se corta antes de subir nada a R2.
   if (proveedor !== null) {
@@ -570,7 +571,7 @@ export async function exigirSelloCompatibleConProveedor(
   const cliente = clienteLectura(bd);
   const proveedor = await cliente.proveedor.findUnique({
     where: { id: idProveedorNuevo },
-    select: { nombre: true, rfc: true, factura: true },
+    select: { nombre: true, rfc: true, modalidadFacturacion: true },
   });
   if (proveedor === null) {
     return; // `validarCabeceraYLineas` ya truena por proveedor inexistente, con mejor mensaje.
@@ -578,10 +579,10 @@ export async function exigirSelloCompatibleConProveedor(
   // §Post-F9.22 — el que NO factura no puede quedarse con una factura amarrada.
   //
   // EL CALLEJÓN QUE ESTO ABRE (dicho a propósito, no es un descuido): si a un proveedor migrado se
-  // le marca `factura = false` DESPUÉS de que ya tenía un borrador con CFDI, ese borrador deja de
-  // poder editarse. Tiene DOS salidas reales, y las dos están al alcance de quien captura: (1) si el
-  // proveedor sí timbra —y el XML es la prueba de que sí—, corregir la casilla del catálogo, que es
-  // justo lo que pide el mensaje de abajo; o (2) cancelar el borrador y recapturarlo sin el XML,
+  // le pone la modalidad `solo_sin` DESPUÉS de que ya tenía un borrador con CFDI, ese borrador deja
+  // de poder editarse. Tiene DOS salidas reales, y las dos están al alcance de quien captura: (1) si
+  // el proveedor sí timbra —y el XML es la prueba de que sí—, corregir "¿Cómo factura?" en el
+  // catálogo, que es justo lo que pide el mensaje de abajo; o (2) cancelar el borrador y recapturarlo sin el XML,
   // que es lo que corresponde si de verdad no factura. NO se agrega una tercera puerta para
   // "desamarrar" el CFDI: soltar un dato fiscal desde la edición es la superficie que se acaba de
   // cerrar (el `uuidCfdi` salió del PUT), y un borrador no cuesta nada de recapturar.

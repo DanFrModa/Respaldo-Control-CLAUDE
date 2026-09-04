@@ -71,6 +71,31 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.106 · 4-sep-2026 · **en prueba** — Una sola pregunta de facturación por proveedor
+
+### Qué se puede hacer ahora que antes no
+
+- **El proveedor contesta una sola vez si factura.** Había dos campos que respondían la misma pregunta —una
+  casilla «¿emite factura?» de los catálogos de junio y la «modalidad de facturación» (sólo con · sólo sin ·
+  ambas) de maquileros— y nada impedía que se contradijeran: un proveedor marcado «no factura» pero con
+  modalidad «sólo con factura» mandaba sus entradas de tela a la relación de pagos sin factura y sus
+  capturas de cuentas por pagar a la relación con factura, **partiendo sus pagos por dos caminos según la
+  puerta por la que entraron**. Daniel: *«es un error que existan»*. Ahora manda **la modalidad**; lo que
+  antes leía la casilla (la entrada de tela, la factura electrónica) lo **deriva** de ella.
+
+### Qué cambió y puede sorprender
+
+- La casilla «¿emite factura?» **desaparece del alta y la edición** del proveedor. Sólo queda la modalidad,
+  que ya era obligatoria desde la 0.110.
+- Los proveedores migrados de Access que traían la casilla pero no la modalidad **no se rellenan** (REGLA
+  0-B): mientras no se les capture la modalidad, el sistema los trata como «sin definir» igual que antes, y
+  lo dice al primer movimiento que la necesite.
+
+### Qué sigue pendiente o roto
+
+- **Sin migración, sin permisos** ⇒ el despliegue no requiere `SEED_ON_START`. La columna vieja se conserva en
+  la base como histórico; ya no se captura ni se lee.
+
 ## 0.105 · 4-sep-2026 · **en prueba** — ⭐ **Cerrar la orden**: el faltante del maquilero se cobra, y deja de aparecer como pendiente
 
 ### Qué se puede hacer ahora que antes no

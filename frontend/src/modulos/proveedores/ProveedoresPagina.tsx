@@ -36,6 +36,7 @@ import {
 } from '@/api/proveedores';
 import {
   ETIQUETAS_METODO_PAGO,
+  ETIQUETAS_MODALIDAD_FACTURACION,
   ETIQUETAS_MONEDA,
   type MetodoPagoClave,
   type MonedaClave,
@@ -550,7 +551,6 @@ function DetalleProveedor({
   puedeAdministrar: boolean;
 }): React.JSX.Element {
   const hayFiscal =
-    p.factura !== null ||
     p.retieneIva !== null ||
     p.retieneIsr !== null ||
     hayTexto(p.rfc) ||
@@ -580,6 +580,19 @@ function DetalleProveedor({
           <CampoTextoSiHay icono={Phone} etiqueta="Teléfono" valor={p.telefono} />
           <CampoTextoSiHay icono={Mail} etiqueta="Email" valor={p.email} />
           <CampoTextoSiHay icono={MapPin} etiqueta="Dirección" valor={p.direccion} anchoCompleto />
+          {/* ⭐ LA ÚNICA pregunta de facturación del proveedor (fila 0.124). Sustituye a la fila
+              *"¿Emite factura (CFDI)?"* que se pintaba en «Fiscal» desde la bandera `factura`: eran
+              dos respuestas a lo mismo y podían contradecirse. Va en General —no en Fiscal— por lo
+              mismo que en el diálogo: no es un dato del SAT, es de quién y cómo se le paga. Se
+              muestra SIEMPRE, incluso vacía: en un proveedor migrado el hueco es justo lo que hay
+              que ver para saber que falta contestarla. */}
+          <CampoDetalle icono={Receipt} etiqueta="¿Cómo factura?">
+            {p.modalidadFacturacion === null ? (
+              <ValorVacio />
+            ) : (
+              ETIQUETAS_MODALIDAD_FACTURACION[p.modalidadFacturacion]
+            )}
+          </CampoDetalle>
           <CampoDetalle icono={Wrench} etiqueta="Roles / servicios" anchoCompleto>
             {p.roles.length > 0 ? (
               <span className="flex flex-wrap gap-1.5" data-testid="roles-proveedor-detalle">
@@ -600,11 +613,6 @@ function DetalleProveedor({
       {hayFiscal ? (
         <SeccionDetalle titulo="Fiscal" icono={Receipt}>
           <RejillaCampos>
-            {siNo(p.factura) !== null ? (
-              <CampoDetalle icono={Receipt} etiqueta="¿Emite factura (CFDI)?">
-                {siNo(p.factura)}
-              </CampoDetalle>
-            ) : null}
             <CampoTextoSiHay icono={FileText} etiqueta="RFC" valor={p.rfc} />
             <CampoTextoSiHay
               icono={FileText}
