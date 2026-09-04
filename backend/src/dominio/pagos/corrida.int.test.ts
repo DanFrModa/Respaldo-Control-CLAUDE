@@ -20,7 +20,7 @@ import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../prue
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 
-import { crearConceptoPago } from '../catalogos/conceptos-pago.js';
+import { crearConceptoPago, listarConceptosPago } from '../catalogos/conceptos-pago.js';
 import { crearCuentaConcepto } from '../catalogos/conceptos-pago-cuentas.js';
 import { crearCuentaPagoProveedor } from '../catalogos/proveedor-cuentas-pago.js';
 import { saldoDeMaquilero } from '../esma/saldos.js';
@@ -162,9 +162,29 @@ describe('(a) el alta de la corrida', () => {
       renglones: 0,
     });
 
-    // El que NO es predeterminado igual está a la vista para poder agregarlo, pero sin renglón.
-    const agua = detalle.secciones.flatMap((s) => s.filas).find((f) => f.nombre === 'Agua');
-    expect(agua?.renglones).toEqual([]);
+    // ⭐ El que NO es predeterminado **no sale como fila**: la corrida sólo carga sola los
+    // predeterminados (doc `pagos-corrida.md` §4: *«los demás se agregan desde el catálogo cuando
+    // hacen falta»*). Meterlo como fila vacía llenaría la relación de renglones que nadie pidió.
+    //
+    // 🔴 Esta prueba afirmaba lo contrario —que «Agua» salía con `renglones: []`— y el CI la puso
+    // roja: era la ASERCIÓN la que estaba mal, no el código. Se escribió sin Postgres, describiendo
+    // lo que yo creía que hacía el dominio en vez de lo que hace.
+    const nombresDeFila = detalle.secciones.flatMap((x) => x.filas).map((f) => f.nombre);
+    expect(nombresDeFila).toEqual(expect.arrayContaining(['Caja chica', 'Nómina por fuera']));
+    expect(nombresDeFila).not.toContain('Agua');
+  });
+
+  it('⭐ …pero el NO predeterminado sí está en el catálogo, listo para agregarse', async () => {
+    // La otra mitad de la regla: que no sea fila no puede significar que sea inalcanzable. La
+    // pantalla lo ofrece desde el catálogo (`useConceptosPago` → `listarConceptosPago`), y de ahí
+    // sale el «agregar concepto». Sin esta prueba, «no está en las filas» sería compatible con «no
+    // está en ningún lado», que es un defecto y no un diseño.
+    await crearConceptoPago(sesion(), { nombre: 'Agua', rubro: 'servicios' }, bd());
+    const catalogo = await listarConceptosPago(sesion(), {}, bd());
+    const agua = catalogo.datos.find((c) => c.nombre === 'Agua');
+    expect(agua).toBeDefined();
+    expect(agua?.predeterminado).toBe(false);
+    expect(agua?.activo).toBe(true);
   });
 });
 
@@ -177,8 +197,13 @@ describe('(b) un solo borrador por semana y segmento', () => {
   });
 
   it('el OTRO segmento de la misma semana sí se puede abrir', async () => {
-    await abrirCorrida(false);
-    await expect(abrirCorrida(true)).resolves.toBeDefined();
+    const sinFactura = await abrirCorrida(false);
+    const conFactura = await abrirCorrida(true);
+    // Que resuelva no basta: son DOS corridas distintas, de la misma semana y de segmentos opuestos.
+    expect(conFactura).not.toBe(sinFactura);
+    const lista = await listarCorridas(sesion(), {}, bd());
+    expect(lista.filas.map((c) => c.conFactura).sort()).toEqual([false, true]);
+    expect(new Set(lista.filas.map((c) => c.semana)).size).toBe(1);
   });
 
   it('⭐ tras CERRAR una, se puede abrir otra de la misma semana (así se corrige, D3)', async () => {
@@ -191,9 +216,12 @@ describe('(b) un solo borrador por semana y segmento', () => {
       bd(),
     );
     await cerrarCorrida(sesion(), id, bd());
-    await expect(
-      crearCorrida(sesion(), { semana: '2026-09-02', conFactura: false }, bd()),
-    ).resolves.toBeDefined();
+    // La segunda corrida del MISMO segmento y semana nace de verdad, con su folio propio: es la
+    // marcha atrás de D3 (lo cerrado no se edita, se corrige con otra).
+    const otra = await crearCorrida(sesion(), { semana: '2026-09-02', conFactura: false }, bd());
+    expect(otra.corrida.estado).toBe('borrador');
+    expect(otra.corrida.semana).toBe('2026-08-31');
+    expect(otra.corrida.id).not.toBe(id);
   });
 });
 
@@ -381,7 +409,9 @@ describe('(d) ⭐ la guarda fiscal', () => {
       undefined,
       bd(),
     );
-    await expect(cerrarCorrida(sesion(), id, bd())).resolves.toBeDefined();
+    // Que resuelva no basta: se comprueba que de verdad quedó CERRADA.
+    const cerrada = await cerrarCorrida(sesion(), id, bd());
+    expect(cerrada.corrida.estado).toBe('cerrada');
   });
 
   it('una corrida sin ningún renglón con monto no se cierra', async () => {
@@ -531,7 +561,14 @@ describe('(g) ⭐ ejecutar: nacen los movimientos', () => {
 
     // Y el renglón sabe qué movimiento creó (trazabilidad + idempotencia).
     const renglon = await cliente.renglonCorridaPago.findFirst({ where: { idCorrida: id } });
-    expect(renglon?.idPagoMaquilero).toBe(pagos[0]?.id);
+    // ⚠️ Los DOS lados se exigen presentes ANTES de compararlos: con `renglon?.x` contra
+    // `pagos[0]?.id`, si faltaran los dos la aserción sería `undefined === undefined` y pasaría en
+    // vacío. Es el mismo defecto que dejó rojas tres pruebas de este archivo, en su versión
+    // silenciosa — ésta habría pasado en verde sin comprobar nada.
+    const pago = pagos[0];
+    expect(pago).toBeDefined();
+    expect(renglon).not.toBeNull();
+    expect(renglon?.idPagoMaquilero).toBe(pago?.id);
   });
 
   it('un renglón de proveedor de estado de cuenta nace como movimiento de CxP', async () => {
@@ -785,7 +822,8 @@ describe('(m) ⭐ `cuentaEsFiscal` queda CONGELADO en el renglón (R4)', () => {
     const renglon = detalle.secciones.flatMap((x) => x.filas.flatMap((f) => f.renglones))[0];
     expect(renglon?.cuentaEsFiscal).toBe(true);
     expect(detalle.bloqueos).toEqual([]);
-    await expect(cerrarCorrida(sesion(), id, bd())).resolves.toBeDefined();
+    const cerrada = await cerrarCorrida(sesion(), id, bd());
+    expect(cerrada.corrida.estado).toBe('cerrada');
   });
 });
 
@@ -852,12 +890,17 @@ describe('(k) ⭐ los CHECK de la migración muerden de verdad', () => {
       numeroCuenta?: string | null;
       tipo?: string | null;
     },
-  ): Promise<void> {
-    await cliente.$executeRawUnsafe(
+  ): Promise<number> {
+    // ⚠️ `RETURNING id` + `$queryRawUnsafe`, no `$executeRawUnsafe`: el caso FELIZ tiene que poder
+    // comprobar que la fila QUEDÓ, no sólo que la promesa resolvió. `$executeRawUnsafe` devuelve el
+    // número de filas y con `.resolves.toBeDefined()` una prueba pasaba en verde sin mirar nada —
+    // que es exactamente cómo estas tres llegaron rojas al CI.
+    const filas = await cliente.$queryRawUnsafe<{ id: number }[]>(
       `INSERT INTO "renglon_corrida_pago"
          ("id_corrida","origen","id_proveedor","rubro","nombre","monto","forma_pago",
           "beneficiario","numero_cuenta","tipo_cuenta","modificado_en")
-       VALUES ($1,'maquila',$2,'maquila','X',$3,$4::"forma_de_pago",'X',$5,$6::"tipo_cuenta_pago",NOW())`,
+       VALUES ($1,'maquila',$2,'maquila','X',$3,$4::"forma_de_pago",'X',$5,$6::"tipo_cuenta_pago",NOW())
+       RETURNING "id"`,
       idCorrida,
       taller.id,
       extra.monto ?? 100,
@@ -865,11 +908,20 @@ describe('(k) ⭐ los CHECK de la migración muerden de verdad', () => {
       extra.numeroCuenta ?? null,
       extra.tipo ?? null,
     );
+    const fila = filas[0];
+    if (fila === undefined) {
+      throw new Error('El INSERT no devolvió id: la fila no se creó.');
+    }
+    return fila.id;
   }
 
   it('un renglón en CERO sí se admite (así nacen los predeterminados)', async () => {
     const id = await abrirCorrida(false);
-    await expect(insertarCrudo(id, { monto: 0 })).resolves.toBeDefined();
+    const idRenglon = await insertarCrudo(id, { monto: 0 });
+    // Se comprueba que la fila EXISTE y con el monto que se pidió: que la promesa resolviera no
+    // dice nada sobre lo que quedó en la base.
+    const guardado = await cliente.renglonCorridaPago.findUnique({ where: { id: idRenglon } });
+    expect(guardado?.monto.toNumber()).toBe(0);
   });
 
   it('⭐ un monto NEGATIVO lo rechaza la base', async () => {
@@ -901,13 +953,14 @@ describe('(k) ⭐ los CHECK de la migración muerden de verdad', () => {
 
   it('una transferencia CON cuenta y tipo sí pasa', async () => {
     const id = await abrirCorrida(false);
-    await expect(
-      insertarCrudo(id, {
-        formaPago: 'transferencia',
-        numeroCuenta: '002010055555555551',
-        tipo: 'clabe',
-      }),
-    ).resolves.toBeDefined();
+    const idRenglon = await insertarCrudo(id, {
+      formaPago: 'transferencia',
+      numeroCuenta: '002010055555555551',
+      tipo: 'clabe',
+    });
+    const guardado = await cliente.renglonCorridaPago.findUnique({ where: { id: idRenglon } });
+    expect(guardado?.formaPago).toBe('transferencia');
+    expect(guardado?.numeroCuenta).toBe('002010055555555551');
   });
 
   it('⭐ un renglón de MAQUILA no puede apuntar a un movimiento de CxP', async () => {
