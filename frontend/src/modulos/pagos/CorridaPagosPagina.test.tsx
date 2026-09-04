@@ -19,13 +19,16 @@ import { CorridaPagosPagina } from './CorridaPagosPagina';
  */
 
 /** Estado mutable de los hooks mockeados (objetos estables para el factory de vi.mock). */
-const estado: { lista: unknown; detalle: unknown; concentrado: unknown } = {
+const estado: { lista: unknown; detalle: unknown; concentrado: unknown; documento: unknown } = {
   lista: null,
   detalle: null,
   concentrado: null,
+  documento: null,
 };
 const ejecutado = { ids: [] as unknown[] };
 const guardado = { llamadas: [] as unknown[] };
+/** Lo que se mandó a imprimir (fila 0.118): `window.open` no existe de verdad en jsdom. */
+const impreso = { documentos: [] as unknown[], corridas: [] as unknown[] };
 
 vi.mock('@/api/pagos', () => ({
   useCorridas: () => estado.lista,
@@ -40,6 +43,11 @@ vi.mock('@/api/pagos', () => ({
   useCerrarCorrida: () => ({ mutate: vi.fn(), isPending: false }),
   useEjecutarCorrida: () => ({ mutate: (id: unknown) => ejecutado.ids.push(id), isPending: false }),
   useConcentrado: () => estado.concentrado,
+  // ── El documento para facturar (fila 0.118) ──────────────────────────────────
+  useDocumentoFacturacion: () => estado.documento,
+  imprimirDocumentoFacturacion: (idCorrida: unknown, idRenglon: unknown) =>
+    impreso.documentos.push([idCorrida, idRenglon]),
+  imprimirDocumentosCorrida: (id: unknown) => impreso.corridas.push(id),
 }));
 
 const TOTALES_CERO = { efectivo: 0, transferencia: 0, total: 0, renglones: 0 };
@@ -144,12 +152,15 @@ const detalle: CorridaDetalle = {
 
 /** La relación ejecutable tal como la manda el servidor (sólo lo que lleva monto). */
 const CONCENTRADO = {
-  corrida: { ...CORRIDA, estado: 'cerrada' as const },
+  // ⚠️ CON factura: es el segmento del que salen los documentos para facturar (fila 0.118). La
+  // pantalla de trabajo de arriba sigue siendo la de SIN factura; son dos corridas distintas.
+  corrida: { ...CORRIDA, estado: 'cerrada' as const, conFactura: true },
   secciones: [
     {
       rubro: 'maquila' as const,
       renglones: [
         {
+          id: 501,
           rubro: 'maquila' as const,
           nombre: 'TALLER NORTE',
           beneficiario: 'Fulana de Tal',
@@ -162,12 +173,62 @@ const CONCENTRADO = {
           monto: 30_000,
           concepto: 'Maquila semana 36',
           referencia: '7909 y 7888',
+          // Fila 0.118: la facturabilidad viaja RESUELTA en el concentrado.
+          facturacion: {
+            facturable: true,
+            motivo: null,
+            motivoTexto: null,
+            faltantes: [],
+          },
         },
       ],
       totales: { efectivo: 0, transferencia: 30_000, total: 30_000, renglones: 1 },
     },
   ],
   totales: { efectivo: 0, transferencia: 30_000, total: 30_000, renglones: 1 },
+};
+
+/**
+ * El documento para facturar de ese renglón (fila 0.118). 🔒 Razón social y RFC INVENTADOS: el repo
+ * es público y los talleres de Daniel son personas físicas.
+ */
+const DOCUMENTO = {
+  facturable: true,
+  motivo: null,
+  motivoTexto: null,
+  faltantes: [],
+  documento: {
+    idCorrida: 7,
+    idRenglon: 501,
+    folioCorrida: 12,
+    semana: '2026-08-31',
+    receptor: {
+      razonSocial: 'EMPRESA DEMO SA DE CV',
+      rfc: 'EDE010101AAA',
+      regimenFiscalSat: '601',
+      codigoPostal: '11000',
+    },
+    emisor: {
+      razonSocial: 'TALLER EJEMPLO UNO SA DE CV',
+      rfc: 'TEU010101AAA',
+      regimenFiscalSat: '626',
+      codigoPostal: '54000',
+    },
+    nombreProveedor: 'TALLER NORTE',
+    usoCfdi: 'G03',
+    usoCfdiSugerido: false,
+    concepto: 'Maquila semana 36',
+    referencia: '7909 y 7888',
+    formaPagoSat: '03',
+    formaPagoTexto: 'Transferencia electrónica de fondos',
+    metodoPagoSat: 'PUE',
+    metodoPagoTexto: 'Pago en una sola exhibición',
+    moneda: 'MXN',
+    subtotal: 25_862.07,
+    iva: 4137.93,
+    tasaIvaTexto: '16 %',
+    total: 30_000,
+  },
 };
 
 // El default es lo realista: quien arma la corrida decide montos, o sea ve dinero.
@@ -180,6 +241,9 @@ function pintar(
 beforeEach(() => {
   guardado.llamadas = [];
   ejecutado.ids = [];
+  impreso.documentos = [];
+  impreso.corridas = [];
+  estado.documento = { data: DOCUMENTO, isPending: false, isError: false };
   estado.concentrado = { data: CONCENTRADO, isPending: false, isError: false };
   estado.lista = { data: lista, isPending: false, isError: false };
   estado.detalle = { data: detalle, isPending: false, isError: false };
@@ -427,6 +491,141 @@ describe('⭐ la RELACIÓN EJECUTABLE (B5)', () => {
     expect(within(relacion).getByText('7909 y 7888')).toBeInTheDocument();
     expect(within(relacion).getByText('Fulana de Tal')).toBeInTheDocument();
     expect(within(relacion).getByTestId('relacion-gran-total')).toHaveTextContent('$30,000.00');
+  });
+});
+
+/**
+ * ⭐ EL DOCUMENTO PARA FACTURAR (fila 0.118, §Post-F9.186(k)). Daniel: *«nadie me factura si no le
+ * mando yo un documento con los datos con los que me tiene que facturar»*.
+ *
+ * Lo que se mide aquí es lo único que la pantalla decide por su cuenta: cuándo el botón se puede
+ * apretar y qué se ve al apretarlo. El veredicto lo manda el servidor ya resuelto (en el
+ * concentrado), así que la pantalla no vuelve a juzgar nada — y eso también se mide.
+ */
+describe('el documento para facturar (fila 0.118)', () => {
+  function abrirRelacion(): Promise<void> {
+    const usuario = userEvent.setup();
+    estado.detalle = {
+      data: { ...detalle, corrida: { ...CORRIDA, estado: 'cerrada' as const } },
+      isPending: false,
+      isError: false,
+    };
+    pintar();
+    return usuario.click(screen.getByTestId('corrida-ver-relacion'));
+  }
+
+  it('cada renglón facturable trae su botón, habilitado', async () => {
+    await abrirRelacion();
+    expect(screen.getByTestId('boton-documento-facturar')).toBeEnabled();
+  });
+
+  it('⭐ el renglón que NO se puede facturar sale DESHABILITADO y con el motivo a la vista', async () => {
+    const seccion = CONCENTRADO.secciones[0];
+    const renglon = seccion?.renglones[0];
+    estado.concentrado = {
+      data: {
+        ...CONCENTRADO,
+        secciones: [
+          {
+            ...seccion,
+            renglones: [
+              {
+                ...renglon,
+                facturacion: {
+                  facturable: false,
+                  motivo: 'faltantes' as const,
+                  motivoTexto:
+                    'Faltan datos fiscales (1): sin ellos el proveedor no puede timbrar.',
+                  faltantes: [
+                    {
+                      quien: 'proveedor' as const,
+                      campo: 'rfc' as const,
+                      texto: 'Falta el RFC del proveedor TALLER NORTE',
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    };
+    await abrirRelacion();
+
+    const boton = screen.getByTestId('boton-documento-facturar');
+    expect(boton).toBeDisabled();
+    // El aviso viene REDACTADO del servidor: la pantalla no lo inventa, sólo lo enseña.
+    expect(boton.parentElement).toHaveAttribute(
+      'title',
+      expect.stringContaining('Falta el RFC del proveedor TALLER NORTE'),
+    );
+  });
+
+  it('⭐ al abrirlo se ven los DOS lados y el IVA EXPLÍCITO, y de ahí sale el PDF', async () => {
+    const usuario = userEvent.setup();
+    await abrirRelacion();
+    await usuario.click(screen.getByTestId('boton-documento-facturar'));
+
+    const partes = screen.getByTestId('documento-facturar-partes');
+    expect(within(partes).getByText('TALLER EJEMPLO UNO SA DE CV')).toBeInTheDocument();
+    expect(within(partes).getByText('TEU010101AAA')).toBeInTheDocument();
+    expect(within(partes).getByText('EMPRESA DEMO SA DE CV')).toBeInTheDocument();
+    expect(within(partes).getByText('EDE010101AAA')).toBeInTheDocument();
+
+    // El IVA no está escondido dentro del total: los tres números, a la vista.
+    const importes = screen.getByTestId('documento-facturar-importes');
+    expect(importes).toHaveTextContent('$25,862.07');
+    expect(importes).toHaveTextContent('IVA trasladado 16 %');
+    expect(importes).toHaveTextContent('$4,137.93');
+    expect(importes).toHaveTextContent('$30,000.00');
+
+    await usuario.click(screen.getByTestId('documento-facturar-pdf'));
+    expect(impreso.documentos).toEqual([[7, 501]]);
+  });
+
+  it('si el servidor dice que no se emite, el diálogo enseña el porqué y NO ofrece PDF', async () => {
+    const usuario = userEvent.setup();
+    estado.documento = {
+      data: {
+        facturable: false,
+        motivo: 'efectivo',
+        motivoTexto: 'El pago sale en efectivo, y las facturas son sólo transferencias.',
+        faltantes: [],
+        documento: null,
+      },
+      isPending: false,
+      isError: false,
+    };
+    await abrirRelacion();
+    await usuario.click(screen.getByTestId('boton-documento-facturar'));
+
+    expect(screen.getByTestId('documento-facturar-no-emitido')).toHaveTextContent(
+      'sólo transferencias',
+    );
+    expect(screen.queryByTestId('documento-facturar-pdf')).not.toBeInTheDocument();
+  });
+
+  it('la corrida entera se imprime de un jalón', async () => {
+    const usuario = userEvent.setup();
+    await abrirRelacion();
+    await usuario.click(screen.getByTestId('documentos-facturar-corrida'));
+    expect(impreso.corridas).toEqual([7]);
+  });
+
+  it('⭐ en la relación SIN factura NO hay botón de la corrida: ahí nada se factura', async () => {
+    // Un botón que sólo puede producir un PDF de «es la relación SIN factura» repetido N veces no
+    // es un botón: es una trampa. Se esconde, y los de cada renglón salen deshabilitados con su
+    // motivo (que es lo que sí hay que poder leer).
+    estado.concentrado = {
+      data: { ...CONCENTRADO, corrida: { ...CONCENTRADO.corrida, conFactura: false } },
+      isPending: false,
+      isError: false,
+    };
+    await abrirRelacion();
+    expect(screen.getByTestId('relacion-ejecutable')).toBeInTheDocument();
+    expect(screen.queryByTestId('documentos-facturar-corrida')).not.toBeInTheDocument();
   });
 });
 

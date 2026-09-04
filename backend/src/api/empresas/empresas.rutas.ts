@@ -56,6 +56,8 @@ function aEmpresaSalida(empresa: Empresa): z.infer<typeof esquemaEmpresaSalida> 
     nombre: empresa.nombre,
     razonSocial: empresa.razonSocial,
     rfc: empresa.rfc,
+    regimenFiscalSat: empresa.regimenFiscalSat,
+    codigoPostalFiscal: empresa.codigoPostalFiscal,
     identificador: empresa.identificador,
     favorita: empresa.favorita,
     paraIpt: empresa.paraIpt,

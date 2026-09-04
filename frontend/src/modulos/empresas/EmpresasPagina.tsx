@@ -342,8 +342,26 @@ export function EmpresasPagina(): React.JSX.Element {
                 <CampoDetalle icono={ScrollText} etiqueta="Razón social" anchoCompleto>
                   {seleccion.razonSocial ?? <ValorVacio />}
                 </CampoDetalle>
-                <CampoDetalle icono={FileText} etiqueta="Identificador (RFC)">
+                {/* La etiqueta decía «Identificador (RFC)» y enseñaba el identificador: son dos
+                    cosas distintas y el RFC no salía por ningún lado. Ahora cada uno es lo suyo. */}
+                <CampoDetalle icono={FileText} etiqueta="Identificador">
                   {seleccion.identificador ?? <ValorVacio />}
+                </CampoDetalle>
+              </RejillaCampos>
+            </SeccionDetalle>
+
+            {/* ⭐ Fila 0.118: la ficha con la que los proveedores nos facturan. Si algo de aquí
+                falta, el documento para facturar NO se emite y lo dice con su nombre. */}
+            <SeccionDetalle titulo="Ficha fiscal (con la que nos facturan)">
+              <RejillaCampos>
+                <CampoDetalle icono={FileText} etiqueta="RFC">
+                  {seleccion.rfc ?? <ValorVacio />}
+                </CampoDetalle>
+                <CampoDetalle icono={FileText} etiqueta="Régimen fiscal">
+                  {seleccion.regimenFiscalSat ?? <ValorVacio />}
+                </CampoDetalle>
+                <CampoDetalle icono={FileText} etiqueta="Código postal fiscal">
+                  {seleccion.codigoPostalFiscal ?? <ValorVacio />}
                 </CampoDetalle>
               </RejillaCampos>
             </SeccionDetalle>

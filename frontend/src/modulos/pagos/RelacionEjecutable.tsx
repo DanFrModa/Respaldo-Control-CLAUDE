@@ -1,4 +1,8 @@
-import { useConcentrado } from '@/api/pagos';
+import { FileTextIcon } from 'lucide-react';
+import { useState } from 'react';
+
+import { imprimirDocumentosCorrida, useConcentrado } from '@/api/pagos';
+import { Button } from '@/components/ui/button';
 import { numeroLegible } from '@/modulos/proveedores/cuentas-pago';
 import {
   TablaDensa,
@@ -10,6 +14,7 @@ import {
 } from '@/components/dominio/TablaDensa';
 
 import { ETIQUETA_FORMA, ETIQUETA_RUBRO, moneda } from './comun';
+import { BotonDocumentoFacturar, DialogoDocumentoFacturar } from './DocumentoParaFacturar';
 
 /**
  * ⭐ LA RELACIÓN EJECUTABLE: lo que finanzas tiene en la mano para hacer las transferencias.
@@ -31,6 +36,11 @@ import { ETIQUETA_FORMA, ETIQUETA_RUBRO, moneda } from './comun';
  *
  * ⚠️ Y los renglones **no se agrupan por beneficiario**: un pago partido en dos cuentas son dos
  * renglones, *«así debe salir en la relación para poder hacer las dos transferencias»*.
+ *
+ * ⭐ **De aquí sale el DOCUMENTO PARA FACTURAR** (fila 0.118, §Post-F9.186(k)): cada renglón tiene su
+ * botón —deshabilitado, con el motivo a la vista, cuando falta algo— y la corrida entera tiene el
+ * suyo para imprimir todos de un jalón. Es el mismo sitio a propósito: la relación ejecutable es
+ * donde Daniel decide QUÉ se paga, y facturar es lo que viene inmediatamente después.
  */
 export interface RelacionEjecutableProps {
   /** Corrida a mostrar, o `null` si no hay ninguna seleccionada. */
@@ -45,6 +55,7 @@ export function RelacionEjecutable({
   abierta,
 }: RelacionEjecutableProps): React.JSX.Element | null {
   const consulta = useConcentrado(idCorrida, abierta);
+  const [renglonDelDocumento, setRenglonDelDocumento] = useState<number | null>(null);
 
   if (!abierta) {
     return null;
@@ -71,10 +82,30 @@ export function RelacionEjecutable({
 
   return (
     <div className="space-y-4" data-testid="relacion-ejecutable">
-      <p className="text-sm text-muted-foreground">
-        Lo que se paga esta semana, listo para el banco. Un renglón = una transferencia (o un pago
-        en efectivo).
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          Lo que se paga esta semana, listo para el banco. Un renglón = una transferencia (o un pago
+          en efectivo).
+        </p>
+        {/* ⭐ Los documentos de TODA la semana de un jalón, con la hoja de a quién le falta algo.
+            ⚠️ SÓLO en la relación CON factura: en la de SIN factura, por definición, ni un renglón
+            produce documento, y el PDF saldría siendo una lista de «es la relación SIN factura»
+            repetida tantas veces como pagos haya. Un botón que sólo puede fallar no es un botón. */}
+        {datos.corrida.conFactura ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (idCorrida !== null) imprimirDocumentosCorrida(idCorrida);
+            }}
+            data-testid="documentos-facturar-corrida"
+          >
+            <FileTextIcon aria-hidden />
+            Documentos para facturar (PDF)
+          </Button>
+        ) : null}
+      </div>
 
       {datos.secciones.map((seccion) => (
         <section key={seccion.rubro} data-testid={`relacion-seccion-${seccion.rubro}`}>
@@ -99,14 +130,12 @@ export function RelacionEjecutable({
                   <TablaDensaHead>Banco</TablaDensaHead>
                   <TablaDensaHead>Cuenta</TablaDensaHead>
                   <TablaDensaHead numerica>Monto</TablaDensaHead>
+                  <TablaDensaHead>Factura</TablaDensaHead>
                 </TablaDensaFila>
               </TablaDensaEncabezado>
               <TablaDensaCuerpo>
-                {seccion.renglones.map((r, i) => (
-                  <TablaDensaFila
-                    key={`${r.nombre}-${r.beneficiario}-${String(i)}`}
-                    data-testid="relacion-renglon"
-                  >
+                {seccion.renglones.map((r) => (
+                  <TablaDensaFila key={r.id} data-testid="relacion-renglon">
                     <TablaDensaCelda className="font-medium">{r.nombre}</TablaDensaCelda>
                     <TablaDensaCelda className="text-xs">{r.concepto ?? ''}</TablaDensaCelda>
                     <TablaDensaCelda className="text-xs text-muted-foreground">
@@ -125,6 +154,14 @@ export function RelacionEjecutable({
                     <TablaDensaCelda numerica className="font-semibold">
                       {moneda(r.monto)}
                     </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <BotonDocumentoFacturar
+                        renglon={r}
+                        alAbrir={(id) => {
+                          setRenglonDelDocumento(id);
+                        }}
+                      />
+                    </TablaDensaCelda>
                   </TablaDensaFila>
                 ))}
               </TablaDensaCuerpo>
@@ -141,6 +178,16 @@ export function RelacionEjecutable({
         {moneda(datos.totales.transferencia)} por transferencia ·{' '}
         <strong>{moneda(datos.totales.total)}</strong> en {String(datos.totales.renglones)} pago(s).
       </div>
+
+      {idCorrida === null ? null : (
+        <DialogoDocumentoFacturar
+          idCorrida={idCorrida}
+          idRenglon={renglonDelDocumento}
+          alCerrar={() => {
+            setRenglonDelDocumento(null);
+          }}
+        />
+      )}
     </div>
   );
 }
