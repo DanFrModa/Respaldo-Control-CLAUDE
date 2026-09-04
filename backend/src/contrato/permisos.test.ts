@@ -145,6 +145,8 @@ describe('catálogo de permisos', () => {
       // Producción / WIP (Módulo 4, F3): corte/envío/recibo/entrega/wip-ver/cancelar (nuevos de v2).
       'produccion.cancelar',
       'produccion.corte',
+      // El EMPAQUE (0.114): servicio sobre la orden, hermano del corte.
+      'produccion.empaque',
       'produccion.entrega',
       'produccion.envio',
       'produccion.recibo',

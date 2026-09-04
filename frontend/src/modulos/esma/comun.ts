@@ -4,6 +4,25 @@
  */
 import type { EsMaPendienteRevision } from '@/api/tipos';
 
+import type { TipoMaquilero } from './SelectorMaquilero';
+
+/**
+ * 🔴 Los tipos de maquilero de IDA Y VUELTA: los servicios que de verdad tienen un ENVÍO y un
+ * RECIBO (0.114).
+ *
+ * Existe para la pantalla de **Recibos semanales**, cuyo reporte se arma leyendo `EtapaMovimiento`
+ * de tipo `recibo_maquila` (`esma/semanales.ts`). El corte y el empaque **no generan recibos** —ésa
+ * es su definición: *«no va y viene»*—, así que ofrecerlos ahí sólo produce un reporte vacío sin
+ * explicación. Acotar el selector es más honesto que dejar al usuario preguntándose qué hizo mal.
+ *
+ * ⚠️ NO aplica a las otras dos pantallas que usan el mismo selector: el estado de cuenta y el
+ * desglosado leen CARGOS, y los de corte/empaque son justo lo que la 0.114 vino a hacer visible ahí.
+ *
+ * (Vive aquí y no junto al selector por la misma razón que `moneda`: ese archivo exporta
+ * COMPONENTES, y mezclar constantes rompe el fast-refresh — es la regla que encabeza este módulo.)
+ */
+export const TIPOS_IDA_Y_VUELTA: readonly Exclude<TipoMaquilero, ''>[] = ['costura', 'estampado'];
+
 /**
  * Formatea un importe en pesos (o "—" si es `null`). El backend devuelve `null` cuando el usuario
  * NO tiene `consultas.ver-importes`, así que "—" es el ocultamiento de importes.

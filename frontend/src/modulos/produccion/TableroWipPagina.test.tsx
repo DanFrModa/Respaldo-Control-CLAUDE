@@ -68,6 +68,8 @@ const DETALLE = {
   // Publicado por el servidor desde V1-E8v (la pantalla ya no lo despeja del pendiente).
   enviadoCostura: 400,
   recibidoCostura: 300,
+  // 0.114: Σ empacado de la orden (etapas de empaque vivas).
+  empacado: 0,
   entregado: 0,
   porEntregar: 300,
   porCortar: [],

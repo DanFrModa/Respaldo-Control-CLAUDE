@@ -31,6 +31,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { resolverConFactura } from './facturacion.js';
 import { recalcularOrdenPagada } from './orden-pagada.js';
 
@@ -60,6 +61,9 @@ const incluirPago = {
         select: {
           idOrden: true,
           orden: { select: { folio: true } },
+          // 0.114: el cargo puede ser de maquila (proceso) o de un servicio de la orden
+          // (corte/empaque); se traen los dos y la etiqueta la redacta `etiqueta-cargo.ts`.
+          servicio: true,
           tipoProceso: { select: { nombre: true } },
         },
       },
@@ -85,7 +89,7 @@ function aPagoSalida(p: PagoConDetalle, puedeVerImportes: boolean): PagoSalida {
       idCargo: a.idCargo,
       idOrden: a.cargo.idOrden,
       folioOrden: Number(a.cargo.orden.folio),
-      tipoProceso: a.cargo.tipoProceso.nombre,
+      tipoProceso: etiquetaProcesoDelCargo(a.cargo),
       cantidad: a.cantidad.toNumber(),
       importe: puedeVerImportes ? a.importe.toNumber() : null,
     })),

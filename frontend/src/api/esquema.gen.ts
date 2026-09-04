@@ -170,6 +170,7 @@ export interface paths {
                 | 'tipos-proceso.ver'
                 | 'tipos-proceso.administrar'
                 | 'produccion.corte'
+                | 'produccion.empaque'
                 | 'produccion.envio'
                 | 'produccion.recibo'
                 | 'produccion.entrega'
@@ -52827,6 +52828,8 @@ export interface paths {
              * @description Fecha del corte (YYYY-MM-DD).
              */
             fecha: string;
+            /** @description Precio por prenda pactado con el cortador (base de su cargo EsMa), opcional. */
+            precioPactado?: number | null;
             observaciones?: string;
             /** @description Matriz color×talla de la etapa (D4). */
             lineas: {
@@ -52864,14 +52867,14 @@ export interface paths {
                * @description Tipo de etapa.
                * @enum {string}
                */
-              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente';
-              /** @description Proceso de maquila (null en corte). */
+              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente' | 'empaque';
+              /** @description Proceso de maquila (null en corte y empaque: son servicios sobre la orden). */
               idTipoProceso: number | null;
-              /** @description Nombre del proceso (null en corte). */
+              /** @description Nombre del proceso (null en corte y empaque). */
               tipoProceso: string | null;
-              /** @description Cortador/maquilero (Proveedor). */
+              /** @description Cortador/maquilero/empacador (Proveedor). */
               idTercero: number | null;
-              /** @description Nombre del cortador/maquilero. */
+              /** @description Nombre del cortador/maquilero/empacador. */
               tercero: string | null;
               /** @description Fecha de la etapa (YYYY-MM-DD). */
               fecha: string;
@@ -53069,14 +53072,442 @@ export interface paths {
                * @description Tipo de etapa.
                * @enum {string}
                */
-              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente';
-              /** @description Proceso de maquila (null en corte). */
+              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente' | 'empaque';
+              /** @description Proceso de maquila (null en corte y empaque: son servicios sobre la orden). */
               idTipoProceso: number | null;
-              /** @description Nombre del proceso (null en corte). */
+              /** @description Nombre del proceso (null en corte y empaque). */
               tipoProceso: string | null;
-              /** @description Cortador/maquilero (Proveedor). */
+              /** @description Cortador/maquilero/empacador (Proveedor). */
               idTercero: number | null;
-              /** @description Nombre del cortador/maquilero. */
+              /** @description Nombre del cortador/maquilero/empacador. */
+              tercero: string | null;
+              /** @description Fecha de la etapa (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Fecha compromiso (YYYY-MM-DD) o null. */
+              fechaCompromiso: string | null;
+              /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
+              precioPactado: number | null;
+              /** @description Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega. */
+              prendaTerminada: boolean;
+              /** @description Almacén de PT del que salieron las prendas (solo envíos de prenda terminada). */
+              idAlmacenOrigen: number | null;
+              /** @description Nombre del almacén de origen o null. */
+              almacenOrigen: string | null;
+              /** @description Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto. */
+              stockSinOrden: boolean;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description Si la etapa está cancelada (suave). */
+              cancelado: boolean;
+              /** @description Cuándo se canceló (ISO) o null. */
+              canceladoEn: string | null;
+              /** @description Id del usuario que canceló o null. */
+              canceladoPorId: string | null;
+              /** @description Motivo de cancelación o null. */
+              motivoCancelacion: string | null;
+              /** @description Matriz color×talla de la etapa. */
+              lineas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack. */
+                pack: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad de la talla. */
+                  cantidad: number;
+                }[];
+                /** @description Total del renglón (derivado por suma). */
+                totalPiezas: number;
+              }[];
+              /** @description Total de piezas de la etapa (derivado). */
+              totalPiezas: number;
+              /**
+               * Format: date-time
+               * @description Fecha de captura (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la capturó. */
+              creadoPorId: string | null;
+              /** @description Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha"). */
+              creadoPorNombre: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/empaques': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Registrar el empaque de una orden (color×talla; cantidad propia, sin tope) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Datos de un empaque de orden (color×talla, D4; cantidad propia, sin tope). */
+      requestBody: {
+        content: {
+          'application/json': {
+            idOrden: number;
+            /** @description Proveedor con rol "empaque". */
+            idEmpacador: number;
+            /**
+             * Format: date
+             * @description Fecha del empaque (YYYY-MM-DD).
+             */
+            fecha: string;
+            /** @description Precio por prenda pactado con el empacador (base de su cargo EsMa), opcional. */
+            precioPactado?: number | null;
+            observaciones?: string;
+            /** @description Matriz color×talla de la etapa (D4). */
+            lineas: {
+              idColor: number;
+              /** @description PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la orden maneja packs; ausente o vacío en las órdenes que no los manejan. */
+              pack?: string;
+              /** @description Cantidades por talla de este color. */
+              tallas: {
+                idTalla: number;
+                cantidad: number;
+              }[];
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Etapa de producción (corte/envío) con su matriz color×talla. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la etapa. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Orden a la que pertenece. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /**
+               * @description Tipo de etapa.
+               * @enum {string}
+               */
+              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente' | 'empaque';
+              /** @description Proceso de maquila (null en corte y empaque: son servicios sobre la orden). */
+              idTipoProceso: number | null;
+              /** @description Nombre del proceso (null en corte y empaque). */
+              tipoProceso: string | null;
+              /** @description Cortador/maquilero/empacador (Proveedor). */
+              idTercero: number | null;
+              /** @description Nombre del cortador/maquilero/empacador. */
+              tercero: string | null;
+              /** @description Fecha de la etapa (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Fecha compromiso (YYYY-MM-DD) o null. */
+              fechaCompromiso: string | null;
+              /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
+              precioPactado: number | null;
+              /** @description Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega. */
+              prendaTerminada: boolean;
+              /** @description Almacén de PT del que salieron las prendas (solo envíos de prenda terminada). */
+              idAlmacenOrigen: number | null;
+              /** @description Nombre del almacén de origen o null. */
+              almacenOrigen: string | null;
+              /** @description Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto. */
+              stockSinOrden: boolean;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description Si la etapa está cancelada (suave). */
+              cancelado: boolean;
+              /** @description Cuándo se canceló (ISO) o null. */
+              canceladoEn: string | null;
+              /** @description Id del usuario que canceló o null. */
+              canceladoPorId: string | null;
+              /** @description Motivo de cancelación o null. */
+              motivoCancelacion: string | null;
+              /** @description Matriz color×talla de la etapa. */
+              lineas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack. */
+                pack: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad de la talla. */
+                  cantidad: number;
+                }[];
+                /** @description Total del renglón (derivado por suma). */
+                totalPiezas: number;
+              }[];
+              /** @description Total de piezas de la etapa (derivado). */
+              totalPiezas: number;
+              /**
+               * Format: date-time
+               * @description Fecha de captura (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la capturó. */
+              creadoPorId: string | null;
+              /** @description Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha"). */
+              creadoPorNombre: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/empaques/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar (suave) un empaque */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Motivo de la cancelación de la etapa. */
+      requestBody: {
+        content: {
+          'application/json': {
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Etapa de producción (corte/envío) con su matriz color×talla. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la etapa. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Orden a la que pertenece. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /**
+               * @description Tipo de etapa.
+               * @enum {string}
+               */
+              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente' | 'empaque';
+              /** @description Proceso de maquila (null en corte y empaque: son servicios sobre la orden). */
+              idTipoProceso: number | null;
+              /** @description Nombre del proceso (null en corte y empaque). */
+              tipoProceso: string | null;
+              /** @description Cortador/maquilero/empacador (Proveedor). */
+              idTercero: number | null;
+              /** @description Nombre del cortador/maquilero/empacador. */
               tercero: string | null;
               /** @description Fecha de la etapa (YYYY-MM-DD). */
               fecha: string;
@@ -53308,14 +53739,14 @@ export interface paths {
                * @description Tipo de etapa.
                * @enum {string}
                */
-              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente';
-              /** @description Proceso de maquila (null en corte). */
+              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente' | 'empaque';
+              /** @description Proceso de maquila (null en corte y empaque: son servicios sobre la orden). */
               idTipoProceso: number | null;
-              /** @description Nombre del proceso (null en corte). */
+              /** @description Nombre del proceso (null en corte y empaque). */
               tipoProceso: string | null;
-              /** @description Cortador/maquilero (Proveedor). */
+              /** @description Cortador/maquilero/empacador (Proveedor). */
               idTercero: number | null;
-              /** @description Nombre del cortador/maquilero. */
+              /** @description Nombre del cortador/maquilero/empacador. */
               tercero: string | null;
               /** @description Fecha de la etapa (YYYY-MM-DD). */
               fecha: string;
@@ -53513,14 +53944,14 @@ export interface paths {
                * @description Tipo de etapa.
                * @enum {string}
                */
-              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente';
-              /** @description Proceso de maquila (null en corte). */
+              tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente' | 'empaque';
+              /** @description Proceso de maquila (null en corte y empaque: son servicios sobre la orden). */
               idTipoProceso: number | null;
-              /** @description Nombre del proceso (null en corte). */
+              /** @description Nombre del proceso (null en corte y empaque). */
               tipoProceso: string | null;
-              /** @description Cortador/maquilero (Proveedor). */
+              /** @description Cortador/maquilero/empacador (Proveedor). */
               idTercero: number | null;
-              /** @description Nombre del cortador/maquilero. */
+              /** @description Nombre del cortador/maquilero/empacador. */
               tercero: string | null;
               /** @description Fecha de la etapa (YYYY-MM-DD). */
               fecha: string;
@@ -54041,14 +54472,14 @@ export interface paths {
                  * @description Tipo de etapa.
                  * @enum {string}
                  */
-                tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente';
-                /** @description Proceso de maquila (null en corte). */
+                tipo: 'corte' | 'envio_maquila' | 'recibo_maquila' | 'entrega_cliente' | 'empaque';
+                /** @description Proceso de maquila (null en corte y empaque: son servicios sobre la orden). */
                 idTipoProceso: number | null;
-                /** @description Nombre del proceso (null en corte). */
+                /** @description Nombre del proceso (null en corte y empaque). */
                 tipoProceso: string | null;
-                /** @description Cortador/maquilero (Proveedor). */
+                /** @description Cortador/maquilero/empacador (Proveedor). */
                 idTercero: number | null;
-                /** @description Nombre del cortador/maquilero. */
+                /** @description Nombre del cortador/maquilero/empacador. */
                 tercero: string | null;
                 /** @description Fecha de la etapa (YYYY-MM-DD). */
                 fecha: string;
@@ -57194,6 +57625,8 @@ export interface paths {
               faltantesSaldados: number;
               /** @description Recibido de costura (mete a PT). */
               recibidoCostura: number;
+              /** @description Σ piezas EMPACADAS de la orden (etapas de empaque vivas, 0.114). Es una cantidad PROPIA: no se deriva de lo recibido ni de lo entregado (se fabrican 1,000 y se empacan 990, la regla de C&A que dictó Daniel), y no toca inventario. Se publica desde el servidor por la misma razón que `enviadoCostura`: para que el stepper del panel no la re-derive. */
+              empacado: number;
               /** @description Total entregado a cliente. */
               entregado: number;
               /** @description recibido(costura) − entregado. */
@@ -57600,9 +58033,11 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden. */
                 folioOrden: number;
-                /** @description Proceso de maquila del cargo. */
-                idTipoProceso: number;
-                /** @description Nombre del proceso. */
+                /** @description Proceso de maquila del cargo. NULL cuando el cargo es de un SERVICIO sobre la orden (corte/empaque, 0.114): ésos no son maquila y llevan `servicio` en su lugar. */
+                idTipoProceso: number | null;
+                /** @description SERVICIO sobre la orden que originó el cargo (0.114), o null si el cargo es de maquila. Excluyente con `idTipoProceso`: exactamente uno de los dos viene lleno. */
+                servicio: ('corte' | 'empaque') | null;
+                /** @description ETIQUETA del cargo, SIEMPRE presente: el nombre del proceso de maquila, o "Corte"/"Empaque" cuando es un servicio sobre la orden (0.114). La redacta el servidor en un solo lugar (`esma/etiqueta-cargo.ts`) para que todas las pantallas digan lo mismo. */
                 tipoProceso: string;
                 /** @description Cantidad recibida que propuso el recibo (derivada del recibo). */
                 cantidadPropuesta: number;
@@ -57788,9 +58223,11 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden. */
               folioOrden: number;
-              /** @description Proceso de maquila del cargo. */
-              idTipoProceso: number;
-              /** @description Nombre del proceso. */
+              /** @description Proceso de maquila del cargo. NULL cuando el cargo es de un SERVICIO sobre la orden (corte/empaque, 0.114): ésos no son maquila y llevan `servicio` en su lugar. */
+              idTipoProceso: number | null;
+              /** @description SERVICIO sobre la orden que originó el cargo (0.114), o null si el cargo es de maquila. Excluyente con `idTipoProceso`: exactamente uno de los dos viene lleno. */
+              servicio: ('corte' | 'empaque') | null;
+              /** @description ETIQUETA del cargo, SIEMPRE presente: el nombre del proceso de maquila, o "Corte"/"Empaque" cuando es un servicio sobre la orden (0.114). La redacta el servidor en un solo lugar (`esma/etiqueta-cargo.ts`) para que todas las pantallas digan lo mismo. */
               tipoProceso: string;
               /** @description Cantidad recibida que propuso el recibo (derivada del recibo). */
               cantidadPropuesta: number;
@@ -57990,9 +58427,11 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden. */
               folioOrden: number;
-              /** @description Proceso de maquila del cargo. */
-              idTipoProceso: number;
-              /** @description Nombre del proceso. */
+              /** @description Proceso de maquila del cargo. NULL cuando el cargo es de un SERVICIO sobre la orden (corte/empaque, 0.114): ésos no son maquila y llevan `servicio` en su lugar. */
+              idTipoProceso: number | null;
+              /** @description SERVICIO sobre la orden que originó el cargo (0.114), o null si el cargo es de maquila. Excluyente con `idTipoProceso`: exactamente uno de los dos viene lleno. */
+              servicio: ('corte' | 'empaque') | null;
+              /** @description ETIQUETA del cargo, SIEMPRE presente: el nombre del proceso de maquila, o "Corte"/"Empaque" cuando es un servicio sobre la orden (0.114). La redacta el servidor en un solo lugar (`esma/etiqueta-cargo.ts`) para que todas las pantallas digan lo mismo. */
               tipoProceso: string;
               /** @description Cantidad recibida que propuso el recibo (derivada del recibo). */
               cantidadPropuesta: number;
@@ -59627,9 +60066,9 @@ export interface paths {
                 idMaquilero: number;
                 /** @description Nombre del maquilero. */
                 maquilero: string;
-                /** @description Proceso de maquila. */
-                idTipoProceso: number;
-                /** @description Nombre del proceso. */
+                /** @description Proceso de maquila, o null si el cargo es de un servicio de la orden (0.114). */
+                idTipoProceso: number | null;
+                /** @description ETIQUETA del cargo (proceso de maquila, o "Corte"/"Empaque" — 0.114). */
                 tipoProceso: string;
                 /** @description Cantidad del cargo (real o null si aún propuesto). */
                 cantidad: number | null;
@@ -60006,8 +60445,8 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          /** @description Filtra por tipo (costura/estampado). Omitir = cualquier rol de maquila. */
-          tipo?: 'costura' | 'estampado';
+          /** @description Filtra por tipo (costura/estampado/corte/empaque). Omitir = cualquier rol de maquila. */
+          tipo?: 'costura' | 'estampado' | 'corte' | 'empaque';
         };
         header?: never;
         path?: never;
@@ -66476,6 +66915,7 @@ export interface paths {
                 /** @enum {string} */
                 rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
                 renglones: {
+                  id: number;
                   /** @enum {string} */
                   rubro:
                     | 'maquila'
@@ -66496,6 +66936,42 @@ export interface paths {
                   monto: number | null;
                   concepto: string | null;
                   referencia: string | null;
+                  facturacion: {
+                    /** @description ¿Se puede emitir el documento para facturar de este renglón? */
+                    facturable: boolean;
+                    motivo:
+                      | (
+                          | 'sinFactura'
+                          | 'concepto'
+                          | 'proveedorNoLegible'
+                          | 'efectivo'
+                          | 'sinMonto'
+                          | 'estado'
+                          | 'faltantes'
+                        )
+                      | null;
+                    motivoTexto: string | null;
+                    faltantes: {
+                      /**
+                       * @description De quién falta el dato.
+                       * @enum {string}
+                       */
+                      quien: 'proveedor' | 'empresa';
+                      /**
+                       * @description Qué dato falta.
+                       * @enum {string}
+                       */
+                      campo:
+                        | 'razonSocial'
+                        | 'rfc'
+                        | 'regimenFiscalSat'
+                        | 'codigoPostalExpedicion'
+                        | 'codigoPostalFiscal'
+                        | 'usoCfdiHabitual';
+                      /** @description El aviso, con el nombre de quien tiene el hueco. */
+                      texto: string;
+                    }[];
+                  };
                 }[];
                 /** @description Totales de efectivo y transferencia (los de su relación semanal). */
                 totales: {
@@ -66521,6 +66997,439 @@ export interface paths {
             };
           };
         };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Los datos con los que el proveedor debe facturar este pago (o por qué no se emite) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+          /** @description Id del renglón. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description El documento para facturar de un renglón, o el motivo por el que no se emite. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              facturable: boolean;
+              /** @description Por qué no se emite, o null. */
+              motivo:
+                | (
+                    | 'sinFactura'
+                    | 'concepto'
+                    | 'proveedorNoLegible'
+                    | 'efectivo'
+                    | 'sinMonto'
+                    | 'estado'
+                    | 'faltantes'
+                  )
+                | null;
+              /** @description El porqué, en palabras, o null. */
+              motivoTexto: string | null;
+              /** @description Los datos fiscales que faltan (vacío si no es ése el problema). */
+              faltantes: {
+                /**
+                 * @description De quién falta el dato.
+                 * @enum {string}
+                 */
+                quien: 'proveedor' | 'empresa';
+                /**
+                 * @description Qué dato falta.
+                 * @enum {string}
+                 */
+                campo:
+                  | 'razonSocial'
+                  | 'rfc'
+                  | 'regimenFiscalSat'
+                  | 'codigoPostalExpedicion'
+                  | 'codigoPostalFiscal'
+                  | 'usoCfdiHabitual';
+                /** @description El aviso, con el nombre de quien tiene el hueco. */
+                texto: string;
+              }[];
+              documento: {
+                idCorrida: number;
+                idRenglon: number;
+                /** @description Folio de la corrida (por empresa). */
+                folioCorrida: number;
+                /** @description Lunes de la semana que se paga (AAAA-MM-DD). */
+                semana: string;
+                /** @description A nombre de quién se factura (la empresa activa, A9). */
+                receptor: {
+                  /** @description Nombre legal con el que se timbra. */
+                  razonSocial: string;
+                  rfc: string;
+                  /** @description Clave del régimen fiscal del SAT. */
+                  regimenFiscalSat: string;
+                  /** @description CP: del domicilio fiscal (receptor) o de expedición (emisor). */
+                  codigoPostal: string;
+                };
+                /** @description Quién va a emitir la factura (el proveedor). */
+                emisor: {
+                  /** @description Nombre legal con el que se timbra. */
+                  razonSocial: string;
+                  rfc: string;
+                  /** @description Clave del régimen fiscal del SAT. */
+                  regimenFiscalSat: string;
+                  /** @description CP: del domicilio fiscal (receptor) o de expedición (emisor). */
+                  codigoPostal: string;
+                };
+                nombreProveedor: string;
+                /** @description Clave del uso de CFDI que declara el receptor (p. ej. G03). */
+                usoCfdi: string;
+                /** @description true = el proveedor no lo tiene capturado y va el default G03, marcado como tal. */
+                usoCfdiSugerido: boolean;
+                /** @description Qué se está pagando (el del renglón, o uno armado por rubro). */
+                concepto: string;
+                /** @description Folios de remisiones/recibos que ampara, o null. */
+                referencia: string | null;
+                /** @description Clave del SAT de la forma de pago (03 = transferencia). */
+                formaPagoSat: string;
+                formaPagoTexto: string;
+                /** @description Clave del SAT del método de pago (PUE). */
+                metodoPagoSat: string;
+                metodoPagoTexto: string;
+                /** @description Moneda del comprobante (MXN). */
+                moneda: string;
+                /** @description Base gravable. */
+                subtotal: number;
+                /** @description IVA trasladado (explícito, nunca escondido en el total). */
+                iva: number;
+                /** @description La tasa como se imprime («16 %»). */
+                tasaIvaTexto: string;
+                /** @description Lo que se transfiere. subtotal + iva === total, al centavo. */
+                total: number;
+              } | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion.pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Documento para facturar de UN pago (PDF) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+          /** @description Id del renglón. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/documentos-facturacion.pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Documentos para facturar de TODA la corrida, con la hoja de los que no se emitieron */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
         /** @description Respuesta de error de la API. */
         400: {
           headers: {
@@ -111041,6 +111950,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -111167,6 +112080,8 @@ export interface paths {
             nombre: string;
             razonSocial?: string;
             rfc?: string;
+            regimenFiscalSat?: string;
+            codigoPostalFiscal?: string;
             identificador?: string;
             /** @default false */
             favorita?: boolean;
@@ -111193,6 +112108,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -111345,6 +112264,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -111486,6 +112409,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -111616,6 +112543,8 @@ export interface paths {
             nombre?: string;
             razonSocial?: string;
             rfc?: string;
+            regimenFiscalSat?: string;
+            codigoPostalFiscal?: string;
             identificador?: string;
             favorita?: boolean;
             paraIpt?: boolean;
@@ -111640,6 +112569,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */

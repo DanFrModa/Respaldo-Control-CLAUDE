@@ -1135,6 +1135,9 @@ export type Etapa =
 /** Cuerpo de alta de un corte (`POST /api/produccion/cortes`). */
 export type CorteCrear =
   paths['/api/produccion/cortes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de alta de un empaque (`POST /api/produccion/empaques`, 0.114). */
+export type EmpaqueCrear =
+  paths['/api/produccion/empaques']['post']['requestBody']['content']['application/json'];
 /** Cuerpo de alta de un envío a maquila (`POST /api/produccion/envios`). */
 export type EnvioCrear =
   paths['/api/produccion/envios']['post']['requestBody']['content']['application/json'];
@@ -2129,6 +2132,17 @@ export type RenglonCorridaGuardar =
 /** La relación ejecutable (`GET /api/pagos/corridas/{id}/concentrado`). */
 export type ConcentradoCorrida =
   paths['/api/pagos/corridas/{id}/concentrado']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la relación ejecutable (con su facturabilidad ya resuelta, fila 0.118). */
+export type ConcentradoRenglon = ConcentradoCorrida['secciones'][number]['renglones'][number];
+
+/**
+ * ⭐ EL DOCUMENTO PARA FACTURAR de un renglón (fila 0.118): o los datos con los que el proveedor
+ * debe facturar, o el motivo por el que no se emite. Nunca las dos cosas.
+ */
+export type DocumentoParaFacturar =
+  paths['/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion']['get']['responses']['200']['content']['application/json'];
+/** Un dato fiscal que falta para poder emitir el documento (con su aviso ya redactado). */
+export type FaltanteFiscal = DocumentoParaFacturar['faltantes'][number];
 
 /** Página del catálogo de conceptos de pago (`GET /api/conceptos-pago`). */
 export type ConceptosPagoPagina =

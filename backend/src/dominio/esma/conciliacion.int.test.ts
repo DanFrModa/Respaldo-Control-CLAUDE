@@ -338,8 +338,12 @@ describe('Conciliación EsMa — prendas INCOMPLETAS (V1-E8k, §Post-F9.136)', (
 
     // El cuadre da 0 porque NO NACIÓ un cargo, no porque alguien lo tapara: de los CUATRO recibos
     // sólo los dos con piezas buenas dejaron cargo en la cola de validación.
+    // fila 0.114: se cuentan SÓLO los cargos de MAQUILA (`servicio === null`). El corte de
+    // `cortarBase()` también deja el suyo desde esa fila, y no tiene nada que ver con esta regla —
+    // que habla de qué recibos generan cargo. El del corte se afirma aparte para no perderlo de vista.
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    expect(cola.filas).toHaveLength(2);
+    expect(cola.filas.filter((f) => f.servicio === null)).toHaveLength(2);
+    expect(cola.filas.filter((f) => f.servicio === 'corte')).toHaveLength(1);
   });
 
   /**

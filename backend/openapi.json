@@ -185,6 +185,7 @@
                           "tipos-proceso.ver",
                           "tipos-proceso.administrar",
                           "produccion.corte",
+                          "produccion.empaque",
                           "produccion.envio",
                           "produccion.recibo",
                           "produccion.entrega",
@@ -137277,6 +137278,19 @@
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
                     "description": "Fecha del corte (YYYY-MM-DD)."
                   },
+                  "precioPactado": {
+                    "description": "Precio por prenda pactado con el cortador (base de su cargo EsMa), opcional.",
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "multipleOf": 0.01
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "observaciones": {
                     "type": "string",
                     "maxLength": 1000
@@ -137391,7 +137405,8 @@
                         "corte",
                         "envio_maquila",
                         "recibo_maquila",
-                        "entrega_cliente"
+                        "entrega_cliente",
+                        "empaque"
                       ],
                       "description": "Tipo de etapa."
                     },
@@ -137406,7 +137421,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Proceso de maquila (null en corte)."
+                      "description": "Proceso de maquila (null en corte y empaque: son servicios sobre la orden)."
                     },
                     "tipoProceso": {
                       "anyOf": [
@@ -137417,7 +137432,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre del proceso (null en corte)."
+                      "description": "Nombre del proceso (null en corte y empaque)."
                     },
                     "idTercero": {
                       "anyOf": [
@@ -137430,7 +137445,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Cortador/maquilero (Proveedor)."
+                      "description": "Cortador/maquilero/empacador (Proveedor)."
                     },
                     "tercero": {
                       "anyOf": [
@@ -137441,7 +137456,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre del cortador/maquilero."
+                      "description": "Nombre del cortador/maquilero/empacador."
                     },
                     "fecha": {
                       "type": "string",
@@ -137927,7 +137942,8 @@
                         "corte",
                         "envio_maquila",
                         "recibo_maquila",
-                        "entrega_cliente"
+                        "entrega_cliente",
+                        "empaque"
                       ],
                       "description": "Tipo de etapa."
                     },
@@ -137942,7 +137958,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Proceso de maquila (null en corte)."
+                      "description": "Proceso de maquila (null en corte y empaque: son servicios sobre la orden)."
                     },
                     "tipoProceso": {
                       "anyOf": [
@@ -137953,7 +137969,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre del proceso (null en corte)."
+                      "description": "Nombre del proceso (null en corte y empaque)."
                     },
                     "idTercero": {
                       "anyOf": [
@@ -137966,7 +137982,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Cortador/maquilero (Proveedor)."
+                      "description": "Cortador/maquilero/empacador (Proveedor)."
                     },
                     "tercero": {
                       "anyOf": [
@@ -137977,7 +137993,1148 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre del cortador/maquilero."
+                      "description": "Nombre del cortador/maquilero/empacador."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha de la etapa (YYYY-MM-DD)."
+                    },
+                    "fechaCompromiso": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha compromiso (YYYY-MM-DD) o null."
+                    },
+                    "precioPactado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
+                    },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones o null."
+                    },
+                    "cancelado": {
+                      "type": "boolean",
+                      "description": "Si la etapa está cancelada (suave)."
+                    },
+                    "canceladoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se canceló (ISO) o null."
+                    },
+                    "canceladoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que canceló o null."
+                    },
+                    "motivoCancelacion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo de cancelación o null."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del color."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color."
+                          },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
+                          "tallas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idTalla": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la talla."
+                                },
+                                "etiquetaTalla": {
+                                  "type": "string",
+                                  "description": "Etiqueta visible de la talla."
+                                },
+                                "cantidad": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Cantidad de la talla."
+                                }
+                              },
+                              "required": [
+                                "idTalla",
+                                "etiquetaTalla",
+                                "cantidad"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Cantidades por talla."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Total del renglón (derivado por suma)."
+                          }
+                        },
+                        "required": [
+                          "idColor",
+                          "color",
+                          "pack",
+                          "tallas",
+                          "totalPiezas"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Matriz color×talla de la etapa."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de piezas de la etapa (derivado)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de captura (ISO)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la capturó."
+                    },
+                    "creadoPorNombre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien la capturó (rediseño R2, §4.4.4: \"capturado por · fecha\")."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folio",
+                    "idEmpresa",
+                    "idOrden",
+                    "folioOrden",
+                    "tipo",
+                    "idTipoProceso",
+                    "tipoProceso",
+                    "idTercero",
+                    "tercero",
+                    "fecha",
+                    "fechaCompromiso",
+                    "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
+                    "stockSinOrden",
+                    "observaciones",
+                    "cancelado",
+                    "canceladoEn",
+                    "canceladoPorId",
+                    "motivoCancelacion",
+                    "lineas",
+                    "totalPiezas",
+                    "creadoEn",
+                    "creadoPorId",
+                    "creadoPorNombre"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Etapa de producción (corte/envío) con su matriz color×talla."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/produccion/empaques": {
+      "post": {
+        "summary": "Registrar el empaque de una orden (color×talla; cantidad propia, sin tope)",
+        "tags": [
+          "produccion"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idOrden": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idEmpacador": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Proveedor con rol \"empaque\"."
+                  },
+                  "fecha": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                    "description": "Fecha del empaque (YYYY-MM-DD)."
+                  },
+                  "precioPactado": {
+                    "description": "Precio por prenda pactado con el empacador (base de su cargo EsMa), opcional.",
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "multipleOf": 0.01
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "observaciones": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "lineas": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idColor": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "pack": {
+                          "description": "PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la orden maneja packs; ausente o vacío en las órdenes que no los manejan.",
+                          "type": "string",
+                          "maxLength": 12
+                        },
+                        "tallas": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idTalla": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "cantidad": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "idTalla",
+                              "cantidad"
+                            ]
+                          },
+                          "description": "Cantidades por talla de este color."
+                        }
+                      },
+                      "required": [
+                        "idColor",
+                        "tallas"
+                      ]
+                    },
+                    "description": "Matriz color×talla de la etapa (D4)."
+                  }
+                },
+                "required": [
+                  "idOrden",
+                  "idEmpacador",
+                  "fecha",
+                  "lineas"
+                ],
+                "description": "Datos de un empaque de orden (color×talla, D4; cantidad propia, sin tope)."
+              }
+            }
+          },
+          "description": "Datos de un empaque de orden (color×talla, D4; cantidad propia, sin tope)."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Etapa de producción (corte/envío) con su matriz color×talla.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la etapa."
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa (A3)."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña (A9)."
+                    },
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Orden a la que pertenece."
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "tipo": {
+                      "type": "string",
+                      "enum": [
+                        "corte",
+                        "envio_maquila",
+                        "recibo_maquila",
+                        "entrega_cliente",
+                        "empaque"
+                      ],
+                      "description": "Tipo de etapa."
+                    },
+                    "idTipoProceso": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Proceso de maquila (null en corte y empaque: son servicios sobre la orden)."
+                    },
+                    "tipoProceso": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del proceso (null en corte y empaque)."
+                    },
+                    "idTercero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cortador/maquilero/empacador (Proveedor)."
+                    },
+                    "tercero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del cortador/maquilero/empacador."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha de la etapa (YYYY-MM-DD)."
+                    },
+                    "fechaCompromiso": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha compromiso (YYYY-MM-DD) o null."
+                    },
+                    "precioPactado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
+                    },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones o null."
+                    },
+                    "cancelado": {
+                      "type": "boolean",
+                      "description": "Si la etapa está cancelada (suave)."
+                    },
+                    "canceladoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se canceló (ISO) o null."
+                    },
+                    "canceladoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que canceló o null."
+                    },
+                    "motivoCancelacion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo de cancelación o null."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del color."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color."
+                          },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack."
+                          },
+                          "tallas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idTalla": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la talla."
+                                },
+                                "etiquetaTalla": {
+                                  "type": "string",
+                                  "description": "Etiqueta visible de la talla."
+                                },
+                                "cantidad": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Cantidad de la talla."
+                                }
+                              },
+                              "required": [
+                                "idTalla",
+                                "etiquetaTalla",
+                                "cantidad"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Cantidades por talla."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Total del renglón (derivado por suma)."
+                          }
+                        },
+                        "required": [
+                          "idColor",
+                          "color",
+                          "pack",
+                          "tallas",
+                          "totalPiezas"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Matriz color×talla de la etapa."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de piezas de la etapa (derivado)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de captura (ISO)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la capturó."
+                    },
+                    "creadoPorNombre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien la capturó (rediseño R2, §4.4.4: \"capturado por · fecha\")."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folio",
+                    "idEmpresa",
+                    "idOrden",
+                    "folioOrden",
+                    "tipo",
+                    "idTipoProceso",
+                    "tipoProceso",
+                    "idTercero",
+                    "tercero",
+                    "fecha",
+                    "fechaCompromiso",
+                    "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
+                    "stockSinOrden",
+                    "observaciones",
+                    "cancelado",
+                    "canceladoEn",
+                    "canceladoPorId",
+                    "motivoCancelacion",
+                    "lineas",
+                    "totalPiezas",
+                    "creadoEn",
+                    "creadoPorId",
+                    "creadoPorNombre"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Etapa de producción (corte/envío) con su matriz color×talla."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/produccion/empaques/{id}/cancelar": {
+      "post": {
+        "summary": "Cancelar (suave) un empaque",
+        "tags": [
+          "produccion"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "description": "Motivo de la cancelación de la etapa."
+              }
+            }
+          },
+          "description": "Motivo de la cancelación de la etapa."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del recurso."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Etapa de producción (corte/envío) con su matriz color×talla.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la etapa."
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa (A3)."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña (A9)."
+                    },
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Orden a la que pertenece."
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "tipo": {
+                      "type": "string",
+                      "enum": [
+                        "corte",
+                        "envio_maquila",
+                        "recibo_maquila",
+                        "entrega_cliente",
+                        "empaque"
+                      ],
+                      "description": "Tipo de etapa."
+                    },
+                    "idTipoProceso": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Proceso de maquila (null en corte y empaque: son servicios sobre la orden)."
+                    },
+                    "tipoProceso": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del proceso (null en corte y empaque)."
+                    },
+                    "idTercero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cortador/maquilero/empacador (Proveedor)."
+                    },
+                    "tercero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del cortador/maquilero/empacador."
                     },
                     "fecha": {
                       "type": "string",
@@ -138565,7 +139722,8 @@
                         "corte",
                         "envio_maquila",
                         "recibo_maquila",
-                        "entrega_cliente"
+                        "entrega_cliente",
+                        "empaque"
                       ],
                       "description": "Tipo de etapa."
                     },
@@ -138580,7 +139738,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Proceso de maquila (null en corte)."
+                      "description": "Proceso de maquila (null en corte y empaque: son servicios sobre la orden)."
                     },
                     "tipoProceso": {
                       "anyOf": [
@@ -138591,7 +139749,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre del proceso (null en corte)."
+                      "description": "Nombre del proceso (null en corte y empaque)."
                     },
                     "idTercero": {
                       "anyOf": [
@@ -138604,7 +139762,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Cortador/maquilero (Proveedor)."
+                      "description": "Cortador/maquilero/empacador (Proveedor)."
                     },
                     "tercero": {
                       "anyOf": [
@@ -138615,7 +139773,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre del cortador/maquilero."
+                      "description": "Nombre del cortador/maquilero/empacador."
                     },
                     "fecha": {
                       "type": "string",
@@ -139101,7 +140259,8 @@
                         "corte",
                         "envio_maquila",
                         "recibo_maquila",
-                        "entrega_cliente"
+                        "entrega_cliente",
+                        "empaque"
                       ],
                       "description": "Tipo de etapa."
                     },
@@ -139116,7 +140275,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Proceso de maquila (null en corte)."
+                      "description": "Proceso de maquila (null en corte y empaque: son servicios sobre la orden)."
                     },
                     "tipoProceso": {
                       "anyOf": [
@@ -139127,7 +140286,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre del proceso (null en corte)."
+                      "description": "Nombre del proceso (null en corte y empaque)."
                     },
                     "idTercero": {
                       "anyOf": [
@@ -139140,7 +140299,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Cortador/maquilero (Proveedor)."
+                      "description": "Cortador/maquilero/empacador (Proveedor)."
                     },
                     "tercero": {
                       "anyOf": [
@@ -139151,7 +140310,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre del cortador/maquilero."
+                      "description": "Nombre del cortador/maquilero/empacador."
                     },
                     "fecha": {
                       "type": "string",
@@ -140291,7 +141450,8 @@
                               "corte",
                               "envio_maquila",
                               "recibo_maquila",
-                              "entrega_cliente"
+                              "entrega_cliente",
+                              "empaque"
                             ],
                             "description": "Tipo de etapa."
                           },
@@ -140306,7 +141466,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Proceso de maquila (null en corte)."
+                            "description": "Proceso de maquila (null en corte y empaque: son servicios sobre la orden)."
                           },
                           "tipoProceso": {
                             "anyOf": [
@@ -140317,7 +141477,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nombre del proceso (null en corte)."
+                            "description": "Nombre del proceso (null en corte y empaque)."
                           },
                           "idTercero": {
                             "anyOf": [
@@ -140330,7 +141490,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Cortador/maquilero (Proveedor)."
+                            "description": "Cortador/maquilero/empacador (Proveedor)."
                           },
                           "tercero": {
                             "anyOf": [
@@ -140341,7 +141501,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nombre del cortador/maquilero."
+                            "description": "Nombre del cortador/maquilero/empacador."
                           },
                           "fecha": {
                             "type": "string",
@@ -147692,6 +148852,12 @@
                       "maximum": 9007199254740991,
                       "description": "Recibido de costura (mete a PT)."
                     },
+                    "empacado": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Σ piezas EMPACADAS de la orden (etapas de empaque vivas, 0.114). Es una cantidad PROPIA: no se deriva de lo recibido ni de lo entregado (se fabrican 1,000 y se empacan 990, la regla de C&A que dictó Daniel), y no toca inventario. Se publica desde el servidor por la misma razón que `enviadoCostura`: para que el stepper del panel no la re-derive."
+                    },
                     "entregado": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -148196,6 +149362,7 @@
                     "pendientePorRecibir",
                     "faltantesSaldados",
                     "recibidoCostura",
+                    "empacado",
                     "entregado",
                     "porEntregar",
                     "porCortar",
@@ -148730,14 +149897,36 @@
                             "description": "Folio de la orden."
                           },
                           "idTipoProceso": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Proceso de maquila del cargo."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proceso de maquila del cargo. NULL cuando el cargo es de un SERVICIO sobre la orden (corte/empaque, 0.114): ésos no son maquila y llevan `servicio` en su lugar."
+                          },
+                          "servicio": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "corte",
+                                  "empaque"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "SERVICIO sobre la orden que originó el cargo (0.114), o null si el cargo es de maquila. Excluyente con `idTipoProceso`: exactamente uno de los dos viene lleno."
                           },
                           "tipoProceso": {
                             "type": "string",
-                            "description": "Nombre del proceso."
+                            "description": "ETIQUETA del cargo, SIEMPRE presente: el nombre del proceso de maquila, o \"Corte\"/\"Empaque\" cuando es un servicio sobre la orden (0.114). La redacta el servidor en un solo lugar (`esma/etiqueta-cargo.ts`) para que todas las pantallas digan lo mismo."
                           },
                           "cantidadPropuesta": {
                             "type": "integer",
@@ -148904,6 +150093,7 @@
                           "idOrden",
                           "folioOrden",
                           "idTipoProceso",
+                          "servicio",
                           "tipoProceso",
                           "cantidadPropuesta",
                           "precioPropuesto",
@@ -149185,14 +150375,36 @@
                       "description": "Folio de la orden."
                     },
                     "idTipoProceso": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Proceso de maquila del cargo."
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Proceso de maquila del cargo. NULL cuando el cargo es de un SERVICIO sobre la orden (corte/empaque, 0.114): ésos no son maquila y llevan `servicio` en su lugar."
+                    },
+                    "servicio": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "corte",
+                            "empaque"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SERVICIO sobre la orden que originó el cargo (0.114), o null si el cargo es de maquila. Excluyente con `idTipoProceso`: exactamente uno de los dos viene lleno."
                     },
                     "tipoProceso": {
                       "type": "string",
-                      "description": "Nombre del proceso."
+                      "description": "ETIQUETA del cargo, SIEMPRE presente: el nombre del proceso de maquila, o \"Corte\"/\"Empaque\" cuando es un servicio sobre la orden (0.114). La redacta el servidor en un solo lugar (`esma/etiqueta-cargo.ts`) para que todas las pantallas digan lo mismo."
                     },
                     "cantidadPropuesta": {
                       "type": "integer",
@@ -149359,6 +150571,7 @@
                     "idOrden",
                     "folioOrden",
                     "idTipoProceso",
+                    "servicio",
                     "tipoProceso",
                     "cantidadPropuesta",
                     "precioPropuesto",
@@ -149666,14 +150879,36 @@
                       "description": "Folio de la orden."
                     },
                     "idTipoProceso": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Proceso de maquila del cargo."
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Proceso de maquila del cargo. NULL cuando el cargo es de un SERVICIO sobre la orden (corte/empaque, 0.114): ésos no son maquila y llevan `servicio` en su lugar."
+                    },
+                    "servicio": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "corte",
+                            "empaque"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SERVICIO sobre la orden que originó el cargo (0.114), o null si el cargo es de maquila. Excluyente con `idTipoProceso`: exactamente uno de los dos viene lleno."
                     },
                     "tipoProceso": {
                       "type": "string",
-                      "description": "Nombre del proceso."
+                      "description": "ETIQUETA del cargo, SIEMPRE presente: el nombre del proceso de maquila, o \"Corte\"/\"Empaque\" cuando es un servicio sobre la orden (0.114). La redacta el servidor en un solo lugar (`esma/etiqueta-cargo.ts`) para que todas las pantallas digan lo mismo."
                     },
                     "cantidadPropuesta": {
                       "type": "integer",
@@ -149840,6 +151075,7 @@
                     "idOrden",
                     "folioOrden",
                     "idTipoProceso",
+                    "servicio",
                     "tipoProceso",
                     "cantidadPropuesta",
                     "precioPropuesto",
@@ -153084,14 +154320,21 @@
                             "description": "Nombre del maquilero."
                           },
                           "idTipoProceso": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Proceso de maquila."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proceso de maquila, o null si el cargo es de un servicio de la orden (0.114)."
                           },
                           "tipoProceso": {
                             "type": "string",
-                            "description": "Nombre del proceso."
+                            "description": "ETIQUETA del cargo (proceso de maquila, o \"Corte\"/\"Empaque\" — 0.114)."
                           },
                           "cantidad": {
                             "anyOf": [
@@ -153831,13 +155074,15 @@
               "type": "string",
               "enum": [
                 "costura",
-                "estampado"
+                "estampado",
+                "corte",
+                "empaque"
               ]
             },
             "in": "query",
             "name": "tipo",
             "required": false,
-            "description": "Filtra por tipo (costura/estampado). Omitir = cualquier rol de maquila."
+            "description": "Filtra por tipo (costura/estampado/corte/empaque). Omitir = cualquier rol de maquila."
           }
         ],
         "security": [
@@ -171239,6 +172484,11 @@
                             "items": {
                               "type": "object",
                               "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "rubro": {
                                   "type": "string",
                                   "enum": [
@@ -171337,9 +172587,94 @@
                                       "type": "null"
                                     }
                                   ]
+                                },
+                                "facturacion": {
+                                  "type": "object",
+                                  "properties": {
+                                    "facturable": {
+                                      "type": "boolean",
+                                      "description": "¿Se puede emitir el documento para facturar de este renglón?"
+                                    },
+                                    "motivo": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "sinFactura",
+                                            "concepto",
+                                            "proveedorNoLegible",
+                                            "efectivo",
+                                            "sinMonto",
+                                            "estado",
+                                            "faltantes"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "motivoTexto": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "faltantes": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "quien": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proveedor",
+                                              "empresa"
+                                            ],
+                                            "description": "De quién falta el dato."
+                                          },
+                                          "campo": {
+                                            "type": "string",
+                                            "enum": [
+                                              "razonSocial",
+                                              "rfc",
+                                              "regimenFiscalSat",
+                                              "codigoPostalExpedicion",
+                                              "codigoPostalFiscal",
+                                              "usoCfdiHabitual"
+                                            ],
+                                            "description": "Qué dato falta."
+                                          },
+                                          "texto": {
+                                            "type": "string",
+                                            "description": "El aviso, con el nombre de quien tiene el hueco."
+                                          }
+                                        },
+                                        "required": [
+                                          "quien",
+                                          "campo",
+                                          "texto"
+                                        ],
+                                        "additionalProperties": false,
+                                        "description": "Un dato fiscal que falta para poder emitir el documento."
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "facturable",
+                                    "motivo",
+                                    "motivoTexto",
+                                    "faltantes"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
+                                "id",
                                 "rubro",
                                 "nombre",
                                 "beneficiario",
@@ -171350,7 +172685,8 @@
                                 "formaPago",
                                 "monto",
                                 "concepto",
-                                "referencia"
+                                "referencia",
+                                "facturacion"
                               ],
                               "additionalProperties": false,
                               "description": "Un renglón de la relación ejecutable."
@@ -171480,6 +172816,814 @@
               }
             }
           },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion": {
+      "get": {
+        "summary": "Los datos con los que el proveedor debe facturar este pago (o por qué no se emite)",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idRenglon",
+            "required": true,
+            "description": "Id del renglón."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El documento para facturar de un renglón, o el motivo por el que no se emite.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "facturable": {
+                      "type": "boolean"
+                    },
+                    "motivo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sinFactura",
+                            "concepto",
+                            "proveedorNoLegible",
+                            "efectivo",
+                            "sinMonto",
+                            "estado",
+                            "faltantes"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué no se emite, o null."
+                    },
+                    "motivoTexto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El porqué, en palabras, o null."
+                    },
+                    "faltantes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "quien": {
+                            "type": "string",
+                            "enum": [
+                              "proveedor",
+                              "empresa"
+                            ],
+                            "description": "De quién falta el dato."
+                          },
+                          "campo": {
+                            "type": "string",
+                            "enum": [
+                              "razonSocial",
+                              "rfc",
+                              "regimenFiscalSat",
+                              "codigoPostalExpedicion",
+                              "codigoPostalFiscal",
+                              "usoCfdiHabitual"
+                            ],
+                            "description": "Qué dato falta."
+                          },
+                          "texto": {
+                            "type": "string",
+                            "description": "El aviso, con el nombre de quien tiene el hueco."
+                          }
+                        },
+                        "required": [
+                          "quien",
+                          "campo",
+                          "texto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Un dato fiscal que falta para poder emitir el documento."
+                      },
+                      "description": "Los datos fiscales que faltan (vacío si no es ése el problema)."
+                    },
+                    "documento": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "idCorrida": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "idRenglon": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "folioCorrida": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Folio de la corrida (por empresa)."
+                            },
+                            "semana": {
+                              "type": "string",
+                              "description": "Lunes de la semana que se paga (AAAA-MM-DD)."
+                            },
+                            "receptor": {
+                              "type": "object",
+                              "properties": {
+                                "razonSocial": {
+                                  "type": "string",
+                                  "description": "Nombre legal con el que se timbra."
+                                },
+                                "rfc": {
+                                  "type": "string"
+                                },
+                                "regimenFiscalSat": {
+                                  "type": "string",
+                                  "description": "Clave del régimen fiscal del SAT."
+                                },
+                                "codigoPostal": {
+                                  "type": "string",
+                                  "description": "CP: del domicilio fiscal (receptor) o de expedición (emisor)."
+                                }
+                              },
+                              "required": [
+                                "razonSocial",
+                                "rfc",
+                                "regimenFiscalSat",
+                                "codigoPostal"
+                              ],
+                              "additionalProperties": false,
+                              "description": "A nombre de quién se factura (la empresa activa, A9)."
+                            },
+                            "emisor": {
+                              "type": "object",
+                              "properties": {
+                                "razonSocial": {
+                                  "type": "string",
+                                  "description": "Nombre legal con el que se timbra."
+                                },
+                                "rfc": {
+                                  "type": "string"
+                                },
+                                "regimenFiscalSat": {
+                                  "type": "string",
+                                  "description": "Clave del régimen fiscal del SAT."
+                                },
+                                "codigoPostal": {
+                                  "type": "string",
+                                  "description": "CP: del domicilio fiscal (receptor) o de expedición (emisor)."
+                                }
+                              },
+                              "required": [
+                                "razonSocial",
+                                "rfc",
+                                "regimenFiscalSat",
+                                "codigoPostal"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Quién va a emitir la factura (el proveedor)."
+                            },
+                            "nombreProveedor": {
+                              "type": "string"
+                            },
+                            "usoCfdi": {
+                              "type": "string",
+                              "description": "Clave del uso de CFDI que declara el receptor (p. ej. G03)."
+                            },
+                            "usoCfdiSugerido": {
+                              "type": "boolean",
+                              "description": "true = el proveedor no lo tiene capturado y va el default G03, marcado como tal."
+                            },
+                            "concepto": {
+                              "type": "string",
+                              "description": "Qué se está pagando (el del renglón, o uno armado por rubro)."
+                            },
+                            "referencia": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Folios de remisiones/recibos que ampara, o null."
+                            },
+                            "formaPagoSat": {
+                              "type": "string",
+                              "description": "Clave del SAT de la forma de pago (03 = transferencia)."
+                            },
+                            "formaPagoTexto": {
+                              "type": "string"
+                            },
+                            "metodoPagoSat": {
+                              "type": "string",
+                              "description": "Clave del SAT del método de pago (PUE)."
+                            },
+                            "metodoPagoTexto": {
+                              "type": "string"
+                            },
+                            "moneda": {
+                              "type": "string",
+                              "description": "Moneda del comprobante (MXN)."
+                            },
+                            "subtotal": {
+                              "type": "number",
+                              "description": "Base gravable."
+                            },
+                            "iva": {
+                              "type": "number",
+                              "description": "IVA trasladado (explícito, nunca escondido en el total)."
+                            },
+                            "tasaIvaTexto": {
+                              "type": "string",
+                              "description": "La tasa como se imprime («16 %»)."
+                            },
+                            "total": {
+                              "type": "number",
+                              "description": "Lo que se transfiere. subtotal + iva === total, al centavo."
+                            }
+                          },
+                          "required": [
+                            "idCorrida",
+                            "idRenglon",
+                            "folioCorrida",
+                            "semana",
+                            "receptor",
+                            "emisor",
+                            "nombreProveedor",
+                            "usoCfdi",
+                            "usoCfdiSugerido",
+                            "concepto",
+                            "referencia",
+                            "formaPagoSat",
+                            "formaPagoTexto",
+                            "metodoPagoSat",
+                            "metodoPagoTexto",
+                            "moneda",
+                            "subtotal",
+                            "iva",
+                            "tasaIvaTexto",
+                            "total"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El documento con el que el proveedor debe facturar (fila 0.118)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "facturable",
+                    "motivo",
+                    "motivoTexto",
+                    "faltantes",
+                    "documento"
+                  ],
+                  "additionalProperties": false,
+                  "description": "El documento para facturar de un renglón, o el motivo por el que no se emite."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion.pdf": {
+      "get": {
+        "summary": "Documento para facturar de UN pago (PDF)",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idRenglon",
+            "required": true,
+            "description": "Id del renglón."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/documentos-facturacion.pdf": {
+      "get": {
+        "summary": "Documentos para facturar de TODA la corrida, con la hoja de los que no se emitieron",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {
@@ -272894,6 +275038,28 @@
                         ],
                         "description": "RFC fiscal de la empresa (F9-E3), o null."
                       },
+                      "regimenFiscalSat": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                      },
+                      "codigoPostalFiscal": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                      },
                       "identificador": {
                         "anyOf": [
                           {
@@ -272972,6 +275138,8 @@
                       "nombre",
                       "razonSocial",
                       "rfc",
+                      "regimenFiscalSat",
+                      "codigoPostalFiscal",
                       "identificador",
                       "favorita",
                       "paraIpt",
@@ -273162,6 +275330,13 @@
                     "type": "string",
                     "maxLength": 13
                   },
+                  "regimenFiscalSat": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "codigoPostalFiscal": {
+                    "type": "string"
+                  },
                   "identificador": {
                     "type": "string",
                     "maxLength": 20
@@ -273230,6 +275405,28 @@
                         }
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
+                    },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
                     },
                     "identificador": {
                       "anyOf": [
@@ -273309,6 +275506,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -273538,6 +275737,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -273616,6 +275837,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -273805,6 +276028,13 @@
                     "type": "string",
                     "maxLength": 13
                   },
+                  "regimenFiscalSat": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "codigoPostalFiscal": {
+                    "type": "string"
+                  },
                   "identificador": {
                     "type": "string",
                     "maxLength": 20
@@ -273884,6 +276114,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -273962,6 +276214,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -274189,6 +276443,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -274267,6 +276543,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",

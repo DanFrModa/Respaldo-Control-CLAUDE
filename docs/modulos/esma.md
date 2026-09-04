@@ -20,7 +20,10 @@ semanales, impresos R9 (estado de cuenta + recibo de pago) y export a Excel.
 ## Modelo de datos (`backend/prisma/schema.prisma`)
 
 - **`EsMaCargo`** — lo que se le debe al maquilero por una orden+proceso. Nace de un **recibo** de
-  maquila (`idEtapaRecibo`, F3-E4) como `propuesto`; el admin lo **valida** fijando `cantidadReal` y
+  maquila (`idEtapaRecibo`, F3-E4) **o de un SERVICIO SOBRE LA ORDEN** —corte o empaque, fila
+  0.114— con `idTipoProceso` NULL y `servicio` lleno; el CHECK `esma_cargo_proceso_o_servicio`
+  exige exactamente uno de los dos. En los dos casos nace como `propuesto`; el admin lo **valida**
+  fijando `cantidadReal` y
   `precioReal`. `sinCosto` = 2ª sin costo (decisión (f), se excluye del saldo). `cantidadPagada` =
   cache de prendas ya pagadas (para derivar "pagado"; el dato de verdad son las `PagoAplicacion`).
   `conFactura` se fija al validar según la modalidad del proveedor (decisión (h)). En el histórico

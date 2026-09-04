@@ -32,6 +32,8 @@ function cola(): CargosEsMa {
         idOrden: 1,
         folioOrden: 100,
         idTipoProceso: 5,
+        // 0.114: cargo de MAQUILA — lleva proceso y `servicio` en null (son excluyentes).
+        servicio: null,
         tipoProceso: 'Costura',
         cantidadPropuesta: 50,
         precioPropuesto: 8,

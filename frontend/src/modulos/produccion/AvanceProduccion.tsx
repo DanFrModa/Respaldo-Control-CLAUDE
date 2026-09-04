@@ -21,8 +21,10 @@ import {
 import {
   CLAVE_ETAPAS,
   useCancelarCorte,
+  useCancelarEmpaque,
   useCancelarEnvio,
   useCrearCorte,
+  useCrearEmpaque,
   useCrearEnvio,
   useEtapasOrden,
   useSugerenciaCaptura,
@@ -98,7 +100,7 @@ import { useSesion } from '@/sesion/useSesion';
 /** Clave de cada etapa del stepper (las claves viven en `etapas-avance.ts`, como datos). */
 type ClaveEtapa = ClaveEtapaAvance;
 
-/** Definición visual de las 6 etapas (orden del proto + el cierre del ciclo). */
+/** Definición visual de las 7 etapas (orden del proto + el empaque + el cierre del ciclo). */
 const ETAPAS: readonly { clave: ClaveEtapa; etiqueta: string; etiquetaProveedor: string }[] = [
   { clave: 'corte', etiqueta: 'Corte', etiquetaProveedor: 'Cortador' },
   { clave: 'entrega-maquila', etiqueta: 'Entrega a maquila', etiquetaProveedor: 'Maquilero' },
@@ -108,6 +110,9 @@ const ETAPAS: readonly { clave: ClaveEtapa; etiqueta: string; etiquetaProveedor:
   // los subtipos Bordado/Estampado siguen existiendo); lo que cambia es lo que el usuario lee.
   { clave: 'entrega-aplicacion', etiqueta: 'Entrega de Arte', etiquetaProveedor: 'Prov. de Arte' },
   { clave: 'recibo-aplicacion', etiqueta: 'Recibo de Arte', etiquetaProveedor: 'Prov. de Arte' },
+  // ⭐ EMPAQUE (0.114): servicio sobre la orden, hermano del corte. Va aquí porque se empaca lo que
+  // ya volvió terminado, justo antes de mandarlo. No toca inventario y su cantidad es propia.
+  { clave: 'empaque', etiqueta: 'Empaque', etiquetaProveedor: 'Empacador' },
   // El CIERRE del ciclo (V1-E3a): saca producto terminado del almacén de PT hacia el cliente. No
   // tiene "proveedor" — el destinatario es el cliente de la orden.
   { clave: 'entrega-cliente', etiqueta: 'Entrega a cliente', etiquetaProveedor: 'Cliente' },
@@ -146,6 +151,8 @@ export function claveEtapaDeMovimiento(
   esCostura: (idTipoProceso: number) => boolean,
 ): ClaveEtapa | null {
   if (movimiento.tipo === 'corte') return 'corte';
+  // 0.114: el empaque es su propia etapa (no lleva proceso: es un servicio sobre la orden).
+  if (movimiento.tipo === 'empaque') return 'empaque';
   const costura = movimiento.idTipoProceso !== null && esCostura(movimiento.idTipoProceso);
   if (movimiento.tipo === 'envio_maquila') {
     return costura ? 'entrega-maquila' : 'entrega-aplicacion';
@@ -221,6 +228,16 @@ export function pasosDesdeWip(wip: WipOrden): PasoEtapa[] {
       clave: 'recibo-aplicacion',
       etiqueta: 'Recibo de Arte',
       hecho: recibidoAplicacion,
+      total: wip.pedido,
+    },
+    // ⭐ EMPAQUE (0.114): Σ de empaques VIVOS, derivado en servidor (`wip.empacado`) — NO se despeja
+    // aquí a partir de otras cifras. El denominador sigue siendo lo PEDIDO, como en todos los pasos;
+    // eso sí, empacar menos que lo pedido NO es un faltante (*«se fabrican 1,000 y se empacan 990»*):
+    // el paso puede cerrar la orden sin llegar al total y eso es correcto.
+    {
+      clave: 'empaque',
+      etiqueta: 'Empaque',
+      hecho: wip.empacado,
       total: wip.pedido,
     },
     // El cierre del ciclo (V1-E3a): Σ de entregas VIVAS a cliente, derivado en servidor.
@@ -621,10 +638,18 @@ export function AvanceProduccion({
 function puedeCapturar(
   etapa: ClaveEtapa,
   tienePermiso: (
-    clave: 'produccion.corte' | 'produccion.envio' | 'produccion.recibo' | 'produccion.entrega',
+    clave:
+      | 'produccion.corte'
+      | 'produccion.empaque'
+      | 'produccion.envio'
+      | 'produccion.recibo'
+      | 'produccion.entrega',
   ) => boolean,
 ): boolean {
   if (etapa === 'corte') return tienePermiso('produccion.corte');
+  // 0.114: el empaque tiene permiso PROPIO (no reusa el del corte): son dos actos, dos servicios y
+  // dos proveedores distintos, y quien captura uno no tiene por qué poder capturar el otro.
+  if (etapa === 'empaque') return tienePermiso('produccion.empaque');
   if (etapa === 'entrega-maquila' || etapa === 'entrega-aplicacion') {
     return tienePermiso('produccion.envio');
   }
@@ -855,7 +880,11 @@ function AvisoCatalogos({
   );
 }
 
-/** Impresos de un movimiento del historial de etapas (el CORTE no tiene impreso propio). */
+/**
+ * Impresos de un movimiento del historial de etapas. Ni el CORTE ni el EMPAQUE tienen impreso propio
+ * (no acompañan un bulto: no sale ni entra mercancía), así que su lista va vacía y la barra del
+ * "recién guardado" ni siquiera se pinta.
+ */
 function impresoDeMovimiento(m: EtapaHistorial, esArte: boolean): MovimientoImpreso {
   if (m.tipo === 'envio_maquila') {
     return { id: m.id, folio: m.folio, etiqueta: 'Envío', impresos: impresosDeEnvio(m.id, esArte) };
@@ -869,6 +898,9 @@ function impresoDeMovimiento(m: EtapaHistorial, esArte: boolean): MovimientoImpr
         { clave: 'recibo', etiqueta: 'PDF del recibo', url: urlImpresoRecibo(m.id), icono: 'pdf' },
       ],
     };
+  }
+  if (m.tipo === 'empaque') {
+    return { id: m.id, folio: m.folio, etiqueta: 'Empaque', impresos: [] };
   }
   return { id: m.id, folio: m.folio, etiqueta: 'Corte', impresos: [] };
 }
@@ -1080,11 +1112,20 @@ function CapturaMovimiento({
   const busquedaProveedor = useDebounce(textoProveedor.trim(), 250);
 
   const crearCorte = useCrearCorte();
+  const crearEmpaque = useCrearEmpaque();
   const crearEnvio = useCrearEnvio();
   const crearRecibo = useCrearRecibo();
 
   const esAplicacion = etapa === 'entrega-aplicacion' || etapa === 'recibo-aplicacion';
   const esRecibo = etapa === 'recibo-maquila' || etapa === 'recibo-aplicacion';
+  /**
+   * ⭐ Los dos SERVICIOS SOBRE LA ORDEN (0.114): corte y empaque. Comparten forma —no llevan proceso
+   * de maquila, no tocan inventario, llevan precio por prenda y generan su cargo— y por eso la
+   * captura los trata igual salvo en el rol del proveedor y en el endpoint al que pega.
+   */
+  const esServicio = etapa === 'corte' || etapa === 'empaque';
+  /** ¿Es un ENVÍO a maquila? (los únicos que llevan fecha compromiso y bandera de prenda terminada). */
+  const esEnvio = etapa === 'entrega-maquila' || etapa === 'entrega-aplicacion';
 
   // Procesos de APLICACIÓN (estampado/bordado/…): los que NO meten a PT. El de COSTURA es el que sí.
   const procesosAplicacion = procesos.filter((p) => !p.generaEntradaPt && p.activo);
@@ -1108,8 +1149,10 @@ function CapturaMovimiento({
   // Proveedores filtrados por el ROL de la etapa (D12/R15; el servidor re-valida).
   const roles = useRolesProveedor();
   const codigoRol =
-    etapa === 'corte'
-      ? 'corte'
+    // 0.114: el rol de un servicio ES su clave de etapa (`corte` → rol `corte`, `empaque` → rol
+    // `empaque`). El servidor lo re-valida (`exigirTerceroConRol`): esta lista es la comodidad.
+    esServicio
+      ? etapa
       : procesoElegido === undefined
         ? undefined
         : rolDelProceso(procesoElegido.codigo);
@@ -1266,6 +1309,14 @@ function CapturaMovimiento({
   // captura entera para que el 400 llegara después, con la matriz ya tecleada.
   const referencia = useMemo<Map<string, number> | null>(() => {
     const mapa = new Map<string, number>();
+    // ⭐ EMPAQUE (0.114): SIN referencia por celda, a propósito. Su cantidad es PROPIA —*«se fabrican
+    // 1,000 y se empacan 990; se paga lo empacado y las 10 se quedan quietas en inventario»*— así
+    // que no hay un pendiente contra el que topar cada celda. Pintar la matriz contra lo recibido
+    // marcaría en rojo («Sobran N») el caso NORMAL del negocio. El aviso de "empacas más de lo
+    // recibido" existe, pero es UN TOTAL informativo y va abajo, no celda por celda.
+    if (etapa === 'empaque') {
+      return null;
+    }
     if (etapa === 'corte') {
       for (const c of wip.porCortar) mapa.set(claveCelda(c.idColor, c.idTalla, c.pack), c.cantidad);
       return mapa;
@@ -1372,16 +1423,27 @@ function CapturaMovimiento({
       : [...referencia.values()].reduce((s, v) => s + Math.max(0, v), 0);
 
   const total = Object.values(valores).reduce((s, v) => s + v, 0);
-  const ocupado = crearCorte.isPending || crearEnvio.isPending || crearRecibo.isPending;
-  const procesoParaGuardar = esAplicacion
-    ? procesoElegido
-    : esRecibo || etapa === 'entrega-maquila'
-      ? // El recibo/envío de costura usa el proceso YA USADO en la orden si existe (porRecibir), o
-        // el proceso costura del catálogo.
-        (procesos.find(
-          (p) => p.id === wip.porRecibir.find((x) => x.generaEntradaPt)?.idTipoProceso,
-        ) ?? procesoCostura)
-      : undefined;
+  /**
+   * Cuánto quedaría EMPACADO DE MÁS sobre lo recibido de costura si se guarda esta captura (0.114).
+   * Puramente INFORMATIVO: alimenta un aviso ámbar y NO bloquea nada (`puedeGuardar` no lo mira).
+   * Los dos operandos los publica el servidor (`wip.empacado`, `wip.recibidoCostura`).
+   */
+  const excedeEmpaque = Math.max(0, wip.empacado + total - wip.recibidoCostura);
+  const ocupado =
+    crearCorte.isPending || crearEmpaque.isPending || crearEnvio.isPending || crearRecibo.isPending;
+  // Los SERVICIOS (corte/empaque) NO tienen proceso: ésa es justamente su marca (`idTipoProceso`
+  // NULL en el servidor). Sin este `esServicio` de por medio, el empaque caía en la rama del envío.
+  const procesoParaGuardar = esServicio
+    ? undefined
+    : esAplicacion
+      ? procesoElegido
+      : esRecibo || etapa === 'entrega-maquila'
+        ? // El recibo/envío de costura usa el proceso YA USADO en la orden si existe (porRecibir), o
+          // el proceso costura del catálogo.
+          (procesos.find(
+            (p) => p.id === wip.porRecibir.find((x) => x.generaEntradaPt)?.idTipoProceso,
+          ) ?? procesoCostura)
+        : undefined;
 
   // ── PRECARGA DE LA MATRIZ (V1-E8i, §Post-F9.131) ───────────────────────────────────────────
   // Petición de Daniel (28-ago-2026): *"marcar el corte como completo… y otro de entrega a maquila
@@ -1593,7 +1655,7 @@ function CapturaMovimiento({
     (total > 0 || (esRecibo && totalIncompletas > 0)) &&
     idProveedor !== null &&
     fecha !== '' &&
-    (etapa === 'corte' || procesoParaGuardar !== undefined) &&
+    (esServicio || procesoParaGuardar !== undefined) &&
     // V1-E8k: si la captura NO trae piezas buenas (recibo SOLO de incompletas), no entra nada a
     // inventario y el almacén deja de tener sentido — el servidor tampoco lo pide en ese caso
     // (`meteAPt` en `recibos.ts` incluye `totalRecibido > 0`). Exigirlo aquí bloquearía justo el
@@ -1608,8 +1670,10 @@ function CapturaMovimiento({
     // V1-E4b: si el envío saca prendas terminadas, hay que decir de qué almacén salen.
     (!prendaTerminada || idAlmacenOrigen !== '') &&
     !segundasInvalidas &&
-    // El sobre-corte SÍ se guarda (decisión (f)); el sobre-envío y el sobre-recibo, NO (decisión (g)).
-    (etapa === 'corte' || excede === 0);
+    // El sobre-corte SÍ se guarda (decisión (f)) y el EMPACAR DE MÁS también (0.114: cantidad
+    // propia); el sobre-envío y el sobre-recibo, NO (decisión (g)). En el empaque `excede` ya vale 0
+    // siempre (no tiene referencia): esto lo deja dicho en vez de depender de ese detalle.
+    (esServicio || excede === 0);
 
   /**
    * Convierte la captura al cuerpo `lineas` del API (descarta ceros).
@@ -1725,9 +1789,21 @@ function CapturaMovimiento({
     };
     if (etapa === 'corte') {
       crearCorte.mutate(
-        { ...comunes, idCortador: idProveedor },
+        // 0.114: el corte ya lleva PRECIO por prenda — de ahí sale el cargo del cortador.
+        { ...comunes, idCortador: idProveedor, ...precioApi() },
         {
           onSuccess: (e) => alExito({ id: e.id, folio: e.folio, etiqueta: 'Corte', impresos: [] }),
+          onError: (error) => toast.error(error.message),
+        },
+      );
+      return;
+    }
+    if (etapa === 'empaque') {
+      crearEmpaque.mutate(
+        { ...comunes, idEmpacador: idProveedor, ...precioApi() },
+        {
+          onSuccess: (e) =>
+            alExito({ id: e.id, folio: e.folio, etiqueta: 'Empaque', impresos: [] }),
           onError: (error) => toast.error(error.message),
         },
       );
@@ -1803,7 +1879,13 @@ function CapturaMovimiento({
       <AvisoCatalogos
         hayError={catalogoConError}
         alReintentar={reintentarCatalogos}
-        que={etapa === 'corte' ? 'cortadores' : 'procesos, proveedores o almacenes'}
+        que={
+          etapa === 'corte'
+            ? 'cortadores'
+            : etapa === 'empaque'
+              ? 'empacadores'
+              : 'procesos, proveedores o almacenes'
+        }
       />
       <div className={cn('grid gap-3', esAplicacion ? 'sm:grid-cols-4' : 'sm:grid-cols-3')}>
         <Field>
@@ -1924,40 +2006,44 @@ function CapturaMovimiento({
         />
       ) : null}
 
-      {/* PRECIO PACTADO (envío y recibo) + FECHA COMPROMISO (envío): migrados de las pantallas
-          retiradas en V1-E3a. Sin el precio, el cargo EsMa del recibo nace SIN precio y hay que
-          teclearlo aparte en su módulo (la doble captura que v2 elimina). */}
-      {etapa !== 'corte' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* El precio se CAPTURA sin permiso extra: `ordenes.ver-precio-real-maquila` gobierna la
-              LECTURA (el backend redacta el campo al devolverlo), no la escritura — ver `precioApi`. */}
+      {/* PRECIO PACTADO (TODAS las etapas de esta captura) + FECHA COMPROMISO (solo el envío).
+          Sin el precio, el cargo EsMa nace SIN precio y hay que teclearlo aparte en su módulo (la
+          doble captura que v2 elimina).
+
+          ⭐ 0.114 — el CORTE y el EMPAQUE también lo llevan. Daniel: *«sólo hay que poner su cantidad
+          y precio para meterlo en la OP»*. Antes este bloque se escondía en el corte porque el corte
+          no generaba cargo; ahora sí lo genera, y su precio es el ÚNICO que ese cargo puede
+          proponer (la orden trae `maquilaOrd`/`aplicacionOrd`, que son precios de MAQUILA y no se
+          le prestan a un servicio). */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* El precio se CAPTURA sin permiso extra: `ordenes.ver-precio-real-maquila` gobierna la
+            LECTURA (el backend redacta el campo al devolverlo), no la escritura — ver `precioApi`. */}
+        <Field>
+          <FieldLabel htmlFor="avance-precio">Precio pactado por prenda</FieldLabel>
+          <Input
+            id="avance-precio"
+            type="number"
+            min={0}
+            step="0.01"
+            value={precioPactado}
+            onChange={(e) => setPrecioPactado(e.target.value)}
+            placeholder="Opcional"
+            data-testid="avance-precio"
+          />
+        </Field>
+        {esEnvio ? (
           <Field>
-            <FieldLabel htmlFor="avance-precio">Precio pactado por prenda</FieldLabel>
+            <FieldLabel htmlFor="avance-fecha-compromiso">Fecha compromiso</FieldLabel>
             <Input
-              id="avance-precio"
-              type="number"
-              min={0}
-              step="0.01"
-              value={precioPactado}
-              onChange={(e) => setPrecioPactado(e.target.value)}
-              placeholder="Opcional"
-              data-testid="avance-precio"
+              id="avance-fecha-compromiso"
+              type="date"
+              value={fechaCompromiso}
+              onChange={(e) => setFechaCompromiso(e.target.value)}
+              data-testid="avance-fecha-compromiso"
             />
           </Field>
-          {!esRecibo ? (
-            <Field>
-              <FieldLabel htmlFor="avance-fecha-compromiso">Fecha compromiso</FieldLabel>
-              <Input
-                id="avance-fecha-compromiso"
-                type="date"
-                value={fechaCompromiso}
-                onChange={(e) => setFechaCompromiso(e.target.value)}
-                data-testid="avance-fecha-compromiso"
-              />
-            </Field>
-          ) : null}
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {/* ── V1-E4b · ¿se mandan prendas YA TERMINADAS? (§Post-F9.61) ───────────────────────────
           Si el proceso va DESPUÉS de la costura, las prendas están en el almacén y salen de él: el
@@ -2282,7 +2368,23 @@ function CapturaMovimiento({
           orden. <b>Se permite</b> (solo es un aviso): el sobre-corte queda registrado tal cual.
         </p>
       ) : null}
-      {excede > 0 && etapa !== 'corte' ? (
+      {/* ⭐ EMPAQUE (0.114): AVISO INFORMATIVO, nunca un tope. La cantidad del empaque es propia y el
+          servidor la acepta tal cual; esto sólo pone un número donde antes no había ninguno, para
+          que quien captura note que está empacando más de lo que la orden tiene recibido de costura.
+          Se compara con `wip.empacado` + lo tecleado contra `wip.recibidoCostura`, DOS totales que
+          publica el servidor — no se re-deriva ninguna regla, porque aquí no hay ninguna. */}
+      {etapa === 'empaque' && wip.recibidoCostura > 0 && excedeEmpaque > 0 ? (
+        <p
+          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+          role="status"
+          data-testid="avance-aviso-empaque-excede"
+        >
+          Con esto llevarías {excedeEmpaque.toLocaleString('es-MX')} pieza(s) empacadas por encima
+          de las {wip.recibidoCostura.toLocaleString('es-MX')} recibidas de costura en esta orden.{' '}
+          <b>Se permite</b> (solo es un aviso): lo que se empaca se cuenta y se paga aparte.
+        </p>
+      ) : null}
+      {excede > 0 && !esServicio ? (
         // Decisión (g): el sobre-envío y el sobre-recibo son ESTRICTOS en el servidor (bajo lock).
         // Se bloquea aquí para no mandar al usuario a comerse un 400 con la matriz ya tecleada.
         <p
@@ -2669,9 +2771,13 @@ function TarjetaResumen({
 }
 
 /**
- * Diálogo de cancelación SUAVE de un movimiento (corte / envío / recibo / entrega a cliente) con
- * motivo obligatorio. El backend conserva el movimiento como historial (D3) y, cuando movió
- * inventario (recibo y entrega), registra su INVERSO — nunca edita ni borra.
+ * Diálogo de cancelación SUAVE de un movimiento (corte / empaque / envío / recibo / entrega a
+ * cliente) con motivo obligatorio. El backend conserva el movimiento como historial (D3) y, cuando
+ * movió inventario (recibo y entrega), registra su INVERSO — nunca edita ni borra.
+ *
+ * ⭐ 0.114 — cancelar un CORTE o un EMPAQUE se lleva su CARGO EsMa: si el cargo ya está validado, el
+ * servidor exige el permiso `esma.cargo-validar` y sin él rechaza la cancelación entera (el error
+ * llega al toast tal cual). No hay inventario que revertir en ninguno de los dos.
  */
 /** Un maquilero del desglose de pendientes (lo que la pantalla necesita para ofrecer el cierre). */
 type MaquileroPendiente = PendientesRecibir['porRecibir'][number]['porMaquilero'][number];
@@ -3046,6 +3152,7 @@ function DialogoCancelarMovimiento({
   alCancelado: (cancelado: MovimientoACancelar) => void;
 }): React.JSX.Element {
   const cancelarCorte = useCancelarCorte();
+  const cancelarEmpaque = useCancelarEmpaque();
   const cancelarEnvio = useCancelarEnvio();
   const cancelarRecibo = useCancelarRecibo();
   const cancelarEntrega = useCancelarEntrega();
@@ -3059,19 +3166,23 @@ function DialogoCancelarMovimiento({
   const etiqueta =
     tipo === 'corte'
       ? 'corte'
-      : tipo === 'recibo_maquila'
-        ? 'recibo'
-        : tipo === 'entrega_cliente'
-          ? 'entrega'
-          : 'envío';
+      : tipo === 'empaque'
+        ? 'empaque'
+        : tipo === 'recibo_maquila'
+          ? 'recibo'
+          : tipo === 'entrega_cliente'
+            ? 'entrega'
+            : 'envío';
   const mutacion =
     tipo === 'corte'
       ? cancelarCorte
-      : tipo === 'recibo_maquila'
-        ? cancelarRecibo
-        : tipo === 'entrega_cliente'
-          ? cancelarEntrega
-          : cancelarEnvio;
+      : tipo === 'empaque'
+        ? cancelarEmpaque
+        : tipo === 'recibo_maquila'
+          ? cancelarRecibo
+          : tipo === 'entrega_cliente'
+            ? cancelarEntrega
+            : cancelarEnvio;
   const sinMotivo = motivo.trim().length < 3;
 
   function confirmar(): void {

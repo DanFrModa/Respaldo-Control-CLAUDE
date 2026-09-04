@@ -7,8 +7,10 @@
  * Endpoints (todos por la empresa activa de la sesión = A9; si una orden/etapa no es de la empresa
  * activa → 404):
  *  • `POST /produccion/cortes`               (perm `produccion.corte`)  → crea un corte.
+ *  • `POST /produccion/empaques`             (perm `produccion.empaque`) → crea un empaque (0.114).
  *  • `POST /produccion/envios`               (perm `produccion.envio`)  → crea un envío a maquila.
  *  • `POST /produccion/cortes/:id/cancelar`  (perm `produccion.cancelar`) → cancela un corte (suave).
+ *  • `POST /produccion/empaques/:id/cancelar` (perm `produccion.cancelar`) → cancela un empaque.
  *  • `POST /produccion/envios/:id/cancelar`  (perm `produccion.cancelar`) → cancela un envío (suave).
  *  • `GET  /produccion/ordenes/:id/pendientes` (perm `produccion.wip-ver`) → pendientes derivados.
  *  • `GET  /produccion/ordenes/:id/sugerencia-captura` (perm `produccion.wip-ver`) → qué precargar
@@ -18,7 +20,7 @@
  *  • `GET  /produccion/envios/:id/impreso`   (perm `produccion.wip-ver`) → documento de envío (PDF).
  *  • `GET  /produccion/envios/:id/ficha-estampado` → PDF de la ficha de estampado (binario).
  *
- * Las dos rutas de cancelación comparten el MISMO servicio de dominio (`cancelarEtapaMovimiento`):
+ * Las TRES rutas de cancelación comparten el MISMO servicio de dominio (`cancelarEtapaMovimiento`):
  * se exponen por separado por claridad de URL, pero el dominio valida el tipo de la etapa.
  */
 import { z } from 'zod';
@@ -26,6 +28,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
   esquemaCorteCrear,
+  esquemaEmpaqueCrear,
   esquemaEnvioCrear,
   esquemaEtapaCancelarCuerpo,
   esquemaEtapaSalida,
@@ -46,6 +49,7 @@ import {
   listarEtapasOrden,
   pendientesPorOrden,
   registrarCorte,
+  registrarEmpaque,
   registrarEnvioMaquila,
   sugerirCaptura,
 } from '../../dominio/produccion/etapas.js';
@@ -110,6 +114,45 @@ export const rutasEtapasProduccion: FastifyPluginCallbackZod = (app, _opciones, 
     schema: {
       tags: ['produccion'],
       summary: 'Cancelar (suave) un corte',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaEtapaCancelarCuerpo,
+      response: { 200: esquemaEtapaSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cancelarEtapaMovimiento(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ── Empaque (0.114): servicio sobre la orden, hermano del corte ───────────────
+  // Mismo par de URLs que el corte (`/produccion/cortes` + `/:id/cancelar`), porque es la MISMA
+  // clase de acto: se captura una matriz color×talla contra la orden y se puede cancelar en suave.
+  app.route({
+    method: 'POST',
+    url: '/produccion/empaques',
+    preHandler: app.conPermiso('produccion.empaque'),
+    schema: {
+      tags: ['produccion'],
+      summary: 'Registrar el empaque de una orden (color×talla; cantidad propia, sin tope)',
+      security: SEGURIDAD_SESION,
+      body: esquemaEmpaqueCrear,
+      response: { 201: esquemaEtapaSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const etapa = await registrarEmpaque(sesion, request.body);
+      return reply.code(201).send(etapa);
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/produccion/empaques/:id/cancelar',
+    preHandler: app.conPermiso('produccion.cancelar'),
+    schema: {
+      tags: ['produccion'],
+      summary: 'Cancelar (suave) un empaque',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       body: esquemaEtapaCancelarCuerpo,

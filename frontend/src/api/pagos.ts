@@ -23,6 +23,7 @@ import type {
   CorridaDetalle,
   CorridasLista,
   CorridasQuery,
+  DocumentoParaFacturar,
   RenglonCorridaGuardar,
 } from './tipos';
 
@@ -216,6 +217,62 @@ export function useConcentrado(
     queryFn: () => obtenerConcentrado(id as number),
     enabled: id !== null && habilitado,
   });
+}
+
+// ── El documento para facturar (fila 0.118) ─────────────────────────────────────────────────────
+
+async function obtenerDocumentoFacturacion(
+  idCorrida: number,
+  idRenglon: number,
+): Promise<DocumentoParaFacturar> {
+  const { data, error } = await api.GET(
+    '/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion',
+    { params: { path: { id: idCorrida, idRenglon } } },
+  );
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * ⭐ Los datos con los que el proveedor debe facturar ESE pago, o el motivo por el que no se emite
+ * (§Post-F9.186(k)). Se pide sólo cuando alguien abre el documento: la relación ejecutable ya trae
+ * en cada renglón si es facturable, así que la lista se pinta sin llamar a esto ni una vez.
+ */
+export function useDocumentoFacturacion(
+  idCorrida: number | null,
+  idRenglon: number | null,
+  habilitado: boolean,
+): UseQueryResult<DocumentoParaFacturar, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CORRIDAS, 'documento-facturacion', idCorrida, idRenglon],
+    queryFn: () => obtenerDocumentoFacturacion(idCorrida as number, idRenglon as number),
+    enabled: idCorrida !== null && idRenglon !== null && habilitado,
+  });
+}
+
+/**
+ * Abre en una pestaña nueva el PDF del documento para facturar de UN pago. Server-side como el
+ * resto de impresos: la auth viaja por la cookie de sesión (mismo origen), así que basta
+ * `window.open`.
+ */
+export function imprimirDocumentoFacturacion(idCorrida: number, idRenglon: number): void {
+  window.open(
+    `/api/pagos/corridas/${String(idCorrida)}/renglones/${String(idRenglon)}/documento-facturacion.pdf`,
+    '_blank',
+    'noopener',
+  );
+}
+
+/**
+ * Abre el PDF de TODA la corrida: una hoja por documento, precedida de la de «no se emitieron».
+ * Ésa es la que Daniel imprime de un jalón para mandar los documentos de la semana.
+ */
+export function imprimirDocumentosCorrida(idCorrida: number): void {
+  window.open(
+    `/api/pagos/corridas/${String(idCorrida)}/documentos-facturacion.pdf`,
+    '_blank',
+    'noopener',
+  );
 }
 
 // ── El catálogo de conceptos (0.125) ────────────────────────────────────────────────────────────
