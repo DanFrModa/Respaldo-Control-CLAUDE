@@ -78,8 +78,9 @@ Las dos mitades de esa frase importan:
   (normalmente **descontandole** esas prendas faltantes)»* (§Post-F9.147).
 - **`capturado` y no `revisado`, porque PROPONE.** Daniel: el botón *«nunca cobra solo»*. Un descuento
   `capturado` no cuenta al saldo y aparece en el estado de cuenta marcado como **pendiente de
-  revisión**: el visto bueno se da con el flujo que ya existía (`revisarMovimiento`,
-  `esma.modificar`), sin pantalla nueva.
+  revisión**: el visto bueno se da con el flujo que ya existía (`revisarMovimiento`), sin pantalla
+  nueva. Ese visto bueno exige **`esma.revisar`** —no `esma.modificar`, que es el de capturar—
+  desde la fila 0.128: quien propone el descuento no puede aprobárselo él mismo.
 - **Se ve de qué es**: sus `observaciones` las redacta el dominio — *«Faltante de la orden #77 ·
   Costura: 5 pza(s) que no se devolvieron»* — y ésa es la `referencia` del renglón en la línea de
   tiempo.
@@ -150,7 +151,8 @@ Las prendas que el maquilero entrega **sin terminar de coser** aparecen en el es
     `esma.cargo-validar`.
   - `movimientos.ts` — `crearAbonoMaquilero` / `crearDescuentoMaquilero` + **revisión**
     (`revisarMovimiento`: `capturado`→`revisado`). `conFactura` se resuelve de la modalidad del
-    proveedor (`facturacion.ts`, decisión (h)). Permiso `esma.modificar`.
+    proveedor (`facturacion.ts`, decisión (h)). **Dos permisos, no uno** (fila 0.128): capturar es
+    `esma.modificar`; REVISAR es `esma.revisar`.
   - `pagos.ts` — `crearPagoMaquilero`: **anti-doble-pago DURO** (decisión (g)). `porPagar =
     cantidadReal − Σ(PagoAplicacion.cantidad)` por **suma directa bajo `pg_advisory_xact_lock` por
     maquilero** (nunca una columna cacheada como verdad, D3); pagar de más lanza `ErrorConflicto`. El
@@ -186,9 +188,19 @@ Las prendas que el maquilero entrega **sin terminar de coser** aparecen en el es
 
 ## Permisos (A4)
 
-`esma.ver-pagos` (ver estado de cuenta + meter pagos) · `esma.modificar` (capturar/revisar
-abonos/descuentos) · `esma.cargo-validar` (validar cargos). Importes ocultos sin
-`consultas.ver-importes`.
+`esma.ver-pagos` (ver estado de cuenta + meter pagos) · `esma.modificar` (**capturar** abonos y
+descuentos, y forzar el estatus «pagada» de una orden) · **`esma.revisar`** (autorizar una partida
+capturada: `capturado`→`revisado`) · `esma.cargo-validar` (validar los cargos propuestos por los
+recibos, fijando cantidad y precio reales). Importes ocultos sin `consultas.ver-importes`.
+
+⭐ **Los dos últimos son «validar», y validar es de Daniel** (fila 0.128, §Post-F9.192(1)): *«La
+entrada la da la persona responsable de recibos o de producción. Pero la validación sólo la doy yo.
+O sea, es un permiso para meter lo recibido y otro para validarlo.»* En el seed los llevan sólo
+`Administrador`, `AdministracionDireccion` y `Directivo`; los cinco perfiles operativos capturan
+(`esma.modificar`) y reciben de maquila (`produccion.recibo`), pero ya no autorizan lo que capturan.
+Hasta la 0.127 revisar exigía `esma.modificar` —el mismo permiso de capturar—, así que el
+capturista se auto-autorizaba; y desde la 0.115 **sólo lo revisado suma al saldo**, o sea que
+autorizar es el acto que convierte un renglón en deuda o en pago real.
 
 ## Migración del histórico (F6-E6)
 

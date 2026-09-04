@@ -121,9 +121,11 @@ async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, 
  * 🔑 **El defecto que esto cierra: era un guardián AL REVÉS — el silencio OTORGABA.** Un permiso
  * nuevo se agregaba al catálogo de `src/contrato`, entraba a `todos` y, si nadie se acordaba de
  * restárselo a alguien, **bajaba solo hasta Secretarial**. Así aterrizó `esma.cargo-validar` en un
- * perfil clerical sin que nadie lo decidiera. Con la forma de SUMA, un permiso nuevo **no nace en
- * NADIE** hasta que se le nombra dueño aquí, y `reparto-de-permisos.test.ts` truena si se queda sin
- * dueño (o si aquí queda una clave fantasma que el catálogo ya no tiene).
+ * perfil clerical sin que nadie lo decidiera (y así se quedó hasta la fila 0.128, que se lo quitó a
+ * los cinco perfiles operativos porque *«la validación sólo la doy yo»*). Con la forma de SUMA, un
+ * permiso nuevo **no nace en NADIE** hasta que se le nombra dueño aquí, y
+ * `reparto-de-permisos.test.ts` truena si se queda sin dueño (o si aquí queda una clave fantasma
+ * que el catálogo ya no tiene).
  *
  * ⚠️ El MOTOR nunca fue cascada y no se tocó: `RolPermiso`/`UsuarioRol` son N:M y los permisos
  * efectivos son la UNIÓN de los roles del usuario (`comun/permisos.ts`). La cascada vivía sólo en
@@ -139,14 +141,25 @@ async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, 
  *
  * ## ⚠️ Lo que estas seis listas SON hoy, y lo que TODAVÍA NO son
  *
- * Son **exactamente** el reparto que producía la cascada el 3-sep-2026, transcrito. El cambio fue
- * de FORMA, no de contenido (lo fija la prueba de EQUIVALENCIA). Eso quiere decir que siguen
- * arrastrando lo que la cascada regalaba: **76 de los 122 permisos no se le restaban a nadie**, así
- * que `Secretarial` conserva hoy cosas tan gordas como `compras.autorizar`, `esma.cargo-validar`,
+ * Nacieron siendo **exactamente** el reparto que producía la cascada el 3-sep-2026, transcrito: el
+ * cambio de aquel día fue de FORMA, no de contenido (lo fija la prueba de EQUIVALENCIA). Eso quiere
+ * decir que siguen arrastrando lo que la cascada regalaba: **76 de los 122 permisos no se le
+ * restaban a nadie**, así que `Secretarial` conserva hoy cosas tan gordas como `compras.autorizar`,
  * `pedidos.modificar`, `notas.cancelar`, `inventario-pt.mover`, `telas.ver-totales` o
- * `calidad.modificar-auditorias`. **Recortarlas no es trabajo de este cambio**: Daniel decidió armar
- * los perfiles concretos AL FINAL, con los puestos reales de sus 23 usuarios. Esta forma es la que
- * hace que ese recorte sea posible sin efectos colaterales.
+ * `calidad.modificar-auditorias`. **Recortarlas en bloque no era trabajo de aquel cambio**: Daniel
+ * decidió armar los perfiles concretos AL FINAL, con los puestos reales de sus 23 usuarios. Esta
+ * forma es la que hace que ese recorte sea posible sin efectos colaterales.
+ *
+ * ✂️ **PRIMER RECORTE REAL (fila 0.128, 4-sep-2026): VALIDAR ES DE DANIEL.** *«La entrada la da la
+ * persona responsable de recibos o de producción. Pero la validación sólo la doy yo»*
+ * (§Post-F9.192(1)). Los dos permisos de validar —`esma.cargo-validar` (fijar cantidad y precio
+ * reales del cargo) y `esma.revisar` (autorizar la partida para que entre al saldo)— quedan sólo en
+ * el administrador y en `Directivo`. Se los quitó a `Gerencial`, `Ventas`, `Logistica`, `Asistente`
+ * y `Secretarial`, que es donde la cascada los había dejado sin que nadie lo decidiera. La lista
+ * `RETIRADOS_DESDE_LA_FOTO` de `reparto-de-permisos.test.ts` lo deja escrito renglón por renglón.
+ *
+ * ⚠️ **Y esto se APLICA SOLO en `prueba` con `SEED_ON_START=true`**, sin migración de datos:
+ * {@link sembrarRoles} SINCRONIZA los 9 roles de sistema (borra lo que sobra), no sólo agrega.
  */
 
 /**
@@ -281,6 +294,7 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   'edr.ver',
   'esma.cargo-validar',
   'esma.modificar',
+  'esma.revisar',
   'esma.ver-pagos',
   'estado-lista.ver',
   'etiquetas-marca.ver',
@@ -395,7 +409,6 @@ const GERENCIAL: readonly ClavePermiso[] = [
   'desarrollo.administrar',
   'desarrollo.precostear',
   'desarrollo.ver',
-  'esma.cargo-validar',
   'esma.modificar',
   'esma.ver-pagos',
   'estado-lista.ver',
@@ -499,7 +512,6 @@ const VENTAS: readonly ClavePermiso[] = [
   'desarrollo.administrar',
   'desarrollo.precostear',
   'desarrollo.ver',
-  'esma.cargo-validar',
   'esma.modificar',
   'esma.ver-pagos',
   'estado-lista.ver',
@@ -593,7 +605,6 @@ const LOGISTICA: readonly ClavePermiso[] = [
   'compras.ver',
   'concepto-costo.ver',
   'desarrollo.ver',
-  'esma.cargo-validar',
   'esma.modificar',
   'esma.ver-pagos',
   'estado-lista.ver',
@@ -680,7 +691,6 @@ const ASISTENTE: readonly ClavePermiso[] = [
   'compras.ver',
   'concepto-costo.ver',
   'desarrollo.ver',
-  'esma.cargo-validar',
   'esma.modificar',
   'esma.ver-pagos',
   'estado-lista.ver',
@@ -747,10 +757,14 @@ const ASISTENTE: readonly ClavePermiso[] = [
  *
  * Hoy su lista es idéntica a la de Asistente (la restricción vieja —no modificar el precio de
  * maquila— ya se pierde en Logística). ⚠️ Es el perfil donde más se nota la herencia de la
- * cascada: conserva `compras.autorizar`, `esma.cargo-validar`, `pedidos.modificar`,
- * `notas.cancelar`, `inventario-pt.mover`, `telas.ver-totales` y `calidad.modificar-auditorias`
- * porque **nadie se los restó nunca**, no porque alguien lo decidiera. Cuando Daniel arme los
- * perfiles por puesto real, éste es el primero que hay que mirar.
+ * cascada: conserva `compras.autorizar`, `pedidos.modificar`, `notas.cancelar`,
+ * `inventario-pt.mover`, `telas.ver-totales` y `calidad.modificar-auditorias` porque **nadie se los
+ * restó nunca**, no porque alguien lo decidiera. Cuando Daniel arme los perfiles por puesto real,
+ * éste es el primero que hay que mirar.
+ *
+ * ✂️ Ya perdió `esma.cargo-validar` (fila 0.128): validar los cargos de maquila es de Daniel, no de
+ * un perfil clerical. Era el ejemplo con el que se explicaba el defecto de la cascada — y el
+ * primero en corregirse.
  */
 const SECRETARIAL: readonly ClavePermiso[] = [
   'admin.ver-bitacora',
@@ -770,7 +784,6 @@ const SECRETARIAL: readonly ClavePermiso[] = [
   'compras.ver',
   'concepto-costo.ver',
   'desarrollo.ver',
-  'esma.cargo-validar',
   'esma.modificar',
   'esma.ver-pagos',
   'estado-lista.ver',

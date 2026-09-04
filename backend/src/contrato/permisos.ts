@@ -1031,12 +1031,36 @@ export const CATALOGO_PERMISOS = [
     descripcion: 'Capturar ajustes y traspasos de avíos (F4-E1, R4)',
   },
 
-  // ── Estados de cuenta de maquileros (EsMa, F3-E4) — permiso NUEVO de v2 ──────
+  // ── Estados de cuenta de maquileros (EsMa, F3-E4) — permisos NUEVOS de v2 ────
+  //
+  // ⭐ LOS DOS PERMISOS DE ESTA PAREJA SON «VALIDAR», Y VALIDAR ES DE DANIEL (fila 0.128,
+  // §Post-F9.192(1), 4-sep-2026):
+  //
+  // > *«La entrada la da la persona responsable de recibos o de producción. Pero la validación
+  // > sólo la doy yo. O sea, es UN permiso para meter lo recibido y OTRO para validarlo.»*
+  //
+  // La entrada ya tenía el suyo (`produccion.recibo`: capturar el recibo de maquila, que propone
+  // el cargo). Lo que faltaba era separar el otro lado en dos actos distintos:
+  //  • `esma.cargo-validar` — fijar la CANTIDAD y el PRECIO reales del cargo propuesto por el
+  //    recibo (la cola de validación). Ya existía como permiso propio desde F3-E4.
+  //  • `esma.revisar` — autorizar una PARTIDA capturada (abono / descuento / pago) para que entre
+  //    al saldo. Antes lo regía `esma.modificar`, el MISMO permiso que capturarla: quien capturaba
+  //    se auto-autorizaba, que es justo lo que Daniel prohibió.
+  //
+  // `esma.modificar` se quedó donde le toca: CAPTURAR abonos/descuentos y forzar el estatus
+  // «pagada» de una orden. Capturar no es validar.
   {
     clave: 'esma.cargo-validar',
     modulo: 'esma',
     descripcion:
       'Validar (o ajustar/cancelar) los cargos propuestos de EsMa desde los recibos (F3-E4)',
+  },
+  {
+    clave: 'esma.revisar',
+    modulo: 'esma',
+    descripcion:
+      'Revisar y autorizar partidas de maquila: convertir lo capturado en deuda o pago real ' +
+      '(desde la 0.115 sólo lo revisado suma al saldo). Sólo el dueño y su círculo',
   },
 
   // ── Notas de salida estructuradas (Módulo 5, F4-E5 — doc 03-Produccion §Notas de Salida; R4/R9) ──

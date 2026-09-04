@@ -189,3 +189,68 @@ describe('⭐ V1-E8b — `listas.aprobar` es la reja de los FACTORES (§Post-F9.
     expect(gerencial).not.toContain('listas.aprobar');
   });
 });
+
+/**
+ * ⭐ FILA 0.128 — **VALIDAR ES DE DANIEL; CAPTURAR LO RECIBIDO ES DE QUIEN RECIBE.**
+ *
+ * Daniel, 4-sep-2026 (§Post-F9.192(1)), textual:
+ *
+ * > *«La entrada la da la persona responsable de recibos o de producción. Pero **la validación
+ * > sólo la doy yo**. O sea, es **un permiso para meter lo recibido y otro para validarlo**.»*
+ *
+ * Son TRES permisos y hay que no confundirlos, porque dos se parecen mucho y el tercero es el que
+ * se colaba:
+ *
+ * | Permiso | Qué acto es | Quién |
+ * |---|---|---|
+ * | `produccion.recibo` | METER lo recibido de maquila (y proponer el cargo) | quien recibe: producción / almacén |
+ * | `esma.cargo-validar` | fijar la CANTIDAD y el PRECIO reales de ese cargo | **sólo el dueño y su círculo** |
+ * | `esma.revisar` | AUTORIZAR una partida capturada (abono/descuento/pago) para que entre al saldo | **sólo el dueño y su círculo** |
+ *
+ * 🔑 **Lo que hacía falta medir aquí, y no lo mide ningún otro archivo:** que `esma.modificar` —el
+ * permiso de CAPTURAR abonos y descuentos— siga bajando a los perfiles operativos **y que eso ya no
+ * les dé de regalo el poder de autorizarlos**. Hasta la 0.127 revisar exigía `esma.modificar`: quien
+ * capturaba se auto-autorizaba. Y desde la 0.115 sólo lo revisado suma al saldo, así que autorizar
+ * es exactamente el acto de convertir un renglón en deuda —o en pago— real.
+ */
+describe('⭐ fila 0.128 — validar es de Daniel; capturar lo recibido es de quien recibe', () => {
+  /** Los tres perfiles del dueño y la dirección: el "círculo" al que Daniel deja validar. */
+  const CIRCULO = ['AdministracionDireccion', 'Administrador', 'Directivo'];
+  /** Los perfiles operativos: capturan, no validan. */
+  const OPERATIVOS = ['Gerencial', 'Ventas', 'Logistica', 'Asistente', 'Secretarial'];
+
+  it.each(['esma.cargo-validar', 'esma.revisar'])(
+    '`%s` lo tienen EXACTAMENTE los tres roles del círculo, y nadie más',
+    (clave) => {
+      const conElPermiso = definirRoles()
+        .filter((r) => (r.permisos as string[]).includes(clave))
+        .map((r) => r.nombre)
+        .sort();
+      expect(conElPermiso).toEqual(CIRCULO);
+    },
+  );
+
+  it('⭐ los operativos SÍ capturan (`esma.modificar`) pero YA NO autorizan lo que capturan', () => {
+    // Las dos mitades juntas, que es lo que hace legible la decisión: si algún día alguien
+    // "simplifica" volviendo a un solo permiso, esta prueba dice en una línea qué se rompió.
+    for (const nombre of OPERATIVOS) {
+      const permisos = permisosDe(nombre);
+      expect(permisos, `${nombre} tiene que poder capturar abonos/descuentos`).toContain(
+        'esma.modificar',
+      );
+      expect(permisos, `${nombre} NO puede autorizar partidas`).not.toContain('esma.revisar');
+      expect(permisos, `${nombre} NO puede validar cargos de maquila`).not.toContain(
+        'esma.cargo-validar',
+      );
+    }
+  });
+
+  it('⭐ la ENTRADA no se tocó: quien recibe de maquila sigue siendo operativo', () => {
+    // La otra mitad de la frase de Daniel. Si al cerrar la validación se hubiera cerrado también
+    // la captura del recibo, el almacén se quedaría sin poder registrar lo que llega — que es
+    // exactamente lo contrario de lo que pidió.
+    for (const nombre of OPERATIVOS) {
+      expect(permisosDe(nombre), nombre).toContain('produccion.recibo');
+    }
+  });
+});
