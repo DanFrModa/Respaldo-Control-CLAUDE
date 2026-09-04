@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.111 · 4-sep-2026 · **en prueba** — **Validar es de Daniel**: capturar lo recibido es de quien recibe, y autorizarlo es otro permiso
+
+### Qué se puede hacer ahora que antes no
+
+- **Separar quién captura de quién valida.** Nace el permiso **«Revisar y autorizar partidas de maquila»**
+  (`esma.revisar`): el botón **Autorizar** del estado de cuenta —el paso que convierte un abono, un descuento o
+  un pago capturado en dinero real desde la 0.115— sólo lo tiene el círculo del dueño (administrador,
+  Administración/Dirección y Directivo). Capturar abonos y descuentos sigue siendo del permiso de siempre.
+- **Validar los cargos de maquila** (fijar cantidad y precio reales de un recibo, un corte o un empaque) también
+  queda en ese círculo: el permiso `esma.cargo-validar` se retira de los perfiles operativos (Gerencial, Ventas,
+  Logística, Asistente, Secretarial). Es lo que Daniel dictó: *«la entrada la da la persona responsable de
+  recibos o de producción. Pero la validación sólo la doy yo»*.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **El deploy necesita `SEED_ON_START=true`**: siembra el permiso nuevo y **quita** el de validar a los cinco
+  perfiles operativos. El seed sincroniza los roles de sistema (borra las ligas que sobran), así que no hace
+  falta migración de datos; un rol **personalizado** que tuviera el permiso lo conserva.
+- Quien no tiene el permiso **no ve** el botón Autorizar (no es un botón que truena).
+- La corrida semanal sigue creando pagos ya revisados bajo su propio permiso (`pagos.corrida-armar`, sólo
+  administrador), que es más estrecho, no una puerta lateral; el cierre de maquila (0.109) deja el descuento
+  capturado y hace falta autorizarlo aparte; el histórico migrado de Access entra ya revisado (transcribe un
+  hecho, sin permiso, fuera del API).
+- La puerta lateral de Cuentas por pagar («entrada sin factura» a un maquilero) ya estaba cerrada: sólo el
+  administrador.
+
+### Qué sigue pendiente o roto
+
+- **Confirmaciones de Daniel** (defaults construidos): el círculo que valida = administrador +
+  Administración/Dirección + Directivo (si debe ser sólo él, se mueven las dos claves a «sólo administrador»);
+  Gerencial deja de validar cargos de maquila; revisar partidas y validar cargos son **dos** permisos, no uno;
+  capturar abonos/descuentos sigue llegando hasta Secretarial.
+
 ## 0.110 · 4-sep-2026 · **en prueba** — ⭐ **Recibir contra la orden de compra ya hace nacer la deuda**: telas y avíos, una sola entrada para inventario y estado de cuenta
 
 ### Qué se puede hacer ahora que antes no
