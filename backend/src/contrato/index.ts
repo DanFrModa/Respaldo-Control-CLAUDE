@@ -2424,3 +2424,21 @@ export {
   type ConcentradoRenglon,
   type ConcentradoSalida,
 } from './esquemas/corrida-pago.js';
+
+// ── El documento para facturar (fila 0.118, §Post-F9.186(k)) ─────────────────────────────────────
+export {
+  MOTIVOS_NO_FACTURABLE,
+  QUIENES_DATO_FISCAL,
+  CAMPOS_FISCALES,
+  esquemaFaltanteFiscal,
+  esquemaDocumentoFacturacion,
+  esquemaDocumentoFacturacionSalida,
+  esquemaFacturabilidadRenglon,
+  type MotivoNoFacturable,
+  type QuienDatoFiscal,
+  type CampoFiscal,
+  type FaltanteFiscal,
+  type DocumentoFacturacion,
+  type DocumentoFacturacionSalida,
+  type FacturabilidadRenglon,
+} from './esquemas/documento-facturacion.js';

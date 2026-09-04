@@ -12136,6 +12136,31 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.196) — EL DOCUMENTO PARA FACTURAR (fila 0.118, 4-sep-2026, madrugada): seis defaults del lead que Daniel confirma o ajusta, y la ficha fiscal de la empresa
+
+**Contexto.** Daniel (§Post-F9.186(k)): *«nadie me factura si no le mando yo un documento con los datos con los que me tiene que facturar… no al revés. Y eso debe salir del sistema»*; el 4-sep: *«lo ideal es que facture lo que es en total. Por eso quedamos que nosotros le vamos a dar un documento con el que va a facturar»* y *«las facturas son sólo transferencias»*. La fila volvió a la V1 por su decisión («Está bien en la fase 1», §190 adenda). Se construyó como **impreso por PAGO** sobre la corrida semanal (0.113): el pago de maquila nace «a cuenta» y el de proveedor es un movimiento de CxP sin aplicaciones, así que hoy no hay forma honesta de desglosar por orden.
+
+**Lo que hace:** para cada renglón de una corrida **con factura**, pagado por **transferencia**, a un maquilero o proveedor, con la corrida **cerrada o ejecutada** y con la ficha fiscal completa de los dos lados, el sistema arma la hoja con la que el proveedor debe timbrar: receptor (FR Moda: razón social, RFC, régimen, CP fiscal, uso de CFDI), emisor (proveedor: razón social, RFC, régimen, CP de expedición), concepto (el del renglón o, si no trae, por rubro y semana), referencia, forma de pago 03, método PUE, MXN y la tabla subtotal / IVA / total. Si falta un dato de cualquiera de los dos lados, **no se emite y se dice qué falta y de quién** (REGLA 0-B: tolerar, avisar, jamás inventar). El PDF de la corrida completa trae delante la hoja de «no se emitieron».
+
+**Seis defaults construidos (Daniel confirma o ajusta; cada uno se cambia en un solo sitio):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿El `monto` de la corrida es total con IVA o subtotal? | **TOTAL con IVA** = lo que se transfiere; el documento lo parte hacia atrás (`subtotal = total / 1.16`, `iva = total − subtotal`, redondeo al centavo con `subtotal + iva === total` siempre). | `comun/iva.ts::desglosarIva`, nada más. |
+| b | ¿Se emite desde una corrida en borrador? | **No**: sólo cerrada o ejecutada (en borrador los montos se mueven). | Se quita la rama `estado` de `evaluarFacturabilidad`. |
+| c | Uso de CFDI cuando el proveedor no lo tiene capturado | **«G03 Gastos en general» impreso y marcado como SUGERIDO**; no bloquea (es un dato que declara el receptor). | Se agrega a la lista de faltantes y bloquea (una línea). |
+| d | Retenciones de IVA/ISR | **No se calculan**: retener cambia lo que se deposita y el monto ya es el depósito; el CFDI del proveedor las resta por su cuenta. | Decidir primero si el monto tecleado es antes o después de la retención (dinero, no código). |
+| e | Renglón en cero | **No factura** (`motivo: sinMonto`); ni sale en la relación ejecutable. | — |
+| f | Tasa de IVA | **16 %** (general; la franja fronteriza del 8 % no aplica). | `comun/iva.ts`. |
+
+**La ficha fiscal de la empresa.** `Empresa` sólo tenía RFC y razón social; un CFDI 4.0 exige del receptor también **régimen fiscal** y **código postal del domicilio fiscal**. Se agregaron (migración aditiva, nullable, sin backfill) y se capturan en Administración › Empresas. ⚠️ **Paso manual de Gabriel:** capturar los de FR Moda (están en la constancia de situación fiscal que Daniel subió el 4-sep). Hasta entonces no se emite ningún documento, y el sistema lo dice con esas palabras.
+
+**Decisiones técnicas del coder aceptadas por el lead:** el documento **no lleva número de cuenta** (se le manda al proveedor; lo bancario vive en la relación ejecutable) y el nombre del archivo PDF lleva folio + renglón, nunca el nombre del taller (repo público, correos reenviados); los datos fiscales se leen **al día**, no congelados (lo contrario le impediría timbrar a quien cambió de régimen), mientras el destino del dinero sí sigue congelado en el renglón; el botón sale **deshabilitado con tooltip**, no escondido; sin permisos nuevos (los del concentrado: ver corrida + ver importes).
+
+**Pendiente (alcance nuevo):** desglose por orden cuando el pago de maquila lleve aplicaciones; la lectura automática de la constancia (0.119) llenará estos datos sin teclearlos.
+
+---
+
 #### (Post-F9.195) — CORTE Y EMPAQUE SON SERVICIOS SOBRE LA ORDEN: cómo se construyó la fila 0.114 (lead, 4-sep-2026, madrugada; Daniel confirma o ajusta)
 
 **Contexto.** Daniel dictó la regla el 3-sep (§Post-F9.185(c)): *«en corte no necesitas mandar y recibir mercancía… sólo hay que poner su cantidad y precio para meterlo en la OP, pero no va y viene. Lo mismo el empaque… el empaque no toca el inventario»*; y la frontera (§185(b)): *«corte es parte de maquilas, no de proveedores: el monto a pagar sale de una orden»*. El repaso midió que el modelo ya distinguía las dos formas (`registrarCorte` crea la etapa con `idTipoProceso = NULL` y no toca inventario) pero nadie la había usado para el pago: el corte no escribía precio, no nacía cargo, y el empaque no existía.
