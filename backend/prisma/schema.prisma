@@ -5807,10 +5807,15 @@ model RecepcionCompraLinea {
   idOrdenCompraLinea Int              @map("id_orden_compra_linea")
   ordenCompraLinea   OrdenCompraLinea @relation(fields: [idOrdenCompraLinea], references: [id], onDelete: Restrict)
 
-  /// Cantidad recibida en UNIDAD DE CONSUMO (ya convertida: cantidadPresentación × factor, R1).
-  /// Para líneas de catálogo es lo que entró al kardex; para líneas libres es informativa.
+  /// Cantidad recibida en UNIDAD DE CONSUMO, la misma de la línea de OC (§Post-F9.97): NO hay
+  /// conversión ninguna — la dualidad presentación/consumo se retiró, y con ella el «× factor» que
+  /// esta línea describía. Para líneas de catálogo es lo que entró al kardex; para líneas libres es
+  /// informativa. Multiplicada por `costoUnit` da el importe que se le debe al proveedor (0.129).
   cantidadRecibida Decimal  @map("cantidad_recibida") @db.Decimal(14, 4)
-  /// Costo por unidad de consumo (precioPresentación ÷ factor, D1). NULL en líneas libres.
+  /// Costo por unidad de consumo con el que se RECIBIÓ (D1): el de la línea de OC, o el que quien
+  /// recibe corrigió (fila 0.129). Es el que valúa el kardex y el que hace el importe de la cuenta
+  /// por pagar. Desde la fila 0.129 los renglones LIBRES también lo llevan (no se inventarían, pero
+  /// se pagan); NULL sólo en los libres anteriores a esa fila (REGLA 0-B: no se reparan).
   costoUnit        Decimal? @map("costo_unit") @db.Decimal(12, 4)
 
   /// Cantidad del COMPLEMENTO (cardigan) recibida en esta línea de TELA (flujo NUEVO por color,

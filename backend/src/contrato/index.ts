@@ -757,6 +757,8 @@ export {
 
 // ── Recepción de compras (Módulo 3, F4-E3; doc 03-Produccion §OC; R7) ─────────
 export {
+  CLASES_DEUDA_RECEPCION,
+  esquemaDeudaRecepcion,
   esquemaRecepcionTelaColorEntrada,
   esquemaRecepcionLineaEntrada,
   esquemaRecepcionCrear,
@@ -768,6 +770,7 @@ export {
   type DatosRecepcionLineaEntrada,
   type DatosRecepcionCrear,
   type DatosRecepcionReversar,
+  type ClaseDeudaRecepcion,
   type RecepcionLineaSalida,
   type RecepcionSalida,
   type RecepcionesLista,

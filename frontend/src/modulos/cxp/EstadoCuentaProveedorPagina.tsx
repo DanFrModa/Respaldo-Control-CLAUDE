@@ -28,7 +28,14 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SelectorProveedor } from './SelectorProveedor';
-import { ETIQUETAS_ORIGEN_CXP, etiquetaOrigen, hoyISO, moneda } from './comun';
+import {
+  esSegmentoCxp,
+  ETIQUETAS_ORIGEN_CXP,
+  etiquetaOrigen,
+  hoyISO,
+  moneda,
+  type SegmentoCxp,
+} from './comun';
 
 /** ¿El renglón se puede cancelar? Solo los del MOTOR, no cancelados ni inversos (los EsMa no aquí). */
 function esCancelable(m: CxpEstadoCuentaMovimiento): boolean {
@@ -49,7 +56,7 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
   const puedeAdministrar = tienePermiso('cxp.administrar');
   const puedeFiscal = tienePermiso('terceros.fiscal');
 
-  const inicio = (location.state ?? null) as { idProveedor?: number } | null;
+  const inicio = (location.state ?? null) as { idProveedor?: number; segmento?: string } | null;
   const [idProveedor, setIdProveedor] = useState<number | null>(inicio?.idProveedor ?? null);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
@@ -57,7 +64,14 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
   // §Post-F9.57: el segmento CON/SIN factura es OPERATIVO (no exige `terceros.fiscal`, a diferencia
   // de la vista fiscal). Daniel: *"hay proveedores de avíos o de telas que puede pasar que algunas
   // cosas sean con factura y otras sin factura"*.
-  const [segmento, setSegmento] = useState<'todos' | 'con' | 'sin'>('todos');
+  //
+  // Arranca en el segmento con el que se venía mirando la BANDEJA (fila 0.132): si se entró desde el
+  // listado "Sin factura", el detalle abre en "sin" y no en "todo" — ver el estado de cuenta completo
+  // ahí haría creer que se le debe al proveedor más de lo que esa relación de pago va a cubrir.
+  const segmentoDeEntrada = inicio?.segmento;
+  const [segmento, setSegmento] = useState<SegmentoCxp>(
+    esSegmentoCxp(segmentoDeEntrada) ? segmentoDeEntrada : 'todos',
+  );
   const [pagina, setPagina] = useState(1);
 
   const [capturaAbierta, setCapturaAbierta] = useState(false);
@@ -187,7 +201,7 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
                   id="cxp-edc-segmento"
                   value={segmento}
                   onChange={(e) => {
-                    setSegmento(e.target.value as 'todos' | 'con' | 'sin');
+                    setSegmento(e.target.value as SegmentoCxp);
                     reiniciarPagina();
                   }}
                   data-testid="cxp-edc-segmento"

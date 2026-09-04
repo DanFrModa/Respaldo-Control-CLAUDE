@@ -11,13 +11,14 @@ import {
   useRecibir,
   useReversarRecepcion,
 } from '@/api/recepciones';
-import type { OrdenCompraLinea, Recepcion, RecepcionLineaEntrada } from '@/api/tipos';
+import type { OrdenCompra, OrdenCompraLinea, Recepcion, RecepcionLineaEntrada } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
 import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
@@ -43,6 +44,12 @@ interface CapturaRenglon {
   /** Cantidad de CUERPO a recibir (en la presentación de la OC). */
   cantidad: string;
   /**
+   * ⭐⭐ FILA 0.129 — PRECIO con el que se recibe. Arranca con el de la OC (Daniel: *"el precio
+   * debería de ser el de la OC"*) y se puede corregir si el proveedor mandó otro. Es lo que decide
+   * el importe de la cuenta por pagar, así que lo que se ve en pantalla es lo que se cobra.
+   */
+  precio: string;
+  /**
    * COLOR de la tela que llegó (B1: obligatorio en telas).
    * ⭐⭐ V1-E3u (§Post-F9.89): aquí decía *"la OC no lo define"* — ya lo define
    * (`OrdenCompraLinea.idTelaColor`). Sigue siendo obligatorio capturarlo porque manda **lo
@@ -55,6 +62,74 @@ interface CapturaRenglon {
   loteProveedor: string;
   /** Precio unitario del COMPLEMENTO (el cardigan tiene su propio precio; la OC trae uno solo). */
   precioComplemento: string;
+}
+
+/**
+ * ⭐⭐ FILA 0.129 — CÓMO QUEDÓ LA DEUDA de una recepción ya guardada, en una etiqueta. El servidor
+ * ya lo decidió (`deuda`, `dominio/terceros/cargo-de-entrada.ts`): aquí sólo se pinta, sin volver a
+ * razonar la regla en el cliente (A1).
+ *
+ * 🔴 AQUÍ NO SE FILTRA NADA (revisión de la 0.129). Esta pantalla escondía la etiqueta de las
+ * recepciones reversadas —`rec.reversada ? null : …`— porque el API contestaba `cargo-no-fiscal` de
+ * un cargo ya cancelado. Eso era la regla viviendo en la UI: cualquier otro consumidor del API leía
+ * una deuda que ya no existe. Ahora el servidor contesta `cancelada` y esta función se limita a no
+ * pintar chip para esa clase (el chip «Reversada» de la fila ya lo explica).
+ */
+function EtiquetaDeuda({
+  deuda,
+  importe,
+}: {
+  deuda: Recepcion['deuda'];
+  importe: number;
+}): React.JSX.Element | null {
+  if (deuda === 'cargo-no-fiscal') {
+    return <ChipEstado tono="info">Cargo {formatearMoneda(importe)}</ChipEstado>;
+  }
+  if (deuda === 'factura-pendiente') {
+    return <ChipEstado tono="warn">Factura pendiente</ChipEstado>;
+  }
+  if (deuda === 'en-entrada-de-tela') {
+    return <ChipEstado tono="neutro">Deuda en la entrada de tela</ChipEstado>;
+  }
+  // `cancelada` y `sin-importe`: no hay deuda que anunciar. La fila ya dice si está reversada.
+  return null;
+}
+
+/**
+ * ⭐⭐ FILA 0.129 — QUÉ VA A PASAR CON LA DEUDA al confirmar, dicho ANTES de confirmar.
+ *
+ * Daniel (§Post-F9.192): *"es la misma entrada que se ocupa tanto para inventario como para su
+ * estado de cuenta"* — si recibir mueve dinero, quien recibe tiene que saber qué está firmando. La
+ * REGLA la manda el servidor (`dominio/terceros/cargo-de-entrada.ts`); esto es su traducción a una
+ * frase, con los mismos tres desenlaces.
+ */
+function avisoDeLaDeuda(
+  modalidad: OrdenCompra['modalidadFacturaProveedor'],
+  proveedor: string,
+  importe: number,
+): { tono: 'cargo' | 'pendiente' | 'neutro'; texto: string } {
+  if (modalidad === 'sin-factura') {
+    return importe < 0.01
+      ? {
+          tono: 'neutro',
+          texto: `Sin importe: no nacerá ningún cargo en el estado de cuenta de ${proveedor}.`,
+        }
+      : {
+          tono: 'cargo',
+          texto:
+            `Nace un cargo SIN FACTURA por ${formatearMoneda(importe)} en el estado de cuenta ` +
+            `de ${proveedor}.`,
+        };
+  }
+  return {
+    tono: 'pendiente',
+    texto:
+      `Factura pendiente: no nace cargo todavía. La deuda de ${formatearMoneda(importe)} nacerá ` +
+      `cuando se importe el CFDI de ${proveedor} en Finanzas` +
+      (modalidad === 'no-definida'
+        ? ' (nadie ha capturado si este proveedor factura: revísalo en su catálogo).'
+        : '.'),
+  };
 }
 
 /**
@@ -178,6 +253,9 @@ export function RecepcionComprasPagina(): React.JSX.Element {
       inicial[linea.id] = {
         incluir: false,
         cantidad: '',
+        // El PRECIO sí nace con el de la OC (fila 0.129): es el dato que la orden ya sabe y que
+        // Daniel dijo que debe mandar. La CANTIDAD no, porque depende de lo ya recibido.
+        precio: String(linea.precio),
         idTelaColor: '',
         cantidadComplemento: '',
         precioComplemento: '',
@@ -233,6 +311,9 @@ export function RecepcionComprasPagina(): React.JSX.Element {
           // Sin dato del renglón (no debería pasar: el servidor devuelve TODOS), en blanco: la
           // cantidad la teclea quien recibe, nunca la adivina la pantalla.
           cantidad: pendiente === undefined ? '' : String(pendiente.pendiente),
+          // Fila 0.129: si quien recibe ya corrigió el precio, se respeta; si no, el de la OC.
+          precio:
+            base?.precio === undefined || base.precio === '' ? String(linea.precio) : base.precio,
           idTelaColor: base?.idTelaColor ?? '',
           cantidadComplemento: base?.cantidadComplemento ?? '',
           precioComplemento: base?.precioComplemento ?? '',
@@ -266,6 +347,26 @@ export function RecepcionComprasPagina(): React.JSX.Element {
         toast.error(`Captura una cantidad válida para "${descripcionMaterial(linea)}".`);
         return;
       }
+      // ⭐⭐ FILA 0.129 — el precio viaja SIEMPRE, aunque sea el de la OC: lo que se ve en pantalla
+      // (y el importe que la pantalla acaba de decir) es exactamente lo que se va a deber. Dejar
+      // que el servidor lo rellenara abriría la rendija de que la OC cambiara de precio entre que
+      // se abrió la pantalla y se confirmó.
+      //
+      // 🔴 VACÍO NO ES CERO (hallazgo de la revisión de la 0.129). `Number('')` es **0**: finito y
+      // no negativo, así que un campo borrado pasaba la guarda entera y se mandaba como $0 EN
+      // SILENCIO — el avío entraba al kardex valuado a 0 y la recepción quedaba "sin importe", sin
+      // que nadie dijera nada. Y no se arregla con `precio <= 0`: un CERO TECLEADO es legítimo
+      // (muestras, mercancía sin cargo) y tiene que poder mandarse. Por eso se mira el TEXTO antes
+      // de convertirlo: lo que se rechaza es que no haya precio, no que el precio sea cero.
+      if (r.precio.trim() === '') {
+        toast.error(`Captura un precio para "${descripcionMaterial(linea)}".`);
+        return;
+      }
+      const precio = Number(r.precio);
+      if (!Number.isFinite(precio) || precio < 0) {
+        toast.error(`Captura un precio válido para "${descripcionMaterial(linea)}".`);
+        return;
+      }
       if (tipoLinea(linea) === 'tela') {
         // B1: el color es OBLIGATORIO (el backend lo re-exige; aquí sólo evitamos el viaje).
         if (r.idTelaColor === '') {
@@ -277,6 +378,7 @@ export function RecepcionComprasPagina(): React.JSX.Element {
         lineas.push({
           idOrdenCompraLinea: linea.id,
           cantidad,
+          precioUnit: precio,
           telaColor: {
             idTelaColor: Number(r.idTelaColor),
             ...(r.cantidadComplemento.trim().length > 0 && Number.isFinite(complemento)
@@ -290,7 +392,7 @@ export function RecepcionComprasPagina(): React.JSX.Element {
           },
         });
       } else {
-        lineas.push({ idOrdenCompraLinea: linea.id, cantidad });
+        lineas.push({ idOrdenCompraLinea: linea.id, cantidad, precioUnit: precio });
       }
     }
     if (lineas.length === 0) {
@@ -337,6 +439,30 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     (s, l) => s + Number(captura[l.id]?.cantidad || 0),
     0,
   );
+
+  /** ⭐ Fila 0.129 — importe de UN renglón (cantidad × precio), o 0 si todavía no cuadra. */
+  function importeDeRenglon(idLinea: number): number {
+    const r = captura[idLinea];
+    const cantidad = Number(r?.cantidad ?? '');
+    const precio = Number(r?.precio ?? '');
+    if (!Number.isFinite(cantidad) || !Number.isFinite(precio)) return 0;
+    return cantidad * precio;
+  }
+
+  /**
+   * ⭐⭐ FILA 0.129 — LO QUE SE LE VA A DEBER AL PROVEEDOR con esta recepción. Se calcula aquí sólo
+   * para ENSEÑARLO antes de confirmar; quien manda es el servidor (A1), que recibe los mismos
+   * precios que se ven y vuelve a sumar.
+   */
+  const importeTotal = lineasIncluidas.reduce((s, l) => s + importeDeRenglon(l.id), 0);
+  const avisoDeuda =
+    ocSeleccionada === undefined || lineasIncluidas.length === 0
+      ? null
+      : avisoDeLaDeuda(
+          ocSeleccionada.modalidadFacturaProveedor,
+          ocSeleccionada.proveedor,
+          importeTotal,
+        );
   const puedeGuardar =
     puedeRecibir &&
     ocSeleccionada !== undefined &&
@@ -680,7 +806,44 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                                   data-testid={`rec-cant-${linea.id}`}
                                 />
                               </Field>
+                              {/* ⭐⭐ FILA 0.129 — EL PRECIO. Viene puesto con el de la OC y se
+                                  corrige si el proveedor mandó otro. Cuando difiere se resalta:
+                                  cambiar un precio es una decisión, no un descuido. */}
+                              <Field>
+                                <FieldLabel htmlFor={`rec-precio-${linea.id}`}>
+                                  Precio unitario
+                                </FieldLabel>
+                                <Input
+                                  id={`rec-precio-${linea.id}`}
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={r.precio}
+                                  onChange={(e) => actualizar(linea.id, { precio: e.target.value })}
+                                  disabled={!puedeRecibir}
+                                  data-testid={`rec-precio-${linea.id}`}
+                                  className={
+                                    Number(r.precio) === Number(linea.precio)
+                                      ? undefined
+                                      : 'border-warn text-warn'
+                                  }
+                                />
+                              </Field>
                             </div>
+                            <p
+                              className="text-xs text-muted-foreground"
+                              data-testid={`rec-importe-${linea.id}`}
+                            >
+                              Importe:{' '}
+                              <strong>{formatearMoneda(importeDeRenglon(linea.id))}</strong>
+                              {Number(r.precio) === Number(linea.precio) ? null : (
+                                <span className="text-warn">
+                                  {' '}
+                                  · precio distinto al de la OC (
+                                  {formatearMoneda(Number(linea.precio))})
+                                </span>
+                              )}
+                            </p>
                           </div>
                         ) : null}
                       </li>
@@ -688,10 +851,29 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                   })}
                 </ul>
 
+                {/* ⭐⭐ FILA 0.129 — QUÉ VA A PASAR CON LA DEUDA, dicho ANTES de confirmar. Daniel:
+                    *"es la misma entrada que se ocupa tanto para inventario como para su estado de
+                    cuenta"* — así que quien recibe tiene que saber qué está firmando. */}
+                {avisoDeuda === null ? null : (
+                  <p
+                    className={`rounded-md border p-2.5 text-xs ${
+                      avisoDeuda.tono === 'cargo'
+                        ? 'border-primary/40 bg-primary-soft'
+                        : avisoDeuda.tono === 'pendiente'
+                          ? 'border-warn/40 bg-warn-soft text-warn'
+                          : 'text-muted-foreground'
+                    }`}
+                    data-testid="rec-aviso-deuda"
+                  >
+                    {avisoDeuda.texto}
+                  </p>
+                )}
+
                 <div className="flex items-center justify-between gap-3 border-t pt-3">
                   <span className="text-sm text-muted-foreground">
-                    Renglones a recibir: <strong>{lineasIncluidas.length}</strong> · Total:{' '}
-                    <strong>{totalRecibir.toLocaleString('es-MX')}</strong>
+                    Renglones a recibir: <strong>{lineasIncluidas.length}</strong> · Cantidad:{' '}
+                    <strong>{totalRecibir.toLocaleString('es-MX')}</strong> · Importe:{' '}
+                    <strong data-testid="rec-importe-total">{formatearMoneda(importeTotal)}</strong>
                   </span>
                   <Button onClick={guardar} disabled={!puedeGuardar} data-testid="rec-guardar">
                     {recibir.isPending ? 'Recibiendo…' : 'Registrar recepción'}
@@ -737,6 +919,10 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                       ) : (
                         <ChipEstado tono="ok">Activa</ChipEstado>
                       )}
+                      {/* ⭐⭐ FILA 0.129 — cómo quedó la DEUDA de esta recepción, tal como la
+                          contesta el servidor. Sin condición: una reversada llega ya como
+                          `cancelada` y la etiqueta no se pinta sola. */}
+                      <EtiquetaDeuda deuda={rec.deuda} importe={rec.importe} />
                     </div>
                     {!rec.reversada && puedeRecibir ? (
                       <Button

@@ -5,7 +5,8 @@
  * hay ninguna ruta que lo edite.
  *
  * Endpoints (por la empresa activa = A9):
- *  • `GET  /cxp/por-pagar`                              (perm `cxp.ver`)         → bandeja + aging + resumen.
+ *  • `GET  /cxp/por-pagar`                              (perm `cxp.ver`)         → bandeja + aging + resumen
+ *    (con `segmento` = todos | con | sin factura: las filas Y el resumen son los de ESA relación de pago).
  *  • `GET  /cxp/proveedores/:id/estado-cuenta`          (perm `cxp.ver`)         → saldo + movimientos.
  *  • `GET  /cxp/proveedores/:id/estado-cuenta/impreso`  (perm `cxp.ver`)         → PDF (R9).
  *  • `POST /cxp/proveedores/:id/movimientos`            (perm `cxp.administrar`) → captura un movimiento.
@@ -81,7 +82,8 @@ export const rutasCxp: FastifyPluginCallbackZod = (app, _opciones, done) => {
     preHandler: app.conPermiso('cxp.ver'),
     schema: {
       tags: ['cxp'],
-      summary: 'Proveedores por pagar con su antigüedad de saldos (aging) + resumen',
+      summary:
+        'Proveedores por pagar con su antigüedad de saldos (aging) + resumen, por segmento de facturación',
       security: SEGURIDAD_SESION,
       querystring: esquemaBandejaCxpQuery,
       response: { 200: esquemaBandejaCxpSalida, ...respuestasError },

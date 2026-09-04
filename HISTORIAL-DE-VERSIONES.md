@@ -71,6 +71,70 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.110 · 4-sep-2026 · **en prueba** — ⭐ **Recibir contra la orden de compra ya hace nacer la deuda**: telas y avíos, una sola entrada para inventario y estado de cuenta
+
+### Qué se puede hacer ahora que antes no
+
+- **Recibir avíos contra una orden de compra y que la deuda nazca sola.** Al recibir, cada renglón trae el
+  **precio de la OC precargado** (se puede corregir si el proveedor cobró otro) y la cantidad se teclea a
+  mano, como pidió Daniel; la pantalla enseña el importe por renglón y el total, y **antes de confirmar dice
+  qué va a pasar con la deuda**: «nace un cargo sin factura por $X en su estado de cuenta», «factura
+  pendiente: la deuda nacerá al importar el CFDI en Finanzas», o «sin importe».
+- **La misma entrada alimenta el inventario y el estado de cuenta.** Un proveedor que **no factura** queda
+  debiéndose en Cuentas por pagar en el mismo acto de recibir (cargo no fiscal por lo capturado); uno que
+  **factura** queda como **«factura pendiente»** hasta que llegue su CFDI, exactamente como ya pasaba con
+  las telas. Los renglones libres de la OC (un flete, una maquila suelta) **también se deben**.
+- **Reversar una recepción cancela su cargo** (movimiento inverso auditado; nada se borra) y la recepción
+  queda marcada como «cancelada» en su etiqueta de deuda.
+- En el historial de recepciones cada una lleva su etiqueta de deuda: cargo, factura pendiente, sin
+  importe, o «en entrada de tela» (las que nacieron de una entrada de tela por factura ya tienen su cargo
+  por ese lado).
+
+### Qué cambió y puede sorprender
+
+- **El precio que se teclea al recibir es el que vale**: va al kardex como costo y al cargo. Si difiere del
+  de la OC, se acepta, se resalta en pantalla y la bitácora guarda los dos precios.
+- **La regla de «qué cargo nace de una entrada» vive en un solo sitio** y la usan tanto la entrada de tela
+  como la recepción de avíos: sin factura ⇒ cargo no fiscal; con factura o sin definir ⇒ pendiente del
+  CFDI. La entrada de tela se comporta igual que antes.
+- Un proveedor con modalidad **«ambos»** también espera el CFDI (no nace cargo al recibir): si en un caso
+  concreto no va a facturar, su deuda se captura como entrada sin factura en Finanzas.
+- Las recepciones capturadas **antes** de esta versión no tienen cargo y se quedan así (no se reparan
+  datos viejos).
+
+### Qué sigue pendiente o roto
+
+- **Confirmaciones de Daniel** (defaults ya construidos): los renglones libres cuentan en la deuda · con
+  factura o «ambos» ⇒ pendiente hasta el CFDI · el precio corregido se acepta sin bloquear y queda en la
+  bitácora · sin número de documento el cargo nace igual, con «(sin documento)».
+- La factura electrónica de avíos se sigue importando en Finanzas (esta puerta no sube XML); ligar ese
+  CFDI a la recepción que lo originó es alcance nuevo.
+
+## 0.109 · 4-sep-2026 · **en prueba** — **La bandeja de Cuentas por pagar en dos listados**: Todos · Con factura · Sin factura
+
+### Qué se puede hacer ahora que antes no
+
+- La bandeja del viernes («a quién le debo») tiene una **segunda fila de chips: Todos · Con factura · Sin
+  factura**. Al elegir una, **la tabla, los totales y la antigüedad se recalculan en el servidor sólo para
+  esa relación**: cartera, vencido, cubetas por días y proveedores con saldo. Son dos relaciones de pago
+  distintas (así se paga: una corrida con factura y otra sin), y ahora se ven por separado.
+- El segmento viaja en la dirección de la pantalla (`?segmento=sin`), así que se puede guardar como
+  marcador y abrir directo el viernes.
+- Al entrar desde la bandeja al **estado de cuenta** de un proveedor, la pantalla abre ya en la misma
+  relación que se estaba viendo, y su PDF sale en esa relación.
+
+### Qué cambió y puede sorprender
+
+- **«Sin factura» incluye lo que quedó sin definir** (lo migrado de Access sin modalidad y los cargos de
+  maquila sin marca de factura): es el mismo criterio único que ya usaban el estado de cuenta y la corrida
+  semanal, y **Con factura + Sin factura suma exactamente Todos** en cartera y maquila. El **vencido** se calcula
+  dentro de cada relación: un pago sin factura no rebaja lo vencido de la relación con factura (ni al revés).
+- «Todos» sigue siendo lo de siempre; los chips viejos «Con saldo / Todos» no cambian.
+
+### Qué sigue pendiente o roto
+
+- Nada nuevo. Sin migración, sin permisos, sin re-seed.
+
 ## 0.108 · 4-sep-2026 · **en prueba** — ⭐ **El documento para facturar**: «yo te digo qué facturarme», con el IVA a la vista
 
 ### Qué se puede hacer ahora que antes no

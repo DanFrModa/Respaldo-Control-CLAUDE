@@ -499,6 +499,21 @@ export const esquemaCompraSalida = z
     estatus: esquemaEstatusOrdenCompra,
     idProveedor: z.number().int().describe('Proveedor.'),
     proveedor: z.string().describe('Nombre del proveedor (para la UI).'),
+    /**
+     * ⭐⭐ FILA 0.129 — ¿ESTE PROVEEDOR FACTURA? Es lo que decide qué pasa con la deuda al RECIBIR
+     * (`dominio/terceros/cargo-de-entrada.ts`), y la pantalla de recepción lo tiene que poder decir
+     * ANTES de confirmar: *"nace un cargo sin factura por $X"* o *"factura pendiente"*.
+     *
+     * Se DERIVA de `Proveedor.modalidadFacturacion` con `emiteFactura()` —la única fuente desde la
+     * fila 0.124—: `solo_sin` ⇒ `sin-factura`; `solo_con`/`ambos` ⇒ `factura`; NULL ⇒ `no-definida`
+     * (los migrados de Access, a los que nadie se lo preguntó). Viaja ya traducido para que la
+     * pantalla no repita la regla: quién factura lo decide el servidor, en un solo lugar (A1).
+     */
+    modalidadFacturaProveedor: z
+      .enum(['factura', 'sin-factura', 'no-definida'])
+      .describe(
+        '¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).',
+      ),
     fecha: z.iso.date().nullable().describe('Fecha de emisión (YYYY-MM-DD), o null.'),
     fechaEntrega: z.iso.date().nullable().describe('Fecha de entrega esperada, o null.'),
     idDireccionEntrega: z

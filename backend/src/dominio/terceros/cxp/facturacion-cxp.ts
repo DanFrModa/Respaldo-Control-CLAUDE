@@ -20,11 +20,15 @@
  * equipara los dos conceptos al proyectar EsMa sobre el libro unificado
  * (`convivencia-esma.ts`: `esFiscal: conFactura === true`). Cero migración.
  */
-import type { OrigenMovimientoCxpClave } from '../../../contrato/index.js';
+import type {
+  OrigenMovimientoCxpClave,
+  SegmentoFacturacionClave,
+} from '../../../contrato/index.js';
 import type { ModalidadFacturacion } from '../../../datos/index.js';
 
 import { ErrorValidacion } from '../../../comun/errores.js';
 import { resolverConFactura } from '../../esma/facturacion.js';
+import type { SegmentoFactura } from '../../esma/formula-saldo.js';
 
 /**
  * Orígenes de CxP que son SIN FACTURA por definición, dijera lo que dijera la modalidad del
@@ -71,6 +75,19 @@ export function resolverSegmentoCxp(
  * Cláusula `where` del segmento sobre `MovimientoTercero.esFiscal`. `todos` no filtra nada.
  * Espejo exacto del `conFacturaWhere` del estado de cuenta de EsMa.
  */
-export function segmentoWhere(segmento: 'todos' | 'con' | 'sin'): { esFiscal?: boolean } {
+export function segmentoWhere(segmento: SegmentoFacturacionClave): { esFiscal?: boolean } {
   return segmento === 'todos' ? {} : { esFiscal: segmento === 'con' };
+}
+
+/**
+ * Traduce el segmento del CONTRATO (`todos` | `con` | `sin`) al del motor de CARTERA
+ * (`SegmentoFactura | undefined`, donde `undefined` = no segmentar). Existe para que la partición
+ * de Daniel viaje como UN PARÁMETRO y nadie vuelva a escribir el criterio «con/sin» por su cuenta:
+ * la bandeja de CxP (fila 0.132) y la corrida semanal de pagos (fila 0.113) piden la MISMA cartera
+ * a `carteraCombinadaPorProveedor`, que a su vez aplica en cada fuente su definición única
+ * (`es_fiscal` en el motor; `con_factura` de EsMa vía `formula-saldo.ts`, donde el «sin» incluye lo
+ * migrado sin definir). Es la misma traducción que `convivencia-esma.ts` ya hacía para EsMa.
+ */
+export function segmentoCartera(segmento: SegmentoFacturacionClave): SegmentoFactura | undefined {
+  return segmento === 'todos' ? undefined : segmento;
 }
