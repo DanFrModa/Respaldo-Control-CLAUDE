@@ -26,7 +26,7 @@ import type {
 import { ErrorConflicto } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import type { ClavePermiso } from '../../contrato/index.js';
+import type { CargoEsMaSalida, ClavePermiso } from '../../contrato/index.js';
 import {
   cancelarReciboMaquila,
   pendientesPorRecibir,
@@ -130,6 +130,25 @@ async function sembrarTiposMovimiento(): Promise<void> {
 }
 
 /** Corta Rojo CH 10 + M 20 (todo lo pedido). */
+/**
+ * ⭐ fila 0.114 — LOS CARGOS DE **MAQUILA**, sin el que dejó el corte.
+ *
+ * Desde 0.114 **todo corte genera su propio `EsMaCargo`** (`servicio: 'corte'`), porque el cortador
+ * se paga desde la orden igual que un maquilero. Como casi todos los escenarios de este archivo
+ * arrancan con `cortarBase()`, contar cargos «a secas» dejó de medir lo que estas pruebas quieren
+ * medir: preguntan por lo que produce EL RECIBO. `servicio === null` es exactamente eso — la marca
+ * de un cargo de maquila (el CHECK `esma_cargo_proceso_o_servicio` garantiza que uno de los dos
+ * está lleno). Filtrar NO debilita nada: el conteo esperado sigue siendo el mismo número de antes.
+ */
+function cargosDeMaquila(filas: readonly CargoEsMaSalida[]): CargoEsMaSalida[] {
+  return filas.filter((f) => f.servicio === null);
+}
+
+/** fila 0.114 — Los cargos que dejó un CORTE (para afirmar que existen, no sólo descartarlos). */
+function cargosDeCorte(filas: readonly CargoEsMaSalida[]): CargoEsMaSalida[] {
+  return filas.filter((f) => f.servicio === 'corte');
+}
+
 async function cortarBase(): Promise<void> {
   await registrarCorte(
     sesion(),
@@ -247,10 +266,15 @@ describe('Recibo de COSTURA (F3-E4)', () => {
 
     // (3) Cargo EsMa propuesto: cantidad propuesta = 10, precio = 8.
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    expect(cola.filas).toHaveLength(1);
-    expect(cola.filas[0]?.cantidadPropuesta).toBe(10);
-    expect(cola.filas[0]?.precioPropuesto).toBe(8);
-    expect(cola.filas[0]?.importePropuesto).toBe(80);
+    // fila 0.114: en la cola hay DOS cargos —el del corte de `cortarBase()` y el de este recibo—; se
+    // afirman los dos por separado, que dice más que el «uno» de antes.
+    expect(cargosDeCorte(cola.filas)).toHaveLength(1);
+    const deMaquila = cargosDeMaquila(cola.filas);
+    expect(deMaquila).toHaveLength(1);
+    expect(deMaquila[0]?.idEtapaRecibo).toBe(recibo.id);
+    expect(deMaquila[0]?.cantidadPropuesta).toBe(10);
+    expect(deMaquila[0]?.precioPropuesto).toBe(8);
+    expect(deMaquila[0]?.importePropuesto).toBe(80);
 
     // WIP baja pendiente: ya no queda nada por recibir de costura en CH.
     const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
@@ -351,8 +375,12 @@ describe('Recibo de ESTAMPADO (F3-E4)', () => {
 
     // SÍ hay cargo EsMa propuesto.
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    expect(cola.filas).toHaveLength(1);
-    expect(cola.filas[0]?.tipoProceso).toBe('Estampado');
+    // fila 0.114: el cargo del corte también está en la cola; el de MAQUILA es el de este recibo.
+    expect(cargosDeCorte(cola.filas)).toHaveLength(1);
+    const deMaquila = cargosDeMaquila(cola.filas);
+    expect(deMaquila).toHaveLength(1);
+    expect(deMaquila[0]?.idEtapaRecibo).toBe(recibo.id);
+    expect(deMaquila[0]?.tipoProceso).toBe('Estampado');
   });
 });
 
@@ -657,8 +685,13 @@ describe('recibido ≤ enviado y atomicidad (F3-E4)', () => {
     expect(recibos).toBe(0);
     const movs = await cliente.movimiento.count({ where: { idEmpresa: empresa.id } });
     expect(movs).toBe(0);
-    const cargos = await cliente.esMaCargo.count({ where: { idEmpresa: empresa.id } });
+    // fila 0.114: lo que NO se escribió es el cargo del RECIBO (`servicio: null` = maquila); el del
+    // corte sí está, y tiene que estar — su transacción cerró antes y nada la revierte.
+    const cargos = await cliente.esMaCargo.count({
+      where: { idEmpresa: empresa.id, servicio: null },
+    });
     expect(cargos).toBe(0);
+    expect(await cliente.esMaCargo.count({ where: { servicio: 'corte' } })).toBe(1);
   });
 
   it('(c2) atomicidad REAL — un fallo TARDÍO (en esMaCargo.create) revierte recibo + kardex ya escritos', async () => {
@@ -705,8 +738,15 @@ describe('recibido ≤ enviado y atomicidad (F3-E4)', () => {
     expect(movs).toBe(0);
     const detalles = await cliente.movimientoDetPt.count();
     expect(detalles).toBe(0);
-    const cargos = await cliente.esMaCargo.count({ where: { idEmpresa: empresa.id } });
+    // fila 0.114: el espía sobre `esMaCargo.create` se instala DESPUÉS de `cortarBase()` y sólo se
+    // le pasa a `registrarReciboMaquila`, así que el create que truena es el del RECIBO — la
+    // atomicidad que mide esta prueba es la de siempre. Lo que cambia es el conteo: el cargo del
+    // corte quedó COMITEADO en su propia transacción y el rollback del recibo NO puede llevárselo.
+    const cargos = await cliente.esMaCargo.count({
+      where: { idEmpresa: empresa.id, servicio: null },
+    });
     expect(cargos).toBe(0);
+    expect(await cliente.esMaCargo.count({ where: { servicio: 'corte' } })).toBe(1);
     // La existencia sigue en 0 (la entrada a PT se revirtió con el resto).
     const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
     expect(existencias.totalExistencia).toBe(0);
@@ -777,7 +817,10 @@ describe('Cancelación de recibos (F3-E4)', () => {
 
     // El cargo EsMa quedó cancelado.
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    expect(cola.filas).toHaveLength(0);
+    // fila 0.114: se cancela el del RECIBO, NO el del corte — cancelar un recibo no le quita al
+    // cortador lo que ya cortó. Por eso el filtro y la afirmación de que el otro sigue propuesto.
+    expect(cargosDeMaquila(cola.filas)).toHaveLength(0);
+    expect(cargosDeCorte(cola.filas)).toHaveLength(1);
 
     // El pendiente por recibir vuelve a 10 (el recibo cancelado deja de contar).
     const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
@@ -928,7 +971,9 @@ describe('Cola de validación EsMa y recibos semanales (F3-E4)', () => {
       bd(),
     );
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    const idCargo = cola.filas[0]?.id as number;
+    // fila 0.114: se valida el cargo del RECIBO, no el del corte que dejó `cortarBase()` (antes
+    // `filas[0]` era el único; ahora hay dos y tomar el primero sería una lotería por `creadoEn`).
+    const idCargo = cargosDeMaquila(cola.filas)[0]?.id as number;
 
     const validado = await validarCargoEsMa(
       sesion(),
@@ -943,7 +988,9 @@ describe('Cola de validación EsMa y recibos semanales (F3-E4)', () => {
 
     // Ya no está en la cola de propuestos.
     const propuestos = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    expect(propuestos.filas).toHaveLength(0);
+    // fila 0.114: el que salió de la cola es el de MAQUILA; validar uno no valida el del corte.
+    expect(cargosDeMaquila(propuestos.filas)).toHaveLength(0);
+    expect(cargosDeCorte(propuestos.filas)).toHaveLength(1);
   });
 
   it('agrupa recibos semanales por maquilero con su calidad', async () => {
@@ -1175,10 +1222,12 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
 
     // (3) NO SE PAGAN: el cargo propone 8 × $8 = $64, y las incompletas viajan aparte.
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    expect(cola.filas).toHaveLength(1);
-    expect(cola.filas[0]?.cantidadPropuesta).toBe(8);
-    expect(cola.filas[0]?.importePropuesto).toBe(64);
-    expect(cola.filas[0]?.incompletas).toBe(2);
+    // fila 0.114: el cargo que se mide es el del RECIBO (el del corte también está en la cola).
+    const deMaquila = cargosDeMaquila(cola.filas);
+    expect(deMaquila).toHaveLength(1);
+    expect(deMaquila[0]?.cantidadPropuesta).toBe(8);
+    expect(deMaquila[0]?.importePropuesto).toBe(64);
+    expect(deMaquila[0]?.incompletas).toBe(2);
 
     // (4) NO CUENTAN COMO PRODUCIDAS: el WIP dice recibido 8 de 10 enviadas.
     const wip = await wipDeOrden(sesion(), idOrden, bd());
@@ -1250,8 +1299,10 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     expect(recibo.totalPiezas).toBe(0);
     expect(recibo.totalIncompletas).toBe(3);
     // Nada que pagar: la cola de validación NO se ensucia con un cargo de cantidad 0.
+    // fila 0.114: se mira SÓLO el cargo de maquila — el del corte sí existe y no tiene nada que ver
+    // con esta regla (el cortador cortó 30 piezas; lo que no se paga es la maquila de las 3 incompletas).
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    expect(cola.filas).toHaveLength(0);
+    expect(cargosDeMaquila(cola.filas)).toHaveLength(0);
     // Ni almacén hizo falta (no metió nada a inventario) ni se creó movimiento de kardex.
     expect(recibo.idMovimientoEntrada).toBeNull();
     const movs = await cliente.movimiento.count({ where: { origenTipo: 'recibo-maquila' } });
@@ -1285,7 +1336,9 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
 
     // Y no quedó rastro: ni recibo, ni kardex, ni cargo (A2).
     expect(await cliente.etapaMovimiento.count({ where: { tipo: 'recibo_maquila' } })).toBe(0);
-    expect(await cliente.esMaCargo.count()).toBe(0);
+    // fila 0.114: «ni cargo» es «ni cargo DE MAQUILA»; el del corte de `cortarBase()` sigue vivo.
+    expect(await cliente.esMaCargo.count({ where: { servicio: null } })).toBe(0);
+    expect(await cliente.esMaCargo.count({ where: { servicio: 'corte' } })).toBe(1);
   });
 
   it('MUTACIÓN «la que la QUITA», acumulada: las incompletas YA entregadas consumen el pendiente', async () => {
