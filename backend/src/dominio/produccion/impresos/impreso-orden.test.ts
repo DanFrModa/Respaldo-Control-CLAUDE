@@ -10,6 +10,7 @@
  *  • `textoTelaComprada` — el texto de la TELA a partir de las OC ligadas (dedup + folios).
  *  • `descargarImagenComoDataUrl` — best-effort (un fallo de red → `null`, no truena).
  */
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ErrorNoEncontrado } from '../../../comun/errores.js';
@@ -26,6 +27,8 @@ import type { ArteOrdenFotosImpreso } from '../fotos-arte-orden.js';
 import {
   armarDatosImpresoOrden,
   armarTabla,
+  bloqueArtes,
+  bloqueFotos,
   descargarImagenComoDataUrl,
   generarPdfOrden,
   generarPdfOrdenes,
@@ -142,7 +145,9 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
     listaArte: [{ descripcion: 'Logo pecho', tipoArte: 'Bordado' }],
     habilitacion: [{ clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 }],
     fotos: [],
+    fotosOcultas: 0,
     artes: [],
+    artesOcultas: 0,
     ...over,
   };
 }
@@ -384,7 +389,7 @@ describe('generarPdfOrden', () => {
       ...(i === 4 ? { principal: true } : {}),
     }));
 
-    expect(recortarFotos(fotos)).toEqual([fotos[4], fotos[0], fotos[1]]);
+    expect(recortarFotos(fotos).mostradas).toEqual([fotos[4], fotos[0], fotos[1]]);
 
     const buffer = await generarPdfOrden({ ...densa, fotos });
     expect(paginasPdf(buffer)).toBe(1);
@@ -459,15 +464,120 @@ describe('recortarFotos', () => {
 
   it('deja hasta MAX_FOTOS y conserva el orden cuando no hay principal marcada', () => {
     const fotos = Array.from({ length: 5 }, (_, i) => foto(i));
-    expect(recortarFotos(fotos)).toEqual(fotos.slice(0, MAX_FOTOS));
+    expect(recortarFotos(fotos).mostradas).toEqual(fotos.slice(0, MAX_FOTOS));
   });
 
   it('sube la foto PRINCIPAL al frente y nunca la deja fuera del tope', () => {
     const fotos = [foto(0), foto(1), foto(2), { ...foto(3), principal: true }];
-    const mostradas = recortarFotos(fotos);
+    const { mostradas } = recortarFotos(fotos);
     expect(mostradas).toHaveLength(MAX_FOTOS);
     expect(mostradas[0]?.titulo).toBe('Foto 3');
     expect(mostradas.slice(1).map((f) => f.titulo)).toEqual(['Foto 0', 'Foto 1']);
+  });
+
+  // ⭐ 0.106 — el bloque de fotos no tiene título donde avisar, pero el conteo ya no se pierde:
+  // sale de aquí y el impreso lo pinta al final de la fila (0 pt de altura).
+  it('⭐ cuenta las que quedaron fuera del tope (antes se perdían sin decirlo)', () => {
+    const fotos = Array.from({ length: 5 }, (_, i) => foto(i));
+    expect(recortarFotos(fotos).ocultas).toBe(5 - MAX_FOTOS);
+    expect(recortarFotos(fotos.slice(0, 2)).ocultas).toBe(0);
+  });
+});
+
+/*
+ * ⭐⭐ 0.106 — QUÉ DICE EL PAPEL CUANDO NO PUDO ENSEÑAR UNA IMAGEN.
+ *
+ * Se prueba sobre el ÁRBOL de elementos (como la ficha de arte de la 0.094), no sobre el PDF ya
+ * renderizado: el texto del hueco y el conteo del título son decisiones, y así se leen sin
+ * depender de cómo `@react-pdf/renderer` acomode los glifos.
+ */
+describe('bloqueFotos / bloqueArtes — el papel dice lo que no pudo enseñar', () => {
+  const pintado = (bloque: ReactElement | null): string => JSON.stringify(bloque);
+
+  it('🔑 sin fotos y sin artes NO se pinta nada: el impreso de siempre', () => {
+    expect(bloqueFotos(datosBase())).toBeNull();
+    expect(bloqueArtes(datosBase())).toBeNull();
+  });
+
+  it('🔑 con todo en su sitio no aparece ni el aviso del hueco ni el del recorte', () => {
+    const datos = datosBase({
+      fotos: [{ dataUrl: PNG_1X1, principal: true }],
+      artes: [{ dataUrl: PNG_1X1, titulo: 'Logo pecho' }],
+    });
+    expect(pintado(bloqueFotos(datos))).not.toContain('no se pudo traer');
+    expect(pintado(bloqueFotos(datos))).not.toContain('se muestran');
+    expect(pintado(bloqueArtes(datos))).toContain('Artes (imágenes)');
+    expect(pintado(bloqueArtes(datos))).not.toContain('se muestran');
+    expect(pintado(bloqueArtes(datos))).not.toContain('no se pudo traer');
+  });
+
+  it('🔴 una foto del modelo que no llegó pinta el HUECO y LO DICE', () => {
+    const datos = datosBase({ fotos: [{ dataUrl: null, principal: true }] });
+    expect(pintado(bloqueFotos(datos))).toContain('no se pudo traer');
+  });
+
+  it('🔴 una foto de arte que no llegó pinta el HUECO con SU rótulo', () => {
+    const datos = datosBase({ artes: [{ dataUrl: null, titulo: 'Estampa espalda' }] });
+    const bloque = pintado(bloqueArtes(datos));
+    expect(bloque).toContain('no se pudo traer');
+    expect(bloque).toContain('Estampa espalda');
+  });
+
+  it('🔴 el TÍTULO de artes cuenta sobre lo PEDIDO (lo recortado antes de bajar incluido)', () => {
+    const artes = Array.from({ length: MAX_ARTES }, (_, i) => ({
+      dataUrl: PNG_1X1,
+      titulo: `Arte ${String(i)}`,
+    }));
+    // 4 impresas + 2 que el tope dejó fuera ANTES de bajarlas = las 6 que la orden pide.
+    expect(pintado(bloqueArtes(datosBase({ artes, artesOcultas: 2 })))).toContain(
+      `se muestran ${String(MAX_ARTES)} de 6`,
+    );
+  });
+
+  it('el CINTURÓN del render sigue capando si le pasan más de la cuenta (y lo dice)', () => {
+    // Nadie debería armar los datos así (el tope va antes de bajar), pero si pasa, ni desborda la
+    // hoja ni miente: 9 imágenes → se pintan MAX_ARTES y el título cuenta las 9.
+    const artes = Array.from({ length: 9 }, (_, i) => ({
+      dataUrl: PNG_1X1,
+      titulo: `Arte ${String(i)}`,
+    }));
+    expect(pintado(bloqueArtes(datosBase({ artes })))).toContain(
+      `se muestran ${String(MAX_ARTES)} de 9`,
+    );
+  });
+
+  it('🔴 las fotos recortadas se dicen en la FILA (el bloque no tiene título donde avisarlo)', () => {
+    const fotos = Array.from({ length: MAX_FOTOS }, () => ({ dataUrl: PNG_1X1 }));
+    expect(pintado(bloqueFotos(datosBase({ fotos, fotosOcultas: 5 })))).toContain(
+      `se muestran ${String(MAX_FOTOS)} de 8`,
+    );
+  });
+
+  // 🔴 Las DOS mitades del conteo de la fila: lo que el tope dejó fuera ANTES de bajar
+  // (`fotosOcultas`) y lo que recorta el CINTURÓN del render al recibir más de la cuenta. El caso
+  // de arriba pasa exactamente MAX_FOTOS, así que la segunda mitad quedaba sin probar y sumarla
+  // podía borrarse sin que ninguna prueba se pusiera roja.
+  it('🔴 el aviso suma lo recortado ANTES de bajar Y lo que capa el cinturón del render', () => {
+    const fotos = Array.from({ length: 5 }, () => ({ dataUrl: PNG_1X1 }));
+    // 3 impresas + 2 que capa el cinturón + 2 que el tope dejó fuera antes de bajar = las 7 pedidas.
+    expect(pintado(bloqueFotos(datosBase({ fotos, fotosOcultas: 2 })))).toContain(
+      `se muestran ${String(MAX_FOTOS)} de 7`,
+    );
+  });
+
+  it('el presupuesto de altura aguanta: densa con HUECOS y avisos sigue en UNA página', async () => {
+    const densa = ordenDensa(MAX_ARTES);
+    const buffer = await generarPdfOrden({
+      ...densa,
+      // Lo peor que puede pasarle a la hoja: huecos (con su texto) en los dos bloques y los dos
+      // avisos de recorte a la vez.
+      fotos: [{ dataUrl: null, principal: true }, { dataUrl: PNG_1X1 }, { dataUrl: null }],
+      fotosOcultas: 4,
+      artes: densa.artes.map((arte, i) => (i % 2 === 0 ? { ...arte, dataUrl: null } : arte)),
+      artesOcultas: 5,
+    });
+    expect(esPdf(buffer)).toBe(true);
+    expect(paginasPdf(buffer)).toBe(1);
   });
 });
 
@@ -734,7 +844,9 @@ describe('armarDatosImpresoOrden', () => {
     expect(datos.fotos).toHaveLength(1);
   });
 
-  it('descarta fotos que no se pudieron descargar (best-effort) y conserva las buenas', async () => {
+  // ⭐ 0.106 — la foto que no se pudo bajar YA NO se descarta: deja su HUECO. El papel va a piso y
+  // no puede parecer completo cuando le falta una imagen que la orden sí manda.
+  it('una foto del modelo que no se pudo bajar deja HUECO (el PDF sale igual)', async () => {
     const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const fotos = [
       { urlDescarga: 'https://r2/ok' },
@@ -752,7 +864,12 @@ describe('armarDatosImpresoOrden', () => {
     );
 
     // La primera foto del modelo es la PRINCIPAL (Daniel, jul-2026) y viene marcada como tal.
-    expect(datos.fotos).toEqual([{ dataUrl: 'data:image/jpeg;base64,AAAA', principal: true }]);
+    expect(datos.fotos).toEqual([
+      { dataUrl: 'data:image/jpeg;base64,AAAA', principal: true },
+      { dataUrl: null },
+    ]);
+    // Nada quedó fuera por el tope: lo que falta es una descarga caída, no un recorte.
+    expect(datos.fotosOcultas).toBe(0);
     // El PDF se genera igual con la foto buena (y sin truncar por la faltante).
     const buffer = await generarPdfOrden(datos);
     expect(esPdf(buffer)).toBe(true);
@@ -1085,7 +1202,7 @@ describe('armarDatosImpresoOrden', () => {
     expect(descargarImagen).not.toHaveBeenCalledWith('https://r2/ficha.pdf');
   });
 
-  it('descarta artes que no se pudieron descargar (best-effort, el PDF sale igual)', async () => {
+  it('un arte que no se pudo descargar deja HUECO (best-effort, el PDF sale igual)', async () => {
     const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const adjuntos = [
       adjunto({ idArchivo: 'a1', urlDescarga: 'https://r2/ok' }),
@@ -1102,7 +1219,8 @@ describe('armarDatosImpresoOrden', () => {
       depsCon(ordenSalida(), bom, [], descargarImagen, adjuntos),
     );
 
-    expect(datos.artes).toEqual([{ dataUrl: PNG_1X1 }]);
+    expect(datos.artes).toEqual([{ dataUrl: PNG_1X1 }, { dataUrl: null }]);
+    expect(datos.artesOcultas).toBe(0);
     const buffer = await generarPdfOrden(datos);
     expect(esPdf(buffer)).toBe(true);
   });
@@ -1258,10 +1376,11 @@ describe('armarDatosImpresoOrden', () => {
     ]);
   });
 
-  it('⭐ un ARTE con VARIAS fotos: todas se incrustan, y el tope reparte por rondas', async () => {
+  it('⭐ un ARTE con VARIAS fotos: el tope reparte por rondas y cuenta las que deja fuera', async () => {
     // V1-E3f (§Post-F9.52 punto 5): las fotos del arte son plurales. Dos cosas que fijar aquí:
-    //  1. las N fotos de un arte SÍ se incrustan (antes solo cabía una);
-    //  2. con el tope de la rejilla, un arte con muchas fotos NO expulsa a los demás artes.
+    //  1. un arte con muchas fotos NO expulsa a los demás artes (reparto por rondas);
+    //  2. 0.106: el tope ya viene aplicado en los datos —no se bajan las que no se imprimen— y lo
+    //     que quedó fuera se cuenta sobre lo PEDIDO (7), que es lo que el título dirá.
     const bom: BomModelo = {
       telas: [],
       avios: [],
@@ -1276,21 +1395,25 @@ describe('armarDatosImpresoOrden', () => {
       ],
     };
 
+    const descargarImagen = vi.fn((url: string) => Promise.resolve(`data:img;${url}`));
     const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
-      ...depsCon(ordenSalida(), bom, [], (url) => Promise.resolve(`data:img;${url}`)),
+      ...depsCon(ordenSalida(), bom, [], descargarImagen),
       archivos: archivosQuePresignan(),
     });
 
-    // Las SIETE fotos llegan al bloque (la rejilla las capa después, no la lectura).
-    expect(datos.artes).toHaveLength(7);
-    // Y llegan REPARTIDAS: la 1ª de cada arte antes que la 2ª de ninguno, así que las primeras
-    // MAX_ARTES —lo que de verdad se imprime— cubren los TRES artes.
-    expect(datos.artes.slice(0, MAX_ARTES).map((a) => a.titulo)).toEqual([
+    // De las SIETE fotos pedidas se imprimen MAX_ARTES, y las otras 3 se cuentan (no se callan).
+    expect(datos.artes).toHaveLength(MAX_ARTES);
+    expect(datos.artesOcultas).toBe(7 - MAX_ARTES);
+    // Llegan REPARTIDAS: la 1ª de cada arte antes que la 2ª de ninguno, así que lo que se imprime
+    // cubre los TRES artes.
+    expect(datos.artes.map((a) => a.titulo)).toEqual([
       'Logo pecho',
       'Estampa espalda',
       'Etiqueta',
       'Logo pecho',
     ]);
+    // Y las 3 que no se imprimen ni se bajan: el tope va antes de tocar R2.
+    expect(descargarImagen).toHaveBeenCalledTimes(MAX_ARTES);
     expect(datos.artes[0]).toMatchObject({
       dataUrl: 'data:img;https://r2/bor/1a.png',
       titulo: 'Logo pecho',
@@ -1299,6 +1422,114 @@ describe('armarDatosImpresoOrden', () => {
     // Solo la PRIMERA foto del PRIMER arte es la principal (la que el tope nunca recorta).
     expect(datos.artes.filter((a) => a.principal === true)).toHaveLength(1);
     expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+  });
+
+  /*
+   * 🔴🔴 0.106 — EL PAPEL QUE VA A PISO NO PUEDE TIRAR IMÁGENES EN SILENCIO NI MENTIR EN SU CONTEO.
+   *
+   * Dos defectos con el MISMO origen —bajar primero y recortar después—, medidos antes de la
+   * corrección con este mismísimo escenario (3 artes, 6 fotos pedidas, tope 4, 2 caídas al bajar):
+   *  (a) las dos caídas DESAPARECÍAN y su sitio lo ocupaban dos fotos EXTRA del primer arte, así que
+   *      el papel enseñaba cuatro imágenes de UN arte cuando la OP manda TRES artes distintos;
+   *  (b) el título contaba sobre lo DESCARGADO (4 de 4 → ni conteo pintaba), no sobre lo PEDIDO.
+   * Con seis artes en la prenda y un papel que dice tres, se produce mal. De ahí la cura de la
+   * 0.094 (la ficha de arte): contar sobre lo pedido, topar ANTES de bajar y dejar HUECO visible.
+   */
+  it('🔴 6 fotos de arte pedidas, tope 4 y 2 caídas: cuenta 4 de 6 y deja los HUECOS a la vista', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      artes: [
+        arteBom({ id: 1, nombre: 'Frente', keysFoto: ['a1.png', 'a2.png', 'a3.png', 'a4.png'] }),
+        arteBom({ id: 2, nombre: 'Espalda', keysFoto: ['b1.png'] }),
+        arteBom({ id: 3, nombre: 'Manga', keysFoto: ['c1.png'] }),
+      ],
+    };
+    // Se caen al bajar la ÚNICA foto de "Espalda" y la 2ª de "Frente".
+    const descargarImagen = vi.fn((url: string) =>
+      Promise.resolve(url.endsWith('b1.png') || url.endsWith('a2.png') ? null : `data:img;${url}`),
+    );
+    const urlDescarga = vi.fn((key: string) => Promise.resolve(`https://r2/${key}`));
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, [], descargarImagen),
+      archivos: { solicitarSubida: vi.fn(), urlDescarga } as unknown as ServicioArchivos,
+    });
+
+    // El tope se lleva las 4 primeras POR RONDAS (la 1ª de cada arte y la 2ª del primero), y las
+    // dos que no llegaron siguen ahí —en su sitio y con su rótulo— como HUECO.
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/a1.png', titulo: 'Frente', principal: true },
+      { dataUrl: null, titulo: 'Espalda' },
+      { dataUrl: 'data:img;https://r2/c1.png', titulo: 'Manga' },
+      { dataUrl: null, titulo: 'Frente' },
+    ]);
+    // …y lo que quedó fuera se cuenta sobre lo que la orden PIDE (6), no sobre lo que se pudo bajar.
+    expect(datos.artesOcultas).toBe(2);
+    // 🔴 El tope va ANTES de tocar R2: no se presigna ni se baja lo que no se va a imprimir.
+    expect(urlDescarga).toHaveBeenCalledTimes(MAX_ARTES);
+    expect(descargarImagen).toHaveBeenCalledTimes(MAX_ARTES);
+    expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+  });
+
+  it('🔴 la foto del modelo que no llegó deja HUECO: la siguiente NO ocupa su lugar', async () => {
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
+    const fotos = [
+      { idFoto: 1, urlDescarga: 'https://r2/f1' },
+      { idFoto: 2, urlDescarga: 'https://r2/f2' },
+      { idFoto: 3, urlDescarga: 'https://r2/f3' },
+      { idFoto: 4, urlDescarga: 'https://r2/f4' },
+    ] as unknown as FotoModeloConUrl[];
+    // Se cae justo la PRINCIPAL (la 1ª): antes desaparecía y la 4ª entraba en su lugar sin decirlo.
+    const descargarImagen = vi.fn((url: string) =>
+      Promise.resolve(url.endsWith('f1') ? null : `data:img;${url}`),
+    );
+
+    const datos = await armarDatosImpresoOrden(
+      sesionConVer(),
+      1,
+      undefined,
+      depsCon(ordenSalida(), bom, fotos, descargarImagen),
+    );
+
+    expect(datos.fotos).toEqual([
+      { dataUrl: null, principal: true },
+      { dataUrl: 'data:img;https://r2/f2' },
+      { dataUrl: 'data:img;https://r2/f3' },
+    ]);
+    expect(datos.fotosOcultas).toBe(1);
+    // La 4ª ni se baja: el tope es sobre lo PEDIDO y va antes de la descarga.
+    expect(descargarImagen).toHaveBeenCalledTimes(MAX_FOTOS);
+    expect(descargarImagen).not.toHaveBeenCalledWith('https://r2/f4');
+    expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+  });
+
+  it('con todo en su sitio y por debajo del tope, el papel es EXACTAMENTE el de siempre (0-B)', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      artes: [arteBom({ id: 1, nombre: 'Logo pecho', keyFoto: 'bor/1.png' })],
+    };
+    const fotos = [
+      { idFoto: 1, urlDescarga: 'https://r2/f1' },
+      { idFoto: 2, urlDescarga: 'https://r2/f2' },
+    ] as unknown as FotoModeloConUrl[];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, fotos, (url) => Promise.resolve(`data:img;${url}`)),
+      archivos: archivosQuePresignan(),
+    });
+
+    expect(datos.fotos).toEqual([
+      { dataUrl: 'data:img;https://r2/f1', principal: true },
+      { dataUrl: 'data:img;https://r2/f2' },
+    ]);
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/bor/1.png', titulo: 'Logo pecho', principal: true },
+    ]);
+    // Nada recortado, nada que avisar: ni el bloque de fotos ni el título de artes cambian.
+    expect(datos.fotosOcultas).toBe(0);
+    expect(datos.artesOcultas).toBe(0);
   });
 
   /** Servicio de archivos que presigna cualquier key (`key` → `https://r2/<key>`). */
@@ -1323,18 +1554,26 @@ describe('armarDatosImpresoOrden', () => {
 
   // El rótulo de cada arte se toma POR ÍNDICE de la lista presignada, así que hay que probar los
   // dos extremos: si solo se cubriera el caso "falla el ÚLTIMO", una implementación con
-  // corrimiento de índice (filtrar los nulos y luego mapear el título por posición) pasaría igual.
+  // corrimiento de índice (casar el título por posición después de filtrar) pasaría igual.
+  // ⭐ 0.106: la que no baja se queda como HUECO **en su sitio y con su rótulo** — antes se caía
+  // del papel, y con ella el aviso de que faltaba justo el arte principal.
   it.each([
     {
       caso: 'falla la PRIMERA (atrapa el corrimiento de índice)',
       bom: bomDosArtes(['Caída', 'falla.png'], ['Buena', 'ok.png']),
-      // El arte PRINCIPAL (el 1º del modelo) es justo el que no bajó: no hay principal que marcar.
-      esperado: [{ dataUrl: PNG_1X1, titulo: 'Buena' }],
+      // El arte PRINCIPAL (el 1º del modelo) es justo el que no bajó: sigue marcado, como hueco.
+      esperado: [
+        { dataUrl: null, titulo: 'Caída', principal: true },
+        { dataUrl: PNG_1X1, titulo: 'Buena' },
+      ],
     },
     {
       caso: 'falla la ÚLTIMA',
       bom: bomDosArtes(['Buena', 'ok.png'], ['Caída', 'falla.png']),
-      esperado: [{ dataUrl: PNG_1X1, titulo: 'Buena', principal: true }],
+      esperado: [
+        { dataUrl: PNG_1X1, titulo: 'Buena', principal: true },
+        { dataUrl: null, titulo: 'Caída' },
+      ],
     },
   ])('una foto de arte del BOM que no baja NO trunca el PDF ($caso)', async ({ bom, esperado }) => {
     const descargarImagen = vi.fn((url: string) =>
@@ -1346,12 +1585,12 @@ describe('armarDatosImpresoOrden', () => {
       archivos: archivosQuePresignan(),
     });
 
-    // La caída se descarta y la buena conserva SU rótulo (nunca el del arte caído).
+    // La caída deja hueco y la buena conserva SU rótulo (nunca el del arte caído).
     expect(datos.artes).toEqual(esperado);
     expect(esPdf(await generarPdfOrden(datos))).toBe(true);
   });
 
-  it('si PRESIGNAR el arte del BOM truena, el impreso sale igual sin esas imágenes', async () => {
+  it('si PRESIGNAR el arte del BOM truena, el impreso sale con el HUECO de esas imágenes', async () => {
     const bom: BomModelo = {
       telas: [],
       avios: [],
@@ -1368,7 +1607,7 @@ describe('armarDatosImpresoOrden', () => {
         archivos,
       });
 
-      expect(datos.artes).toEqual([]);
+      expect(datos.artes).toEqual([{ dataUrl: null, titulo: 'Logo', principal: true }]);
       expect(advertir).toHaveBeenCalled();
       // La lista de texto del arte sigue ahí (el bordado no desaparece del impreso).
       expect(datos.listaArte).toEqual([{ descripcion: 'Logo', tipoArte: 'Bordado' }]);
@@ -1395,8 +1634,11 @@ describe('armarDatosImpresoOrden', () => {
         archivos,
       });
 
-      // El arte que sí se presignó sale (con SU rótulo); el otro se pierde solo él.
-      expect(datos.artes).toEqual([{ dataUrl: PNG_1X1, titulo: 'Buena' }]);
+      // El arte que sí se presignó sale (con SU rótulo); el otro queda como hueco, solo él.
+      expect(datos.artes).toEqual([
+        { dataUrl: null, titulo: 'Caída', principal: true },
+        { dataUrl: PNG_1X1, titulo: 'Buena' },
+      ]);
       expect(advertir).toHaveBeenCalled();
       expect(esPdf(await generarPdfOrden(datos))).toBe(true);
     } finally {

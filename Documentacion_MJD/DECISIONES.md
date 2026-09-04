@@ -12159,6 +12159,8 @@ Daniel pegó el **Repaso de Inventarios** del 2-sep (fila 0.096: cuatro cosas gr
 
 **Lo que este repaso deja listo:** las filas de inventarios se construyen **cuando finanzas cierre** (§Post-F9.192(k)), en este orden propuesto: 0.136 (grave, arranque) → 0.099 (la pantalla del arranque) → 0.104 → 0.100 → 0.101 → 0.137 → 0.103 → 0.102 → 0.138 → 0.130 (venta de sobrantes de PT). Daniel ya no tiene preguntas abiertas de inventarios: **las doce están contestadas**.
 
+**Corrección medida (4-sep, 02:50 UTC):** la **0.136 ya estaba construida** —la entregó la v0.093 (fila 0.098) el 3-sep, un día después del repaso que la midió rota—; el coder lo midió antes de tocar y no escribió código. Queda ✅ «cerrada midiéndola». Lección para los repasos: **antes de numerar lo que un repaso dice roto, medirlo contra `prueba` del día.**
+
 - **Aplica en:** las filas 0.136–0.139 y las adendas nacen en la versión que cierra 0.113. **Fecha:** 2026-09-04.
 
 ---

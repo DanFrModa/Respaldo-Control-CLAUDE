@@ -60,9 +60,10 @@ import type { EtapaSalida } from '../../../contrato/index.js';
 // separado. Lecturas de BAJO NIVEL (sin permiso propio): esta impresión ya está autorizada por
 // `produccion.wip-ver` y qué arte lleva la orden es parte de su documento.
 import {
-  anteponerPrincipal,
   descargarImagenComoDataUrl,
   leerFotosArteDeLaOrdenPorId,
+  presignarKeys,
+  recortarAlTope,
   type DescargarImagen,
   type FotoArteDeLaOrden,
 } from './imagenes-impreso.js';
@@ -108,9 +109,9 @@ export interface DatosImpresoEnvio {
  * `fotosArteDeLaOrden`, cuatro huecos alcanzan para que **cada arte distinto** enseñe su primera
  * foto antes de que ninguno enseñe la segunda: un arte con cinco fotos ya no expulsa a los demás.
  *
- * ⚠️ El tope se aplica **ANTES** de presignar y de bajar bytes (a diferencia del impreso de la
- * orden, que baja todo y recorta después). Así el trabajo y la memoria quedan ACOTADOS: como mucho
- * cuatro descargas por ficha, pase lo que pase en la receta.
+ * ⚠️ El tope se aplica **ANTES** de presignar y de bajar bytes. Así el trabajo y la memoria quedan
+ * ACOTADOS: como mucho cuatro descargas por ficha, pase lo que pase en la receta. *(La 0.106 llevó
+ * ese mismo criterio al impreso de la ORDEN, que hasta entonces bajaba todo y recortaba después.)*
  *
  * Lo que se recorta NO se esconde: el título de la sección dice cuántas se muestran del total.
  */
@@ -271,19 +272,18 @@ export async function armarDatosImpresoEnvio(
 }
 
 /**
- * Aplica el tope de la ficha: la foto PRINCIPAL al frente ({@link anteponerPrincipal}) y las
- * primeras {@link MAX_FOTOS_FICHA_ARTE}; devuelve además cuántas quedaron fuera (para el aviso del
- * título). Como el tope es ≥ 1 y la principal quedó en la posición 0, la principal nunca se
- * recorta. Las fotos llegan repartidas por rondas, así que el tope se lleva primero las fotos
- * EXTRA de un arte y solo después la única foto de otro. Pura, exportada para probar el criterio
- * sin renderizar.
+ * Aplica el tope de la ficha: la foto PRINCIPAL al frente y las primeras
+ * {@link MAX_FOTOS_FICHA_ARTE}; devuelve además cuántas quedaron fuera (para el aviso del título).
+ * El criterio vive en `imagenes-impreso.ts` ({@link recortarAlTope}, compartido con el impreso de
+ * la orden desde la 0.106); aquí solo se le pone EL TOPE DE ESTA FICHA. Las fotos llegan repartidas
+ * por rondas, así que el tope se lleva primero las fotos EXTRA de un arte y solo después la única
+ * foto de otro. Pura, exportada para probar el criterio sin renderizar.
  */
 export function recortarFotosArte(fotos: readonly FotoArteDeLaOrden[]): {
   mostradas: FotoArteDeLaOrden[];
   ocultas: number;
 } {
-  const mostradas = anteponerPrincipal(fotos).slice(0, MAX_FOTOS_FICHA_ARTE);
-  return { mostradas, ocultas: fotos.length - mostradas.length };
+  return recortarAlTope(fotos, MAX_FOTOS_FICHA_ARTE);
 }
 
 /**
@@ -302,9 +302,10 @@ export function recortarFotosArte(fotos: readonly FotoArteDeLaOrden[]): {
  *     las demás siguen saliendo.
  *  3. **La descarga de bytes** de cada imagen: `null` (fallo, vacío o pasada de peso) → HUECO.
  *
- * ⚠️ **Y aquí la ficha DIVERGE a propósito del impreso de la orden**, que descarta en silencio la
- * foto que no pudo bajar. En esta hoja una imagen que existe y no llegó **se dice**: quien la tiene
- * en la mano ve que falta algo y lo pide, en vez de estampar creyendo que no había arte.
+ * ⚠️ En esta hoja una imagen que existe y no llegó **se dice**: quien la tiene en la mano ve que
+ * falta algo y lo pide, en vez de estampar creyendo que no había arte. *(Cuando esto se escribió,
+ * el impreso de la ORDEN sí descartaba en silencio; la 0.106 le aplicó esta misma cura, así que hoy
+ * los dos papeles de la orden se comportan igual.)*
  *
  * 🔑 **La gemela:** una OP **sin arte, o con arte sin fotos, imprime NORMAL** — `fotosArte` queda
  * vacío y la ficha no pinta ni la sección ni un hueco. El hueco es sólo para una foto que la OP
@@ -349,24 +350,25 @@ export async function armarDatosImpresoFichaArte(
 
   const archivos = deps.archivos ?? servicioArchivos();
 
-  // Capa 2: presign por imagen (`allSettled`). Una key que R2 rechaza no se lleva a las demás: se
-  // queda sin URL y más abajo se pinta como hueco.
-  const presignadas = await Promise.allSettled(
-    mostradas.map((foto) => archivos.urlDescarga(foto.key)),
+  // Capa 2: presign por imagen (`allSettled`, en `imagenes-impreso.ts`). Una key que R2 rechaza no
+  // se lleva a las demás: se queda sin URL y más abajo se pinta como hueco.
+  const { urls, fallos, primerMotivo } = await presignarKeys(
+    mostradas.map((foto) => foto.key),
+    archivos,
   );
 
   // Capa 3: bytes por imagen, con tope duro de peso. `null` (fallo o pasada de peso) → hueco.
   const dataUrls = await Promise.all(
-    presignadas.map(async (resultado) =>
-      resultado.status === 'fulfilled'
-        ? await descargarImagen(resultado.value, MAX_BYTES_FOTO_ARTE)
-        : null,
+    urls.map(async (url) =>
+      url === null ? null : await descargarImagen(url, MAX_BYTES_FOTO_ARTE),
     ),
   );
-  const fallos = presignadas.filter((r) => r.status === 'rejected').length;
   if (fallos > 0) {
     console.warn(
       `No se pudieron presignar ${String(fallos)} foto(s) del arte de la orden ${String(etapa.idOrden)} para la ficha del envío ${String(idEtapa)}.`,
+      // El MOTIVO del primer fallo, igual que el impreso de la orden: sin él, un rechazo de R2 deja
+      // un aviso que dice que pasó algo pero no qué, y hay que reproducirlo para saberlo.
+      primerMotivo,
     );
   }
 

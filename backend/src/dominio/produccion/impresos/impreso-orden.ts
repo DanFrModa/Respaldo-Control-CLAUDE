@@ -23,9 +23,9 @@
  *    `leerBom` (solo para la FOTO de cada arte, que vive en el modelo) y `listarFotos`. NO se reinventa.
  *
  * Fotos: se incrustan en el PDF bajando los bytes del objeto R2 (vía la URL GET prefirmada que da
- * `listarFotos`) y degradando con ELEGANCIA: si una foto no se puede obtener, el PDF se renderiza
- * igual sin esa imagen (jamás se trunca el impreso por una foto faltante). El servicio de archivos
- * y la descarga de bytes son INYECTABLES para los tests (sin R2 real).
+ * `listarFotos`) y degradando con ELEGANCIA: el PDF se renderiza igual aunque una imagen no se
+ * pueda obtener (jamás se trunca el impreso por una foto faltante). El servicio de archivos y la
+ * descarga de bytes son INYECTABLES para los tests (sin R2 real).
  *
  * Artes (petición Daniel, jul-2026): además de las fotos del MODELO, el impreso incluye en la
  * sección "Artes (imágenes)" las FOTOS DE LOS BORDADOS/ESTAMPADOS del BOM (el arte propiamente
@@ -36,8 +36,19 @@
  *
  * Imagen PRINCIPAL (petición Daniel, 25-jul-2026): el modelo tiene una FOTO principal (la primera
  * de su galería) y un ARTE principal (el primero de su BOM). En el impreso las dos van PRIMERO en
- * su bloque y están BLINDADAS contra los topes (`recortarFotos`/`recortarArtes`): pase lo que pase,
- * si se pudieron bajar, se imprimen. No hay bandera en BD: "principal" = ser el primero por `orden`.
+ * su bloque y están BLINDADAS contra los topes (`recortarFotos`/`recortarArtes`): pase lo que pase
+ * se imprimen —y si sus bytes no llegaron, se imprime su HUECO en ese sitio—. No hay bandera en BD:
+ * "principal" = ser el primero por `orden`.
+ *
+ * ⭐⭐ 0.106 — ESTE PAPEL VA A PISO Y NO PUEDE MENTIR SOBRE SUS IMÁGENES. Dos correcciones con el
+ * mismo origen (bajaba TODO y recortaba al pintar):
+ *  • **el tope se aplica sobre lo que la orden PIDE y ANTES de presignar/bajar** — así el conteo
+ *    del título ("se muestran 4 de 6") habla de lo que la prenda lleva, no de lo que R2 alcanzó a
+ *    dar, y no se gastan descargas ni memoria en imágenes que se van a tirar;
+ *  • **una imagen que no llega deja HUECO visible** con su rótulo y su aviso, en su sitio, en vez
+ *    de desaparecer y dejar que otra ocupe su lugar. Es la cura que la ficha de arte (0.094) ya
+ *    tenía; aquí faltaba, y con ella un papel que decía «3 artes» para una prenda de 5 se producía
+ *    mal. Lo compartido vive en `imagenes-impreso.ts` (`recortarAlTope`, `presignarKeys`).
  *
  * Tela (petición Daniel, jul-2026): el campo TELA del encabezado ya no depende solo de lo que se
  * capturó a mano en la orden (`Orden.idTela`): se arma con la(s) tela(s) que REALMENTE se
@@ -96,16 +107,23 @@ import {
   descargarImagenComoDataUrl,
   fotosArteDeLaOrden,
   porRondas,
+  presignarKeys,
+  recortarAlTope,
   type DescargarImagen,
 } from './imagenes-impreso.js';
 import { obtenerOrden } from '../ordenes.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin red ni BD) ──────────────────────────────────
 
-/** Una foto del modelo ya descargada, lista para incrustar como `<Image src>` (data-URL). */
+/** Una imagen del papel ya resuelta: sus bytes como data-URL, o el HUECO si no se pudieron traer. */
 export interface FotoImpreso {
-  /** Data-URL `data:<mime>;base64,...` con los bytes de la imagen. */
-  dataUrl: string;
+  /**
+   * Data-URL `data:<mime>;base64,...` con los bytes de la imagen, o **`null` = esta orden SÍ manda
+   * esta imagen y no se pudo traer** (presign rechazado, red caída, HTTP ≠ 2xx, cuerpo vacío) → el
+   * papel pinta su HUECO con el aviso. ⭐ 0.106: antes se descartaba en silencio y la siguiente
+   * imagen ocupaba su lugar, así que la hoja de piso se veía completa sin estarlo.
+   */
+  dataUrl: string | null;
   /**
    * Rótulo opcional debajo de la imagen (lo usan los ARTES del BOM: el nombre del
    * bordado/estampado). Las fotos del modelo y los adjuntos de la orden van sin rótulo.
@@ -118,10 +136,13 @@ export interface FotoImpreso {
    * la ponen al frente y NUNCA la dejan fuera del tope, aunque el bloque se recorte. A lo sumo hay
    * una por bloque; si no viene ninguna, los topes se comportan como siempre (las primeras N).
    *
-   * Hay DOS casos sin principal marcada, ambos a propósito: (1) la imagen de la principal no se
-   * pudo bajar de R2 (best-effort) y (2) el arte principal del BOM NO tiene foto — el segundo arte
-   * **no hereda** el papel (ser principal es una decisión sobre un arte concreto, no un puesto que
-   * se transfiera). En los dos casos el bloque se comporta como antes de esta mejora.
+   * Casos SIN principal marcada, a propósito: (1) el arte principal del BOM NO tiene foto —el
+   * segundo arte **no hereda** el papel: ser principal es una decisión sobre un arte concreto, no
+   * un puesto que se transfiera— y (2) ESTA OP ocultó la foto principal del modelo
+   * (§Post-F9.169(b)), con el mismo criterio. En los dos el bloque se comporta como siempre.
+   *
+   * ⭐ 0.106: que sus BYTES no lleguen ya NO la desmarca — sigue marcada, en su sitio, como HUECO.
+   * Antes desaparecía, y con ella el aviso de que faltaba justo la imagen más importante.
    */
   principal?: boolean;
 }
@@ -190,14 +211,49 @@ export interface DatosImpresoOrden {
   /** Lista de TEXTO del arte del modelo (nombre + subtipo). Las IMÁGENES van en `artes`. */
   listaArte: ArteImpreso[];
   habilitacion: AvioImpreso[];
+  /**
+   * FOTOS del modelo que este papel imprime, **ya recortadas al tope** ({@link MAX_FOTOS}) y con
+   * los HUECOS de las que no se pudieron traer (0.106). Vacío = el bloque no se pinta.
+   */
   fotos: FotoImpreso[];
   /**
-   * ARTES (petición Daniel, jul-2026), ya descargados best-effort igual que `fotos`, en orden:
-   * primero las FOTOS DE LOS BORDADOS/ESTAMPADOS del BOM (cada una con su nombre como `titulo`) y
-   * después las IMÁGENES subidas como adjuntos de la orden (F8-E6, `tipoMime` image/*, sin
-   * rótulo). Sección propia "Artes (imágenes)" en el impreso; vacío = la sección no se pinta.
+   * Cuántas fotos del modelo que ESTA orden manda quedaron fuera POR EL TOPE (0.106). Se cuenta
+   * sobre lo PEDIDO, no sobre lo que se pudo bajar, y el bloque lo dice en su fila.
+   */
+  fotosOcultas: number;
+  /**
+   * ARTES (petición Daniel, jul-2026), ya descargados best-effort igual que `fotos` y **recortados
+   * al tope** ({@link MAX_ARTES}), en orden: primero las FOTOS DE LOS BORDADOS/ESTAMPADOS del BOM
+   * (cada una con su nombre como `titulo`) y después las IMÁGENES subidas como adjuntos de la
+   * orden (F8-E6, `tipoMime` image/*, sin rótulo). Sección propia "Artes (imágenes)" en el
+   * impreso; vacío = la sección no se pinta.
    */
   artes: FotoImpreso[];
+  /**
+   * Cuántas imágenes de arte que ESTA orden manda quedaron fuera POR EL TOPE (0.106). Se cuenta
+   * sobre lo PEDIDO —no sobre lo que R2 alcanzó a dar— y es lo que dice el TÍTULO de la sección
+   * ("se muestran 4 de 6"). Contarlo sobre lo descargado era mentir en el papel que va a piso.
+   */
+  artesOcultas: number;
+}
+
+/**
+ * ⭐ 0.106 — Una imagen que ESTA orden manda imprimir, **antes de tocar R2**: es lo que entra al
+ * tope. Sobre esta lista se cuenta lo que queda fuera y de ella salen las descargas, para que el
+ * papel nunca hable de "lo que se pudo bajar" ni gaste una descarga en lo que no va a imprimir.
+ */
+interface ImagenPedida {
+  /** Rótulo bajo la imagen (el arte del modelo); las fotos del modelo y los adjuntos van sin él. */
+  titulo?: string;
+  /** ¿Es la PRINCIPAL de su bloque? El tope la antepone y jamás la deja fuera. */
+  principal?: boolean;
+  /**
+   * De dónde sale su URL de descarga: una KEY de R2 que se presigna DESPUÉS del tope (el arte del
+   * modelo, cuyas keys llegan del BOM), o una URL ya prefirmada por la lectura que la trajo (las
+   * fotos del modelo y los adjuntos de la orden, que se presignan antes de que este impreso pueda
+   * decidir nada).
+   */
+  origen: { tipo: 'key'; valor: string } | { tipo: 'url'; valor: string };
 }
 
 // ── Resolución de datos (lo único que toca BD/red) ──────────────────────────────────────────────
@@ -417,7 +473,7 @@ export async function armarDatosImpresoOrden(
   // la foto del modelo** (D3): otra orden del mismo modelo la sigue imprimiendo.
   const ocultasEnLaOrden = new Set(await leerOcultas(cliente, id));
   // ⚠️ SER PRINCIPAL NO ES UN PUESTO QUE SE TRANSFIERA (mismo criterio que el arte principal sin
-  // foto, arriba): si esta OP ocultó la principal del modelo, esta OP se imprime SIN principal —
+  // foto, más abajo): si esta OP ocultó la principal del modelo, esta OP se imprime SIN principal —
   // la segunda foto no hereda la estrella ni el blindaje contra el tope.
   const principalOculta =
     fotosDelModelo.length > 0 && ocultasEnLaOrden.has(fotosDelModelo[0]?.idFoto as number);
@@ -435,12 +491,6 @@ export async function armarDatosImpresoOrden(
     );
   }
 
-  // ARTES: presignar es una llamada a R2 por imagen → BEST-EFFORT **POR IMAGEN** (`allSettled`, no
-  // `all`): si la key de un arte truena, se pierde ESA imagen y las demás siguen saliendo (mismo
-  // criterio que la descarga de bytes). El orden y la marca de PRINCIPAL los fija
-  // `fotosArteDeLaOrden` —recorre `bom.artes`, ORDENADO por el `orden` del modelo, y conserva sólo
-  // los artes que ESTA orden lleva por su TRAZA `idModeloArte`—, así que el arte principal sigue
-  // siendo el primero del modelo y el tope de la rejilla jamás lo recorta (Daniel, jul-2026).
   /*
    * ⭐⭐ §Post-F9.177 — LO QUE **ESTA OP** DECIDIÓ SOBRE LAS FOTOS DEL ARTE, en su papel.
    *
@@ -461,22 +511,11 @@ export async function armarDatosImpresoOrden(
       error,
     );
   }
+  // El orden y la marca de PRINCIPAL los fija `fotosArteDeLaOrden` —recorre `bom.artes`, ORDENADO
+  // por el `orden` del modelo, y conserva sólo los artes que ESTA orden lleva por su TRAZA
+  // `idModeloArte`—, así que el arte principal sigue siendo el primero del modelo y el tope de la
+  // rejilla jamás lo recorta (Daniel, jul-2026). Aquí todavía NO se toca R2: son keys y rótulos.
   const artesBom = fotosArteDeLaOrden(bom.artes, receta.artes, decisionesArte);
-  const presignados = await Promise.allSettled(
-    artesBom.map(async (arte) => ({
-      titulo: arte.titulo,
-      principal: arte.principal,
-      urlDescarga: await archivos.urlDescarga(arte.key),
-    })),
-  );
-  const urlsArteBom = presignados.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
-  const primerFallo = presignados.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-  if (primerFallo !== undefined) {
-    console.warn(
-      `No se pudieron presignar ${String(presignados.length - urlsArteBom.length)} foto(s) del arte (BOM) de la orden ${String(id)} para su impreso.`,
-      primerFallo.reason,
-    );
-  }
 
   // ARTES: los adjuntos de la orden (F8-E6) que sean IMAGEN (`tipoMime` image/*). `listarAdjuntos`
   // exige el mismo `ordenes.ver` que ya autoriza esta impresión (no introduce 403 nuevos), pero
@@ -495,39 +534,66 @@ export async function armarDatosImpresoOrden(
     );
   }
 
-  // Fotos y artes (del BOM y de la orden): se bajan en paralelo y se descartan las que no se
-  // pudieron obtener (best-effort: una imagen caída JAMÁS trunca el impreso).
-  const [dataUrls, dataUrlsArteBom, dataUrlsArtes] = await Promise.all([
-    Promise.all(fotos.map((f) => descargarImagen(f.urlDescarga))),
-    Promise.all(urlsArteBom.map((a) => descargarImagen(a.urlDescarga))),
-    Promise.all(adjuntosImagen.map((a) => descargarImagen(a.urlDescarga))),
-  ]);
-  // La PRIMERA foto del modelo (las fotos llegan ordenadas por `orden`) es la PRINCIPAL: se marca
-  // para que el bloque de fotos la ponga al frente y el tope nunca la recorte. Si esa foto no se
-  // pudo bajar, simplemente no hay principal (best-effort de siempre) y las demás salen igual.
-  const fotosImpreso: FotoImpreso[] = dataUrls.flatMap((dataUrl, i) =>
-    dataUrl === null
-      ? []
-      : [i === 0 && !principalOculta ? { dataUrl, principal: true } : { dataUrl }],
+  /*
+   * ⭐⭐ 0.106 — EL TOPE VA SOBRE LO QUE LA ORDEN **PIDE**, Y **ANTES** DE TOCAR R2.
+   *
+   * Hasta aquí sólo hay LISTAS (keys, URLs y rótulos): ni un byte bajado. Se recorta ahora, y sólo
+   * después se presigna y se baja lo que de verdad se va a imprimir. Dos cosas que antes salían
+   * mal —las dos por bajar primero y recortar al pintar—:
+   *  • el conteo del título contaba sobre lo DESCARGADO: una orden con 6 imágenes de arte a la que
+   *    se le caían 2 acababa mostrando 4 y diciendo «Artes (imágenes)» a secas, como si estuvieran
+   *    todas. En una hoja de PISO eso se produce mal: el papel dice 3 artes y la prenda lleva 5;
+   *  • una imagen caída DESAPARECÍA y su sitio lo ocupaba la siguiente —típicamente otra foto del
+   *    mismo arte—, así que un arte entero podía quedar fuera del papel sin dejar rastro.
+   * Y de regalo, el trabajo queda ACOTADO: como mucho MAX_FOTOS + MAX_ARTES descargas por orden
+   * (antes eran todas las fotos del modelo, más todas las del arte, más todos los adjuntos — y esos
+   * megas cruzaban además al worker del PDF).
+   */
+  const fotosPedidas: ImagenPedida[] = fotos.map((foto, i) => ({
+    origen: { tipo: 'url' as const, valor: foto.urlDescarga },
+    // La PRIMERA foto del modelo (llegan ordenadas por `orden`) es la PRINCIPAL: se marca para que
+    // el tope la anteponga y nunca la recorte. Si ESTA OP la ocultó, este papel sale sin principal.
+    ...(i === 0 && !principalOculta ? { principal: true } : {}),
+  }));
+  const artesPedidos: ImagenPedida[] = [
+    // El arte del MODELO va PRIMERO (es el arte del modelo) y lleva su nombre como rótulo…
+    ...artesBom.map((arte) => ({
+      titulo: arte.titulo,
+      origen: { tipo: 'key' as const, valor: arte.key },
+      ...(arte.principal ? { principal: true } : {}),
+    })),
+    // …y detrás las imágenes subidas a la orden (sin rótulo, como hasta hoy).
+    ...adjuntosImagen.map((adjunto) => ({
+      origen: { tipo: 'url' as const, valor: adjunto.urlDescarga },
+    })),
+  ];
+  // Mismo criterio y misma constante que el cinturón del render (`recortarFotos`/`recortarArtes`);
+  // aquí se aplica sobre lo PEDIDO, que es lo que hace que el conteo diga la verdad.
+  const { mostradas: fotosAImprimir, ocultas: fotosOcultas } = recortarAlTope(
+    fotosPedidas,
+    MAX_FOTOS,
   );
-  // El arte del BOM va PRIMERO (es el arte del modelo) y lleva su nombre como rótulo; luego las
-  // imágenes subidas a la orden (sin rótulo, como hasta hoy).
-  const artesModelo: FotoImpreso[] = dataUrlsArteBom.flatMap((dataUrl, i) => {
-    const arte = urlsArteBom[i];
-    if (dataUrl === null || arte === undefined) {
-      return [];
-    }
-    return [
-      {
-        dataUrl,
-        ...(arte.titulo === undefined ? {} : { titulo: arte.titulo }),
-        ...(arte.principal ? { principal: true } : {}),
-      },
-    ];
-  });
-  const artesImpreso: FotoImpreso[] = dataUrlsArtes
-    .filter((u): u is string => u !== null)
-    .map((dataUrl) => ({ dataUrl }));
+  const { mostradas: artesAImprimir, ocultas: artesOcultas } = recortarAlTope(
+    artesPedidos,
+    MAX_ARTES,
+  );
+
+  // Presign (sólo de las keys que sobrevivieron al tope) + bytes. Una imagen que no llegue queda
+  // con `dataUrl: null` → HUECO en el papel, nunca un descarte mudo.
+  const [fotosImpreso, artesImpreso] = await Promise.all([
+    bajarImagenesPedidas(
+      fotosAImprimir,
+      archivos,
+      descargarImagen,
+      `de las fotos del modelo de la orden ${String(id)}`,
+    ),
+    bajarImagenesPedidas(
+      artesAImprimir,
+      archivos,
+      descargarImagen,
+      `del arte de la orden ${String(id)}`,
+    ),
+  ]);
 
   const tabla = armarTabla(orden.lineas);
 
@@ -557,9 +623,60 @@ export async function armarDatosImpresoOrden(
     listaArte: receta.artes.map((a) => ({ descripcion: a.descripcion, tipoArte: a.tipoArte })),
     habilitacion: receta.avios,
     fotos: fotosImpreso,
+    fotosOcultas,
     // Primero el arte del MODELO (sus fotos), luego el subido a la orden.
-    artes: [...artesModelo, ...artesImpreso],
+    artes: artesImpreso,
+    artesOcultas,
   };
+}
+
+/**
+ * ⭐ 0.106 — Presigna lo que haga falta y baja los bytes de UN bloque de imágenes **ya recortado al
+ * tope**, conservando el ORDEN y el RÓTULO de cada una.
+ *
+ * Best-effort **por imagen** y en dos capas —presign (`allSettled`, en `imagenes-impreso.ts`) y
+ * descarga—: la que no llegue sale con `dataUrl: null`, que en el papel es un HUECO con su aviso.
+ * Nunca lanza: un impreso jamás se trunca por una imagen que no se pudo traer.
+ *
+ * ⚠️ Las URLs del presign vuelven SOLO de las pedidas que traían key, así que se re-casan por
+ * posición recorriendo la lista en orden; las que ya venían con URL pasan tal cual. Casarlas de
+ * otro modo (filtrar y mapear por índice) es justo el corrimiento que haría que una imagen saliera
+ * con el rótulo de otra.
+ */
+async function bajarImagenesPedidas(
+  pedidas: readonly ImagenPedida[],
+  archivos: ServicioArchivos,
+  descargarImagen: DescargarImagen,
+  contexto: string,
+): Promise<FotoImpreso[]> {
+  const { urls, fallos, primerMotivo } = await presignarKeys(
+    pedidas.flatMap((pedida) => (pedida.origen.tipo === 'key' ? [pedida.origen.valor] : [])),
+    archivos,
+  );
+  if (fallos > 0) {
+    console.warn(
+      `No se pudieron presignar ${String(fallos)} imagen(es) ${contexto} para su impreso.`,
+      primerMotivo,
+    );
+  }
+  const urlsPorPedida: (string | null)[] = [];
+  let siguienteKey = 0;
+  for (const pedida of pedidas) {
+    if (pedida.origen.tipo === 'url') {
+      urlsPorPedida.push(pedida.origen.valor);
+    } else {
+      urlsPorPedida.push(urls[siguienteKey] ?? null);
+      siguienteKey += 1;
+    }
+  }
+  const dataUrls = await Promise.all(
+    urlsPorPedida.map(async (url) => (url === null ? null : await descargarImagen(url))),
+  );
+  return pedidas.map((pedida, i) => ({
+    dataUrl: dataUrls[i] ?? null,
+    ...(pedida.titulo === undefined ? {} : { titulo: pedida.titulo }),
+    ...(pedida.principal === true ? { principal: true } : {}),
+  }));
 }
 
 // ── Documento PDF (react-pdf, sin JSX: `createElement`) ──────────────────────────────────────────
@@ -601,6 +718,22 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETA.borde,
   },
+  // ⭐ 0.106 — el HUECO de una imagen que ESTA orden manda y no se pudo traer. MISMO tamaño y marco
+  // que la imagen que sustituye: así el papel no se descuadra el día que algo falla, y se VE que
+  // ahí faltaba algo (el mismo criterio que la ficha de arte de la 0.094).
+  fotoHueco: {
+    width: 110,
+    height: 120,
+    borderWidth: 1,
+    borderColor: PALETA.borde,
+    backgroundColor: PALETA.superficie,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  huecoTexto: { fontSize: TIPO.pie, color: PALETA.muted, textAlign: 'center' },
+  // Aviso de recorte de las FOTOS. Va DENTRO de la fila (que ya mide 120 pt de alto por la
+  // tarjeta) y pegado abajo: cuesta 0 pt de altura, igual que el aviso del título de los artes.
+  fotosAviso: { fontSize: TIPO.pie, color: PALETA.muted, alignSelf: 'flex-end', maxWidth: 150 },
   // Artes: tarjeta MÁS CHICA que la del bloque de fotos (son miniaturas de referencia del arte, no
   // la foto de la prenda), en fila que ENVUELVE y con rótulo opcional debajo (el nombre del
   // bordado/estampado del BOM). 4 × 80 + 3 × 8 = 344 pt: una sola fila con holgura.
@@ -612,6 +745,16 @@ const estilos = StyleSheet.create({
     objectFit: 'contain',
     borderWidth: 1,
     borderColor: PALETA.borde,
+  },
+  // El HUECO de una foto de arte que no llegó: mismo tamaño y marco que la tarjeta que sustituye.
+  arteHueco: {
+    width: 80,
+    height: 88,
+    borderWidth: 1,
+    borderColor: PALETA.borde,
+    backgroundColor: PALETA.superficie,
+    justifyContent: 'center',
+    paddingHorizontal: 3,
   },
   arteTitulo: { fontSize: TIPO.pie, color: PALETA.muted, marginTop: 2, textAlign: 'center' },
   colColor: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
@@ -641,19 +784,43 @@ function bandaCancelada(datos: DatosImpresoOrden): ReactElement | null {
   });
 }
 
-/** Bloque de fotos del modelo (vacío si no hay ninguna disponible). */
-function bloqueFotos(datos: DatosImpresoOrden): ReactElement | null {
+/**
+ * Bloque de fotos del modelo (vacío si no hay ninguna que imprimir: el impreso de siempre).
+ *
+ * A PROPÓSITO se muestran hasta {@link MAX_FOTOS} (la principal SIEMPRE, luego las que sigan por
+ * orden): es una hoja de PISO de producción, no una galería; más desbordaría el encabezado. El
+ * tope ya se aplicó al armar los datos —ahí es donde ahorra descargas—; aquí se vuelve a aplicar
+ * como CINTURÓN (es idempotente) por si alguien construye los datos a mano.
+ *
+ * ⭐ 0.106 — dos cosas que este bloque ya no calla: la foto que ESTA orden manda y **no llegó**
+ * deja su HUECO en el sitio que le tocaba (antes desaparecía y la siguiente ocupaba su lugar), y
+ * las que quedaron fuera por el tope se DICEN al final de la fila, donde no cuestan altura.
+ */
+export function bloqueFotos(datos: DatosImpresoOrden): ReactElement | null {
   if (datos.fotos.length === 0) {
     return null;
   }
+  const { mostradas, ocultas } = recortarFotos(datos.fotos);
+  const fueraDelTope = ocultas + datos.fotosOcultas;
   return h(
     View,
     { style: estilos.fotos },
-    // A PROPÓSITO se muestran hasta MAX_FOTOS (la principal SIEMPRE, luego las que sigan por
-    // orden): es una hoja de PISO de producción, no una galería; más desbordaría el encabezado.
-    ...recortarFotos(datos.fotos).map((foto, i) =>
-      h(Image, { key: `foto-${i}`, style: estilos.foto, src: foto.dataUrl }),
+    ...mostradas.map((foto, i) =>
+      foto.dataUrl === null
+        ? h(
+            View,
+            { key: `foto-${String(i)}`, style: estilos.fotoHueco },
+            h(Text, { style: estilos.huecoTexto }, 'Esta foto del modelo no se pudo traer.'),
+          )
+        : h(Image, { key: `foto-${String(i)}`, style: estilos.foto, src: foto.dataUrl }),
     ),
+    fueraDelTope === 0
+      ? null
+      : h(
+          Text,
+          { key: 'aviso', style: estilos.fotosAviso },
+          `Fotos del modelo: se muestran ${String(mostradas.length)} de ${String(mostradas.length + fueraDelTope)}`,
+        ),
   );
 }
 
@@ -746,7 +913,21 @@ function tablaMatriz(datos: DatosImpresoOrden): ReactElement {
  */
 export const MAX_ARTES = 4;
 
-/** Tope de fotos del MODELO en el encabezado (bloque `bloqueFotos`). Igual que antes: 3. */
+/**
+ * Tope de fotos del MODELO en el encabezado (bloque `bloqueFotos`). Igual que antes: 3.
+ *
+ * ⚠️ **PRESUPUESTO HORIZONTAL (0.106) — subir este número puede tirar el aviso fuera de la fila.**
+ * El aviso de recorte («Fotos del modelo: se muestran 3 de 8») vive DENTRO de la fila de fotos para
+ * no costar altura, así que compite por el ANCHO con las tarjetas. La cuenta, en A4 con el
+ * `padding` de 40 por lado (≈ **515 pt útiles**):
+ *
+ *     3 tarjetas × 110 + 3 huecos × 8 (`gap`) + 150 (`maxWidth` de `estilos.fotosAviso`) = **504 pt**
+ *
+ * Quedan ~11 pt de holgura. Con `MAX_FOTOS = 4` serían 622 pt y el aviso se saldría de la fila (o
+ * envolvería), y lo mismo si crece el ancho de la tarjeta, el `gap` o el `maxWidth` del aviso.
+ * 🔴 `paginasPdf` NO lo detecta —el desborde es horizontal, no agrega hoja—, así que si tocas
+ * cualquiera de esos cuatro números, **rehaz la cuenta y mira el PDF**.
+ */
 export const MAX_FOTOS = 3;
 
 /**
@@ -770,19 +951,32 @@ export { porRondas };
  * recorta. Las fotos de los artes llegan repartidas {@link porRondas}, así que el tope se lleva
  * primero las fotos EXTRA de un arte y solo después la única foto de otro. Función pura, exportada
  * para probar el criterio sin renderizar.
+ *
+ * ⭐ 0.106 — el tope de verdad se aplica ANTES de presignar y de bajar bytes, sobre la lista de lo
+ * que la orden PIDE ({@link ImagenPedida}), con el mismo {@link recortarAlTope} y la misma
+ * constante. Esta función es su gemela para imágenes YA resueltas: el CINTURÓN del render, por si
+ * alguien arma los datos a mano. Es idempotente, así que aplicarla dos veces no cambia nada.
  */
-export function recortarArtes(artes: FotoImpreso[]): { mostradas: FotoImpreso[]; ocultas: number } {
-  const mostradas = anteponerPrincipal(artes).slice(0, MAX_ARTES);
-  return { mostradas, ocultas: artes.length - mostradas.length };
+export function recortarArtes(artes: readonly FotoImpreso[]): {
+  mostradas: FotoImpreso[];
+  ocultas: number;
+} {
+  return recortarAlTope(artes, MAX_ARTES);
 }
 
 /**
  * Mismo criterio para las FOTOS del modelo del encabezado: la principal al frente y hasta
- * {@link MAX_FOTOS}. No devuelve conteo porque ese bloque no lleva título donde avisarlo (la
- * cantidad de fotos no es información de piso, a diferencia del arte).
+ * {@link MAX_FOTOS}, con el conteo de las que quedaron fuera.
+ *
+ * ⭐ 0.106: antes devolvía sólo las mostradas —"ese bloque no lleva título donde avisarlo"—, y así
+ * el papel se quedaba callado cuando el modelo tenía más fotos de las que caben. El bloque sigue
+ * SIN título; el aviso va DENTRO de la fila de fotos, que no cuesta un solo pt de altura.
  */
-export function recortarFotos(fotos: FotoImpreso[]): FotoImpreso[] {
-  return anteponerPrincipal(fotos).slice(0, MAX_FOTOS);
+export function recortarFotos(fotos: readonly FotoImpreso[]): {
+  mostradas: FotoImpreso[];
+  ocultas: number;
+} {
+  return recortarAlTope(fotos, MAX_FOTOS);
 }
 
 /**
@@ -791,18 +985,23 @@ export function recortarFotos(fotos: FotoImpreso[]): FotoImpreso[] {
  * image/*), ya descargadas best-effort, capadas a {@link MAX_ARTES}. Sin artes NO se pinta nada
  * (ni el título): el impreso histórico queda idéntico.
  */
-function bloqueArtes(datos: DatosImpresoOrden): ReactElement | null {
+export function bloqueArtes(datos: DatosImpresoOrden): ReactElement | null {
   if (datos.artes.length === 0) {
     return null;
   }
+  // El tope ya se aplicó al armar los datos (antes de bajar nada); aquí se repite como CINTURÓN.
   const { mostradas, ocultas } = recortarArtes(datos.artes);
+  // ⭐ 0.106 — el TOTAL es lo que la orden PIDE (`artesOcultas` viene contado sobre eso), no lo que
+  // R2 alcanzó a dar. Contarlo sobre lo descargado hacía que un papel al que se le cayeron dos
+  // imágenes dijera «Artes (imágenes)» a secas, como si estuvieran todas.
+  const total = mostradas.length + ocultas + datos.artesOcultas;
   // El aviso de truncado va EN EL TÍTULO de la sección, no en una leyenda aparte: así el conteo
   // total sigue a la vista sin costar un renglón extra de altura (que en las órdenes pesadas es
   // justo lo que empujaba el impreso a una segunda hoja).
   const titulo =
-    ocultas === 0
+    total === mostradas.length
       ? 'Artes (imágenes)'
-      : `Artes (imágenes) — se muestran ${String(mostradas.length)} de ${String(datos.artes.length)}`;
+      : `Artes (imágenes) — se muestran ${String(mostradas.length)} de ${String(total)}`;
   return h(
     View,
     { style: estilosDoc.seccion },
@@ -813,8 +1012,20 @@ function bloqueArtes(datos: DatosImpresoOrden): ReactElement | null {
       ...mostradas.map((arte, i) =>
         h(
           View,
-          { key: `arte-${i}`, style: estilos.arte },
-          h(Image, { style: estilos.arteFoto, src: arte.dataUrl }),
+          { key: `arte-${String(i)}`, style: estilos.arte },
+          // Una imagen que ESTA orden manda y no llegó deja HUECO, y lo DICE: quien tiene el papel
+          // en la mano ve que falta algo y lo pide, en vez de producir creyendo que no había arte.
+          arte.dataUrl === null
+            ? h(
+                View,
+                { style: estilos.arteHueco },
+                h(
+                  Text,
+                  { style: estilos.huecoTexto },
+                  'Esta foto del arte no se pudo traer. Pídela antes de producir.',
+                ),
+              )
+            : h(Image, { style: estilos.arteFoto, src: arte.dataUrl }),
           arte.titulo === undefined ? null : h(Text, { style: estilos.arteTitulo }, arte.titulo),
         ),
       ),

@@ -3,6 +3,8 @@
  *  • `fotosArteDeLaOrden` — la REGLA de qué fotos de arte manda la OP (0.083, §Post-F9.177), ahora
  *    compartida por el impreso de la ORDEN y la FICHA DE ARTE. Función pura.
  *  • `anteponerPrincipal` — la garantía anti-recorte.
+ *  • `recortarAlTope` / `presignarKeys` (0.106) — el tope con su conteo y el presign best-effort
+ *    por imagen, compartidos por los dos papeles de la orden.
  *  • `descargarImagenComoDataUrl` — best-effort y su TOPE DE PESO opcional.
  * No tocan BD ni red: `fetch` va stubbeado.
  */
@@ -16,6 +18,8 @@ import {
   fotosArteDeLaOrden,
   leerFotosArteDeLaOrdenPorId,
   porRondas,
+  presignarKeys,
+  recortarAlTope,
   type ArteModeloParaImpreso,
   type DepsFotosArteOrden,
 } from './imagenes-impreso.js';
@@ -375,5 +379,85 @@ describe('leerFotosArteDeLaOrdenPorId — el cableado que toca la BD', () => {
     expect(salida.map((f) => f.key)).toEqual(['k1', 'k2']);
     expect(aviso).toHaveBeenCalled();
     aviso.mockRestore();
+  });
+});
+
+/*
+ * ⭐ 0.106 — los dos primitivos que comparten el impreso de la ORDEN y la FICHA DE ARTE. Aquí se
+ * prueban SOLOS; que cada papel les pase su tope y su contexto lo prueban sus propios tests.
+ */
+describe('recortarAlTope — el tope con su conteo', () => {
+  const img = (n: number, principal = false) => ({ id: n, principal });
+
+  it('por debajo del tope no recorta ni cuenta nada', () => {
+    expect(recortarAlTope([img(1), img(2)], 4)).toEqual({
+      mostradas: [img(1), img(2)],
+      ocultas: 0,
+    });
+  });
+
+  it('corta en el tope conservando el orden y CUENTA lo que dejó fuera', () => {
+    const seis = [img(1), img(2), img(3), img(4), img(5), img(6)];
+    expect(recortarAlTope(seis, 4)).toEqual({ mostradas: seis.slice(0, 4), ocultas: 2 });
+  });
+
+  it('la foto PRINCIPAL nunca se recorta, aunque llegue en último lugar', () => {
+    const cinco = [img(1), img(2), img(3), img(4), img(5, true)];
+    const { mostradas, ocultas } = recortarAlTope(cinco, 3);
+
+    expect(mostradas.map((m) => m.id)).toEqual([5, 1, 2]);
+    expect(ocultas).toBe(2);
+  });
+
+  it('es idempotente: volver a aplicarlo (el cinturón del render) no cambia nada', () => {
+    const seis = [img(1), img(2), img(3), img(4), img(5), img(6)];
+    const una = recortarAlTope(seis, 4);
+    expect(recortarAlTope(una.mostradas, 4)).toEqual({ mostradas: una.mostradas, ocultas: 0 });
+  });
+
+  it('con la lista vacía no truena', () => {
+    expect(recortarAlTope([] as { principal?: boolean }[], 4)).toEqual({
+      mostradas: [],
+      ocultas: 0,
+    });
+  });
+});
+
+describe('presignarKeys — best-effort POR IMAGEN, conservando la posición', () => {
+  it('devuelve una URL por key, en su mismo orden', async () => {
+    const archivos = { urlDescarga: (key: string) => Promise.resolve(`https://r2/${key}`) };
+
+    expect(await presignarKeys(['a', 'b'], archivos)).toEqual({
+      urls: ['https://r2/a', 'https://r2/b'],
+      fallos: 0,
+      primerMotivo: undefined,
+    });
+  });
+
+  it('🔴 la key que R2 rechaza queda en null EN SU SITIO (las demás siguen saliendo)', async () => {
+    // Casar las URLs por posición es lo que impide que una imagen salga con el rótulo de otra.
+    const archivos = {
+      urlDescarga: (key: string) =>
+        key === 'mala'
+          ? Promise.reject(new Error('R2 rechazó la key'))
+          : Promise.resolve(`u:${key}`),
+    };
+
+    const { urls, fallos, primerMotivo } = await presignarKeys(['a', 'mala', 'b'], archivos);
+
+    expect(urls).toEqual(['u:a', null, 'u:b']);
+    expect(fallos).toBe(1);
+    expect(primerMotivo).toBeInstanceOf(Error);
+  });
+
+  it('sin keys no llama a R2 ni reporta fallos', async () => {
+    const urlDescarga = vi.fn(() => Promise.resolve('x'));
+
+    expect(await presignarKeys([], { urlDescarga })).toEqual({
+      urls: [],
+      fallos: 0,
+      primerMotivo: undefined,
+    });
+    expect(urlDescarga).not.toHaveBeenCalled();
   });
 });
