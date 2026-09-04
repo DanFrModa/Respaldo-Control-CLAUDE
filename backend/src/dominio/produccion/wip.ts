@@ -11,6 +11,10 @@
  *  • Por recibir         = enviado − recibido − incompletas − faltantes saldados   (por proceso/TipoProceso)
  *  • Entregado a cliente = Σ entregas (etapa `entrega_cliente`)
  *  • Por entregar        = recibido(costura, procesos `generaEntradaPt`) − entregado a cliente
+ *  • Empacado            = Σ empaques (etapa `empaque`, 0.114). SIN pendiente derivado: la cantidad
+ *    del empaque es PROPIA y no se topa contra nada (*«se fabrican 1,000 y se empacan 990; se paga
+ *    lo empacado y las 10 se quedan quietas en inventario»*), así que un «por empacar» sería una
+ *    resta que el negocio no hace.
  *
  * Decisión de "por entregar": el viejo entregaba al cliente lo que ya estaba en PT (lo metido por el
  * recibo de COSTURA, `TipoProceso.generaEntradaPt`). Por eso la base de "por entregar" es el
@@ -1166,6 +1170,9 @@ export async function wipDeOrden(
   const totalPedido = [...pedido.values()].reduce((s, v) => s + v, 0);
   const totalCortado = [...cortado.values()].reduce((s, v) => s + v, 0);
   const totalEnviado = await totalEtapa(cliente, idOrden, TipoEtapaMovimiento.envio_maquila);
+  // 0.114: Σ EMPACADO. Suma directa de las etapas de empaque VIVAS, igual que el resto — NO se
+  // deriva de lo recibido ni de lo entregado: la cantidad del empaque es propia (regla de C&A).
+  const totalEmpacado = await totalEtapa(cliente, idOrden, TipoEtapaMovimiento.empaque);
   const totalEntregado = [...entregadoMapa.values()].reduce((s, v) => s + v, 0);
 
   return {
@@ -1182,6 +1189,7 @@ export async function wipDeOrden(
     recibido: recibidoTotal,
     enviadoCostura,
     recibidoCostura,
+    empacado: totalEmpacado,
     // Las dos cifras que completan la TRAZABILIDAD DE LAS CUATRO CUBETAS que pidió Daniel
     // (§Post-F9.147: *"debemos de saber que paso con cada prenda despues"*):
     //   enviado = buenas (`recibido`) + incompletas + faltante (`pendientePorRecibir`).

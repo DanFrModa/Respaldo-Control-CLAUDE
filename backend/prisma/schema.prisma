@@ -4253,13 +4253,32 @@ model OrdenArteFotoOculta {
 /// (D8 — "maquila unificada parametrizada por TipoProceso"). El `corte` y la `entrega_cliente`
 /// no llevan proceso. El estampado pre/post-costura se modela como envío/recibo de su
 /// TipoProceso (WIP+cargo) y, para su va-y-ven de inventario, con los tipos 6/3 del kardex (E3).
+///
+/// ⭐ `empaque` (0.114) es un SERVICIO SOBRE LA ORDEN, no una maquila de ida y vuelta (Daniel:
+/// *«el empaque no toca el inventario … simplemente sucede y ya»*). Como el `corte`, va con
+/// `id_tipo_proceso = NULL` —esa NULL es justamente la marca de "servicio sobre la orden"— no
+/// mueve kardex, no tiene envío ni recibo, y su cantidad es PROPIA (no se deriva del recibo:
+/// se fabrican 1,000 y se empacan 990; las 10 se quedan quietas en inventario).
 enum TipoEtapaMovimiento {
   corte
   envio_maquila
   recibo_maquila
   entrega_cliente
+  empaque
 
   @@map("tipo_etapa_movimiento")
+}
+
+/// SERVICIO sobre la orden que originó un cargo EsMa cuando NO hay proceso de maquila (0.114).
+/// El corte y el empaque se pagan igual que una maquila —*«el monto a pagar sale de una orden, lo
+/// mismo que un maquilero»*— pero no son un `TipoProceso`: convertirlos en uno los metería al
+/// flujo envío→recibo que Daniel dice que NO son. Por eso `EsMaCargo` lleva o `idTipoProceso`
+/// (maquila) o `servicio` (corte/empaque), nunca los dos ni ninguno (CHECK en la migración).
+enum ServicioOrden {
+  corte
+  empaque
+
+  @@map("servicio_orden")
 }
 
 /// Dirección de un tipo de movimiento de inventario (ex `IPT_TiposMov.TipoEnSa`: 1/2/3).
@@ -4933,7 +4952,8 @@ model EsMaCargo {
   idEmpresa Int     @map("id_empresa")
   empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
 
-  /// Recibo de maquila que originó el cargo (F3-E4). NULLABLE para el histórico migrado
+  /// ETAPA que originó el cargo: recibo de maquila (F3-E4), CORTE o EMPAQUE (0.114 — servicios
+  /// sobre la orden que se pagan igual pero no van y vienen). NULLABLE para el histórico migrado
   /// (F3-E6: cargos viejos sin liga formal). Restrict.
   idEtapaRecibo Int?             @map("id_etapa_recibo")
   etapaRecibo   EtapaMovimiento? @relation(fields: [idEtapaRecibo], references: [id], onDelete: Restrict)
@@ -4946,9 +4966,16 @@ model EsMaCargo {
   idOrden Int   @map("id_orden")
   orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Restrict)
 
-  /// Proceso de maquila del cargo (costura/estampado…). Restrict.
-  idTipoProceso Int         @map("id_tipo_proceso")
-  tipoProceso   TipoProceso @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
+  /// Proceso de maquila del cargo (costura/estampado…). Restrict. NULLABLE desde 0.114: un cargo
+  /// de CORTE o de EMPAQUE no tiene proceso de maquila — lleva `servicio` en su lugar.
+  idTipoProceso Int?         @map("id_tipo_proceso")
+  tipoProceso   TipoProceso? @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
+
+  /// ⭐ SERVICIO sobre la orden que originó el cargo (0.114): `corte` o `empaque`. Excluyente con
+  /// `idTipoProceso` — exactamente UNO de los dos va lleno (CHECK `esma_cargo_proceso_o_servicio`
+  /// en la migración). Es la frontera que dictó Daniel: corte y empaque se pagan como maquila
+  /// (salen del estado de cuenta y de la corrida semanal) pero NO son procesos de maquila.
+  servicio ServicioOrden?
 
   /// Cantidad real validada por el admin (F3-E4). NULL mientras esté `propuesto`. Decimal.
   cantidadReal Decimal? @map("cantidad_real") @db.Decimal(14, 2)
@@ -4989,6 +5016,8 @@ model EsMaCargo {
   @@index([idEmpresa])
   @@index([idEtapaRecibo])
   @@index([idMaquilero])
+  // Sin índice por `servicio`: la cardinalidad es 2 y ninguna consulta filtra por él (los cargos se
+  // buscan por maquilero/orden/estado). El CHECK de exclusividad vive en la migración.
   @@index([idOrden])
   @@index([idTipoProceso])
   @@index([estado])

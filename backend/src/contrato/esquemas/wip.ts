@@ -387,6 +387,15 @@ export const esquemaWipOrden = z
           'trazabilidad de las cuatro cubetas.',
       ),
     recibidoCostura: z.number().int().describe('Recibido de costura (mete a PT).'),
+    empacado: z
+      .number()
+      .int()
+      .describe(
+        'Σ piezas EMPACADAS de la orden (etapas de empaque vivas, 0.114). Es una cantidad PROPIA: ' +
+          'no se deriva de lo recibido ni de lo entregado (se fabrican 1,000 y se empacan 990, la ' +
+          'regla de C&A que dictó Daniel), y no toca inventario. Se publica desde el servidor por ' +
+          'la misma razón que `enviadoCostura`: para que el stepper del panel no la re-derive.',
+      ),
     entregado: z.number().int().describe('Total entregado a cliente.'),
     porEntregar: z.number().int().describe('recibido(costura) − entregado.'),
     // Detalle por color×talla.

@@ -1135,6 +1135,9 @@ export type Etapa =
 /** Cuerpo de alta de un corte (`POST /api/produccion/cortes`). */
 export type CorteCrear =
   paths['/api/produccion/cortes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de alta de un empaque (`POST /api/produccion/empaques`, 0.114). */
+export type EmpaqueCrear =
+  paths['/api/produccion/empaques']['post']['requestBody']['content']['application/json'];
 /** Cuerpo de alta de un envío a maquila (`POST /api/produccion/envios`). */
 export type EnvioCrear =
   paths['/api/produccion/envios']['post']['requestBody']['content']['application/json'];

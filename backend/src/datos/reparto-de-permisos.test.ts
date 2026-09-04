@@ -246,6 +246,7 @@ const CATALOGO_AL_3_SEP: readonly string[] = [
   'produccion.cancelar',
   'produccion.corte',
   'produccion.corte-salidas',
+  'produccion.empaque',
   'produccion.entradas-maquila',
   'produccion.entrega',
   'produccion.envio',

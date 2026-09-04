@@ -13,6 +13,7 @@ import type {
   CorteCrear,
   CorteSemanal,
   CorteSemanalQuery,
+  EmpaqueCrear,
   EnvioCrear,
   Etapa,
   EtapaCancelar,
@@ -41,6 +42,14 @@ async function crearCorte(cuerpo: CorteCrear): Promise<Etapa> {
   return data;
 }
 
+async function crearEmpaque(cuerpo: EmpaqueCrear): Promise<Etapa> {
+  const { data, error } = await api.POST('/api/produccion/empaques', { body: cuerpo });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 async function crearEnvio(cuerpo: EnvioCrear): Promise<Etapa> {
   const { data, error } = await api.POST('/api/produccion/envios', { body: cuerpo });
   if (!data) {
@@ -51,6 +60,17 @@ async function crearEnvio(cuerpo: EnvioCrear): Promise<Etapa> {
 
 async function cancelarCorte(id: number, cuerpo: EtapaCancelar): Promise<Etapa> {
   const { data, error } = await api.POST('/api/produccion/cortes/{id}/cancelar', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function cancelarEmpaque(id: number, cuerpo: EtapaCancelar): Promise<Etapa> {
+  const { data, error } = await api.POST('/api/produccion/empaques/{id}/cancelar', {
     params: { path: { id } },
     body: cuerpo,
   });
@@ -196,6 +216,18 @@ export function useCrearCorte(): UseMutationResult<Etapa, ErrorDeApi, CorteCrear
   });
 }
 
+/**
+ * Registra un EMPAQUE (0.114) e invalida los pendientes. El empaque es un servicio sobre la orden
+ * —no toca inventario y su cantidad es propia—, pero para la caché es una etapa más de la orden.
+ */
+export function useCrearEmpaque(): UseMutationResult<Etapa, ErrorDeApi, EmpaqueCrear> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: crearEmpaque,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS }),
+  });
+}
+
 /** Registra un envío a maquila e invalida los pendientes. */
 export function useCrearEnvio(): UseMutationResult<Etapa, ErrorDeApi, EnvioCrear> {
   const queryClient = useQueryClient();
@@ -216,6 +248,15 @@ export function useCancelarCorte(): UseMutationResult<Etapa, ErrorDeApi, ArgsCan
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCancelarEtapa) => cancelarCorte(id, cuerpo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS }),
+  });
+}
+
+/** Cancela (suave) un empaque e invalida los pendientes (0.114). */
+export function useCancelarEmpaque(): UseMutationResult<Etapa, ErrorDeApi, ArgsCancelarEtapa> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCancelarEtapa) => cancelarEmpaque(id, cuerpo),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS }),
   });
 }
