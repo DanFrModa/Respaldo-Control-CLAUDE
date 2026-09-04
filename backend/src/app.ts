@@ -312,7 +312,8 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasCuentaEsMa, { prefix: '/api' });
   // EsMa (F6-E5) — experiencia de usuario: estado de cuenta unificado + desglosado (+ PDF R9 + Excel),
   // saldos de todos, pagos/recibos semanales, selector de maquileros y revisión de partidas. Consulta
-  // con esma.ver-pagos; revisar con esma.modificar. Importes ocultos sin consultas.ver-importes.
+  // con esma.ver-pagos; REVISAR con esma.revisar (su propio permiso desde la fila 0.128: capturar es
+  // de quien recibe, validar es de Daniel). Importes ocultos sin consultas.ver-importes.
   await app.register(rutasEstadoCuentaEsMa, { prefix: '/api' });
   // FINANZAS (Módulo 14, F9-E1) — MOTOR único de cuenta corriente de terceros (CxC/CxP) que
   // generaliza EsMa (D12/D15/R10): registrar/cancelar movimientos (terceros.administrar), saldo

@@ -210,7 +210,9 @@ un cobro por cada uno.
   mando (normalmente **descontandole** esas prendas faltantes)»* (§Post-F9.147).
 - **«Propone, no cobra»**: el `DescuentoMaquilero` nace `capturado`, que **no cuenta al saldo** y se ve
   en el estado de cuenta marcado como pendiente de revisión (fila 0.115). Ahí está el visto bueno, con
-  el flujo de revisión que ya existía (`esma.modificar`) — **sin pantalla nueva**. Su `observaciones`
+  el flujo de revisión que ya existía — **sin pantalla nueva**—, que desde la fila 0.128 exige
+  **`esma.revisar`** y no `esma.modificar`: cerrar la orden (`produccion.recibo`) propone el
+  descuento, pero aprobarlo es del círculo del dueño. Su `observaciones`
   dice de qué OP y de qué es: *«Faltante de la orden #77 · Costura: 5 pza(s) que no se devolvieron»*.
 - **Deshacer** = acto inverso auditado (D3), con **update CONDICIONAL** (`updateMany` sobre
   `estadoRevision: 'capturado'` + `canceladoEn: null`, y falla si `count === 0`): `revisarMovimiento`

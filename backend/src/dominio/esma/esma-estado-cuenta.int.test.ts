@@ -60,6 +60,9 @@ const PERM_TODOS: ClavePermiso[] = [
   'inventario-pt.ver',
   'esma.cargo-validar',
   'esma.modificar',
+  // Autorizar una partida capturada es `esma.revisar` desde la fila 0.128 (capturar y validar
+  // dejaron de ser el mismo permiso). Estas pruebas revisan como paso de arreglo, así que lo llevan.
+  'esma.revisar',
   'esma.ver-pagos',
   'consultas.ver-importes',
 ];

@@ -12136,6 +12136,23 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.198) — VALIDAR ES DE DANIEL (fila 0.128, 4-sep-2026): un permiso nuevo, cinco perfiles sin validar, y cuatro defaults que Daniel confirma o ajusta
+
+**Contexto.** Daniel, §Post-F9.192 (1): *«la entrada la da la persona responsable de recibos o de producción. Pero **la validación sólo la doy yo**. O sea, es un permiso para meter lo recibido y otro para validarlo»*. El repaso midió que validar cargos (`esma.cargo-validar`) y revisar partidas (que colgaba de `esma.modificar`, el mismo permiso que capturar) se sembraban en TODOS los perfiles: cualquiera podía convertir un recibo en deuda fijando el precio.
+
+**Lo que se construyó:** nace `esma.revisar` («Revisar y autorizar partidas de maquila: convertir lo capturado en deuda o pago real»); `revisarMovimiento` y su ruta lo exigen; `esma.modificar` se queda para capturar; `esma.cargo-validar` sigue siendo el permiso de validar cargos. El seed da los dos permisos de validar sólo al círculo y se los quita a los cinco perfiles operativos. Como `sembrarRoles` **sincroniza** los roles de sistema (borra las ligas que sobran), basta `SEED_ON_START=true`; un rol personalizado conserva lo que tenga. Todos los caminos que escriben `revisado`/`validado` quedaron recorridos: la corrida semanal crea pagos ya revisados bajo `pagos.corrida-armar` (sólo administrador: más estrecho, no una puerta lateral); el cierre de maquila deja el descuento capturado y se autoriza aparte; el ETL histórico transcribe hechos ya revisados en Access, fuera del API. La puerta lateral de CxP («entrada sin factura») ya era sólo del administrador.
+
+**Cuatro defaults construidos (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿Quién es «el círculo» que valida? | Administrador + Administración/Dirección + **Directivo**. | Mover `esma.revisar` y `esma.cargo-validar` a «sólo administrador» (dos listas del seed, sin migración). |
+| b | ¿El perfil Gerencial valida cargos de maquila? | **No** (pierde `esma.cargo-validar`). | Devolvérselo en el seed. |
+| c | ¿Revisar partidas y validar cargos son un permiso o dos? | **Dos** (`esma.revisar` y `esma.cargo-validar`): fusionarlos después es barato; separarlos después, no. | Fusionarlos en el catálogo y el seed. |
+| d | ¿Capturar abonos/descuentos (`esma.modificar`) sigue llegando hasta Secretarial? | **Sí**, Daniel no lo mencionó; candidato al recorte cuando arme los perfiles por puesto real. | Quitarlo en el seed a los perfiles que no capturan. |
+
+---
+
 #### (Post-F9.197) — LA RECEPCIÓN CONTRA LA OC HACE NACER LA DEUDA (fila 0.129, 4-sep-2026): cuatro defaults del lead que Daniel confirma o ajusta
 
 **Contexto.** Daniel, §Post-F9.192 (2)(3): *«la persona que recibe (a partir de una OC) mete las cantidades y precios… el precio debería de ser el de la OC, la cantidad puede variar un poco, por eso se mete a mano… es la misma entrada que se ocupa tanto para inventario como para su estado de cuenta»* · *«Lo ideal es recibir con la factura. Pero si no fuera el caso, está bien dejarla como pendiente. Todo se recibe a partir de la OC. Tanto telas como avíos.»* El repaso midió que las telas ya lo hacían (la deuda nace al confirmar la entrada, en cuatro casos) y los avíos no: la recepción contra OC movía inventario y actualizaba la OC, pero nunca tocaba Cuentas por pagar.

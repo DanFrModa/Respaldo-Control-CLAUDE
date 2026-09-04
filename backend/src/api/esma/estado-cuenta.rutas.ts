@@ -2,7 +2,9 @@
  * Rutas REST del ESTADO DE CUENTA de EsMa (F6-E5): estado de cuenta unificado, desglosado (+ PDF R9 +
  * Excel), saldos de todos, consultas semanales, selector de maquileros y revisión de partidas.
  * Handlers DELGADOS (A1): validan (Zod compartido), autorizan (`conPermiso`, A4) y delegan al dominio.
- * Todo es solo lectura salvo `revisar` (transición de estado, `esma.modificar`). A9 por empresa activa.
+ * Todo es solo lectura salvo `revisar` (transición de estado, **`esma.revisar`** — su propio
+ * permiso desde la fila 0.128: capturar es de quien recibe, VALIDAR es de Daniel). A9 por empresa
+ * activa.
  *
  * ORDEN de rutas: las estáticas (`/esma/maquileros`, `/esma/saldos`, …) no colisionan con las de
  * `:id` (Fastify usa un router radix: distinto número de segmentos = ruta distinta).
@@ -149,10 +151,13 @@ export const rutasEstadoCuentaEsMa: FastifyPluginCallbackZod = (app, _opciones, 
   });
 
   // ── Revisión (autorización) de una partida ────────────────────────────────────
+  // ⭐ `esma.revisar`, NO `esma.modificar` (fila 0.128, Daniel §Post-F9.192(1)): autorizar una
+  // partida es lo que la mete al saldo (0.115), y ése es un acto distinto de capturarla. El
+  // dominio lo re-verifica (A1/A4).
   app.route({
     method: 'POST',
     url: '/esma/movimientos/:concepto/:id/revisar',
-    preHandler: app.conPermiso('esma.modificar'),
+    preHandler: app.conPermiso('esma.revisar'),
     schema: {
       tags: ['esma'],
       summary: 'Revisar (autorizar) una partida capturada → revisada',

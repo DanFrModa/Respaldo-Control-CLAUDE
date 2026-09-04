@@ -18,14 +18,21 @@
  * | Batería | Qué caza | Cuándo debe fallar |
  * |---|---|---|
  * | **ATRIBUCIÓN** | que ninguna clave quede sin dueño, y que ningún perfil nombre claves fantasma | al agregar un permiso al catálogo y no repartirlo · al dejar en un perfil una clave que el catálogo ya no tiene |
- * | **EQUIVALENCIA** | que el cambio de forma (resta → suma) no MOVIERA a nadie de sitio | al mover de perfil cualquiera de las 122 claves que existían el 3-sep-2026 |
+ * | **EQUIVALENCIA** | que nadie se mueva de sitio salvo por un retiro DECLARADO | al mover de perfil cualquiera de las 122 claves del 3-sep-2026 sin escribirlo en {@link RETIRADOS_DESDE_LA_FOTO} |
  * | **LO NACIDO DESPUÉS** | que un permiso posterior a la foto también cueste una decisión escrita | al agregar un permiso al catálogo sin declararlo en {@link NUEVOS_DESDE_LA_FOTO} |
  *
- * ⚠️ La de EQUIVALENCIA es una FOTO del 3-sep-2026 y se actualiza a mano cuando el reparto cambie
- * de verdad — ése es justo el punto: que cambiar quién puede qué **cueste una decisión visible**.
- * Habla SÓLO de las 122 claves que existían ese día: un permiso posterior no le incumbe (de ése se
- * encarga la de ATRIBUCIÓN), para que agregar permisos no obligue a retocar la foto y acabe
- * volviéndola un trámite que alguien borra.
+ * 🔑 Las dos listas declarativas son simétricas y contestan la misma pregunta por los dos lados:
+ * {@link NUEVOS_DESDE_LA_FOTO} dice **a quién se le DIO** un permiso nuevo y por qué;
+ * {@link RETIRADOS_DESDE_LA_FOTO} dice **a quién se le QUITÓ** uno viejo y por qué. Sin la segunda,
+ * recortar el reparto obligaba a reescribir la foto —o sea, a borrar la evidencia del cambio—.
+ *
+ * ⚠️ La de EQUIVALENCIA es una FOTO del 3-sep-2026 y **no se retoca**: es el registro de lo que
+ * había ese día. Cuando el reparto cambie de verdad, el cambio se escribe ENCIMA de ella —en
+ * {@link RETIRADOS_DESDE_LA_FOTO}—, que es lo que hace que cambiar quién puede qué **cueste una
+ * decisión visible** sin borrar la evidencia de cómo estaba antes. Habla SÓLO de las 122 claves que
+ * existían ese día: un permiso posterior no le incumbe (de ése se encargan la de ATRIBUCIÓN y la de
+ * LO NACIDO DESPUÉS), para que agregar permisos no obligue a retocar la foto y acabe volviéndola un
+ * trámite que alguien borra.
  *
  * Está escrita en la forma VIEJA (un catálogo congelado menos cuatro listas de recortes), que es
  * como estaba el seed antes de voltearlo; el seed hoy lo dice al revés (listas explícitas de lo que
@@ -44,9 +51,10 @@
  *
  * 📌 Lo que esta prueba NO hace: juzgar si el reparto de hoy es el bueno. No lo es —76 de los 122
  * permisos nunca se le restaron a nadie, así que `Secretarial` arrastra cosas como
- * `compras.autorizar` o `esma.cargo-validar`—. Daniel decidió armar los perfiles concretos AL
- * FINAL, con los puestos reales de sus 23 usuarios; esta prueba es la que hará que ese recorte se
- * note renglón por renglón.
+ * `compras.autorizar` o `notas.cancelar`—. Daniel decidió armar los perfiles concretos AL FINAL,
+ * con los puestos reales de sus 23 usuarios; esta prueba es la que hace que ese recorte se note
+ * renglón por renglón. El primero ya se hizo: `esma.cargo-validar` (fila 0.128), que era
+ * precisamente el ejemplo con el que arriba se explica el defecto de la cascada.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -341,6 +349,38 @@ const RESTA_LOGISTICA: readonly string[] = [
   'precostos.consultar',
 ];
 
+/**
+ * ✂️ **RETIROS deliberados POSTERIORES a la foto** — el otro lado de {@link NUEVOS_DESDE_LA_FOTO}.
+ *
+ * La foto del 3-sep-2026 dice qué tenía cada perfil ESE DÍA, y se compara contra ella justamente
+ * para que mover a alguien de sitio **cueste una decisión visible**. Pero «visible» no puede querer
+ * decir «reescribe la foto y ya»: si se editaran las listas de resta —que describen lo que hacía la
+ * cascada, un hecho histórico— la foto empezaría a mentir sobre el pasado y dejaría de poder
+ * distinguir un recorte decidido de un accidente.
+ *
+ * Por eso los recortes viven aquí, **encima** de la foto: la foto sigue diciendo la verdad de aquel
+ * día, y esta lista dice qué se le quitó a quién DESPUÉS, con su razón escrita (obligatoria por el
+ * tipo, igual que en `SOLO_ADMINISTRADOR`). Quitarle un permiso a un perfil sin declararlo aquí
+ * hace fallar la equivalencia; declarar un retiro que el seed no hizo hace fallar la coherencia.
+ */
+const RETIRADOS_DESDE_LA_FOTO: readonly {
+  clave: ClavePermiso;
+  perfiles: readonly string[];
+  razon: string;
+}[] = [
+  {
+    clave: 'esma.cargo-validar',
+    perfiles: ['Gerencial', 'Ventas', 'Logistica', 'Asistente', 'Secretarial'],
+    razon:
+      'Fila 0.128 — DANIEL, 4-sep-2026 (§Post-F9.192(1)): *«La entrada la da la persona ' +
+      'responsable de recibos o de producción. Pero la validación sólo la doy yo.»* Validar el ' +
+      'cargo es fijar la cantidad y el precio REALES que se le van a pagar al maquilero. Queda en ' +
+      'el administrador y en Directivo (el círculo del dueño). Era, además, el ejemplo con el que ' +
+      'se explicaba el defecto de la cascada: aterrizó en un perfil clerical sin que nadie lo ' +
+      'decidiera, y aquí se decide lo contrario.',
+  },
+];
+
 /** Reconstruye la foto restando, que es como estaba escrito el seed antes de voltearlo. */
 function fotoDel3DeSeptiembre(): Record<string, string[]> {
   const menos = (base: readonly string[], quitar: readonly string[]): string[] =>
@@ -362,8 +402,22 @@ function fotoDel3DeSeptiembre(): Record<string, string[]> {
   };
 }
 
-describe('📸 equivalencia: voltear el seed de RESTA a SUMA no movió a nadie de sitio', () => {
-  const foto = fotoDel3DeSeptiembre();
+/**
+ * La foto de aquel día MENOS los retiros decididos después: contra esto se compara el seed de hoy.
+ * (La foto se deja intacta a propósito — es el registro del pasado, no la expectativa de hoy.)
+ */
+function repartoEsperadoHoy(): Record<string, string[]> {
+  const esperado = fotoDel3DeSeptiembre();
+  for (const retiro of RETIRADOS_DESDE_LA_FOTO) {
+    for (const perfil of retiro.perfiles) {
+      esperado[perfil] = (esperado[perfil] ?? []).filter((clave) => clave !== retiro.clave);
+    }
+  }
+  return esperado;
+}
+
+describe('📸 equivalencia: nadie se mueve de sitio salvo por un retiro DECLARADO', () => {
+  const foto = repartoEsperadoHoy();
 
   it('los 9 perfiles siguen existiendo, con su nombre exacto', () => {
     expect(definirRoles().map((rol) => rol.nombre)).toEqual(Object.keys(foto));
@@ -385,13 +439,41 @@ describe('📸 equivalencia: voltear el seed de RESTA a SUMA no movió a nadie d
     // Se nombran las diferencias en los dos sentidos: un `toEqual` de 100 claves no se lee.
     expect(
       ahora.filter((clave) => !esperado.includes(clave)),
-      `${nombre} GANÓ permisos que no tenía el 3-sep-2026`,
+      `${nombre} GANÓ permisos que no tenía el 3-sep-2026 (ni están declarados como retiro)`,
     ).toEqual([]);
     expect(
       esperado.filter((clave) => !ahora.includes(clave)),
-      `${nombre} PERDIÓ permisos que sí tenía el 3-sep-2026`,
+      `${nombre} PERDIÓ permisos que sí tenía el 3-sep-2026.\nSi el recorte es a propósito, ` +
+        `decláralo en RETIRADOS_DESDE_LA_FOTO con su razón: quitarle un permiso a un perfil tiene ` +
+        `que costar una decisión escrita, igual que dárselo.`,
     ).toEqual([]);
     expect(ahora.length, `${nombre}: cambió el CONTEO de permisos`).toBe(esperado.length);
+  });
+
+  it('✂️ cada RETIRO declarado es real: la clave existe, estaba en la foto y el seed ya no la da', () => {
+    // Las tres formas en que esta lista podría pudrirse, y las tres se cazan aquí:
+    //  (1) declarar el retiro de un permiso que ya no existe → la lista habla de un fantasma;
+    //  (2) declarar como retiro algo que la foto nunca dio → el retiro no retira nada;
+    //  (3) declararlo y NO quitarlo del seed → la razón escrita miente y el permiso sigue puesto.
+    const catalogo = new Set<string>(CLAVES_PERMISO);
+    const fotoOriginal = fotoDel3DeSeptiembre();
+    for (const retiro of RETIRADOS_DESDE_LA_FOTO) {
+      expect(catalogo.has(retiro.clave), `${retiro.clave} ya no está en el catálogo`).toBe(true);
+      expect(retiro.razon.trim().length, `${retiro.clave} sin razón`).toBeGreaterThan(20);
+      expect(retiro.perfiles.length, `${retiro.clave} sin perfiles`).toBeGreaterThan(0);
+      for (const nombre of retiro.perfiles) {
+        const rol = definirRoles().find((r) => r.nombre === nombre);
+        expect(rol, `el retiro nombra un perfil que no existe: "${nombre}"`).toBeDefined();
+        expect(
+          fotoOriginal[nombre] ?? [],
+          `${nombre} NO tenía ${retiro.clave} el 3-sep-2026: no hay nada que retirarle`,
+        ).toContain(retiro.clave);
+        expect(
+          rol?.permisos ?? [],
+          `${retiro.clave} está declarado como RETIRADO de ${nombre}, pero el seed se lo sigue dando`,
+        ).not.toContain(retiro.clave);
+      }
+    }
   });
 
   it('la foto sigue hablando del catálogo de hoy (ninguna de sus claves desapareció)', () => {
@@ -429,6 +511,18 @@ describe('📸 equivalencia: voltear el seed de RESTA a SUMA no movió a nadie d
  *
  */
 const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = [
+  // ── «Validar es de Daniel» (fila 0.128, §Post-F9.192(1)) ───────────────────────────────────
+  {
+    clave: 'esma.revisar',
+    razon:
+      'SÓLO el administrador y Directivo (el círculo del dueño). DANIEL, 4-sep-2026: *«La entrada ' +
+      'la da la persona responsable de recibos o de producción. Pero la validación sólo la doy ' +
+      'yo. O sea, es un permiso para meter lo recibido y otro para validarlo.»* Revisar una ' +
+      'partida es lo que la mete al saldo (desde la 0.115 sólo lo revisado suma), o sea es el ' +
+      'acto de convertirla en deuda o en pago REAL. NO baja a Gerencial ni de ahí para abajo: ' +
+      'ellos capturan con `esma.modificar`, que se queda repartido como estaba — capturar no es ' +
+      'validar, y ése es el punto entero de la fila.',
+  },
   // ── La corrida semanal de pagos (fila 0.113) y su catálogo (0.125), §Post-F9.189(g) ────────
   {
     clave: 'pagos.corrida-armar',
