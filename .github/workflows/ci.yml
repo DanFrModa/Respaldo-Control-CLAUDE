@@ -118,10 +118,25 @@ jobs:
 
       # El lint con tipos crece con el proyecto: con el heap por defecto de Node
       # (~4 GB) el runner murió con "JavaScript heap out of memory" (6-ago-2026).
+      #
+      # 4-sep-2026: los 6 GB tampoco alcanzaron (exit 134 en el PR #307, OOM a
+      # 6011 MB de 6144). El comentario de abajo pedía ATACAR LA CAUSA y no volver
+      # a subir el número, así que ANTES de tocarlo se midió la vía que proponía:
+      # PARTIR el lint no sirve. Con 3 GB, `eslint src/dominio` y `eslint . salvo
+      # src/dominio` mueren LAS DOS con OOM — porque el costo no es cuántos
+      # archivos se revisan, sino construir el programa de tipos ENTERO, que es el
+      # mismo en las dos mitades. El mismo `eslint .` con 6144 SÍ pasa en la caja
+      # de desarrollo: el proyecto no dejó de caber, está en el filo y el runner
+      # tiene menos margen. De ahí 8192 (el runner público trae 16 GB).
+      #
+      # ⚠️ Sigue sin ser la cura. La cura es adelgazar el programa de tipos
+      # (proyectos de TS separados, tipos generados más chicos), y está anotada
+      # como deuda en `HOJA-DE-RUTA.md` §4. Lo que este cambio aporta al debate es
+      # una medición: la vía de partirlo queda descartada, no hay que reintentarla.
       - name: Lint (eslint)
         run: npm run lint
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: --max-old-space-size=8192
 
       # MISMA causa que el lint, diez días después (16-ago-2026): `tsc --noEmit`
       # murió con OOM (exit 134) en el runner. En su momento se le subió el heap

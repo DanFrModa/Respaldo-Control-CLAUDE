@@ -2500,6 +2500,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
 
+- **El análisis de estilo del CI ya no cabe en 6 GB, y partirlo NO sirve** (medido el 4-sep en el PR #307): `eslint src/dominio` y `eslint .` menos ese directorio mueren **las dos** con 3 GB, porque el costo es construir el programa de tipos **entero**, idéntico en las dos mitades. Se subió el techo a 8 GB como venda; **la cura sigue siendo adelgazar el programa de tipos** (proyectos de TS separados, tipos generados más chicos). Lo que aporta la medición es descartar la vía de partirlo: no hay que volver a intentarla.
 - **El agregado de «lo pendiente por validar» lee la tabla de detalles ENTERA** (fila 0.111, medido por su reviewer): `sqlCargosPropuestosPorMaquilero` agrega `etapa_movimiento_det` sin filtro en **cada** carga del tablero de saldos, la bandeja de cuentas por pagar y la corrida semanal. Hoy es correcto y nadie ha medido que duela; con el histórico de F3/F4 cargado puede volverse un plan caro. **No se toca sin una medición que lo justifique.**
 - **🟡 ABIERTO POR V1-E8q — LA TERCERA PUERTA: el hilo de comentarios de la ORDEN pinta el id crudo.**
   `frontend/src/modulos/ordenes/PanelComentarios.tsx` hace `{comentario.idUsuario ?? 'Sistema'}` — o sea
