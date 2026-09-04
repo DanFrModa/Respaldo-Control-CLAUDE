@@ -334,6 +334,7 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   'produccion.cancelar',
   'produccion.corte',
   'produccion.corte-salidas',
+  'produccion.empaque',
   'produccion.entradas-maquila',
   'produccion.entrega',
   'produccion.envio',
@@ -447,6 +448,7 @@ const GERENCIAL: readonly ClavePermiso[] = [
   'produccion.cancelar',
   'produccion.corte',
   'produccion.corte-salidas',
+  'produccion.empaque',
   'produccion.entradas-maquila',
   'produccion.entrega',
   'produccion.envio',
@@ -544,6 +546,7 @@ const VENTAS: readonly ClavePermiso[] = [
   'produccion.cancelar',
   'produccion.corte',
   'produccion.corte-salidas',
+  'produccion.empaque',
   'produccion.entradas-maquila',
   'produccion.entrega',
   'produccion.envio',
@@ -630,6 +633,7 @@ const LOGISTICA: readonly ClavePermiso[] = [
   'produccion.cancelar',
   'produccion.corte',
   'produccion.corte-salidas',
+  'produccion.empaque',
   'produccion.entradas-maquila',
   'produccion.entrega',
   'produccion.envio',
@@ -716,6 +720,7 @@ const ASISTENTE: readonly ClavePermiso[] = [
   'produccion.cancelar',
   'produccion.corte',
   'produccion.corte-salidas',
+  'produccion.empaque',
   'produccion.entradas-maquila',
   'produccion.entrega',
   'produccion.envio',
@@ -805,6 +810,7 @@ const SECRETARIAL: readonly ClavePermiso[] = [
   'produccion.cancelar',
   'produccion.corte',
   'produccion.corte-salidas',
+  'produccion.empaque',
   'produccion.entradas-maquila',
   'produccion.entrega',
   'produccion.envio',
@@ -954,6 +960,10 @@ const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
   // terceros, D12/R15): un taller marca con casillas qué servicios presta.
   { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
   { codigo: 'corte', nombre: 'Corte' },
+  // ⭐ 0.114 — Daniel: *«y una maquila de empaque también»*. El empacador es un proveedor de
+  // servicio como el cortador: se le carga desde la orden y sale en el estado de cuenta de maquila.
+  // Rol NUEVO: `prueba` necesita `SEED_ON_START=true` para que aparezca (el upsert es idempotente).
+  { codigo: 'empaque', nombre: 'Empaque' },
   // Nombres como los pide Daniel (§Post-F9.54 punto 1, 16-ago-2026): *"Yo cambiaría el nombre a
   // Estampador, Bordador… El vende telas y vende avíos lo dejaría solo como Telas y Avíos, le
   // quitaría el «Vende»."* Solo cambia el NOMBRE visible; el `codigo` es la clave estable.

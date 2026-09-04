@@ -8,13 +8,20 @@
  * Nunca se confía en el `state` de la navegación: se valida contra estas claves.
  */
 
-/** Clave de cada etapa del stepper, en el orden del flujo. */
+/**
+ * Clave de cada etapa del stepper, en el orden del flujo.
+ *
+ * ⭐ `empaque` (0.114) va ENTRE el recibo de arte y la entrega a cliente, que es su lugar real en el
+ * taller: se empaca lo que ya volvió terminado, justo antes de mandarlo. Es un SERVICIO sobre la
+ * orden —no toca inventario y su cantidad es propia— pero se captura como cualquier otra etapa.
+ */
 export const CLAVES_ETAPA_AVANCE = [
   'corte',
   'entrega-maquila',
   'recibo-maquila',
   'entrega-aplicacion',
   'recibo-aplicacion',
+  'empaque',
   'entrega-cliente',
 ] as const;
 

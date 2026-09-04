@@ -431,10 +431,12 @@ function DrillDownOrden({
   const navigate = useNavigate();
   const { tienePermiso } = useSesion();
   const puedeEntregar = tienePermiso('produccion.entrega');
-  // El panel de avance captura corte, envío y recibo: basta poder capturar UNO para que el atajo
-  // sirva (el propio panel esconde después lo que la sesión no puede, A4; el servidor decide, A1).
+  // El panel de avance captura corte, empaque (0.114), envío y recibo: basta poder capturar UNO para
+  // que el atajo sirva (el propio panel esconde después lo que la sesión no puede, A4; el servidor
+  // decide, A1).
   const puedeCapturarAvance =
     tienePermiso('produccion.corte') ||
+    tienePermiso('produccion.empaque') ||
     tienePermiso('produccion.envio') ||
     tienePermiso('produccion.recibo');
 

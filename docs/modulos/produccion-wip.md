@@ -71,7 +71,9 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
   del pedido (entregado/faltante) es DERIVADO de las entregas vivas (D3). Evento `entrega-registrado`.
 - `produccion/wip.ts` (F3-E5) — **tablero WIP** + existencias en poder del maquilero (`MaqExis`): CONSULTAS
   de solo lectura, todo derivado por suma de `EtapaMovimientoDet` (excluyendo canceladas).
-- `esma/cargos.ts` (F3-E4) — **cola de validación EsMa**: el cargo nace `propuesto` del recibo; el admin
+- `esma/cargos.ts` (F3-E4) — **cola de validación EsMa**: el cargo nace `propuesto` del recibo **o de un
+  SERVICIO SOBRE LA ORDEN** —corte o empaque, fila 0.114— con `idTipoProceso` NULL y `servicio` lleno; el
+  CHECK `esma_cargo_proceso_o_servicio` exige exactamente uno de los dos. El admin
   lo `validado` fijando cantidad/precio reales (punto de control humano de v1). El estado de cuenta
   completo (abonos/saldos) es F6.
 - `produccion/migracion.ts` y `esma/migracion.ts` (F3-E6, **Pieza A**) — modo migración del histórico de

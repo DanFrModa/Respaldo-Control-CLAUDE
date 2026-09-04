@@ -81,8 +81,28 @@ export const esquemaCargoEsMaSalida = z
     maquilero: z.string().describe('Nombre del maquilero.'),
     idOrden: z.number().int().describe('Orden a la que pertenece el cargo.'),
     folioOrden: z.number().int().describe('Folio de la orden.'),
-    idTipoProceso: z.number().int().describe('Proceso de maquila del cargo.'),
-    tipoProceso: z.string().describe('Nombre del proceso.'),
+    idTipoProceso: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Proceso de maquila del cargo. NULL cuando el cargo es de un SERVICIO sobre la orden ' +
+          '(corte/empaque, 0.114): ésos no son maquila y llevan `servicio` en su lugar.',
+      ),
+    servicio: z
+      .enum(['corte', 'empaque'])
+      .nullable()
+      .describe(
+        'SERVICIO sobre la orden que originó el cargo (0.114), o null si el cargo es de maquila. ' +
+          'Excluyente con `idTipoProceso`: exactamente uno de los dos viene lleno.',
+      ),
+    tipoProceso: z
+      .string()
+      .describe(
+        'ETIQUETA del cargo, SIEMPRE presente: el nombre del proceso de maquila, o "Corte"/' +
+          '"Empaque" cuando es un servicio sobre la orden (0.114). La redacta el servidor en un ' +
+          'solo lugar (`esma/etiqueta-cargo.ts`) para que todas las pantallas digan lo mismo.',
+      ),
     cantidadPropuesta: z
       .number()
       .int()
@@ -468,8 +488,14 @@ export const esquemaCargoSinReciboFila = z
     folioOrden: z.number().int().describe('Folio de la orden.'),
     idMaquilero: z.number().int().describe('Maquilero (Proveedor).'),
     maquilero: z.string().describe('Nombre del maquilero.'),
-    idTipoProceso: z.number().int().describe('Proceso de maquila.'),
-    tipoProceso: z.string().describe('Nombre del proceso.'),
+    idTipoProceso: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Proceso de maquila, o null si el cargo es de un servicio de la orden (0.114).'),
+    tipoProceso: z
+      .string()
+      .describe('ETIQUETA del cargo (proceso de maquila, o "Corte"/"Empaque" — 0.114).'),
     cantidad: z.number().nullable().describe('Cantidad del cargo (real o null si aún propuesto).'),
   })
   .describe('Cargo EsMa sin recibo ligado.');
@@ -855,8 +881,13 @@ export type RecibosSemanalesEsMaSalida = z.infer<typeof esquemaRecibosSemanalesE
 
 // ── Selector de maquileros de EsMa (activos + por tipo) ───────────────────────────────────────────
 
-/** Tipo de maquilero para el selector: costura o estampado (mapea al rol del proveedor). */
-export const TIPOS_MAQUILERO_ESMA = ['costura', 'estampado'] as const;
+/**
+ * Tipo de maquilero para el selector (mapea al rol del proveedor). `corte` y `empaque` entraron en
+ * 0.114, cuando Daniel puso los dos servicios del lado de la maquila: *«corte es parte de maquilas,
+ * no de proveedores … y una maquila de empaque también»*. Sin filtro salen TODOS los roles de
+ * maquila, los cinco de siempre más estos dos.
+ */
+export const TIPOS_MAQUILERO_ESMA = ['costura', 'estampado', 'corte', 'empaque'] as const;
 /** Clave de tipo de maquilero. */
 export type TipoMaquileroEsMaClave = (typeof TIPOS_MAQUILERO_ESMA)[number];
 
@@ -866,7 +897,9 @@ export const esquemaMaquilerosEsMaQuery = z
     tipo: z
       .enum(TIPOS_MAQUILERO_ESMA)
       .optional()
-      .describe('Filtra por tipo (costura/estampado). Omitir = cualquier rol de maquila.'),
+      .describe(
+        'Filtra por tipo (costura/estampado/corte/empaque). Omitir = cualquier rol de maquila.',
+      ),
   })
   .describe('Filtros del selector de maquileros.');
 

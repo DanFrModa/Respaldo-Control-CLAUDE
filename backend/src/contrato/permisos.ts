@@ -962,6 +962,12 @@ export const CATALOGO_PERMISOS = [
     descripcion: 'Capturar el corte de una orden de producción (F3-E2)',
   },
   {
+    clave: 'produccion.empaque',
+    modulo: 'produccion',
+    descripcion:
+      'Capturar el empaque de una orden (servicio sobre la orden, hermano del corte: no toca inventario y genera su cargo de maquila) (0.114)',
+  },
+  {
     clave: 'produccion.envio',
     modulo: 'produccion',
     descripcion: 'Capturar envíos de maquila (costura/estampado/…) de una orden (F3-E2)',

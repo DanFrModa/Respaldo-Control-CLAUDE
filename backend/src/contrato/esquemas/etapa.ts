@@ -63,9 +63,28 @@ export type DatosEtapaLineaEntrada = z.infer<typeof esquemaEtapaLinea>;
 // ── Corte ────────────────────────────────────────────────────────────────────────────────────
 
 /**
+ * PRECIO POR PRENDA pactado con el proveedor de un SERVICIO sobre la orden (corte/empaque, 0.114).
+ * Misma forma que el `precioPactado` del envío a maquila: opcional, ≥ 0 y con dos decimales — la
+ * columna es `Decimal(12,2)` y un tercer decimal se perdería en silencio al guardarlo.
+ *
+ * Es la mitad que faltaba de *«sólo hay que poner su cantidad y precio para meterlo en la OP»*: sin
+ * él, el cargo del cortador nace SIN precio y hay que teclearlo aparte al validarlo — la doble
+ * captura que v2 elimina.
+ */
+const esquemaPrecioServicio = z
+  .number({ error: 'El precio pactado debe ser un número' })
+  .min(0, { error: 'El precio pactado no puede ser negativo' })
+  .multipleOf(0.01, { error: 'El precio pactado no puede tener más de 2 decimales' });
+
+/**
  * Alta de un CORTE de una orden (doc 03-Produccion Paso 3). `idTipoProceso` es NULL (el corte no
  * es maquila); `idTercero` es el CORTADOR (Proveedor con rol `corte`). Sobre-corte LIBRE (f): no
  * hay tope de cantidad — la pantalla avisa, el servidor acepta.
+ *
+ * ⭐ 0.114 — el corte es PAGABLE. Daniel: *«en corte no necesitas mandar y recibir mercancía… sólo
+ * hay que poner su cantidad y precio para meterlo en la OP, pero no va y viene»*. Con
+ * `precioPactado` el corte genera su CARGO EsMa (`servicio: 'corte'`) igual que el recibo de
+ * maquila genera el suyo, sin envío ni recibo de por medio.
  */
 export const esquemaCorteCrear = z
   .object({
@@ -81,6 +100,9 @@ export const esquemaCorteCrear = z
     fecha: z.iso
       .date({ error: 'La fecha del corte es obligatoria (YYYY-MM-DD)' })
       .describe('Fecha del corte (YYYY-MM-DD).'),
+    precioPactado: esquemaPrecioServicio
+      .nullish()
+      .describe('Precio por prenda pactado con el cortador (base de su cargo EsMa), opcional.'),
     observaciones: z.string().trim().max(1000).optional(),
     lineas: esquemaEtapaMatriz,
   })
@@ -88,6 +110,44 @@ export const esquemaCorteCrear = z
 
 /** Datos validados de alta de corte. */
 export type DatosCorteCrear = z.infer<typeof esquemaCorteCrear>;
+
+// ── Empaque (servicio sobre la orden, hermano del corte — 0.114) ────────────────────────────────
+
+/**
+ * Alta de un EMPAQUE de una orden (0.114). Calcado del corte y por la MISMA razón: Daniel dictó que
+ * *«el empaque no toca el inventario»* y que *«una maquila de empaque»* se paga desde la orden. Así
+ * que `idTipoProceso` va NULL (no es maquila: no hay envío ni recibo) e `idTercero` es el EMPACADOR
+ * (Proveedor con rol `empaque`).
+ *
+ * ⭐ LA CANTIDAD ES PROPIA, no se deriva del recibo (regla de C&A que dictó Daniel): se fabrican
+ * 1,000 y se empacan 990 — se paga lo empacado y las 10 restantes se quedan quietas en inventario.
+ * Por eso el servidor NO topa el empaque contra lo recibido ni contra lo cortado (igual que el
+ * sobre-corte libre, decisión (f)): la pantalla puede AVISAR, el servidor acepta.
+ */
+export const esquemaEmpaqueCrear = z
+  .object({
+    idOrden: z
+      .number({ error: 'La orden es obligatoria' })
+      .int({ error: 'El id de la orden debe ser entero' })
+      .positive({ error: 'El id de la orden debe ser positivo' }),
+    idEmpacador: z
+      .number({ error: 'El empacador es obligatorio' })
+      .int({ error: 'El id del empacador debe ser entero' })
+      .positive({ error: 'El id del empacador debe ser positivo' })
+      .describe('Proveedor con rol "empaque".'),
+    fecha: z.iso
+      .date({ error: 'La fecha del empaque es obligatoria (YYYY-MM-DD)' })
+      .describe('Fecha del empaque (YYYY-MM-DD).'),
+    precioPactado: esquemaPrecioServicio
+      .nullish()
+      .describe('Precio por prenda pactado con el empacador (base de su cargo EsMa), opcional.'),
+    observaciones: z.string().trim().max(1000).optional(),
+    lineas: esquemaEtapaMatriz,
+  })
+  .describe('Datos de un empaque de orden (color×talla, D4; cantidad propia, sin tope).');
+
+/** Datos validados de alta de empaque. */
+export type DatosEmpaqueCrear = z.infer<typeof esquemaEmpaqueCrear>;
 
 // ── Envío a maquila (UN servicio para costura Y estampado) ──────────────────────────────────────
 
@@ -196,12 +256,16 @@ export const esquemaEtapaSalida = z
     idOrden: z.number().int().describe('Orden a la que pertenece.'),
     folioOrden: z.number().int().describe('Folio de la orden.'),
     tipo: z
-      .enum(['corte', 'envio_maquila', 'recibo_maquila', 'entrega_cliente'])
+      .enum(['corte', 'envio_maquila', 'recibo_maquila', 'entrega_cliente', 'empaque'])
       .describe('Tipo de etapa.'),
-    idTipoProceso: z.number().int().nullable().describe('Proceso de maquila (null en corte).'),
-    tipoProceso: z.string().nullable().describe('Nombre del proceso (null en corte).'),
-    idTercero: z.number().int().nullable().describe('Cortador/maquilero (Proveedor).'),
-    tercero: z.string().nullable().describe('Nombre del cortador/maquilero.'),
+    idTipoProceso: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Proceso de maquila (null en corte y empaque: son servicios sobre la orden).'),
+    tipoProceso: z.string().nullable().describe('Nombre del proceso (null en corte y empaque).'),
+    idTercero: z.number().int().nullable().describe('Cortador/maquilero/empacador (Proveedor).'),
+    tercero: z.string().nullable().describe('Nombre del cortador/maquilero/empacador.'),
     fecha: z.string().describe('Fecha de la etapa (YYYY-MM-DD).'),
     fechaCompromiso: z.string().nullable().describe('Fecha compromiso (YYYY-MM-DD) o null.'),
     precioPactado: z

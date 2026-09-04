@@ -12136,6 +12136,34 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.195) — CORTE Y EMPAQUE SON SERVICIOS SOBRE LA ORDEN: cómo se construyó la fila 0.114 (lead, 4-sep-2026, madrugada; Daniel confirma o ajusta)
+
+**Contexto.** Daniel dictó la regla el 3-sep (§Post-F9.185(c)): *«en corte no necesitas mandar y recibir mercancía… sólo hay que poner su cantidad y precio para meterlo en la OP, pero no va y viene. Lo mismo el empaque… el empaque no toca el inventario»*; y la frontera (§185(b)): *«corte es parte de maquilas, no de proveedores: el monto a pagar sale de una orden»*. El repaso midió que el modelo ya distinguía las dos formas (`registrarCorte` crea la etapa con `idTipoProceso = NULL` y no toca inventario) pero nadie la había usado para el pago: el corte no escribía precio, no nacía cargo, y el empaque no existía.
+
+**Lo que se decidió (defaults del lead, construidos en la 0.114):**
+
+1. **Un cargo de maquila aprende «servicio sobre la orden».** `EsMaCargo.idTipoProceso` pasa a nullable y nace `EsMaCargo.servicio ∈ {corte, empaque}`, con un CHECK en base de datos: **exactamente uno** de los dos está informado. ⛔ **No se convirtieron corte/empaque en `TipoProceso`**: eso los habría metido al flujo de envío/recibo que Daniel dice que NO son. La etiqueta del cargo («Costura», «Corte», «Empaque») sale de **una sola función** (`esma/etiqueta-cargo.ts`) para todos los consumidores.
+2. **El corte se paga desde la orden.** La captura del corte gana **precio por prenda** (opcional) y crea, en la misma transacción, el cargo `propuesto` al cortador —igual que un recibo de maquila crea el suyo—. Quien valida el cargo fija cantidad y precio reales. **Un corte sin precio también genera su cargo** (nace sin precio y quien valida lo teclea), porque sólo hay cortes de terceros con rol `corte` y siempre hay a quién pagarle.
+3. **El empaque es un acto nuevo, calcado del corte.** `registrarEmpaque`: empacador con el rol nuevo `empaque`, matriz color×talla, fecha, precio, observaciones. **No toca el kardex** y **no se topa contra lo recibido** (regla de C&A: 1,000 fabricadas / 990 empacadas ⇒ se paga lo empacado y las 10 se quedan quietas en inventario). La pantalla sólo **avisa** en ámbar si el total empacado excede lo recibido de costura; el servidor acepta, como el sobre-corte libre. Permiso nuevo `produccion.empaque`, sembrado en los mismos perfiles que `produccion.corte`. El acto vive en el panel de **Avance de producción** como séptima etapa (sin menú nuevo) y el tablero WIP publica `empacado`.
+4. **La frontera de Daniel en la corrida.** `corte` y `empaque` entran a los roles de maquila de EsMa ⇒ el cortador y el empacador caen en el rubro **maquila** de la corrida semanal (0.113) y aparecen en «Saldos de todos los maquileros», con su saldo hecho de cargos validados de servicio. (Hasta hoy el cortador caía en «proveedores», como avisaba §189(j).)
+5. **El precio de un servicio se valúa sólo con su propio precio pactado.** `maquilaOrd`/`aplicacionOrd` son precios de MAQUILA; prestárselos a un corte sería peor que no proponer nada.
+6. **Cancelar un corte/empaque arrastra su cargo** como lo hace el recibo: cargo propuesto ⇒ se cancela junto; cargo **validado** ⇒ hace falta `esma.cargo-validar` y entonces sí se cancela; sin el permiso no se cancela nada (una sola transacción).
+
+**Tres desviaciones de la ficha, medidas por el coder y aceptadas por el lead:**
+- La ruta es `POST /api/produccion/empaques` (la convención del archivo: `/cortes`, `/envios`), no `/etapas/empaque`.
+- El precio del corte/empaque **no se esconde** al capturar sin `ordenes.ver-precio-real-maquila`: medido, el envío tampoco lo esconde —ese permiso gobierna la **lectura** (el servidor redacta el precio al devolver la etapa), no la captura—; gatear la captura dejaría a Logística/Asistente/Secretarial capturando sin precio y el cargo nacería sin él.
+- **El empaque NO emite evento de Ruta Crítica.** El proceso RC `empaque` **ya tiene dueño**: lo completa el hito de orden de tipo `empaque`. Un segundo escritor con otra regla de completitud haría que un empaque **parcial** (990 de 1,000, el caso de Daniel) **des-completara** un hito ya registrado. Queda escrito en el TSDoc de `registrarEmpaque`.
+
+**⏳ Pendientes de Daniel (sin frenar):**
+- **¿El empaque capturado debe cerrar solo su proceso de Ruta Crítica?** Si sí, hay que decidir **cuál de los dos manda** (hito o etapa) y **con qué regla de completitud** (¿basta con capturar algo? ¿hay que cubrir la matriz? ¿990 de 1,000 es completo?). Default de hoy: **el hito sigue mandando** y el empaque no toca la RC.
+- Confirmar los defaults 2, 3 y 6.
+
+**⚠️ Deploy a `prueba`:** migración automática (`20260904080000_corte_y_empaque_servicios_sobre_la_orden`, sin tocar filas existentes) + **`SEED_ON_START=true` OBLIGATORIO** (rol de proveedor `empaque` y permiso `produccion.empaque`) + **un paso manual**: marcar la casilla **«Empaque»** a los talleres que empacan en el catálogo de proveedores (el rol nace vacío). Los cortes capturados antes de esta versión no tienen cargo, y eso está bien (REGLA 0-B).
+
+**Lo que NO entró (a propósito, alcance nuevo si se quiere):** el `origen` del libro unificado de terceros sigue proyectando corte/empaque como `recibo_maquila` (la fila sí dice «Orden #N · Corte» en observaciones); el costo real de corte/empaque no se refleja aún en el EDR; el «Corte semanal por cortador» sigue siendo un reporte de cantidades (ahora podría valuarse); no hay impreso PDF de empaque ni de corte.
+
+---
+
 #### (Post-F9.194) — EL ALMACÉN DEL TIPO CORRECTO (fila 0.137, 4-sep-2026): dos decisiones tomadas solas, con default, y una precondición de despliegue
 
 Del repaso de inventarios (§Post-F9.193, «otras cosas»): *nadie verifica que el almacén sea del tipo correcto*. Al construirlo se midió que **ninguno de los once escritores del dominio validaba el tipo** — ni uno — y salieron tres cosas que el encargo no fijaba:

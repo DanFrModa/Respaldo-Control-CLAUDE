@@ -71,6 +71,48 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.107 · 4-sep-2026 · **en prueba** — ⭐ **Corte y empaque se pagan desde la orden**: son servicios, no maquilas de ida y vuelta
+
+### Qué se puede hacer ahora que antes no
+
+- **Pagarle al cortador desde la orden.** Al capturar el corte se puede poner el **precio por prenda** pactado
+  y, con eso, nace un cargo a su cuenta de maquila —igual que nace el del maquilero cuando se recibe la
+  costura—. Antes el corte se registraba sin precio y el cortador no aparecía en ningún lado para pagarle.
+- **Registrar el EMPAQUE** como un acto propio, en el mismo panel de *Avance de producción* (séptima etapa):
+  quién empacó (un taller con la casilla nueva **«Empaque»**), cuántas prendas por color y talla, fecha y
+  precio. Nace su cargo al empacador. **No mueve inventario** ni exige que coincida con lo recibido: como en
+  C&A, se paga lo empacado (1,000 fabricadas / 990 empacadas ⇒ 990) y las demás se quedan quietas en el
+  almacén. Si el total empacado excede lo recibido de costura, la pantalla **avisa** en ámbar pero deja seguir.
+- **El cortador y el empacador ya cuentan como maquila**: aparecen en *Saldos de todos los maquileros*, su
+  cargo pasa por la misma cola de validación (Daniel fija cantidad y precio reales) y caen en el rubro
+  **maquila** de la corrida semanal de pagos —donde Daniel dijo que van—, no en «proveedores».
+- El estado de cuenta, la conciliación y los pagos etiquetan cada cargo por lo que es: **Costura**, **Corte**
+  o **Empaque**.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Hay que marcar la casilla «Empaque» a los talleres que empacan** en el catálogo de proveedores: la
+  casilla es nueva y nace vacía. Sin ella, el selector de empacador sale vacío. Y el deploy **necesita
+  `SEED_ON_START=true`** (siembra la casilla y el permiso nuevo `produccion.empaque`).
+- **Un corte capturado sin precio también genera su cargo**: nace sin precio y quien lo valida lo teclea (es
+  lo mismo que pasa con un recibo de maquila). Los cortes capturados **antes** de esta versión no tienen
+  cargo y se quedan así (no se reparan datos viejos).
+- **Cancelar un corte o un empaque cancela su cargo** si aún está propuesto; si Daniel ya lo había validado,
+  cancelar exige el permiso de validar cargos, y sin él no se cancela nada.
+- **El empaque no cierra por sí solo su proceso de Ruta Crítica**: ese proceso ya lo completa el *hito* de
+  empaque de la orden, y dos escritores con reglas distintas se pisarían (un empaque parcial des-completaría
+  un hito ya registrado). Queda como pregunta para Daniel.
+- El precio del corte y del empaque **se ve al capturar** para todos los perfiles que capturan (como en el
+  envío a maquila); al consultar, se sigue ocultando a quien no tiene permiso de ver el precio real de maquila.
+
+### Qué sigue pendiente o roto
+
+- **Decisión de Daniel:** ¿el empaque capturado debe cerrar su proceso de Ruta Crítica, y con qué regla de
+  completitud (¿basta capturar algo? ¿990 de 1,000 cuenta como completo?)? Hoy manda el hito.
+- El costo real del corte y del empaque todavía **no se refleja en el EDR**; el reporte *Corte semanal por
+  cortador* sigue siendo de cantidades (ahora podría valuarse); no hay impreso PDF de empaque.
+- Queda la segunda pasada del guard de almacén en producción (recibos y entregas), pendiente desde la 0.137.
+
 ## 0.106 · 4-sep-2026 · **en prueba** — Una sola pregunta de facturación por proveedor
 
 ### Qué se puede hacer ahora que antes no
