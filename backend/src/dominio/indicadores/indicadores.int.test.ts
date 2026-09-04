@@ -365,4 +365,87 @@ describe('kpisWip', () => {
     expect(k.totales.incompletas).toBe(8);
     expect(k.totales.porRecibir).toBe(0);
   });
+
+  it('⭐ los FALTANTES SALDADOS sacan la orden de `soloPendientes` (V1, fila 0.109)', async () => {
+    // GEMELA de la prueba de arriba, y de la de `resumen.int.test.ts`. Vale por el `WHERE` de
+    // `condicionesWip`, que es la TERCERA copia de la fórmula del pendiente en este archivo (las
+    // otras dos son las expresiones `porRecibir` de los dos SELECT). En la fila 0.109 se
+    // actualizaron las dos del SELECT y se olvidó el WHERE 60 líneas más arriba: la orden seguía
+    // saliendo en el listado con `soloPendientes` y enseñando «Por recibir» = 0 en su propia fila —
+    // una fila contradiciéndose a sí misma.
+    //
+    // La orden se arma A PROPÓSITO con las otras tres etapas cuadradas (pedido = cortado = enviado,
+    // nada entregado): así el ÚNICO motivo por el que puede aparecer es el «por recibir».
+    const proceso = await cliente.tipoProceso.create({
+      data: { codigo: 'costura-kpi', nombre: 'Costura', generaEntradaPt: true },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 9001n,
+        idEmpresa: empresa.id,
+        idModelo,
+        idCliente,
+        estado: 'capturada',
+        fecha: new Date('2026-06-01T00:00:00.000Z'),
+        lineas: {
+          create: [
+            { idColor: idColorRojo, tallas: { create: [{ idTalla: idTallaM, cantidad: 10 }] } },
+          ],
+        },
+      },
+    });
+    for (const [folio, tipo] of [
+      [9100n, 'corte'],
+      [9101n, 'envio_maquila'],
+    ] as const) {
+      await cliente.etapaMovimiento.create({
+        data: {
+          folio,
+          idEmpresa: empresa.id,
+          idOrden: orden.id,
+          tipo,
+          ...(tipo === 'envio_maquila'
+            ? { idTercero: idMaquilero, idTipoProceso: proceso.id }
+            : {}),
+          fecha: new Date('2026-06-02T00:00:00.000Z'),
+          detalles: { create: [{ idColor: idColorRojo, idTalla: idTallaM, cantidad: 10 }] },
+        },
+      });
+    }
+    await refrescarKpis(bd());
+
+    // ANTES del cierre: le debe 10 y por eso SÍ sale con `soloPendientes`.
+    const antes = await kpisWip(sesion(empresa.id), { soloPendientes: true }, bd());
+    expect(antes.datos.some((o) => o.idOrden === orden.id)).toBe(true);
+    expect(antes.datos.find((o) => o.idOrden === orden.id)?.porRecibir).toBe(10);
+    const totalAntes = antes.total;
+
+    // Se cierra la orden con ese maquilero: las 10 quedan saldadas.
+    await cliente.cierreMaquilaOrden.create({
+      data: {
+        idEmpresa: empresa.id,
+        idOrden: orden.id,
+        idMaquilero,
+        idTipoProceso: proceso.id,
+        fecha: new Date('2026-06-05T00:00:00.000Z'),
+        desenlace: 'cobrado',
+        detalles: {
+          create: [{ idColor: idColorRojo, idTalla: idTallaM, cantidadFaltantes: 10 }],
+        },
+      },
+    });
+    await refrescarKpis(bd());
+
+    const despues = await kpisWip(sesion(empresa.id), { soloPendientes: true }, bd());
+    // 🔴 Lo que el WHERE roto dejaba pasar: la orden seguía en la lista Y en el conteo.
+    expect(despues.datos.some((o) => o.idOrden === orden.id)).toBe(false);
+    expect(despues.total).toBe(totalAntes - 1);
+
+    // Y sin el filtro sigue existiendo, con sus cuatro cubetas cuadradas.
+    const todas = await kpisWip(sesion(empresa.id), { soloPendientes: false }, bd());
+    const fila = todas.datos.find((o) => o.idOrden === orden.id);
+    expect(fila?.enviado).toBe(10);
+    expect(fila?.faltantesSaldados).toBe(10);
+    expect(fila?.porRecibir).toBe(0);
+  });
 });

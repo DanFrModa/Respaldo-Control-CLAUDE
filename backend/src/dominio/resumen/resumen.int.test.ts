@@ -3,7 +3,7 @@
  * (testcontainers). Arma un dataset calculado A MANO alrededor de un "hoy" fijo (miércoles
  * 8-jul-2026, semana ISO 28) y ejercita el DOMINIO (no HTTP). Verifica:
  *  (a) órdenes ABIERTAS = con algo pendiente (la 100% cerrada no cuenta; criterio del tablero WIP);
- *  (b) WIP en maquila = enviado − recibido − incompletas (vivos) + maquileros con saldo (V1-E8v);
+ *  (b) WIP en maquila = enviado − recibido − incompletas − faltantes saldados (vivos) + maquileros con saldo (V1-E8v);
  *  (c) cortado esta semana vs anterior (canceladas fuera) + la serie de 7 barras;
  *  (d) % entregas a tiempo últimos 30 días + delta vs la ventana previa (vista de F7 refrescada);
  *  (e) existencia PT total (Σ de la vista en vivo) + almacenes con existencia;

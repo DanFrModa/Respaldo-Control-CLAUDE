@@ -322,6 +322,50 @@ export interface DepsPdfWip {
   kpisWip?: typeof kpisWip;
 }
 
+/**
+ * ⭐ COLUMNAS de la tabla «Órdenes con avance» del PDF del tablero WIP. Exportadas —junto con
+ * {@link filaOrdenWip}— para que una prueba pueda aseverar que **cada fila tiene tantas celdas como
+ * títulos**: `@react-pdf/renderer` NO truena cuando faltan celdas, simplemente dibuja el renglón
+ * corto, así que «el PDF se generó» no prueba nada sobre su alineación. Se midió por mutación:
+ * quitando la celda de «Saldados» el PDF seguía saliendo válido y la prueba pasaba en verde.
+ *
+ * La identidad que hace legible el renglón —y la razón de que estén las DOS cubetas que no son
+ * «recibido»— es `enviado = recibido + incompletas + saldados + por recibir`, porque «x recibir»
+ * resta las dos (V1-E8v + V1 fila 0.109).
+ */
+export const COLUMNAS_ORDENES_WIP: Columna[] = [
+  { titulo: 'Folio', ancho: 44 },
+  { titulo: 'Cliente' },
+  { titulo: 'Modelo', ancho: 80 },
+  { titulo: 'Ped.', ancho: 40, derecha: true },
+  { titulo: 'Cort.', ancho: 40, derecha: true },
+  { titulo: 'Env.', ancho: 40, derecha: true },
+  { titulo: 'Rec.', ancho: 40, derecha: true },
+  { titulo: 'Incompl.', ancho: 48, derecha: true },
+  { titulo: 'Saldados', ancho: 52, derecha: true },
+  { titulo: 'Entr.', ancho: 40, derecha: true },
+  { titulo: 'x recibir', ancho: 52, derecha: true },
+  { titulo: 'x entregar', ancho: 56, derecha: true },
+];
+
+/** Una orden del tablero WIP como fila de texto del PDF (misma cardinalidad que {@link COLUMNAS_ORDENES_WIP}). */
+export function filaOrdenWip(o: KpisWip['datos'][number]): string[] {
+  return [
+    `#${String(o.folio)}`,
+    o.cliente,
+    o.codigoModelo,
+    String(o.pedido),
+    String(o.cortado),
+    String(o.enviado),
+    String(o.recibido),
+    String(o.incompletas),
+    String(o.faltantesSaldados),
+    String(o.entregado),
+    String(o.porRecibir),
+    String(o.porEntregar),
+  ];
+}
+
 /** Genera el PDF del tablero WIP analítico. */
 export async function impresoKpisWip(
   sesion: SesionUsuario,
@@ -387,36 +431,7 @@ export async function generarPdfKpisWip(payload: PayloadPdfKpisWip): Promise<Buf
       ],
     ),
     h(Text, { key: 't-ord', style: estilos.seccionTitulo }, 'Órdenes con avance'),
-    tabla(
-      'ord',
-      [
-        { titulo: 'Folio', ancho: 44 },
-        { titulo: 'Cliente' },
-        { titulo: 'Modelo', ancho: 80 },
-        { titulo: 'Ped.', ancho: 40, derecha: true },
-        { titulo: 'Cort.', ancho: 40, derecha: true },
-        { titulo: 'Env.', ancho: 40, derecha: true },
-        { titulo: 'Rec.', ancho: 40, derecha: true },
-        // Cuarta cubeta (V1-E8v): sin ella el impreso no cuadra lo enviado.
-        { titulo: 'Incompl.', ancho: 48, derecha: true },
-        { titulo: 'Entr.', ancho: 40, derecha: true },
-        { titulo: 'x recibir', ancho: 52, derecha: true },
-        { titulo: 'x entregar', ancho: 56, derecha: true },
-      ],
-      datos.datos.map((o) => [
-        `#${String(o.folio)}`,
-        o.cliente,
-        o.codigoModelo,
-        String(o.pedido),
-        String(o.cortado),
-        String(o.enviado),
-        String(o.recibido),
-        String(o.incompletas),
-        String(o.entregado),
-        String(o.porRecibir),
-        String(o.porEntregar),
-      ]),
-    ),
+    tabla('ord', COLUMNAS_ORDENES_WIP, datos.datos.map(filaOrdenWip)),
   ];
 
   // Aviso de truncado: se dibujaron `datos.datos.length` de `datos.total` (universo); null si caben todas.

@@ -83,6 +83,7 @@ import { rutasRecetaOrden } from './api/produccion/receta-orden.rutas.js';
 import { rutasAdjuntosOrden } from './api/produccion/adjuntos-orden.rutas.js';
 import { rutasFotosArteOrden } from './api/produccion/fotos-arte-orden.rutas.js';
 import { rutasFotosOcultasOrden } from './api/produccion/fotos-ocultas-orden.rutas.js';
+import { rutasCierreMaquila } from './api/produccion/cierre-maquila.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
@@ -291,14 +292,14 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // kardex; pendientes por recibir; recibos semanales por maquilero; PDF de recibo. RBAC por ruta
   // (produccion.recibo/.cancelar/.wip-ver).
   await app.register(rutasRecibosProduccion, { prefix: '/api' });
+  await app.register(rutasCierreMaquila, { prefix: '/api' });
   // Producción / WIP — ENTREGA a cliente (F3-E5): cierre del ciclo de la orden. Salida de PT
   // (kardex) no-negativa bajo lock, seguimiento del pedido DERIVADO (pedido − entregado),
   // cancelación con inverso de kardex y comprobante PDF. RBAC produccion.entrega/.cancelar/.wip-ver.
   await app.register(rutasEntregasCliente, { prefix: '/api' });
   // Producción / WIP — TABLERO de avance + existencias en poder del maquilero (F3-E5): el WIP de las
   // órdenes (derivado por suma) y lo que cada maquilero todavía tiene —enviado − recibido −
-  // incompletas, V1-E8v—. Solo lectura
-  // (produccion.wip-ver).
+  // incompletas − faltantes saldados (V1-E8v + fila 0.109)—. Solo lectura (produccion.wip-ver).
   await app.register(rutasWip, { prefix: '/api' });
   // EsMa (F3-E4) — cola de validación de cargos de maquila derivados de los recibos (propuesto →
   // validado, ajustando cantidad/precio reales). RBAC esma.cargo-validar.

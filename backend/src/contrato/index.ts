@@ -1492,6 +1492,20 @@ export {
   type RecibosSemanalesLista,
 } from './esquemas/recibo.js';
 
+// ── Cerrar la orden con un maquilero: saldar el faltante (V1, fila 0.109) ────
+export {
+  esquemaCierreMaquilaCrear,
+  esquemaCierreMaquilaDeshacerCuerpo,
+  esquemaCierreMaquilaSalida,
+  esquemaCierresMaquilaLista,
+  DESENLACES_CIERRE_MAQUILA,
+  type DesenlaceCierreMaquilaClave,
+  type DatosCierreMaquilaCrear,
+  type DatosCierreMaquilaDeshacer,
+  type CierreMaquilaSalida,
+  type CierresMaquilaLista,
+} from './esquemas/cierre-maquila.js';
+
 // ── Cargos EsMa: cola de validación derivada de los recibos (F3-E4; doc 07-EsMa) ──
 // ── + Movimientos (abonos/descuentos/pagos), saldos, conciliación y orden pagada (F6-E4) ──
 export {

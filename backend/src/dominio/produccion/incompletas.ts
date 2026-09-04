@@ -15,8 +15,17 @@
  *     enviado = primeras + segundas + faltantes + incompletas
  *
  * Las cuatro cubetas son EXCLUYENTES y suman lo enviado. `primeras`+`segundas` son las buenas
- * (`EtapaMovimientoDet.cantidad`); `incompletas` es su columna propia; el **faltante** es el
- * residuo — lo que NO volvió — y es lo único que sigue en poder del maquilero.
+ * (`EtapaMovimientoDet.cantidad`); `incompletas` es su columna propia; y el **faltante** —lo que NO
+ * volvió— tiene la suya desde V1 (fila 0.109): `CierreMaquilaOrdenDet.cantidadFaltantes`, que se
+ * llena al CERRAR LA ORDEN con ese maquilero.
+ *
+ * ⭐ HASTA ESA FILA EL FALTANTE NO ERA UN DATO: era el RESIDUO de la resta, o sea el pendiente
+ * mismo. `faltante ≡ pendiente` significaba que **cobrarlo no bajaba nada** y que la lista de
+ * pendientes crecía para siempre — con la prosa de este módulo diciendo, desde V1-E8v, que el
+ * faltante *«se le cobra»*, y `esma/cargos.ts` sin mencionar la palabra ni una vez. La regla vivía
+ * en la prosa y no en el código. Hoy: mientras el maquilero no cierre, su faltante ES el pendiente
+ * (sigue debiéndolas); al cerrar, se salda en su columna y sale del pendiente
+ * ({@link pendientePorCelda}), y —si se cobró— nace un `DescuentoMaquilero` PROPUESTO.
  *
  * LAS CINCO REGLAS DEL CONCEPTO:
  *  1. NO cuenta como producida: de 100 mandadas con 95 buenas + 5 incompletas, la orden produjo 95.
@@ -43,7 +52,7 @@
  *
  * LO QUE SÍ TOPAN, por la regla 5, es **el pendiente**, que desde V1-E8v es UN SOLO NÚMERO:
  * {@link pendientePorCelda}. Antes había dos —"pendiente" (enviado − buenas) y "recibible"
- * (enviado − buenas − incompletas)— y la pantalla tenía que llevar los dos; hoy son el mismo, y el
+ * (enviado − buenas − incompletas − faltantes saldados)— y la pantalla tenía que llevar los dos; hoy son el mismo, y el
  * campo `recibible` del contrato desapareció. Lo usan, todas por esta misma función:
  *  • el tope que valida `registrarReciboMaquila` bajo lock (`produccion/recibos.ts`);
  *  • el pendiente por maquilero y por proceso del WIP (`produccion/wip.ts`);
@@ -82,16 +91,28 @@ export function piezasDevueltas(det: PiezasDelDetalle): number {
 
 /**
  * EL PENDIENTE de una celda color×talla: lo que se le envió menos lo que ya devolvió (buenas +
- * incompletas). Es a la vez *"lo que el maquilero todavía tiene en su taller"* y *"lo que todavía se
- * le puede recibir"* — desde V1-E8v (regla 5) son **el mismo número**, y por eso hay una sola
- * función y un solo campo en el contrato. Lo que quede aquí cuando el maquilero ya cerró su entrega
- * es el FALTANTE, que es lo que se le cobra.
+ * incompletas) menos lo que ya se SALDÓ al cerrar la orden con él (V1, fila 0.109). Es a la vez
+ * *"lo que el maquilero todavía tiene en su taller"* y *"lo que todavía se le puede recibir"* —
+ * desde V1-E8v (regla 5) son **el mismo número**, y por eso hay una sola función y un solo campo en
+ * el contrato.
+ *
+ * ⭐ EL TERCER SUMANDO (`saldado`) ES DE LA FILA 0.109, y es lo que vuelve COBRABLE al faltante.
+ * Hasta esa fila el faltante era el RESIDUO de esta resta —`faltante ≡ pendiente`, el mismo
+ * número—, así que cobrarlo no bajaba nada y la lista de pendientes crecía para siempre. Al cerrar
+ * la orden con un maquilero, sus piezas no devueltas pasan a `CierreMaquilaOrdenDet.cantidadFaltantes`
+ * —su propia columna, en su propia tabla— y **salen del pendiente**. Deshacer el cierre las devuelve.
+ *
+ * 🔑 EL TERCER PARÁMETRO ES OBLIGATORIO A PROPÓSITO. Con un default de 0, cada puerta que se
+ * olvidara de leer los cierres seguiría compilando y seguiría contando como pendiente lo ya saldado
+ * — o sea, el defecto exacto que esta fila vino a cerrar, pero silencioso. Así el compilador obliga
+ * a que cada sitio conteste la pregunta: *¿aquí aplica el cierre?* (Los que de verdad no lo
+ * necesitan pasan `0` y dicen por qué.)
  *
  * Puede salir negativo cuando el histórico migrado tiene recibos sin envío; quien lo use decide si
  * lo pisa a 0.
  */
-export function pendientePorCelda(enviado: number, devuelto: number): number {
-  return enviado - devuelto;
+export function pendientePorCelda(enviado: number, devuelto: number, saldado: number): number {
+  return enviado - devuelto - saldado;
 }
 
 // ── Las incompletas que un maquilero entregó (regla 4: dónde se VEN) ─────────────────────────────

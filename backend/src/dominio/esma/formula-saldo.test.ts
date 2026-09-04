@@ -77,10 +77,16 @@ function comoLiteral(valor: unknown): string {
  * Traduce una cláusula de Prisma a las condiciones SQL que DEBERÍA producir, sin mirar el generador:
  * la columna se deduce del nombre del campo y el valor se literaliza aparte. Así la prueba es una
  * segunda opinión, no un eco de la implementación.
+ *
+ * ⚠️ `null` se traduce a `IS NULL`, **nunca** a `= NULL` (V1, fila 0.109 — el criterio «vivo» del
+ * descuento). `= NULL` no es falso en SQL: es DESCONOCIDO, y se comería la fila entera en silencio.
+ * Esta segunda opinión lo sabe por su cuenta: si el generador emitiera `= 'null'`, la prueba lo caza.
  */
 function condicionesEsperadas(where: Record<string, unknown>): string[] {
-  return Object.entries(where).map(
-    ([campo, valor]) => `"${aColumna(campo)}" = ${comoLiteral(valor)}`,
+  return Object.entries(where).map(([campo, valor]) =>
+    valor === null
+      ? `"${aColumna(campo)}" IS NULL`
+      : `"${aColumna(campo)}" = ${comoLiteral(valor)}`,
   );
 }
 
@@ -125,10 +131,25 @@ describe('formula-saldo · el SQL y el Prisma salen del MISMO criterio', () => {
     }
   });
 
-  it('los tres movimientos planos comparten criterio (misma columna, mismos valores)', () => {
+  it('abono y pago comparten criterio; el DESCUENTO lleva UNA condición más: estar VIVO', () => {
+    // Hasta la fila 0.109 los TRES planos compartían criterio y esta prueba lo exigía. Ya no, y el
+    // cambio es de negocio, no de forma: el descuento es el único que puede NACER DE UN ACTO
+    // REVERSIBLE —el cierre de una orden con un maquilero, que propone cobrarle el faltante y que se
+    // puede DESHACER— y por eso es el único que se cancela. La condición `cancelado_en IS NULL` va
+    // en los DOS criterios: un descuento cancelado ni suma al saldo ni sigue esperando revisión.
     expect(sqlCuenta('abono').sql).toBe(sqlCuenta('pago').sql);
-    expect(sqlCuenta('abono').sql).toBe(sqlCuenta('descuento').sql);
-    expect(sqlPendiente('abono').sql).toBe(sqlPendiente('descuento').sql);
+    expect(sqlPendiente('abono').sql).toBe(sqlPendiente('pago').sql);
+
+    // El descuento = lo mismo que sus hermanos MÁS la condición de vivo (en los dos criterios).
+    for (const fragmento of [sqlCuenta('descuento').sql, sqlPendiente('descuento').sql]) {
+      expect(condicionesDe(fragmento)).toContain('"cancelado_en" IS NULL');
+    }
+    expect(condicionesDe(sqlCuenta('descuento').sql).sort()).toEqual(
+      [...condicionesDe(sqlCuenta('abono').sql), '"cancelado_en" IS NULL'].sort(),
+    );
+    expect(condicionesDe(sqlPendiente('descuento').sql).sort()).toEqual(
+      [...condicionesDe(sqlPendiente('abono').sql), '"cancelado_en" IS NULL'].sort(),
+    );
   });
 
   it('lo que entra CRUDO al SQL se valida: columnas y valores', () => {

@@ -12,7 +12,7 @@ import { esquemaPackSalida } from './pack.js';
  * Fórmulas del avance por orden (todas excluyen etapas canceladas):
  *  • Por cortar          = pedido(orden) − cortado
  *  • Cortado por enviar  = cortado − enviado            (por proceso/TipoProceso, D8)
- *  • Por recibir         = enviado − recibido − incompletas   (por proceso/TipoProceso; las
+ *  • Por recibir         = enviado − recibido − incompletas − faltantes saldados   (por proceso/TipoProceso; las
  *                          prendas incompletas ya volvieron del taller — V1-E8v, §Post-F9.147)
  *  • Entregado a cliente = Σ entregas (etapa tipo `entrega_cliente`)
  *  • Por entregar        = recibido(costura) − entregado a cliente
@@ -100,6 +100,15 @@ export const esquemaWipOrdenFila = z
           'del pendiente por recibir — ya no están en la maquila. Cuarta cubeta de ' +
           '`enviado = primeras + segundas + faltantes + incompletas`.',
       ),
+    faltantesSaldados: z
+      .number()
+      .int()
+      .describe(
+        'Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109). ' +
+          'Nunca volvieron del taller y ya no se esperan: salen del pendiente por recibir. Es la ' +
+          'tercera cubeta con columna propia, junto a `recibido` e `incompletas`, y con ellas ' +
+          'cierra `enviado = primeras + segundas + faltantes + incompletas`.',
+      ),
     recibidoCostura: z
       .number()
       .int()
@@ -111,8 +120,9 @@ export const esquemaWipOrdenFila = z
       .number()
       .int()
       .describe(
-        'enviado − recibido − incompletas (total, todos los procesos). Es el FALTANTE: lo que el ' +
-          'maquilero todavía tiene en su taller (V1-E8v).',
+        'enviado − recibido − incompletas − faltantes saldados (total, todos los procesos). Es ' +
+          'lo que el maquilero todavía tiene en su taller y todavía se le espera. Lo saldado sale ' +
+          'de aquí a propósito (V1, fila 0.109): ya se decidió que no vuelve.',
       ),
     porEntregar: z
       .number()
@@ -141,6 +151,15 @@ export const esquemaWipTotales = z
       .number()
       .int()
       .describe('Σ prendas INCOMPLETAS entregadas (V1-E8v): volvieron, pero no se produjeron.'),
+    faltantesSaldados: z
+      .number()
+      .int()
+      .describe(
+        'Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109). ' +
+          'Nunca volvieron del taller y ya no se esperan: salen del pendiente por recibir. Es la ' +
+          'tercera cubeta con columna propia, junto a `recibido` e `incompletas`, y con ellas ' +
+          'cierra `enviado = primeras + segundas + faltantes + incompletas`.',
+      ),
     recibidoCostura: z.number().int().describe('Recibido de procesos que meten a PT (costura).'),
     entregado: z.number().int().describe('Total entregado a cliente (Σ entregas vivas).'),
     porCortar: z.number().int().describe('pedido − cortado (piezas por cortar).'),
@@ -148,7 +167,10 @@ export const esquemaWipTotales = z
     porRecibir: z
       .number()
       .int()
-      .describe('enviado − recibido − incompletas (piezas realmente en poder de maquila, V1-E8v).'),
+      .describe(
+        'enviado − recibido − incompletas − faltantes saldados (piezas realmente en poder de ' +
+          'maquila y todavía esperadas).',
+      ),
     porEntregar: z.number().int().describe('recibido(costura) − entregado (piezas por entregar).'),
   })
   .describe('Agregado de piezas por etapa del universo filtrado (KPIs del tablero WIP).');
@@ -225,7 +247,7 @@ const esquemaWipCeldaPorRecibir = esquemaWipCelda.extend({
 
 /**
  * Lo que UN maquilero concreto tiene pendiente de devolver de un proceso (`enviado − buenas −
- * incompletas` de ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
+ * incompletas − faltantes saldados` de ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
  * corte de un maquilero diferente al que se lo entregué"* — la pantalla de recibo ofrece solo a
  * quienes tienen entrega viva, y la matriz se valida contra el pendiente de ESE maquilero, no
  * contra el del proceso entero. Derivado en servidor (A1/B2), nunca pivoteado en el cliente.
@@ -244,13 +266,49 @@ const esquemaWipMaquileroPendiente = z.object({
     .number()
     .int()
     .describe(
-      'Total pendiente de ese maquilero = enviado − buenas − incompletas (derivado; NEGATIVO si ' +
+      'Total pendiente de ese maquilero = enviado − buenas − incompletas − faltantes saldados (derivado; NEGATIVO si ' +
         'recibió sin envío). Es lo que TIENE y a la vez lo que todavía se le puede recibir.',
     ),
   totalIncompletas: z
     .number()
     .int()
     .describe('Prendas incompletas que ya entregó (informativo; SÍ cierran el pendiente, V1-E8v).'),
+  faltantesSaldados: z
+    .number()
+    .int()
+    .describe(
+      'Piezas FALTANTES de ese maquilero ya SALDADAS al cerrar la orden con él (V1, fila 0.109). ' +
+        'Restan de `totalPendiente`: ya se decidió que no vuelven. Viajan aquí para que la celda ' +
+        'cerrada siga contando su historia en vez de desaparecer.',
+    ),
+  faltantesSaldables: z
+    .number()
+    .int()
+    .describe(
+      'Las piezas que de VERDAD se pueden saldar hoy con ese maquilero: Σ del pendiente POSITIVO ' +
+        'por color×talla (V1, fila 0.109). Es el número exacto que el servidor escribirá al cerrar ' +
+        '—y por el que multiplicará el descuento—, y por eso es el que la pantalla debe enseñar y ' +
+        'usar para decidir si ofrece el botón. ⚠️ NO es `totalPendiente`: esa suma es plana y una ' +
+        'celda NEGATIVA (histórico migrado, o lo devuelto sin decir de qué pack era) la compensa. ' +
+        'Con +5 y −5 la suma plana da 0 —el botón no aparecería y esa orden nunca se podría ' +
+        'cerrar— habiendo 5 piezas que saldar; con +5 y −3 da 2 mientras el cobro saldría por 5.',
+    ),
+  precioFaltante: z
+    .number()
+    .nullable()
+    .describe(
+      'Precio pactado del envío vivo a ese maquilero, base del cobro que se PROPONDRÍA al cerrar ' +
+        '(V1, fila 0.109). `null` si el envío no lo trae (histórico migrado) o si el usuario no ' +
+        'tiene `ordenes.ver-precio-real-maquila` (redactado, R2 §4.4.3).',
+    ),
+  importeFaltantePropuesto: z
+    .number()
+    .nullable()
+    .describe(
+      'Lo que se propondría cobrarle si se cerrara AHORA: `faltantesSaldables × precioFaltante`, ' +
+        'calculado en el SERVIDOR para que la confirmación no re-derive la regla. `null` sin ' +
+        'precio o sin permiso de verlo.',
+    ),
 });
 
 /** Forma del pendiente por recibir de UN maquilero. */
@@ -271,7 +329,7 @@ const esquemaWipProcesoPorRecibir = esquemaWipProcesoPendiente.extend({
   porMaquilero: z
     .array(esquemaWipMaquileroPendiente)
     .describe(
-      'enviado − buenas − incompletas por MAQUILERO (todo tercero con envío o recibo vivo del ' +
+      'enviado − buenas − incompletas − faltantes saldados por MAQUILERO (todo tercero con envío o recibo vivo del ' +
         'proceso).',
     ),
 });
@@ -315,9 +373,18 @@ export const esquemaWipOrden = z
       .number()
       .int()
       .describe(
-        'enviado − recibido − incompletas: el FALTANTE, lo que el maquilero todavía tiene (y lo ' +
-          'que se le cobra si ya cerró su entrega). Con `enviado`, `recibido` e `incompletas` ' +
-          'cierra la trazabilidad que pidió Daniel: qué pasó con cada prenda que se mandó.',
+        'enviado − recibido − incompletas − faltantes saldados: el FALTANTE VIVO, lo que el ' +
+          'maquilero todavía tiene. Con `enviado`, `recibido`, `incompletas` y ' +
+          '`faltantesSaldados` cierra la trazabilidad que pidió Daniel: qué pasó con cada prenda ' +
+          'que se mandó.',
+      ),
+    faltantesSaldados: z
+      .number()
+      .int()
+      .describe(
+        'Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): ' +
+          'nunca volvieron y ya no se esperan. Con `recibido` e `incompletas` completa la ' +
+          'trazabilidad de las cuatro cubetas.',
       ),
     recibidoCostura: z.number().int().describe('Recibido de costura (mete a PT).'),
     entregado: z.number().int().describe('Total entregado a cliente.'),
@@ -340,7 +407,7 @@ export const esquemaWipOrden = z
     porRecibir: z
       .array(esquemaWipProcesoPorRecibir)
       .describe(
-        'enviado − buenas − incompletas por proceso, color×talla, con desglose por maquilero.',
+        'enviado − buenas − incompletas − faltantes saldados por proceso, color×talla, con desglose por maquilero.',
       ),
     entregadoCeldas: z
       .array(esquemaWipCelda)
@@ -351,11 +418,11 @@ export const esquemaWipOrden = z
 /** Forma del drill-down de una orden. */
 export type WipOrden = z.infer<typeof esquemaWipOrden>;
 
-// ── Existencias en poder del maquilero (enviado − recibido − incompletas) ───────────────────────
+// ── Existencias en poder del maquilero (enviado − recibido − incompletas − faltantes saldados) ───────────────────────
 
 /**
  * Filtros de las EXISTENCIAS EN PODER DEL MAQUILERO en la URL (querystring). Base del form `MaqExis`
- * del viejo: lo que cada maquilero tiene pendiente de devolver (enviado − recibido − incompletas).
+ * del viejo: lo que cada maquilero tiene pendiente de devolver (enviado − recibido − incompletas − faltantes saldados).
  * Filtros por
  * maquilero/proceso/orden.
  */
@@ -377,7 +444,7 @@ export type ExistenciaMaquileroQuery = z.infer<typeof esquemaExistenciaMaquilero
 
 /**
  * Una fila de EXISTENCIA EN PODER DEL MAQUILERO: por maquilero × proceso × orden, lo que tiene
- * pendiente de devolver = `enviado − buenas − incompletas` (V1-E8v, §Post-F9.147: la incompleta ya
+ * pendiente de devolver = `enviado − buenas − incompletas − faltantes saldados` (V1-E8v, §Post-F9.147: la incompleta ya
  * volvió, así que deja de estar en la maquila). Solo se devuelven filas con saldo ≠ 0.
  */
 export const esquemaExistenciaMaquileroFila = z
@@ -401,13 +468,23 @@ export const esquemaExistenciaMaquileroFila = z
       .describe(
         'Prendas INCOMPLETAS que devolvió (V1-E8v): ya no las tiene, pero tampoco se produjeron.',
       ),
+    faltantesSaldados: z
+      .number()
+      .int()
+      .describe(
+        'Piezas suyas ya SALDADAS al cerrar la orden con él (V1, fila 0.109): dejan de estar en su ' +
+          'poder porque ya se decidió que no vuelven (se le cobraron o se le perdonaron).',
+      ),
     enPoder: z
       .number()
       .int()
-      .describe('enviado − recibido − incompletas (lo que el maquilero tiene de verdad).'),
+      .describe(
+        'enviado − recibido − incompletas − faltantes saldados (lo que el maquilero tiene de ' +
+          'verdad y todavía se le espera).',
+      ),
   })
   .describe(
-    'Existencia en poder de un maquilero (enviado − recibido − incompletas) por orden y proceso.',
+    'Existencia en poder de un maquilero (enviado − recibido − incompletas − faltantes saldados) por orden y proceso.',
   );
 
 /** Forma de una fila de existencia en poder del maquilero. */
@@ -421,7 +498,9 @@ export const esquemaExistenciaMaquileroLista = z
       .describe('Existencias en poder por maquilero × proceso × orden (saldo ≠ 0).'),
     totalEnPoder: z.number().int().describe('Total de piezas en poder de maquileros (derivado).'),
   })
-  .describe('Existencias en poder del maquilero (enviado − recibido − incompletas).');
+  .describe(
+    'Existencias en poder del maquilero (enviado − recibido − incompletas − faltantes saldados).',
+  );
 
 /** Forma de la respuesta de existencias en poder del maquilero. */
 export type ExistenciaMaquileroLista = z.infer<typeof esquemaExistenciaMaquileroLista>;

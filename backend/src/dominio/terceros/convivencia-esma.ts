@@ -24,6 +24,7 @@ import type { PrismaClient } from '../../datos/index.js';
 import {
   aporteCargoAlSaldo,
   cuentaAlSaldoPlano,
+  WHERE_VIVO_DESCUENTO,
   whereSegmentoFactura,
   type SegmentoFactura,
   type WhereSegmentoFactura,
@@ -197,7 +198,14 @@ export async function proyectarMovimientosEsMa(
       },
     }),
     cliente.descuentoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero: idProveedor, ...factura, ...rangoFecha(desde, hasta) },
+      // VIVOS (V1, fila 0.109): un descuento cancelado por un deshacer de cierre no es movimiento.
+      where: {
+        idEmpresa,
+        idMaquilero: idProveedor,
+        ...WHERE_VIVO_DESCUENTO,
+        ...factura,
+        ...rangoFecha(desde, hasta),
+      },
       select: {
         id: true,
         monto: true,

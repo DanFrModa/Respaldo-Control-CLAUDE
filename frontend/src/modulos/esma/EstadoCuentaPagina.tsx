@@ -471,9 +471,9 @@ function IncompletasSeccion({
 }
 
 /**
- * Existencias EN PODER del maquilero (enviado − recibido − incompletas, F3/V1-E8v). Componente aparte
- * para que el hook solo
- * se dispare cuando hay maquilero elegido y el usuario tiene `produccion.wip-ver`.
+ * Existencias EN PODER del maquilero (enviado − recibido − incompletas − faltantes saldados;
+ * F3/V1-E8v + fila 0.109). Componente aparte para que el hook solo se dispare cuando hay maquilero
+ * elegido y el usuario tiene `produccion.wip-ver`.
  */
 function ExistenciasMaquileroSeccion({ idMaquilero }: { idMaquilero: number }): React.JSX.Element {
   const consulta = useExistenciaMaquilero({ idMaquilero });

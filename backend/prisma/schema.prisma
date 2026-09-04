@@ -98,6 +98,8 @@ model Empresa {
   abonosMaquilero        AbonoMaquilero[]
   /// Descuentos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
   descuentosMaquilero    DescuentoMaquilero[]
+  /// Cierres de orden con un maquilero de esta empresa (V1, fila 0.109, A9). Restrict.
+  cierresMaquila         CierreMaquilaOrden[]
   /// Pagos a maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
   pagosMaquilero         PagoMaquilero[]
   /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
@@ -774,6 +776,8 @@ model Proveedor {
   abonosMaquilero         AbonoMaquilero[]
   /// Descuentos a su cuenta de maquila (EsMa, F6-E4). Restrict.
   descuentosMaquilero     DescuentoMaquilero[]
+  /// Cierres de orden en los que este maquilero quedó saldado (V1, fila 0.109). Restrict.
+  cierresMaquila          CierreMaquilaOrden[]
   /// Pagos recibidos como maquilero (EsMa, F6-E4). Restrict.
   pagosMaquilero          PagoMaquilero[]
   /// Lotes de tela que este proveedor surtió (F4-E1, D5). Restrict.
@@ -1117,6 +1121,8 @@ model Color {
   ordenLineas            OrdenLinea[]
   /// Renglones de etapas de producción (corte/envío/recibo/entrega) en este color (F3-E1, D4). Restrict.
   etapasMovimientoDet    EtapaMovimientoDet[]
+  /// Renglones de FALTANTES SALDADOS al cerrar la orden con un maquilero (V1, fila 0.109). Restrict.
+  cierresMaquilaDet      CierreMaquilaOrdenDet[]
   /// Renglones de kardex PT en este color (F3-E1, D4). Restrict.
   movimientosDetPt       MovimientoDetPt[]
   /// Lotes de tela teñidos en este color (F4-E1, D5: el lote define el teñido). Restrict.
@@ -1233,13 +1239,15 @@ model TipoProceso {
 
   /// Etapas de envío/recibo de maquila de este proceso (F3, Restrict): un tipo de
   /// proceso en uso por una etapa no se borra físico → se desactiva.
-  etapas      EtapaMovimiento[]
+  etapas         EtapaMovimiento[]
   /// Cargos a maquileros (EsMa) de este proceso (F3, Restrict).
-  cargosEsMa  EsMaCargo[]
+  cargosEsMa     EsMaCargo[]
+  /// Cierres de orden con un maquilero de este proceso (V1, fila 0.109, Restrict).
+  cierresMaquila CierreMaquilaOrden[]
   /// Artes del MODELO de este tipo (V1-E3f, Restrict): un tipo en uso no se borra físico.
-  artesModelo ModeloArte[]
+  artesModelo    ModeloArte[]
   /// Artes congelados en ÓRDENES de este tipo (V1-E3f, Restrict).
-  artesOrden  OrdenArte[]
+  artesOrden     OrdenArte[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1269,6 +1277,8 @@ model Talla {
   ordenLineasTalla       OrdenLineaTalla[]
   /// Renglones de etapas de producción en esta talla (F3-E1, D4). Restrict.
   etapasMovimientoDet    EtapaMovimientoDet[]
+  /// Renglones de FALTANTES SALDADOS al cerrar la orden con un maquilero (V1, fila 0.109). Restrict.
+  cierresMaquilaDet      CierreMaquilaOrdenDet[]
   /// Renglones de kardex PT en esta talla (F3-E1, D4). Restrict.
   movimientosDetPt       MovimientoDetPt[]
   /// Cantidades de la matriz talla×color de renglones de OC en esta talla (F4-E2). Restrict.
@@ -3465,6 +3475,8 @@ model Orden {
   etapasMovimiento     EtapaMovimiento[]
   /// Cargos a maquileros (EsMa) derivados de los recibos de esta orden (F3-E1). Restrict.
   cargosEsMa           EsMaCargo[]
+  /// Cierres de esta orden con cada maquilero (V1, fila 0.109). Restrict.
+  cierresMaquila       CierreMaquilaOrden[]
   /// Renglones de orden de compra ligados a esta orden de producción (F4-E2, R7: la
   /// liga es POR LÍNEA para cruzar gasto↔producción sin prorrateos). Restrict.
   ordenCompraLineas    OrdenCompraLinea[]
@@ -4479,6 +4491,147 @@ model EtapaMovimientoDet {
   @@map("etapa_movimiento_det")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ⭐ CERRAR LA ORDEN CON UN MAQUILERO — la CUARTA CUBETA se salda (V1, fila 0.109;
+// DANIEL 3-sep-2026). Cierra el hueco que dejaba abierta la invariante de §Post-F9.147:
+//
+//     enviado = primeras + segundas + faltantes + incompletas
+//
+// Las otras tres cubetas tenían dónde vivir (`cantidad`, `cantidadPrimeras`/`cantidadSegundas` y
+// `cantidadIncompletas`); el FALTANTE no: era el RESIDUO de la resta, o sea el pendiente mismo. Y
+// mientras faltante ≡ pendiente, **cobrarlo no bajaba nada** y la lista de pendientes crecía para
+// siempre. Aquí el faltante deja de ser un residuo y pasa a ser un DATO con su columna.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Cómo terminó un cierre de orden con un maquilero (V1, fila 0.109). Los DOS limpian la lista de
+/// pendientes; lo que cambia es si se le propone o no el cobro del faltante. DANIEL: *«se cierra por
+/// orden»*, con dos desenlaces — *cerrado y cobrado* o *cerrado y perdonado*.
+enum DesenlaceCierreMaquila {
+  /// Se le propone COBRAR el faltante (nace un `DescuentoMaquilero` `capturado`, sin cobrar todavía).
+  cobrado
+  /// Se le PERDONA: se salda el pendiente y no nace ningún movimiento de dinero.
+  perdonado
+
+  @@map("desenlace_cierre_maquila")
+}
+
+/// ⭐ EL ACTO DE CERRAR una orden con UN maquilero de UN proceso (V1, fila 0.109). DANIEL: *«un
+/// botón de cerrar la orden… lo aprieta quien recibe»*, que **salda siempre el pendiente** y
+/// **propone** el cobro esperando su visto bueno — *nunca cobra solo*.
+///
+/// 🔑 POR QUÉ ES UN REGISTRO PROPIO Y NO UN ESTADO DE LA ORDEN (§Post-F9.181(a)): `EstadoOrden` es
+/// `capturada | completa | cancelada` y `completa` significa completitud de CAPTURA (tallas +
+/// receta + arte), no *«terminada»*. Colgar el cierre de ahí habría resignificado un estado que ya
+/// tiene dueño. Y, sobre todo: **una orden puede tener varios maquileros vivos**, así que el acto
+/// no cabe en una bandera por orden.
+///
+/// 🔑 POR QUÉ LA LLAVE LLEVA EL PROCESO además del maquilero: el pendiente se lleva por
+/// orden × proceso × maquilero (`pendientePorMaquilero`), el `precioPactado` vive en el ENVÍO (que
+/// es de un proceso) y el movimiento de dinero necesita saber de qué proceso habla. Un maquilero que
+/// cose Y estampa la misma orden tiene dos saldos distintos y se cierra dos veces.
+///
+/// D3: NUNCA se edita ni se borra. Deshacer es el acto inverso auditado (`deshechoEn`), que
+/// des-salda la cubeta y cancela el descuento propuesto — y que se RECHAZA si el descuento ya se
+/// revisó (ya movió el saldo del maquilero).
+model CierreMaquilaOrden {
+  id        Int     @id @default(autoincrement())
+  /// Empresa dueña del acto (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Orden que se cierra. Restrict.
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Maquilero con el que se cierra (Proveedor con rol de servicio, D12/R15). Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Proceso de maquila del saldo que se cierra (costura/estampado/…). Restrict.
+  idTipoProceso Int         @map("id_tipo_proceso")
+  tipoProceso   TipoProceso @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
+
+  /// Fecha del cierre (date-only, la que el operador declara).
+  fecha DateTime @db.Date
+
+  /// Cómo terminó: cobrado o perdonado. Los dos saldan el pendiente.
+  desenlace DesenlaceCierreMaquila
+
+  /// PRECIO con el que se propuso el cobro, CONGELADO al cerrar: el `precioPactado` del envío vivo
+  /// de ese maquilero+proceso. NULL cuando el envío no lo traía (1,309 envíos migrados no lo traen)
+  /// o cuando se perdonó. Que quede congelado es lo que permite auditar el importe propuesto aunque
+  /// el envío se corrija después. Decimal.
+  precioFaltante Decimal? @map("precio_faltante") @db.Decimal(12, 2)
+
+  /// Motivo / nota del cierre (OBLIGATORIO al perdonar: perdonar dinero sin decir por qué es
+  /// justo lo que una auditoría no puede aceptar). Texto libre.
+  motivo String? @db.Text
+
+  /// DESHACER (D3: acto inverso auditado, jamás edición ni borrado). Con `deshechoEn` puesto, el
+  /// cierre deja de saldar: las piezas vuelven al pendiente y el descuento propuesto queda cancelado.
+  deshechoEn     DateTime? @map("deshecho_en")
+  /// Usuario que deshizo (sin FK física — ADR-0005).
+  deshechoPorId  String?   @map("deshecho_por_id")
+  motivoDeshacer String?   @map("motivo_deshacer") @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// Las piezas saldadas, color×talla×pack (D4). Cascade (el detalle no vive sin su cierre).
+  detalles  CierreMaquilaOrdenDet[]
+  /// El DESCUENTO propuesto al maquilero, si el desenlace fue «cobrado» (0..1). Restrict.
+  descuento DescuentoMaquilero?
+
+  @@index([idEmpresa])
+  @@index([idOrden])
+  @@index([idMaquilero])
+  @@index([idTipoProceso])
+  @@index([deshechoEn])
+  @@map("cierre_maquila_orden")
+}
+
+/// ⭐ LA TERCERA COLUMNA DE LA TRAZABILIDAD: las piezas FALTANTES que un cierre saldó, por
+/// color×talla×pack (V1, fila 0.109). Es la cubeta que le faltaba a §Post-F9.147.
+///
+/// 🔴 POR QUÉ VIVE EN SU PROPIA TABLA Y NO EN `EtapaMovimientoDet`: todo lo que produce, inventaría
+/// o cobra (`kardex PT`, `esma/cargos.ts`, `esma/conciliacion.ts`, el EDR, los KPIs) suma
+/// `EtapaMovimientoDet.cantidad` (o sus `cantidadPrimeras`/`cantidadSegundas`). Un faltante que
+/// viviera ahí acabaría, tarde o temprano, multiplicado por un precio de maquila y empujado al
+/// almacén — que es exactamente lo contrario de lo que es. Aquí queda **fuera de producción, de
+/// inventario y del pago POR CONSTRUCCIÓN**, no por un filtro que alguien pueda olvidar mañana (la
+/// misma razón por la que `cantidadIncompletas` es su propia columna, §Post-F9.136).
+///
+/// Lo ÚNICO que toca es el PENDIENTE: `pendiente = enviado − devuelto − saldado`
+/// ({@link produccion/incompletas.ts::pendientePorCelda}).
+model CierreMaquilaOrdenDet {
+  id       Int                @id @default(autoincrement())
+  idCierre Int                @map("id_cierre")
+  cierre   CierreMaquilaOrden @relation(fields: [idCierre], references: [id], onDelete: Cascade)
+
+  idColor Int   @map("id_color")
+  color   Color @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idTalla Int   @map("id_talla")
+  talla   Talla @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+
+  /// PACK / TENDIDO de la celda (§Post-F9.10). CADENA VACÍA (nunca NULL, por la unicidad de abajo)
+  /// cuando la orden no maneja packs o cuando el pendiente que se salda no está atribuido a ninguno.
+  pack String @default("")
+
+  /// Piezas FALTANTES saldadas en esta celda: lo que el maquilero NUNCA devolvió. Entera ≥ 0.
+  cantidadFaltantes Int @map("cantidad_faltantes")
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idCierre, idColor, idTalla, pack])
+  @@index([idCierre])
+  @@index([idColor])
+  @@index([idTalla])
+  @@map("cierre_maquila_orden_det")
+}
+
 /// Catálogo de tipos de movimiento de inventario (F3-E1 — ex `IPT_TiposMov`, doc 04-Inventarios
 /// §A.2). 19 tipos en el seed (Fase 2): Inventario Inicial, Entrada de Maquila, Entrega a
 /// Cliente, Transferencia, Ajustes… Cada tipo lleva su `direccion` (entrada/salida/traspaso, ex
@@ -4904,6 +5057,25 @@ model DescuentoMaquilero {
   observaciones  String?            @db.Text
   estadoRevision EstadoRevisionEsMa @default(capturado) @map("estado_revision")
 
+  /// ⭐ V1 (fila 0.109) — CIERRE DE ORDEN que PROPUSO este descuento, cuando nació de cobrarle a un
+  /// maquilero las prendas FALTANTES. DANIEL: *«ese faltante si se le queda y se le quita a mando
+  /// (normalmente **descontándole** esas prendas faltantes)»* (§Post-F9.147) — por eso el faltante es
+  /// un DESCUENTO (signo −, baja lo que se le debe) y no un cargo (signo +, que se lo pagaría).
+  /// NULL en todo descuento capturado a mano y en TODO lo migrado. `@unique`: un cierre propone UN
+  /// descuento. Restrict (no se borra un cierre con su descuento colgando).
+  idCierreMaquila Int?                @unique @map("id_cierre_maquila")
+  cierreMaquila   CierreMaquilaOrden? @relation(fields: [idCierreMaquila], references: [id], onDelete: Restrict)
+
+  /// ⭐ V1 (fila 0.109) — CANCELACIÓN SUAVE (D3: nunca se edita ni se borra). Hoy la usa el
+  /// DESHACER del cierre: el descuento propuesto queda cancelado en vez de desaparecer. Un descuento
+  /// cancelado NO cuenta al saldo y NO cuenta como pendiente de revisión — y eso no se decide aquí:
+  /// sale de la definición única (`esma/formula-saldo.ts`), que lleva `canceladoEn: null` en los DOS
+  /// criterios del concepto y lo propaga a Prisma y al SQL crudo por igual.
+  canceladoEn       DateTime? @map("cancelado_en")
+  /// Usuario que canceló (sin FK física — ADR-0005).
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -4911,6 +5083,7 @@ model DescuentoMaquilero {
 
   @@index([idEmpresa])
   @@index([idMaquilero])
+  @@index([canceladoEn])
   @@map("descuento_maquilero")
 }
 

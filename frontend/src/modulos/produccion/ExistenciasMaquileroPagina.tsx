@@ -25,8 +25,8 @@ function fmt(n: number): string {
 
 /**
  * EXISTENCIAS EN PODER DEL MAQUILERO (F3-E5, form `MaqExis` del viejo): lo que cada maquilero tiene
- * pendiente de devolver = `enviado − recibido − incompletas`, por orden y proceso (Σ de etapas, sin
- * acumuladores). Filtro por maquilero. RESPONSIVE: tabla en escritorio, tarjetas en móvil
+ * pendiente de devolver = `enviado − recibido − incompletas − faltantes saldados`, por orden y
+ * proceso (Σ de etapas y de cierres vivos, sin acumuladores). Filtro por maquilero. RESPONSIVE: tabla en escritorio, tarjetas en móvil
  * (consultar también es móvil, regla del plan).
  *
  * ⭐ V1-E8v (§Post-F9.147) — DANIEL, sobre esta pantalla: *"Al registrarlas como incompletas

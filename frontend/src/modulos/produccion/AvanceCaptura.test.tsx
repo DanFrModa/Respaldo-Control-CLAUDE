@@ -97,6 +97,20 @@ vi.mock('@/api/entregas-cliente', () => ({
   urlComprobanteEntrega: (id: number) => `/api/produccion/entregas-cliente/${id}/comprobante`,
 }));
 vi.mock('@/api/ordenes-centro', () => ({ CLAVE_ORDENES_CENTRO: ['centro'] }));
+/**
+ * ⭐ V1 (fila 0.109) — CERRAR LA ORDEN CON UN MAQUILERO. Se simula igual que el resto de la capa de
+ * datos: sin red. `useCierresMaquila` arranca vacío (ninguna orden cerrada) y las pruebas del bloque
+ * de cierre lo sobreescriben cuando necesitan uno.
+ */
+const cerrarOrden = vi.fn();
+const deshacerCierre = vi.fn();
+const useCierresMaquila = vi.fn<() => unknown>();
+vi.mock('@/api/cierre-maquila', () => ({
+  CLAVE_CIERRES_MAQUILA: ['cierres-maquila'],
+  useCierresMaquila: () => useCierresMaquila(),
+  useCerrarOrdenMaquila: () => ({ mutate: cerrarOrden, isPending: false }),
+  useDeshacerCierreMaquila: () => ({ mutate: deshacerCierre, isPending: false }),
+}));
 vi.mock('react-router-dom', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   useNavigate: () => navegar,
@@ -149,6 +163,11 @@ function wip(
     pendiente: number;
     /** Celdas explícitas; por default, una sola celda con el pendiente. */
     celdas?: { cantidad: number; incompletas?: number }[];
+    /** V1 (fila 0.109): lo SALDABLE que publica el servidor. Default: el pendiente si es positivo. */
+    saldables?: number;
+    /** Precio pactado e importe propuesto, ya derivados y redactados por el servidor. */
+    precio?: number;
+    importe?: number;
   }[],
 ): WipOrden {
   // `pack: ''` = la orden NO se fabrica por tendidos (§Post-F9.10). Toda celda del WIP lo trae
@@ -167,6 +186,7 @@ function wip(
     enviado: 10,
     recibido: 0,
     incompletas: 0,
+    faltantesSaldados: 0,
     pendientePorRecibir: 10,
     // Lo publica el SERVIDOR desde V1-E8v (antes la pantalla lo despejaba del pendiente, que era la
     // NOVENA puerta): 10 enviadas al proceso de costura.
@@ -208,6 +228,14 @@ function wip(
           })),
           totalPendiente: m.pendiente,
           totalIncompletas: (m.celdas ?? []).reduce((t, c) => t + (c.incompletas ?? 0), 0),
+          // ⭐ V1 (fila 0.109). `faltantesSaldables` NO se deriva de `pendiente` a propósito: es un
+          // número que manda el SERVIDOR (Σ del pendiente POSITIVO por color×talla) y que puede
+          // diferir de la suma plana cuando hay celdas negativas. El fixture deja ponerlo aparte
+          // justo para poder probar ese caso; por default coincide con lo que se le debe.
+          faltantesSaldados: 0,
+          faltantesSaldables: m.saldables ?? Math.max(0, m.pendiente),
+          precioFaltante: m.precio ?? null,
+          importeFaltantePropuesto: m.importe ?? null,
         })),
       },
     ],
@@ -238,6 +266,7 @@ async function abrirCaptura(
 }
 
 beforeEach(() => {
+  useCierresMaquila.mockReturnValue({ data: { idOrden: 1, folioOrden: 5424, filas: [] } });
   navegar.mockReset();
   crearCorte.mockReset();
   crearEnvio.mockReset();
@@ -1478,6 +1507,10 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
                 ],
                 totalPendiente: 4,
                 totalIncompletas: 0,
+                faltantesSaldados: 0,
+                faltantesSaldables: 4,
+                precioFaltante: null,
+                importeFaltantePropuesto: null,
               },
             ],
           },
@@ -2022,6 +2055,11 @@ describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima pu
           celdas: [{ ...celda, cantidad: 0, incompletas: 2 }],
           totalPendiente: 0,
           totalIncompletas: 2,
+          faltantesSaldados: 0,
+          // Todo devuelto (buenas + incompletas): no hay nada que saldar, así que tampoco botón.
+          faltantesSaldables: 0,
+          precioFaltante: null,
+          importeFaltantePropuesto: null,
         },
       ],
     });
@@ -2038,6 +2076,7 @@ describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima pu
       enviado: 20, // 10 costura + 10 arte
       recibido: 16, // 8 + 8 buenas
       incompletas: 4, // 2 + 2
+      faltantesSaldados: 0, // sin cierres de orden (V1, fila 0.109)
       pendientePorRecibir: 0, // 20 − 16 − 4
       enviadoCostura: 10,
       recibidoCostura: 8,
@@ -2071,6 +2110,7 @@ describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima pu
       ...base,
       recibido: 12,
       incompletas: 0,
+      faltantesSaldados: 0,
       pendientePorRecibir: 8,
       recibidoCostura: 6,
       porEntregar: 6,
@@ -2082,6 +2122,10 @@ describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima pu
           celdas: m.celdas.map((c) => ({ ...c, cantidad: 4, incompletas: 0 })),
           totalPendiente: 4,
           totalIncompletas: 0,
+          faltantesSaldados: 0,
+          faltantesSaldables: 4,
+          precioFaltante: null,
+          importeFaltantePropuesto: null,
         })),
       })),
     } satisfies WipOrden;
@@ -2163,6 +2207,10 @@ function wipConPacks(celdasMaquilero: { pack: string; cantidad: number }[]): Wip
             })),
             totalPendiente: celdasMaquilero.reduce((s, c) => s + c.cantidad, 0),
             totalIncompletas: 0,
+            faltantesSaldados: 0,
+            faltantesSaldables: celdasMaquilero.reduce((s, c) => s + Math.max(0, c.cantidad), 0),
+            precioFaltante: null,
+            importeFaltantePropuesto: null,
           },
         ],
       },
@@ -2398,5 +2446,192 @@ describe('Captura del avance · EL PACK / TENDIDO (§Post-F9.10)', () => {
     await usuario.clear(screen.getByLabelText('Rojo pack B, talla CH'));
     await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '3');
     expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
+  });
+});
+
+describe('⭐ Cerrar la orden con un maquilero (V1, fila 0.109)', () => {
+  /** Elige a un maquilero en la captura del recibo (es lo que enciende el bloque de cierre). */
+  async function elegirMaquilero(
+    usuario: ReturnType<typeof userEvent.setup>,
+    nombre: string,
+  ): Promise<void> {
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText(nombre));
+  }
+
+  it('ofrece cerrar con las piezas SALDABLES del servidor, no con la suma plana', async () => {
+    // 🔴 El caso que rompía: `totalPendiente` = 0 (una celda +5 y otra −5 del histórico migrado) y
+    // 5 piezas realmente saldables. Con la suma plana el botón NO aparecía y esa orden no se podía
+    // cerrar NUNCA — el grueso de «la lista que nunca se vacía».
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 0,
+          celdas: [{ cantidad: 5 }],
+          saldables: 5,
+          precio: 8,
+          importe: 40,
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await elegirMaquilero(usuario, 'Maquila del Norte');
+
+    const bloque = await screen.findByTestId('cierre-maquila');
+    expect(bloque).toHaveTextContent('le faltan 5 pza(s)');
+    expect(screen.getByTestId('cierre-maquila-abrir')).toBeInTheDocument();
+  });
+
+  it('NO ofrece cerrar a quien no tiene nada saldable (aunque su pendiente plano no sea cero)', async () => {
+    // Al revés: pendiente plano −5 (recibió sin envío, histórico) y CERO saldable. No hay deuda.
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: -5,
+          celdas: [{ cantidad: -5 }],
+          saldables: 0,
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+
+    expect(screen.queryByTestId('cierre-maquila-abrir')).not.toBeInTheDocument();
+  });
+
+  it('la confirmación pinta las TRES cifras del servidor (piezas, precio e importe)', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 2, // la suma plana dice 2…
+          celdas: [{ cantidad: 2 }],
+          saldables: 5, // …y lo que se va a saldar (y cobrar) son 5
+          precio: 8,
+          importe: 40,
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await elegirMaquilero(usuario, 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('cierre-maquila-abrir'));
+
+    // La pantalla NO multiplica: enseña lo que el servidor va a escribir.
+    expect(await screen.findByTestId('cierre-piezas')).toHaveTextContent('5');
+    expect(screen.getByTestId('cierre-importe')).toHaveTextContent('40');
+    expect(screen.getByTestId('cierre-importe')).not.toHaveTextContent('16');
+  });
+
+  it('al confirmar manda SÓLO la decisión: el QUÉ se salda lo deriva el servidor', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 5,
+          saldables: 5,
+          precio: 8,
+          importe: 40,
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await elegirMaquilero(usuario, 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('cierre-maquila-abrir'));
+    await usuario.click(await screen.findByTestId('cierre-confirmar'));
+
+    expect(cerrarOrden).toHaveBeenCalledTimes(1);
+    const [args] = cerrarOrden.mock.calls[0] as [
+      { idOrden: number; cuerpo: Record<string, unknown> },
+    ];
+    expect(args.idOrden).toBe(1);
+    expect(args.cuerpo.idMaquilero).toBe(77);
+    expect(args.cuerpo.idTipoProceso).toBe(5);
+    expect(args.cuerpo.desenlace).toBe('cobrado');
+    // Ninguna cantidad viaja: si la pantalla dijera cuántas piezas se cobran, el servidor estaría
+    // obedeciendo a la vista en vez de a su propio saldo bajo bloqueo (D3).
+    expect(Object.keys(args.cuerpo)).not.toContain('piezas');
+    expect(Object.keys(args.cuerpo)).not.toContain('cantidad');
+  });
+
+  it('PERDONAR exige motivo: sin él, el botón de confirmar queda deshabilitado', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([
+        { idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 5, saldables: 5, precio: 8 },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await elegirMaquilero(usuario, 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('cierre-maquila-abrir'));
+    await usuario.selectOptions(await screen.findByTestId('cierre-desenlace'), 'perdonado');
+
+    expect(screen.getByTestId('cierre-confirmar')).toBeDisabled();
+    await usuario.type(screen.getByTestId('cierre-motivo'), 'Se le perdona por el retraso de tela');
+    expect(screen.getByTestId('cierre-confirmar')).toBeEnabled();
+  });
+
+  it('lista lo ya cerrado y ofrece DESHACERLO, salvo si el descuento ya se revisó', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0, saldables: 0 }]),
+      isPending: false,
+    });
+    useCierresMaquila.mockReturnValue({
+      data: {
+        idOrden: 1,
+        folioOrden: 5424,
+        filas: [
+          {
+            id: 31,
+            idTipoProceso: 5,
+            maquilero: 'Maquila del Norte',
+            piezasFaltantes: 5,
+            desenlace: 'cobrado',
+            importe: 40,
+            fecha: '2026-09-04',
+            idDescuento: 9,
+            descuentoRevisado: false,
+            deshecho: false,
+          },
+          {
+            id: 32,
+            idTipoProceso: 5,
+            maquilero: 'Otra Maquila',
+            piezasFaltantes: 2,
+            desenlace: 'cobrado',
+            importe: 16,
+            fecha: '2026-09-04',
+            idDescuento: 10,
+            descuentoRevisado: true,
+            deshecho: false,
+          },
+        ],
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    const lista = await screen.findByTestId('cierre-maquila-lista');
+    expect(lista).toHaveTextContent('5 pza(s) faltantes');
+    // El que ya se revisó no se puede deshacer desde aquí (ese dinero ya está en el saldo).
+    expect(screen.getByTestId('cierre-maquila-deshacer-31')).toBeEnabled();
+    expect(screen.getByTestId('cierre-maquila-deshacer-32')).toBeDisabled();
   });
 });

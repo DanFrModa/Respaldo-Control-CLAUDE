@@ -5,7 +5,7 @@
  * inserta la etapa `entrega_cliente` directo para verificar que el WIP la LEE). Verifica:
  *  (a) los totales y pendientes derivados cuadran EXACTO en cada etapa (tablero + drill-down);
  *  (b) el drill-down baja a color×talla con el faltante real por celda;
- *  (c) enviado − recibido − incompletas por maquilero cuadra (existencias en poder, V1-E8v);
+ *  (c) enviado − recibido − incompletas − faltantes saldados por maquilero cuadra (existencias en poder, V1-E8v);
  *  (d) las etapas CANCELADAS no cuentan en ninguna suma;
  *  (e) `soloPendientes` filtra las órdenes 100% cerradas;
  *  (f) la consulta filtra por empresa activa (A9) y exige el permiso (A4).
@@ -586,8 +586,8 @@ describe('Tablero WIP (totales y pendientes derivados)', () => {
   });
 });
 
-describe('Existencias en poder del maquilero (enviado − recibido − incompletas)', () => {
-  it('cuadra enviado − recibido − incompletas por maquilero × proceso × orden, sin el saldo 0', async () => {
+describe('Existencias en poder del maquilero (enviado − recibido − incompletas − faltantes saldados)', () => {
+  it('cuadra enviado − recibido − incompletas − faltantes saldados por maquilero × proceso × orden, sin el saldo 0', async () => {
     await cortar30();
     await enviarCostura30(); // costura: 30 en poder del maquilero de costura
     // Recibe 25 → en poder 5.

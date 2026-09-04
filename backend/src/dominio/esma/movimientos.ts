@@ -31,6 +31,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { resolverConFactura, type ModalidadFacturacion } from './facturacion.js';
+import { WHERE_VIVO_DESCUENTO } from './formula-saldo.js';
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
@@ -197,7 +198,8 @@ export async function listarDescuentosMaquilero(
   verificarPermiso(sesion, 'esma.ver-pagos');
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const filas = await clienteLectura(bd).descuentoMaquilero.findMany({
-    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero },
+    // VIVOS: el descuento que canceló un deshacer de cierre no se lista (V1, fila 0.109).
+    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero, ...WHERE_VIVO_DESCUENTO },
     orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
     include: incluirMaquilero,
   });
@@ -240,7 +242,10 @@ export async function revisarMovimiento(
           })
         : concepto === 'descuento'
           ? await tx.descuentoMaquilero.findFirst({
-              where: { id, idEmpresa },
+              // ⭐ V1 (fila 0.109): un descuento CANCELADO por el deshacer de un cierre no existe
+              // para la revisión. Sin este filtro se podía marcar `revisado` por API un movimiento
+              // muerto y quedaba un fantasma «cancelado + revisado» que ninguna suma sabe leer.
+              where: { id, idEmpresa, ...WHERE_VIVO_DESCUENTO },
               select: { estadoRevision: true },
             })
           : await tx.pagoMaquilero.findFirst({
@@ -255,13 +260,28 @@ export async function revisarMovimiento(
       throw new ErrorConflicto('Esa partida ya está revisada.');
     }
 
+    // ⭐⭐ EL UPDATE ES CONDICIONAL, no un `update` por id (V1, fila 0.109 — precedente F8-E3,
+    // `CLAUDE.md` §7.3). La lectura de arriba da el MENSAJE; la condición del `updateMany` da la
+    // GARANTÍA. Entre las dos cabe una transacción concurrente: revisar y deshacer-el-cierre pelean
+    // por el mismo renglón, y sin la condición el segundo pisaba al primero —o revisaba un
+    // descuento ya cancelado, o cancelaba uno ya revisado (dinero que ya está en el saldo)—.
+    // `count === 0` significa exactamente eso: alguien llegó primero.
     const datos = { estadoRevision: 'revisado' as const, ...datosModificacion(sesion) };
-    if (concepto === 'abono') {
-      await tx.abonoMaquilero.update({ where: { id }, data: datos });
-    } else if (concepto === 'descuento') {
-      await tx.descuentoMaquilero.update({ where: { id }, data: datos });
-    } else {
-      await tx.pagoMaquilero.update({ where: { id }, data: datos });
+    const condicion = { id, idEmpresa, estadoRevision: 'capturado' as const };
+    const cambiadas =
+      concepto === 'abono'
+        ? await tx.abonoMaquilero.updateMany({ where: condicion, data: datos })
+        : concepto === 'descuento'
+          ? await tx.descuentoMaquilero.updateMany({
+              where: { ...condicion, ...WHERE_VIVO_DESCUENTO },
+              data: datos,
+            })
+          : await tx.pagoMaquilero.updateMany({ where: condicion, data: datos });
+    if (cambiadas.count === 0) {
+      throw new ErrorConflicto(
+        'Esa partida cambió mientras se revisaba (otra persona la revisó o la canceló). ' +
+          'Vuelve a consultarla antes de decidir.',
+      );
     }
 
     await registrarBitacora(tx, sesion, {

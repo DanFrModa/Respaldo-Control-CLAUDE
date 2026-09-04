@@ -215,7 +215,18 @@ const esquemaWipTotales = z.object({
   entregado: z.number().int().describe('Σ entregado a cliente.'),
   porCortar: z.number().int().describe('Σ (pedido − cortado).'),
   cortadoPorEnviar: z.number().int().describe('Σ (cortado − enviado).'),
-  porRecibir: z.number().int().describe('Σ (enviado − recibido − incompletas), V1-E8v.'),
+  faltantesSaldados: z
+    .number()
+    .int()
+    .describe(
+      'Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca ' +
+        'volvieron y ya se decidió que no vuelven (se cobraron o se perdonaron). Restan del ' +
+        'pendiente por recibir, igual que las incompletas.',
+    ),
+  porRecibir: z
+    .number()
+    .int()
+    .describe('Σ (enviado − recibido − incompletas − faltantes saldados), V1-E8v + fila 0.109.'),
   porEntregar: z.number().int().describe('Σ (recibido costura − entregado).'),
 });
 
@@ -239,7 +250,18 @@ const esquemaWipFila = z.object({
   entregado: z.number().int().describe('Entregado a cliente.'),
   porCortar: z.number().int().describe('pedido − cortado.'),
   cortadoPorEnviar: z.number().int().describe('cortado − enviado.'),
-  porRecibir: z.number().int().describe('enviado − recibido − incompletas (V1-E8v).'),
+  faltantesSaldados: z
+    .number()
+    .int()
+    .describe(
+      'Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca ' +
+        'volvieron y ya se decidió que no vuelven (se cobraron o se perdonaron). Restan del ' +
+        'pendiente por recibir, igual que las incompletas.',
+    ),
+  porRecibir: z
+    .number()
+    .int()
+    .describe('enviado − recibido − incompletas − faltantes saldados (V1-E8v + fila 0.109).'),
   porEntregar: z.number().int().describe('recibido costura − entregado.'),
 });
 

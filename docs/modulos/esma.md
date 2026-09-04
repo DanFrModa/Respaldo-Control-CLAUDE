@@ -32,6 +32,12 @@ semanales, impresos R9 (estado de cuenta + recibo de pago) y export a Excel.
   (`capturado`/`revisado`, ex asteriscos `Rev` del viejo).
 - **`PagoAplicacion`** — puente N:N pago↔cargo (decisión (g)): cuántas prendas de un cargo cubrió un
   pago y por qué importe. PK `(idPago, idCargo)`.
+- ⭐ **`DescuentoMaquilero.idCierreMaquila` + su cancelación suave** (V1, fila 0.109) — el descuento
+  puede **nacer de un acto de producción**: CERRAR la orden con un maquilero cobrándole las prendas
+  **faltantes** (las que nunca devolvió). `idCierreMaquila` (único) es su origen, y
+  `canceladoEn`/`canceladoPorId`/`motivoCancelacion` permiten **deshacer** ese cierre sin borrar nada
+  (D3). Es el único de los tres movimientos planos que se cancela, porque es el único que nace de un
+  acto reversible.
 
 El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σcargos + Σabonos − Σpagos − Σdescuentos`,
 y al saldo **sólo entra lo YA REVISADO, en los CUATRO conceptos** — cargo `validado` y no `sinCosto`;
@@ -56,6 +62,42 @@ objeto y no escritos aparte), los predicados de un renglón suelto (`cuentaAlSal
   escribiendo además una condición a mano). Garantiza que nadie **reescriba** el criterio; no que todo
   el que sume lo aplique — `migracion/cuadre-f6.ts` suma los planos sin filtrar por revisión a
   propósito, porque compara contra un Access que no conocía el concepto.
+
+### ⭐ El FALTANTE del maquilero es un DESCUENTO, no un cargo (V1, fila 0.109)
+
+Cuando una orden se **cierra** con un maquilero cobrándole lo que nunca devolvió
+(`dominio/produccion/cierre-maquila.ts`), lo que nace aquí es un **`DescuentoMaquilero` `capturado`**.
+Las dos mitades de esa frase importan:
+
+- **Descuento y no cargo, por el SIGNO.** `SIGNO_SALDO` pone el cargo en `+1`: un cargo **sube** lo que
+  se le debe al maquilero. Cobrarle las prendas perdidas lo **baja**. Un cargo le habría pagado las
+  prendas que no devolvió, además de dejárselas. Y es la palabra de Daniel: *«se le quita a mando
+  (normalmente **descontandole** esas prendas faltantes)»* (§Post-F9.147).
+- **`capturado` y no `revisado`, porque PROPONE.** Daniel: el botón *«nunca cobra solo»*. Un descuento
+  `capturado` no cuenta al saldo y aparece en el estado de cuenta marcado como **pendiente de
+  revisión**: el visto bueno se da con el flujo que ya existía (`revisarMovimiento`,
+  `esma.modificar`), sin pantalla nueva.
+- **Se ve de qué es**: sus `observaciones` las redacta el dominio — *«Faltante de la orden #77 ·
+  Costura: 5 pza(s) que no se devolvieron»* — y ésa es la `referencia` del renglón en la línea de
+  tiempo.
+- **Deshacer el cierre lo CANCELA** (`canceladoEn`), no lo borra. Un descuento cancelado no cuenta al
+  saldo **ni** como pendiente de revisión: la condición `canceladoEn: null` entró en los **dos**
+  criterios del concepto dentro de `formula-saldo.ts`, así que viaja sola a las cinco sumas (Prisma y
+  SQL crudo) y a las pantallas que listan descuentos (`WHERE_VIVO_DESCUENTO`). 🔴 Si el descuento
+  **ya se revisó**, el deshacer se **rechaza**: ese importe ya está en el saldo y puede estar pagado.
+- ⭐ **Y las dos escrituras son CONDICIONALES** (`updateMany` con el estado esperado en el `where`,
+  fallando si `count === 0`), no `update` por id. `revisarMovimiento` **no** toma el lock de la orden
+  —no sabe nada de órdenes—, así que no se serializa con el deshacer del cierre: entre la lectura que
+  da el mensaje y la escritura cabe la otra transacción. Sin la condición, deshacer podía cancelar un
+  descuento recién revisado (dinero que ya está en el saldo, desapareciendo en silencio) y revisar
+  podía marcar `revisado` uno ya cancelado. La lectura da el MENSAJE; la condición da la GARANTÍA
+  (precedente F8-E3, `CLAUDE.md` §7.3). De paso, la revisión de abono y pago quedó con la misma
+  guarda de idempotencia.
+- **Precio**: el `precioPactado` del ENVÍO vivo a ese maquilero, congelado en el cierre. Si no lo hay
+  (histórico migrado), el cierre salda el pendiente pero **no** crea el descuento, y lo dice con
+  nombre — no inventa un precio (REGLA 0-B).
+
+Detalle completo del acto (la cubeta, el tope del recibo, el deshacer): `docs/modulos/produccion-wip.md`.
 
 ### `pendienteRevision`: el dinero excluido se VE
 

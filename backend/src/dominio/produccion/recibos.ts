@@ -87,6 +87,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
+import { saldadosPorCelda } from './faltantes-saldados.js';
 import { pendientePorCelda, piezasDevueltas } from './incompletas.js';
 import {
   SIN_PACK,
@@ -373,7 +374,11 @@ async function exigirMaquileroConRol(
  * así "enviado disponible por recibir" es consistente y dos recibos concurrentes no exceden lo
  * enviado. El lock se libera al commit.
  */
-async function bloquearEtapasDeOrden(tx: Tx, idEmpresa: number, idOrden: number): Promise<void> {
+export async function bloquearEtapasDeOrden(
+  tx: Tx,
+  idEmpresa: number,
+  idOrden: number,
+): Promise<void> {
   const clave1 = ((idEmpresa * 1_000_003) ^ 0x4f000000) | 0;
   const clave2 = idOrden | 0;
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
@@ -385,7 +390,7 @@ async function bloquearEtapasDeOrden(tx: Tx, idEmpresa: number, idOrden: number)
  * porque salen de las MISMAS filas: pedirlas por separado serían dos consultas idénticas y, peor,
  * dos oportunidades de que una quedara filtrada distinto que la otra.
  */
-interface SumaCeldas {
+export interface SumaCeldas {
   /** Por `claveCelda` (color:talla): el AGREGADO de todos los packs. */
   total: Map<string, number>;
   /** Por `claveCeldaPack` (color:talla:pack): el saldo de cada tendido. */
@@ -404,7 +409,7 @@ interface SumaCeldas {
  * §Post-F9.147: la incompleta ya volvió, así que sale del tránsito; el pendiente y lo recibible son
  * el MISMO número). En envíos `cantidadIncompletas` es NULL y la suma no cambia.
  */
-async function sumarCeldas(
+export async function sumarCeldas(
   tx: Tx | ReturnType<typeof clienteLectura>,
   idOrden: number,
   tipo: TipoEtapaMovimiento,
@@ -712,6 +717,15 @@ export async function registrarReciboMaquila(
       datos.idTipoProceso,
       datos.idMaquilero,
     );
+    // ⭐ V1 (fila 0.109): lo que ya se SALDÓ al cerrar la orden con este maquilero consume saldo
+    // igual que lo devuelto. Sin esto, cerrar y luego recibir contaría dos veces las mismas piezas
+    // (el maquilero quedaría saldado Y con la mercancía adentro). Para recibir después de un
+    // cierre hay que DESHACERLO primero — que es el acto inverso auditado, no una edición.
+    const yaSaldado = await saldadosPorCelda(tx, {
+      idOrden: datos.idOrden,
+      idTipoProceso: datos.idTipoProceso,
+      idMaquilero: datos.idMaquilero,
+    });
     if (enviado.total.size === 0) {
       const { nombres, sinMaquilero } = await maquilerosConEnvio(
         tx,
@@ -758,6 +772,8 @@ export async function registrarReciboMaquila(
         devueltoTotal: yaDevuelto.total,
         enviadoPorPack: enviado.porPack,
         devueltoPorPack: yaDevuelto.porPack,
+        saldadoTotal: yaSaldado.total,
+        saldadoPorPack: yaSaldado.porPack,
       },
     );
     // Cuál se REPORTA cuando fallan las dos: la que DE VERDAD limita, o sea la de menor
@@ -1211,7 +1227,7 @@ export async function obtenerRecibo(
 
 /**
  * PENDIENTES POR RECIBIR de una orden (derivados, sin acumuladores). Por cada proceso ya enviado a
- * la orden (envíos vivos), `enviado − buenas − incompletas` a ESE proceso, por color×talla (celdas
+ * la orden (envíos vivos), `enviado − buenas − incompletas − faltantes saldados` a ESE proceso, por color×talla (celdas
  * con pendiente **o** con incompletas entregadas: una celda ya cerrada del todo —95 buenas + 5
  * incompletas de 100— sigue mostrándose con pendiente 0 e incompletas 5, que es su historia). Las
  * etapas canceladas NO cuentan. Solo lectura (`produccion.wip-ver`).
@@ -1306,13 +1322,23 @@ export async function pendientesPorRecibir(
     if (proc.idTipoProceso === null) continue;
     // MISMO derivado que el drill-down del WIP (helper compartido): el pendiente por proceso y su
     // desglose POR MAQUILERO, para que esta pantalla ofrezca y tope igual que el panel de avance.
-    const { porMaquilero, enviado, recibido, incompletas } = await pendientePorMaquilero(
+    const { porMaquilero, enviado, recibido, incompletas, saldados } = await pendientePorMaquilero(
       cliente,
       idOrden,
       proc.idTipoProceso,
       meta,
+      {
+        // ÉSTA es la pantalla del botón de cerrar, así que aquí sí viaja el precio propuesto —
+        // redactado con el MISMO permiso que redacta el `precioPactado` de un recibo (R2 §4.4.3).
+        ocultarPrecio: !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'),
+      },
     );
-    const claves = new Set<string>([...enviado.keys(), ...recibido.keys(), ...incompletas.keys()]);
+    const claves = new Set<string>([
+      ...enviado.keys(),
+      ...recibido.keys(),
+      ...incompletas.keys(),
+      ...saldados.keys(),
+    ]);
     const celdas = [...claves]
       .map((clave) => {
         // MISMO respaldo que el drill-down del WIP (`metaPara`, exportado por `wip.ts`), y no una
@@ -1320,7 +1346,7 @@ export async function pendientesPorRecibir(
         // (§Post-F9.10), habría devuelto un pack truncado en silencio. Dos vistas del mismo
         // pendiente no pueden nombrar distinto a la misma celda.
         const m = metaPara(meta, clave);
-        // PENDIENTE = enviado − buenas − incompletas, por la MISMA función que el tope de
+        // PENDIENTE = enviado − buenas − incompletas − faltantes saldados, por la MISMA función que el tope de
         // `registrarReciboMaquila` (arriba, bajo lock). Desde V1-E8v (§Post-F9.147) «lo que falta
         // por recibirle» y «lo que todavía se le puede recibir» son EL MISMO número: la incompleta
         // ya volvió del taller. Lo que quede aquí al cerrar su entrega es el faltante que se cobra.
@@ -1328,6 +1354,9 @@ export async function pendientesPorRecibir(
         const cantidad = pendientePorCelda(
           enviado.get(clave) ?? 0,
           (recibido.get(clave) ?? 0) + inc,
+          // Lo saldado al cerrar sale del pendiente (V1, fila 0.109): la lista de pendientes deja
+          // de enseñar lo que ya se resolvió, que es exactamente lo que pedía la fila.
+          saldados.get(clave) ?? 0,
         );
         return {
           ...m,
@@ -1347,9 +1376,11 @@ export async function pendientesPorRecibir(
       )
       .map(({ ordenTalla: _o, ...resto }) => resto);
     const totalIncompletas = [...incompletas.values()].reduce((s, v) => s + v, 0);
+    const totalFaltantesSaldados = [...saldados.values()].reduce((s, v) => s + v, 0);
     const totalPendiente = pendientePorCelda(
       [...enviado.values()].reduce((s, v) => s + v, 0),
       [...recibido.values()].reduce((s, v) => s + v, 0) + totalIncompletas,
+      totalFaltantesSaldados,
     );
     porRecibir.push({
       idTipoProceso: proc.idTipoProceso,
@@ -1361,6 +1392,7 @@ export async function pendientesPorRecibir(
       celdas,
       totalPendiente,
       totalIncompletas,
+      totalFaltantesSaldados,
       porMaquilero,
     });
   }

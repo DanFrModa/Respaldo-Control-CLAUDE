@@ -1353,6 +1353,19 @@ export type ReciboCancelar =
 /** Pendientes por recibir de una orden (`GET /api/produccion/ordenes/{id}/pendientes-recibir`). */
 export type PendientesRecibir =
   paths['/api/produccion/ordenes/{id}/pendientes-recibir']['get']['responses']['200']['content']['application/json'];
+/** Un CIERRE de orden con un maquilero (V1, fila 0.109). */
+export type CierreMaquila =
+  paths['/api/produccion/ordenes/{id}/cierre-maquila']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de `POST /api/produccion/ordenes/{id}/cierre-maquila` (cerrar la orden con un maquilero). */
+export type CierreMaquilaCrear =
+  paths['/api/produccion/ordenes/{id}/cierre-maquila']['post']['requestBody']['content']['application/json'];
+/** Cuerpo del deshacer de un cierre (`POST /api/produccion/cierres-maquila/{id}/deshacer`). */
+export type CierreMaquilaDeshacer =
+  paths['/api/produccion/cierres-maquila/{id}/deshacer']['post']['requestBody']['content']['application/json'];
+/** Los cierres de una orden (`GET /api/produccion/ordenes/{id}/cierres-maquila`). */
+export type CierresMaquila =
+  paths['/api/produccion/ordenes/{id}/cierres-maquila']['get']['responses']['200']['content']['application/json'];
+
 /** Recibos semanales por maquilero (`GET /api/produccion/recibos-semanales`). */
 export type RecibosSemanales =
   paths['/api/produccion/recibos-semanales']['get']['responses']['200']['content']['application/json'];
@@ -1543,7 +1556,7 @@ export type WipProcesoPendiente = WipOrden['cortadoPorEnviar'][number];
 /** Existencias en poder del maquilero (`GET /api/produccion/existencias-maquilero`). */
 export type ExistenciaMaquilero =
   paths['/api/produccion/existencias-maquilero']['get']['responses']['200']['content']['application/json'];
-/** Una fila de existencia en poder del maquilero (enviado − recibido − incompletas). */
+/** Una fila de existencia en poder del maquilero (enviado − recibido − incompletas − saldados). */
 export type ExistenciaMaquileroFila = ExistenciaMaquilero['filas'][number];
 /** Parámetros de las existencias en poder del maquilero (querystring). */
 export type ExistenciaMaquileroQuery = NonNullable<

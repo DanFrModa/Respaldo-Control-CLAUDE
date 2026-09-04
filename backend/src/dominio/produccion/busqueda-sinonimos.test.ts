@@ -94,6 +94,12 @@ function bdStub(catalogo: FilaCatalogo[] = CATALOGO_FUSIONADO) {
     ordenCompraLinea: { findMany: vi.fn(() => Promise.resolve([])) },
     // Agregados del tablero WIP y de la lista de costos (universo vacío: aquí se mide el `where`).
     etapaMovimientoDet: { aggregate: vi.fn(() => Promise.resolve({ _sum: { cantidad: null } })) },
+    // Los FALTANTES SALDADOS del agregado WIP (V1, fila 0.109): universo vacío, igual que el resto.
+    cierreMaquilaOrdenDet: {
+      aggregate: vi.fn(() => Promise.resolve({ _sum: { cantidadFaltantes: null } })),
+      findMany: vi.fn(() => Promise.resolve([])),
+    },
+    cierreMaquilaOrden: { findMany: vi.fn(() => Promise.resolve([])) },
     costoOrden: {
       count: vi.fn(() => Promise.resolve(0)),
       findMany: vi.fn(() => Promise.resolve([])),

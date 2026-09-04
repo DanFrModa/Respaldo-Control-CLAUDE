@@ -39,10 +39,15 @@ import {
 const COLOR = 7;
 const TALLA = 3;
 
-/** Arma los cuatro saldos a partir de listas legibles `[pack, piezas]`. */
+/**
+ * Arma los saldos a partir de listas legibles `[pack, piezas]`. El tercero —lo SALDADO al cerrar la
+ * orden con el maquilero (V1, fila 0.109)— es opcional y por default va vacío: casi todas estas
+ * pruebas son del PACK, no del cierre.
+ */
 function saldos(
   enviado: [pack: string, piezas: number][],
   devuelto: [pack: string, piezas: number][],
+  saldado: [pack: string, piezas: number][] = [],
 ): SaldosDelRecibo {
   const porPack = (filas: [string, number][]): Map<string, number> => {
     const m = new Map<string, number>();
@@ -64,6 +69,10 @@ function saldos(
     devueltoPorPack: porPack(devuelto),
     enviadoTotal: total(enviado),
     devueltoTotal: total(devuelto),
+    // Lo SALDADO consume saldo igual que lo devuelto (V1, fila 0.109): una vez cerrada la orden,
+    // esas piezas ya no se pueden recibir.
+    saldadoPorPack: porPack(saldado),
+    saldadoTotal: total(saldado),
   };
 }
 
@@ -136,6 +145,8 @@ describe('excesosDelRecibo — orden SIN packs (tiene que comportarse EXACTAMENT
       devueltoPorPack: new Map(),
       enviadoTotal: new Map([[`${COLOR}:${TALLA}`, 100]]),
       devueltoTotal: new Map(),
+      saldadoPorPack: new Map(),
+      saldadoTotal: new Map(),
     };
     expect(excesosDelRecibo([celda(SIN_PACK, 100)], s)).toEqual([]);
   });
@@ -313,12 +324,52 @@ describe('⭐ excesosDelRecibo — (3) LAS DOS FORMAS JUNTAS no dejan recibir de
     ]);
   });
 
+  // ── ⭐ V1 (fila 0.109) · EL TERCER SUMANDO DEL TOPE: lo ya SALDADO al cerrar la orden ──────────
+  //
+  // Estas tres pruebas existen porque el reviewer midió que sin ellas el sumando era LETRA MUERTA:
+  // puso a cero `saldadoTotal`/`saldadoPorPack` en `excesosDelRecibo` y los 3,056 tests seguían en
+  // verde. El tope tiene que restarlo: cerrar da por perdidas esas piezas, así que recibirlas
+  // después las contaría DOS veces (el maquilero saldado Y la mercancía adentro).
+  it('⭐ lo SALDADO consume saldo: cerradas las 40 que faltaban, ya no se pueden recibir', () => {
+    const s = saldos([[SIN_PACK, 100]], [[SIN_PACK, 60]], [[SIN_PACK, 40]]);
+    // Sin el cierre quedaban 40 recibibles; con él, cero.
+    expect(excesosDelRecibo([celda(SIN_PACK, 1)], s)).toEqual([
+      { motivo: 'total', idColor: COLOR, idTalla: TALLA, pide: 1, disponible: 0 },
+    ]);
+  });
+
+  it('⭐ un cierre PARCIAL deja recibir el resto, y ni una pieza más', () => {
+    const s = saldos([[SIN_PACK, 100]], [[SIN_PACK, 60]], [[SIN_PACK, 30]]);
+    expect(excesosDelRecibo([celda(SIN_PACK, 10)], s)).toEqual([]);
+    expect(excesosDelRecibo([celda(SIN_PACK, 11)], s)).toEqual([
+      { motivo: 'total', idColor: COLOR, idTalla: TALLA, pide: 11, disponible: 10 },
+    ]);
+  });
+
+  it('⭐ lo SALDADO también topa POR PACK, no sólo al agregado', () => {
+    // Enviadas 5 de A y 5 de B; el cierre saldó las 5 de A. El pack A no admite ni una; B sí.
+    const s = saldos(
+      [
+        ['A', 5],
+        ['B', 5],
+      ],
+      [],
+      [['A', 5]],
+    );
+    expect(excesosDelRecibo([celda('A', 1)], s)).toEqual([
+      { motivo: 'pack', idColor: COLOR, idTalla: TALLA, pack: 'A', pide: 1, disponible: 0 },
+    ]);
+    expect(excesosDelRecibo([celda('B', 5)], s)).toEqual([]);
+  });
+
   it('celdas de tallas distintas NO se prestan saldo entre sí', () => {
     const s: SaldosDelRecibo = {
       enviadoPorPack: new Map([[claveCeldaPack(COLOR, TALLA, 'A'), 10]]),
       devueltoPorPack: new Map(),
       enviadoTotal: new Map([[`${COLOR}:${TALLA}`, 10]]),
       devueltoTotal: new Map(),
+      saldadoPorPack: new Map(),
+      saldadoTotal: new Map(),
     };
     // La talla 99 no tiene envío: no cabe nada, aunque la talla 3 tenga 10 libres.
     const otraTalla: CeldaRecibidaParaTope = {

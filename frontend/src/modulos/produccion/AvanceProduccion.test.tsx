@@ -26,6 +26,7 @@ const wipBase: WipOrden = {
   enviado: 2500, // 1726 costura + 774 aplicación
   recibido: 1900, // 1500 costura + 400 aplicación
   incompletas: 0,
+  faltantesSaldados: 0,
   pendientePorRecibir: 600, // enviado 2500 − recibido 1900 − incompletas 0
   enviadoCostura: 1726,
   recibidoCostura: 1500,

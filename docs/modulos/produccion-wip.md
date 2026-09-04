@@ -86,7 +86,7 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
     aparte en **`cortadoCeldas`** (Σ corte por celda, con los ceros incluidos — cero cortado es un tope
     real, no una ausencia de dato). La pantalla lo lee tal cual: antes lo re-derivaba restando
     *pedido − porCortar*, y la misma regla escrita en dos lados deriva (V1-E8i).
-- Por recibir = enviado − recibido − **incompletas** (por `TipoProceso`, **y desglosado por
+- Por recibir = enviado − recibido − **incompletas** − **saldados** (lo saldado sale de los cierres vivos de la orden con el maquilero, 0.109: tres sumandos, no dos; por `TipoProceso`, **y desglosado por
   MAQUILERO**). Las incompletas restan desde V1-E8v: ya volvieron del taller (§Post-F9.147)
 - Entregado a cliente = Σ entregas (etapa `entrega_cliente`)
 - Por entregar = recibido(procesos `generaEntradaPt`) − entregado a cliente
@@ -145,7 +145,8 @@ enviado = primeras + segundas + faltantes + incompletas
   `cantidad` (el pendiente, que es también el tope de captura) e `incompletas` (informativo, para la
   trazabilidad).
 - **Las DIEZ puertas** que llevan esta fórmula, todas por la misma función (o con el comentario que
-  apunta a ella cuando es SQL): `pendientePorMaquilero` · `wipDeOrden` (por proceso) ·
+  apunta a ella cuando es SQL) — y desde la fila 0.109 la fórmula lleva **tres** sumandos
+  (`enviado − devuelto − saldado`), no dos: `pendientePorMaquilero` · `wipDeOrden` (por proceso) ·
   `pendientesPorRecibir` · **`consultarExistenciaMaquilero`** · `pendientesDerivados`/`agregadoWip`
   (por orden) · `contarOrdenesAbiertas` y `contarMaquilerosConSaldo` del Resumen operativo · la vista
   materializada **`kpi_wip`** (única fórmula congelada en SQL; migración
@@ -162,12 +163,111 @@ enviado = primeras + segundas + faltantes + incompletas
   maquilero»** (columna propia), el estado de cuenta del maquilero (las dos vistas → PDF y Excel),
   la cola de validación de cargos, los recibos semanales y el PDF del recibo. Detalle en
   `docs/modulos/esma.md`.
+
 - ⚠️ **Deuda con nombre:** con proceso DESPUÉS de la costura (envío de prenda ya terminada, V1-E4b),
   las incompletas **se quedan en el almacén Tránsito** — no vuelven a primeras ni a segundas porque no
   se inventarían. Coherente con *«se pierden esas prendas»*, pero deja saldo vivo ahí. Darles salida
   pide un tipo de movimiento nuevo (¿merma?) y **es decisión de negocio sin tomar**. Caso marginal (la
   incompleta casi siempre aparece en el recibo de costura, donde no hay tránsito). Ver
   `HOJA-DE-RUTA.md` §4.
+
+## ⭐⭐ Cerrar la orden con un maquilero: el FALTANTE por fin se puede cobrar (V1, fila 0.109)
+
+**El problema.** §Post-F9.147 dejó escrita la invariante de las cuatro cubetas, pero el **faltante no
+era un dato**: era el RESIDUO de `pendiente = enviado − buenas − incompletas`. **Faltante ≡ pendiente,
+el mismo número** ⇒ cobrarlo no bajaba nada y la lista de pendientes crecía para siempre. Y
+`esma/cargos.ts` no mencionaba la palabra «faltante» ni una vez: la regla vivía en la prosa y no en el
+código.
+
+**Lo que pidió Daniel (3-sep-2026).** Un botón de **«cerrar la orden»** (*«se cierra por orden»*), que
+**lo aprieta quien recibe**, que **salda siempre el pendiente** y que **PROPONE** el cobro esperando su
+visto bueno — *«nunca cobra solo»*. Dos desenlaces, y los dos limpian la lista: **cerrado y cobrado** o
+**cerrado y perdonado**. Reversible. Y una orden puede tener **varios maquileros vivos** ⇒ un cierre y
+un cobro por cada uno.
+
+**Cómo quedó.**
+
+- **El acto**: `CierreMaquilaOrden` (+ `CierreMaquilaOrdenDet`), por **orden × maquilero × proceso** —
+  que es la granularidad a la que se lleva el pendiente, a la que vive el `precioPactado` (en el
+  ENVÍO) y a la que se cobra. **No** es un estado de la orden: `EstadoOrden.completa` significa
+  completitud de CAPTURA (§Post-F9.181(a)) y una bandera por orden no cabría con varios maquileros.
+- **La cubeta**: `CierreMaquilaOrdenDet.cantidadFaltantes`, color×talla×pack. En **tabla aparte** de
+  `EtapaMovimientoDet` a propósito: todo lo que produce, inventaría o cobra suma
+  `EtapaMovimientoDet.cantidad`, así que un faltante alojado ahí acabaría multiplicado por un precio y
+  empujado al almacén. Aquí queda fuera de los tres **por construcción** (misma razón que
+  `cantidadIncompletas`).
+- **La fórmula, con su tercer sumando**: `pendiente = enviado − devuelto − saldado`
+  (`pendientePorCelda`, tercer parámetro **obligatorio** a propósito: con un default de 0, cualquier
+  puerta que se olvidara de leer los cierres seguiría compilando y seguiría contando como pendiente lo
+  ya saldado). Las mismas puertas de la lista de arriba, más `kpi_wip` (columna `faltantes_saldados`,
+  migración `20260903180000_cerrar_la_orden_con_el_maquilero`).
+- **El cobro es un DESCUENTO, no un cargo** — es la parte que hay que leer despacio. El saldo es
+  `Σcargos + Σabonos − Σpagos − Σdescuentos` (`esma/formula-saldo.ts`): un CARGO **sube** lo que se le
+  debe al maquilero, o sea que le pagaría las prendas que no devolvió, además de dejárselas. Cobrarle
+  **baja** lo que se le debe. Y es la palabra de Daniel: *«ese faltante si se le queda y se le quita a
+  mando (normalmente **descontandole** esas prendas faltantes)»* (§Post-F9.147).
+- **«Propone, no cobra»**: el `DescuentoMaquilero` nace `capturado`, que **no cuenta al saldo** y se ve
+  en el estado de cuenta marcado como pendiente de revisión (fila 0.115). Ahí está el visto bueno, con
+  el flujo de revisión que ya existía (`esma.modificar`) — **sin pantalla nueva**. Su `observaciones`
+  dice de qué OP y de qué es: *«Faltante de la orden #77 · Costura: 5 pza(s) que no se devolvieron»*.
+- **Deshacer** = acto inverso auditado (D3), con **update CONDICIONAL** (`updateMany` sobre
+  `estadoRevision: 'capturado'` + `canceladoEn: null`, y falla si `count === 0`): `revisarMovimiento`
+  NO toma el lock de la orden —no sabe nada de órdenes—, así que puede commitear entre la lectura y la
+  escritura; sin la condición, deshacer cancelaba un descuento **ya revisado** y ese dinero
+  desaparecía del saldo sin que nada lo dijera (precedente F8-E3). La otra mitad del candado está en
+  `revisarMovimiento`: filtra `canceladoEn: null` y también actualiza condicionalmente, para que un
+  descuento cancelado no se pueda marcar `revisado` (fantasma «cancelado + revisado»). El cierre queda
+  `deshechoEn` (las piezas vuelven al pendiente porque el pendiente se DERIVA) y el descuento
+  propuesto queda **cancelado**
+  (`DescuentoMaquilero.canceladoEn`, columna nueva; la condición «vivo» entró en la definición única
+  de `formula-saldo.ts`, así que viaja sola a las cinco sumas del saldo). 🔴 Se **rechaza** si el
+  descuento **ya se revisó**: ese importe ya está en el saldo y puede estar pagado — sacarlo de ahí no
+  es deshacer un acto, es capturar el movimiento contrario.
+- **Consume saldo como lo devuelto**: tras cerrar, esas piezas **ya no se pueden recibir** (el tope de
+  `registrarReciboMaquila` resta lo saldado, en sus DOS condiciones: agregada y por pack). Si el
+  maquilero las trae después, primero se deshace el cierre.
+- ⭐ **Y el ENVÍO que las sostiene no se puede cancelar** (`etapas.ts::cancelarEtapaMovimiento`). El
+  guard viejo sólo miraba recibos vivos, y el camino malo no tiene ninguno: se envían 100, no devuelve
+  nada, se cierra cobrándole las 100 y se cancela el envío ⇒ `enviado = 0` con `saldado = 100`, o sea
+  pendiente **−100** en las cinco puertas, la orden de vuelta en ABIERTA, `kpi_wip` negativo y un
+  descuento cobrando prendas de un envío que ya no existe. Es la «lección de la décima puerta»
+  aplicada a quien ESCRIBE: **quien borra el minuendo tiene que mirar todos los sustraendos**.
+- ⭐⭐ **`faltantesSaldables` — el número que se enseña ES el que se escribe.** Lo saldable es
+  `Σ máx(0, pendiente por color×talla)`, **no** `totalPendiente` (la suma plana). Con una celda
+  negativa —un recibo del histórico capturado en la talla equivocada, o lo devuelto sin decir de qué
+  pack era— las dos cifras se separan y las dos formas de separarse son un defecto: con `+5` y `−5`
+  la suma plana da 0 y **el botón no aparecería nunca** (justo en las órdenes migradas, que son el
+  grueso de la lista que no se vacía); con `+5` y `−3` da 2 y el descuento saldría por 5. Por eso hay
+  **una sola función** (`faltantes-saldados.ts::celdasSaldables`/`totalSaldable`) que usan las dos
+  caras: la que OFRECE (`pendientePorMaquilero`, que la publica en el contrato junto al precio y al
+  importe ya multiplicado) y la que ESCRIBE (`cierre-maquila.ts::derivarFaltantes`). La pantalla no
+  multiplica ni suma nada.
+- **Sin precio pactado en el envío** (1,309 envíos migrados no lo traen): el cierre **salda igual** y
+  **no propone** el cobro; lo dice con nombre (`idDescuento: null` con `desenlace: 'cobrado'`) para que
+  el descuento se capture a mano. **No se inventa un precio** (REGLA 0-B: lo viejo se tolera, no se
+  compensa).
+- **Dónde está el botón**: en la captura del **RECIBO** del panel de avance (`AvanceProduccion`), que es
+  donde trabaja *«quien recibe»*. Su confirmación enseña **cuántas piezas se saldan, a qué precio y
+  cuánto se propondría cobrar** —los tres números los manda el servidor ya derivados—, y debajo va la
+  lista de lo ya cerrado con su **Deshacer**. **Cero pantallas nuevas.**
+- ⚠️ **La fórmula está escrita TRES veces sólo en `indicadores/kpis.ts`** —el `WHERE` de
+  `condicionesWip` y las dos expresiones `porRecibir` de sus dos `SELECT`— más su gemela en
+  `resumen/resumen.ts::contarOrdenesAbiertas`. La fila 0.109 actualizó las dos del SELECT y **olvidó
+  el WHERE**, 60 líneas más arriba: la orden con el faltante ya saldado seguía saliendo en el
+  listado de `soloPendientes` y en su conteo, enseñando «Por recibir» = 0 **en su propia fila**. Al
+  tocar una, se tocan las cuatro.
+- **Los impresos también llevan la cubeta**: el Excel y el PDF del tablero WIP analítico tienen
+  columna **«Saldados»** junto a «Incompletas» (`indicadores/impresos/{excel,pdf}.ts`), porque los
+  dos declaran la identidad `enviado = recibido + incompletas + saldados + por recibir` como razón de
+  ser de esas columnas. Sin ella, la hoja no cuadra para cualquier orden con cierre vivo. ⚠️ La
+  prueba del PDF asevera sobre la TABLA (`COLUMNAS_ORDENES_WIP` / `filaOrdenWip`, exportadas para
+  eso), no sobre los bytes: medido por mutación, `@react-pdf/renderer` **no truena** por una fila
+  corta —la dibuja corta—, así que «el PDF se generó» no prueba nada sobre su alineación.
+- **Permisos**: `produccion.recibo` (cerrar) · `produccion.cancelar` (deshacer) · `produccion.wip-ver`
+  (ver). **Ninguno nuevo** ⇒ no requiere `SEED_ON_START`.
+- **Gancho para el futuro**: el acto emite el evento de outbox **`cierre-maquila-resuelto`**. Hoy nadie
+  lo consume (el despachador del auto-avance ignora en silencio los tipos que no conoce), y está puesto
+  para que el **congelado del costo** (fila 0.061) se cuelgue de ahí sin rediseñar el acto.
 
 ## Permisos (RBAC, A4)
 

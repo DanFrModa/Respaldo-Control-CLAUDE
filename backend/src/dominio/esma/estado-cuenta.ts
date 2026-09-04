@@ -46,6 +46,7 @@ import {
   pendienteDeRevisionCargo,
   pendienteDeRevisionPlano,
   WHERE_CARGO_REVISADO,
+  WHERE_VIVO_DESCUENTO,
   whereSegmentoFactura,
   type SegmentoFactura,
   type WhereSegmentoFactura,
@@ -169,7 +170,15 @@ export async function estadoCuentaMaquilero(
       select: { id: true, monto: true, fecha: true, observaciones: true, estadoRevision: true },
     }),
     cliente.descuentoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero, ...factura, ...rangoFecha(filtros.desde, filtros.hasta) },
+      // VIVOS: un descuento que un deshacer de cierre canceló no se enseña (V1, fila 0.109). El
+      // criterio sale de la definición única, igual que el del saldo.
+      where: {
+        idEmpresa,
+        idMaquilero,
+        ...WHERE_VIVO_DESCUENTO,
+        ...factura,
+        ...rangoFecha(filtros.desde, filtros.hasta),
+      },
       select: { id: true, monto: true, fecha: true, observaciones: true, estadoRevision: true },
     }),
     cliente.pagoMaquilero.findMany({
@@ -400,7 +409,14 @@ export async function estadoCuentaDesglosado(
       orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
     }),
     cliente.descuentoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero, ...factura, ...rangoFecha(filtros.desde, filtros.hasta) },
+      // VIVOS (V1, fila 0.109): ver la nota del estado de cuenta unificado.
+      where: {
+        idEmpresa,
+        idMaquilero,
+        ...WHERE_VIVO_DESCUENTO,
+        ...factura,
+        ...rangoFecha(filtros.desde, filtros.hasta),
+      },
       orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
     }),
     cliente.pagoMaquilero.findMany({

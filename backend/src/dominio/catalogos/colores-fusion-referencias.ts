@@ -3,8 +3,8 @@
  *
  * `fusionarColores` nació en F1-E6 para depurar duplicados del catálogo migrado. Reasigna al color
  * destino las referencias de **`TelaColor`** y luego **DESACTIVA** el origen. Ese "y luego desactiva"
- * es el problema: `Color` tiene **DOCE** llaves foráneas entrantes y la fusión sólo mueve **una**.
- * Las otras **once** se quedan apuntando a un color apagado.
+ * es el problema: `Color` tiene **QUINCE** relaciones entrantes y la fusión sólo mueve **una**.
+ * Las otras **catorce** se quedan apuntando a un color apagado.
  *
  * Y eso no es un daño abstracto: el propio dominio impone que **una orden viva no puede apuntar a un
  * color inactivo** (`produccion/ordenes.ts`, `sincronizarMatriz`: *"El color … está desactivado; no se
@@ -45,7 +45,7 @@ export interface ReferenciaBloqueante {
 }
 
 /**
- * Las ONCE referencias entrantes de `Color` que la fusión no reasigna. Quedan fuera, a propósito, dos:
+ * Las TRECE referencias entrantes de `Color` que la fusión no reasigna. Quedan fuera, a propósito, dos:
  * `telas` (= `TelaColor`, la única que sí sabe mover) y `absorbidos` (V1-E8s, §Post-F9.143: la
  * relación REFLEXIVA `idFusionadoEn`, que no es un uso del color sino la contabilidad de la propia
  * fusión — bloquear por ella impediría encadenar «A→B» y luego «B→C»). El orden es el del daño que
@@ -113,6 +113,15 @@ export const REFERENCIAS_QUE_BLOQUEAN_FUSION: ReferenciaBloqueante[] = [
     relacion: 'modelosPorColor',
     etiqueta: 'modelos de producción nacidos de este color',
     contar: (tx, id) => tx.modelo.count({ where: { idColor: id } }),
+  },
+  {
+    // ⭐ V1 (fila 0.109) — las PIEZAS FALTANTES SALDADAS al cerrar una orden con un maquilero. Mismo
+    // daño que `etapasMovimientoDet`, y con dinero encima: ese renglón es lo que se le cobró (o se
+    // le perdonó) a un maquilero por color×talla, y colgado de un color apagado deja de poder
+    // explicarse. La prueba de este archivo lo exigió en cuanto la relación existió.
+    relacion: 'cierresMaquilaDet',
+    etiqueta: 'faltantes saldados al cerrar órdenes con maquileros',
+    contar: (tx, id) => tx.cierreMaquilaOrdenDet.count({ where: { idColor: id } }),
   },
   {
     relacion: 'telaProveedorColores',

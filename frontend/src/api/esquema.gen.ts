@@ -268,9 +268,9 @@ export interface paths {
               } | null;
               /** @description Piezas en producción/maquila (permiso `produccion.wip-ver`; null sin permiso). */
               wipMaquila: {
-                /** @description Piezas en poder de maquila (enviado − recibido − incompletas, vivos; V1-E8v). */
+                /** @description Piezas en poder de maquila (enviado − recibido − incompletas − faltantes saldados, vivos; V1-E8v). */
                 piezas: number;
-                /** @description Maquileros con saldo ≠ 0 en su poder (enviado − recibido − incompletas por tercero, V1-E8v). */
+                /** @description Maquileros con saldo ≠ 0 en su poder (enviado − recibido − incompletas − faltantes saldados por tercero, V1-E8v). */
                 maquileros: number;
               } | null;
               /** @description Cortado esta semana (permiso `produccion.wip-ver`; null sin permiso). */
@@ -55031,7 +55031,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Pendientes por recibir de una orden (enviado − recibido − incompletas, por proceso) */
+    /** Pendientes por recibir de una orden (enviado − recibido − incompletas − faltantes saldados, por proceso) */
     get: {
       parameters: {
         query?: never;
@@ -55055,7 +55055,7 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden. */
               folioOrden: number;
-              /** @description enviado − buenas − incompletas, por proceso ya usado en la orden. */
+              /** @description enviado − buenas − incompletas − faltantes saldados, por proceso ya usado en la orden. */
               porRecibir: {
                 /** @description Id del tipo de proceso. */
                 idTipoProceso: number;
@@ -55069,7 +55069,7 @@ export interface paths {
                 devuelveAPt: boolean;
                 /** @description Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b). */
                 stockSinOrden: boolean;
-                /** @description enviado − recibido − incompletas a este proceso, por color×talla. Se incluyen las celdas con pendiente **o** con incompletas entregadas (V1-E8v): una celda ya cerrada del todo —95 buenas + 5 incompletas de 100— viaja con pendiente 0 e incompletas 5, que es su historia. */
+                /** @description enviado − recibido − incompletas − faltantes saldados a este proceso, por color×talla. Se incluyen las celdas con pendiente **o** con incompletas entregadas (V1-E8v): una celda ya cerrada del todo —95 buenas + 5 incompletas de 100— viaja con pendiente 0 e incompletas 5, que es su historia. */
                 celdas: {
                   /** @description Id del color. */
                   idColor: number;
@@ -55081,7 +55081,7 @@ export interface paths {
                   idTalla: number;
                   /** @description Etiqueta visible de la talla. */
                   etiquetaTalla: string;
-                  /** @description Pendiente por recibir = enviado − buenas − incompletas (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico. */
+                  /** @description Pendiente por recibir = enviado − buenas − incompletas − faltantes saldados (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico. */
                   cantidad: number;
                   /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). RESTAN del pendiente (ya volvieron del taller) y viajan aquí para la trazabilidad: una celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas. */
                   incompletas: number;
@@ -55090,13 +55090,15 @@ export interface paths {
                 totalPendiente: number;
                 /** @description Prendas incompletas ya entregadas a este proceso (SÍ cierran el pendiente, V1-E8v). */
                 totalIncompletas: number;
+                /** @description Piezas faltantes ya saldadas en este proceso al cerrar la orden (V1, fila 0.109). */
+                totalFaltantesSaldados: number;
                 /** @description El mismo pendiente DESGLOSADO por maquilero (todo tercero con envío o recibo vivo). */
                 porMaquilero: {
                   /** @description Maquilero (Proveedor), o null si el histórico migrado no lo trae. */
                   idMaquilero: number | null;
                   /** @description Nombre del maquilero (o "Sin asignar" en lo migrado sin dato). */
                   maquilero: string;
-                  /** @description enviado − buenas − incompletas de ESE maquilero, por color×talla (celdas con pendiente o con incompletas entregadas). */
+                  /** @description enviado − buenas − incompletas − faltantes saldados de ESE maquilero, por color×talla (celdas con pendiente o con incompletas entregadas). */
                   celdas: {
                     /** @description Id del color. */
                     idColor: number;
@@ -55108,7 +55110,7 @@ export interface paths {
                     idTalla: number;
                     /** @description Etiqueta visible de la talla. */
                     etiquetaTalla: string;
-                    /** @description Pendiente por recibir = enviado − buenas − incompletas (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico. */
+                    /** @description Pendiente por recibir = enviado − buenas − incompletas − faltantes saldados (V1-E8v, §Post-F9.147). Es a la vez lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v al volverse idéntico. */
                     cantidad: number;
                     /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). RESTAN del pendiente (ya volvieron del taller) y viajan aquí para la trazabilidad: una celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas. */
                     incompletas: number;
@@ -55117,6 +55119,14 @@ export interface paths {
                   totalPendiente: number;
                   /** @description Prendas incompletas que ese maquilero ya entregó (SÍ cierran el pendiente, V1-E8v). */
                   totalIncompletas: number;
+                  /** @description Piezas FALTANTES de ese maquilero ya SALDADAS al CERRAR la orden con él (V1, fila 0.109): nunca volvieron y ya se decidió que no vuelven. Restan de `totalPendiente`. */
+                  faltantesSaldados: number;
+                  /** @description Las piezas que de VERDAD se pueden saldar hoy con ese maquilero: Σ del pendiente POSITIVO por color×talla (V1, fila 0.109). Es el número exacto que el servidor escribirá al cerrar —y por el que multiplicará el descuento—, y por eso es el que la pantalla debe enseñar y usar para decidir si ofrece el botón. ⚠️ NO es `totalPendiente`: esa suma es plana y una celda NEGATIVA (histórico migrado, o lo devuelto sin decir de qué pack era) la compensa. Con +5 y −5 la suma plana da 0 —el botón no aparecería y esa orden nunca se podría cerrar— habiendo 5 piezas que saldar; con +5 y −3 da 2 mientras el cobro saldría por 5. */
+                  faltantesSaldables: number;
+                  /** @description Precio pactado del envío vivo a ese maquilero, base del cobro que se propondría al cerrar. `null` si el envío no lo trae o si falta `ordenes.ver-precio-real-maquila` (redactado). */
+                  precioFaltante: number | null;
+                  /** @description Lo que se propondría cobrarle si se cerrara AHORA: `faltantesSaldables × precioFaltante`, calculado en el servidor. `null` sin precio o sin permiso de verlo. */
+                  importeFaltantePropuesto: number | null;
                 }[];
               }[];
             };
@@ -55377,6 +55387,605 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/ordenes/{id}/cierre-maquila': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Cerrar la orden con un maquilero: salda su faltante y propone (o no) cobrárselo
+     * @description Salda las piezas que ese maquilero nunca devolvió de ese proceso (derivadas en el servidor por suma directa bajo bloqueo) y, con `desenlace = cobrado`, PROPONE un descuento EsMa `capturado`: no cuenta al saldo hasta que alguien lo revise.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cierre de una orden con un maquilero: salda el faltante y propone (o no) cobrarlo. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Maquilero con el que se cierra la orden (Proveedor). */
+            idMaquilero: number;
+            /** @description Proceso cuyo saldo se cierra (costura/estampado/…). */
+            idTipoProceso: number;
+            /**
+             * Format: date
+             * @description Fecha del cierre (YYYY-MM-DD).
+             */
+            fecha: string;
+            /**
+             * @description `cobrado` propone el descuento; `perdonado` solo salda el pendiente.
+             * @enum {string}
+             */
+            desenlace: 'cobrado' | 'perdonado';
+            /** @description Con/sin factura del descuento propuesto. Solo hace falta cuando el maquilero factura de las DOS formas (`modalidadFacturacion = ambos`): ahí el movimiento no puede quedar ambiguo (F6-E4, decisión (h)). Con `solo_con`/`solo_sin` se ignora y manda el catálogo. */
+            conFactura?: boolean;
+            /** @description Nota del cierre. OBLIGATORIA al perdonar. */
+            motivo?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Cierre de una orden con un maquilero (V1, fila 0.109). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del cierre. */
+              id: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Orden cerrada. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Maquilero con el que se cerró. */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Proceso cuyo saldo se cerró. */
+              idTipoProceso: number;
+              /** @description Nombre del proceso. */
+              tipoProceso: string;
+              /** @description Fecha del cierre (YYYY-MM-DD). */
+              fecha: string;
+              /**
+               * @description `cobrado` (propuso descuento) o `perdonado`.
+               * @enum {string}
+               */
+              desenlace: 'cobrado' | 'perdonado';
+              /** @description Total de piezas saldadas (derivado del detalle). */
+              piezasFaltantes: number;
+              /** @description Precio pactado con el que se propuso el cobro, CONGELADO al cerrar. `null` si el envío no traía precio, si se perdonó, o si el usuario no puede ver precios reales de maquila. */
+              precioFaltante: number | null;
+              /** @description Importe propuesto (piezas × precio), o null. Redactado sin permiso de precios. */
+              importe: number | null;
+              /** @description Descuento EsMa propuesto por este cierre, o null. Con `desenlace = cobrado` y esto en `null`, el cierre SÍ saldó el faltante pero NO pudo proponer el cobro porque el envío no traía precio pactado (1,309 envíos migrados no lo traen): hay que capturar el descuento a mano en el estado de cuenta. Se dice con nombre en vez de inventar un precio. */
+              idDescuento: number | null;
+              /** @description Si el descuento propuesto YA fue revisado (y por tanto ya movió el saldo del maquilero). Con esto en `true` el cierre ya NO se puede deshacer. */
+              descuentoRevisado: boolean;
+              /** @description Nota del cierre o null. */
+              motivo: string | null;
+              /** @description Si el cierre está deshecho (las piezas volvieron al pendiente). */
+              deshecho: boolean;
+              /** @description Cuándo se deshizo (ISO) o null. */
+              deshechoEn: string | null;
+              /** @description Id del usuario que lo deshizo o null. */
+              deshechoPorId: string | null;
+              /** @description Motivo del deshacer o null. */
+              motivoDeshacer: string | null;
+              /** @description Las piezas saldadas, color×talla×pack. */
+              celdas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description PACK / tendido de la celda; cadena vacía si no aplica. */
+                pack: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Piezas faltantes saldadas en esta celda. */
+                cantidadFaltantes: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Cuándo se cerró (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que cerró. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/cierres-maquila/{id}/deshacer': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Deshacer un cierre (acto inverso auditado): las piezas vuelven al pendiente
+     * @description Marca el cierre como deshecho y CANCELA el descuento propuesto. Se rechaza (400) si ese descuento ya fue revisado: ese importe ya está en el saldo del maquilero.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Motivo del deshacer del cierre. */
+      requestBody: {
+        content: {
+          'application/json': {
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Cierre de una orden con un maquilero (V1, fila 0.109). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del cierre. */
+              id: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Orden cerrada. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Maquilero con el que se cerró. */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Proceso cuyo saldo se cerró. */
+              idTipoProceso: number;
+              /** @description Nombre del proceso. */
+              tipoProceso: string;
+              /** @description Fecha del cierre (YYYY-MM-DD). */
+              fecha: string;
+              /**
+               * @description `cobrado` (propuso descuento) o `perdonado`.
+               * @enum {string}
+               */
+              desenlace: 'cobrado' | 'perdonado';
+              /** @description Total de piezas saldadas (derivado del detalle). */
+              piezasFaltantes: number;
+              /** @description Precio pactado con el que se propuso el cobro, CONGELADO al cerrar. `null` si el envío no traía precio, si se perdonó, o si el usuario no puede ver precios reales de maquila. */
+              precioFaltante: number | null;
+              /** @description Importe propuesto (piezas × precio), o null. Redactado sin permiso de precios. */
+              importe: number | null;
+              /** @description Descuento EsMa propuesto por este cierre, o null. Con `desenlace = cobrado` y esto en `null`, el cierre SÍ saldó el faltante pero NO pudo proponer el cobro porque el envío no traía precio pactado (1,309 envíos migrados no lo traen): hay que capturar el descuento a mano en el estado de cuenta. Se dice con nombre en vez de inventar un precio. */
+              idDescuento: number | null;
+              /** @description Si el descuento propuesto YA fue revisado (y por tanto ya movió el saldo del maquilero). Con esto en `true` el cierre ya NO se puede deshacer. */
+              descuentoRevisado: boolean;
+              /** @description Nota del cierre o null. */
+              motivo: string | null;
+              /** @description Si el cierre está deshecho (las piezas volvieron al pendiente). */
+              deshecho: boolean;
+              /** @description Cuándo se deshizo (ISO) o null. */
+              deshechoEn: string | null;
+              /** @description Id del usuario que lo deshizo o null. */
+              deshechoPorId: string | null;
+              /** @description Motivo del deshacer o null. */
+              motivoDeshacer: string | null;
+              /** @description Las piezas saldadas, color×talla×pack. */
+              celdas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description PACK / tendido de la celda; cadena vacía si no aplica. */
+                pack: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Piezas faltantes saldadas en esta celda. */
+                cantidadFaltantes: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Cuándo se cerró (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que cerró. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/ordenes/{id}/cierres-maquila': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Cierres de una orden con sus maquileros (vivos primero, deshechos al final) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Cierres de una orden con sus maquileros. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Cierres de la orden. */
+              filas: {
+                /** @description Id del cierre. */
+                id: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Orden cerrada. */
+                idOrden: number;
+                /** @description Folio de la orden. */
+                folioOrden: number;
+                /** @description Maquilero con el que se cerró. */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Proceso cuyo saldo se cerró. */
+                idTipoProceso: number;
+                /** @description Nombre del proceso. */
+                tipoProceso: string;
+                /** @description Fecha del cierre (YYYY-MM-DD). */
+                fecha: string;
+                /**
+                 * @description `cobrado` (propuso descuento) o `perdonado`.
+                 * @enum {string}
+                 */
+                desenlace: 'cobrado' | 'perdonado';
+                /** @description Total de piezas saldadas (derivado del detalle). */
+                piezasFaltantes: number;
+                /** @description Precio pactado con el que se propuso el cobro, CONGELADO al cerrar. `null` si el envío no traía precio, si se perdonó, o si el usuario no puede ver precios reales de maquila. */
+                precioFaltante: number | null;
+                /** @description Importe propuesto (piezas × precio), o null. Redactado sin permiso de precios. */
+                importe: number | null;
+                /** @description Descuento EsMa propuesto por este cierre, o null. Con `desenlace = cobrado` y esto en `null`, el cierre SÍ saldó el faltante pero NO pudo proponer el cobro porque el envío no traía precio pactado (1,309 envíos migrados no lo traen): hay que capturar el descuento a mano en el estado de cuenta. Se dice con nombre en vez de inventar un precio. */
+                idDescuento: number | null;
+                /** @description Si el descuento propuesto YA fue revisado (y por tanto ya movió el saldo del maquilero). Con esto en `true` el cierre ya NO se puede deshacer. */
+                descuentoRevisado: boolean;
+                /** @description Nota del cierre o null. */
+                motivo: string | null;
+                /** @description Si el cierre está deshecho (las piezas volvieron al pendiente). */
+                deshecho: boolean;
+                /** @description Cuándo se deshizo (ISO) o null. */
+                deshechoEn: string | null;
+                /** @description Id del usuario que lo deshizo o null. */
+                deshechoPorId: string | null;
+                /** @description Motivo del deshacer o null. */
+                motivoDeshacer: string | null;
+                /** @description Las piezas saldadas, color×talla×pack. */
+                celdas: {
+                  /** @description Id del color. */
+                  idColor: number;
+                  /** @description Nombre del color. */
+                  color: string;
+                  /** @description PACK / tendido de la celda; cadena vacía si no aplica. */
+                  pack: string;
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Piezas faltantes saldadas en esta celda. */
+                  cantidadFaltantes: number;
+                }[];
+                /**
+                 * Format: date-time
+                 * @description Cuándo se cerró (ISO).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que cerró. */
+                creadoPorId: string | null;
+              }[];
+            };
+          };
+        };
         /** @description Respuesta de error de la API. */
         400: {
           headers: {
@@ -56398,6 +57007,8 @@ export interface paths {
                 recibido: number;
                 /** @description Prendas INCOMPLETAS entregadas (V1-E8v, §Post-F9.147): volvieron del taller pero no se produjeron, no entraron a inventario y no se pagan. Van APARTE de `recibido` y RESTAN del pendiente por recibir — ya no están en la maquila. Cuarta cubeta de `enviado = primeras + segundas + faltantes + incompletas`. */
                 incompletas: number;
+                /** @description Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109). Nunca volvieron del taller y ya no se esperan: salen del pendiente por recibir. Es la tercera cubeta con columna propia, junto a `recibido` e `incompletas`, y con ellas cierra `enviado = primeras + segundas + faltantes + incompletas`. */
+                faltantesSaldados: number;
                 /** @description Recibido de procesos que meten a PT (costura) — base de "por entregar". */
                 recibidoCostura: number;
                 /** @description Total entregado a cliente (Σ entregas vivas). */
@@ -56406,7 +57017,7 @@ export interface paths {
                 porCortar: number;
                 /** @description cortado − enviado (total, todos los procesos). */
                 cortadoPorEnviar: number;
-                /** @description enviado − recibido − incompletas (total, todos los procesos). Es el FALTANTE: lo que el maquilero todavía tiene en su taller (V1-E8v). */
+                /** @description enviado − recibido − incompletas − faltantes saldados (total, todos los procesos). Es lo que el maquilero todavía tiene en su taller y todavía se le espera. Lo saldado sale de aquí a propósito (V1, fila 0.109): ya se decidió que no vuelve. */
                 porRecibir: number;
                 /** @description recibido(costura) − entregado a cliente (lo que falta entregar). */
                 porEntregar: number;
@@ -56423,6 +57034,8 @@ export interface paths {
                 recibido: number;
                 /** @description Σ prendas INCOMPLETAS entregadas (V1-E8v): volvieron, pero no se produjeron. */
                 incompletas: number;
+                /** @description Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109). Nunca volvieron del taller y ya no se esperan: salen del pendiente por recibir. Es la tercera cubeta con columna propia, junto a `recibido` e `incompletas`, y con ellas cierra `enviado = primeras + segundas + faltantes + incompletas`. */
+                faltantesSaldados: number;
                 /** @description Recibido de procesos que meten a PT (costura). */
                 recibidoCostura: number;
                 /** @description Total entregado a cliente (Σ entregas vivas). */
@@ -56431,7 +57044,7 @@ export interface paths {
                 porCortar: number;
                 /** @description cortado − enviado (piezas por enviar a maquila). */
                 cortadoPorEnviar: number;
-                /** @description enviado − recibido − incompletas (piezas realmente en poder de maquila, V1-E8v). */
+                /** @description enviado − recibido − incompletas − faltantes saldados (piezas realmente en poder de maquila y todavía esperadas). */
                 porRecibir: number;
                 /** @description recibido(costura) − entregado (piezas por entregar). */
                 porEntregar: number;
@@ -56577,8 +57190,10 @@ export interface paths {
               recibido: number;
               /** @description Total de prendas INCOMPLETAS entregadas en la orden (V1-E8v, §Post-F9.147). Volvieron del taller pero se perdieron: no se produjeron, no se inventariaron y no se pagan. */
               incompletas: number;
-              /** @description enviado − recibido − incompletas: el FALTANTE, lo que el maquilero todavía tiene (y lo que se le cobra si ya cerró su entrega). Con `enviado`, `recibido` e `incompletas` cierra la trazabilidad que pidió Daniel: qué pasó con cada prenda que se mandó. */
+              /** @description enviado − recibido − incompletas − faltantes saldados: el FALTANTE VIVO, lo que el maquilero todavía tiene. Con `enviado`, `recibido`, `incompletas` y `faltantesSaldados` cierra la trazabilidad que pidió Daniel: qué pasó con cada prenda que se mandó. */
               pendientePorRecibir: number;
+              /** @description Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca volvieron y ya no se esperan. Con `recibido` e `incompletas` completa la trazabilidad de las cuatro cubetas. */
+              faltantesSaldados: number;
               /** @description Recibido de costura (mete a PT). */
               recibidoCostura: number;
               /** @description Total entregado a cliente. */
@@ -56643,7 +57258,7 @@ export interface paths {
                 /** @description Total pendiente de este proceso (derivado). */
                 totalPendiente: number;
               }[];
-              /** @description enviado − buenas − incompletas por proceso, color×talla, con desglose por maquilero. */
+              /** @description enviado − buenas − incompletas − faltantes saldados por proceso, color×talla, con desglose por maquilero. */
               porRecibir: {
                 /** @description Id del tipo de proceso. */
                 idTipoProceso: number;
@@ -56674,7 +57289,7 @@ export interface paths {
                 devuelveAPt: boolean;
                 /** @description Esas prendas salieron del bucket de existencia «sin orden asignada» (histórico migrado / inventario de arranque) y ahí regresan. Fija el bucket de las entregas siguientes: no se pueden mezclar. */
                 stockSinOrden: boolean;
-                /** @description enviado − buenas − incompletas por MAQUILERO (todo tercero con envío o recibo vivo del proceso). */
+                /** @description enviado − buenas − incompletas − faltantes saldados por MAQUILERO (todo tercero con envío o recibo vivo del proceso). */
                 porMaquilero: {
                   /** @description Maquilero (Proveedor), o null si el histórico migrado no lo trae. */
                   idMaquilero: number | null;
@@ -56697,10 +57312,18 @@ export interface paths {
                     /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136): prendas a las que les faltó una pieza y nunca se terminaron de coser. RESTAN del pendiente (V1-E8v: ya volvieron del taller) y viajan aquí para la trazabilidad — una celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas. */
                     incompletas: number;
                   }[];
-                  /** @description Total pendiente de ese maquilero = enviado − buenas − incompletas (derivado; NEGATIVO si recibió sin envío). Es lo que TIENE y a la vez lo que todavía se le puede recibir. */
+                  /** @description Total pendiente de ese maquilero = enviado − buenas − incompletas − faltantes saldados (derivado; NEGATIVO si recibió sin envío). Es lo que TIENE y a la vez lo que todavía se le puede recibir. */
                   totalPendiente: number;
                   /** @description Prendas incompletas que ya entregó (informativo; SÍ cierran el pendiente, V1-E8v). */
                   totalIncompletas: number;
+                  /** @description Piezas FALTANTES de ese maquilero ya SALDADAS al cerrar la orden con él (V1, fila 0.109). Restan de `totalPendiente`: ya se decidió que no vuelven. Viajan aquí para que la celda cerrada siga contando su historia en vez de desaparecer. */
+                  faltantesSaldados: number;
+                  /** @description Las piezas que de VERDAD se pueden saldar hoy con ese maquilero: Σ del pendiente POSITIVO por color×talla (V1, fila 0.109). Es el número exacto que el servidor escribirá al cerrar —y por el que multiplicará el descuento—, y por eso es el que la pantalla debe enseñar y usar para decidir si ofrece el botón. ⚠️ NO es `totalPendiente`: esa suma es plana y una celda NEGATIVA (histórico migrado, o lo devuelto sin decir de qué pack era) la compensa. Con +5 y −5 la suma plana da 0 —el botón no aparecería y esa orden nunca se podría cerrar— habiendo 5 piezas que saldar; con +5 y −3 da 2 mientras el cobro saldría por 5. */
+                  faltantesSaldables: number;
+                  /** @description Precio pactado del envío vivo a ese maquilero, base del cobro que se PROPONDRÍA al cerrar (V1, fila 0.109). `null` si el envío no lo trae (histórico migrado) o si el usuario no tiene `ordenes.ver-precio-real-maquila` (redactado, R2 §4.4.3). */
+                  precioFaltante: number | null;
+                  /** @description Lo que se propondría cobrarle si se cerrara AHORA: `faltantesSaldables × precioFaltante`, calculado en el SERVIDOR para que la confirmación no re-derive la regla. `null` sin precio o sin permiso de verlo. */
+                  importeFaltantePropuesto: number | null;
                 }[];
               }[];
               /** @description Entregado a cliente por color×talla (Σ de entregas vivas). */
@@ -56802,7 +57425,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Existencias del maquilero (enviado − recibido − incompletas, por orden y proceso) */
+    /** Existencias del maquilero (enviado − recibido − incompletas − faltantes saldados, por orden y proceso) */
     get: {
       parameters: {
         query?: {
@@ -56819,7 +57442,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Existencias en poder del maquilero (enviado − recibido − incompletas). */
+        /** @description Existencias en poder del maquilero (enviado − recibido − incompletas − faltantes saldados). */
         200: {
           headers: {
             [name: string]: unknown;
@@ -56848,7 +57471,9 @@ export interface paths {
                 recibido: number;
                 /** @description Prendas INCOMPLETAS que devolvió (V1-E8v): ya no las tiene, pero tampoco se produjeron. */
                 incompletas: number;
-                /** @description enviado − recibido − incompletas (lo que el maquilero tiene de verdad). */
+                /** @description Piezas suyas ya SALDADAS al cerrar la orden con él (V1, fila 0.109): dejan de estar en su poder porque ya se decidió que no vuelven (se le cobraron o se le perdonaron). */
+                faltantesSaldados: number;
+                /** @description enviado − recibido − incompletas − faltantes saldados (lo que el maquilero tiene de verdad y todavía se le espera). */
                 enPoder: number;
               }[];
               /** @description Total de piezas en poder de maquileros (derivado). */
@@ -88606,7 +89231,9 @@ export interface paths {
                 porCortar: number;
                 /** @description Σ (cortado − enviado). */
                 cortadoPorEnviar: number;
-                /** @description Σ (enviado − recibido − incompletas), V1-E8v. */
+                /** @description Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca volvieron y ya se decidió que no vuelven (se cobraron o se perdonaron). Restan del pendiente por recibir, igual que las incompletas. */
+                faltantesSaldados: number;
+                /** @description Σ (enviado − recibido − incompletas − faltantes saldados), V1-E8v + fila 0.109. */
                 porRecibir: number;
                 /** @description Σ (recibido costura − entregado). */
                 porEntregar: number;
@@ -88643,7 +89270,9 @@ export interface paths {
                 porCortar: number;
                 /** @description cortado − enviado. */
                 cortadoPorEnviar: number;
-                /** @description enviado − recibido − incompletas (V1-E8v). */
+                /** @description Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca volvieron y ya se decidió que no vuelven (se cobraron o se perdonaron). Restan del pendiente por recibir, igual que las incompletas. */
+                faltantesSaldados: number;
+                /** @description enviado − recibido − incompletas − faltantes saldados (V1-E8v + fila 0.109). */
                 porRecibir: number;
                 /** @description recibido costura − entregado. */
                 porEntregar: number;

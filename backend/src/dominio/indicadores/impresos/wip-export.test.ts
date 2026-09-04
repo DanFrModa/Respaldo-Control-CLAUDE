@@ -11,8 +11,8 @@ import { sesionDePrueba } from '../../../pruebas/sesiones.js';
 import { MAX_FILAS_PDF } from '../../../comun/impreso-topes.js';
 
 import type { kpisWip } from '../kpis.js';
-import { armarDatosExcelKpisWip } from './excel.js';
-import { generarPdfKpisWip } from './pdf.js';
+import { armarDatosExcelKpisWip, construirExcelKpisWip } from './excel.js';
+import { COLUMNAS_ORDENES_WIP, filaOrdenWip, generarPdfKpisWip } from './pdf.js';
 
 /** Totales del universo (no dependen de la página); marco `porRecibir` para verificar que se conserven. */
 const TOTALES: KpisWip['totales'] = {
@@ -21,6 +21,7 @@ const TOTALES: KpisWip['totales'] = {
   enviado: 0,
   recibido: 0,
   incompletas: 0,
+  faltantesSaldados: 0,
   recibidoCostura: 0,
   entregado: 0,
   porCortar: 0,
@@ -43,6 +44,7 @@ function fila(i: number): KpisWip['datos'][number] {
     enviado: 80,
     recibido: 50,
     incompletas: 0,
+    faltantesSaldados: 0,
     recibidoCostura: 50,
     entregado: 20,
     porCortar: 0,
@@ -120,4 +122,105 @@ describe('export WIP — PDF con aviso de truncado (D3)', () => {
 // Referencia al tope estándar para dejar constancia de que el impreso lo respeta (no re-implementa).
 it('el tope de dibujo del PDF es el estándar de impresos', () => {
   expect(MAX_FILAS_PDF).toBeGreaterThanOrEqual(100);
+});
+
+describe('export WIP — la CUARTA y la TERCERA cubeta tienen columna propia (V1, fila 0.109)', () => {
+  /**
+   * ⭐ La hoja y el PDF declaran una IDENTIDAD como razón de ser de sus columnas:
+   *
+   *     enviado = recibido + incompletas + saldados + por recibir
+   *
+   * Desde que «por recibir» resta también los FALTANTES SALDADOS al cerrar la orden con un
+   * maquilero, sin la columna «Saldados» la identidad deja de cuadrar para cualquier orden con
+   * cierre vivo: el lector ve un `enviado` que no le suma y no tiene dónde buscar la diferencia.
+   */
+  const conSaldados: KpisWip['datos'][number] = {
+    ...fila(1),
+    enviado: 100,
+    recibido: 80,
+    incompletas: 5,
+    faltantesSaldados: 12,
+    porRecibir: 3, // 100 − 80 − 5 − 12
+  };
+
+  it('la identidad del fixture cuadra (si no, la prueba de abajo no probaría nada)', () => {
+    expect(conSaldados.enviado).toBe(
+      conSaldados.recibido +
+        conSaldados.incompletas +
+        conSaldados.faltantesSaldados +
+        conSaldados.porRecibir,
+    );
+  });
+
+  it('el EXCEL trae la columna «Saldados» con su valor, y el renglón cuadra el enviado', async () => {
+    const buffer = await construirExcelKpisWip({
+      datosAl: null,
+      totales: TOTALES,
+      datos: [conSaldados],
+      total: 1,
+      pagina: 1,
+      porPagina: 100,
+      totalPaginas: 1,
+    });
+    const { default: ExcelJS } = await import('exceljs');
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(buffer as unknown as ArrayBuffer);
+    const hoja = libro.getWorksheet('Órdenes');
+    expect(hoja).toBeDefined();
+
+    // `row.values` viene indexado desde 1 y con huecos: sólo interesan los títulos, que son texto.
+    const crudos = hoja?.getRow(1).values as unknown[];
+    const encabezados = crudos.map((v) => (typeof v === 'string' ? v : ''));
+    expect(encabezados).toContain('Incompletas');
+    expect(encabezados).toContain('Saldados');
+
+    const columna = encabezados.indexOf('Saldados');
+    expect(hoja?.getRow(2).getCell(columna).value).toBe(12);
+
+    // Y la identidad se puede LEER de la hoja: enviado = recibido + incompletas + saldados + x recibir.
+    const celda = (titulo: string): number => {
+      const valor: unknown = hoja?.getRow(2).getCell(encabezados.indexOf(titulo)).value;
+      return typeof valor === 'number' ? valor : 0;
+    };
+    expect(celda('Enviado')).toBe(
+      celda('Recibido') + celda('Incompletas') + celda('Saldados') + celda('Por recibir'),
+    );
+  });
+
+  it('el PDF trae la columna «Saldados» y cada fila tiene tantas celdas como títulos', () => {
+    // 🔴 Se asevera sobre la TABLA, no sobre los bytes. Medido por mutación: quitando la celda de
+    // «Saldados» del PDF, `generarPdfKpisWip` seguía devolviendo un `%PDF-` perfectamente válido —
+    // `@react-pdf/renderer` no truena por una fila corta, la dibuja corta—. O sea que «el PDF se
+    // generó» no prueba NADA sobre su alineación, y la prueba anterior pasaba en verde con la
+    // columna vacía. Por eso las columnas y la fila se exportan y se comparan aquí.
+    const titulos = COLUMNAS_ORDENES_WIP.map((c) => c.titulo);
+    expect(titulos).toContain('Incompl.');
+    expect(titulos).toContain('Saldados');
+
+    const fila = filaOrdenWip(conSaldados);
+    expect(fila).toHaveLength(titulos.length);
+    expect(fila[titulos.indexOf('Saldados')]).toBe('12');
+
+    // Y la identidad se lee de la fila, igual que en la hoja.
+    const celda = (titulo: string): number => Number(fila[titulos.indexOf(titulo)]);
+    expect(celda('Env.')).toBe(
+      celda('Rec.') + celda('Incompl.') + celda('Saldados') + celda('x recibir'),
+    );
+  });
+
+  it('y el PDF completo se sigue generando con esa columna', async () => {
+    const buffer = await generarPdfKpisWip({
+      pagador: 'FR Moda SA de CV',
+      datos: {
+        datosAl: null,
+        totales: TOTALES,
+        datos: [conSaldados],
+        total: 1,
+        pagina: 1,
+        porPagina: 100,
+        totalPaginas: 1,
+      },
+    });
+    expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
 });

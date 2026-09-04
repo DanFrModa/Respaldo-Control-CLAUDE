@@ -61,8 +61,15 @@ export const SIGNO_SALDO = {
   descuento: -1,
 } as const satisfies Record<ConceptoSaldo, 1 | -1>;
 
-/** Criterio declarativo: campo del modelo Prisma → valor exacto que debe tener para calificar. */
-type Criterio = Readonly<Record<string, string | boolean>>;
+/**
+ * Criterio declarativo: campo del modelo Prisma → valor exacto que debe tener para calificar.
+ *
+ * `null` significa *«esa columna tiene que estar VACÍA»* (`IS NULL` en SQL, `null` en Prisma). Entró
+ * con la fila 0.109 para el DESCUENTO CANCELADO: un descuento que un deshacer canceló no cuenta al
+ * saldo **ni** cuenta como pendiente de revisión, y eso tenía que decirse aquí —en la definición
+ * única— y no en cada una de las cinco sumas que existen.
+ */
+type Criterio = Readonly<Record<string, string | boolean | null>>;
 
 /** Definición de un concepto: cómo se traduce a SQL y sus dos criterios (cuenta / pendiente). */
 interface DefinicionConcepto {
@@ -103,6 +110,34 @@ const PLANO: DefinicionConcepto = {
 };
 
 /**
+ * ⭐ EL DESCUENTO tiene UNA condición más que sus dos hermanos (V1, fila 0.109): estar VIVO. Es el
+ * único de los tres movimientos planos que se puede cancelar, porque es el que puede nacer de un
+ * acto reversible — el CIERRE de una orden con un maquilero, que propone cobrarle el faltante y que
+ * se puede DESHACER mientras nadie lo haya revisado.
+ *
+ * 🔴 LA CONDICIÓN VA EN LOS **DOS** CRITERIOS, y el segundo es el que casi se olvida: un descuento
+ * cancelado obviamente no puede sumar al saldo (`cuenta`), pero tampoco puede seguir apareciendo
+ * como *«esperando tu decisión»* (`pendiente`) — si no, el tablero de EsMa y la bandeja de CxP
+ * enseñarían para siempre una partida por revisar que ya no existe. Al vivir aquí, la condición
+ * viaja sola a las cinco sumas: `saldos.ts` (Prisma), los dos SQL crudos de `saldos-todos.ts`, y de
+ * ahí a CxP y a terceros.
+ */
+const DESCUENTO: DefinicionConcepto = {
+  columnas: { estadoRevision: 'estado_revision', canceladoEn: 'cancelado_en' },
+  cuenta: { estadoRevision: REVISADO, canceladoEn: null },
+  pendiente: { estadoRevision: CAPTURADO, canceladoEn: null },
+};
+
+/**
+ * El descuento VIVO, a secas (sin decir nada de su revisión). Lo usan las pantallas que LISTAN
+ * descuentos —el estado de cuenta, el detalle desglosado, los movimientos del maquilero, la
+ * convivencia con terceros—, que no suman saldo pero tampoco pueden enseñar un movimiento que se
+ * canceló. Sale de la MISMA constante que los criterios de arriba: si mañana «vivo» cambia de
+ * forma, cambia en un solo sitio.
+ */
+export const WHERE_VIVO_DESCUENTO: Prisma.DescuentoMaquileroWhereInput = { canceladoEn: null };
+
+/**
  * ⭐ EL CRITERIO, UNA SOLA VEZ. Todo lo demás de este módulo se deriva de aquí.
  *
  * El CARGO lleva su propio par de condiciones: `validado` (su equivalente de «revisado», ver el
@@ -117,7 +152,7 @@ const DEFINICION: Readonly<Record<ConceptoSaldo, DefinicionConcepto>> = {
   },
   abono: PLANO,
   pago: PLANO,
-  descuento: PLANO,
+  descuento: DESCUENTO,
 };
 
 // ── Cláusulas para PRISMA ────────────────────────────────────────────────────────────────────────
@@ -198,6 +233,11 @@ function aSql(definicion: DefinicionConcepto, criterio: Criterio): Prisma.Sql {
         `La fórmula del saldo no sabe traducir el campo "${campo}" a SQL: falta su columna en ` +
           'DEFINICION (formula-saldo.ts).',
       );
+    }
+    // `null` es «la columna está vacía»: en SQL eso es `IS NULL`, NUNCA `= NULL` (que no es falso:
+    // es DESCONOCIDO, y se comería la fila entera en silencio).
+    if (valor === null) {
+      return Prisma.raw(`"${columnaSegura(columna)}" IS NULL`);
     }
     return Prisma.raw(`"${columnaSegura(columna)}" = ${literal(valor)}`);
   });

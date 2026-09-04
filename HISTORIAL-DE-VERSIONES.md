@@ -71,6 +71,53 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.105 · 4-sep-2026 · **en prueba** — ⭐ **Cerrar la orden**: el faltante del maquilero se cobra, y deja de aparecer como pendiente
+
+### Qué se puede hacer ahora que antes no
+
+- **Cerrar una orden por maquilero**, con un botón que aprieta **quien recibe** — no Daniel—. Al cerrarla, lo
+  que quedó pendiente **se salda** y, si fue **faltante** (*«de 1000 entrego 995 y faltan 5»*: nunca volvió),
+  el sistema **propone un descuento** al maquilero al precio pactado — **propone, nunca cobra solo**: nace
+  «por revisar» y Daniel lo aprueba en el estado de cuenta, igual que todo lo demás desde la 0.099. Es un
+  **descuento y no un cargo** porque un cargo le habría *subido* el saldo al maquilero: le pagaríamos las
+  prendas que no devolvió, además de dejárselas.
+- El diálogo enseña **piezas a saldar, precio e importe propuesto**, y los tres los calcula el servidor: el
+  número que se aprueba es exactamente el que se escribe, también en las órdenes migradas con celdas raras.
+- Dos desenlaces, los dos limpian la lista: **cerrado y cobrado**, o **cerrado y perdonado** (con motivo).
+- Lo **incompleto** (*«regreso las 5 sin confeccionar, pero ahí están»*) **no se cobra**, como ya era.
+- Una orden con **varios maquileros** se cierra maquilero por maquilero, y nace un descuento por cada uno.
+- **Se puede deshacer**: el cierre se marca deshecho, el pendiente vuelve a aparecer y el descuento se
+  cancela si todavía estaba por revisar; si Daniel ya lo había aprobado, el sistema lo dice y se cancela por
+  su propio camino (nada se borra, D3).
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Antes era imposible cobrar el faltante**: «faltante» y «pendiente» eran **el mismo número**, así que
+  cobrar no bajaba nada y la lista de pendientes crecía para siempre. Ahora lo saldado vive en su propia
+  cubeta, fuera de producción, inventario y pago **por construcción**, y la fórmula del pendiente lleva
+  **tres sumandos** (enviado − devuelto − saldado) en todas las pantallas, incluidos Indicadores y sus
+  impresos, que ganan la columna «Saldados».
+- **Cancelar un envío que ya tiene un cierre encima se rechaza**: primero se deshace el cierre. Sin esto, el
+  maquilero seguiría con un descuento por prendas de un envío que ya no existe.
+- **«Cerrar la orden» es un acto nuevo**, no un estado de la orden: `completa` sigue significando lo que
+  significaba (captura completa: tallas, receta liberada y arte). No se confunden.
+- **Sin pantalla nueva**: el botón vive donde ya se ve el pendiente por maquilero, y el descuento en el
+  estado de cuenta de siempre. Al cerrar o deshacer, la pantalla se refresca sola (botón, selector de
+  maquilero y avance).
+- El descuento del maquilero **ahora se puede cancelar** (con motivo; queda marcado, nunca borrado), y los
+  saldos ya no cuentan los cancelados.
+
+### Qué sigue pendiente o roto
+
+- ⭐ **Congelar el costo al cerrar** (fila **0.061**, decidido por Daniel el 30-ago) **cuelga de este mismo
+  acto** y es lo siguiente: el gancho quedó puesto (evento `cierre-maquila-resuelto`).
+- Las órdenes migradas de Access **sin precio pactado** se pueden cerrar igual, pero **no proponen cobro**:
+  lo dicen con nombre y el descuento se captura a mano en el estado de cuenta (REGLA 0-B: lo migrado viene
+  incompleto a propósito y no se inventa un precio).
+- **Lleva migración** (recrea la vista de Indicadores con la cubeta de lo saldado). Esta versión no agrega
+  permisos, pero arrastra los cuatro de la corrida (0.102) y el almacén de avíos (0.104): si `prueba` aún no
+  corrió esos seeds, desplegar con `SEED_ON_START=true` (es idempotente).
+
 ## 0.104 · 4-sep-2026 · **en prueba** — Ningún movimiento puede caer en un almacén del tipo equivocado
 
 ### Qué se puede hacer ahora que antes no

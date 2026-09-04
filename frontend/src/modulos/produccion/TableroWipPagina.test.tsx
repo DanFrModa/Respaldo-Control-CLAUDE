@@ -63,6 +63,7 @@ const DETALLE = {
   enviado: 400,
   recibido: 300,
   incompletas: 20,
+  faltantesSaldados: 0,
   pendientePorRecibir: 80,
   // Publicado por el servidor desde V1-E8v (la pantalla ya no lo despeja del pendiente).
   enviadoCostura: 400,
