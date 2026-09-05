@@ -199,6 +199,7 @@
                           "inventario-avios.ver",
                           "inventario-avios.mover",
                           "esma.cargo-validar",
+                          "esma.revisar",
                           "notas.ver",
                           "notas.administrar",
                           "notas.cancelar",
@@ -95241,6 +95242,15 @@
                             "type": "string",
                             "description": "Nombre del proveedor (para la UI)."
                           },
+                          "modalidadFacturaProveedor": {
+                            "type": "string",
+                            "enum": [
+                              "factura",
+                              "sin-factura",
+                              "no-definida"
+                            ],
+                            "description": "¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129)."
+                          },
                           "fecha": {
                             "anyOf": [
                               {
@@ -95845,6 +95855,7 @@
                           "estatus",
                           "idProveedor",
                           "proveedor",
+                          "modalidadFacturaProveedor",
                           "fecha",
                           "fechaEntrega",
                           "idDireccionEntrega",
@@ -96422,6 +96433,15 @@
                       "type": "string",
                       "description": "Nombre del proveedor (para la UI)."
                     },
+                    "modalidadFacturaProveedor": {
+                      "type": "string",
+                      "enum": [
+                        "factura",
+                        "sin-factura",
+                        "no-definida"
+                      ],
+                      "description": "¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129)."
+                    },
                     "fecha": {
                       "anyOf": [
                         {
@@ -97026,6 +97046,7 @@
                     "estatus",
                     "idProveedor",
                     "proveedor",
+                    "modalidadFacturaProveedor",
                     "fecha",
                     "fechaEntrega",
                     "idDireccionEntrega",
@@ -97517,6 +97538,15 @@
                       "type": "string",
                       "description": "Nombre del proveedor (para la UI)."
                     },
+                    "modalidadFacturaProveedor": {
+                      "type": "string",
+                      "enum": [
+                        "factura",
+                        "sin-factura",
+                        "no-definida"
+                      ],
+                      "description": "¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129)."
+                    },
                     "fecha": {
                       "anyOf": [
                         {
@@ -98121,6 +98151,7 @@
                     "estatus",
                     "idProveedor",
                     "proveedor",
+                    "modalidadFacturaProveedor",
                     "fecha",
                     "fechaEntrega",
                     "idDireccionEntrega",
@@ -98668,6 +98699,15 @@
                       "type": "string",
                       "description": "Nombre del proveedor (para la UI)."
                     },
+                    "modalidadFacturaProveedor": {
+                      "type": "string",
+                      "enum": [
+                        "factura",
+                        "sin-factura",
+                        "no-definida"
+                      ],
+                      "description": "¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129)."
+                    },
                     "fecha": {
                       "anyOf": [
                         {
@@ -99272,6 +99312,7 @@
                     "estatus",
                     "idProveedor",
                     "proveedor",
+                    "modalidadFacturaProveedor",
                     "fecha",
                     "fechaEntrega",
                     "idDireccionEntrega",
@@ -99692,6 +99733,15 @@
                       "type": "string",
                       "description": "Nombre del proveedor (para la UI)."
                     },
+                    "modalidadFacturaProveedor": {
+                      "type": "string",
+                      "enum": [
+                        "factura",
+                        "sin-factura",
+                        "no-definida"
+                      ],
+                      "description": "¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129)."
+                    },
                     "fecha": {
                       "anyOf": [
                         {
@@ -100296,6 +100346,7 @@
                     "estatus",
                     "idProveedor",
                     "proveedor",
+                    "modalidadFacturaProveedor",
                     "fecha",
                     "fechaEntrega",
                     "idDireccionEntrega",
@@ -100564,6 +100615,15 @@
                       "type": "string",
                       "description": "Nombre del proveedor (para la UI)."
                     },
+                    "modalidadFacturaProveedor": {
+                      "type": "string",
+                      "enum": [
+                        "factura",
+                        "sin-factura",
+                        "no-definida"
+                      ],
+                      "description": "¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129)."
+                    },
                     "fecha": {
                       "anyOf": [
                         {
@@ -101168,6 +101228,7 @@
                     "estatus",
                     "idProveedor",
                     "proveedor",
+                    "modalidadFacturaProveedor",
                     "fecha",
                     "fechaEntrega",
                     "idDireccionEntrega",
@@ -101436,6 +101497,15 @@
                       "type": "string",
                       "description": "Nombre del proveedor (para la UI)."
                     },
+                    "modalidadFacturaProveedor": {
+                      "type": "string",
+                      "enum": [
+                        "factura",
+                        "sin-factura",
+                        "no-definida"
+                      ],
+                      "description": "¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129)."
+                    },
                     "fecha": {
                       "anyOf": [
                         {
@@ -102040,6 +102110,7 @@
                     "estatus",
                     "idProveedor",
                     "proveedor",
+                    "modalidadFacturaProveedor",
                     "fecha",
                     "fechaEntrega",
                     "idDireccionEntrega",
@@ -102287,6 +102358,15 @@
                       "type": "string",
                       "description": "Nombre del proveedor (para la UI)."
                     },
+                    "modalidadFacturaProveedor": {
+                      "type": "string",
+                      "enum": [
+                        "factura",
+                        "sin-factura",
+                        "no-definida"
+                      ],
+                      "description": "¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129)."
+                    },
                     "fecha": {
                       "anyOf": [
                         {
@@ -102891,6 +102971,7 @@
                     "estatus",
                     "idProveedor",
                     "proveedor",
+                    "modalidadFacturaProveedor",
                     "fecha",
                     "fechaEntrega",
                     "idDireccionEntrega",
@@ -104715,7 +104796,12 @@
                         "cantidad": {
                           "type": "number",
                           "exclusiveMinimum": 0,
-                          "description": "Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1). En TELA es el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento (se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de entrada por factura/remisión (B1), que sí admite cuerpo 0."
+                          "description": "Cantidad recibida en UNIDAD DE CONSUMO, la misma de la línea de OC (§Post-F9.97): no se convierte nada. En TELA es el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento (se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de entrada por factura/remisión (B1), que sí admite cuerpo 0."
+                        },
+                        "precioUnit": {
+                          "description": "Precio por unidad de consumo con el que se recibe. Si se omite, el de la línea de OC.",
+                          "type": "number",
+                          "minimum": 0
                         },
                         "telaColor": {
                           "description": "Color + complemento + lote del proveedor (OBLIGATORIO en líneas de tela, B1).",
@@ -104902,6 +104988,34 @@
                       ],
                       "description": "Motivo del reverso, o null."
                     },
+                    "importe": {
+                      "type": "number",
+                      "description": "⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento."
+                    },
+                    "idMovimientoTercero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3)."
+                    },
+                    "deuda": {
+                      "type": "string",
+                      "enum": [
+                        "cargo-no-fiscal",
+                        "factura-pendiente",
+                        "sin-importe",
+                        "en-entrada-de-tela",
+                        "cancelada"
+                      ],
+                      "description": "Cómo quedó la cuenta por pagar de esta recepción (fila 0.129)."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -105022,7 +105136,15 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Costo por unidad de consumo, o null."
+                            "description": "Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda."
+                          },
+                          "precioOc": {
+                            "type": "number",
+                            "description": "⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC."
+                          },
+                          "precioDistintoOc": {
+                            "type": "boolean",
+                            "description": "⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números."
                           },
                           "idTelaColor": {
                             "anyOf": [
@@ -105149,6 +105271,8 @@
                           "cantidadRecibida",
                           "cantidadComplemento",
                           "costoUnit",
+                          "precioOc",
+                          "precioDistintoOc",
                           "idTelaColor",
                           "telaColor",
                           "idPartida",
@@ -105197,6 +105321,9 @@
                     "reversadaEn",
                     "reversadaPorId",
                     "motivoReverso",
+                    "importe",
+                    "idMovimientoTercero",
+                    "deuda",
                     "lineas",
                     "creadoEn",
                     "creadoPorId"
@@ -105497,6 +105624,34 @@
                             ],
                             "description": "Motivo del reverso, o null."
                           },
+                          "importe": {
+                            "type": "number",
+                            "description": "⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento."
+                          },
+                          "idMovimientoTercero": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3)."
+                          },
+                          "deuda": {
+                            "type": "string",
+                            "enum": [
+                              "cargo-no-fiscal",
+                              "factura-pendiente",
+                              "sin-importe",
+                              "en-entrada-de-tela",
+                              "cancelada"
+                            ],
+                            "description": "Cómo quedó la cuenta por pagar de esta recepción (fila 0.129)."
+                          },
                           "lineas": {
                             "type": "array",
                             "items": {
@@ -105617,7 +105772,15 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Costo por unidad de consumo, o null."
+                                  "description": "Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda."
+                                },
+                                "precioOc": {
+                                  "type": "number",
+                                  "description": "⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC."
+                                },
+                                "precioDistintoOc": {
+                                  "type": "boolean",
+                                  "description": "⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números."
                                 },
                                 "idTelaColor": {
                                   "anyOf": [
@@ -105744,6 +105907,8 @@
                                 "cantidadRecibida",
                                 "cantidadComplemento",
                                 "costoUnit",
+                                "precioOc",
+                                "precioDistintoOc",
                                 "idTelaColor",
                                 "telaColor",
                                 "idPartida",
@@ -105792,6 +105957,9 @@
                           "reversadaEn",
                           "reversadaPorId",
                           "motivoReverso",
+                          "importe",
+                          "idMovimientoTercero",
+                          "deuda",
                           "lineas",
                           "creadoEn",
                           "creadoPorId"
@@ -107027,6 +107195,34 @@
                       ],
                       "description": "Motivo del reverso, o null."
                     },
+                    "importe": {
+                      "type": "number",
+                      "description": "⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento."
+                    },
+                    "idMovimientoTercero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3)."
+                    },
+                    "deuda": {
+                      "type": "string",
+                      "enum": [
+                        "cargo-no-fiscal",
+                        "factura-pendiente",
+                        "sin-importe",
+                        "en-entrada-de-tela",
+                        "cancelada"
+                      ],
+                      "description": "Cómo quedó la cuenta por pagar de esta recepción (fila 0.129)."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -107147,7 +107343,15 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Costo por unidad de consumo, o null."
+                            "description": "Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda."
+                          },
+                          "precioOc": {
+                            "type": "number",
+                            "description": "⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC."
+                          },
+                          "precioDistintoOc": {
+                            "type": "boolean",
+                            "description": "⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números."
                           },
                           "idTelaColor": {
                             "anyOf": [
@@ -107274,6 +107478,8 @@
                           "cantidadRecibida",
                           "cantidadComplemento",
                           "costoUnit",
+                          "precioOc",
+                          "precioDistintoOc",
                           "idTelaColor",
                           "telaColor",
                           "idPartida",
@@ -107322,6 +107528,9 @@
                     "reversadaEn",
                     "reversadaPorId",
                     "motivoReverso",
+                    "importe",
+                    "idMovimientoTercero",
+                    "deuda",
                     "lineas",
                     "creadoEn",
                     "creadoPorId"
@@ -107640,6 +107849,34 @@
                       ],
                       "description": "Motivo del reverso, o null."
                     },
+                    "importe": {
+                      "type": "number",
+                      "description": "⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento."
+                    },
+                    "idMovimientoTercero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3)."
+                    },
+                    "deuda": {
+                      "type": "string",
+                      "enum": [
+                        "cargo-no-fiscal",
+                        "factura-pendiente",
+                        "sin-importe",
+                        "en-entrada-de-tela",
+                        "cancelada"
+                      ],
+                      "description": "Cómo quedó la cuenta por pagar de esta recepción (fila 0.129)."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -107760,7 +107997,15 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Costo por unidad de consumo, o null."
+                            "description": "Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda."
+                          },
+                          "precioOc": {
+                            "type": "number",
+                            "description": "⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC."
+                          },
+                          "precioDistintoOc": {
+                            "type": "boolean",
+                            "description": "⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números."
                           },
                           "idTelaColor": {
                             "anyOf": [
@@ -107887,6 +108132,8 @@
                           "cantidadRecibida",
                           "cantidadComplemento",
                           "costoUnit",
+                          "precioOc",
+                          "precioDistintoOc",
                           "idTelaColor",
                           "telaColor",
                           "idPartida",
@@ -107935,6 +108182,9 @@
                     "reversadaEn",
                     "reversadaPorId",
                     "motivoReverso",
+                    "importe",
+                    "idMovimientoTercero",
+                    "deuda",
                     "lineas",
                     "creadoEn",
                     "creadoPorId"
@@ -155935,6 +156185,17 @@
                           ],
                           "description": "Σ descuentos capturados sin revisar (o null)."
                         },
+                        "cargos": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes)."
+                        },
                         "neto": {
                           "anyOf": [
                             {
@@ -155944,24 +156205,39 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                          "description": "Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null)."
                         },
                         "partidas": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
-                          "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                          "description": "Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                        },
+                        "cargosPartidas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántas de esas partidas son cargos por validar (conteo: NO se oculta)."
+                        },
+                        "cargosSinPrecio": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta)."
                         }
                       },
                       "required": [
                         "abonos",
                         "pagos",
                         "descuentos",
+                        "cargos",
                         "neto",
-                        "partidas"
+                        "partidas",
+                        "cargosPartidas",
+                        "cargosSinPrecio"
                       ],
                       "additionalProperties": false,
-                      "description": "Lo capturado que aún no se revisa: no suma al saldo, pero se ve."
+                      "description": "Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar."
                     }
                   },
                   "required": [
@@ -157500,6 +157776,17 @@
                                 ],
                                 "description": "Σ descuentos capturados sin revisar (o null)."
                               },
+                              "cargos": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes)."
+                              },
                               "neto": {
                                 "anyOf": [
                                   {
@@ -157509,24 +157796,39 @@
                                     "type": "null"
                                   }
                                 ],
-                                "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                                "description": "Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null)."
                               },
                               "partidas": {
                                 "type": "integer",
                                 "minimum": -9007199254740991,
                                 "maximum": 9007199254740991,
-                                "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                                "description": "Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                              },
+                              "cargosPartidas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Cuántas de esas partidas son cargos por validar (conteo: NO se oculta)."
+                              },
+                              "cargosSinPrecio": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta)."
                               }
                             },
                             "required": [
                               "abonos",
                               "pagos",
                               "descuentos",
+                              "cargos",
                               "neto",
-                              "partidas"
+                              "partidas",
+                              "cargosPartidas",
+                              "cargosSinPrecio"
                             ],
                             "additionalProperties": false,
-                            "description": "Lo capturado que aún no se revisa: no suma al saldo, pero se ve."
+                            "description": "Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar."
                           }
                         },
                         "required": [
@@ -157566,13 +157868,20 @@
                         }
                       ],
                       "description": "Σ del pendiente neto de todas las filas (o null si se ocultan importes)."
+                    },
+                    "totalCargosPorValidar": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Σ de los cargos sin validar de todas las filas (conteo: NO se oculta). Lo agrega el servidor para que la pantalla no tenga que sumar la columna."
                     }
                   },
                   "required": [
                     "conFactura",
                     "filas",
                     "totalSaldo",
-                    "totalPendienteNeto"
+                    "totalPendienteNeto",
+                    "totalCargosPorValidar"
                   ],
                   "additionalProperties": false,
                   "description": "Saldos de todos los maquileros."
@@ -158842,6 +159151,17 @@
                               ],
                               "description": "Σ descuentos capturados sin revisar (o null)."
                             },
+                            "cargos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes)."
+                            },
                             "neto": {
                               "anyOf": [
                                 {
@@ -158851,24 +159171,39 @@
                                   "type": "null"
                                 }
                               ],
-                              "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                              "description": "Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null)."
                             },
                             "partidas": {
                               "type": "integer",
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991,
-                              "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                              "description": "Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                            },
+                            "cargosPartidas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas de esas partidas son cargos por validar (conteo: NO se oculta)."
+                            },
+                            "cargosSinPrecio": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta)."
                             }
                           },
                           "required": [
                             "abonos",
                             "pagos",
                             "descuentos",
+                            "cargos",
                             "neto",
-                            "partidas"
+                            "partidas",
+                            "cargosPartidas",
+                            "cargosSinPrecio"
                           ],
                           "additionalProperties": false,
-                          "description": "Lo capturado que aún no se revisa: no suma al saldo, pero se ve."
+                          "description": "Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar."
                         }
                       },
                       "required": [
@@ -160002,6 +160337,17 @@
                               ],
                               "description": "Σ descuentos capturados sin revisar (o null)."
                             },
+                            "cargos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes)."
+                            },
                             "neto": {
                               "anyOf": [
                                 {
@@ -160011,24 +160357,39 @@
                                   "type": "null"
                                 }
                               ],
-                              "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                              "description": "Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null)."
                             },
                             "partidas": {
                               "type": "integer",
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991,
-                              "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                              "description": "Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                            },
+                            "cargosPartidas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas de esas partidas son cargos por validar (conteo: NO se oculta)."
+                            },
+                            "cargosSinPrecio": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta)."
                             }
                           },
                           "required": [
                             "abonos",
                             "pagos",
                             "descuentos",
+                            "cargos",
                             "neto",
-                            "partidas"
+                            "partidas",
+                            "cargosPartidas",
+                            "cargosSinPrecio"
                           ],
                           "additionalProperties": false,
-                          "description": "Lo capturado que aún no se revisa: no suma al saldo, pero se ve."
+                          "description": "Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar."
                         }
                       },
                       "required": [
@@ -162499,7 +162860,7 @@
     },
     "/api/cxp/por-pagar": {
       "get": {
-        "summary": "Proveedores por pagar con su antigüedad de saldos (aging) + resumen",
+        "summary": "Proveedores por pagar con su antigüedad de saldos (aging) + resumen, por segmento de facturación",
         "tags": [
           "cxp"
         ],
@@ -162551,6 +162912,21 @@
             "name": "busqueda",
             "required": false,
             "description": "Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas)."
+          },
+          {
+            "schema": {
+              "default": "todos",
+              "type": "string",
+              "enum": [
+                "todos",
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "segmento",
+            "required": false,
+            "description": "todos = cartera completa; con = sólo lo CON factura (fiscal / con_factura); sin = sólo lo SIN factura, incluido lo sin definir."
           }
         ],
         "security": [
@@ -162560,7 +162936,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen).",
+            "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento.",
             "content": {
               "application/json": {
                 "schema": {
@@ -162700,6 +163076,17 @@
                                 ],
                                 "description": "Σ descuentos capturados sin revisar (o null)."
                               },
+                              "cargos": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes)."
+                              },
                               "neto": {
                                 "anyOf": [
                                   {
@@ -162709,24 +163096,39 @@
                                     "type": "null"
                                   }
                                 ],
-                                "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                                "description": "Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null)."
                               },
                               "partidas": {
                                 "type": "integer",
                                 "minimum": -9007199254740991,
                                 "maximum": 9007199254740991,
-                                "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                                "description": "Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                              },
+                              "cargosPartidas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Cuántas de esas partidas son cargos por validar (conteo: NO se oculta)."
+                              },
+                              "cargosSinPrecio": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta)."
                               }
                             },
                             "required": [
                               "abonos",
                               "pagos",
                               "descuentos",
+                              "cargos",
                               "neto",
-                              "partidas"
+                              "partidas",
+                              "cargosPartidas",
+                              "cargosSinPrecio"
                             ],
                             "additionalProperties": false,
-                            "description": "Maquila (EsMa) capturada y AÚN sin revisar: no suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a)."
+                            "description": "Maquila (EsMa) que aún espera una decisión: lo capturado sin revisar MÁS los cargos propuestos (los que esperan que alguien fije cantidad y precio). No suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a) — incluido el que sólo tiene cargos por validar (V1, fila 0.111)."
                           }
                         },
                         "required": [
@@ -162860,6 +163262,17 @@
                               ],
                               "description": "Σ descuentos capturados sin revisar (o null)."
                             },
+                            "cargos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes)."
+                            },
                             "neto": {
                               "anyOf": [
                                 {
@@ -162869,24 +163282,39 @@
                                   "type": "null"
                                 }
                               ],
-                              "description": "Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null)."
+                              "description": "Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null)."
                             },
                             "partidas": {
                               "type": "integer",
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991,
-                              "description": "Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                              "description": "Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas)."
+                            },
+                            "cargosPartidas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas de esas partidas son cargos por validar (conteo: NO se oculta)."
+                            },
+                            "cargosSinPrecio": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta)."
                             }
                           },
                           "required": [
                             "abonos",
                             "pagos",
                             "descuentos",
+                            "cargos",
                             "neto",
-                            "partidas"
+                            "partidas",
+                            "cargosPartidas",
+                            "cargosSinPrecio"
                           ],
                           "additionalProperties": false,
-                          "description": "Σ de la maquila capturada sin revisar en toda la cartera: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero no desaparece."
+                          "description": "Σ de la maquila que espera decisión en toda la cartera —lo capturado sin revisar MÁS los cargos propuestos—: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero no desaparece."
                         }
                       },
                       "required": [
@@ -162898,7 +163326,16 @@
                         "maquilaPorRevisar"
                       ],
                       "additionalProperties": false,
-                      "description": "KPIs sobre toda la cartera con saldo."
+                      "description": "KPIs sobre toda la cartera con saldo DEL SEGMENTO pedido (no de la cartera completa)."
+                    },
+                    "segmento": {
+                      "type": "string",
+                      "enum": [
+                        "todos",
+                        "con",
+                        "sin"
+                      ],
+                      "description": "Segmento aplicado (todos/con/sin factura). Viaja de vuelta porque las filas Y el resumen son de ESE segmento: sin él, una cartera parcial se leería como la total."
                     },
                     "limitesAging": {
                       "type": "object",
@@ -162931,10 +163368,11 @@
                     "porPagina",
                     "totalPaginas",
                     "resumen",
+                    "segmento",
                     "limitesAging"
                   ],
                   "additionalProperties": false,
-                  "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen)."
+                  "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento."
                 }
               }
             }
@@ -168194,13 +168632,13 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Neto capturado que aún NO suma al saldo (sólo maquila), o null."
+                                  "description": "Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null."
                                 },
                                 "porRevisarPartidas": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Cuántas partidas esperan revisión (0 si no aplica). NO es un importe."
+                                  "description": "Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe."
                                 },
                                 "recibosSemanaImporte": {
                                   "anyOf": [
@@ -169070,13 +169508,13 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Neto capturado que aún NO suma al saldo (sólo maquila), o null."
+                                  "description": "Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null."
                                 },
                                 "porRevisarPartidas": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Cuántas partidas esperan revisión (0 si no aplica). NO es un importe."
+                                  "description": "Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe."
                                 },
                                 "recibosSemanaImporte": {
                                   "anyOf": [
@@ -170199,13 +170637,13 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Neto capturado que aún NO suma al saldo (sólo maquila), o null."
+                                  "description": "Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null."
                                 },
                                 "porRevisarPartidas": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Cuántas partidas esperan revisión (0 si no aplica). NO es un importe."
+                                  "description": "Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe."
                                 },
                                 "recibosSemanaImporte": {
                                   "anyOf": [
@@ -171165,13 +171603,13 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Neto capturado que aún NO suma al saldo (sólo maquila), o null."
+                                  "description": "Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null."
                                 },
                                 "porRevisarPartidas": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Cuántas partidas esperan revisión (0 si no aplica). NO es un importe."
+                                  "description": "Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe."
                                 },
                                 "recibosSemanaImporte": {
                                   "anyOf": [
@@ -172050,13 +172488,13 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Neto capturado que aún NO suma al saldo (sólo maquila), o null."
+                                  "description": "Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null."
                                 },
                                 "porRevisarPartidas": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Cuántas partidas esperan revisión (0 si no aplica). NO es un importe."
+                                  "description": "Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe."
                                 },
                                 "recibosSemanaImporte": {
                                   "anyOf": [
@@ -172926,13 +173364,13 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Neto capturado que aún NO suma al saldo (sólo maquila), o null."
+                                  "description": "Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null."
                                 },
                                 "porRevisarPartidas": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Cuántas partidas esperan revisión (0 si no aplica). NO es un importe."
+                                  "description": "Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe."
                                 },
                                 "recibosSemanaImporte": {
                                   "anyOf": [
@@ -173802,13 +174240,13 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Neto capturado que aún NO suma al saldo (sólo maquila), o null."
+                                  "description": "Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null."
                                 },
                                 "porRevisarPartidas": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Cuántas partidas esperan revisión (0 si no aplica). NO es un importe."
+                                  "description": "Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe."
                                 },
                                 "recibosSemanaImporte": {
                                   "anyOf": [
@@ -174500,6 +174938,11 @@
                             "items": {
                               "type": "object",
                               "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "rubro": {
                                   "type": "string",
                                   "enum": [
@@ -174598,9 +175041,94 @@
                                       "type": "null"
                                     }
                                   ]
+                                },
+                                "facturacion": {
+                                  "type": "object",
+                                  "properties": {
+                                    "facturable": {
+                                      "type": "boolean",
+                                      "description": "¿Se puede emitir el documento para facturar de este renglón?"
+                                    },
+                                    "motivo": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "sinFactura",
+                                            "concepto",
+                                            "proveedorNoLegible",
+                                            "efectivo",
+                                            "sinMonto",
+                                            "estado",
+                                            "faltantes"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "motivoTexto": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "faltantes": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "quien": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proveedor",
+                                              "empresa"
+                                            ],
+                                            "description": "De quién falta el dato."
+                                          },
+                                          "campo": {
+                                            "type": "string",
+                                            "enum": [
+                                              "razonSocial",
+                                              "rfc",
+                                              "regimenFiscalSat",
+                                              "codigoPostalExpedicion",
+                                              "codigoPostalFiscal",
+                                              "usoCfdiHabitual"
+                                            ],
+                                            "description": "Qué dato falta."
+                                          },
+                                          "texto": {
+                                            "type": "string",
+                                            "description": "El aviso, con el nombre de quien tiene el hueco."
+                                          }
+                                        },
+                                        "required": [
+                                          "quien",
+                                          "campo",
+                                          "texto"
+                                        ],
+                                        "additionalProperties": false,
+                                        "description": "Un dato fiscal que falta para poder emitir el documento."
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "facturable",
+                                    "motivo",
+                                    "motivoTexto",
+                                    "faltantes"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
+                                "id",
                                 "rubro",
                                 "nombre",
                                 "beneficiario",
@@ -174611,7 +175139,8 @@
                                 "formaPago",
                                 "monto",
                                 "concepto",
-                                "referencia"
+                                "referencia",
+                                "facturacion"
                               ],
                               "additionalProperties": false,
                               "description": "Un renglón de la relación ejecutable."
@@ -174741,6 +175270,814 @@
               }
             }
           },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion": {
+      "get": {
+        "summary": "Los datos con los que el proveedor debe facturar este pago (o por qué no se emite)",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idRenglon",
+            "required": true,
+            "description": "Id del renglón."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El documento para facturar de un renglón, o el motivo por el que no se emite.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "facturable": {
+                      "type": "boolean"
+                    },
+                    "motivo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "sinFactura",
+                            "concepto",
+                            "proveedorNoLegible",
+                            "efectivo",
+                            "sinMonto",
+                            "estado",
+                            "faltantes"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué no se emite, o null."
+                    },
+                    "motivoTexto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El porqué, en palabras, o null."
+                    },
+                    "faltantes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "quien": {
+                            "type": "string",
+                            "enum": [
+                              "proveedor",
+                              "empresa"
+                            ],
+                            "description": "De quién falta el dato."
+                          },
+                          "campo": {
+                            "type": "string",
+                            "enum": [
+                              "razonSocial",
+                              "rfc",
+                              "regimenFiscalSat",
+                              "codigoPostalExpedicion",
+                              "codigoPostalFiscal",
+                              "usoCfdiHabitual"
+                            ],
+                            "description": "Qué dato falta."
+                          },
+                          "texto": {
+                            "type": "string",
+                            "description": "El aviso, con el nombre de quien tiene el hueco."
+                          }
+                        },
+                        "required": [
+                          "quien",
+                          "campo",
+                          "texto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Un dato fiscal que falta para poder emitir el documento."
+                      },
+                      "description": "Los datos fiscales que faltan (vacío si no es ése el problema)."
+                    },
+                    "documento": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "idCorrida": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "idRenglon": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "folioCorrida": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Folio de la corrida (por empresa)."
+                            },
+                            "semana": {
+                              "type": "string",
+                              "description": "Lunes de la semana que se paga (AAAA-MM-DD)."
+                            },
+                            "receptor": {
+                              "type": "object",
+                              "properties": {
+                                "razonSocial": {
+                                  "type": "string",
+                                  "description": "Nombre legal con el que se timbra."
+                                },
+                                "rfc": {
+                                  "type": "string"
+                                },
+                                "regimenFiscalSat": {
+                                  "type": "string",
+                                  "description": "Clave del régimen fiscal del SAT."
+                                },
+                                "codigoPostal": {
+                                  "type": "string",
+                                  "description": "CP: del domicilio fiscal (receptor) o de expedición (emisor)."
+                                }
+                              },
+                              "required": [
+                                "razonSocial",
+                                "rfc",
+                                "regimenFiscalSat",
+                                "codigoPostal"
+                              ],
+                              "additionalProperties": false,
+                              "description": "A nombre de quién se factura (la empresa activa, A9)."
+                            },
+                            "emisor": {
+                              "type": "object",
+                              "properties": {
+                                "razonSocial": {
+                                  "type": "string",
+                                  "description": "Nombre legal con el que se timbra."
+                                },
+                                "rfc": {
+                                  "type": "string"
+                                },
+                                "regimenFiscalSat": {
+                                  "type": "string",
+                                  "description": "Clave del régimen fiscal del SAT."
+                                },
+                                "codigoPostal": {
+                                  "type": "string",
+                                  "description": "CP: del domicilio fiscal (receptor) o de expedición (emisor)."
+                                }
+                              },
+                              "required": [
+                                "razonSocial",
+                                "rfc",
+                                "regimenFiscalSat",
+                                "codigoPostal"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Quién va a emitir la factura (el proveedor)."
+                            },
+                            "nombreProveedor": {
+                              "type": "string"
+                            },
+                            "usoCfdi": {
+                              "type": "string",
+                              "description": "Clave del uso de CFDI que declara el receptor (p. ej. G03)."
+                            },
+                            "usoCfdiSugerido": {
+                              "type": "boolean",
+                              "description": "true = el proveedor no lo tiene capturado y va el default G03, marcado como tal."
+                            },
+                            "concepto": {
+                              "type": "string",
+                              "description": "Qué se está pagando (el del renglón, o uno armado por rubro)."
+                            },
+                            "referencia": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Folios de remisiones/recibos que ampara, o null."
+                            },
+                            "formaPagoSat": {
+                              "type": "string",
+                              "description": "Clave del SAT de la forma de pago (03 = transferencia)."
+                            },
+                            "formaPagoTexto": {
+                              "type": "string"
+                            },
+                            "metodoPagoSat": {
+                              "type": "string",
+                              "description": "Clave del SAT del método de pago (PUE)."
+                            },
+                            "metodoPagoTexto": {
+                              "type": "string"
+                            },
+                            "moneda": {
+                              "type": "string",
+                              "description": "Moneda del comprobante (MXN)."
+                            },
+                            "subtotal": {
+                              "type": "number",
+                              "description": "Base gravable."
+                            },
+                            "iva": {
+                              "type": "number",
+                              "description": "IVA trasladado (explícito, nunca escondido en el total)."
+                            },
+                            "tasaIvaTexto": {
+                              "type": "string",
+                              "description": "La tasa como se imprime («16 %»)."
+                            },
+                            "total": {
+                              "type": "number",
+                              "description": "Lo que se transfiere. subtotal + iva === total, al centavo."
+                            }
+                          },
+                          "required": [
+                            "idCorrida",
+                            "idRenglon",
+                            "folioCorrida",
+                            "semana",
+                            "receptor",
+                            "emisor",
+                            "nombreProveedor",
+                            "usoCfdi",
+                            "usoCfdiSugerido",
+                            "concepto",
+                            "referencia",
+                            "formaPagoSat",
+                            "formaPagoTexto",
+                            "metodoPagoSat",
+                            "metodoPagoTexto",
+                            "moneda",
+                            "subtotal",
+                            "iva",
+                            "tasaIvaTexto",
+                            "total"
+                          ],
+                          "additionalProperties": false,
+                          "description": "El documento con el que el proveedor debe facturar (fila 0.118)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "facturable",
+                    "motivo",
+                    "motivoTexto",
+                    "faltantes",
+                    "documento"
+                  ],
+                  "additionalProperties": false,
+                  "description": "El documento para facturar de un renglón, o el motivo por el que no se emite."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion.pdf": {
+      "get": {
+        "summary": "Documento para facturar de UN pago (PDF)",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idRenglon",
+            "required": true,
+            "description": "Id del renglón."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagos/corridas/{id}/documentos-facturacion.pdf": {
+      "get": {
+        "summary": "Documentos para facturar de TODA la corrida, con la hoja de los que no se emitieron",
+        "tags": [
+          "pagos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la corrida."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {
@@ -276282,6 +277619,28 @@
                         ],
                         "description": "RFC fiscal de la empresa (F9-E3), o null."
                       },
+                      "regimenFiscalSat": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                      },
+                      "codigoPostalFiscal": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                      },
                       "identificador": {
                         "anyOf": [
                           {
@@ -276360,6 +277719,8 @@
                       "nombre",
                       "razonSocial",
                       "rfc",
+                      "regimenFiscalSat",
+                      "codigoPostalFiscal",
                       "identificador",
                       "favorita",
                       "paraIpt",
@@ -276550,6 +277911,13 @@
                     "type": "string",
                     "maxLength": 13
                   },
+                  "regimenFiscalSat": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "codigoPostalFiscal": {
+                    "type": "string"
+                  },
                   "identificador": {
                     "type": "string",
                     "maxLength": 20
@@ -276618,6 +277986,28 @@
                         }
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
+                    },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
                     },
                     "identificador": {
                       "anyOf": [
@@ -276697,6 +278087,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -276926,6 +278318,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -277004,6 +278418,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -277193,6 +278609,13 @@
                     "type": "string",
                     "maxLength": 13
                   },
+                  "regimenFiscalSat": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "codigoPostalFiscal": {
+                    "type": "string"
+                  },
                   "identificador": {
                     "type": "string",
                     "maxLength": 20
@@ -277272,6 +278695,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -277350,6 +278795,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -277577,6 +279024,28 @@
                       ],
                       "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado."
+                    },
+                    "codigoPostalFiscal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -277655,6 +279124,8 @@
                     "nombre",
                     "razonSocial",
                     "rfc",
+                    "regimenFiscalSat",
+                    "codigoPostalFiscal",
                     "identificador",
                     "favorita",
                     "paraIpt",

@@ -41,6 +41,28 @@ export const esquemaEmpresaCrear = z.object({
       error: 'El RFC no tiene una forma válida (12 para moral, 13 para física)',
     })
     .optional(),
+  /**
+   * ⭐ RÉGIMEN FISCAL del SAT de ESTA empresa como RECEPTOR (fila 0.118). Clave del catálogo del SAT
+   * (p. ej. `601`). Validación SUAVE —sólo el largo, igual que la del proveedor (R15)— porque el
+   * catálogo del SAT cambia y no vive aquí. Vacío ('') = no capturado / limpiarlo.
+   */
+  regimenFiscalSat: z
+    .string()
+    .trim()
+    .max(10, { error: 'El régimen fiscal no puede tener más de 10 caracteres' })
+    .optional(),
+  /**
+   * ⭐ CÓDIGO POSTAL del DOMICILIO FISCAL de esta empresa (fila 0.118). Obligatorio en el CFDI 4.0
+   * que nos emite el proveedor. Vacío ('') = no capturado; si viene, 5 dígitos (mismo criterio que
+   * `Proveedor.codigoPostalExpedicion`, que es OTRA cosa: el lugar de expedición del EMISOR).
+   */
+  codigoPostalFiscal: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\d{5}$/.test(v), {
+      error: 'El código postal debe tener 5 dígitos',
+    })
+    .optional(),
   identificador: z
     .string()
     .trim()
@@ -84,6 +106,14 @@ export const esquemaEmpresaSalida = z
     nombre: z.string().describe('Nombre corto de uso diario.'),
     razonSocial: z.string().nullable().describe('Razón social, o null.'),
     rfc: z.string().nullable().describe('RFC fiscal de la empresa (F9-E3), o null.'),
+    regimenFiscalSat: z
+      .string()
+      .nullable()
+      .describe('Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado.'),
+    codigoPostalFiscal: z
+      .string()
+      .nullable()
+      .describe('CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado.'),
     identificador: z.string().nullable().describe('Identificador corto para folios, o null.'),
     favorita: z.boolean().describe('Empresa propuesta por defecto al iniciar sesión.'),
     paraIpt: z.boolean().describe('Participa en el inventario de producto terminado.'),

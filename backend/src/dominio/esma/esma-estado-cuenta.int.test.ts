@@ -60,6 +60,9 @@ const PERM_TODOS: ClavePermiso[] = [
   'inventario-pt.ver',
   'esma.cargo-validar',
   'esma.modificar',
+  // Autorizar una partida capturada es `esma.revisar` desde la fila 0.128 (capturar y validar
+  // dejaron de ser el mismo permiso). Estas pruebas revisan como paso de arreglo, así que lo llevan.
+  'esma.revisar',
   'esma.ver-pagos',
   'consultas.ver-importes',
 ];
@@ -305,10 +308,26 @@ describe('Saldos de todos los maquileros (F6-E5)', () => {
     const fila = todos.filas.find((f) => f.idMaquilero === maquileroCostura.id);
     const saldoUno = await saldoDeMaquilero(sesion(), maquileroCostura.id, {}, bd());
     expect(fila?.saldo).toBe(saldoUno.saldo);
-    // El estampador (rol maquila, sin movimientos → saldo 0) NO aparece.
+    // El estampador (rol maquila, sin movimientos → saldo 0 y nada pendiente) NO aparece.
     expect(todos.filas.some((f) => f.idMaquilero === estampador.id)).toBe(false);
-    // El cortador (rol 'corte', no es maquila) tampoco.
-    expect(todos.filas.some((f) => f.idMaquilero === cortador.id)).toBe(false);
+    // ⭐ EL CORTADOR SÍ APARECE, y esta aserción está INVERTIDA a propósito (V1, fila 0.111).
+    //
+    // Decía que no aparecía «porque el rol `corte` no es maquila». Eso dejó de ser cierto en la
+    // 0.114: `ROLES_MAQUILA_ESMA` (`esma/maquileros.ts`) incluye hoy `corte` y `empaque` —*«corte es
+    // parte de maquilas, no de proveedores»*, Daniel—, y `cortarBase()` del `beforeEach` le crea un
+    // CARGO DE SERVICIO `propuesto`. Hasta la 0.111 ese cargo no lo contaba nadie, así que el
+    // cortador seguía invisible por un segundo motivo (saldo 0 y pendiente 0) que tapaba al primero.
+    // Ahora se ve, que es exactamente lo que Daniel pidió: quien tenga algo esperando su decisión
+    // sale en el tablero.
+    const filaCortador = todos.filas.find((f) => f.idMaquilero === cortador.id);
+    expect(filaCortador).toBeDefined();
+    expect(filaCortador?.saldo).toBe(0);
+    // Un cargo por validar, y sin precio: `registrarCorte` no capturó `precioPactado`, y la orden
+    // no tiene precio de corte que prestarle (REGLA 0-B: no se inventa uno).
+    expect(filaCortador?.pendienteRevision.cargosPartidas).toBe(1);
+    expect(filaCortador?.pendienteRevision.partidas).toBe(1);
+    expect(filaCortador?.pendienteRevision.cargos).toBe(0);
+    expect(filaCortador?.pendienteRevision.cargosSinPrecio).toBe(1);
   });
 });
 
@@ -394,7 +413,9 @@ describe('Selector de maquileros (F6-E5)', () => {
     const costura = await listarMaquilerosEsMa(sesion(), { tipo: 'costura' }, bd());
     expect(costura.filas.some((m) => m.id === maquileroCostura.id)).toBe(true);
     expect(costura.filas.some((m) => m.id === estampador.id)).toBe(false);
-    // El cortador (rol 'corte') no es maquila → no aparece.
+    // El cortador tampoco: NO porque «corte no sea maquila» —desde la 0.114 sí lo es, está en
+    // `ROLES_MAQUILA_ESMA`— sino porque el filtro pide `tipo: 'costura'`, que resuelve al único rol
+    // `maquila-costura`. Sin filtro sí saldría.
     expect(costura.filas.some((m) => m.id === cortador.id)).toBe(false);
 
     const estamp = await listarMaquilerosEsMa(sesion(), { tipo: 'estampado' }, bd());

@@ -649,7 +649,8 @@ export type DatosContrasena = z.infer<typeof esquemaContrasena>;
 
 /**
  * Captura del formulario de empresa (alta y edicion comparten forma). Solo el
- * `nombre` es obligatorio; razon social, RFC e identificador son opcionales. Las
+ * `nombre` es obligatorio; razon social, RFC, ficha fiscal (regimen + CP, fila
+ * 0.118) e identificador son opcionales. Las
  * banderas (favorita, paraIpt, paraEdr) se capturan como checkbox y no van en este
  * schema de texto. El RFC (F9-E3) valida su forma en el backend (A1); aquí solo el largo.
  */
@@ -668,6 +669,21 @@ export const esquemaEmpresaFormulario = z.object({
     .trim()
     .toUpperCase()
     .max(13, { error: 'El RFC no puede tener más de 13 caracteres' }),
+  /**
+   * ⭐ Régimen fiscal del SAT de la empresa como RECEPTOR (fila 0.118). Sin él, el proveedor no
+   * puede timbrar a su nombre y el documento para facturar no se emite. Vacío = no capturado.
+   */
+  regimenFiscalSat: z
+    .string()
+    .trim()
+    .max(10, { error: 'El régimen fiscal no puede tener más de 10 caracteres' }),
+  /** ⭐ CP del domicilio fiscal (fila 0.118). Vacío = no capturado; si viene, 5 dígitos. */
+  codigoPostalFiscal: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\d{5}$/.test(v), {
+      error: 'El código postal debe tener 5 dígitos',
+    }),
   identificador: z
     .string()
     .trim()

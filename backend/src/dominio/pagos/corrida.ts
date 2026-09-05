@@ -47,7 +47,7 @@ import {
   type RenglonCorridaSalida,
   type RubroPagoClave,
 } from '../../contrato/index.js';
-import type { Prisma, PrismaClient } from '../../datos/index.js';
+import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -79,6 +79,14 @@ import {
   type CuentaElegible,
   type ProveedorParaPago,
 } from './beneficiarios.js';
+import {
+  exigirCorrida,
+  exigirVerCorrida,
+  incluirRenglones,
+  type CorridaConRenglones,
+  type RenglonFila,
+} from './acceso-corrida.js';
+import { facturabilidadDeRenglones, SIN_FACTURACION } from './documento-facturacion.js';
 import { aDateColumna, aFechaIso, lunesDeLaSemana, rangoDeLaSemana } from './semana.js';
 import { redondear2, tieneMonto, totalesDe } from './totales.js';
 
@@ -95,34 +103,10 @@ const CLAVE_FOLIO_CORRIDA = 'corrida-pago';
  */
 const NAMESPACE_LOCK_CORRIDA = 20_551;
 
-/**
- * Exige poder VER la corrida. Pasa con `pagos.corrida-ver` **o** con `pagos.corrida-armar`: quien
- * la arma obviamente la ve, y exigir los dos convertiría un rol a medio configurar en un 403 justo
- * después de crear la corrida (las mutaciones devuelven la pantalla). Sigue siendo deny-by-default
- * (A4): sin ninguno de los dos, 403.
- */
-function exigirVerCorrida(sesion: SesionUsuario): void {
-  if (tienePermiso(sesion, 'pagos.corrida-armar')) {
-    return;
-  }
-  verificarPermiso(sesion, 'pagos.corrida-ver');
-}
-
 /** Serializa las corridas de la empresa dentro de la transacción. */
 async function bloquearCorridas(tx: Tx, idEmpresa: number): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_CORRIDA}::int, ${idEmpresa}::int)`;
 }
-
-/** `include` de una corrida con sus renglones (orden estable: por rubro y luego por id). */
-const incluirRenglones = {
-  renglones: { orderBy: [{ rubro: 'asc' }, { id: 'asc' }] },
-} satisfies Prisma.CorridaPagoInclude;
-
-/** Corrida con sus renglones, tal como la devuelve Prisma. */
-type CorridaConRenglones = Prisma.CorridaPagoGetPayload<{ include: typeof incluirRenglones }>;
-
-/** Un renglón tal como lo devuelve Prisma. */
-type RenglonFila = CorridaConRenglones['renglones'][number];
 
 /** Proyecta un renglón al contrato (oculta importes si no se pueden ver). */
 function proyectarRenglon(r: RenglonFila, puedeVerImportes: boolean): RenglonCorridaSalida {
@@ -365,22 +349,6 @@ export async function listarCorridas(
   };
 }
 
-/** Lee una corrida de la empresa activa (A9), o lanza 404. */
-async function exigirCorrida(
-  cliente: Tx | PrismaClient,
-  idEmpresa: number,
-  idCorrida: number,
-): Promise<CorridaConRenglones> {
-  const corrida = await cliente.corridaPago.findFirst({
-    where: { id: idCorrida, idEmpresa },
-    include: incluirRenglones,
-  });
-  if (corrida === null) {
-    throw new ErrorNoEncontrado('CorridaPago', idCorrida);
-  }
-  return corrida;
-}
-
 // ── La pantalla de trabajo ──────────────────────────────────────────────────────────────────────
 
 /**
@@ -492,6 +460,10 @@ export async function obtenerCorridaDetalle(
         esMaquila || neta === undefined
           ? null
           : oculto(redondear2(neta.d1a30 + neta.d31a60 + neta.mas60)),
+      // El «por revisar» viene ENTERO del mismo agregado que la bandeja de CxP: desde la fila 0.111
+      // incluye los RECIBOS SIN VALIDAR del maquilero (cargos `propuesto`) además de sus abonos,
+      // pagos y descuentos capturados. Aquí no se filtra ni se recalcula nada — si se recalculara,
+      // la corrida y la bandeja podrían decir cosas distintas del mismo maquilero.
       porRevisarNeto: esMaquila && neta !== undefined ? oculto(neta.maquilaPorRevisar.neto) : null,
       porRevisarPartidas: esMaquila && neta !== undefined ? neta.maquilaPorRevisar.partidas : 0,
       recibosSemanaImporte:
@@ -1235,9 +1207,15 @@ export async function concentradoDeCorrida(
 ): Promise<ConcentradoSalida> {
   exigirVerCorrida(sesion);
   verificarPermiso(sesion, 'consultas.ver-importes');
-  const corrida = await exigirCorrida(clienteLectura(bd), sesion.idEmpresaActiva, idCorrida);
+  const cliente = clienteLectura(bd);
+  const corrida = await exigirCorrida(cliente, sesion.idEmpresaActiva, idCorrida);
 
   const conMonto = corrida.renglones.filter((r) => tieneMonto(r.monto.toNumber()));
+
+  // ⭐ La facturabilidad de TODOS los renglones, en dos consultas (fila 0.118). Va aquí y no en una
+  // llamada por renglón porque la pantalla pinta un botón «Documento para facturar» por fila: en una
+  // relación de 40 renglones serían 40 peticiones para dibujar 40 botones.
+  const facturacion = await facturabilidadDeRenglones(cliente, sesion, corrida, conMonto);
 
   const secciones = ORDEN_RUBROS_PAGO.map((rubro) => {
     const propios = conMonto
@@ -1249,6 +1227,7 @@ export async function concentradoDeCorrida(
     return {
       rubro,
       renglones: propios.map((r) => ({
+        id: r.id,
         rubro: r.rubro,
         nombre: r.nombre,
         beneficiario: r.beneficiario,
@@ -1260,6 +1239,7 @@ export async function concentradoDeCorrida(
         monto: r.monto.toNumber(),
         concepto: r.concepto,
         referencia: r.referencia,
+        facturacion: facturacion.get(r.id) ?? SIN_FACTURACION,
       })),
       totales: totalesDe(sumables(propios), true),
     };

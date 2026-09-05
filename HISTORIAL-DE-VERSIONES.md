@@ -71,6 +71,200 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.113 · 4-sep-2026 · **en prueba** — **Lo que espera tu decisión ya se ve junto al saldo**: los recibos por validar cuentan
+
+### Qué se puede hacer ahora que antes no
+
+- En el **tablero de saldos de maquileros**, la columna «Por revisar» ya no cuenta sólo abonos, descuentos y
+  pagos capturados: **también los recibos, cortes y empaques que esperan que Daniel los valide**, con su
+  importe propuesto (precio de la orden por proceso, o el precio pactado del corte y del empaque) y su
+  conteo. Debajo de cada renglón se lee cuántos son y cuánto valen, y arriba el total de la semana.
+- Un maquilero cuyo **único** movimiento sea un recibo sin validar **ya aparece**. Antes tenía saldo cero,
+  pendiente cero y era invisible: justo el trabajo que hay que decidir cada semana no se veía por ningún lado.
+- Lo mismo se hereda en la **bandeja de Cuentas por pagar** (cubeta «maquila por revisar») y en la **corrida
+  semanal de pagos**, que sube esa fila como que pide decisión. Sin pantalla nueva, como pidió Daniel.
+- Si un cargo aún **no tiene precio**, se cuenta como partida y se dice aparte que no se puede valuar, en vez
+  de desaparecer o de valer cero.
+
+### Qué cambió y puede sorprender
+
+- **Los importes por revisar no suman al saldo** (el saldo sigue siendo sólo lo revisado): son dinero que
+  espera una decisión, y se enseñan al lado, nunca dentro.
+- Un cargo propuesto todavía **no tiene marcada la modalidad de factura**, así que cae entero en la relación
+  **sin factura** al partir por segmento. Es el mismo criterio único de siempre.
+- Los cargos marcados **sin costo** (segundas que no se pagan) no cuentan ni como pendiente ni como importe.
+- ⚠️ **Van a aparecer más nombres de los que esperas, y está bien.** Desde que el corte y el empaque se
+  cobran como servicio (versión 0.107), **cada corte registrado crea un cargo esperando validación**, así
+  que todo cortador con un corte sin validar va a salir en el tablero, en la bandeja de cuentas por pagar
+  y arriba en la corrida semanal. No es un defecto: son exactamente las decisiones que están esperando a
+  Daniel. Y si la etapa de corte no traía precio pactado, esos cargos salen **«sin precio»** — no heredan
+  el de la orden, a propósito.
+
+### Qué sigue pendiente o roto
+
+- Nada nuevo. Sin migración, sin permisos, sin re-seed.
+
+## 0.112 · 4-sep-2026 · **en prueba** — **El recibo del proveedor de arte ya lleva la foto**
+
+### Qué se puede hacer ahora que antes no
+
+- El **recibo de maquila de un proceso de arte** (estampado, bordado, aplicación, lavado) sale con las **fotos
+  del arte de la orden**, igual que la ficha que se le manda al enviarlo. Antes sólo la ficha las llevaba: el
+  papel que el proveedor tiene en la mano al devolver la prenda iba sin ninguna imagen.
+- Cuando la orden no tiene fotos cargadas, el recibo lo **dice** en vez de dejar un hueco mudo. Y el aviso es
+  el suyo: en la ficha invita a pedirla antes de producir; en el recibo eso ya no aplica, y el texto lo refleja.
+- El **recibo de costura** sigue sin fotos: el arte no es lo suyo.
+
+### Qué cambió y puede sorprender
+
+- La regla de las fotos (cuántas caben, en qué orden, el tope de peso, qué hacer si una no se puede
+  descargar) **vive ahora en un solo sitio** que usan la ficha y el recibo. La ficha se comporta exactamente
+  igual que antes; lo que cambió es de dónde saca la regla.
+- Un recibo con observaciones muy largas, o que devuelve prendas de tránsito, puede irse a una segunda hoja.
+  Está medido y escrito, no disimulado.
+
+### Qué sigue pendiente o roto
+
+- Nada nuevo. Sin migración, sin permisos, sin re-seed.
+
+## 0.111 · 4-sep-2026 · **en prueba** — **Validar es de Daniel**: capturar lo recibido es de quien recibe, y autorizarlo es otro permiso
+
+### Qué se puede hacer ahora que antes no
+
+- **Separar quién captura de quién valida.** Nace el permiso **«Revisar y autorizar partidas de maquila»**
+  (`esma.revisar`): el botón **Autorizar** del estado de cuenta —el paso que convierte un abono, un descuento o
+  un pago capturado en dinero real desde la 0.115— sólo lo tiene el círculo del dueño (administrador,
+  Administración/Dirección y Directivo). Capturar abonos y descuentos sigue siendo del permiso de siempre.
+- **Validar los cargos de maquila** (fijar cantidad y precio reales de un recibo, un corte o un empaque) también
+  queda en ese círculo: el permiso `esma.cargo-validar` se retira de los perfiles operativos (Gerencial, Ventas,
+  Logística, Asistente, Secretarial). Es lo que Daniel dictó: *«la entrada la da la persona responsable de
+  recibos o de producción. Pero la validación sólo la doy yo»*.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **El deploy necesita `SEED_ON_START=true`**: siembra el permiso nuevo y **quita** el de validar a los cinco
+  perfiles operativos. El seed sincroniza los roles de sistema (borra las ligas que sobran), así que no hace
+  falta migración de datos; un rol **personalizado** que tuviera el permiso lo conserva.
+- Quien no tiene el permiso **no ve** el botón Autorizar (no es un botón que truena).
+- La corrida semanal sigue creando pagos ya revisados bajo su propio permiso (`pagos.corrida-armar`, sólo
+  administrador), que es más estrecho, no una puerta lateral; el cierre de maquila (0.109) deja el descuento
+  capturado y hace falta autorizarlo aparte; el histórico migrado de Access entra ya revisado (transcribe un
+  hecho, sin permiso, fuera del API).
+- La puerta lateral de Cuentas por pagar («entrada sin factura» a un maquilero) ya estaba cerrada: sólo el
+  administrador.
+
+### Qué sigue pendiente o roto
+
+- **Confirmaciones de Daniel** (defaults construidos): el círculo que valida = administrador +
+  Administración/Dirección + Directivo (si debe ser sólo él, se mueven las dos claves a «sólo administrador»);
+  Gerencial deja de validar cargos de maquila; revisar partidas y validar cargos son **dos** permisos, no uno;
+  capturar abonos/descuentos sigue llegando hasta Secretarial.
+
+## 0.110 · 4-sep-2026 · **en prueba** — ⭐ **Recibir contra la orden de compra ya hace nacer la deuda**: telas y avíos, una sola entrada para inventario y estado de cuenta
+
+### Qué se puede hacer ahora que antes no
+
+- **Recibir avíos contra una orden de compra y que la deuda nazca sola.** Al recibir, cada renglón trae el
+  **precio de la OC precargado** (se puede corregir si el proveedor cobró otro) y la cantidad se teclea a
+  mano, como pidió Daniel; la pantalla enseña el importe por renglón y el total, y **antes de confirmar dice
+  qué va a pasar con la deuda**: «nace un cargo sin factura por $X en su estado de cuenta», «factura
+  pendiente: la deuda nacerá al importar el CFDI en Finanzas», o «sin importe».
+- **La misma entrada alimenta el inventario y el estado de cuenta.** Un proveedor que **no factura** queda
+  debiéndose en Cuentas por pagar en el mismo acto de recibir (cargo no fiscal por lo capturado); uno que
+  **factura** queda como **«factura pendiente»** hasta que llegue su CFDI, exactamente como ya pasaba con
+  las telas. Los renglones libres de la OC (un flete, una maquila suelta) **también se deben**.
+- **Reversar una recepción cancela su cargo** (movimiento inverso auditado; nada se borra) y la recepción
+  queda marcada como «cancelada» en su etiqueta de deuda.
+- En el historial de recepciones cada una lleva su etiqueta de deuda: cargo, factura pendiente, sin
+  importe, o «en entrada de tela» (las que nacieron de una entrada de tela por factura ya tienen su cargo
+  por ese lado).
+
+### Qué cambió y puede sorprender
+
+- **El precio que se teclea al recibir es el que vale**: va al kardex como costo y al cargo. Si difiere del
+  de la OC, se acepta, se resalta en pantalla y la bitácora guarda los dos precios.
+- **La regla de «qué cargo nace de una entrada» vive en un solo sitio** y la usan tanto la entrada de tela
+  como la recepción de avíos: sin factura ⇒ cargo no fiscal; con factura o sin definir ⇒ pendiente del
+  CFDI. La entrada de tela se comporta igual que antes.
+- Un proveedor con modalidad **«ambos»** también espera el CFDI (no nace cargo al recibir): si en un caso
+  concreto no va a facturar, su deuda se captura como entrada sin factura en Finanzas.
+- Las recepciones capturadas **antes** de esta versión no tienen cargo y se quedan así (no se reparan
+  datos viejos).
+
+### Qué sigue pendiente o roto
+
+- **Confirmaciones de Daniel** (defaults ya construidos): los renglones libres cuentan en la deuda · con
+  factura o «ambos» ⇒ pendiente hasta el CFDI · el precio corregido se acepta sin bloquear y queda en la
+  bitácora · sin número de documento el cargo nace igual, con «(sin documento)».
+- La factura electrónica de avíos se sigue importando en Finanzas (esta puerta no sube XML); ligar ese
+  CFDI a la recepción que lo originó es alcance nuevo.
+
+## 0.109 · 4-sep-2026 · **en prueba** — **La bandeja de Cuentas por pagar en dos listados**: Todos · Con factura · Sin factura
+
+### Qué se puede hacer ahora que antes no
+
+- La bandeja del viernes («a quién le debo») tiene una **segunda fila de chips: Todos · Con factura · Sin
+  factura**. Al elegir una, **la tabla, los totales y la antigüedad se recalculan en el servidor sólo para
+  esa relación**: cartera, vencido, cubetas por días y proveedores con saldo. Son dos relaciones de pago
+  distintas (así se paga: una corrida con factura y otra sin), y ahora se ven por separado.
+- El segmento viaja en la dirección de la pantalla (`?segmento=sin`), así que se puede guardar como
+  marcador y abrir directo el viernes.
+- Al entrar desde la bandeja al **estado de cuenta** de un proveedor, la pantalla abre ya en la misma
+  relación que se estaba viendo, y su PDF sale en esa relación.
+
+### Qué cambió y puede sorprender
+
+- **«Sin factura» incluye lo que quedó sin definir** (lo migrado de Access sin modalidad y los cargos de
+  maquila sin marca de factura): es el mismo criterio único que ya usaban el estado de cuenta y la corrida
+  semanal, y **Con factura + Sin factura suma exactamente Todos** en cartera y maquila. El **vencido** se calcula
+  dentro de cada relación: un pago sin factura no rebaja lo vencido de la relación con factura (ni al revés).
+- «Todos» sigue siendo lo de siempre; los chips viejos «Con saldo / Todos» no cambian.
+
+### Qué sigue pendiente o roto
+
+- Nada nuevo. Sin migración, sin permisos, sin re-seed.
+
+## 0.108 · 4-sep-2026 · **en prueba** — ⭐ **El documento para facturar**: «yo te digo qué facturarme», con el IVA a la vista
+
+### Qué se puede hacer ahora que antes no
+
+- Desde la **relación ejecutable** de una corrida semanal cerrada, cada pago por **transferencia** tiene su
+  botón para **generar la hoja con la que el proveedor nos debe facturar**: razón social, RFC, régimen y
+  código postal de los dos lados, uso del CFDI, concepto, forma y método de pago, moneda, y la tabla
+  **subtotal · IVA 16 % · total**. Sale en pantalla y en PDF para mandársela.
+- Un botón de la corrida completa imprime **una hoja por cada pago** y, delante, la hoja de **«no se
+  emitieron»**: a quién no se le puede pedir factura todavía y exactamente por qué (falta el RFC, falta el
+  régimen…). Es lo que Daniel pidió: nadie factura si no le mandamos nosotros el documento, no al revés.
+- En **Administración › Empresas** se capturan dos datos fiscales nuevos de FR Moda: **régimen fiscal** y
+  **código postal fiscal**, los que un CFDI 4.0 exige del receptor. El detalle de la empresa estrena la
+  sección «Ficha fiscal (con la que nos facturan)» y por fin muestra el RFC como RFC.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Hasta que se capturen el régimen y el CP fiscal de FR Moda, ningún documento se emite**, y la
+  pantalla lo dice con esas palabras. Las columnas nacen vacías (no se rellenan datos viejos).
+- **Un pago en efectivo no produce documento** («las facturas son sólo transferencias»), y un pago a un
+  concepto del catálogo tampoco. Una corrida en **borrador** tampoco: se cierra primero, porque en borrador
+  los montos todavía se mueven.
+- **Si falta un dato fiscal de cualquiera de los dos lados, el botón aparece deshabilitado** y al pasar el
+  ratón dice qué falta y de quién. Nunca se inventa un dato.
+- **El monto de la corrida se toma como el TOTAL con IVA** (lo que se transfiere), y el documento lo
+  desglosa hacia atrás. El uso de CFDI sale como **«G03» sugerido** cuando el proveedor no lo tiene
+  capturado. Ninguna retención se calcula.
+- **El documento no lleva número de cuenta**: se le manda al proveedor; los datos bancarios se quedan en la
+  relación ejecutable. Y el nombre del archivo PDF lleva folio y renglón, nunca el nombre del taller.
+- Los datos fiscales del proveedor se leen **al día**, no congelados: si cambió de régimen, el documento de
+  hoy lleva el de hoy.
+
+### Qué sigue pendiente o roto
+
+- **Decisiones de Daniel** (defaults ya construidos, se ajustan si dice lo contrario): que el monto es
+  total con IVA · sólo corridas cerradas o ejecutadas · «G03» sugerido · sin retenciones · tasa 16 %.
+- **Un documento por PAGO, no por orden**: el pago de maquila nace «a cuenta» y hoy no hay forma honesta de
+  desglosar cuánto de un pago corresponde a cada orden.
+- Falta la lectura automática de la constancia de situación fiscal (0.119), que es la que llenará estos
+  datos sin teclearlos.
+
 ## 0.107 · 4-sep-2026 · **en prueba** — ⭐ **Corte y empaque se pagan desde la orden**: son servicios, no maquilas de ida y vuelta
 
 ### Qué se puede hacer ahora que antes no

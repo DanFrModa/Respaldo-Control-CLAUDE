@@ -118,10 +118,34 @@ jobs:
 
       # El lint con tipos crece con el proyecto: con el heap por defecto de Node
       # (~4 GB) el runner murió con "JavaScript heap out of memory" (6-ago-2026).
+      #
+      # ⚠️⚠️ TERCERA VEZ, y la PRIMERA que el techo deja de ser uno solo (5-sep-2026).
+      # El lint volvió a morir con exit 134 contra los 6 GB — reproducido dos veces,
+      # pico medido de 6011 MiB. Antes de mover el número se midieron las dos salidas
+      # baratas, y las dos están MUERTAS:
+      #   • partirlo por carpetas NO ayuda: `eslint src/dominio` A SOLAS revienta con
+      #     4096 Y con 5120 — el costo no está en el número de archivos, está en el
+      #     grafo de tipos que cada archivo obliga a cargar entero;
+      #   • `eslint.config.js` YA usa `parserOptions.projectService` y YA ignora el
+      #     cliente generado de Prisma (`src/datos/generated/`, 22 MB / 181 .ts).
+      # Medido a 8192: pasa, con un pico de 7034 MiB (~14 % de margen).
+      #
+      # 🔴 POR QUÉ SÓLO AQUÍ, y no en los otros tres sitios (decisión de Gabriel,
+      # 5-sep-2026): `backend/Dockerfile` NO corre eslint —construye la imagen con
+      # `tsc`—, así que no queda ningún hermano atrás, que es lo que el guardián de la
+      # fila 0.092 (`comun/techo-de-memoria.test.ts`) existe para impedir. Y el número
+      # se puede subir aquí porque la memoria del runner de GitHub SÍ es medible
+      # (16 GB); la del contenedor que construye en Railway, NO — y un techo por encima
+      # de lo que el contenedor puede dar no protege, EMPEORA (cambia el OOM limpio de
+      # V8, exit 134, por el OOM-killer del kernel, exit 137).
+      #
+      # 🔴 Y ESTA VENDA YA NO TIENE OTRA VUELTA: con el margen en ~14 % y sin salidas
+      # baratas, la siguiente vez toca la CURA (adelgazar el programa de tipos), no el
+      # número. Deuda en `HOJA-DE-RUTA.md` §4.
       - name: Lint (eslint)
         run: npm run lint
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: --max-old-space-size=8192
 
       # MISMA causa que el lint, diez días después (16-ago-2026): `tsc --noEmit`
       # murió con OOM (exit 134) en el runner. En su momento se le subió el heap

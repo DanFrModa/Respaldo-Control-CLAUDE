@@ -1,7 +1,9 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CxpBandeja } from '@/api/tipos';
+import type * as ReactRouterDom from 'react-router-dom';
+
+import type { CxpBandeja, CxpBandejaQuery } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { CxpPagina } from './CxpPagina';
@@ -9,12 +11,44 @@ import { CxpPagina } from './CxpPagina';
 /** Estado mutable del hook mockeado (objeto estable para el factory de vi.mock). */
 const estado: { valor: unknown } = { valor: null };
 
+/** Las QUERIES con las que la pantalla pidió la bandeja, en orden (la última es la vigente). */
+const consultas: CxpBandejaQuery[] = [];
+
 vi.mock('@/api/cxp', () => ({
-  useBandejaPorPagar: () => estado.valor,
+  useBandejaPorPagar: (query: CxpBandejaQuery) => {
+    consultas.push(query);
+    return estado.valor;
+  },
 }));
 
+/** Adónde navegó la pantalla, con el `state` que llevaba (el segmento viaja ahí). */
+const navegar = vi.fn();
+
+vi.mock('react-router-dom', async (importarOriginal) => ({
+  ...(await importarOriginal<typeof ReactRouterDom>()),
+  useNavigate: () => navegar,
+}));
+
+/** La última query que la pantalla mandó al servidor. */
+function ultimaConsulta(): CxpBandejaQuery {
+  const ultima = consultas.at(-1);
+  if (ultima === undefined) {
+    throw new Error('La pantalla no consultó la bandeja ni una vez.');
+  }
+  return ultima;
+}
+
 /** Nada capturado sin revisar (lo normal). */
-const sinPorRevisar = { abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 0 };
+const sinPorRevisar = {
+  abonos: 0,
+  pagos: 0,
+  descuentos: 0,
+  cargos: 0,
+  neto: 0,
+  partidas: 0,
+  cargosPartidas: 0,
+  cargosSinPrecio: 0,
+};
 
 const conCartera: CxpBandeja = {
   filas: [
@@ -59,11 +93,13 @@ const conCartera: CxpBandeja = {
     proveedoresConSaldo: 2,
     maquilaPorRevisar: sinPorRevisar,
   },
+  segmento: 'todos',
   limitesAging: { limite1: 30, limite2: 60 },
 };
 
 describe('CxpPagina (F9-E2)', () => {
   beforeEach(() => {
+    consultas.length = 0;
     estado.valor = { data: conCartera, isPending: false, isError: false, error: null };
   });
 
@@ -169,7 +205,16 @@ describe('CxpPagina · maquila por revisar', () => {
     d31a60: 0,
     mas60: 0,
     maquila: 0,
-    maquilaPorRevisar: { abonos: 400, pagos: 0, descuentos: 0, neto: 400, partidas: 1 },
+    maquilaPorRevisar: {
+      abonos: 400,
+      pagos: 0,
+      descuentos: 0,
+      cargos: 0,
+      neto: 400,
+      partidas: 1,
+      cargosPartidas: 0,
+      cargosSinPrecio: 0,
+    },
   };
 
   it('⭐ el maquilero con TODO sin revisar se ve, con saldo 0 y su «por revisar» explicado', () => {
@@ -198,6 +243,68 @@ describe('CxpPagina · maquila por revisar', () => {
     expect(kpi).toHaveTextContent('$400.00');
   });
 
+  it('⭐ el desglose de los CARGOS por validar viaja en el `title` de la celda (V1, fila 0.111)', () => {
+    // 🔴 Sin esta prueba el `title={textoCargosPorValidar(...)}` de la celda se podía BORRAR entero
+    // y las 9 pruebas de este archivo seguían verdes: todos los fixtures traían `cargosPartidas: 0`,
+    // así que el atributo nunca se pintaba. La bandeja HEREDA el número del mismo agregado que el
+    // tablero de EsMa, y el desglose es lo que explica por qué creció.
+    const conCargos: CxpBandeja['filas'][number] = {
+      ...todoCapturado,
+      idProveedor: 12,
+      proveedor: 'Maquila Con Cargos',
+      maquilaPorRevisar: {
+        abonos: 0,
+        pagos: 0,
+        descuentos: 0,
+        cargos: 1_200,
+        neto: 1_200,
+        partidas: 3,
+        cargosPartidas: 3,
+        cargosSinPrecio: 1,
+      },
+    };
+    estado.valor = {
+      data: {
+        ...conCartera,
+        filas: [conCargos],
+        total: 1,
+        resumen: { ...conCartera.resumen, maquilaPorRevisar: conCargos.maquilaPorRevisar },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver', 'consultas.ver-importes']),
+    });
+    const fila = screen.getByTestId('cxp-fila-12');
+    // El número visible es el neto del bloque entero…
+    expect(fila).toHaveTextContent('$1,200.00');
+    // …y el `title` explica de qué está hecho, con la MISMA fuente de texto que EsMa (`comun.ts`).
+    expect(
+      within(fila).getByTitle('3 cargos por validar · $1,200.00 · 1 sin precio'),
+    ).toBeInTheDocument();
+  });
+
+  it('sin cargos por validar, la celda no lleva ese `title`', () => {
+    estado.valor = {
+      data: {
+        ...conCartera,
+        filas: [todoCapturado],
+        total: 1,
+        resumen: { ...conCartera.resumen, maquilaPorRevisar: todoCapturado.maquilaPorRevisar },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver', 'consultas.ver-importes']),
+    });
+    const fila = screen.getByTestId('cxp-fila-11');
+    expect(within(fila).queryByTitle(/por validar/)).toBeNull();
+  });
+
   it('con los importes ocultos, dice CUÁNTAS partidas (el conteo nunca se oculta)', () => {
     estado.valor = {
       data: {
@@ -215,8 +322,11 @@ describe('CxpPagina · maquila por revisar', () => {
               abonos: null,
               pagos: null,
               descuentos: null,
+              cargos: null,
               neto: null,
               partidas: 2,
+              cargosPartidas: 0,
+              cargosSinPrecio: 0,
             },
           },
         ],
@@ -231,8 +341,11 @@ describe('CxpPagina · maquila por revisar', () => {
             abonos: null,
             pagos: null,
             descuentos: null,
+            cargos: null,
             neto: null,
             partidas: 2,
+            cargosPartidas: 0,
+            cargosSinPrecio: 0,
           },
         },
       },
@@ -243,5 +356,104 @@ describe('CxpPagina · maquila por revisar', () => {
     renderConProveedores(<CxpPagina />, { sesion: estadoSesionDePrueba(['cxp.ver']) });
     expect(screen.getByTestId('cxp-fila-11')).toHaveTextContent('2 partidas');
     expect(screen.getByTestId('kpi-cartera')).toHaveTextContent('2 partidas');
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ FILA 0.132 (§Post-F9.192(5)) — DOS LISTADOS: Con factura / Sin factura
+// Daniel: la bandeja del viernes *"debería partirse en Con factura / Sin factura, con totales y
+// antigüedad por separado, porque son dos relaciones de pago distintas"*. La pantalla NO parte nada:
+// cambia el `segmento` de la CONSULTA y el servidor devuelve las filas Y los KPIs de esa relación.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('CxpPagina · las dos relaciones de pago (segmento)', () => {
+  /** La misma bandeja, respondida como si fuera la de un segmento (KPIs incluidos). */
+  function bandejaDe(segmento: 'todos' | 'con' | 'sin', carteraTotal: number): CxpBandeja {
+    return {
+      ...conCartera,
+      segmento,
+      resumen: { ...conCartera.resumen, carteraTotal },
+    };
+  }
+
+  beforeEach(() => {
+    consultas.length = 0;
+    navegar.mockReset();
+    estado.valor = {
+      data: bandejaDe('todos', 103000),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+  });
+
+  it('arranca en la cartera completa: pide `segmento: todos`', () => {
+    renderConProveedores(<CxpPagina />, { sesion: estadoSesionDePrueba(['cxp.ver']) });
+    expect(ultimaConsulta().segmento).toBe('todos');
+    expect(screen.getByTestId('cxp-titulo-tabla')).toHaveTextContent('Con y sin factura');
+  });
+
+  it.each([
+    ['cxp-segmento-con', 'con', 'Con factura'],
+    ['cxp-segmento-sin', 'sin', 'Sin factura'],
+  ] as const)('el chip %s consulta el segmento «%s»', (testid, segmento, titulo) => {
+    renderConProveedores(<CxpPagina />, { sesion: estadoSesionDePrueba(['cxp.ver']) });
+    fireEvent.click(screen.getByTestId(testid));
+
+    expect(ultimaConsulta().segmento).toBe(segmento);
+    expect(screen.getByTestId('cxp-titulo-tabla')).toHaveTextContent(titulo);
+    expect(screen.getByTestId('cxp-titulo-kpis')).toHaveTextContent(titulo);
+  });
+
+  it('⭐ los KPIs cambian con el chip: son los del segmento, no los de la cartera completa', () => {
+    estado.valor = { data: bandejaDe('con', 88000), isPending: false, isError: false, error: null };
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver', 'consultas.ver-importes']),
+      rutaInicial: '/cxp?segmento=con',
+    });
+    // El total que se ve es el que devolvió el servidor PARA "con factura" (no los 103,000 de todo).
+    expect(screen.getByTestId('kpi-cartera')).toHaveTextContent('$88,000.00');
+    expect(screen.getByTestId('kpi-cartera')).not.toHaveTextContent('$103,000.00');
+  });
+
+  it('⭐ el segmento se puede abrir DIRECTO por la URL (el enlace del viernes)', () => {
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver']),
+      rutaInicial: '/cxp?segmento=sin',
+    });
+    expect(ultimaConsulta().segmento).toBe('sin');
+    expect(screen.getByTestId('cxp-segmento-sin')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('un `?segmento=` inventado cae en la cartera completa, no viaja al API', () => {
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver']),
+      rutaInicial: '/cxp?segmento=fiscal',
+    });
+    expect(ultimaConsulta().segmento).toBe('todos');
+  });
+
+  it('⭐ el clic en un proveedor lleva el segmento al estado de cuenta (no abre en «todo»)', () => {
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver']),
+      rutaInicial: '/cxp?segmento=sin',
+    });
+    fireEvent.click(screen.getByTestId('cxp-fila-7'));
+    expect(navegar).toHaveBeenCalledWith('/cxp/estado-cuenta', {
+      state: { idProveedor: 7, segmento: 'sin' },
+    });
+  });
+
+  it('la tabla vacía DICE en qué relación está vacía', () => {
+    estado.valor = {
+      data: { ...bandejaDe('sin', 0), filas: [], total: 0 },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver']),
+      rutaInicial: '/cxp?segmento=sin',
+    });
+    expect(screen.getByTestId('cxp-vacio')).toHaveTextContent('Sin factura');
   });
 });

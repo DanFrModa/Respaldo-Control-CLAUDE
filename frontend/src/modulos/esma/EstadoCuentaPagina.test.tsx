@@ -19,7 +19,16 @@ const saldo: EsMaSaldo = {
   totalPagos: 200,
   totalDescuentos: 0,
   saldo: 800,
-  pendienteRevision: { abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 0 },
+  pendienteRevision: {
+    abonos: 0,
+    pagos: 0,
+    descuentos: 0,
+    cargos: 0,
+    neto: 0,
+    partidas: 0,
+    cargosPartidas: 0,
+    cargosSinPrecio: 0,
+  },
 };
 
 const estadoConMovimientos: EsMaEstadoCuenta = {
@@ -97,13 +106,13 @@ describe('EstadoCuentaPagina (F6-E5)', () => {
 
   it('muestra los movimientos y su marca de pendiente al llegar con un maquilero (router state)', () => {
     renderConProveedores(<EstadoCuentaPagina />, {
-      sesion: estadoSesionDePrueba(['esma.ver-pagos', 'esma.modificar', 'consultas.ver-importes']),
+      sesion: estadoSesionDePrueba(['esma.ver-pagos', 'esma.revisar', 'consultas.ver-importes']),
       rutaInicial: { pathname: '/esma/estado-cuenta', state: { idMaquilero: 5 } },
     });
     const fila = screen.getByTestId('edc-fila');
     expect(fila).toHaveTextContent('Abono');
     expect(fila).toHaveTextContent('Anticipo');
-    // Con esma.modificar y partida pendiente, aparece el botón de autorizar (vista móvil).
+    // Con esma.revisar y partida pendiente, aparece el botón de autorizar (vista móvil).
     expect(screen.getByTestId('edc-autorizar')).toBeInTheDocument();
   });
 
@@ -142,12 +151,42 @@ describe('EstadoCuentaPagina (F6-E5)', () => {
     expect(screen.queryByTestId('edc-incompletas')).not.toBeInTheDocument();
   });
 
-  it('sin esma.modificar no ofrece autorizar la partida pendiente', () => {
+  it('sin esma.revisar no ofrece autorizar la partida pendiente', () => {
     renderConProveedores(<EstadoCuentaPagina />, {
       sesion: estadoSesionDePrueba(['esma.ver-pagos']),
       rutaInicial: { pathname: '/esma/estado-cuenta', state: { idMaquilero: 5 } },
     });
     expect(screen.getByTestId('edc-fila')).toBeInTheDocument();
     expect(screen.queryByTestId('edc-autorizar')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ FILA 0.128 — el botón «Autorizar» dejó de colgar de `esma.modificar`. Daniel
+   * (§Post-F9.192(1)): *«es un permiso para meter lo recibido y otro para validarlo»*. La prueba
+   * de arriba («sin esma.revisar…») no basta: pasaba también ANTES del cambio, porque esa sesión
+   * tampoco traía `esma.modificar`. Lo que caza la regresión es el caso con el permiso de
+   * CAPTURAR puesto y el de VALIDAR ausente.
+   */
+  it('⭐ con esma.modificar (capturar) pero SIN esma.revisar: captura, y NO autoriza', () => {
+    renderConProveedores(<EstadoCuentaPagina />, {
+      sesion: estadoSesionDePrueba(['esma.ver-pagos', 'esma.modificar']),
+      rutaInicial: { pathname: '/esma/estado-cuenta', state: { idMaquilero: 5 } },
+    });
+    // Capturar sigue siendo suyo: los botones de alta quedan habilitados…
+    expect(screen.getByTestId('edc-agregar-abono')).toBeEnabled();
+    expect(screen.getByTestId('edc-agregar-descuento')).toBeEnabled();
+    // …pero el de autorizar NI SIQUIERA SE DIBUJA (no un botón que truena en el 403).
+    expect(screen.queryByTestId('edc-autorizar')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Autorizar/i })).not.toBeInTheDocument();
+  });
+
+  it('⭐ y al revés: con esma.revisar pero sin esma.modificar autoriza, y no captura', () => {
+    renderConProveedores(<EstadoCuentaPagina />, {
+      sesion: estadoSesionDePrueba(['esma.ver-pagos', 'esma.revisar']),
+      rutaInicial: { pathname: '/esma/estado-cuenta', state: { idMaquilero: 5 } },
+    });
+    expect(screen.getByTestId('edc-autorizar')).toBeInTheDocument();
+    expect(screen.getByTestId('edc-agregar-abono')).toBeDisabled();
+    expect(screen.getByTestId('edc-agregar-descuento')).toBeDisabled();
   });
 });

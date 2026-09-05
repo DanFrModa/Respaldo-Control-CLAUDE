@@ -22,6 +22,13 @@
  *  • `POST   /pagos/corridas/:id/cerrar`                  (`…corrida-armar`) → la deja final.
  *  • `POST   /pagos/corridas/:id/ejecutar`                (`…corrida-armar`) → nacen los movimientos.
  *  • `GET    /pagos/corridas/:id/concentrado`             (ver **o** armar) → la relación ejecutable.
+ *
+ * ⭐ Y EL DOCUMENTO PARA FACTURAR (fila 0.118, §Post-F9.186(k)) — *«nadie me factura si no le mando
+ * yo un documento con los datos con los que me tiene que facturar»*. Mismos permisos que el
+ * concentrado (lleva importes), SIN permisos nuevos y SIN seed:
+ *  • `GET …/renglones/:idRenglon/documento-facturacion`      → JSON: los datos, o el porqué de que no.
+ *  • `GET …/renglones/:idRenglon/documento-facturacion.pdf`  → la hoja que se le manda al proveedor.
+ *  • `GET …/documentos-facturacion.pdf`                      → la corrida entera + «no se emitieron».
  */
 import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
@@ -29,6 +36,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import {
   esquemaConcentradoSalida,
   esquemaCorridaCrear,
+  esquemaDocumentoFacturacionSalida,
   esquemaCorridaDetalleSalida,
   esquemaCorridasLista,
   esquemaCorridasQuery,
@@ -37,6 +45,11 @@ import {
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
+import {
+  impresoDocumentoFacturacion,
+  impresoDocumentosCorrida,
+} from '../../dominio/pagos/impresos/impreso-documento-facturacion.js';
+import { datosDocumentoFacturacion } from '../../dominio/pagos/documento-facturacion.js';
 import {
   cerrarCorrida,
   concentradoDeCorrida,
@@ -256,6 +269,78 @@ export const rutasCorridaPagos: FastifyPluginCallbackZod = (app, _opciones, done
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return concentradoDeCorrida(sesion, request.params.id);
+    },
+  });
+
+  // ── El documento para facturar (fila 0.118) ──────────────────────────────────
+  app.route({
+    method: 'GET',
+    url: '/pagos/corridas/:id/renglones/:idRenglon/documento-facturacion',
+    preHandler: app.conAlgunPermiso('pagos.corrida-ver', 'pagos.corrida-armar'),
+    schema: {
+      tags: ['pagos'],
+      summary: 'Los datos con los que el proveedor debe facturar este pago (o por qué no se emite)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamRenglon,
+      response: { 200: esquemaDocumentoFacturacionSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return datosDocumentoFacturacion(sesion, request.params.id, request.params.idRenglon);
+    },
+  });
+
+  // Impresos (binario application/pdf; sólo se documentan los errores).
+  app.route({
+    method: 'GET',
+    url: '/pagos/corridas/:id/renglones/:idRenglon/documento-facturacion.pdf',
+    preHandler: app.conAlgunPermiso('pagos.corrida-ver', 'pagos.corrida-armar'),
+    schema: {
+      tags: ['pagos'],
+      summary: 'Documento para facturar de UN pago (PDF)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamRenglon,
+      response: { ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const { buffer, folioCorrida } = await impresoDocumentoFacturacion(
+        sesion,
+        request.params.id,
+        request.params.idRenglon,
+      );
+      reply.header('Content-Type', 'application/pdf').header(
+        'Content-Disposition',
+        // El nombre lleva folio + renglón y NADA del proveedor: el nombre de un taller es el de una
+        // persona física, y un archivo se reenvía por correo con el nombre puesto (repo público).
+        `inline; filename="documento-facturar-${String(folioCorrida)}-${String(request.params.idRenglon)}.pdf"`,
+      );
+      return reply.send(buffer as unknown as never);
+    },
+  });
+
+  app.route({
+    method: 'GET',
+    url: '/pagos/corridas/:id/documentos-facturacion.pdf',
+    preHandler: app.conAlgunPermiso('pagos.corrida-ver', 'pagos.corrida-armar'),
+    schema: {
+      tags: ['pagos'],
+      summary:
+        'Documentos para facturar de TODA la corrida, con la hoja de los que no se emitieron',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const { buffer, folioCorrida } = await impresoDocumentosCorrida(sesion, request.params.id);
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header(
+          'Content-Disposition',
+          `inline; filename="documentos-facturar-corrida-${String(folioCorrida)}.pdf"`,
+        );
+      return reply.send(buffer as unknown as never);
     },
   });
 

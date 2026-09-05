@@ -95,8 +95,12 @@ describe('catálogo de permisos', () => {
       'edr.capturar',
       'edr.ver',
       'empresas.administrar',
-      // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
+      // EsMa: los DOS permisos de validar (F3-E4 + fila 0.128). `esma.cargo-validar` fija la
+      // cantidad y el precio reales del cargo que propuso el recibo; `esma.revisar` autoriza una
+      // partida capturada para que entre al saldo. Daniel, §Post-F9.192(1): *«es un permiso para
+      // meter lo recibido y otro para validarlo»*.
       'esma.cargo-validar',
+      'esma.revisar',
       // Desarrollo/Cotización (Módulo 15, F8-E1): estados de lista (R20), catálogo config admin-only.
       'estado-lista.administrar',
       'estado-lista.ver',

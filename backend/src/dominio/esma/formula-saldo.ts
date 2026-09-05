@@ -8,6 +8,11 @@
  * revisar NO suma — pero tampoco desaparece: se devuelve aparte como PENDIENTE DE REVISIÓN, con su
  * desglose y su neto (mismo signo que el saldo), para que nadie vea un número más chico sin razón.
  *
+ * ⭐ El CUARTO concepto entró al pendiente en la fila 0.111: los cargos `propuesto` (los recibos que
+ * esperan que alguien fije cantidad y precio) faltaban, y por eso un maquilero con diez recibos sin
+ * validar y nada más era invisible en las tres pantallas del dinero. Su importe no está guardado: se
+ * DERIVA con la regla única de `cargo-propuesto.ts`.
+ *
  * ## Por qué existe este archivo
  *
  * La fórmula estaba escrita TRES veces —`saldos.ts` (Prisma), y dos SQL crudos en `saldos-todos.ts`
@@ -148,7 +153,13 @@ const DEFINICION: Readonly<Record<ConceptoSaldo, DefinicionConcepto>> = {
   cargo: {
     columnas: { estado: 'estado', sinCosto: 'sin_costo' },
     cuenta: { ...CARGO_REVISADO, sinCosto: CARGO_SIN_COSTO_CUENTA },
-    pendiente: { estado: CARGO_PROPUESTO },
+    // ⭐ El pendiente del cargo lleva LAS MISMAS DOS condiciones que el que cuenta, cambiando sólo
+    // el estado (V1, fila 0.111). `sin_costo` va en los dos por el mismo motivo que `cancelado_en`
+    // en el descuento: una segunda que NO se le va a pagar al maquilero no es dinero esperando una
+    // decisión — igual que un cargo `cancelado` no lo es. Hoy ningún cargo nace `sinCosto` (la
+    // bandera se fija al VALIDARLO), así que la condición no cambia ni una fila; está aquí para que
+    // el día que alguien pueda marcarla antes, las cinco sumas se enteren solas.
+    pendiente: { estado: CARGO_PROPUESTO, sinCosto: CARGO_SIN_COSTO_CUENTA },
   },
   abono: PLANO,
   pago: PLANO,
@@ -175,6 +186,13 @@ export const WHERE_CUENTA_PAGO: Prisma.PagoMaquileroWhereInput = DEFINICION.pago
 /** Descuentos que cuentan al saldo: revisados. */
 export const WHERE_CUENTA_DESCUENTO: Prisma.DescuentoMaquileroWhereInput =
   DEFINICION.descuento.cuenta;
+
+/**
+ * Cargos PROPUESTOS que esperan validación: fuera del saldo, dentro del pendiente (V1, fila 0.111).
+ * Su importe no está persistido —se DERIVA con `cargo-propuesto.ts`—, pero la partida existe y
+ * alguien tiene que decidir sobre ella.
+ */
+export const WHERE_PENDIENTE_CARGO: Prisma.EsMaCargoWhereInput = DEFINICION.cargo.pendiente;
 
 /** Abonos capturados que esperan revisión (fuera del saldo, dentro del pendiente). */
 export const WHERE_PENDIENTE_ABONO: Prisma.AbonoMaquileroWhereInput = DEFINICION.abono.pendiente;
@@ -275,9 +293,18 @@ export function cuentaAlSaldoCargo(cargo: { estado: EstadoCargoEsMa; sinCosto: b
   return cargo.estado === CARGO_VALIDADO && cargo.sinCosto === CARGO_SIN_COSTO_CUENTA;
 }
 
-/** ¿Este cargo está propuesto, esperando validación? (aún sin importe real que sumar). */
-export function pendienteDeRevisionCargo(cargo: { estado: EstadoCargoEsMa }): boolean {
-  return cargo.estado === CARGO_PROPUESTO;
+/**
+ * ¿Este cargo está esperando validación? Las MISMAS dos condiciones que {@link WHERE_PENDIENTE_CARGO}
+ * (propuesto y con costo), para que la marca del renglón y la suma no puedan decir cosas distintas.
+ *
+ * Su importe todavía no está persistido: se DERIVA con `cargo-propuesto.ts` (cantidad del recibo ×
+ * precio de la orden), y puede no poder calcularse — la partida cuenta igual.
+ */
+export function pendienteDeRevisionCargo(cargo: {
+  estado: EstadoCargoEsMa;
+  sinCosto: boolean;
+}): boolean {
+  return cargo.estado === CARGO_PROPUESTO && cargo.sinCosto === CARGO_SIN_COSTO_CUENTA;
 }
 
 /**
@@ -312,8 +339,18 @@ export interface TotalesSaldo {
  * LO PENDIENTE DE REVISIÓN: lo capturado que todavía no entra al saldo. Se devuelve junto al saldo
  * para que el dinero excluido se vea (y se entienda que espera una decisión), no para sumarlo.
  *
- * Los CARGOS `propuesto` no aparecen aquí porque aún no tienen importe (`cantidadReal`/`precioReal`
- * son NULL hasta validarlos): su lugar es la cola de validación de cargos, no un importe pendiente.
+ * ⭐ LOS CUATRO CONCEPTOS ESTÁN AQUÍ (V1, fila 0.111). La 0.115 metió los tres PLANOS —abonos, pagos
+ * y descuentos capturados— pero dejó fuera los CARGOS `propuesto`, con el argumento de que «aún no
+ * tienen importe». El resultado era el hueco que Daniel describió: un
+ * maquilero con diez recibos sin validar y nada más tenía saldo 0, pendiente 0 y era **invisible**
+ * en el tablero, en la bandeja de CxP y en la corrida — justo lo que él tiene que decidir cada
+ * semana (*«cada semana me pueda meter a algún lugar donde estén todos los maquileros que tengan
+ * algo pendiente por pagar o por descontar»*).
+ *
+ * El importe del cargo propuesto no está persistido, pero **se DERIVA** (`cargo-propuesto.ts`:
+ * cantidad del recibo × precio de la orden). Cuando ni eso se puede —orden sin precio y envío sin
+ * precio pactado—, la partida cuenta igual y el cargo se anota en {@link cargosSinPrecio}: se dice
+ * que no se puede valuar, no se inventa un número ni se esconde la partida.
  */
 export interface PendienteRevision {
   /** Σ abonos capturados (suman al neto). */
@@ -322,14 +359,28 @@ export interface PendienteRevision {
   pagos: number;
   /** Σ descuentos capturados (restan del neto). */
   descuentos: number;
-  /** Neto con el MISMO signo del saldo: `abonos − pagos − descuentos`. */
+  /**
+   * Σ del importe PROPUESTO de los cargos que esperan validación y SÍ se pueden valuar (suman al
+   * neto, con el mismo signo que un cargo en el saldo: es dinero que se le va a deber al maquilero).
+   */
+  cargos: number;
+  /** Neto con el MISMO signo del saldo: `cargos + abonos − pagos − descuentos`. */
   neto: number;
   /**
-   * CUÁNTAS partidas están esperando revisión (abonos + pagos + descuentos). Es un CONTEO, no
-   * dinero: es lo que decide si hay algo que enseñar, porque los importes pueden netear cero y aun
-   * así haber partidas. Ver {@link hayPendiente}.
+   * CUÁNTAS partidas están esperando revisión: los tres planos capturados **más** los cargos
+   * propuestos. Es un CONTEO, no dinero: es lo que decide si hay algo que enseñar, porque los
+   * importes pueden netear cero —o no poder calcularse— y aun así haber partidas. Ver
+   * {@link hayPendiente}.
    */
   partidas: number;
+  /** Cuántas de esas {@link partidas} son cargos propuestos (los «recibos por validar»). */
+  cargosPartidas: number;
+  /**
+   * De los {@link cargosPartidas}, cuántos NO se pueden valuar (sin precio de referencia). Cuentan
+   * como partida pero no aportan un peso a {@link cargos}: sin este número, un maquilero con tres
+   * recibos sin precio enseñaría «$0.00» y parecería que no hay nada que decidir.
+   */
+  cargosSinPrecio: number;
 }
 
 /**
@@ -355,13 +406,21 @@ export function saldoDeTotales(t: TotalesSaldo): number {
   );
 }
 
-/** Los tres importes del pendiente, sin el neto ni el conteo (entrada de {@link netoPendiente}). */
-export type ImportesPendientes = Pick<PendienteRevision, 'abonos' | 'pagos' | 'descuentos'>;
+/** Los CUATRO importes del pendiente, sin el neto ni los conteos (entrada de {@link netoPendiente}). */
+export type ImportesPendientes = Pick<
+  PendienteRevision,
+  'abonos' | 'pagos' | 'descuentos' | 'cargos'
+>;
 
-/** El neto pendiente a partir de sus tres importes, con los MISMOS signos del saldo. */
+/**
+ * El neto pendiente a partir de sus cuatro importes, con los MISMOS signos del saldo — incluido el
+ * de los CARGOS propuestos, que suman igual que un cargo validado (`SIGNO_SALDO.cargo`): un recibo
+ * sin validar es dinero que se le va a DEBER al maquilero, no que se le va a descontar.
+ */
 export function netoPendiente(p: ImportesPendientes): number {
   return redondear2(
-    SIGNO_SALDO.abono * p.abonos +
+    SIGNO_SALDO.cargo * p.cargos +
+      SIGNO_SALDO.abono * p.abonos +
       SIGNO_SALDO.pago * p.pagos +
       SIGNO_SALDO.descuento * p.descuentos,
   );
@@ -382,33 +441,79 @@ export function hayPendiente(p: Pick<PendienteRevision, 'partidas'>): boolean {
   return p.partidas > 0;
 }
 
-/** Arma el bloque de pendiente (sus tres importes redondeados + el neto + el conteo) de una vez. */
-export function armarPendiente(
-  abonos: number,
-  pagos: number,
-  descuentos: number,
-  partidas: number,
-): PendienteRevision {
-  const partes = {
-    abonos: redondear2(abonos),
-    pagos: redondear2(pagos),
-    descuentos: redondear2(descuentos),
-  };
-  return { ...partes, neto: netoPendiente(partes), partidas };
+/**
+ * Lo que hay que MEDIR para armar un bloque de pendiente. Va como objeto y no como lista de
+ * argumentos a propósito (V1, fila 0.111): al entrar los cargos serían SEIS números seguidos del
+ * mismo tipo, y equivocarse de posición no lo caza el compilador — pero sí cambia el dinero que ve
+ * Daniel.
+ */
+export interface EntradaPendiente {
+  /** Σ abonos capturados. */
+  abonos: number;
+  /** Σ pagos capturados. */
+  pagos: number;
+  /** Σ descuentos capturados. */
+  descuentos: number;
+  /** Σ del importe propuesto de los cargos que SÍ se pueden valuar. */
+  cargos: number;
+  /** Cuántas partidas PLANAS (abonos + pagos + descuentos) esperan revisión. */
+  partidasPlanas: number;
+  /** Cuántos CARGOS propuestos esperan validación (se puedan valuar o no). */
+  cargosPartidas: number;
+  /** De ésos, cuántos no se pueden valuar por falta de precio. */
+  cargosSinPrecio: number;
 }
 
-/** El bloque de pendiente tal como VIAJA al cliente: importes en `null` si se ocultan; el conteo siempre. */
+/**
+ * Arma el bloque de pendiente (sus cuatro importes redondeados + el neto + los conteos) de una vez.
+ *
+ * ⭐ El CONTEO TOTAL se suma AQUÍ (`partidasPlanas + cargosPartidas`), no en quien llama: es la
+ * garantía de que los cargos propuestos entren en `partidas` en los tres caminos —Prisma, el SQL del
+ * tablero y el SQL del lote de CxP— sin que ninguno se pueda olvidar. Y `partidas` es lo que decide
+ * si el maquilero se ve ({@link hayPendiente}).
+ */
+export function armarPendiente(e: EntradaPendiente): PendienteRevision {
+  const partes = {
+    abonos: redondear2(e.abonos),
+    pagos: redondear2(e.pagos),
+    descuentos: redondear2(e.descuentos),
+    cargos: redondear2(e.cargos),
+  };
+  return {
+    ...partes,
+    neto: netoPendiente(partes),
+    partidas: e.partidasPlanas + e.cargosPartidas,
+    cargosPartidas: e.cargosPartidas,
+    cargosSinPrecio: e.cargosSinPrecio,
+  };
+}
+
+/** Un bloque de pendiente VACÍO (nada esperando decisión): el neutro de {@link armarPendiente}. */
+export const PENDIENTE_VACIO: EntradaPendiente = {
+  abonos: 0,
+  pagos: 0,
+  descuentos: 0,
+  cargos: 0,
+  partidasPlanas: 0,
+  cargosPartidas: 0,
+  cargosSinPrecio: 0,
+};
+
+/** El bloque de pendiente tal como VIAJA al cliente: importes en `null` si se ocultan; los conteos siempre. */
 export interface PendienteRevisionSalida {
   abonos: number | null;
   pagos: number | null;
   descuentos: number | null;
+  cargos: number | null;
   neto: number | null;
   partidas: number;
+  cargosPartidas: number;
+  cargosSinPrecio: number;
 }
 
 /**
- * Prepara el pendiente para salir por el API respetando `consultas.ver-importes`: los cuatro importes
- * se ocultan, el CONTEO no. No es un importe, y sin él quien no puede ver dinero tampoco sabría que
+ * Prepara el pendiente para salir por el API respetando `consultas.ver-importes`: los CUATRO importes
+ * se ocultan, los TRES CONTEOS no (`partidas`, `cargosPartidas`, `cargosSinPrecio`). No es un importe, y sin él quien no puede ver dinero tampoco sabría que
  * hay partidas esperando decisión — que es justo lo que esta fila vino a destapar. Un solo lugar para
  * esa regla: el saldo de uno, el tablero de EsMa y la bandeja de CxP la aplican igual.
  */
@@ -421,8 +526,11 @@ export function pendienteParaSalida(
     abonos: oculto(p.abonos),
     pagos: oculto(p.pagos),
     descuentos: oculto(p.descuentos),
+    cargos: oculto(p.cargos),
     neto: oculto(p.neto),
     partidas: p.partidas,
+    cargosPartidas: p.cargosPartidas,
+    cargosSinPrecio: p.cargosSinPrecio,
   };
 }
 

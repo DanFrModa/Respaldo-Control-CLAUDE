@@ -184,6 +184,7 @@ export interface paths {
                 | 'inventario-avios.ver'
                 | 'inventario-avios.mover'
                 | 'esma.cargo-validar'
+                | 'esma.revisar'
                 | 'notas.ver'
                 | 'notas.administrar'
                 | 'notas.cancelar'
@@ -36881,6 +36882,11 @@ export interface paths {
                 idProveedor: number;
                 /** @description Nombre del proveedor (para la UI). */
                 proveedor: string;
+                /**
+                 * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+                 * @enum {string}
+                 */
+                modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
                 /** @description Fecha de emisión (YYYY-MM-DD), o null. */
                 fecha: string | null;
                 /** @description Fecha de entrega esperada, o null. */
@@ -37210,6 +37216,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -37605,6 +37616,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -37929,6 +37945,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -38300,6 +38321,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -38572,6 +38598,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -38844,6 +38875,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -39109,6 +39145,11 @@ export interface paths {
               idProveedor: number;
               /** @description Nombre del proveedor (para la UI). */
               proveedor: string;
+              /**
+               * @description ¿El proveedor emite factura (CFDI)? Decide qué deuda nace al recibir (fila 0.129).
+               * @enum {string}
+               */
+              modalidadFacturaProveedor: 'factura' | 'sin-factura' | 'no-definida';
               /** @description Fecha de emisión (YYYY-MM-DD), o null. */
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
@@ -40125,6 +40166,20 @@ export interface paths {
                 reversadaPorId: string | null;
                 /** @description Motivo del reverso, o null. */
                 motivoReverso: string | null;
+                /** @description ⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento. */
+                importe: number;
+                /** @description ⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3). */
+                idMovimientoTercero: number | null;
+                /**
+                 * @description Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).
+                 * @enum {string}
+                 */
+                deuda:
+                  | 'cargo-no-fiscal'
+                  | 'factura-pendiente'
+                  | 'sin-importe'
+                  | 'en-entrada-de-tela'
+                  | 'cancelada';
                 /** @description Renglones recibidos. */
                 lineas: {
                   /** @description Id del renglón de recepción. */
@@ -40152,8 +40207,12 @@ export interface paths {
                   cantidadRecibida: number;
                   /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                   cantidadComplemento: number | null;
-                  /** @description Costo por unidad de consumo, o null. */
+                  /** @description Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda. */
                   costoUnit: number | null;
+                  /** @description ⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC. */
+                  precioOc: number;
+                  /** @description ⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números. */
+                  precioDistintoOc: boolean;
                   /** @description Color de tela recibido (B1), o null. */
                   idTelaColor: number | null;
                   /** @description Nombre del color de tela, o null. */
@@ -40292,8 +40351,10 @@ export interface paths {
             /** @description Renglones de OC que se reciben (parcial o total). */
             lineas: {
               idOrdenCompraLinea: number;
-              /** @description Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1). En TELA es el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento (se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de entrada por factura/remisión (B1), que sí admite cuerpo 0. */
+              /** @description Cantidad recibida en UNIDAD DE CONSUMO, la misma de la línea de OC (§Post-F9.97): no se convierte nada. En TELA es el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento (se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de entrada por factura/remisión (B1), que sí admite cuerpo 0. */
               cantidad: number;
+              /** @description Precio por unidad de consumo con el que se recibe. Si se omite, el de la línea de OC. */
+              precioUnit?: number;
               /** @description Color + complemento + lote del proveedor (OBLIGATORIO en líneas de tela, B1). */
               telaColor?: {
                 /** @description Color (hijo de la tela) que llegó. Se EXIGE: la OC no determina el color. */
@@ -40348,6 +40409,20 @@ export interface paths {
               reversadaPorId: string | null;
               /** @description Motivo del reverso, o null. */
               motivoReverso: string | null;
+              /** @description ⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento. */
+              importe: number;
+              /** @description ⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3). */
+              idMovimientoTercero: number | null;
+              /**
+               * @description Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).
+               * @enum {string}
+               */
+              deuda:
+                | 'cargo-no-fiscal'
+                | 'factura-pendiente'
+                | 'sin-importe'
+                | 'en-entrada-de-tela'
+                | 'cancelada';
               /** @description Renglones recibidos. */
               lineas: {
                 /** @description Id del renglón de recepción. */
@@ -40375,8 +40450,12 @@ export interface paths {
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo, o null. */
+                /** @description Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda. */
                 costoUnit: number | null;
+                /** @description ⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC. */
+                precioOc: number;
+                /** @description ⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números. */
+                precioDistintoOc: boolean;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
@@ -40998,6 +41077,20 @@ export interface paths {
               reversadaPorId: string | null;
               /** @description Motivo del reverso, o null. */
               motivoReverso: string | null;
+              /** @description ⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento. */
+              importe: number;
+              /** @description ⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3). */
+              idMovimientoTercero: number | null;
+              /**
+               * @description Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).
+               * @enum {string}
+               */
+              deuda:
+                | 'cargo-no-fiscal'
+                | 'factura-pendiente'
+                | 'sin-importe'
+                | 'en-entrada-de-tela'
+                | 'cancelada';
               /** @description Renglones recibidos. */
               lineas: {
                 /** @description Id del renglón de recepción. */
@@ -41025,8 +41118,12 @@ export interface paths {
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo, o null. */
+                /** @description Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda. */
                 costoUnit: number | null;
+                /** @description ⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC. */
+                precioOc: number;
+                /** @description ⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números. */
+                precioDistintoOc: boolean;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
@@ -41213,6 +41310,20 @@ export interface paths {
               reversadaPorId: string | null;
               /** @description Motivo del reverso, o null. */
               motivoReverso: string | null;
+              /** @description ⭐ Fila 0.129: lo que esta recepción le debe al proveedor = Σ (cantidad recibida × precio), avíos Y renglones libres. Es el importe con el que nace el cargo. En las recepciones generadas por una ENTRADA DE TELA es sólo el valor del cuerpo recibido: la deuda de verdad (con complemento e impuestos) vive en ese documento. */
+              importe: number;
+              /** @description ⭐ Fila 0.129: cargo de cuenta por pagar que NACIÓ de esta recepción, o null. Sigue apuntando al cargo aunque después se haya cancelado (el reverso lo cancela, D3). */
+              idMovimientoTercero: number | null;
+              /**
+               * @description Cómo quedó la cuenta por pagar de esta recepción (fila 0.129).
+               * @enum {string}
+               */
+              deuda:
+                | 'cargo-no-fiscal'
+                | 'factura-pendiente'
+                | 'sin-importe'
+                | 'en-entrada-de-tela'
+                | 'cancelada';
               /** @description Renglones recibidos. */
               lineas: {
                 /** @description Id del renglón de recepción. */
@@ -41240,8 +41351,12 @@ export interface paths {
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo, o null. */
+                /** @description Costo por unidad de consumo CON EL QUE SE RECIBIÓ (fila 0.129: el de la OC, o el que se corrigió al recibir). Es el que valúa el kardex y el que hace el importe de la deuda. */
                 costoUnit: number | null;
+                /** @description ⭐ Fila 0.129: precio VIGENTE del renglón de OC que se recibió, para poder comparar con el de la recepción. Siempre existe: la recepción no puede vivir sin su renglón de OC. */
+                precioOc: number;
+                /** @description ⭐ Fila 0.129: verdadero si el precio con el que se recibió NO es el de la OC (quien recibe lo corrigió). La pantalla lo resalta; la bitácora guarda los dos números. */
+                precioDistintoOc: boolean;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
@@ -60483,7 +60598,7 @@ export interface paths {
               totalDescuentos: number | null;
               /** @description Saldo derivado (o null si se ocultan importes). */
               saldo: number | null;
-              /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+              /** @description Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar. */
               pendienteRevision: {
                 /** @description Σ abonos capturados sin revisar (o null). */
                 abonos: number | null;
@@ -60491,10 +60606,16 @@ export interface paths {
                 pagos: number | null;
                 /** @description Σ descuentos capturados sin revisar (o null). */
                 descuentos: number | null;
-                /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                cargos: number | null;
+                /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                 neto: number | null;
-                /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                 partidas: number;
+                /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                cargosPartidas: number;
+                /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                cargosSinPrecio: number;
               };
             };
           };
@@ -61213,7 +61334,7 @@ export interface paths {
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
-                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                /** @description Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar. */
                 pendienteRevision: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -61221,16 +61342,24 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               }[];
               /** @description Σ de los saldos (o null si se ocultan importes). */
               totalSaldo: number | null;
               /** @description Σ del pendiente neto de todas las filas (o null si se ocultan importes). */
               totalPendienteNeto: number | null;
+              /** @description Σ de los cargos sin validar de todas las filas (conteo: NO se oculta). Lo agrega el servidor para que la pantalla no tenga que sumar la columna. */
+              totalCargosPorValidar: number;
             };
           };
         };
@@ -61825,7 +61954,7 @@ export interface paths {
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
-                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                /** @description Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar. */
                 pendienteRevision: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -61833,10 +61962,16 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               };
               /** @description Renglones del periodo, ordenados por fecha (fecha+id). */
@@ -62203,7 +62338,7 @@ export interface paths {
                 totalDescuentos: number | null;
                 /** @description Saldo derivado (o null si se ocultan importes). */
                 saldo: number | null;
-                /** @description Lo capturado que aún no se revisa: no suma al saldo, pero se ve. */
+                /** @description Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar. */
                 pendienteRevision: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -62211,10 +62346,16 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               };
             };
@@ -63347,7 +63488,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen */
+    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen, por segmento de facturación */
     get: {
       parameters: {
         query?: {
@@ -63359,6 +63500,8 @@ export interface paths {
           filtro?: 'con-saldo' | 'todos';
           /** @description Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas). */
           busqueda?: string;
+          /** @description todos = cartera completa; con = sólo lo CON factura (fiscal / con_factura); sin = sólo lo SIN factura, incluido lo sin definir. */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path?: never;
@@ -63366,7 +63509,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen). */
+        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen), de un segmento. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -63395,7 +63538,7 @@ export interface paths {
                 mas60: number | null;
                 /** @description Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte). */
                 maquila: number | null;
-                /** @description Maquila (EsMa) capturada y AÚN sin revisar: no suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a). */
+                /** @description Maquila (EsMa) que aún espera una decisión: lo capturado sin revisar MÁS los cargos propuestos (los que esperan que alguien fije cantidad y precio). No suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a) — incluido el que sólo tiene cargos por validar (V1, fila 0.111). */
                 maquilaPorRevisar: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -63403,10 +63546,16 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               }[];
               /** @description Total de proveedores que cumplen el filtro. */
@@ -63417,7 +63566,7 @@ export interface paths {
               porPagina: number;
               /** @description Total de páginas. */
               totalPaginas: number;
-              /** @description KPIs sobre toda la cartera con saldo. */
+              /** @description KPIs sobre toda la cartera con saldo DEL SEGMENTO pedido (no de la cartera completa). */
               resumen: {
                 /** @description Cartera total por pagar (Σ saldos combinados: motor + maquila). */
                 carteraTotal: number | null;
@@ -63429,7 +63578,7 @@ export interface paths {
                 alCorrientePct: number | null;
                 /** @description Proveedores con saldo ≠ 0. */
                 proveedoresConSaldo: number;
-                /** @description Σ de la maquila capturada sin revisar en toda la cartera: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero no desaparece. */
+                /** @description Σ de la maquila que espera decisión en toda la cartera —lo capturado sin revisar MÁS los cargos propuestos—: NO suma a carteraTotal ni a maquilaTotal (todavía no es deuda), pero no desaparece. */
                 maquilaPorRevisar: {
                   /** @description Σ abonos capturados sin revisar (o null). */
                   abonos: number | null;
@@ -63437,12 +63586,23 @@ export interface paths {
                   pagos: number | null;
                   /** @description Σ descuentos capturados sin revisar (o null). */
                   descuentos: number | null;
-                  /** @description Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null). */
+                  /** @description Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar (o null si se ocultan importes). */
+                  cargos: number | null;
+                  /** @description Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null). */
                   neto: number | null;
-                  /** @description Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
+                  /** @description Cuántas partidas esperan revisión (los tres movimientos planos capturados más los cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas). */
                   partidas: number;
+                  /** @description Cuántas de esas partidas son cargos por validar (conteo: NO se oculta). */
+                  cargosPartidas: number;
+                  /** @description De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan como partida pero no aportan importe (conteo: NO se oculta). */
+                  cargosSinPrecio: number;
                 };
               };
+              /**
+               * @description Segmento aplicado (todos/con/sin factura). Viaja de vuelta porque las filas Y el resumen son de ESE segmento: sin él, una cartera parcial se leería como la total.
+               * @enum {string}
+               */
+              segmento: 'todos' | 'con' | 'sin';
               /** @description Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas. */
               limitesAging: {
                 /** @description Fin de la 1ª cubeta vencida (días de atraso). */
@@ -65662,9 +65822,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -65911,9 +66071,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -66286,9 +66446,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -66559,9 +66719,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -66798,9 +66958,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -67048,9 +67208,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -67299,9 +67459,9 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
-                  /** @description Neto capturado que aún NO suma al saldo (sólo maquila), o null. */
+                  /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
-                  /** @description Cuántas partidas esperan revisión (0 si no aplica). NO es un importe. */
+                  /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
                   porRevisarPartidas: number;
                   /** @description Σ de lo recibido esta semana valuado a precio pactado (sólo maquila), o null. */
                   recibosSemanaImporte: number | null;
@@ -67511,6 +67671,7 @@ export interface paths {
                 /** @enum {string} */
                 rubro: 'maquila' | 'proveedores' | 'nomina' | 'servicios' | 'caja_chica' | 'otros';
                 renglones: {
+                  id: number;
                   /** @enum {string} */
                   rubro:
                     | 'maquila'
@@ -67531,6 +67692,42 @@ export interface paths {
                   monto: number | null;
                   concepto: string | null;
                   referencia: string | null;
+                  facturacion: {
+                    /** @description ¿Se puede emitir el documento para facturar de este renglón? */
+                    facturable: boolean;
+                    motivo:
+                      | (
+                          | 'sinFactura'
+                          | 'concepto'
+                          | 'proveedorNoLegible'
+                          | 'efectivo'
+                          | 'sinMonto'
+                          | 'estado'
+                          | 'faltantes'
+                        )
+                      | null;
+                    motivoTexto: string | null;
+                    faltantes: {
+                      /**
+                       * @description De quién falta el dato.
+                       * @enum {string}
+                       */
+                      quien: 'proveedor' | 'empresa';
+                      /**
+                       * @description Qué dato falta.
+                       * @enum {string}
+                       */
+                      campo:
+                        | 'razonSocial'
+                        | 'rfc'
+                        | 'regimenFiscalSat'
+                        | 'codigoPostalExpedicion'
+                        | 'codigoPostalFiscal'
+                        | 'usoCfdiHabitual';
+                      /** @description El aviso, con el nombre de quien tiene el hueco. */
+                      texto: string;
+                    }[];
+                  };
                 }[];
                 /** @description Totales de efectivo y transferencia (los de su relación semanal). */
                 totales: {
@@ -67556,6 +67753,439 @@ export interface paths {
             };
           };
         };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Los datos con los que el proveedor debe facturar este pago (o por qué no se emite) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+          /** @description Id del renglón. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description El documento para facturar de un renglón, o el motivo por el que no se emite. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              facturable: boolean;
+              /** @description Por qué no se emite, o null. */
+              motivo:
+                | (
+                    | 'sinFactura'
+                    | 'concepto'
+                    | 'proveedorNoLegible'
+                    | 'efectivo'
+                    | 'sinMonto'
+                    | 'estado'
+                    | 'faltantes'
+                  )
+                | null;
+              /** @description El porqué, en palabras, o null. */
+              motivoTexto: string | null;
+              /** @description Los datos fiscales que faltan (vacío si no es ése el problema). */
+              faltantes: {
+                /**
+                 * @description De quién falta el dato.
+                 * @enum {string}
+                 */
+                quien: 'proveedor' | 'empresa';
+                /**
+                 * @description Qué dato falta.
+                 * @enum {string}
+                 */
+                campo:
+                  | 'razonSocial'
+                  | 'rfc'
+                  | 'regimenFiscalSat'
+                  | 'codigoPostalExpedicion'
+                  | 'codigoPostalFiscal'
+                  | 'usoCfdiHabitual';
+                /** @description El aviso, con el nombre de quien tiene el hueco. */
+                texto: string;
+              }[];
+              documento: {
+                idCorrida: number;
+                idRenglon: number;
+                /** @description Folio de la corrida (por empresa). */
+                folioCorrida: number;
+                /** @description Lunes de la semana que se paga (AAAA-MM-DD). */
+                semana: string;
+                /** @description A nombre de quién se factura (la empresa activa, A9). */
+                receptor: {
+                  /** @description Nombre legal con el que se timbra. */
+                  razonSocial: string;
+                  rfc: string;
+                  /** @description Clave del régimen fiscal del SAT. */
+                  regimenFiscalSat: string;
+                  /** @description CP: del domicilio fiscal (receptor) o de expedición (emisor). */
+                  codigoPostal: string;
+                };
+                /** @description Quién va a emitir la factura (el proveedor). */
+                emisor: {
+                  /** @description Nombre legal con el que se timbra. */
+                  razonSocial: string;
+                  rfc: string;
+                  /** @description Clave del régimen fiscal del SAT. */
+                  regimenFiscalSat: string;
+                  /** @description CP: del domicilio fiscal (receptor) o de expedición (emisor). */
+                  codigoPostal: string;
+                };
+                nombreProveedor: string;
+                /** @description Clave del uso de CFDI que declara el receptor (p. ej. G03). */
+                usoCfdi: string;
+                /** @description true = el proveedor no lo tiene capturado y va el default G03, marcado como tal. */
+                usoCfdiSugerido: boolean;
+                /** @description Qué se está pagando (el del renglón, o uno armado por rubro). */
+                concepto: string;
+                /** @description Folios de remisiones/recibos que ampara, o null. */
+                referencia: string | null;
+                /** @description Clave del SAT de la forma de pago (03 = transferencia). */
+                formaPagoSat: string;
+                formaPagoTexto: string;
+                /** @description Clave del SAT del método de pago (PUE). */
+                metodoPagoSat: string;
+                metodoPagoTexto: string;
+                /** @description Moneda del comprobante (MXN). */
+                moneda: string;
+                /** @description Base gravable. */
+                subtotal: number;
+                /** @description IVA trasladado (explícito, nunca escondido en el total). */
+                iva: number;
+                /** @description La tasa como se imprime («16 %»). */
+                tasaIvaTexto: string;
+                /** @description Lo que se transfiere. subtotal + iva === total, al centavo. */
+                total: number;
+              } | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion.pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Documento para facturar de UN pago (PDF) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+          /** @description Id del renglón. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pagos/corridas/{id}/documentos-facturacion.pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Documentos para facturar de TODA la corrida, con la hoja de los que no se emitieron */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la corrida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
         /** @description Respuesta de error de la API. */
         400: {
           headers: {
@@ -112095,6 +112725,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -112221,6 +112855,8 @@ export interface paths {
             nombre: string;
             razonSocial?: string;
             rfc?: string;
+            regimenFiscalSat?: string;
+            codigoPostalFiscal?: string;
             identificador?: string;
             /** @default false */
             favorita?: boolean;
@@ -112247,6 +112883,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -112399,6 +113039,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -112540,6 +113184,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -112670,6 +113318,8 @@ export interface paths {
             nombre?: string;
             razonSocial?: string;
             rfc?: string;
+            regimenFiscalSat?: string;
+            codigoPostalFiscal?: string;
             identificador?: string;
             favorita?: boolean;
             paraIpt?: boolean;
@@ -112694,6 +113344,10 @@ export interface paths {
               razonSocial: string | null;
               /** @description RFC fiscal de la empresa (F9-E3), o null. */
               rfc: string | null;
+              /** @description Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado. */
+              regimenFiscalSat: string | null;
+              /** @description CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado. */
+              codigoPostalFiscal: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */

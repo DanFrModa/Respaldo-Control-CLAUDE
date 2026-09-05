@@ -53,6 +53,18 @@ model Empresa {
   /// viene (forma del RFC mexicano). NULL si no se ha capturado (la validación del receptor entonces
   /// solo AVISA, no rechaza).
   rfc           String?
+  /// ⭐ RÉGIMEN FISCAL DEL SAT del RECEPTOR (clave del catálogo, p. ej. "601"). Lo exige el CFDI 4.0
+  /// de quien nos factura: sin él, el proveedor NO puede timbrar a nombre de esta empresa. Nació con
+  /// EL DOCUMENTO PARA FACTURAR (fila 0.118, §Post-F9.186(k): *«nadie me factura si no le mando yo un
+  /// documento con los datos con los que me tiene que facturar»*) — el proveedor ya tenía sus cuatro
+  /// datos fiscales desde F1-E1B y la empresa sólo tenía razón social y RFC.
+  /// NULL = no capturado: el documento entonces NO se emite y dice qué falta (REGLA 0-B).
+  regimenFiscalSat   String? @map("regimen_fiscal_sat")
+  /// ⭐ CÓDIGO POSTAL DEL DOMICILIO FISCAL del receptor (5 dígitos). El otro dato obligatorio del
+  /// receptor en un CFDI 4.0 (`DomicilioFiscalReceptor`). Ojo: NO es el mismo concepto que
+  /// `Proveedor.codigoPostalExpedicion` —ése es el LUGAR DE EXPEDICIÓN del emisor—, por eso lleva
+  /// otro nombre. NULL = no capturado (mismo trato que el régimen).
+  codigoPostalFiscal String? @map("codigo_postal_fiscal")
   /// Identificador corto usado en folios e impresos (viejo: `Identificador`).
   identificador String?
   /// Empresa propuesta por defecto al iniciar sesión (viejo: `Importancia = 1`).
@@ -5841,10 +5853,15 @@ model RecepcionCompraLinea {
   idOrdenCompraLinea Int              @map("id_orden_compra_linea")
   ordenCompraLinea   OrdenCompraLinea @relation(fields: [idOrdenCompraLinea], references: [id], onDelete: Restrict)
 
-  /// Cantidad recibida en UNIDAD DE CONSUMO (ya convertida: cantidadPresentación × factor, R1).
-  /// Para líneas de catálogo es lo que entró al kardex; para líneas libres es informativa.
+  /// Cantidad recibida en UNIDAD DE CONSUMO, la misma de la línea de OC (§Post-F9.97): NO hay
+  /// conversión ninguna — la dualidad presentación/consumo se retiró, y con ella el «× factor» que
+  /// esta línea describía. Para líneas de catálogo es lo que entró al kardex; para líneas libres es
+  /// informativa. Multiplicada por `costoUnit` da el importe que se le debe al proveedor (0.129).
   cantidadRecibida Decimal  @map("cantidad_recibida") @db.Decimal(14, 4)
-  /// Costo por unidad de consumo (precioPresentación ÷ factor, D1). NULL en líneas libres.
+  /// Costo por unidad de consumo con el que se RECIBIÓ (D1): el de la línea de OC, o el que quien
+  /// recibe corrigió (fila 0.129). Es el que valúa el kardex y el que hace el importe de la cuenta
+  /// por pagar. Desde la fila 0.129 los renglones LIBRES también lo llevan (no se inventarían, pero
+  /// se pagan); NULL sólo en los libres anteriores a esa fila (REGLA 0-B: no se reparan).
   costoUnit        Decimal? @map("costo_unit") @db.Decimal(12, 4)
 
   /// Cantidad del COMPLEMENTO (cardigan) recibida en esta línea de TELA (flujo NUEVO por color,

@@ -9,8 +9,14 @@ import { EstadoCuentaProveedorPagina } from './EstadoCuentaProveedorPagina';
 /** Estado mutable del hook mockeado. */
 const estado: { valor: unknown } = { valor: null };
 
+/** Las queries con las que la pantalla pidió el estado de cuenta (la última es la vigente). */
+const consultas: { segmento?: string }[] = [];
+
 vi.mock('@/api/cxp', () => ({
-  useEstadoCuentaProveedor: () => estado.valor,
+  useEstadoCuentaProveedor: (_id: number | null, query: { segmento?: string }) => {
+    consultas.push(query);
+    return estado.valor;
+  },
   useRegistrarMovimientoCxp: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarMovimientoCxp: () => ({ mutate: vi.fn(), isPending: false }),
   imprimirEstadoCuentaCxp: vi.fn(),
@@ -82,6 +88,7 @@ const conProveedor = { pathname: '/cxp/estado-cuenta', state: { idProveedor: 7 }
 
 describe('EstadoCuentaProveedorPagina (F9-E2)', () => {
   beforeEach(() => {
+    consultas.length = 0;
     estado.valor = { data: cuenta, isPending: false, isError: false, error: null };
   });
 
@@ -118,5 +125,45 @@ describe('EstadoCuentaProveedorPagina (F9-E2)', () => {
     });
     expect(screen.getByTestId('cxp-edc-capturar')).toBeInTheDocument();
     expect(screen.getByTestId('cxp-edc-cancelar')).toBeInTheDocument();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ FILA 0.132 — EL DETALLE ABRE EN LA MISMA RELACIÓN DE PAGO QUE LA BANDEJA
+// Si se entra desde el listado "Sin factura" y el estado de cuenta abriera en "todo", se leería un
+// saldo MAYOR que el que esa relación va a pagar — justo la confusión que partir la bandeja evita.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('EstadoCuentaProveedorPagina · segmento heredado de la bandeja', () => {
+  beforeEach(() => {
+    consultas.length = 0;
+    estado.valor = { data: cuenta, isPending: false, isError: false, error: null };
+  });
+
+  it.each(['con', 'sin'] as const)('abre en el segmento «%s» que traía el enlace', (segmento) => {
+    renderConProveedores(<EstadoCuentaProveedorPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver']),
+      rutaInicial: { pathname: '/cxp/estado-cuenta', state: { idProveedor: 7, segmento } },
+    });
+    expect(consultas.at(-1)?.segmento).toBe(segmento);
+    expect(screen.getByTestId('cxp-edc-segmento')).toHaveValue(segmento);
+  });
+
+  it('sin segmento en el enlace sigue abriendo en la cuenta completa', () => {
+    renderConProveedores(<EstadoCuentaProveedorPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver']),
+      rutaInicial: conProveedor,
+    });
+    expect(consultas.at(-1)?.segmento).toBe('todos');
+  });
+
+  it('un segmento inventado en el `state` no viaja al API', () => {
+    renderConProveedores(<EstadoCuentaProveedorPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver']),
+      rutaInicial: {
+        pathname: '/cxp/estado-cuenta',
+        state: { idProveedor: 7, segmento: 'fiscal' },
+      },
+    });
+    expect(consultas.at(-1)?.segmento).toBe('todos');
   });
 });

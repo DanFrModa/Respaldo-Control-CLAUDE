@@ -12136,6 +12136,88 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.199) — LO PENDIENTE DE LA DECISIÓN SE VE JUNTO AL SALDO (fila 0.111, 4-sep-2026): qué cuenta como «por revisar» y cómo se valúa
+
+**Contexto.** Daniel, 3-sep: *«cada semana me pueda meter a algún lugar donde estén todos los maquileros que tengan algo pendiente por pagar o por descontar»* · *«**no quiero otra pantalla** para ver los pendientes»* · *«es una de las pantallas más importantes del sistema, debe estar muy bien hecha»*. El tablero ya existía y desde la 0.115 tenía su columna «Por revisar», pero **sólo contaba abonos, descuentos y pagos capturados**: los **cargos `propuesto`** —los recibos de maquila (y, desde la 0.114, los cortes y empaques) que esperan que él fije cantidad y precio— no contaban en ninguna de las tres puertas. Un maquilero con diez recibos sin validar y nada más tenía saldo cero, pendiente cero y era **invisible**, que es exactamente el trabajo que hay que decidir cada semana.
+
+**Lo que se construyó:** el criterio de «¿qué cargo espera decisión?» vive en la definición única del saldo (`formula-saldo.ts`: `estado = 'propuesto'` **y** `sin_costo = FALSE`), y la **valuación** en un solo módulo nuevo (`esma/cargo-propuesto.ts`), en sus dos formas —TypeScript y SQL agregada— derivadas de la misma constante. El precio de referencia es el de la orden por proceso (costura `maquilaOrd`, el resto `aplicacionOrd`) con caída al `precioPactado` de la etapa; un **cargo de servicio** (corte o empaque, fila 0.114) se valúa **sólo** con su propio `precioPactado`, porque la orden no tiene precio de corte ni de empaque. Las tres puertas leen del mismo agregado: tablero, bandeja de CxP y corrida semanal.
+
+**Decisiones del lead (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido |
+|---|---|---|
+| a | ¿El importe por revisar suma al saldo? | **No**: el saldo sigue siendo sólo lo revisado; lo pendiente se enseña al lado, con su conteo. |
+| b | ¿Un cargo `sinCosto` (segundas que no se pagan) cuenta como pendiente? | **No**: ni como partida ni como importe. |
+| c | ¿Qué pasa con un cargo propuesto **sin precio**? | Cuenta como **partida** y se declara aparte que no se puede valuar (nunca vale cero ni desaparece). |
+| d | ¿En qué relación cae un cargo propuesto al partir por segmento? | En la **sin factura**: su `conFactura` es NULL hasta que se valida, y ése es el criterio único de siempre. |
+
+**Hallazgo medido durante la construcción:** al agregado en lote que alimenta la bandeja de CxP le faltaba incluir a los proveedores que sólo tienen cargos propuestos; sin ese arreglo, el maquilero con sólo recibos por validar **nunca** habría aparecido en Cuentas por pagar, ni siquiera con la columna nueva.
+
+---
+
+#### (Post-F9.198) — VALIDAR ES DE DANIEL (fila 0.128, 4-sep-2026): un permiso nuevo, cinco perfiles sin validar, y cuatro defaults que Daniel confirma o ajusta
+
+**Contexto.** Daniel, §Post-F9.192 (1): *«la entrada la da la persona responsable de recibos o de producción. Pero **la validación sólo la doy yo**. O sea, es un permiso para meter lo recibido y otro para validarlo»*. El repaso midió que validar cargos (`esma.cargo-validar`) y revisar partidas (que colgaba de `esma.modificar`, el mismo permiso que capturar) se sembraban en TODOS los perfiles: cualquiera podía convertir un recibo en deuda fijando el precio.
+
+**Lo que se construyó:** nace `esma.revisar` («Revisar y autorizar partidas de maquila: convertir lo capturado en deuda o pago real»); `revisarMovimiento` y su ruta lo exigen; `esma.modificar` se queda para capturar; `esma.cargo-validar` sigue siendo el permiso de validar cargos. El seed da los dos permisos de validar sólo al círculo y se los quita a los cinco perfiles operativos. Como `sembrarRoles` **sincroniza** los roles de sistema (borra las ligas que sobran), basta `SEED_ON_START=true`; un rol personalizado conserva lo que tenga. Todos los caminos que escriben `revisado`/`validado` quedaron recorridos: la corrida semanal crea pagos ya revisados bajo `pagos.corrida-armar` (sólo administrador: más estrecho, no una puerta lateral); el cierre de maquila deja el descuento capturado y se autoriza aparte; el ETL histórico transcribe hechos ya revisados en Access, fuera del API. La puerta lateral de CxP («entrada sin factura») ya era sólo del administrador.
+
+**Cuatro defaults construidos (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿Quién es «el círculo» que valida? | Administrador + Administración/Dirección + **Directivo**. | Mover `esma.revisar` y `esma.cargo-validar` a «sólo administrador» (dos listas del seed, sin migración). |
+| b | ¿El perfil Gerencial valida cargos de maquila? | **No** (pierde `esma.cargo-validar`). | Devolvérselo en el seed. |
+| c | ¿Revisar partidas y validar cargos son un permiso o dos? | **Dos** (`esma.revisar` y `esma.cargo-validar`): fusionarlos después es barato; separarlos después, no. | Fusionarlos en el catálogo y el seed. |
+| d | ¿Capturar abonos/descuentos (`esma.modificar`) sigue llegando hasta Secretarial? | **Sí**, Daniel no lo mencionó; candidato al recorte cuando arme los perfiles por puesto real. | Quitarlo en el seed a los perfiles que no capturan. |
+
+---
+
+#### (Post-F9.197) — LA RECEPCIÓN CONTRA LA OC HACE NACER LA DEUDA (fila 0.129, 4-sep-2026): cuatro defaults del lead que Daniel confirma o ajusta
+
+**Contexto.** Daniel, §Post-F9.192 (2)(3): *«la persona que recibe (a partir de una OC) mete las cantidades y precios… el precio debería de ser el de la OC, la cantidad puede variar un poco, por eso se mete a mano… es la misma entrada que se ocupa tanto para inventario como para su estado de cuenta»* · *«Lo ideal es recibir con la factura. Pero si no fuera el caso, está bien dejarla como pendiente. Todo se recibe a partir de la OC. Tanto telas como avíos.»* El repaso midió que las telas ya lo hacían (la deuda nace al confirmar la entrada, en cuatro casos) y los avíos no: la recepción contra OC movía inventario y actualizaba la OC, pero nunca tocaba Cuentas por pagar.
+
+**Lo que se construyó:** la regla de «qué cargo nace de una entrada de mercancía» se sacó a **un solo sitio** (`terceros/cargo-de-entrada.ts`) y la usan las dos puertas: la entrada de tela (sin cambiar su comportamiento) y la recepción de avíos contra OC. La decisión es la de la 0.124: `emiteFactura(modalidadFacturacion)` — **sólo el proveedor marcado «sólo sin factura» genera el cargo no fiscal en el acto**; con factura, «ambos» o sin definir, la recepción queda **«factura pendiente»** y la deuda nace cuando el CFDI se importa en Finanzas. El precio por renglón se precarga de la OC y se puede corregir; el importe se calcula con lo capturado; el cargo nace en la misma transacción que el kardex; reversar la recepción cancela el cargo.
+
+**Cuatro defaults construidos (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿Los renglones LIBRES de la OC (un flete, una maquila suelta, algo sin catálogo) entran a la deuda? | **Sí**: no mueven inventario pero sí se deben, así que suman al cargo. | Se excluyen del importe en `importeDeRecepcion` (una condición). |
+| b | Proveedor que factura (o «ambos») ⇒ ¿nace un cargo provisional al recibir? | **No**: queda «factura pendiente» y la deuda nace con el CFDI, igual que en telas. Evita cobrar dos veces (provisional + factura). | Habría que diseñar el cargo provisional y su sustitución por el CFDI (alcance nuevo). |
+| c | Precio capturado distinto al de la OC | **Se acepta sin bloquear** (Daniel: «el precio debería de ser el de la OC», pero quien recibe lo puede corregir); se resalta en pantalla y la bitácora guarda los dos. | Bloquear o exigir permiso: una guarda en `recibirCompra`. |
+| d | Recepción sin número de factura/remisión | **El cargo nace igual**, con «(sin documento)» en la observación. | Exigir el número antes de crear el cargo. |
+
+**Cicatriz de proceso (lead):** la fila se construyó primero sobre `prueba` v0.105, que aún no tenía la 0.124 (estaba en PR), y el helper nació sobre la casilla `factura` retirada. Se corrigió fusionando la rama de la 0.124 antes de la revisión. Regla desde hoy: si una fila depende de otra que aún está en PR, su worktree se corta de la rama de esa PR o la fusiona enseguida.
+
+**Alcance nuevo (no entra):** ligar el CFDI importado en Finanzas con la recepción que lo originó; subir el XML desde la recepción de avíos (hoy sólo la entrada de tela sella CFDI).
+
+---
+
+#### (Post-F9.196) — EL DOCUMENTO PARA FACTURAR (fila 0.118, 4-sep-2026, madrugada): seis defaults del lead que Daniel confirma o ajusta, y la ficha fiscal de la empresa
+
+**Contexto.** Daniel (§Post-F9.186(k)): *«nadie me factura si no le mando yo un documento con los datos con los que me tiene que facturar… no al revés. Y eso debe salir del sistema»*; el 4-sep: *«lo ideal es que facture lo que es en total. Por eso quedamos que nosotros le vamos a dar un documento con el que va a facturar»* y *«las facturas son sólo transferencias»*. La fila volvió a la V1 por su decisión («Está bien en la fase 1», §190 adenda). Se construyó como **impreso por PAGO** sobre la corrida semanal (0.113): el pago de maquila nace «a cuenta» y el de proveedor es un movimiento de CxP sin aplicaciones, así que hoy no hay forma honesta de desglosar por orden.
+
+**Lo que hace:** para cada renglón de una corrida **con factura**, pagado por **transferencia**, a un maquilero o proveedor, con la corrida **cerrada o ejecutada** y con la ficha fiscal completa de los dos lados, el sistema arma la hoja con la que el proveedor debe timbrar: receptor (FR Moda: razón social, RFC, régimen, CP fiscal, uso de CFDI), emisor (proveedor: razón social, RFC, régimen, CP de expedición), concepto (el del renglón o, si no trae, por rubro y semana), referencia, forma de pago 03, método PUE, MXN y la tabla subtotal / IVA / total. Si falta un dato de cualquiera de los dos lados, **no se emite y se dice qué falta y de quién** (REGLA 0-B: tolerar, avisar, jamás inventar). El PDF de la corrida completa trae delante la hoja de «no se emitieron».
+
+**Seis defaults construidos (Daniel confirma o ajusta; cada uno se cambia en un solo sitio):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿El `monto` de la corrida es total con IVA o subtotal? | **TOTAL con IVA** = lo que se transfiere; el documento lo parte hacia atrás (`subtotal = total / 1.16`, `iva = total − subtotal`, redondeo al centavo con `subtotal + iva === total` siempre). | `comun/iva.ts::desglosarIva`, nada más. |
+| b | ¿Se emite desde una corrida en borrador? | **No**: sólo cerrada o ejecutada (en borrador los montos se mueven). | Se quita la rama `estado` de `evaluarFacturabilidad`. |
+| c | Uso de CFDI cuando el proveedor no lo tiene capturado | **«G03 Gastos en general» impreso y marcado como SUGERIDO**; no bloquea (es un dato que declara el receptor). | Se agrega a la lista de faltantes y bloquea (una línea). |
+| d | Retenciones de IVA/ISR | **No se calculan**: retener cambia lo que se deposita y el monto ya es el depósito; el CFDI del proveedor las resta por su cuenta. | Decidir primero si el monto tecleado es antes o después de la retención (dinero, no código). |
+| e | Renglón en cero | **No factura** (`motivo: sinMonto`); ni sale en la relación ejecutable. | — |
+| f | Tasa de IVA | **16 %** (general; la franja fronteriza del 8 % no aplica). | `comun/iva.ts`. |
+
+**La ficha fiscal de la empresa.** `Empresa` sólo tenía RFC y razón social; un CFDI 4.0 exige del receptor también **régimen fiscal** y **código postal del domicilio fiscal**. Se agregaron (migración aditiva, nullable, sin backfill) y se capturan en Administración › Empresas. ⚠️ **Paso manual de Gabriel:** capturar los de FR Moda (están en la constancia de situación fiscal que Daniel subió el 4-sep). Hasta entonces no se emite ningún documento, y el sistema lo dice con esas palabras.
+
+**Decisiones técnicas del coder aceptadas por el lead:** el documento **no lleva número de cuenta** (se le manda al proveedor; lo bancario vive en la relación ejecutable) y el nombre del archivo PDF lleva folio + renglón, nunca el nombre del taller (repo público, correos reenviados); los datos fiscales se leen **al día**, no congelados (lo contrario le impediría timbrar a quien cambió de régimen), mientras el destino del dinero sí sigue congelado en el renglón; el botón sale **deshabilitado con tooltip**, no escondido; sin permisos nuevos (los del concentrado: ver corrida + ver importes).
+
+**Pendiente (alcance nuevo):** desglose por orden cuando el pago de maquila lleve aplicaciones; la lectura automática de la constancia (0.119) llenará estos datos sin teclearlos.
+
+---
+
 #### (Post-F9.195) — CORTE Y EMPAQUE SON SERVICIOS SOBRE LA ORDEN: cómo se construyó la fila 0.114 (lead, 4-sep-2026, madrugada; Daniel confirma o ajusta)
 
 **Contexto.** Daniel dictó la regla el 3-sep (§Post-F9.185(c)): *«en corte no necesitas mandar y recibir mercancía… sólo hay que poner su cantidad y precio para meterlo en la OP, pero no va y viene. Lo mismo el empaque… el empaque no toca el inventario»*; y la frontera (§185(b)): *«corte es parte de maquilas, no de proveedores: el monto a pagar sale de una orden»*. El repaso midió que el modelo ya distinguía las dos formas (`registrarCorte` crea la etapa con `idTipoProceso = NULL` y no toca inventario) pero nadie la había usado para el pago: el corte no escribía precio, no nacía cargo, y el empaque no existía.

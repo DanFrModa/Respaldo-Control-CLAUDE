@@ -761,6 +761,8 @@ export {
 
 // ── Recepción de compras (Módulo 3, F4-E3; doc 03-Produccion §OC; R7) ─────────
 export {
+  CLASES_DEUDA_RECEPCION,
+  esquemaDeudaRecepcion,
   esquemaRecepcionTelaColorEntrada,
   esquemaRecepcionLineaEntrada,
   esquemaRecepcionCrear,
@@ -772,6 +774,7 @@ export {
   type DatosRecepcionLineaEntrada,
   type DatosRecepcionCrear,
   type DatosRecepcionReversar,
+  type ClaseDeudaRecepcion,
   type RecepcionLineaSalida,
   type RecepcionSalida,
   type RecepcionesLista,
@@ -2430,3 +2433,21 @@ export {
   type ConcentradoRenglon,
   type ConcentradoSalida,
 } from './esquemas/corrida-pago.js';
+
+// ── El documento para facturar (fila 0.118, §Post-F9.186(k)) ─────────────────────────────────────
+export {
+  MOTIVOS_NO_FACTURABLE,
+  QUIENES_DATO_FISCAL,
+  CAMPOS_FISCALES,
+  esquemaFaltanteFiscal,
+  esquemaDocumentoFacturacion,
+  esquemaDocumentoFacturacionSalida,
+  esquemaFacturabilidadRenglon,
+  type MotivoNoFacturable,
+  type QuienDatoFiscal,
+  type CampoFiscal,
+  type FaltanteFiscal,
+  type DocumentoFacturacion,
+  type DocumentoFacturacionSalida,
+  type FacturabilidadRenglon,
+} from './esquemas/documento-facturacion.js';

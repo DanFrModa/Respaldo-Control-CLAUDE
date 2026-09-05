@@ -1123,3 +1123,401 @@ describe('ocsRecibibles (§Post-F9.87) — las OC abiertas del proveedor que lle
     ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// ⭐⭐ FILA 0.129 — LA RECEPCIÓN HACE NACER LA CUENTA POR PAGAR
+//
+// Daniel (§Post-F9.192, 4-sep-2026): *"es la misma entrada que se ocupa tanto para inventario como
+// para su estado de cuenta"* · *"lo ideal es recibir con la factura. Pero si no fuera el caso, está
+// bien dejarla como pendiente. Todo se recibe a partir de la OC. Tanto telas como avíos"*.
+//
+// Aquí se mide lo que SOLO la base puede decir: que el cargo se escribe en la MISMA transacción que
+// el kardex, que se liga a la recepción, que el reverso lo cancela por su inverso (D3) y que dos
+// recepciones no lo duplican. La regla en sí (los cuatro casos) se mide sin base en
+// `dominio/terceros/cargo-de-entrada.test.ts`.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Un proveedor con su MODALIDAD de facturación puesta a propósito. Desde la fila 0.124 es la ÚNICA
+ * que contesta "¿este proveedor factura?" (`solo_sin` ⇒ no; `solo_con`/`ambos` ⇒ sí; NULL ⇒ nadie
+ * lo definió), así que es lo único que estas pruebas necesitan capturar.
+ */
+async function proveedorConModalidad(
+  nombre: string,
+  modalidadFacturacion: 'solo_con' | 'solo_sin' | 'ambos' | null,
+): Promise<Proveedor> {
+  return cliente.proveedor.create({ data: { nombre, modalidadFacturacion } });
+}
+
+/** OC autorizada de UN avío, a nombre del proveedor que se le pase (no del global de fixtures). */
+async function ocAvioDe(idProveedor: number, cantidad = 100, precio = 3) {
+  const oc = await crearOC(
+    sesion(PERM),
+    {
+      ...encabezadoOc(),
+      idProveedor,
+      lineas: [{ idAvio: avioBoton.id, cantidad, precio, unidad: 'pza' }],
+    },
+    bd(),
+  );
+  await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+  return oc;
+}
+
+/** Los movimientos de cuenta corriente que nacieron de UNA recepción (sin sus inversos). */
+async function cargosDe(idRecepcion: number) {
+  return cliente.movimientoTercero.findMany({
+    where: { refTipo: 'recepcion-compra', refId: idRecepcion },
+    orderBy: { id: 'asc' },
+  });
+}
+
+describe('Recepción — fila 0.129: proveedor que NO factura → nace el cargo NO fiscal', () => {
+  it('la misma entrada mueve el kardex Y deja la deuda en su estado de cuenta', async () => {
+    const prov = await proveedorConModalidad('Avíos de Contado', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 100, 3);
+
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        factura: 'REM-77',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 100 }],
+      },
+      bd(),
+    );
+
+    // 1) El inventario: 100 piezas entraron (Σ movimientos, D3).
+    expect(await existenciaAvio(avioBoton.id)).toBe(100);
+
+    // 2) La deuda: UN cargo, no fiscal, por 100 × 3, ligado a ESTA recepción.
+    const cargos = await cargosDe(rec.id);
+    expect(cargos).toHaveLength(1);
+    expect(cargos[0]!.idProveedor).toBe(prov.id);
+    expect(cargos[0]!.origen).toBe('factura_proveedor');
+    expect(cargos[0]!.esFiscal).toBe(false);
+    expect(Number(cargos[0]!.monto)).toBe(300);
+    expect(cargos[0]!.uuidCfdi).toBeNull();
+    expect(cargos[0]!.observaciones).toContain('REM-77');
+
+    // 3) Y la salida lo dice, para que la pantalla no tenga que deducirlo (A1).
+    expect(rec.importe).toBe(300);
+    expect(rec.idMovimientoTercero).toBe(cargos[0]!.id);
+    expect(rec.deuda).toBe('cargo-no-fiscal');
+  });
+
+  it('los renglones LIBRES también se deben (no se inventarían, pero se pagan)', async () => {
+    const prov = await proveedorConModalidad('Fletes del Bajío', 'solo_sin');
+    const oc = await crearOC(
+      sesion(PERM),
+      {
+        ...encabezadoOc(),
+        idProveedor: prov.id,
+        lineas: [
+          { idAvio: avioBoton.id, cantidad: 10, precio: 2, unidad: 'pza' },
+          { descripcionLibre: 'Flete', cantidad: 1, precio: 300 },
+        ],
+      },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [
+          { idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 10 },
+          { idOrdenCompraLinea: oc.lineas[1]!.id, cantidad: 1 },
+        ],
+      },
+      bd(),
+    );
+
+    // 20 del avío + 300 del flete: si el libre se quedara fuera, la deuda nacería más chica que la
+    // mercancía que llegó (que es como estaba antes de esta fila).
+    expect(rec.importe).toBe(320);
+    expect(Number((await cargosDe(rec.id))[0]!.monto)).toBe(320);
+    // El renglón libre sigue SIN mover kardex: sólo guarda su precio.
+    const libre = rec.lineas.find((l) => l.tipo === 'libre')!;
+    expect(libre.idMovimiento).toBeNull();
+    expect(libre.costoUnit).toBe(300);
+  });
+
+  it('sin número de documento el cargo nace igual y lo dice: (sin documento)', async () => {
+    const prov = await proveedorConModalidad('Avíos sin Papel', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 5, 10);
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 5 }],
+      },
+      bd(),
+    );
+    expect((await cargosDe(rec.id))[0]!.observaciones).toContain('(sin documento)');
+  });
+
+  it('sin importe (todo a precio 0) NO nace cargo: una deuda de cero sería ruido', async () => {
+    const prov = await proveedorConModalidad('Muestras Gratis', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 50, 0);
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 50 }],
+      },
+      bd(),
+    );
+    expect(await cargosDe(rec.id)).toHaveLength(0);
+    expect(rec.deuda).toBe('sin-importe');
+    // Y el material SÍ entró: no tener deuda no es no tener mercancía.
+    expect(await existenciaAvio(avioBoton.id)).toBe(50);
+  });
+});
+
+describe('Recepción — fila 0.129: proveedor que factura → la deuda queda PENDIENTE', () => {
+  it('no nace cargo y la recepción lo dice (nacerá al importar el CFDI en Finanzas)', async () => {
+    const prov = await proveedorConModalidad('Telas que Facturan', 'solo_con');
+    const oc = await ocAvioDe(prov.id, 100, 3);
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 100 }],
+      },
+      bd(),
+    );
+    expect(await cargosDe(rec.id)).toHaveLength(0);
+    expect(rec.idMovimientoTercero).toBeNull();
+    expect(rec.deuda).toBe('factura-pendiente');
+    // El importe se calcula igual (es lo que se va a deber cuando llegue la factura).
+    expect(rec.importe).toBe(300);
+    // Y el inventario entró: la deuda pendiente no frena la mercancía.
+    expect(await existenciaAvio(avioBoton.id)).toBe(100);
+  });
+
+  it('el proveedor SIN la modalidad definida (migrado) se trata igual: nada se inventa', async () => {
+    const prov = await proveedorConModalidad('Proveedor Migrado', null);
+    const oc = await ocAvioDe(prov.id, 10, 1);
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 10 }],
+      },
+      bd(),
+    );
+    expect(await cargosDe(rec.id)).toHaveLength(0);
+    expect(rec.deuda).toBe('factura-pendiente');
+  });
+});
+
+describe('Recepción — fila 0.129: el precio se puede corregir al recibir', () => {
+  it('el precio capturado manda sobre el de la OC, va al kardex y queda en la bitácora', async () => {
+    const prov = await proveedorConModalidad('Avíos que Subieron', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 100, 3);
+
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 100, precioUnit: 3.5 }],
+      },
+      bd(),
+    );
+
+    // La salida enseña los DOS números y marca que difieren (la pantalla lo resalta).
+    const linea = rec.lineas[0]!;
+    expect(linea.costoUnit).toBe(3.5);
+    expect(linea.precioOc).toBe(3);
+    expect(linea.precioDistintoOc).toBe(true);
+    // El kardex se valúa con el precio REAL (D1: el costo vive en el movimiento).
+    const det = await cliente.movimientoDetAvio.findFirstOrThrow({
+      where: { movimiento: { idEmpresa: empresa.id } },
+    });
+    expect(Number(det.costoUnit)).toBe(3.5);
+    // Y la deuda también: 100 × 3.5.
+    expect(Number((await cargosDe(rec.id))[0]!.monto)).toBe(350);
+    // A7 — la corrección queda auditada con los dos precios, no sólo con el que ganó.
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'RecepcionCompra', idEntidad: String(rec.id), accion: 'CREAR' },
+    });
+    expect(JSON.stringify(bitacora.datos)).toContain('preciosCorregidos');
+    expect(JSON.stringify(bitacora.datos)).toContain('3.5');
+  });
+
+  it('sin precio capturado manda el de la OC y NO se marca como distinto', async () => {
+    const prov = await proveedorConModalidad('Avíos Estables', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 20, 7.25);
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 20 }],
+      },
+      bd(),
+    );
+    expect(rec.lineas[0]!.costoUnit).toBe(7.25);
+    expect(rec.lineas[0]!.precioDistintoOc).toBe(false);
+    expect(rec.importe).toBe(145);
+  });
+});
+
+describe('Recepción — fila 0.129: reverso y no-duplicación del cargo', () => {
+  it('reversar CANCELA el cargo por su inverso auditado (D3): el saldo neta a 0', async () => {
+    const prov = await proveedorConModalidad('Avíos Devueltos', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 100, 3);
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 100 }],
+      },
+      bd(),
+    );
+    const idCargo = (await cargosDe(rec.id))[0]!.id;
+
+    // Antes de reversar, el API dice que hay un cargo vivo.
+    expect(rec.deuda).toBe('cargo-no-fiscal');
+
+    const reversada = await reversarRecepcion(
+      sesion(PERM),
+      rec.id,
+      { motivo: 'Se devolvió todo' },
+      bd(),
+    );
+
+    // ⭐ RONDA 2 — y DESPUÉS lo dice el SERVIDOR, no la pantalla: ya no se debe nada por ella,
+    // pero la traza al cargo no se pierde (D3: el inverso se lee desde el original).
+    expect(reversada.deuda).toBe('cancelada');
+    expect(reversada.idMovimientoTercero).toBe(idCargo);
+
+    // El original NO se borra ni se edita: se marca cancelado y nace su inverso (D3).
+    const original = await cliente.movimientoTercero.findUniqueOrThrow({ where: { id: idCargo } });
+    expect(original.cancelado).toBe(true);
+    const inverso = await cliente.movimientoTercero.findFirstOrThrow({
+      where: { idMovimientoInverso: idCargo },
+    });
+    expect(Number(inverso.monto)).toBe(-300);
+    expect(inverso.observaciones).toContain('Se devolvió todo');
+    // Σ de los dos = 0: el proveedor deja de tener esa deuda.
+    const suma = await cliente.movimientoTercero.aggregate({
+      where: { idProveedor: prov.id },
+      _sum: { monto: true },
+    });
+    expect(Number(suma._sum.monto)).toBe(0);
+  });
+
+  it('reversar dos veces no vuelve a cancelar el cargo (y la 2ª se rechaza)', async () => {
+    const prov = await proveedorConModalidad('Avíos Reversados', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 10, 5);
+    const rec = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 10 }],
+      },
+      bd(),
+    );
+    await reversarRecepcion(sesion(PERM), rec.id, { motivo: 'Devolución' }, bd());
+    await expect(
+      reversarRecepcion(sesion(PERM), rec.id, { motivo: 'Otra vez' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    // Un solo inverso: nada de dos cancelaciones del mismo cargo.
+    expect(await cliente.movimientoTercero.count({ where: { idProveedor: prov.id } })).toBe(2);
+  });
+
+  it('recibir DOS veces la misma OC deja dos recepciones con UN cargo cada una (sin duplicar)', async () => {
+    const prov = await proveedorConModalidad('Avíos en Parcialidades', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 100, 3);
+    const idLinea = oc.lineas[0]!.id;
+
+    const rec1 = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-04',
+        lineas: [{ idOrdenCompraLinea: idLinea, cantidad: 60 }],
+      },
+      bd(),
+    );
+    const rec2 = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-09-05',
+        lineas: [{ idOrdenCompraLinea: idLinea, cantidad: 40 }],
+      },
+      bd(),
+    );
+
+    // Cada recepción es UN hecho distinto → su propio cargo, ninguno repetido.
+    expect(await cargosDe(rec1.id)).toHaveLength(1);
+    expect(await cargosDe(rec2.id)).toHaveLength(1);
+    const suma = await cliente.movimientoTercero.aggregate({
+      where: { idProveedor: prov.id },
+      _sum: { monto: true },
+    });
+    expect(Number(suma._sum.monto)).toBe(300); // 60×3 + 40×3
+    // Y reversar UNA sola deja viva la deuda de la otra.
+    await reversarRecepcion(sesion(PERM), rec1.id, { motivo: 'Se devolvió la primera' }, bd());
+    const suma2 = await cliente.movimientoTercero.aggregate({
+      where: { idProveedor: prov.id },
+      _sum: { monto: true },
+    });
+    expect(Number(suma2._sum.monto)).toBe(120);
+  });
+
+  it('⭐ A2 — si el CARGO no se puede escribir, NO queda ni recepción ni kardex', async () => {
+    // El proveedor se desactiva DESPUÉS de autorizar la OC: el kardex ya se movió cuando el motor
+    // de terceros rechaza el cargo. O las dos cosas o ninguna — que es justo lo que hace que "la
+    // misma entrada" signifique algo.
+    const prov = await proveedorConModalidad('Avíos Atómicos', 'solo_sin');
+    const oc = await ocAvioDe(prov.id, 100, 3);
+    await cliente.proveedor.update({ where: { id: prov.id }, data: { activo: false } });
+
+    await expect(
+      recibirCompra(
+        sesion(PERM),
+        {
+          idOrdenCompra: oc.id,
+          idAlmacen: almacen.id,
+          fecha: '2026-09-04',
+          lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 100 }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    expect(await cliente.movimientoTercero.count({ where: { idProveedor: prov.id } })).toBe(0);
+    expect(await cliente.recepcionCompra.count({ where: { idOrdenCompra: oc.id } })).toBe(0);
+    expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(0);
+    expect(await existenciaAvio(avioBoton.id)).toBe(0);
+    expect((await cliente.ordenCompra.findUniqueOrThrow({ where: { id: oc.id } })).estatus).toBe(
+      'autorizada',
+    );
+  });
+});

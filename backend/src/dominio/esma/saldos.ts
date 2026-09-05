@@ -12,7 +12,9 @@
  * mandaba en los cargos, y la fórmula estaba triplicada).
  *
  * Lo capturado y aún NO revisado no suma, pero tampoco se pierde de vista: viaja aparte en
- * `pendiente` (desglose + neto con el mismo signo del saldo).
+ * `pendiente` (desglose + neto con el mismo signo del saldo). Desde la fila 0.111 eso incluye los
+ * CARGOS `propuesto` —los recibos que esperan validación—, cuyo importe se DERIVA con la regla única
+ * de `cargo-propuesto.ts` porque no está persistido.
  *
  * Segmentable por facturación (decisión (h)): con `conFactura = 'con' | 'sin'` cuadra solo ese
  * segmento (para el proveedor "ambos" → dos estados de cuenta, E5). Los movimientos con `conFactura`
@@ -30,6 +32,7 @@ import { clienteLectura, type ContextoBd, type Tx } from '../../comun/transaccio
 import type { PrismaClient } from '../../datos/index.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { SELECT_VALUACION_PROPUESTA, valuarCargoPropuesto } from './cargo-propuesto.js';
 import {
   armarPendiente,
   pendienteParaSalida,
@@ -40,6 +43,7 @@ import {
   WHERE_CUENTA_DESCUENTO,
   WHERE_CUENTA_PAGO,
   WHERE_PENDIENTE_ABONO,
+  WHERE_PENDIENTE_CARGO,
   WHERE_PENDIENTE_DESCUENTO,
   WHERE_PENDIENTE_PAGO,
   whereSegmentoFactura,
@@ -101,6 +105,16 @@ export async function calcularSaldoMaquilero(
     ),
   );
 
+  // ⭐ Cargos PROPUESTOS: los recibos que esperan validación (V1, fila 0.111). No suman al saldo,
+  // pero son partidas esperando una decisión y su importe se DERIVA con la regla única de
+  // `cargo-propuesto.ts` (cantidad del recibo × precio de la orden). El criterio de QUÉ cargo está
+  // pendiente sale, como los otros tres, de la definición única.
+  const cargosPropuestos = await cliente.esMaCargo.findMany({
+    where: { ...base, ...WHERE_PENDIENTE_CARGO },
+    select: SELECT_VALUACION_PROPUESTA,
+  });
+  const valuados = cargosPropuestos.map(valuarCargoPropuesto);
+
   // Abonos / pagos / descuentos: Σ monto de los REVISADOS (al saldo) y de los CAPTURADOS (pendiente).
   const [abonos, pagos, descuentos, abonosPend, pagosPend, descuentosPend] = await Promise.all([
     cliente.abonoMaquilero.aggregate({
@@ -139,12 +153,16 @@ export async function calcularSaldoMaquilero(
     totalPagos: redondear2(pagos._sum.monto?.toNumber() ?? 0),
     totalDescuentos: redondear2(descuentos._sum.monto?.toNumber() ?? 0),
   };
-  const pendiente = armarPendiente(
-    abonosPend._sum.monto?.toNumber() ?? 0,
-    pagosPend._sum.monto?.toNumber() ?? 0,
-    descuentosPend._sum.monto?.toNumber() ?? 0,
-    abonosPend._count._all + pagosPend._count._all + descuentosPend._count._all,
-  );
+  const pendiente = armarPendiente({
+    abonos: abonosPend._sum.monto?.toNumber() ?? 0,
+    pagos: pagosPend._sum.monto?.toNumber() ?? 0,
+    descuentos: descuentosPend._sum.monto?.toNumber() ?? 0,
+    // Los que NO se pueden valuar aportan 0 al importe (nunca un precio inventado) y se cuentan aparte.
+    cargos: valuados.reduce((s, v) => s + (v.importe ?? 0), 0),
+    partidasPlanas: abonosPend._count._all + pagosPend._count._all + descuentosPend._count._all,
+    cargosPartidas: valuados.length,
+    cargosSinPrecio: valuados.filter((v) => v.precio === null).length,
+  });
 
   return { ...totales, saldo: saldoDeTotales(totales), pendiente };
 }
