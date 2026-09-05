@@ -1,8 +1,19 @@
 /**
  * Impreso PDF de la HOJA DE CONTEO de un inventario cíclico (F7-E5, R9). Generado EN EL SERVIDOR con
  * `@react-pdf/renderer`. REUSA el servicio de dominio (`leerConteoParaHoja`, A1: aplica A9 + el
- * permiso). CONTEO CIEGO (D6): la hoja NO imprime el teórico — trae una columna en blanco para anotar
- * a mano la cantidad FÍSICA contada.
+ * permiso).
+ *
+ * ⭐ **UNA hoja para las tres dimensiones (fila 0.099).** El renglón viene YA DESCRITO del servidor
+ * (`titulo`/`subtitulo`), así que la misma plantilla imprime prendas, telas o avíos sin ramificar.
+ * Lo que sí cambia con la dimensión son dos columnas:
+ *
+ *  • **«Sistema»** sale SÓLO cuando el conteo NO es ciego. En producto terminado el conteo es CIEGO
+ *    (D6) y la hoja NO imprime el teórico — igual que la pantalla. En telas y avíos Daniel pidió
+ *    capturar «con el saldo del sistema a la vista» (§Post-F9.193 punto 4), y la hoja que se lleva
+ *    al anaquel enseña lo mismo que la pantalla: si la hoja lo ocultara, la decisión valdría sólo
+ *    para quien cuenta frente a un monitor.
+ *  • **La segunda casilla en blanco** aparece cuando algún renglón lleva COMPLEMENTO (D5): esa tela
+ *    se cuenta con dos números, y sin la segunda casilla no habría dónde anotar el cardigan.
  */
 import { createElement as h, type ReactElement } from 'react';
 
@@ -54,21 +65,44 @@ interface Columna {
   contar?: boolean; // columna en blanco para anotar a mano
 }
 
-const COLUMNAS: Columna[] = [
-  { titulo: '#', ancho: 26, derecha: true },
-  { titulo: 'Modelo', ancho: 90 },
-  { titulo: 'Color' },
-  { titulo: 'Talla', ancho: 60 },
-  { titulo: 'Orden', ancho: 60 },
-  { titulo: 'Cantidad contada', ancho: 130, contar: true },
-];
-
 function estiloCol(c: Columna): Style[] {
   const arr: Style[] = [estilos.celda];
   arr.push(c.ancho === undefined ? { flexGrow: 1, flexBasis: 0 } : { width: c.ancho });
   if (c.derecha) arr.push({ textAlign: 'right' });
   if (c.contar) arr.push(estilos.celdaContar);
   return arr;
+}
+
+/** Renglón ya descrito por el servidor (la forma que devuelve `leerConteoParaHoja`). */
+type RenglonHoja = Awaited<ReturnType<typeof leerConteoParaHoja>>['renglones'][number];
+
+/**
+ * Arma las columnas de ESTA hoja: siempre `#`, artículo, detalle y la casilla del conteo; más la
+ * columna «Sistema» si el conteo no es ciego, y una segunda casilla si hay complementos que contar.
+ */
+function columnasDe(renglones: readonly RenglonHoja[]): {
+  columnas: Columna[];
+  conSistema: boolean;
+  conComplemento: boolean;
+} {
+  // El conteo CIEGO se reconoce por lo que NO viene: el dominio no serializa `cantTeorica` en PT.
+  const conSistema = renglones.some((r) => r.cantTeorica !== undefined);
+  const conComplemento = renglones.some((r) => r.nombreComplemento !== null);
+  const columnas: Columna[] = [
+    { titulo: '#', ancho: 26, derecha: true },
+    { titulo: 'Artículo', ancho: 120 },
+    { titulo: 'Detalle' },
+    ...(conSistema ? [{ titulo: 'Sistema', ancho: 60, derecha: true }] : []),
+    { titulo: conComplemento ? 'Contado' : 'Cantidad contada', ancho: conComplemento ? 90 : 130, contar: true },
+    ...(conComplemento ? [{ titulo: 'Contado (2º comp.)', ancho: 90, contar: true }] : []),
+  ];
+  return { columnas, conSistema, conComplemento };
+}
+
+/** Cantidad con su unidad, para la columna «Sistema» (`—` si el renglón no la trae). */
+function conUnidad(valor: number | undefined, unidad: string | null): string {
+  if (valor === undefined) return '';
+  return unidad === null ? String(valor) : `${String(valor)} ${unidad}`;
 }
 
 /** Genera el PDF de la hoja de conteo (CIEGA — sin teórico). */
@@ -99,33 +133,37 @@ export async function generarPdfHojaConteo(payload: PayloadPdfHojaConteo): Promi
   const { pagador, datos } = payload;
   const titulo = `Hoja de conteo — Cíclico #${String(datos.folio)}`;
 
+  const { columnas, conSistema, conComplemento } = columnasDe(datos.renglones);
   const enc = h(
     View,
     { style: estilosDoc.filaTabla, key: 'enc' },
-    ...COLUMNAS.map((c, i) =>
+    ...columnas.map((c, i) =>
       h(Text, { key: `h-${i}`, style: [...estiloCol(c), estilosDoc.celdaEncabezado] }, c.titulo),
     ),
   );
   const cuerpo =
     datos.renglones.length === 0
       ? [h(Text, { key: 'vacio', style: estilosDoc.subtitulo }, 'Sin artículos que contar.')]
-      : datos.renglones.map((r, idx) =>
-          h(
+      : datos.renglones.map((r, idx) => {
+          const celdas: string[] = [
+            String(idx + 1),
+            r.titulo,
+            r.subtitulo ?? '',
+            ...(conSistema ? [conUnidad(r.cantTeorica, r.unidad)] : []),
+            // Columna EN BLANCO: el capturista anota lo que contó, a mano.
+            '',
+            // Segunda casilla sólo si ESTE renglón lleva complemento; si no, se raya con «—» para
+            // que nadie anote un número donde no hay nada que contar.
+            ...(conComplemento ? [r.nombreComplemento === null ? '—' : ''] : []),
+          ];
+          return h(
             View,
             { style: estilosDoc.filaTabla, key: `f-${r.idDet}`, wrap: false },
-            h(Text, { key: 'c0', style: estiloCol(COLUMNAS[0]!) }, String(idx + 1)),
-            h(Text, { key: 'c1', style: estiloCol(COLUMNAS[1]!) }, r.modelo),
-            h(Text, { key: 'c2', style: estiloCol(COLUMNAS[2]!) }, r.color),
-            h(Text, { key: 'c3', style: estiloCol(COLUMNAS[3]!) }, r.etiquetaTalla),
-            h(
-              Text,
-              { key: 'c4', style: estiloCol(COLUMNAS[4]!) },
-              r.folioOrden === null ? 'Sin orden' : `#${String(r.folioOrden)}`,
+            ...celdas.map((texto, i) =>
+              h(Text, { key: `c${String(i)}`, style: estiloCol(columnas[i]!) }, texto),
             ),
-            // Columna EN BLANCO (conteo ciego): el capturista anota la cantidad física a mano.
-            h(Text, { key: 'c5', style: estiloCol(COLUMNAS[5]!) }, ''),
-          ),
-        );
+          );
+        });
 
   const documento: ReactElement<DocumentProps> = h(
     Document,

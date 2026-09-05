@@ -75,6 +75,26 @@ async function leerAlmacenUsable(
 }
 
 /**
+ * Lee el TIPO de un almacén ya verificado como usable por la empresa (existe + activo + A9), SIN
+ * exigir un tipo concreto. Es la única lectura legítima "antes de saber el tipo", y existe por el
+ * inventario CÍCLICO (fila 0.099): ahí el usuario elige el ALMACÉN y el sistema DERIVA de su tipo
+ * qué se va a contar (producto terminado, telas o avíos) — no al revés.
+ *
+ * ⚠️ NO sustituye a {@link exigirAlmacenDelTipo} ni relaja nada: quien usa esto sigue obligado a
+ * pasar por la puerta con el tipo que ya dedujo. La razón es que entre el ALTA de una hoja de
+ * conteo y su CIERRE pueden pasar días, y en ese rato el almacén pudo desactivarse o cambiar de
+ * tipo; la hoja lleva su dimensión persistida y al cerrar se vuelve a exigir contra ella.
+ */
+export async function tipoDeAlmacenUsable(
+  tx: Tx,
+  idAlmacen: number,
+  idEmpresa: number,
+): Promise<TipoAlmacen> {
+  const almacen = await leerAlmacenUsable(tx, idAlmacen, idEmpresa);
+  return almacen.tipo;
+}
+
+/**
  * Verifica que un almacén exista, esté ACTIVO, sea GLOBAL o de la empresa dada (A9) y sea del
  * `tipo` que corresponde al artículo que se está moviendo (fila 0.137). Lanza `ErrorNoEncontrado`
  * si no existe y `ErrorValidacion` si está desactivado, es de otra empresa o es de otro tipo — este

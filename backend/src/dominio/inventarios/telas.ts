@@ -66,6 +66,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirCancelableFueraDelCiclico } from './cancelacion-comun.js';
 import {
   exigirPermisoParaCancelarSalidaSinOrden,
   rechazarTipoReservado,
@@ -587,6 +588,9 @@ export async function cancelarMovimientoTela(
     // orden —que sólo el dueño puede registrar— se podría deshacer desde aquí con el
     // `inventario-telas.mover` que lleva medio organigrama, aunque `cancelarMovimientoTelaColor` la
     // proteja. La llave tiene que pedirse en TODAS las puertas, no en la principal.
+    // Fila 0.099 — el ajuste de un cíclico NO se deshace desde Inventarios (la hoja quedaría
+    // `cerrado` mientras el kardex dice otra cosa). Misma puerta de atrás que cerró la 0.104.
+    exigirCancelableFueraDelCiclico(original.origenTipo);
     await exigirPermisoParaCancelarSalidaSinOrden(tx, sesion, original);
     const codigoInverso =
       original.tipoMov.direccion === DireccionMovimiento.entrada

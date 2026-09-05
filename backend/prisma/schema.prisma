@@ -44,15 +44,15 @@ datasource db {
 /// del sistema viejo (doc 10 §5): `favorita` reemplaza a `Importancia = 1`,
 /// `paraIpt`/`paraEdr` conservan en qué procesos participa la empresa.
 model Empresa {
-  id            Int     @id @default(autoincrement())
+  id                 Int     @id @default(autoincrement())
   /// Nombre corto de uso diario (viejo: `Empresas.Empresa`). Único para evitar duplicados de captura.
-  nombre        String  @unique
-  razonSocial   String? @map("razon_social")
+  nombre             String  @unique
+  razonSocial        String? @map("razon_social")
   /// RFC fiscal de la empresa. Se usa para validar que el RECEPTOR de un CFDI de proveedor importado
   /// sea esta empresa (F9-E3, A9) y como EMISOR en los CFDI de ventas (F9-E4). Validado en Zod si
   /// viene (forma del RFC mexicano). NULL si no se ha capturado (la validación del receptor entonces
   /// solo AVISA, no rechaza).
-  rfc           String?
+  rfc                String?
   /// ⭐ RÉGIMEN FISCAL DEL SAT del RECEPTOR (clave del catálogo, p. ej. "601"). Lo exige el CFDI 4.0
   /// de quien nos factura: sin él, el proveedor NO puede timbrar a nombre de esta empresa. Nació con
   /// EL DOCUMENTO PARA FACTURAR (fila 0.118, §Post-F9.186(k): *«nadie me factura si no le mando yo un
@@ -66,15 +66,15 @@ model Empresa {
   /// otro nombre. NULL = no capturado (mismo trato que el régimen).
   codigoPostalFiscal String? @map("codigo_postal_fiscal")
   /// Identificador corto usado en folios e impresos (viejo: `Identificador`).
-  identificador String?
+  identificador      String?
   /// Empresa propuesta por defecto al iniciar sesión (viejo: `Importancia = 1`).
-  favorita      Boolean @default(false)
+  favorita           Boolean @default(false)
   /// Participa en el inventario de producto terminado (viejo: `ParaIPT`).
-  paraIpt       Boolean @map("para_ipt")
+  paraIpt            Boolean @map("para_ipt")
   /// Participa en el estado de resultados (viejo: `ParaEdoRes`).
-  paraEdr       Boolean @map("para_edr")
+  paraEdr            Boolean @map("para_edr")
   /// Borrado suave (plan §4: patrón conservado del sistema viejo): las empresas no se eliminan, se desactivan.
-  activa        Boolean @default(true)
+  activa             Boolean @default(true)
 
   /// LOGO de la empresa (post-F9, petición de Daniel 25-jul-2026): un solo archivo en R2 que
   /// brandea TODO — los 23 impresos PDF (vía `EncabezadoDocumento`) y la app (riel + login).
@@ -1787,6 +1787,8 @@ model TelaColor {
   dadosPorCubierto RequerimientoCubierto[]
   /// Renglones de orden de compra que piden ESTE color.
   lineasCompra     OrdenCompraLinea[]
+  /// Renglones de INVENTARIO CÍCLICO de telas que cuentan ESTE color (fila 0.099). Restrict.
+  ciclicoDetalles  InventarioCiclicoDetTela[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2198,6 +2200,8 @@ model Avio {
   notaSalidaLineas   NotaSalidaLinea[]
   /// Renglones de precosto que valúan este avío (F8-E3, traza del amarre). Restrict.
   precostoLineas     PrecostoLinea[]
+  /// Renglones de INVENTARIO CÍCLICO de avíos que cuentan ESTE avío (fila 0.099). Restrict.
+  ciclicoDetalles    InventarioCiclicoDetAvio[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3424,12 +3428,12 @@ model Orden {
   /// cerrada` es su espejo visible (para el badge y los filtros). NULL = abierta. Reabrir la
   /// vuelve a NULL: el historial de cierres y reaperturas vive en la Bitácora (A7), que es
   /// donde D3 lo pide — no se edita ni se borra ningún hecho, se agrega el acto inverso.
-  cerradaEn       DateTime?   @map("cerrada_en")
+  cerradaEn    DateTime? @map("cerrada_en")
   /// QUIÉN la cerró. Sin FK física (mismo criterio que `creadoPorId`/`modificadoPorId`, ADR-0005).
-  cerradaPorId    String?     @map("cerrada_por_id")
+  cerradaPorId String?   @map("cerrada_por_id")
   /// Motivo del cierre, OPCIONAL (a diferencia del de la cancelación, que es obligatorio: cerrar
   /// es el final normal de una orden, no una excepción que haya que justificar).
-  motivoCierre    String?     @map("motivo_cierre") @db.Text
+  motivoCierre String?   @map("motivo_cierre") @db.Text
 
   // El código de barra de la orden (viejo: `UPC`) fue ELIMINADO (decisión Gabriel 16-jun-2026):
   // los códigos de barra están en retiro; la columna no se conserva ni se migra.
@@ -4815,15 +4819,21 @@ model Movimiento {
 
   /// Renglones de nota de salida de TELA que REFERENCIAN este movimiento `salida-tela-orden` como
   /// documento de envío (F4-E5, decisión (e): la nota no descuenta tela, la referencia). Inversa.
-  notaLineasSalidaTela NotaSalidaLinea[]      @relation("NotaLineaSalidaTela")
+  notaLineasSalidaTela      NotaSalidaLinea[]          @relation("NotaLineaSalidaTela")
   /// Renglones de nota de salida de AVÍO cuyo descuento (`salida-por-nota`) GENERÓ este movimiento
   /// al confirmar la nota (F4-E5, R4). Inversa informativa.
-  notaLineasAvio       NotaSalidaLinea[]      @relation("NotaLineaAvio")
+  notaLineasAvio            NotaSalidaLinea[]          @relation("NotaLineaAvio")
   /// Renglones de inventario cíclico cuyo AJUSTE generó este movimiento (F7-E5). Inversa informativa.
-  ajustesCiclico       InventarioCiclicoDet[]
+  ajustesCiclico            InventarioCiclicoDet[]
+  /// Renglones de conteo de TELA (fila 0.099) cuyo ajuste ENTRÓ por este movimiento. Inversa.
+  ajustesCiclicoTelaEntrada InventarioCiclicoDetTela[] @relation("CiclicoTelaAjusteEntrada")
+  /// Renglones de conteo de TELA (fila 0.099) cuyo ajuste SALIÓ por este movimiento. Inversa.
+  ajustesCiclicoTelaSalida  InventarioCiclicoDetTela[] @relation("CiclicoTelaAjusteSalida")
+  /// Renglones de conteo de AVÍO (fila 0.099) cuyo ajuste generó este movimiento. Inversa.
+  ajustesCiclicoAvio        InventarioCiclicoDetAvio[]
   /// Documento de ENTRADA de tela por factura/remisión (B1) que generó este movimiento al
   /// CONFIRMARSE. 0 o 1 (la liga es 1:1 — `EntradaTela.idMovimiento` es único). Inversa.
-  entradaTela          EntradaTela?
+  entradaTela               EntradaTela?
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -7913,6 +7923,19 @@ enum EstadoInventarioCiclico {
   @@map("estado_inventario_ciclico")
 }
 
+/// QUÉ inventario cuenta una hoja de conteo cíclico (fila 0.099). NO la elige el usuario: se DERIVA
+/// del `Almacen.tipo` al dar de alta y se persiste en el encabezado, porque un almacén guarda una
+/// sola clase de mercancía (`TipoAlmacen`, fila 0.137). Es lo que decide la tabla de detalle
+/// (`InventarioCiclicoDet` / `…DetTela` / `…DetAvio`), qué kardex mueve el ajuste y si el conteo es
+/// CIEGO (PT) o con el saldo a la vista (telas y avíos — §Post-F9.193 punto 4).
+enum DimensionInventarioCiclico {
+  PT
+  TELA
+  AVIO
+
+  @@map("dimension_inventario_ciclico")
+}
+
 /// INVENTARIO CÍCLICO — encabezado (F7-E5; doc 05-Indicadores; ← forms `Alm_IC_Alta`/`_Cont`/
 /// `_Consulta`). Cuenta el físico contra el KARDEX de v2 (D3/D6): el ALTA CONGELA el teórico por
 /// artículo (`InventarioCiclicoDet.cantTeorica`) para que no cambie mientras se cuenta; el conteo es
@@ -7933,10 +7956,20 @@ model InventarioCiclico {
   fecha  DateTime                @db.Date
   estado EstadoInventarioCiclico @default(abierto)
 
+  /// QUÉ se cuenta (fila 0.099). DERIVADA del tipo del almacén al dar de alta — nunca la teclea
+  /// nadie — y persistida para que el resto del ciclo (conteo, ajuste, hoja) sepa a qué tabla de
+  /// detalle y a qué kardex ir sin volver a preguntarle al almacén. `@default(PT)` deja las hojas
+  /// que ya existían exactamente donde estaban (migración aditiva, SIN backfill — REGLA 0-B).
+  dimension DimensionInventarioCiclico @default(PT)
+
   observaciones String? @db.Text
 
-  /// Renglones (artículos) del conteo, a la granularidad REAL del kardex (…×orden). Cascade.
-  detalles InventarioCiclicoDet[]
+  /// Renglones (artículos) del conteo de PT, a la granularidad REAL del kardex (…×orden). Cascade.
+  detalles     InventarioCiclicoDet[]
+  /// Renglones del conteo de TELAS, por tela×color (fila 0.099). Cascade. Vacío si `dimension` ≠ TELA.
+  detallesTela InventarioCiclicoDetTela[]
+  /// Renglones del conteo de AVÍOS, por avío (fila 0.099). Cascade. Vacío si `dimension` ≠ AVIO.
+  detallesAvio InventarioCiclicoDetAvio[]
 
   /// Cancelación suave con motivo (A7): abortar el conteo sin generar ajuste.
   canceladoEn       DateTime? @map("cancelado_en")
@@ -8001,6 +8034,95 @@ model InventarioCiclicoDet {
   @@index([idInventarioCiclico])
   @@index([idMovimientoAjuste])
   @@map("inventario_ciclico_det")
+}
+
+/// INVENTARIO CÍCLICO — detalle de TELAS (fila 0.099). Un renglón por TELA×COLOR, que es la
+/// dimensión REAL de la existencia de tela del flujo nuevo (`existencia_tela_color`: tela × color ×
+/// almacén; el almacén sale del encabezado). NO se mezcla con `InventarioCiclicoDet`: meter las tres
+/// dimensiones en una tabla con columnas anulables rompería tanto la llave única como las FK
+/// Restrict — el detalle es ESPEJO del kardex al que ajusta.
+///
+/// ⭐ DOS COMPONENTES POR RENGLÓN (D5). Una tela puede llevar COMPLEMENTO (el cardigan), y cuerpo y
+/// complemento viajan JUNTOS en el mismo renglón de kardex: por eso hay dos pares
+/// teórico/real y DOS ligas de ajuste — un mismo renglón puede necesitar a la vez una ENTRADA (el
+/// componente que faltó) y una SALIDA (el que sobró). `cantTeoricaComplemento` NULL = la tela no
+/// lleva complemento (distinto de 0, que sí lo lleva y está en cero).
+model InventarioCiclicoDetTela {
+  id                  Int               @id @default(autoincrement())
+  idInventarioCiclico Int               @map("id_inventario_ciclico")
+  inventario          InventarioCiclico @relation(fields: [idInventarioCiclico], references: [id], onDelete: Cascade)
+
+  /// Color de la tela contado (hijo de `Tela`, flujo nuevo por color). Restrict.
+  idTelaColor Int       @map("id_tela_color")
+  telaColor   TelaColor @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
+
+  /// Existencia TEÓRICA CONGELADA del CUERPO al dar de alta (D6): Σ de movimientos en ese instante.
+  cantTeorica            Decimal  @map("cant_teorica") @db.Decimal(14, 4)
+  /// Cantidad FÍSICA contada del cuerpo. NULL hasta capturar el conteo del renglón.
+  cantReal               Decimal? @map("cant_real") @db.Decimal(14, 4)
+  /// Teórico CONGELADO del COMPLEMENTO. NULL = la tela no lleva complemento (≠ 0).
+  cantTeoricaComplemento Decimal? @map("cant_teorica_complemento") @db.Decimal(14, 4)
+  /// Cantidad FÍSICA contada del complemento. NULL = sin contar o sin complemento.
+  cantRealComplemento    Decimal? @map("cant_real_complemento") @db.Decimal(14, 4)
+
+  contadoEn    DateTime? @map("contado_en")
+  contadoPorId String?   @map("contado_por_id")
+
+  /// Movimiento de ENTRADA del ajuste que reconcilió este renglón (D3). NULL si no faltó nada.
+  idMovimientoAjusteEntrada Int?        @map("id_movimiento_ajuste_entrada")
+  movimientoAjusteEntrada   Movimiento? @relation("CiclicoTelaAjusteEntrada", fields: [idMovimientoAjusteEntrada], references: [id], onDelete: Restrict)
+  /// Movimiento de SALIDA del ajuste que reconcilió este renglón (D3). NULL si no sobró nada.
+  idMovimientoAjusteSalida  Int?        @map("id_movimiento_ajuste_salida")
+  movimientoAjusteSalida    Movimiento? @relation("CiclicoTelaAjusteSalida", fields: [idMovimientoAjusteSalida], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// Un color NO se cuenta dos veces en la misma hoja: dos renglones se restarían dos veces contra
+  /// el MISMO teórico. Aquí SÍ lo garantiza la BD (ninguna columna de la llave es NULL).
+  @@unique([idInventarioCiclico, idTelaColor])
+  @@index([idInventarioCiclico])
+  @@index([idMovimientoAjusteEntrada])
+  @@index([idMovimientoAjusteSalida])
+  @@map("inventario_ciclico_det_tela")
+}
+
+/// INVENTARIO CÍCLICO — detalle de AVÍOS (fila 0.099). Un renglón por AVÍO, que es la dimensión REAL
+/// de la existencia de avíos (`existencia_avio`: avío × almacén — el LOTE no entra, R4; el almacén
+/// sale del encabezado). Cantidad DECIMAL (los avíos se miden en metros, kilos o piezas).
+model InventarioCiclicoDetAvio {
+  id                  Int               @id @default(autoincrement())
+  idInventarioCiclico Int               @map("id_inventario_ciclico")
+  inventario          InventarioCiclico @relation(fields: [idInventarioCiclico], references: [id], onDelete: Cascade)
+
+  /// Avío contado. Restrict: un avío con conteos no se borra físico.
+  idAvio Int  @map("id_avio")
+  avio   Avio @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+
+  /// Existencia TEÓRICA CONGELADA al dar de alta (D6): Σ de movimientos en ese instante.
+  cantTeorica Decimal  @map("cant_teorica") @db.Decimal(14, 4)
+  /// Cantidad FÍSICA contada. NULL hasta capturar el conteo del renglón.
+  cantReal    Decimal? @map("cant_real") @db.Decimal(14, 4)
+
+  contadoEn    DateTime? @map("contado_en")
+  contadoPorId String?   @map("contado_por_id")
+
+  /// Movimiento de kardex del AJUSTE que reconcilió este renglón (D3). NULL hasta generar el ajuste.
+  idMovimientoAjuste Int?        @map("id_movimiento_ajuste")
+  movimientoAjuste   Movimiento? @relation(fields: [idMovimientoAjuste], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// Un avío NO se cuenta dos veces en la misma hoja (misma razón que en telas).
+  @@unique([idInventarioCiclico, idAvio])
+  @@index([idInventarioCiclico])
+  @@index([idMovimientoAjuste])
+  @@map("inventario_ciclico_det_avio")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

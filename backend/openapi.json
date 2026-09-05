@@ -237673,6 +237673,20 @@
             "in": "query",
             "name": "idAlmacen",
             "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PT",
+                "TELA",
+                "AVIO"
+              ]
+            },
+            "in": "query",
+            "name": "dimension",
+            "required": false,
+            "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
           }
         ],
         "security": [
@@ -237715,6 +237729,15 @@
                           },
                           "almacen": {
                             "type": "string"
+                          },
+                          "dimension": {
+                            "type": "string",
+                            "enum": [
+                              "PT",
+                              "TELA",
+                              "AVIO"
+                            ],
+                            "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
                           },
                           "fecha": {
                             "type": "string",
@@ -237797,6 +237820,7 @@
                           "idEmpresa",
                           "idAlmacen",
                           "almacen",
+                          "dimension",
                           "fecha",
                           "estado",
                           "observaciones",
@@ -238009,7 +238033,27 @@
                     "maximum": 9007199254740991
                   },
                   "idsModelo": {
-                    "description": "Modelos a revisar; vacío/ausente = todo el almacén.",
+                    "description": "Solo almacenes de PT: modelos a revisar; vacío/ausente = todo el almacén.",
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "idsTela": {
+                    "description": "Solo almacenes de TELA: telas a revisar; vacío/ausente = todo el almacén.",
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "idsAvio": {
+                    "description": "Solo almacenes de AVÍO: avíos a revisar; vacío/ausente = todo el almacén.",
                     "maxItems": 500,
                     "type": "array",
                     "items": {
@@ -238065,6 +238109,15 @@
                     },
                     "almacen": {
                       "type": "string"
+                    },
+                    "dimension": {
+                      "type": "string",
+                      "enum": [
+                        "PT",
+                        "TELA",
+                        "AVIO"
+                      ],
+                      "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
                     },
                     "fecha": {
                       "type": "string",
@@ -238147,6 +238200,7 @@
                     "idEmpresa",
                     "idAlmacen",
                     "almacen",
+                    "dimension",
                     "fecha",
                     "estado",
                     "observaciones",
@@ -238365,6 +238419,15 @@
                     "almacen": {
                       "type": "string"
                     },
+                    "dimension": {
+                      "type": "string",
+                      "enum": [
+                        "PT",
+                        "TELA",
+                        "AVIO"
+                      ],
+                      "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
+                    },
                     "fecha": {
                       "type": "string",
                       "format": "date",
@@ -238446,6 +238509,7 @@
                     "idEmpresa",
                     "idAlmacen",
                     "almacen",
+                    "dimension",
                     "fecha",
                     "estado",
                     "observaciones",
@@ -238635,7 +238699,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Vista de captura de conteo — CIEGA (sin teórico, doc 05 §Almacén / D6).",
+            "description": "Vista de captura de conteo (doc 05 §Almacén / D6).",
             "content": {
               "application/json": {
                 "schema": {
@@ -238658,6 +238722,15 @@
                     },
                     "almacen": {
                       "type": "string"
+                    },
+                    "dimension": {
+                      "type": "string",
+                      "enum": [
+                        "PT",
+                        "TELA",
+                        "AVIO"
+                      ],
+                      "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
                     },
                     "fecha": {
                       "type": "string",
@@ -238684,65 +238757,40 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991
                           },
-                          "idModelo": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
+                          "titulo": {
+                            "type": "string",
+                            "description": "El artículo: código del modelo, nombre de la tela o clave del avío."
                           },
-                          "modelo": {
-                            "type": "string"
-                          },
-                          "idColor": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "color": {
-                            "type": "string"
-                          },
-                          "idTalla": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "etiquetaTalla": {
-                            "type": "string"
-                          },
-                          "ordenTalla": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "idOrden": {
+                          "subtitulo": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "string"
                               },
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Lo que lo distingue: color·talla·orden, el color de la tela, la descripción del avío."
                           },
-                          "folioOrden": {
+                          "unidad": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "string"
                               },
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Unidad de la cantidad (m, kg, pza…); null si no aplica."
+                          },
+                          "cantTeorica": {
+                            "description": "Saldo del sistema al abrir la hoja. AUSENTE en PT (conteo ciego, D6).",
+                            "type": "number"
                           },
                           "cantReal": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "number"
                               },
                               {
                                 "type": "null"
@@ -238750,26 +238798,46 @@
                             ],
                             "description": "Cantidad física capturada; null si no se ha contado."
                           },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del segundo componente de la tela (D5); null si el artículo no lleva."
+                          },
+                          "cantTeoricaComplemento": {
+                            "type": "number"
+                          },
+                          "cantRealComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "contado": {
                             "type": "boolean"
                           }
                         },
                         "required": [
                           "idDet",
-                          "idModelo",
-                          "modelo",
-                          "idColor",
-                          "color",
-                          "idTalla",
-                          "etiquetaTalla",
-                          "ordenTalla",
-                          "idOrden",
-                          "folioOrden",
+                          "titulo",
+                          "subtitulo",
+                          "unidad",
                           "cantReal",
+                          "nombreComplemento",
+                          "cantRealComplemento",
                           "contado"
                         ],
                         "additionalProperties": false,
-                        "description": "Renglón de conteo ciego (sin cantTeorica)."
+                        "description": "Renglón de conteo (con el saldo a la vista en telas/avíos; ciego en PT)."
                       }
                     }
                   },
@@ -238778,12 +238846,13 @@
                     "folio",
                     "idAlmacen",
                     "almacen",
+                    "dimension",
                     "fecha",
                     "estado",
                     "renglones"
                   ],
                   "additionalProperties": false,
-                  "description": "Vista de captura de conteo — CIEGA (sin teórico, doc 05 §Almacén / D6)."
+                  "description": "Vista de captura de conteo (doc 05 §Almacén / D6)."
                 }
               }
             }
@@ -238959,9 +239028,13 @@
                           "maximum": 9007199254740991
                         },
                         "cantReal": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 9007199254740991
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "cantRealComplemento": {
+                          "description": "Solo telas CON complemento (D5): lo contado del cardigan.",
+                          "type": "number",
+                          "minimum": 0
                         }
                       },
                       "required": [
@@ -238997,7 +239070,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Vista de captura de conteo — CIEGA (sin teórico, doc 05 §Almacén / D6).",
+            "description": "Vista de captura de conteo (doc 05 §Almacén / D6).",
             "content": {
               "application/json": {
                 "schema": {
@@ -239020,6 +239093,15 @@
                     },
                     "almacen": {
                       "type": "string"
+                    },
+                    "dimension": {
+                      "type": "string",
+                      "enum": [
+                        "PT",
+                        "TELA",
+                        "AVIO"
+                      ],
+                      "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
                     },
                     "fecha": {
                       "type": "string",
@@ -239046,65 +239128,40 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991
                           },
-                          "idModelo": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
+                          "titulo": {
+                            "type": "string",
+                            "description": "El artículo: código del modelo, nombre de la tela o clave del avío."
                           },
-                          "modelo": {
-                            "type": "string"
-                          },
-                          "idColor": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "color": {
-                            "type": "string"
-                          },
-                          "idTalla": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "etiquetaTalla": {
-                            "type": "string"
-                          },
-                          "ordenTalla": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "idOrden": {
+                          "subtitulo": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "string"
                               },
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Lo que lo distingue: color·talla·orden, el color de la tela, la descripción del avío."
                           },
-                          "folioOrden": {
+                          "unidad": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "string"
                               },
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Unidad de la cantidad (m, kg, pza…); null si no aplica."
+                          },
+                          "cantTeorica": {
+                            "description": "Saldo del sistema al abrir la hoja. AUSENTE en PT (conteo ciego, D6).",
+                            "type": "number"
                           },
                           "cantReal": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "number"
                               },
                               {
                                 "type": "null"
@@ -239112,26 +239169,46 @@
                             ],
                             "description": "Cantidad física capturada; null si no se ha contado."
                           },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del segundo componente de la tela (D5); null si el artículo no lleva."
+                          },
+                          "cantTeoricaComplemento": {
+                            "type": "number"
+                          },
+                          "cantRealComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "contado": {
                             "type": "boolean"
                           }
                         },
                         "required": [
                           "idDet",
-                          "idModelo",
-                          "modelo",
-                          "idColor",
-                          "color",
-                          "idTalla",
-                          "etiquetaTalla",
-                          "ordenTalla",
-                          "idOrden",
-                          "folioOrden",
+                          "titulo",
+                          "subtitulo",
+                          "unidad",
                           "cantReal",
+                          "nombreComplemento",
+                          "cantRealComplemento",
                           "contado"
                         ],
                         "additionalProperties": false,
-                        "description": "Renglón de conteo ciego (sin cantTeorica)."
+                        "description": "Renglón de conteo (con el saldo a la vista en telas/avíos; ciego en PT)."
                       }
                     }
                   },
@@ -239140,12 +239217,394 @@
                     "folio",
                     "idAlmacen",
                     "almacen",
+                    "dimension",
                     "fecha",
                     "estado",
                     "renglones"
                   ],
                   "additionalProperties": false,
-                  "description": "Vista de captura de conteo — CIEGA (sin teórico, doc 05 §Almacén / D6)."
+                  "description": "Vista de captura de conteo (doc 05 §Almacén / D6)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/indicadores/ciclicos/{id}/renglones": {
+      "post": {
+        "summary": "Agregar a la hoja un artículo que el sistema cree que no tiene",
+        "tags": [
+          "indicadores"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idModelo": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idColor": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idTalla": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idOrden": {
+                    "description": "PT: orden dueña de las prendas; ausente/null = bucket «sin orden».",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idTelaColor": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idAvio": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vista de captura de conteo (doc 05 §Almacén / D6).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "idAlmacen": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "almacen": {
+                      "type": "string"
+                    },
+                    "dimension": {
+                      "type": "string",
+                      "enum": [
+                        "PT",
+                        "TELA",
+                        "AVIO"
+                      ],
+                      "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "abierto",
+                        "contado",
+                        "cerrado",
+                        "cancelado"
+                      ],
+                      "description": "abierto → contado → cerrado (ajuste aplicado); cancelado = abortado antes de cerrar."
+                    },
+                    "renglones": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idDet": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "titulo": {
+                            "type": "string",
+                            "description": "El artículo: código del modelo, nombre de la tela o clave del avío."
+                          },
+                          "subtitulo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Lo que lo distingue: color·talla·orden, el color de la tela, la descripción del avío."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de la cantidad (m, kg, pza…); null si no aplica."
+                          },
+                          "cantTeorica": {
+                            "description": "Saldo del sistema al abrir la hoja. AUSENTE en PT (conteo ciego, D6).",
+                            "type": "number"
+                          },
+                          "cantReal": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cantidad física capturada; null si no se ha contado."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del segundo componente de la tela (D5); null si el artículo no lleva."
+                          },
+                          "cantTeoricaComplemento": {
+                            "type": "number"
+                          },
+                          "cantRealComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "contado": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "idDet",
+                          "titulo",
+                          "subtitulo",
+                          "unidad",
+                          "cantReal",
+                          "nombreComplemento",
+                          "cantRealComplemento",
+                          "contado"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de conteo (con el saldo a la vista en telas/avíos; ciego en PT)."
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folio",
+                    "idAlmacen",
+                    "almacen",
+                    "dimension",
+                    "fecha",
+                    "estado",
+                    "renglones"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Vista de captura de conteo (doc 05 §Almacén / D6)."
                 }
               }
             }
@@ -239352,6 +239811,15 @@
                     "almacen": {
                       "type": "string"
                     },
+                    "dimension": {
+                      "type": "string",
+                      "enum": [
+                        "PT",
+                        "TELA",
+                        "AVIO"
+                      ],
+                      "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
+                    },
                     "fecha": {
                       "type": "string",
                       "format": "date",
@@ -239409,53 +239877,23 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991
                           },
-                          "idModelo": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "modelo": {
+                          "titulo": {
                             "type": "string"
                           },
-                          "idColor": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "color": {
-                            "type": "string"
-                          },
-                          "idTalla": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "etiquetaTalla": {
-                            "type": "string"
-                          },
-                          "ordenTalla": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "idOrden": {
+                          "subtitulo": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "string"
                               },
                               {
                                 "type": "null"
                               }
                             ]
                           },
-                          "folioOrden": {
+                          "unidad": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "string"
                               },
                               {
                                 "type": "null"
@@ -239463,16 +239901,12 @@
                             ]
                           },
                           "cantTeorica": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
+                            "type": "number"
                           },
                           "cantReal": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "number"
                               },
                               {
                                 "type": "null"
@@ -239482,9 +239916,7 @@
                           "exactitud": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "number"
                               },
                               {
                                 "type": "null"
@@ -239492,47 +239924,91 @@
                             ],
                             "description": "cantReal − cantTeorica; null si el renglón no se ha contado."
                           },
-                          "idMovimientoAjuste": {
+                          "nombreComplemento": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "string"
                               },
                               {
                                 "type": "null"
                               }
                             ]
                           },
-                          "folioMovimientoAjuste": {
+                          "cantTeoricaComplemento": {
                             "anyOf": [
                               {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                                "type": "number"
                               },
                               {
                                 "type": "null"
                               }
                             ]
+                          },
+                          "cantRealComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "exactitudComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "ajustes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "direccion": {
+                                  "type": "string",
+                                  "enum": [
+                                    "entrada",
+                                    "salida"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "folio",
+                                "direccion"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
                           "idDet",
-                          "idModelo",
-                          "modelo",
-                          "idColor",
-                          "color",
-                          "idTalla",
-                          "etiquetaTalla",
-                          "ordenTalla",
-                          "idOrden",
-                          "folioOrden",
+                          "titulo",
+                          "subtitulo",
+                          "unidad",
                           "cantTeorica",
                           "cantReal",
                           "exactitud",
-                          "idMovimientoAjuste",
-                          "folioMovimientoAjuste"
+                          "nombreComplemento",
+                          "cantTeoricaComplemento",
+                          "cantRealComplemento",
+                          "exactitudComplemento",
+                          "ajustes"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de exactitud (teórico vs real)."
@@ -239556,23 +240032,19 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
-                          "description": "Renglones contados con exactitud 0."
+                          "description": "Renglones contados sin diferencia en NINGÚN componente."
                         },
                         "diferencias": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
-                          "description": "Renglones contados con exactitud ≠ 0."
+                          "description": "Renglones contados con diferencia en algún componente."
                         },
                         "teorico": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
+                          "type": "number"
                         },
                         "real": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991,
+                          "type": "number",
                           "description": "Suma de cantReal (solo renglones contados)."
                         }
                       },
@@ -239593,6 +240065,7 @@
                     "idEmpresa",
                     "idAlmacen",
                     "almacen",
+                    "dimension",
                     "fecha",
                     "estado",
                     "observaciones",
@@ -239761,6 +240234,24 @@
         "tags": [
           "indicadores"
         ],
+        "description": "Si el almacén se movió entre el alta y el cierre, responde 200 con `aplicado: false` y el AVISO de qué artículos se movieron, SIN escribir nada (decisión 6: avisar y dejar decidir, no bloquear). Repetir con `confirmarMovimiento: true` aplica.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirmarMovimiento": {
+                    "default": false,
+                    "description": "true = ya vi el aviso de que el almacén se movió y aun así quiero aplicar.",
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -239780,286 +240271,406 @@
         ],
         "responses": {
           "200": {
-            "description": "Vista de exactitud + generación del ajuste (permiso de consulta).",
+            "description": "Ajuste del cíclico: aplicado, o detenido con el aviso de que el almacén se movió.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                    "aplicado": {
+                      "type": "boolean",
+                      "description": "false = NO se escribió nada: hay un aviso que confirmar antes de aplicar."
                     },
-                    "folio": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    },
-                    "idEmpresa": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    },
-                    "idAlmacen": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    },
-                    "almacen": {
-                      "type": "string"
-                    },
-                    "fecha": {
-                      "type": "string",
-                      "format": "date",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                    },
-                    "estado": {
-                      "type": "string",
-                      "enum": [
-                        "abierto",
-                        "contado",
-                        "cerrado",
-                        "cancelado"
-                      ],
-                      "description": "abierto → contado → cerrado (ajuste aplicado); cancelado = abortado antes de cerrar."
-                    },
-                    "observaciones": {
+                    "aviso": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "object",
+                          "properties": {
+                            "articulos": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "idDet": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "titulo": {
+                                    "type": "string"
+                                  },
+                                  "subtitulo": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "componente": {
+                                    "type": "string",
+                                    "enum": [
+                                      "cuerpo",
+                                      "complemento"
+                                    ],
+                                    "description": "Qué componente se movió (las telas tienen dos; PT y avíos, sólo «cuerpo»)."
+                                  },
+                                  "cantTeorica": {
+                                    "type": "number",
+                                    "description": "Lo que el sistema tenía CONGELADO al abrir la hoja."
+                                  },
+                                  "existenciaActual": {
+                                    "type": "number",
+                                    "description": "Lo que el sistema tiene AHORA (Σ de movimientos, D3)."
+                                  },
+                                  "cantReal": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Lo que se contó físicamente; null si no se contó."
+                                  },
+                                  "ajuste": {
+                                    "type": "number",
+                                    "description": "Lo que el ajuste va a mover en este componente (contado − teórico congelado)."
+                                  },
+                                  "existenciaResultante": {
+                                    "type": "number",
+                                    "description": "Existencia que quedará si se aplica: existenciaActual + ajuste."
+                                  }
+                                },
+                                "required": [
+                                  "idDet",
+                                  "titulo",
+                                  "subtitulo",
+                                  "componente",
+                                  "cantTeorica",
+                                  "existenciaActual",
+                                  "cantReal",
+                                  "ajuste",
+                                  "existenciaResultante"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "articulos"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Artículos cuya existencia cambió entre el alta y el cierre de la hoja."
                         },
                         {
                           "type": "null"
                         }
                       ]
                     },
-                    "canceladoEn": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date-time",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "motivoCancelacion": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "renglones": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "idDet": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "idModelo": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "modelo": {
-                            "type": "string"
-                          },
-                          "idColor": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "color": {
-                            "type": "string"
-                          },
-                          "idTalla": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "etiquetaTalla": {
-                            "type": "string"
-                          },
-                          "ordenTalla": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "idOrden": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "folioOrden": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "cantTeorica": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "cantReal": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "exactitud": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "cantReal − cantTeorica; null si el renglón no se ha contado."
-                          },
-                          "idMovimientoAjuste": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "folioMovimientoAjuste": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          }
-                        },
-                        "required": [
-                          "idDet",
-                          "idModelo",
-                          "modelo",
-                          "idColor",
-                          "color",
-                          "idTalla",
-                          "etiquetaTalla",
-                          "ordenTalla",
-                          "idOrden",
-                          "folioOrden",
-                          "cantTeorica",
-                          "cantReal",
-                          "exactitud",
-                          "idMovimientoAjuste",
-                          "folioMovimientoAjuste"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Renglón de exactitud (teórico vs real)."
-                      }
-                    },
-                    "totales": {
+                    "exactitud": {
                       "type": "object",
                       "properties": {
-                        "total": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991,
-                          "description": "Artículos enumerados."
-                        },
-                        "contados": {
+                        "id": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
-                        "exactos": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991,
-                          "description": "Renglones contados con exactitud 0."
-                        },
-                        "diferencias": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991,
-                          "description": "Renglones contados con exactitud ≠ 0."
-                        },
-                        "teorico": {
+                        "folio": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
                         },
-                        "real": {
+                        "idEmpresa": {
                           "type": "integer",
                           "minimum": -9007199254740991,
-                          "maximum": 9007199254740991,
-                          "description": "Suma de cantReal (solo renglones contados)."
+                          "maximum": 9007199254740991
+                        },
+                        "idAlmacen": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "almacen": {
+                          "type": "string"
+                        },
+                        "dimension": {
+                          "type": "string",
+                          "enum": [
+                            "PT",
+                            "TELA",
+                            "AVIO"
+                          ],
+                          "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
+                        },
+                        "fecha": {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        "estado": {
+                          "type": "string",
+                          "enum": [
+                            "abierto",
+                            "contado",
+                            "cerrado",
+                            "cancelado"
+                          ],
+                          "description": "abierto → contado → cerrado (ajuste aplicado); cancelado = abortado antes de cerrar."
+                        },
+                        "observaciones": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "canceladoEn": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "motivoCancelacion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "renglones": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idDet": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "titulo": {
+                                "type": "string"
+                              },
+                              "subtitulo": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "unidad": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "cantTeorica": {
+                                "type": "number"
+                              },
+                              "cantReal": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "exactitud": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "cantReal − cantTeorica; null si el renglón no se ha contado."
+                              },
+                              "nombreComplemento": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "cantTeoricaComplemento": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "cantRealComplemento": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "exactitudComplemento": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "ajustes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "folio": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "direccion": {
+                                      "type": "string",
+                                      "enum": [
+                                        "entrada",
+                                        "salida"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "folio",
+                                    "direccion"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "idDet",
+                              "titulo",
+                              "subtitulo",
+                              "unidad",
+                              "cantTeorica",
+                              "cantReal",
+                              "exactitud",
+                              "nombreComplemento",
+                              "cantTeoricaComplemento",
+                              "cantRealComplemento",
+                              "exactitudComplemento",
+                              "ajustes"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Renglón de exactitud (teórico vs real)."
+                          }
+                        },
+                        "totales": {
+                          "type": "object",
+                          "properties": {
+                            "total": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Artículos enumerados."
+                            },
+                            "contados": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "exactos": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Renglones contados sin diferencia en NINGÚN componente."
+                            },
+                            "diferencias": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Renglones contados con diferencia en algún componente."
+                            },
+                            "teorico": {
+                              "type": "number"
+                            },
+                            "real": {
+                              "type": "number",
+                              "description": "Suma de cantReal (solo renglones contados)."
+                            }
+                          },
+                          "required": [
+                            "total",
+                            "contados",
+                            "exactos",
+                            "diferencias",
+                            "teorico",
+                            "real"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
-                        "total",
-                        "contados",
-                        "exactos",
-                        "diferencias",
-                        "teorico",
-                        "real"
+                        "id",
+                        "folio",
+                        "idEmpresa",
+                        "idAlmacen",
+                        "almacen",
+                        "dimension",
+                        "fecha",
+                        "estado",
+                        "observaciones",
+                        "canceladoEn",
+                        "motivoCancelacion",
+                        "renglones",
+                        "totales"
                       ],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "Vista de exactitud + generación del ajuste (permiso de consulta)."
                     }
                   },
                   "required": [
-                    "id",
-                    "folio",
-                    "idEmpresa",
-                    "idAlmacen",
-                    "almacen",
-                    "fecha",
-                    "estado",
-                    "observaciones",
-                    "canceladoEn",
-                    "motivoCancelacion",
-                    "renglones",
-                    "totales"
+                    "aplicado",
+                    "aviso",
+                    "exactitud"
                   ],
                   "additionalProperties": false,
-                  "description": "Vista de exactitud + generación del ajuste (permiso de consulta)."
+                  "description": "Ajuste del cíclico: aplicado, o detenido con el aviso de que el almacén se movió."
                 }
               }
             }
@@ -240286,6 +240897,15 @@
                     "almacen": {
                       "type": "string"
                     },
+                    "dimension": {
+                      "type": "string",
+                      "enum": [
+                        "PT",
+                        "TELA",
+                        "AVIO"
+                      ],
+                      "description": "Qué se cuenta; se deriva del tipo del almacén, no se captura."
+                    },
                     "fecha": {
                       "type": "string",
                       "format": "date",
@@ -240367,6 +240987,7 @@
                     "idEmpresa",
                     "idAlmacen",
                     "almacen",
+                    "dimension",
                     "fecha",
                     "estado",
                     "observaciones",
@@ -240533,7 +241154,7 @@
     },
     "/api/indicadores/ciclicos/{id}/hoja-conteo": {
       "get": {
-        "summary": "Hoja de conteo en PDF (CIEGA — sin teórico, R9)",
+        "summary": "Hoja de conteo en PDF (R9; ciega en PT — sin teórico, D6)",
         "tags": [
           "indicadores"
         ],
