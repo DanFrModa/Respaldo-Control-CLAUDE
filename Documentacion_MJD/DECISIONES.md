@@ -12022,7 +12022,7 @@ allí la respuesta textual.)*
 **(a) 0.061(c) · «El costo se congela al cerrar la orden»** — respuesta a la pregunta que **él mismo levantó**
 el 30-ago (*«¿en qué momento se define que ya se cerró el costo? ¿O va cambiando?»*).
 ⚠️ **MEDIDO, y hay que saberlo antes de construir: «cerrar la orden» NO EXISTE HOY.** `EstadoOrden` es
-`capturada | completa | cancelada`, **no hay «cerrada»**, y 🔴 **`completa` NO significa «terminada»**: el
+`capturada | completa | cancelada`, **no había «cerrada»** —la construyó la fila 0.061—, y 🔴 **`completa` NO significa «terminada»**: el
 propio esquema la define como **completitud de CAPTURA** (tallas + receta liberada + arte). **El nombre invita
 al error.**
 ⚠️ **Y el candidato automático NO sirve — lo desmiente la propia decisión (a) de §Post-F9.154:** como los
@@ -12135,6 +12135,32 @@ nuevo **sí** pasan.
 - **Aplica en:** versión **0.087**, ficha `V1-E9s`. **Fecha:** 2026-09-02.
 
 ---
+
+#### (Post-F9.200) Cerrar la orden y congelar el costo — los seis valores por omisión (fila 0.061, 4-sep-2026)
+
+**Contexto.** Daniel decidió el 30-ago (§Post-F9.154) que la prenda incompleta sale de tránsito como merma,
+que el divisor del costo pasa a `recibido`, y —contestando su propia pregunta *«¿en qué momento se define que
+ya se cerró el costo? ¿o va cambiando?»*— que **el costo se congela al cerrar la orden**. Al construirlo
+apareció que **cerrar la orden no existía**: `EstadoOrden` era `capturada | completa | cancelada`, y
+`completa` significa completitud de **captura**, no «terminada». Hubo que construir el acto, y con él estas
+seis decisiones. **Van implementadas con el valor de abajo; Daniel confirma o ajusta.**
+
+1. **Quién puede cerrar y reabrir.** Permiso nuevo `ordenes.cerrar` → **Administrador, Administración /
+   Dirección y Directivo**. Es el mismo círculo que ya cierra dinero.
+2. **Qué bloquea el cierre.** Toda captura y todo lo que mueva el costo: encabezado, matriz de tallas,
+   copiar matriz, referencias del cliente, precio de maquila, receta congelada, cancelación de la orden.
+   **Quedan libres** los comentarios, los adjuntos y consultar/imprimir.
+3. **El motivo.** **Opcional al cerrar** (es el final normal de una orden) y **obligatorio al reabrir** (es
+   la excepción, y debe quedar dicho por qué).
+4. **Cerrar una orden cancelada** → se **rechaza**. Una orden ya tiene un final; no se le ponen dos.
+5. **Cerrar dos veces** → se **rechaza**; hay que reabrir primero. Así nadie re-congela un costo distinto en
+   silencio.
+6. **Reabrir no restaura el estado que la orden tenía**: lo **vuelve a computar** de sus requisitos, que es
+   la única fuente que no puede quedar desfasada.
+
+⚠️ **Consecuencia de la decisión (a) que conviene tener presente:** como las incompletas salen como merma y
+**no vuelven**, una orden que perdió piezas **nunca llega al 100 % entregado**. Por eso el cierre es un acto
+de una persona y no algo que el sistema pueda deducir solo.
 
 #### (Post-F9.199) — LO PENDIENTE DE LA DECISIÓN SE VE JUNTO AL SALDO (fila 0.111, 4-sep-2026): qué cuenta como «por revisar» y cómo se valúa
 

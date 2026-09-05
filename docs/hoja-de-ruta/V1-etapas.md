@@ -1240,7 +1240,7 @@ sus hermanas — *«advirtiendo de la diferencia»*, §Post-F9.156 Pieza 1. Con 
 
 ### ⭐⭐ El defecto grande: el arreglo INVERTÍA el aviso, y luego lo APAGABA
 
-Como **no existe estado de «cerrada»** (`capturada | completa | cancelada`), **una OP entregada en 2019 vota
+Como este módulo **no usa** el estado «cerrada» que estrenó la 0.061 (antes ni siquiera existía: `capturada | completa | cancelada`), **una OP entregada en 2019 vota
 para siempre** ⇒ N históricas contra 1 nueva **señalaban a la nueva y correcta**. Se acotó: **las recetas
 escritas por un backfill no votan**.
 
