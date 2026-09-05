@@ -50,7 +50,12 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { cantidadDeBase, cantidadesDeOrdenes, cantidadesVacias } from '../costos/cantidades.js';
+import {
+  cantidadDeBase,
+  cantidadesDeOrdenes,
+  cantidadesVacias,
+  divisorCongelado,
+} from '../costos/cantidades.js';
 import { num, redondear2 } from '../costos/decimales.js';
 
 /** Totales que alimentan la fórmula del resultado. */
@@ -133,9 +138,21 @@ interface LineaParaCosto {
 
 /**
  * Calcula el COSTO ACTUAL (D1) de un conjunto de líneas en pocas consultas (no N+1): el costo unitario
- * de una orden = `CostoOrden.costoTotal ÷ cantidadDeBase(cantidades, base)` (base guardada en el costo,
- * default `cortado`), y el de la línea = unitario × cantVendida. Las líneas SIN orden, sin `CostoOrden`,
- * sin `costoTotal` o con base 0 quedan `sinCosto` (costo 0) para que el usuario las revise.
+ * de una orden = `CostoOrden.costoTotal ÷ divisor`, y el de la línea = unitario × cantVendida. Las
+ * líneas SIN orden, sin `CostoOrden`, sin `costoTotal` o con divisor 0 quedan `sinCosto` (costo 0)
+ * para que el usuario las revise. La base la manda el costo guardado (default `recibido` desde
+ * 0.061; hasta esa versión, `cortado`).
+ *
+ * ⭐⭐ **EL DIVISOR RESPETA EL CONGELADO DE LA ORDEN CERRADA (0.061 — §Post-F9.154(c)).** Si la orden
+ * está cerrada se usa `cantidadBaseCongelada`, el mismo número que enseñan su ficha de costeo y la
+ * lista de costos; sólo la orden ABIERTA se re-divide en vivo.
+ *
+ * 🔴 **Por qué importa aquí más que en ningún lado.** Éste es el COSTO DE VENTA del Estado de
+ * Resultados. `recibido` se deriva de los recibos de procesos con `generaEntradaPt`, y esa bandera
+ * **se edita desde el CRUD «Tipos de proceso»**: al tocarla cambia el divisor VIVO de todas las
+ * órdenes. Sin esta línea, el EDR de un mes ya cerrado diría un costo y la ficha de la MISMA orden
+ * diría otro — y el que manda para el negocio es éste. No es defensa teórica: es el camino por el
+ * que el costo congelado se descongelaba solo.
  */
 async function costoActualPorLinea(
   lineas: LineaParaCosto[],
@@ -152,7 +169,16 @@ async function costoActualPorLinea(
       ? []
       : await cliente.costoOrden.findMany({
           where: { idOrden: { in: idsOrden } },
-          select: { idOrden: true, costoTotal: true, baseProrrateo: true },
+          select: {
+            idOrden: true,
+            costoTotal: true,
+            baseProrrateo: true,
+            // 0.061: el sello del congelado + el cierre de su orden. Sin estas tres columnas el
+            // divisor de una orden cerrada se volvería a calcular en vivo.
+            congeladoEn: true,
+            cantidadBaseCongelada: true,
+            orden: { select: { cerradaEn: true } },
+          },
         });
   const costoPorOrden = new Map(costos.map((c) => [c.idOrden, c]));
 
@@ -170,7 +196,11 @@ async function costoActualPorLinea(
       sinCosto(l.id);
       continue;
     }
-    const base = cantidadDeBase(cant.get(l.idOrden) ?? cantidadesVacias(), co.baseProrrateo);
+    // ⭐ 0.061: la orden CERRADA usa su divisor CONGELADO; la abierta lo recalcula en vivo. Es la
+    // MISMA regla (`divisorCongelado`) que la ficha de costeo y la lista de costos.
+    const base =
+      divisorCongelado(co.orden, co) ??
+      cantidadDeBase(cant.get(l.idOrden) ?? cantidadesVacias(), co.baseProrrateo);
     if (base <= 0) {
       sinCosto(l.id);
       continue;

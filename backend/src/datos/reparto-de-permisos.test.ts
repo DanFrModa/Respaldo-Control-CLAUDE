@@ -551,6 +551,17 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
       'y dar de alta un concepto es dar de alta A DÓNDE puede salir dinero fuera del padrón de ' +
       'proveedores.',
   },
+  // ── ⭐⭐ Cerrar la orden y CONGELAR su costo (fila 0.061), §Post-F9.154(c) ──────────────────
+  {
+    clave: 'ordenes.cerrar',
+    razon:
+      'Administrador, Administración/Dirección y Directivo — el mismo círculo que ya cierra ' +
+      'dinero (`costos.capturar`, `edr.*`). Cerrar una orden CONGELA su costo unitario y la deja ' +
+      'en solo lectura (ninguna etapa, ningún costo, ninguna cancelación), y REABRIRLA va con el ' +
+      'MISMO permiso: quien puede congelar el costo es quien puede descongelarlo. NO baja a ' +
+      'producción ni a Ventas — el piso captura, no decide que una orden terminó. Default del ' +
+      'lead; Daniel confirma.',
+  },
 ];
 
 describe('🆕 lo nacido DESPUÉS de la foto también se decide por escrito', () => {

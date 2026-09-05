@@ -18,7 +18,7 @@
  *   | Recibo de primeras                   | traspaso  TRÁNSITO → almacén de primeras            |
  *   | Recibo de segundas                   | traspaso  TRÁNSITO → almacén de segundas            |
  *   | Diferencia (lo que no volvió)        | se QUEDA en TRÁNSITO, viva, a cargo del tercero     |
- *   | Recibo de INCOMPLETAS                | NADA: no se inventarían ⇒ se quedan en TRÁNSITO     |
+ *   | Recibo de INCOMPLETAS                | SALIDA de TRÁNSITO como MERMA (0.061; ver abajo)    |
  *
  * Consecuencias, que son justo lo que Daniel pidió:
  *  • el faltante NO se absorbe en silencio (D3): sigue existiendo, en tránsito, hasta que llegue o
@@ -34,19 +34,39 @@
  * responde "¿cuántas piezas NO están en el piso?" y el WIP "¿a quién se las reclamo?". Por eso el
  * tránsito no necesita un almacén por tercero.
  *
- * 🔴 **PERO DESDE V1-E8v (§Post-F9.147) LAS DOS CAPAS DIVERGEN, y hay que saberlo.** Hasta esa etapa
- * las dos cuentas coincidían pieza por pieza. Ya no: la prenda que vuelve **INCOMPLETA** sale del
- * WIP —el maquilero la devolvió, deja de tenerla— pero **NO sale del TRÁNSITO**, porque no se
+ * ⭐ **LA INCOMPLETA SALE SOLA, COMO MERMA (0.061 — §Post-F9.154(a), DANIEL 30-ago-2026).** Entre
+ * V1-E8v y esta versión las dos capas DIVERGÍAN: la prenda que volvía **INCOMPLETA** salía del WIP
+ * —el maquilero la devolvió, deja de tenerla— pero **no salía del TRÁNSITO**, porque no se
  * inventaría (Daniel: *"tampoco entra al inventario…. es decir se pierden esas prendas"*). Con 100
- * enviadas y 95 buenas + 5 incompletas, el WIP dice que el maquilero no tiene nada y el tránsito
- * sigue guardando 5 piezas que **nadie va a devolver**.
+ * enviadas y 95 buenas + 5 incompletas, el WIP decía que el maquilero no tenía nada y el tránsito
+ * seguía guardando 5 piezas que **nadie iba a devolver, para siempre**. La salida existía —un
+ * movimiento manual de PT con motivo— pero exigía que alguien se acordara de hacerla, y nadie lo
+ * hacía.
  *
- * NO rompe D3: la existencia sigue siendo la Σ de movimientos REALES, y esas 5 piezas de verdad
- * salieron del almacén y nunca volvieron a él. Lo que dejó de ser cierto es que las dos capas lleven
- * el mismo número — así que **no se pueden usar la una para cuadrar la otra**. Se limpian igual que
- * el faltante: con un movimiento manual de PT con motivo. Darles salida automática exigiría un tipo
- * de movimiento nuevo (¿merma?) y **eso es una decisión de negocio que Daniel no ha tomado**;
- * inventarla sería ponerle en la boca algo que no dijo. Deuda con nombre en `HOJA-DE-RUTA.md` §4.
+ * El TSDoc de esta etapa decía que darles salida automática *«exigiría un tipo de movimiento nuevo
+ * (¿merma?) y eso es una decisión de negocio que Daniel no ha tomado»*. **Ya la tomó**: la incompleta
+ * sale del tránsito **automáticamente al registrar el recibo**, con el tipo de movimiento
+ * `merma-incompletas` (dirección `salida`, sembrado en `prisma/seed.ts`), y lo hace
+ * {@link darSalidaMermaIncompletas} DENTRO de la transacción del recibo (A2).
+ *
+ * Con eso **las dos capas vuelven a cuadrar** para todo lo que se capture de aquí en adelante: lo
+ * que queda en tránsito es exactamente el FALTANTE (lo que no volvió), que es justo lo que el WIP
+ * sigue reclamando. Y sigue sin romper D3: la merma es un movimiento REAL, auditado y **reversible
+ * por el camino de siempre** — cancelar el recibo la revierte con su inverso (`error-salida`), sin
+ * editar ni borrar nada, porque queda sellada con el `origenTipo`/`origenId` DEL RECIBO y
+ * {@link revertirMovimientosDeHecho} revierte por origen.
+ *
+ * ⚠️ **NO ES RETROACTIVA (REGLA 0-B).** Los recibos capturados ANTES de esta versión —y todo lo
+ * migrado de Access, que ni siquiera tiene el concepto de incompleta— dejaron sus piezas en
+ * tránsito y **ahí se quedan**: no se repara el pasado, no hay backfill ni script de rescate. Si
+ * alguna vez estorban, se limpian como siempre se pudo, con un movimiento manual de PT con su
+ * motivo. Lo viejo se tira, no se arregla.
+ *
+ * ⚠️ **Y sólo aplica cuando el envío sacó PRENDA TERMINADA** (`prendaTerminada`, o sea cuando el
+ * recibo `devuelveAPt`). Si el proceso es la COSTURA —el envío mandó bultos cortados, que no son PT
+ * y nunca entraron al kardex—, la incompleta no está en ningún almacén del que sacarla: no se
+ * inventarió jamás. Ahí no hay merma que registrar, y no registrarla es lo correcto (meter una
+ * salida dejaría el tránsito NEGATIVO por una pieza que nunca estuvo).
  *
  * Innegociables aplicados: A1 (la lógica vive en dominio) · A2 (todo dentro de la transacción del
  * hecho) · A9 (empresa activa) · D3 (existencia = Σ de movimientos, validada por suma DIRECTA bajo
@@ -58,6 +78,7 @@ import { ErrorConflicto, ErrorValidacion } from '../../comun/errores.js';
 import {
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
   exigirExistenciaPt,
+  registrarMovimientoPt as registrarMovimientoPtMotor,
   registrarTraspasoPt as registrarTraspasoPtMotor,
   type LineaMovimientoPt,
 } from '../../comun/kardex.js';
@@ -73,6 +94,11 @@ const COD_TRASPASO_ENTRADA = 'transferencia-entrada';
 const COD_ERROR_ENTRADA = 'error-entrada';
 /** Inverso de una SALIDA al cancelar (dirección `entrada`). */
 const COD_ERROR_SALIDA = 'error-salida';
+/**
+ * Salida del TRÁNSITO de las prendas INCOMPLETAS (0.061, dirección `salida`). Sembrado en
+ * `prisma/seed.ts` ⇒ el deploy que estrena esta versión necesita `SEED_ON_START=true`.
+ */
+const COD_MERMA_INCOMPLETAS = 'merma-incompletas';
 
 /** Resuelve un tipo de movimiento por su `codigo`, exigiéndolo ACTIVO. */
 async function tipoPorCodigo(tx: Tx, codigo: string): Promise<{ id: number; nombre: string }> {
@@ -317,6 +343,68 @@ export async function devolverPrendasDeTransito(
       lineas,
       origenTipo: datos.origenTipo,
       origenId: datos.origenId,
+    },
+    { tx },
+  );
+}
+
+/**
+ * ⭐ DA SALIDA del TRÁNSITO a las prendas INCOMPLETAS de un recibo, como **MERMA** (0.061 —
+ * §Post-F9.154(a)). Dentro de la transacción del recibo (A2): si el recibo no se guarda, la merma
+ * tampoco. Ver la cabecera del módulo para el porqué.
+ *
+ * QUÉ HACE, exactamente: una SALIDA simple (no un traspaso: la mercancía no va a ningún otro
+ * almacén, se pierde) del almacén de TRÁNSITO, por color×talla, con el tipo
+ * {@link COD_MERMA_INCOMPLETAS} y sellada con el `origenTipo`/`origenId` DEL RECIBO.
+ *
+ * Tres cosas que hace bien y no son obvias:
+ *  1. **El sello del origen es lo que la vuelve reversible.** Al cancelar el recibo,
+ *     {@link revertirMovimientosDeHecho} barre TODOS los movimientos de ese origen y le pone a cada
+ *     uno el inverso de su dirección opuesta: a esta salida le toca `error-salida` (una ENTRADA),
+ *     que devuelve las piezas al tránsito. No hace falta ni una línea de código de cancelación
+ *     propia — y hay una prueba que lo demuestra en vez de confiar en que así sea.
+ *  2. **Valida existencia antes de sacar (D3)**, por suma directa bajo advisory lock. Si el tránsito
+ *     no tiene esas piezas, el dato está mal capturado y se rechaza; nunca se deja el inventario en
+ *     negativo. En la práctica no debería fallar: el tope del recibo (`enviado − devuelto − saldado`)
+ *     ya impide devolver más de lo que salió.
+ *  3. **Sale del MISMO bucket de existencia del que salieron** (`idOrdenBucket`, F6-E2): si el envío
+ *     tomó del bucket «sin orden asignada», ahí se merman. Reetiquetarlas sería mover saldo entre
+ *     buckets sin que nadie lo pidiera.
+ *
+ * `celdas` viene YA PLEGADA por color×talla (el pack no significa nada en el inventario de PT). No
+ * hace nada si no hay celdas con cantidad.
+ */
+export async function darSalidaMermaIncompletas(
+  sesion: SesionUsuario,
+  tx: Tx,
+  datos: {
+    idEmpresa: number;
+    idModelo: number;
+    /** Bucket del que salen: el MISMO del que salieron al enviarse. */
+    idOrdenBucket: number | null;
+    fecha: Date;
+    origenTipo: OrigenMovimiento;
+    origenId: string;
+    celdas: LineaTransito[];
+  },
+): Promise<void> {
+  const lineas = aLineasKardex(datos.idModelo, datos.idOrdenBucket, datos.celdas);
+  if (lineas.length === 0) return;
+
+  const transito = await almacenDeTransito(tx, datos.idEmpresa);
+  await exigirExistenciaPt(tx, datos.idEmpresa, transito.id, datos.idModelo, lineas);
+
+  const merma = await tipoPorCodigo(tx, COD_MERMA_INCOMPLETAS);
+  await registrarMovimientoPtMotor(
+    sesion,
+    {
+      idEmpresa: datos.idEmpresa,
+      idTipoMov: merma.id,
+      idAlmacen: transito.id,
+      fecha: datos.fecha,
+      origenTipo: datos.origenTipo,
+      origenId: datos.origenId,
+      lineas,
     },
     { tx },
   );

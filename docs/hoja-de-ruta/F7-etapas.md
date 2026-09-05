@@ -11,7 +11,7 @@
 
 Registradas en `Documentacion_MJD/DECISIONES.md` D2 (12 puntos). Resumen operativo:
 
-1. **Costo por prenda** = tela (importe total ÷ prendas **cortadas**) + procesos (maquila/estampado/otros) + **avíos** (costura y empaque). Base de prorrateo default = **cortado**.
+1. **Costo por prenda** = tela (importe total ÷ prendas **cortadas**) + procesos (maquila/estampado/otros) + **avíos** (costura y empaque). Base de prorrateo default = **recibido** (era `cortado` hasta la fila 0.061, que lo cambió **sólo hacia adelante**: lo ya costeado conserva su base).
 2. **Regalía FUERA del costo** → va **sobre la venta**. En `CostoOrden` se ELIMINAN los componentes `regaliasCalc/regaliasCost`; quedan tela / procesos / avíos (+ `otros` para flexibilidad). Los "6 componentes" del texto original de E1 bajan a estos.
 3. **Regalías siempre sobre la venta**: la lista de precios aplica `regaliasBase` (10%, ya seedeada) sobre el precio.
 4. **Redondeo del precio sugerido = AL ALZA (techo/`Math.ceil`)**, NO el `CInt` (al más cercano) del viejo.
@@ -63,7 +63,7 @@ Registradas en `Documentacion_MJD/DECISIONES.md` D2 (12 puntos). Resumen operati
 - [ ] Abre Pre-costo de un modelo con receta completa; con calculadora suma cantidad × precio de cada tela/avío + precio de bordado (una vez, sin cantidad) + maquila + regalías %; compara contra lo que muestra la pantalla — debe ser idéntico
 - [ ] Abre Costeo de orden con la orden del dataset de Daniel: captura/ajusta los 6 componentes como en su hoja y compara costoTotal y costo unitario contra su cálculo manual — número por número
 - [ ] En esa pantalla verifica el doble juego: cambia a mano un componente guardado distinto del teórico y confirma que el total se arma con el GUARDADO y que el teórico sigue visible al lado
-- [ ] Cambia la base de prorrateo de cortado a vendido y confirma que el unitario cambia y que la base queda visible en pantalla; regresa a cortado (default)
+- [ ] Cambia la base de prorrateo de cortado a vendido y confirma que el unitario cambia y que la base queda visible en pantalla; regresa a recibido (el default desde la 0.061)
 - [ ] Intenta costear una orden marcada noCost — el sistema debe rechazarlo con mensaje claro
 - [ ] Abre Márgenes por pedido con el pedido del dataset y compara importe/margen promedio/margen $ por pieza contra la hoja de Daniel
 - [ ] Descarga la Lista de precios PDF; cambia utilidadSugerida en Administración, regenera y confirma que los precios cambian (ya no hay ×2 fijo); luego cambia TAMBIÉN regaliasBase, regenera y confirma que los precios vuelven a cambiar (ya no hay /0.9 fijo); revisa que el redondeo del precio siga la regla definida

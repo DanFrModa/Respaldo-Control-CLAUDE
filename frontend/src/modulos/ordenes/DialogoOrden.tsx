@@ -3,6 +3,8 @@ import {
   Calendar,
   Factory,
   Grid3x3,
+  Lock,
+  LockOpen,
   ListChecks,
   Loader2Icon,
   MessageSquare,
@@ -30,6 +32,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { AdjuntosOrden } from './AdjuntosOrden';
 import { DialogoCancelarOrden } from './DialogoCancelarOrden';
+import { DialogoCerrarOrden } from './DialogoCerrarOrden';
 import { DialogoCopiarMatriz } from './DialogoCopiarMatriz';
 import { EditorEncabezadoOrden } from './EditorEncabezadoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
@@ -60,13 +63,18 @@ function fechaCorta(valor: string | null): string {
 /** Texto + variante del badge de estado DERIVADO de la orden. */
 function badgeEstado(estado: EstadoOrden): {
   texto: string;
-  variante: 'default' | 'secondary' | 'destructive';
+  variante: 'default' | 'secondary' | 'destructive' | 'outline';
 } {
   if (estado === 'completa') {
     return { texto: 'Completa', variante: 'default' };
   }
   if (estado === 'cancelada') {
     return { texto: 'Cancelada', variante: 'destructive' };
+  }
+  if (estado === 'cerrada') {
+    // 0.061: la orden terminó su vida administrativa y su costo quedó CONGELADO. `outline` la
+    // distingue de la cancelada (que es un fracaso) sin gritar: cerrar es el final NORMAL.
+    return { texto: 'Cerrada', variante: 'outline' };
   }
   return { texto: 'Capturada', variante: 'secondary' };
 }
@@ -142,6 +150,8 @@ export function DialogoOrden({
   const navigate = useNavigate();
   const puedeAdministrar = tienePermiso('ordenes.administrar');
   const puedeCancelar = tienePermiso('ordenes.cancelar');
+  // ⭐ 0.061: cerrar la orden congela su costo y cierra la captura ⇒ permiso propio.
+  const puedeCerrar = tienePermiso('ordenes.cerrar');
   const puedeRutaVer = tienePermiso('rc.ruta-ver');
   const puedeProgramar = tienePermiso('rc.programar');
   // Hitos de la orden (post-F9): capturar/cancelar exige `rc.capturar` (es un avance de RC).
@@ -158,6 +168,8 @@ export function DialogoOrden({
   // Diálogos hijos (Radix): se montan SOLO al abrirse, así no consultan el API mientras cerrados.
   const [aCancelar, setACancelar] = useState<Orden | null>(null);
   const [aCopiarMatriz, setACopiarMatriz] = useState<Orden | null>(null);
+  // 0.061: `null` = ningún diálogo de cierre abierto; si no, en qué dirección va.
+  const [aCerrar, setACerrar] = useState<'cerrar' | 'reabrir' | null>(null);
 
   // Guardado único de las secciones con captura + guardia de cierre con cambios sin guardar.
   const { valorContexto, hayCambios, impedimento, guardando, guardarTodo } =
@@ -188,7 +200,13 @@ export function DialogoOrden({
   // copiar/confirmar salida) está abierto: su propio Esc lo cierra (Radix) y si este listener
   // también corriera, tiraría el panel entero.
   useEffect(() => {
-    if (!abierto || aCancelar !== null || aCopiarMatriz !== null || confirmarSalida) {
+    if (
+      !abierto ||
+      aCancelar !== null ||
+      aCopiarMatriz !== null ||
+      aCerrar !== null ||
+      confirmarSalida
+    ) {
       return;
     }
     function alTeclear(evento: KeyboardEvent): void {
@@ -198,14 +216,18 @@ export function DialogoOrden({
     }
     window.addEventListener('keydown', alTeclear);
     return () => window.removeEventListener('keydown', alTeclear);
-  }, [abierto, intentarCerrar, aCancelar, aCopiarMatriz, confirmarSalida]);
+  }, [abierto, intentarCerrar, aCancelar, aCopiarMatriz, aCerrar, confirmarSalida]);
 
   if (!abierto || idOrden === null) {
     return null;
   }
 
-  // El pie con el botón único sólo aparece donde hay algo que guardar (con permiso y no cancelada).
-  const puedeGuardar = orden !== undefined && puedeAdministrar && orden.estado !== 'cancelada';
+  // El pie con el botón único sólo aparece donde hay algo que guardar (con permiso, no cancelada y
+  // —0.061— no CERRADA: la orden cerrada es de solo lectura; el backend lo rechaza igual, esto sólo
+  // evita ofrecer un botón que va a rebotar).
+  const estaCerrada = orden !== undefined && orden.cerradaEn !== null;
+  const puedeGuardar =
+    orden !== undefined && puedeAdministrar && orden.estado !== 'cancelada' && !estaCerrada;
 
   return (
     <div
@@ -240,8 +262,23 @@ export function DialogoOrden({
               )}
             </p>
           </div>
-          {/* Cancelar = desactivar (suave) de la orden; exige `ordenes.cancelar`. */}
-          {orden !== undefined && puedeCancelar && orden.estado !== 'cancelada' ? (
+          {/* ⭐ 0.061: Cerrar / Reabrir la orden. Cerrar CONGELA su costo y cierra la captura; la
+              confirmación lo dice. Exige `ordenes.cerrar`; el backend re-decide (A1). Una orden
+              CANCELADA no se cierra (no hay nada que cerrar). */}
+          {orden !== undefined && puedeCerrar && orden.estado !== 'cancelada' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setACerrar(estaCerrada ? 'reabrir' : 'cerrar')}
+              data-testid={estaCerrada ? 'reabrir-orden' : 'cerrar-orden'}
+            >
+              {estaCerrada ? <LockOpen aria-hidden /> : <Lock aria-hidden />}
+              {estaCerrada ? 'Reabrir' : 'Cerrar'}
+            </Button>
+          ) : null}
+          {/* Cancelar = desactivar (suave) de la orden; exige `ordenes.cancelar`. Una orden CERRADA
+              tampoco se cancela: primero hay que reabrirla (0.061). */}
+          {orden !== undefined && puedeCancelar && orden.estado !== 'cancelada' && !estaCerrada ? (
             <Button
               variant="destructive"
               size="sm"
@@ -364,6 +401,17 @@ export function DialogoOrden({
           }
         }}
         orden={aCancelar ?? undefined}
+      />
+      {/* ⭐ 0.061: cerrar / reabrir la orden (congela y descongela su costo). */}
+      <DialogoCerrarOrden
+        abierto={aCerrar !== null}
+        alCambiarAbierto={(abiertoNuevo) => {
+          if (!abiertoNuevo) {
+            setACerrar(null);
+          }
+        }}
+        orden={orden}
+        modo={aCerrar ?? 'cerrar'}
       />
 
       {/* Guardia de cierre con cambios sin guardar (Daniel 24-jul-2026). */}

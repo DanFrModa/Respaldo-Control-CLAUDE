@@ -31,6 +31,16 @@ import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../prue
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 
+import { cerrarOrden, reabrirOrden } from './cierre-orden.js';
+// 0.061: las puertas de escritura de la ORDEN misma (no de sus etapas), que también respetan el
+// cierre. Van aquí, junto a la prueba de la guarda, para que la lista de puertas sea UNA sola.
+import {
+  actualizarOrden,
+  cancelarOrden,
+  guardarMatrizOrden,
+  guardarReferenciasOrden,
+} from './ordenes.js';
+import { actualizarPreciosOrden } from './precios-orden.js';
 import { cancelarEtapaMovimiento, registrarCorte, registrarEnvioMaquila } from './etapas.js';
 import { cancelarReciboMaquila, pendientesPorRecibir, registrarReciboMaquila } from './recibos.js';
 import { wipDeOrden } from './wip.js';
@@ -67,8 +77,9 @@ const PERM_TODOS: ClavePermiso[] = [
   'produccion.entrega',
 ];
 
-const sesion = (): ReturnType<typeof sesionDePrueba> =>
-  sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_TODOS });
+/** Sesión de prueba; con `permisos` se pide un juego distinto (p. ej. + `ordenes.cerrar`, 0.061). */
+const sesion = (permisos: ClavePermiso[] = PERM_TODOS): ReturnType<typeof sesionDePrueba> =>
+  sesionDePrueba({ idEmpresaActiva: empresa.id, permisos });
 const bd = (): { cliente: PrismaClient } => ({ cliente });
 
 /** Crea un proveedor con un rol dado (vía RolProveedor). */
@@ -122,6 +133,8 @@ async function sembrarTiposMovimiento(): Promise<void> {
       { codigo: 'ajuste-entrada', nombre: 'Ajuste (Entrada)', direccion: 'entrada' },
       { codigo: 'ajuste-salida', nombre: 'Ajuste (Salida)', direccion: 'salida' },
       { codigo: 'entrega-cliente', nombre: 'Entrega a Cliente', direccion: 'salida' },
+      // ⭐ 0.061: la salida del tránsito de las prendas INCOMPLETAS (§Post-F9.154(a)).
+      { codigo: 'merma-incompletas', nombre: 'Merma por prendas incompletas', direccion: 'salida' },
     ],
   });
 }
@@ -1157,5 +1170,390 @@ describe('F1 · el mensaje de "dónde sí se cancela" tiene que ser cierto', () 
     await expect(fallo).rejects.toThrowError(/movimiento manual NUEVO/);
     // …y NO manda de vuelta al cíclico, que rechazaría por estar cerrado.
     await expect(fallo).rejects.not.toThrowError(/se corrige desde el cíclico/);
+  });
+});
+
+// ── ⭐⭐ 0.061 · LA INCOMPLETA SALE DEL TRÁNSITO COMO MERMA (§Post-F9.154(a)) ────────────────────
+
+describe('La prenda INCOMPLETA sale sola del tránsito, como merma', () => {
+  /** Existencia de Rojo/CH en un almacén contando SÓLO los movimientos de un tipo. */
+  async function existenciaPorTipo(almacen: Almacen, codigoTipo: string): Promise<number> {
+    const filas = await cliente.$queryRaw<{ total: bigint }[]>`
+      SELECT COALESCE(SUM(d."cantidad"), 0)::bigint AS total
+      FROM "movimiento_det_pt" d
+      JOIN "movimientos" m ON m."id" = d."id_movimiento"
+      JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+      WHERE m."id_almacen" = ${almacen.id} AND t."codigo" = ${codigoTipo}
+    `;
+    return Number(filas[0]?.total ?? 0n);
+  }
+
+  it('⭐ 10 al estampador → 7 primeras + 1 segunda + 2 INCOMPLETAS: el tránsito queda en 0', async () => {
+    // Antes de 0.061 esas 2 se quedaban en tránsito PARA SIEMPRE: nadie las iba a devolver y la
+    // única salida era un movimiento manual que nadie hacía. Ahora salen solas, como merma.
+    await cortar100();
+    await meterAPt(almPrimeras, 10);
+    await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+    expect(await existencia(almTransito)).toBe(10);
+
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-18',
+        idAlmacenPrimeras: almPrimeras.id,
+        idAlmacenSegundas: almSegundas.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [
+              {
+                idTalla: tallaCH.id,
+                cantidad: 8,
+                cantidadPrimeras: 7,
+                cantidadSegundas: 1,
+                cantidadIncompletas: 2,
+              },
+            ],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    // Las buenas vuelven a su almacén…
+    expect(await existencia(almPrimeras)).toBe(7);
+    expect(await existencia(almSegundas)).toBe(1);
+    // …y las 2 incompletas SALEN: el tránsito queda en 0 (10 = 7 + 1 + 2, nada atorado).
+    expect(await existencia(almTransito)).toBe(0);
+    // Y salieron con SU tipo de movimiento, no disfrazadas de otra cosa.
+    expect(await existenciaPorTipo(almTransito, 'merma-incompletas')).toBe(2);
+
+    // NO entraron a ningún inventario: 7 + 1 = 8 piezas en total, no 10.
+    expect((await existencia(almPrimeras)) + (await existencia(almSegundas))).toBe(8);
+  });
+
+  it('CANCELAR el recibo devuelve las incompletas al tránsito (D3, sin código propio)', async () => {
+    // La reversión sale gratis porque la merma queda sellada con el origen DEL RECIBO y
+    // `revertirMovimientosDeHecho` revierte por origen con el inverso de la dirección opuesta.
+    // Esto lo DEMUESTRA en vez de confiar en que así sea.
+    await cortar100();
+    await meterAPt(almPrimeras, 10);
+    await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-18',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [
+              { idTalla: tallaCH.id, cantidad: 8, cantidadPrimeras: 8, cantidadIncompletas: 2 },
+            ],
+          },
+        ],
+      },
+      bd(),
+    );
+    expect(await existencia(almTransito)).toBe(0);
+
+    await cancelarReciboMaquila(sesion(), recibo.id, { motivo: 'mal capturado' }, bd());
+
+    // Todo vuelve a como estaba ANTES del recibo: las 10 en tránsito, el almacén en 0.
+    expect(await existencia(almTransito)).toBe(10);
+    expect(await existencia(almPrimeras)).toBe(0);
+    // D3: el movimiento original NO se borró — se anuló con su inverso.
+    const movs = await cliente.movimiento.count({
+      where: { origenTipo: ORIGEN.reciboMaquila, origenId: String(recibo.id) },
+    });
+    expect(movs).toBeGreaterThan(0);
+  });
+
+  it('un recibo de SÓLO incompletas también las saca (no exige almacén destino)', async () => {
+    // `meteAPt` pide `totalRecibido > 0`; la merma es INDEPENDIENTE de eso, y este es el caso que
+    // lo prueba: el maquilero devolvió las 3 que no pudo terminar y nada más.
+    await cortar100();
+    await meterAPt(almPrimeras, 10);
+    await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-18',
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 0, cantidadIncompletas: 3 }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    expect(await existencia(almTransito)).toBe(7); // 10 − 3 mermadas; las 7 siguen pendientes
+    expect(await existencia(almPrimeras)).toBe(0);
+  });
+
+  it('en un recibo de COSTURA no hay merma: esas piezas nunca estuvieron en el kardex', async () => {
+    // El envío mandó BULTOS CORTADOS, que no son PT. Meter una salida dejaría el tránsito NEGATIVO
+    // por una pieza que jamás estuvo ahí.
+    await cortar100();
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-08-17',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-08-18',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [
+              { idTalla: tallaCH.id, cantidad: 8, cantidadPrimeras: 8, cantidadIncompletas: 2 },
+            ],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    expect(await existencia(almPrimeras)).toBe(8); // la costura CREA las 8 buenas
+    expect(await existencia(almTransito)).toBe(0); // y el tránsito ni se toca
+    expect(await existenciaPorTipo(almTransito, 'merma-incompletas')).toBe(0);
+  });
+
+  it('sale del MISMO bucket del que salieron (stock «sin orden asignada»)', async () => {
+    // Si el envío tomó del bucket «sin orden», la merma tiene que salir de ahí — no reetiquetarse
+    // a la orden, que sería mover saldo entre buckets sin que nadie lo pidiera.
+    await cortar100();
+    await registrarMovimientoPtMotor(
+      sesion(),
+      {
+        idEmpresa: empresa.id,
+        idTipoMov: (
+          await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+            where: { codigo: 'ajuste-entrada' },
+          })
+        ).id,
+        idAlmacen: almPrimeras.id,
+        fecha: new Date('2026-08-16T00:00:00.000Z'),
+        origenTipo: ORIGEN.movimientoManual,
+        origenId: 'siembra-sin-orden',
+        lineas: [{ idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaCH.id, cantidad: 10 }],
+      },
+      bd(),
+    );
+    await enviarAEstampado(10, {
+      prendaTerminada: true,
+      idAlmacenOrigen: almPrimeras.id,
+      stockSinOrden: true,
+    });
+    expect(await existenciaSinOrden(almTransito)).toBe(10);
+
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-18',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [
+              { idTalla: tallaCH.id, cantidad: 8, cantidadPrimeras: 8, cantidadIncompletas: 2 },
+            ],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    expect(await existenciaSinOrden(almTransito)).toBe(0); // 8 devueltas + 2 mermadas
+    expect(await existencia(almTransito)).toBe(0); // y el bucket de la ORDEN ni se tocó
+  });
+});
+
+// ── ⭐⭐ 0.061 · LA ORDEN CERRADA NO ADMITE CAPTURA (§Post-F9.154(c)) ────────────────────────────
+
+describe('La guarda de la orden CERRADA, puerta por puerta', () => {
+  // ⚠️ Lleva TAMBIÉN `ordenes.ver`: `cerrarOrden`/`reabrirOrden` devuelven la orden y la leen con
+  // `obtenerOrden`, que lo exige (y lo comprueba ANTES de escribir — ver `costos.int.test.ts`).
+  const sesionCierre = () => sesion([...PERM_TODOS, 'ordenes.cerrar', 'ordenes.ver']);
+
+  it('cerrar la orden RECHAZA corte, envío, recibo, entrega y las cancelaciones', async () => {
+    // La guarda es UNA sola (`exigirOrdenAbierta`) aplicada en cada puerta de escritura. Esta
+    // prueba recorre las puertas: si alguien agrega una y se olvida de la guarda, aquí NO se
+    // entera — pero al menos las que existen hoy quedan amarradas.
+    await cortar100();
+    await meterAPt(almPrimeras, 10);
+    const envio = await enviarAEstampado(10, {
+      prendaTerminada: true,
+      idAlmacenOrigen: almPrimeras.id,
+    });
+
+    await cerrarOrden(sesionCierre(), idOrden, { motivo: 'ya terminó' }, bd());
+
+    // (1) CORTE
+    await expect(
+      registrarCorte(
+        sesionCierre(),
+        {
+          idOrden,
+          idCortador: cortador.id,
+          fecha: '2026-08-19',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // (2) ENVÍO
+    await expect(
+      enviarAEstampado(1, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // (3) RECIBO
+    await expect(
+      registrarReciboMaquila(
+        sesionCierre(),
+        {
+          idOrden,
+          idTipoProceso: procesoEstampado.id,
+          idMaquilero: estampador.id,
+          fecha: '2026-08-19',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [
+            {
+              idColor: colorRojo.id,
+              tallas: [{ idTalla: tallaCH.id, cantidad: 1, cantidadPrimeras: 1 }],
+            },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // (4) ENTREGA A CLIENTE
+    await expect(
+      registrarEntregaCliente(
+        sesionCierre(),
+        {
+          idOrden,
+          fecha: '2026-08-19',
+          idAlmacen: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // (5) CANCELAR UNA ETAPA (mueve las cantidades ⇒ movería el costo congelado)
+    await expect(
+      cancelarEtapaMovimiento(sesionCierre(), envio.id, { motivo: 'ups' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('REABRIRLA vuelve a dejar capturar (el bloqueo es del cierre, no del histórico)', async () => {
+    await cortar100();
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await reabrirOrden(sesionCierre(), idOrden, { motivo: 'faltaba una etapa' }, bd());
+
+    await meterAPt(almPrimeras, 10);
+    await expect(
+      enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id }),
+    ).resolves.toBeDefined();
+  });
+
+  it('⭐ y RECHAZA también las puertas de la ORDEN: encabezado, matriz, referencias, precios y cancelar', async () => {
+    // Las etapas eran la mitad del cierre; la otra mitad es la orden MISMA. Sin esto, una orden
+    // cerrada seguía admitiendo que le cambiaran la matriz (las piezas pedidas), el precio de
+    // maquila (un componente del costo) o que la CANCELARAN — y eso último dejaba el `estado` en
+    // `cancelada` mientras `cerradaEn` seguía puesta: dos finales a la vez.
+    const s = sesion([
+      ...PERM_TODOS,
+      'ordenes.cerrar',
+      'ordenes.ver',
+      'ordenes.administrar',
+      'ordenes.cancelar',
+      'ordenes.precio-maquila',
+    ]);
+    await cerrarOrden(s, idOrden, {}, bd());
+
+    // (1) ENCABEZADO
+    await expect(
+      actualizarOrden(s, { id: idOrden, observaciones: 'nueva nota' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // (2) MATRIZ (las piezas pedidas — moverlas movería el costo)
+    await expect(
+      guardarMatrizOrden(
+        s,
+        idOrden,
+        { lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 50 }] }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // (3) REFERENCIAS del cliente (D7)
+    await expect(
+      guardarReferenciasOrden(s, idOrden, { referencias: [] }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // (4) PRECIO real de maquila (componente del costo congelado)
+    await expect(
+      actualizarPreciosOrden(s, idOrden, { campo: 'maquila', precio: 12.5 }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // (5) CANCELAR la orden
+    await expect(cancelarOrden(s, idOrden, { motivo: 'ya no' }, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+
+    // Y la rama gemela: reabierta, la MISMA llamada pasa (el bloqueo era del cierre).
+    await reabrirOrden(s, idOrden, { motivo: 'hay que corregir el encabezado' }, bd());
+    await expect(
+      actualizarOrden(s, { id: idOrden, observaciones: 'nueva nota' }, bd()),
+    ).resolves.toBeDefined();
+  });
+
+  it('el mensaje del rechazo NOMBRA la salida (reabrir), que el usuario no puede adivinar', async () => {
+    await cortar100();
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await expect(
+      registrarCorte(
+        sesionCierre(),
+        {
+          idOrden,
+          idCortador: cortador.id,
+          fecha: '2026-08-19',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/reábrela/i);
   });
 });

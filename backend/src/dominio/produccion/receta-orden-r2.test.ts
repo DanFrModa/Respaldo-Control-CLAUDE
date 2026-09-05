@@ -138,6 +138,9 @@ function bdParaQuitarArte(opciones: {
     idEmpresa: 1,
     idModelo: 7,
     estado: 'capturada',
+    // 0.061: ABIERTA. La guarda del cierre mira esta columna y trata «no viene» como CERRADA
+    // (falla del lado seguro): un doble que la calle mentiría sobre el dato.
+    cerradaEn: null,
     fechaCompletada: null,
     recetaLiberadaEn: null,
     recetaLiberadaPorId: null,

@@ -77,6 +77,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { exigirOrdenAbierta, exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
 import { rechazarAlmacenDeTransito } from './transito.js';
 
@@ -126,7 +127,10 @@ async function resolverOrden(
     where: { id: idOrden, idEmpresa: idEmpresaActiva },
     select: {
       idEmpresa: true,
+      folio: true,
       estado: true,
+      // 0.061: la guarda de la orden CERRADA mira esta columna, no el estado.
+      cerradaEn: true,
       idModelo: true,
       idCliente: true,
       lineas: { select: { idColor: true, tallas: { select: { idTalla: true } } } },
@@ -138,6 +142,8 @@ async function resolverOrden(
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada; no se le pueden capturar etapas.');
   }
+  // ⭐ 0.061: una orden CERRADA no admite captura nueva (su costo quedó congelado). Guarda ÚNICA.
+  exigirOrdenAbierta(orden, 'le pueden capturar entregas');
   const colores = new Set<number>();
   const tallasPorColor = new Map<number, Set<number>>();
   for (const linea of orden.lineas) {
@@ -508,6 +514,9 @@ export async function cancelarEntregaCliente(
     if (entrega.canceladoEn !== null) {
       throw new ErrorConflicto(`La entrega ${Number(entrega.folio)} ya está cancelada.`);
     }
+    // ⭐ 0.061: cancelar una entrega mueve el inventario Y el divisor `vendido`. Sobre una orden
+    // CERRADA hay que reabrirla primero (acto inverso auditado, no una edición).
+    await exigirOrdenAbiertaPorId(tx, entrega.idOrden, 'puede cancelar su entrega');
 
     // Revierte la(s) SALIDA(s) de PT que generó la entrega con inverso(s) de entrada (re-entra lo que
     // salió). El inverso es un movimiento de corrección: SIEMPRE puede registrarse (no valida tope).

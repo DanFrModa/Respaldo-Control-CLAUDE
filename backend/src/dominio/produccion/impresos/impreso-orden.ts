@@ -68,6 +68,7 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import type { EstadoOrden } from '../../../datos/index.js';
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
 import {
   estilosDoc,
@@ -176,7 +177,8 @@ export interface ArteImpreso {
 export interface DatosImpresoOrden {
   empresa: string;
   folio: number;
-  estado: 'capturada' | 'completa' | 'cancelada';
+  /** Estado de la orden: el TIPO del enum, NUNCA una copia literal de sus valores (0.061). */
+  estado: EstadoOrden;
   motivoCancelada: string | null;
   fecha: string | null;
   fechaEntrega: string | null;

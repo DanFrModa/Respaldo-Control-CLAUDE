@@ -21,6 +21,7 @@ import {
   type DatosModeloCrearMigracion,
   type DatosModeloEditar,
 } from '../../contrato/esquemas/modelo.js';
+import type { BaseProrrateo } from '../../contrato/index.js';
 import { Prisma, type Genero, type Modelo } from '../../datos/index.js';
 import { z } from 'zod';
 
@@ -42,7 +43,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { cantidadDeBase, cantidadesDeOrdenes } from '../costos/cantidades.js';
+import { cantidadDeBase, cantidadesDeOrdenes, divisorCongelado } from '../costos/cantidades.js';
 import { redondear2 } from '../costos/decimales.js';
 import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
 import {
@@ -1280,9 +1281,15 @@ async function adjuntarAgregadosListado(
 /**
  * Resuelve el costo UNITARIO del ÚLTIMO costeo (F7) de cada modelo: DISTINCT ON por modelo del
  * `CostoOrden` con `costoTotal` guardado (el modificado más recientemente gana; desempate por id),
- * y `costoTotal / cantidadDeBase(baseProrrateo)` con las cantidades derivadas de esas órdenes
- * (`cantidadesDeOrdenes` — el MISMO helper de la Lista de costos, no una derivación distinta).
- * Los modelos sin costeo o con base 0 no entran al mapa (→ `null` en la salida).
+ * y `costoTotal / divisor` con las cantidades derivadas de esas órdenes (`cantidadesDeOrdenes` — el
+ * MISMO helper de la Lista de costos, no una derivación distinta). Los modelos sin costeo o con
+ * divisor 0 no entran al mapa (→ `null` en la salida).
+ *
+ * ⭐ **El divisor respeta el CONGELADO de la orden cerrada (0.061 — §Post-F9.154(c)):** si la orden
+ * del último costeo está cerrada se usa `cantidadBaseCongelada`, el mismo número que enseñan su
+ * ficha y la lista de costos. Por eso la consulta trae `congelado_en`, `cantidad_base_congelada` y
+ * `o."cerrada_en"`: sin ellas esta columna se re-dividía en vivo y podía contradecir a la ficha de
+ * la MISMA orden en cuanto cambiara una cantidad derivada.
  */
 async function costoUnitarioUltimoCosteo(
   cliente: ReturnType<typeof clienteLectura>,
@@ -1295,14 +1302,23 @@ async function costoUnitarioUltimoCosteo(
       idModelo: number;
       idOrden: number;
       costoTotal: Prisma.Decimal;
-      baseProrrateo: 'cortado' | 'recibido' | 'vendido';
+      // El tipo del CONTRATO, no una copia literal: si algún día se agrega una base, esto no se
+      // queda callado (0.061).
+      baseProrrateo: BaseProrrateo;
+      // 0.061: el congelado del cierre (el `snake_case` viene de la consulta cruda con alias).
+      congeladoEn: Date | null;
+      cantidadBaseCongelada: number | null;
+      cerradaEn: Date | null;
     }[]
   >(Prisma.sql`
     SELECT DISTINCT ON (o."id_modelo")
       o."id_modelo"       AS "idModelo",
       co."id_orden"       AS "idOrden",
       co."costo_total"    AS "costoTotal",
-      co."base_prorrateo" AS "baseProrrateo"
+      co."base_prorrateo" AS "baseProrrateo",
+      co."congelado_en"             AS "congeladoEn",
+      co."cantidad_base_congelada"  AS "cantidadBaseCongelada",
+      o."cerrada_en"                AS "cerradaEn"
     FROM "costo_orden" co
     JOIN "ordenes" o ON o."id" = co."id_orden"
     WHERE co."id_empresa" = ${idEmpresa}
@@ -1321,7 +1337,9 @@ async function costoUnitarioUltimoCosteo(
   const resultado = new Map<number, number>();
   for (const u of ultimos) {
     const c = cantidades.get(u.idOrden);
-    const cantidadBase = c === undefined ? 0 : cantidadDeBase(c, u.baseProrrateo);
+    // ⭐ 0.061: cerrada ⇒ el divisor CONGELADO; abierta ⇒ el vivo. La MISMA regla que la ficha.
+    const cantidadBase =
+      divisorCongelado(u, u) ?? (c === undefined ? 0 : cantidadDeBase(c, u.baseProrrateo));
     if (cantidadBase > 0) {
       resultado.set(u.idModelo, redondear2(Number(u.costoTotal) / cantidadBase));
     }

@@ -87,7 +87,7 @@ import {
   esquemaRecetaQuitarCuerpo,
   esquemaTraerDelModeloCuerpo,
 } from '../../contrato/index.js';
-import { EstadoRenglonReceta, Prisma } from '../../datos/index.js';
+import { EstadoRenglonReceta, Prisma, type EstadoOrden } from '../../datos/index.js';
 
 import { eliminarObjetosBestEffort, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -142,6 +142,8 @@ import {
 // Vive en su propio módulo y NO aquí: es otra pregunta que la desalineación de este archivo (que es
 // la VERTICAL, contra la receta del modelo) y mezclarlas es como se apagaría el aviso justo en el
 // caso que lo justifica — ver el encabezado de `hermanas-de-la-op.ts`.
+// ⭐ 0.061: la guarda ÚNICA de la orden CERRADA.
+import { exigirOrdenAbierta } from './cierre-orden.js';
 import { frenteAlGrupoDeOrdenes, sinHermanas } from './hermanas-de-la-op.js';
 import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-avios.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
@@ -170,7 +172,10 @@ interface OrdenParaReceta {
   folio: bigint;
   idEmpresa: number;
   idModelo: number;
-  estado: 'capturada' | 'completa' | 'cancelada';
+  /** Estado de la orden: el TIPO del enum, NUNCA una copia literal de sus valores (0.061). */
+  estado: EstadoOrden;
+  /** 0.061: cuándo se CERRÓ la orden (null = abierta). La guarda del cierre mira esto, no el estado. */
+  cerradaEn: Date | null;
   /** Sello histórico de "cuándo quedó lista por primera vez" (lo necesita el recálculo del estado). */
   fechaCompletada: Date | null;
   recetaLiberadaEn: Date | null;
@@ -206,6 +211,7 @@ async function exigirOrdenDeLaEmpresa(
       idEmpresa: true,
       idModelo: true,
       estado: true,
+      cerradaEn: true,
       fechaCompletada: true,
       recetaLiberadaEn: true,
       recetaLiberadaPorId: true,
@@ -238,11 +244,17 @@ async function exigirOrdenDeLaEmpresa(
   return orden;
 }
 
-/** Una orden CANCELADA no se toca (misma regla que el resto del módulo de órdenes). */
+/**
+ * Una orden CANCELADA no se toca (misma regla que el resto del módulo de órdenes) — y desde 0.061,
+ * tampoco una CERRADA: la receta congelada de la orden es lo que sostiene su costo TEÓRICO, así que
+ * moverla después de congelar el unitario dejaría la ficha diciendo dos cosas distintas. Primero se
+ * reabre la orden (acto inverso auditado), y entonces sí.
+ */
 function exigirOrdenViva(orden: OrdenParaReceta): void {
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada: su receta ya no se puede modificar.');
   }
+  exigirOrdenAbierta(orden, 'puede modificar su receta');
 }
 
 // ── 1. COPIAR la receta del modelo al crear la orden ───────────────────────────────────────
@@ -1692,25 +1704,33 @@ async function enRecetaEditable<T>(
   opciones: {
     cambiaElContenido?: boolean;
     /**
-     * ⭐⭐ V1-E8z — LA ÚNICA MUTACIÓN QUE SE PERMITE SOBRE UNA ORDEN CANCELADA: **cerrar la receta**.
+     * ⭐⭐ V1-E8z — LA ÚNICA MUTACIÓN QUE SE PERMITE SOBRE UNA ORDEN QUE YA NO ESTÁ VIVA: **cerrar
+     * la receta**. Salta {@link exigirOrdenViva} ENTERO, y eso incluye sus DOS guardas: la de la
+     * orden CANCELADA y —desde 0.061— la de la orden CERRADA.
      *
-     * 🔴 El caso es real y no tiene otra salida. Si una orden se cancela con la receta ABIERTA, la
-     * guarda de `exigirOrdenViva` dejaría el candado puesto **para siempre**: no habría forma de
+     * 🔴 El caso es real y no tiene otra salida. Si una orden se cancela **o se cierra** con la
+     * receta ABIERTA, la guarda dejaría el candado puesto **para siempre**: no habría forma de
      * cerrarlo, la orden seguiría en la bandeja marcada «En corrección» y su compra congelada, sin
-     * ningún camino que ofrecerle a nadie. Un candado que sólo se puede abrir es una trampa.
+     * ningún camino que ofrecerle a nadie. Un candado que sólo se puede abrir es una trampa. Y para
+     * la CERRADA la trampa sería doble, porque la salida de emergencia —reabrir la orden— exige un
+     * permiso que quien está en esa bandeja puede no tener.
      *
-     * Y no afloja nada: cerrar **no toca ni un renglón** —limpia las tres columnas del candado y
-     * escribe su bitácora—, así que la receta de una orden cancelada sigue siendo tan inmutable
-     * como antes. ABRIR sí exige la orden viva: reabrir para corregir lo que ya no se va a producir
-     * no significa nada.
+     * Y no afloja nada, ni en un caso ni en el otro: cerrar **no toca ni un renglón** —limpia las
+     * tres columnas del candado y escribe su bitácora—, así que la receta sigue siendo tan
+     * inmutable como antes y el costo congelado de la orden cerrada **no se mueve** (no depende de
+     * la apertura de la receta, sino de `costoTotal` y del divisor). ABRIR sí exige la orden viva:
+     * reabrir para corregir lo que ya no se va a producir, o lo que ya se cerró, no significa nada.
+     *
+     * ⚠️ El nombre dice «NoViva», no «Cancelada», justo por esto: cuando sólo decía «Cancelada»,
+     * la opción ya se saltaba también la guarda del cierre y **nadie podía saberlo leyéndola**.
      */
-    permitirOrdenCancelada?: boolean;
+    permitirOrdenNoViva?: boolean;
   } = {},
 ): Promise<RecetaOrden> {
   verificarPermiso(sesion, 'desarrollo.administrar');
   return enTransaccion(async (tx) => {
     const orden = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
-    if (opciones.permitirOrdenCancelada !== true) exigirOrdenViva(orden);
+    if (opciones.permitirOrdenNoViva !== true) exigirOrdenViva(orden);
     let sobreLapida = false;
     const tocados: { tipo: TipoRenglonRecetaClave; idRenglon: number }[] = [];
     await accion(tx, orden, {
@@ -3225,7 +3245,8 @@ export async function liberarReceta(
  *
  * LAS TRES CONDICIONES, y por qué cada una:
  *  • **La orden tiene que estar VIVA.** Reabrir para corregir lo que ya no se va a producir no
- *    significa nada (cerrar sí se permite cancelada: ver `permitirOrdenCancelada`).
+ *    significa nada (cerrar sí se permite sobre una orden cancelada O CERRADA: ver
+ *    `permitirOrdenNoViva`).
  *  • **La receta tiene que estar LIBERADA COMPLETA** (`recetaLiberadaEn` no nulo). Y es la condición
  *    que hace que el candado no tenga trampa: como al abrir no quedaba nada sin firmar, todo lo que
  *    quede sin firmar al cerrar es **algo que esta corrección tocó**, así que siempre hay alguien
@@ -3315,9 +3336,10 @@ export async function abrirReceta(
  * sin firmar. No abre ninguna puerta — la puerta vieja (`exigirRecetaLiberada`) sigue frenando la
  * compra porque no hay nada liberado que comprar.
  *
- * 🔴 **NO exige la orden viva**, y es deliberado ({@link enRecetaEditable} `permitirOrdenCancelada`):
- * si la orden se cancela con la receta abierta, ésta es la única salida del candado. Un candado que
- * sólo se puede abrir es una trampa.
+ * 🔴 **NO exige la orden viva**, y es deliberado ({@link enRecetaEditable} `permitirOrdenNoViva`):
+ * si la orden se cancela —o se CIERRA (0.061)— con la receta abierta, ésta es la única salida del
+ * candado. Un candado que sólo se puede abrir es una trampa. Es la ÚNICA operación de receta que
+ * una orden cerrada admite, y no mueve ni un renglón ni un peso: sólo suelta el freno de la compra.
  *
  * **Sin cuerpo, sin motivo**: la razón ya se dio al abrir. Pedir un segundo texto por la misma
  * corrección es la fricción que entrena a escribir "ok".
@@ -3371,10 +3393,12 @@ export async function cerrarReceta(
         motivoDeApertura: orden.recetaAbiertaMotivo,
         // Cerrar una orden CANCELADA es legal y raro: que quede dicho en la traza.
         ordenCancelada: orden.estado === 'cancelada',
+        // 0.061: cerrar la receta de una orden CERRADA también es legal y raro — misma razón.
+        ordenCerrada: orden.cerradaEn !== null,
         efecto: 'la compra de esta orden vuelve a regirse por la firma de cada renglón',
       });
     },
-    { permitirOrdenCancelada: true },
+    { permitirOrdenNoViva: true },
   );
 }
 

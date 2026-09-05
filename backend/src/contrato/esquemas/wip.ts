@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { esquemaEstadoOrden } from './orden.js';
 import { esquemaPackSalida } from './pack.js';
 
 /**
@@ -46,10 +47,9 @@ export const esquemaTableroWipQuery = z
       .describe('Texto a buscar (folio, código de modelo, cliente o valor de referencia D7).'),
     idModelo: z.coerce.number().int().positive().optional().describe('Filtra por modelo.'),
     idCliente: z.coerce.number().int().positive().optional().describe('Filtra por cliente.'),
-    estado: z
-      .enum(['capturada', 'completa', 'cancelada'])
-      .optional()
-      .describe('Filtra por estado de la orden.'),
+    // El esquema COMPARTIDO, no una copia: cuando 0.061 agregó `cerrada`, la copia habría dejado
+    // el tablero sin poder filtrar por las órdenes cerradas.
+    estado: esquemaEstadoOrden.optional().describe('Filtra por estado de la orden.'),
     soloPendientes: z
       .stringbool()
       .default(false)
@@ -74,7 +74,7 @@ export const esquemaWipOrdenFila = z
   .object({
     idOrden: z.number().int().describe('Id de la orden.'),
     folio: z.number().int().describe('Folio consecutivo por empresa.'),
-    estado: z.enum(['capturada', 'completa', 'cancelada']).describe('Estado de la orden.'),
+    estado: esquemaEstadoOrden.describe('Estado de la orden.'),
     fecha: z.string().nullable().describe('Fecha de la orden (YYYY-MM-DD) o null.'),
     fechaEntrega: z.string().nullable().describe('Fecha de entrega comprometida o null.'),
     idModelo: z.number().int().describe('Modelo a producir.'),
@@ -343,7 +343,7 @@ export const esquemaWipOrden = z
   .object({
     idOrden: z.number().int().describe('Id de la orden.'),
     folio: z.number().int().describe('Folio de la orden.'),
-    estado: z.enum(['capturada', 'completa', 'cancelada']).describe('Estado de la orden.'),
+    estado: esquemaEstadoOrden.describe('Estado de la orden.'),
     idModelo: z.number().int().describe('Modelo a producir.'),
     codigoModelo: z.string().describe('Código del modelo.'),
     idCliente: z.number().int().describe('Cliente de la orden.'),

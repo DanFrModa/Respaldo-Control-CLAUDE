@@ -325,6 +325,10 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 8. **Gabriel verifica cada etapa en el ambiente de `prueba` de Railway** (NO en local), antes de continuar.
 9. **NUNCA Docker local (innegociable).** Ni el lead ni los agentes abren ni corren Docker / `docker compose` / testcontainers en la máquina de Gabriel. Las pruebas pesadas (integración con testcontainers, e2e con compose) corren en **CI (GitHub Actions)**; la verificación funcional, en **Railway**. Para generar migraciones Prisma sin BD local: redactar el `migration.sql` a mano y validarlo con `prisma migrate diff`, o dejar que CI/Railway las apliquen. *(Decisión de Gabriel, 13-jun-2026.)*
 
+   > ⭐ **PERO las `.int.test.ts` SÍ se pueden medir en local — sin Docker (reviewer de la 0.111, 4-sep-2026).** «Nada de Docker» **no** quiere decir «nada de Postgres»: un cluster levantado con `initdb` + `pg_ctl` en un puerto suelto (p. ej. 55432), con `npx prisma migrate deploy` encima y un `globalSetup` propio que sólo publica la URL, corre el proyecto de integración entero. Los archivos de configuración viven **fuera del repo** (en el scratchpad) y el cluster se **apaga y se borra** al terminar.
+   >
+   > **Por qué importa:** «las de integración las juzga el CI» venía costando ciclos enteros. El mismo día, dos filas llegaron al CI en rojo por pruebas que nadie había corrido (la 0.128 con nueve, la 0.111 con cuatro —tres de ellas regresiones de pruebas que sí pasaban en `prueba`—), y las dos se habrían cazado en minutos. En una fila cuya garantía **es** el cruce contra la base de datos (un agregado SQL contra su gemelo en TypeScript, un kardex, una transacción), medirlo antes de subir deja de ser un lujo. El CI sigue siendo **el juez**; esto es para no llegar a él en rojo.
+
 ---
 
 ## 8. ESTADO DE EJECUCIÓN (resumen — el detalle vive en las fichas)

@@ -155,7 +155,10 @@ export async function insumosRequisitosDeOrden(
  * Traduce los requisitos al par (`estado`, `fechaCompletada`) que debe quedar guardado, a partir
  * de lo que la orden tiene HOY. Puro (no toca BD) para poder probarlo sin Postgres.
  *
- *  • `cancelada` SIEMPRE gana: una orden cancelada no cambia de estado por esta regla.
+ *  • `cancelada` y `cerrada` SIEMPRE ganan: una orden cancelada o CERRADA (0.061) no cambia de
+ *    estado por esta regla. Los dos son actos de una PERSONA, no derivados — degradarlos aquí
+ *    borraría el acto en silencio. Para el `cerrada`, además, el estado es el espejo de
+ *    `Orden.cerradaEn`: dejarlos desalineados haría mentir al badge y a los filtros.
  *  • El `estado` refleja la VERDAD ACTUAL: si deja de cumplir requisitos (le borran la matriz, o su
  *    receta deja de estar liberada por completo) vuelve a `capturada`. No es un sello de una sola
  *    vía. Editar el BOM del MODELO ya no la mueve (V1-E3d: la receta de la orden está congelada).
@@ -168,7 +171,8 @@ export function cambiosEstadoPorRequisitos(
   requisitos: RequisitosOrden,
   ahora: Date = new Date(),
 ): { estado?: EstadoOrden; fechaCompletada?: Date } | null {
-  if (actual.estado === 'cancelada') return null;
+  // ⭐ Los estados que NO se derivan (los pone y los quita una persona) son intocables aquí.
+  if (actual.estado === 'cancelada' || actual.estado === 'cerrada') return null;
 
   const estado: EstadoOrden = requisitos.completa ? 'completa' : 'capturada';
   const sellaFecha = requisitos.completa && actual.fechaCompletada === null;
@@ -293,6 +297,8 @@ export async function recalcularEstadoOrdenesDeModelo(
 
   // Universo: `capturada` de este modelo CON matriz y CON receta liberada. Lo demás no puede
   // completarse por un cambio de la casilla, y filtrarlo aquí evita traerlo a memoria.
+  // (0.061: `cerrada` y `cancelada` quedan fuera POR CONSTRUCCIÓN — el filtro es `= 'capturada'`,
+  // no un `!=`. Si algún día se ensancha este universo, hay que excluirlas a mano.)
   const candidatas = await tx.orden.findMany({
     where: {
       idModelo,
@@ -410,6 +416,9 @@ export function sumarResumenRealineacion(
  * permite degradar (el propósito es justamente poner al día el semáforo), pero solo donde el
  * cinturón lo autoriza.
  *
+ * ⚠️ NO toca las órdenes `cancelada` ni `cerrada` (0.061): las dos son actos de una persona, no
+ * estados derivables, y realinearlas las desharía.
+ *
  * NO toca `fechaCompletada` más que para sellarla la primera vez (nunca la borra) ni
  * `modificadoPorId` (no lo hizo una persona: el rastro es la bitácora con `idUsuario` NULL, mismo
  * criterio que el ETL y que la migración `20260726130000_recalculo_estado_ordenes`).
@@ -431,7 +440,10 @@ export async function realinearEstadoOrdenes(
   if (idsOrden.length === 0) return vacio;
 
   const ordenes = await tx.orden.findMany({
-    where: { id: { in: idsOrden }, estado: { not: 'cancelada' } },
+    // ⭐ 0.061: `cerrada` queda FUERA igual que `cancelada`. Sin esto, el script de mantenimiento
+    // post-carga REABRIRÍA en silencio toda orden cerrada (le pondría `capturada`/`completa`),
+    // dejando el badge mintiendo mientras `cerradaEn` sigue puesta y la guarda sigue bloqueando.
+    where: { id: { in: idsOrden }, estado: { notIn: ['cancelada', 'cerrada'] } },
     select: {
       id: true,
       idModelo: true,

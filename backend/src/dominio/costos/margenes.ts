@@ -6,7 +6,10 @@
  * Fórmula de MARGEN de Daniel (D2 #6), por orden con costo ≠ 0:
  *     margen = 1 − ( costoUnitario ÷ ( precio − bonificacionesCliente ) )
  * donde `precio` = precio pactado del renglón del pedido y `costoUnitario` = `costoTotal` ÷ base de
- * prorrateo de la orden (cortado por defecto). Las BONIFICACIONES del cliente (logística, publicidad)
+ * prorrateo de la orden (`recibido` por defecto desde 0.061; hasta esa versión, `cortado`). Y si la
+ * orden está CERRADA, el divisor es el CONGELADO del cierre, no uno vivo: lo aplica el `CASE` de
+ * `orden_calc` en la consulta de abajo, traducción literal de `divisorCongelado` (`cantidades.ts`).
+ * Las BONIFICACIONES del cliente (logística, publicidad)
  * RESTAN de la venta (precio neto), no del costo. ⚠️ Deuda: en F7-E1 NO existe fuente de las
  * bonificaciones por cliente (llegan con Finanzas/F9), así que `bonificaciones = 0` (precio neto =
  * precio); la fórmula ya las contempla y el día que haya dato se enchufa aquí sin tocar el resto.
@@ -91,6 +94,11 @@ export async function margenesPorPedido(
         pl."cantidad_pedida"   AS cantidad,
         co."costo_total"       AS costo_total,
         co."base_prorrateo"    AS base,
+        -- ⭐⭐ 0.061: las tres columnas del COSTO CONGELADO. Sin ellas este cálculo dividía SIEMPRE
+        -- en vivo (ver "orden_calc").
+        co."cantidad_base_congelada" AS cantidad_base_congelada,
+        co."congelado_en"            AS congelado_en,
+        o."cerrada_en"               AS cerrada_en,
         COALESCE((
           SELECT SUM(d."cantidad") FROM "etapa_movimiento_det" d
           JOIN "etapa_movimiento" e ON e."id" = d."id_etapa_mov"
@@ -119,10 +127,31 @@ export async function margenesPorPedido(
         ob.id_pedido,
         ob.precio,
         ob.cantidad,
-        CASE ob.base
-          WHEN 'recibido' THEN ob.recibido
-          WHEN 'vendido'  THEN ob.vendido
-          ELSE ob.cortado
+        -- ⭐⭐ 0.061 — EL DIVISOR RESPETA EL CONGELADO DE LA ORDEN CERRADA (§Post-F9.154(c)).
+        --
+        -- Es la traducción LITERAL a SQL de "divisorCongelado(orden, costo) ?? cantidadDeBase(...)"
+        -- ("costos/cantidades.ts"), que es la regla ÚNICA: congelado SÓLO si la orden está cerrada
+        -- **y** el costo trae el sello ("congelado_en"); si falta cualquiera de los dos, o el
+        -- divisor congelado es NULL, se cae al vivo. Un "cantidad_base_congelada = 0" SÍ se respeta
+        -- como cero (por eso la condición mira "IS NOT NULL", no "> 0"): esa orden se cerró sin
+        -- piezas y su margen tiene que quedar NULL, no recalcularse.
+        --
+        -- 🔴 SIN esto, éste era el QUINTO publicador del costo unitario y el único que seguía
+        -- dividiendo EN VIVO. Medido: una orden cerrada con divisor congelado 25 y unitario 63.60
+        -- daba margen/pieza 36.40; al capturarse un recibo POSTERIOR al cierre, el margen saltaba a
+        -- 68.20 (1590/50 = 31.80) mientras su ficha seguía diciendo 63.60. El mismo
+        -- "genera_entrada_pt" que hace explotable el caso del EDR aplica aquí: lo filtra la
+        -- subconsulta de "recibido", y esa bandera se edita desde el CRUD «Tipos de proceso».
+        CASE
+          WHEN ob.cerrada_en IS NOT NULL
+           AND ob.congelado_en IS NOT NULL
+           AND ob.cantidad_base_congelada IS NOT NULL
+          THEN ob.cantidad_base_congelada
+          ELSE CASE ob.base
+            WHEN 'recibido' THEN ob.recibido
+            WHEN 'vendido'  THEN ob.vendido
+            ELSE ob.cortado
+          END
         END AS base_cant,
         ob.costo_total
       FROM orden_base ob

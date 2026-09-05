@@ -24,6 +24,11 @@ type ArgsMutacion = { id: number; cuerpo: Record<string, unknown> };
 const actualizarOrden = vi.fn<(args: ArgsMutacion) => Promise<void>>(() => Promise.resolve());
 const guardarReferencias = vi.fn<(args: ArgsMutacion) => Promise<void>>(() => Promise.resolve());
 const guardarMatriz = vi.fn<(args: ArgsMutacion) => Promise<void>>(() => Promise.resolve());
+// ⭐ 0.061 — cerrar / reabrir la orden. Se capturan los argumentos para poder AFIRMAR qué se manda
+// (el motivo opcional al cerrar, el obligatorio al reabrir), no sólo que el botón exista.
+type ArgsCierre = { id: number; cuerpo: { motivo?: string } };
+const cerrarOrden = vi.fn<(args: ArgsCierre) => void>();
+const reabrirOrden = vi.fn<(args: ArgsCierre) => void>();
 
 vi.mock('@/api/ordenes', () => ({
   useOrden: () => useOrden(),
@@ -31,6 +36,8 @@ vi.mock('@/api/ordenes', () => ({
   useGuardarMatriz: () => ({ mutateAsync: guardarMatriz, isPending: false }),
   useCopiarMatriz: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useCerrarOrden: () => ({ mutate: cerrarOrden, isPending: false }),
+  useReabrirOrden: () => ({ mutate: reabrirOrden, isPending: false }),
   useGuardarReferencias: () => ({ mutateAsync: guardarReferencias, isPending: false }),
   useAgregarComentario: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -124,6 +131,8 @@ function orden(
     estado?: Orden['estado'];
     idCliente?: number;
     requisitos?: Orden['requisitos'];
+    /** 0.061: cuándo se cerró la orden (null = abierta). */
+    cerradaEn?: string | null;
   } = {},
 ): Orden {
   return {
@@ -131,6 +140,8 @@ function orden(
     folio,
     idEmpresa: 1,
     estado: opciones.estado ?? 'capturada',
+    cerradaEn: opciones.cerradaEn ?? null,
+    motivoCierre: null,
     idPedidoLinea: 500 + id,
     idModelo: 10,
     codigoModelo: 'A-100',
@@ -378,6 +389,91 @@ describe('<DialogoOrden>', () => {
     // El campo activo aparece; el inactivo NO.
     expect(within(detalle).getByLabelText('Orden de compra')).toBeInTheDocument();
     expect(within(detalle).queryByLabelText('Temporada')).not.toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ 0.061 — CERRAR / REABRIR LA ORDEN (§Post-F9.154(c), DANIEL).
+// Cerrar no es «archivar»: cierra la captura y CONGELA el costo por prenda. Por eso tiene permiso
+// propio (`ordenes.cerrar`) y una confirmación que dice qué implica — si el usuario se entera
+// después, se entera cuando el piso ya no pueda capturar un recibo.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
+  /** Los de siempre MÁS el permiso propio del cierre. */
+  const PERM_CON_CIERRE = [...PERM_TODOS, 'ordenes.cerrar'] as const;
+
+  beforeEach(() => {
+    useOrden.mockReset();
+    cerrarOrden.mockClear();
+    reabrirOrden.mockClear();
+    useCamposCliente.mockReturnValue({ data: [], isPending: false, isError: false, error: null });
+  });
+
+  it('con `ordenes.cerrar`, la orden ABIERTA ofrece «Cerrar» (y no «Reabrir»)', () => {
+    renderDialogo(orden(1, 101), [...PERM_CON_CIERRE]);
+
+    expect(screen.getByTestId('cerrar-orden')).toBeInTheDocument();
+    expect(screen.queryByTestId('reabrir-orden')).not.toBeInTheDocument();
+  });
+
+  it('SIN `ordenes.cerrar` no ofrece ni cerrar ni reabrir (es permiso PROPIO)', () => {
+    // La rama que importa: `ordenes.administrar` + `ordenes.cancelar` NO alcanzan. Sin esto, el
+    // botón podría colgar de «administrar» y nadie lo notaría hasta que el backend rebotara.
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
+    expect(screen.queryByTestId('cerrar-orden')).not.toBeInTheDocument();
+
+    renderDialogo(orden(2, 102, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_TODOS]);
+    expect(screen.queryByTestId('reabrir-orden')).not.toBeInTheDocument();
+  });
+
+  it('la orden CERRADA ofrece «Reabrir», y ya no deja cancelar ni guardar', () => {
+    renderDialogo(orden(3, 103, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+
+    expect(screen.getByTestId('reabrir-orden')).toBeInTheDocument();
+    expect(screen.queryByTestId('cerrar-orden')).not.toBeInTheDocument();
+    // Cerrada = solo lectura: ni el pie de guardado ni la cancelación (el backend los rechaza
+    // igual; esto evita ofrecer botones que van a rebotar).
+    expect(screen.queryByTestId('pie-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('cancelar-orden')).not.toBeInTheDocument();
+  });
+
+  it('la confirmación de CERRAR dice que el costo queda congelado, y el motivo es OPCIONAL', async () => {
+    const usuario = userEvent.setup();
+    renderDialogo(orden(4, 104), [...PERM_CON_CIERRE]);
+
+    await usuario.click(screen.getByTestId('cerrar-orden'));
+
+    // Lo que el usuario tiene que leer ANTES de apretar.
+    expect(screen.getByText(/costo por prenda queda congelado/i)).toBeInTheDocument();
+    // Sin motivo, el botón sigue vivo: cerrar es el final NORMAL de una orden.
+    const confirmar = screen.getByTestId('confirmar-cerrar-orden');
+    expect(confirmar).toBeEnabled();
+
+    await usuario.click(confirmar);
+    expect(cerrarOrden).toHaveBeenCalledTimes(1);
+    // Cuerpo VACÍO (no un motivo en blanco): el contrato lo declara opcional.
+    expect(cerrarOrden.mock.calls[0]?.[0]).toMatchObject({ id: 4, cuerpo: {} });
+  });
+
+  it('REABRIR exige motivo: el botón arranca deshabilitado y manda lo escrito', async () => {
+    const usuario = userEvent.setup();
+    renderDialogo(orden(5, 105, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+
+    await usuario.click(screen.getByTestId('reabrir-orden'));
+
+    const confirmar = screen.getByTestId('confirmar-reabrir-orden');
+    expect(confirmar).toBeDisabled();
+
+    await usuario.type(screen.getByTestId('orden-motivo-cierre'), '  Faltó capturar un recibo  ');
+    expect(confirmar).toBeEnabled();
+
+    await usuario.click(confirmar);
+    expect(reabrirOrden).toHaveBeenCalledTimes(1);
+    // Se manda RECORTADO: el backend valida `min(1)` sobre el texto ya limpio.
+    expect(reabrirOrden.mock.calls[0]?.[0]).toMatchObject({
+      id: 5,
+      cuerpo: { motivo: 'Faltó capturar un recibo' },
+    });
   });
 });
 

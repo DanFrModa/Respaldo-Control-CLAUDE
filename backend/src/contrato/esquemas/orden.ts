@@ -12,7 +12,9 @@ import { esquemaPackEntrada, esquemaPackSalida } from './pack.js';
  *  • La orden NUEVA SIEMPRE sale de un renglón de pedido (`idPedidoLinea` obligatorio); el
  *    modelo/cliente/empresa se AUTORRELLENAN del renglón→pedido (no se capturan). Orden sin
  *    pedido = solo histórico (lo migra el ETL), JAMÁS captura nueva (decisión Gabriel 16-jun-2026).
- *  • El `estado` (capturada/completa/cancelada) lo DERIVAN los servicios; ningún cuerpo lo lleva.
+ *  • El `estado` lo DERIVAN los servicios y ningún cuerpo lo lleva como campo. Desde 0.061 hay un
+ *    cuarto valor, `cerrada`, que NO se deriva: lo ponen y lo quitan `POST /ordenes/:id/cerrar` y
+ *    `/reabrir` (permiso `ordenes.cerrar`), que tampoco lo reciben como campo — lo hacen ellos.
  *  • El TOTAL de la orden y de cada color se DERIVA por suma de cantidades (D4 + espíritu D3):
  *    NUNCA viaja un `total` de entrada, y en la salida sale calculado.
  *  • Los campos-dato de v1 sin motor (RC=F5; maquilaOrd/aplicacionOrd/pagada=F3/F6; tallasV1 crudo)
@@ -263,6 +265,46 @@ export const esquemaOrdenCancelarCuerpo = z.object({
 /** Datos validados del cuerpo de cancelar. */
 export type DatosOrdenCancelar = z.infer<typeof esquemaOrdenCancelarCuerpo>;
 
+// ── ⭐⭐ Cerrar / reabrir la orden (0.061 — §Post-F9.154(c)) ─────────────────────────
+
+/**
+ * Cuerpo de CERRAR una orden: el motivo es OPCIONAL. Cerrar es el final NORMAL de una orden (ya no
+ * se va a mover y su costo se congela), no una excepción que haya que justificar — a diferencia de
+ * cancelar, donde el motivo es obligatorio porque algo salió mal.
+ */
+export const esquemaOrdenCerrarCuerpo = z
+  .object({
+    motivo: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+      .optional()
+      .describe('Motivo del cierre (OPCIONAL).'),
+  })
+  .describe('Cerrar la orden: deja de admitir captura y CONGELA su costo unitario.');
+
+/** Datos validados del cuerpo de cerrar. */
+export type DatosOrdenCerrar = z.infer<typeof esquemaOrdenCerrarCuerpo>;
+
+/**
+ * Cuerpo de REABRIR una orden cerrada: el motivo es OBLIGATORIO. Aquí sí es la excepción —
+ * se está deshaciendo un cierre y devolviendo el costo a cálculo vivo—, y la excepción se justifica.
+ */
+export const esquemaOrdenReabrirCuerpo = z
+  .object({
+    motivo: z
+      .string({ error: 'El motivo de la reapertura es obligatorio' })
+      .trim()
+      .min(1, { error: 'El motivo de la reapertura es obligatorio' })
+      .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+      .describe('Motivo de la reapertura (OBLIGATORIO).'),
+  })
+  .describe('Reabrir una orden cerrada: el costo vuelve a calcularse en vivo (acto inverso, D3).');
+
+/** Datos validados del cuerpo de reabrir. */
+export type DatosOrdenReabrir = z.infer<typeof esquemaOrdenReabrirCuerpo>;
+
 // ── Referencias (D7 — campos de cliente) ─────────────────────────────────────────────
 
 /** Un valor de referencia: el `ClienteCampo` (ACTIVO, del cliente de la orden) + su valor. */
@@ -311,10 +353,24 @@ export type DatosOrdenComentario = z.infer<typeof esquemaOrdenComentarioCuerpo>;
 
 // ── Salidas ─────────────────────────────────────────────────────────────────────────
 
-/** Estado de la orden tal como sale al cliente. */
+/**
+ * Estado de la orden tal como sale al cliente.
+ *
+ * `capturada`/`completa` son DERIVADOS (los calcula `requisitos-orden.ts` de tallas + receta
+ * liberada + arte); `cancelada` es la cancelación suave; y `cerrada` (⭐ 0.061 — §Post-F9.154(c))
+ * es el ÚNICO que pone y quita una PERSONA, con el permiso `ordenes.cerrar`: la orden terminó su
+ * vida administrativa, ya no admite captura y su costo unitario quedó CONGELADO.
+ *
+ * ⚠️ `cerrada` NO sustituye ni redefine a `completa`: `completa` habla de la completitud de la
+ * CAPTURA (tallas + receta + arte) y `cerrada` de que la orden terminó. Una orden se puede cerrar
+ * estando `capturada`, y al REABRIRLA el estado derivado se vuelve a calcular del dato.
+ */
 export const esquemaEstadoOrden = z
-  .enum(['capturada', 'completa', 'cancelada'])
-  .describe('Estado DERIVADO de la orden (no editable).');
+  .enum(['capturada', 'completa', 'cancelada', 'cerrada'])
+  .describe(
+    'Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada ' +
+      '(acto explícito de 0.061 que congela el costo; no editable como campo).',
+  );
 
 /**
  * REQUISITOS que sostienen el estado `completa` (Daniel 26-jul-2026): la orden dice POR QUÉ está
@@ -454,6 +510,15 @@ export const esquemaOrdenSalida = z
       ),
     requisitos: esquemaRequisitosOrden,
     motivoCancelada: z.string().nullable().describe('Motivo de la cancelación, o null.'),
+    // ── ⭐⭐ Cierre de la orden (0.061 — §Post-F9.154(c)) ──
+    cerradaEn: z.iso
+      .datetime()
+      .nullable()
+      .describe(
+        'Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o ' +
+          'null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo.',
+      ),
+    motivoCierre: z.string().nullable().describe('Motivo del cierre (opcional), o null.'),
     ocCliente: z
       .string()
       .nullable()

@@ -139,6 +139,9 @@ describe('precios de la orden — captura con rastro (A2/A7, D3)', () => {
             id: 5,
             folio: 5424n,
             estado: 'completa',
+            // 0.061: ABIERTA. La guarda del cierre mira esta columna y trata «no viene» como
+            // CERRADA (falla del lado seguro): un doble que la calle mentiría sobre el dato.
+            cerradaEn: null,
             maquilaOrd: null,
             aplicacionOrd: null,
             // Para el re-read del resumen tras el PATCH:
