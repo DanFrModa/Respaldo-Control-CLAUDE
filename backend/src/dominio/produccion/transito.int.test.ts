@@ -155,6 +155,7 @@ async function meterAPt(almacen: Almacen, cantidad: number): Promise<void> {
       idAlmacen: almacen.id,
       idModelo: modelo.id,
       fecha: '2026-08-17',
+      motivo: 'Alta de existencia para la prueba',
       lineas: [
         {
           idColor: colorRojo.id,
@@ -183,6 +184,7 @@ async function meterAPtSinOrden(almacen: Almacen, cantidad: number): Promise<voi
       idAlmacen: almacen.id,
       idModelo: modelo.id,
       fecha: '2026-08-17',
+      motivo: 'Alta de existencia para la prueba',
       lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
     },
     bd(),
@@ -696,6 +698,7 @@ describe('Cancelaciones (D3: inverso auditado, jamás edición)', () => {
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-08-19',
+        motivo: 'Alta de existencia para la prueba',
         lineas: [
           { idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
         ],
@@ -854,6 +857,7 @@ describe('H4 · el recibo no puede devolver más de lo que queda en tránsito', 
         idAlmacen: almTransito.id,
         idModelo: modelo.id,
         fecha: '2026-08-19',
+        motivo: 'Alta de existencia para la prueba',
         lineas: [
           { idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] },
         ],

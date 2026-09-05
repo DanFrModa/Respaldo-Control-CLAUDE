@@ -100,6 +100,7 @@ async function mover(
       idAlmacen,
       idModelo: modelo.id,
       fecha: '2026-07-01',
+      motivo: 'Alta de existencia para la prueba',
       lineas: [
         {
           idColor: opciones.idColor ?? colorRojo.id,

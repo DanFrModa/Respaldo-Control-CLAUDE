@@ -11,6 +11,7 @@
  *  • `GET  /inventarios/pt/existencias`            (perm `inventario-pt.ver`)   → existencias (vista).
  *  • `GET  /inventarios/pt/kardex`                 (perm `inventario-pt.ver`)   → kardex por modelo.
  *  • `GET  /inventarios/pt/kardex/folio/:folio`    (perm `inventario-pt.ver`)   → un movimiento por folio.
+ *  • `GET  /inventarios/pt/traspasos/:id/impreso` (perm `inventario-pt.ver`)   → hoja del traspaso (PDF).
  *
  * NINGÚN endpoint edita ni borra movimientos (D3): la corrección es un inverso por la ruta de cancelar.
  */
@@ -40,6 +41,7 @@ import {
   registrarMovimientoPt,
   registrarTraspasoPt,
 } from '../../dominio/inventarios/movimientos-pt.js';
+import { impresoTraspasoPt } from '../../dominio/inventarios/impresos/impreso-traspaso-pt.js';
 
 /** Parámetro de ruta `:id`. */
 const esquemaParamId = z.object({
@@ -179,6 +181,33 @@ export const rutasMovimientosPt: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return obtenerMovimientoPorFolio(sesion, request.params.folio);
+    },
+  });
+
+  // ── Impreso PDF 'Traspaso de PT entre almacenes' (fila 0.100, §Post-F9.193) ──
+  // La hoja que ACOMPAÑA las prendas que salen a otro almacén. NO genera folio ni documento nuevo:
+  // IMPRIME el traspaso que ya existe, por el id de CUALQUIERA de sus dos patas (así se reimprime
+  // desde el kardex en modo «Por folio», que es la segunda puerta del papel). Un traspaso cancelado
+  // NO se imprime (400).
+  // Respuesta BINARIA (application/pdf): no se declara `response` 200 (Fastify manda el Buffer).
+  app.route({
+    method: 'GET',
+    url: '/inventarios/pt/traspasos/:id/impreso',
+    preHandler: app.conPermiso('inventario-pt.ver'),
+    schema: {
+      tags: ['inventario-pt'],
+      summary: 'Hoja del traspaso de PT entre almacenes (PDF del folio que ya existe)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const { buffer, folio } = await impresoTraspasoPt(sesion, request.params.id);
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `inline; filename="traspaso-pt-${String(folio)}.pdf"`);
+      return reply.send(buffer as unknown as never);
     },
   });
 

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -130,6 +130,14 @@ vi.mock('@/api/modelos', () => ({
 
 const sesion = () => estadoSesionDePrueba(['inventario-pt.ver', 'inventario-pt.mover']);
 
+/** Fila 0.100 — el motivo es OBLIGATORIO: sin él el botón de guardar no se habilita. */
+async function ponerMotivo(
+  usuario: ReturnType<typeof userEvent.setup>,
+  texto = 'Conteo físico de septiembre',
+): Promise<void> {
+  await usuario.type(screen.getByTestId('mov-motivo'), texto);
+}
+
 async function elegirModelo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
   // El selector es un combobox POPOVER (R9): la lista abre al enfocar el input de búsqueda.
   await usuario.click(screen.getByTestId('selector-modelo-busqueda'));
@@ -197,6 +205,8 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.clear(celda);
     await usuario.type(celda, '12');
 
+    await ponerMotivo(usuario);
+
     const guardar = screen.getByTestId('mov-guardar');
     expect(guardar).toBeEnabled();
     await usuario.click(guardar);
@@ -253,6 +263,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.clear(celda);
     await usuario.type(celda, '100');
 
+    await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('mov-guardar'));
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idOrden?: number }[] }];
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
@@ -286,6 +297,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.clear(celda);
     await usuario.type(celda, '4');
 
+    await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('mov-guardar'));
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idOrden?: number }[] }];
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
@@ -304,6 +316,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.clear(celda);
     await usuario.type(celda, '3');
 
+    await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('mov-guardar'));
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: Record<string, unknown>[] }];
     expect(cuerpo.lineas[0]).not.toHaveProperty('idOrden');
@@ -324,5 +337,71 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     expect(screen.getByTestId('mov-orden-error')).toBeInTheDocument();
     const opciones = [...screen.getByTestId('mov-orden').querySelectorAll('option')];
     expect(opciones.map((o) => o.value)).toEqual(['sin']);
+  });
+
+  // ── Fila 0.100: motivo obligatorio al meter o sacar PT a mano (§Post-F9.193) ─
+  describe('Fila 0.100 · el motivo es obligatorio', () => {
+    /** Deja la pantalla lista para guardar, SIN motivo. */
+    async function capturaSinMotivo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+      await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-color'), '7');
+      await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+      const celda = screen.getByTestId('mov-matriz-celda');
+      await usuario.clear(celda);
+      await usuario.type(celda, '12');
+    }
+
+    it('el campo existe y está rotulado como obligatorio', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+
+      expect(screen.getByTestId('mov-motivo')).toBeInTheDocument();
+      expect(screen.getByText(/Motivo \(obligatorio\)/i)).toBeInTheDocument();
+    });
+
+    it('SIN motivo no deja guardar, aunque todo lo demás esté capturado', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await capturaSinMotivo(usuario);
+
+      expect(screen.getByTestId('mov-guardar')).toBeDisabled();
+      expect(crearMutate).not.toHaveBeenCalled();
+    });
+
+    it('un motivo DEMASIADO CORTO tampoco habilita (mismo mínimo que el servidor)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await capturaSinMotivo(usuario);
+      await ponerMotivo(usuario, 'ab');
+
+      expect(screen.getByTestId('mov-guardar')).toBeDisabled();
+    });
+
+    it('⭐ con motivo lo MANDA recortado, y al guardar el campo QUEDA VACÍO', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await capturaSinMotivo(usuario);
+      await ponerMotivo(usuario, '  Merma por manchas  ');
+
+      await usuario.click(screen.getByTestId('mov-guardar'));
+      const [cuerpo, opciones] = crearMutate.mock.calls[0] as [
+        Record<string, unknown>,
+        { onSuccess: (mov: unknown) => void },
+      ];
+      expect(cuerpo.motivo).toBe('Merma por manchas');
+      expect(cuerpo.observaciones).toBeUndefined();
+
+      // ⭐ Y el campo se VACÍA al guardar. Si ese reset se perdiera, el motivo del movimiento
+      // anterior quedaría pegado, seguiría siendo válido (≥3 caracteres) y se adjuntaría EN
+      // SILENCIO al siguiente: una palabra equivocada en el rastro es peor que ninguna, y el
+      // rastro es justo lo que esta fila vino a construir.
+      act(() => {
+        opciones.onSuccess({ folio: 4321, totalPiezas: 12 });
+      });
+      expect(screen.getByTestId('mov-motivo')).toHaveValue('');
+    });
   });
 });

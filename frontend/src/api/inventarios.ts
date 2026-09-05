@@ -97,6 +97,20 @@ async function obtenerMovimientoPorFolio(folio: number): Promise<MovimientoPt> {
   return data;
 }
 
+/**
+ * URL del PDF de la HOJA DE TRASPASO de PT (fila 0.100, §Post-F9.193 decisión 2): el papel que
+ * acompaña las prendas que salen a otro almacén. NO es un folio nuevo — imprime el traspaso que ya
+ * existe, por el id de CUALQUIERA de sus dos patas. Un traspaso cancelado no se imprime: el backend
+ * lo rechaza.
+ *
+ * Tiene DOS llamadores, y son las dos puertas del papel: `TraspasosPtPagina` (la barra que aparece
+ * al guardar) y `KardexPtPagina` en modo «Por folio» (la REIMPRESIÓN — se busca el folio y se
+ * vuelve a sacar). Sin la segunda, una impresora atascada o una pestaña cerrada perderían la hoja.
+ */
+export function urlImpresoTraspasoPt(idMovimiento: number): string {
+  return `/api/inventarios/pt/traspasos/${String(idMovimiento)}/impreso`;
+}
+
 // ── Hooks de consulta ─────────────────────────────────────────────────────────
 
 /** Catálogo de tipos de movimiento de inventario (para el dropdown de movimientos manuales). */

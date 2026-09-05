@@ -51,6 +51,8 @@ test.describe('Inventario PT operable (F3-E3)', () => {
       await agregarTalla.selectOption({ index: 1 });
     }
     await page.getByTestId('mov-matriz-celda').first().fill('30');
+    // Fila 0.100 — el MOTIVO es obligatorio: sin él el botón de guardar sigue deshabilitado.
+    await page.getByTestId('mov-motivo').fill('Inventario inicial de la prueba');
     await page.getByTestId('mov-guardar').click();
     await expect(page.getByText(/Movimiento #\d+ guardado/)).toBeVisible();
 
@@ -68,8 +70,16 @@ test.describe('Inventario PT operable (F3-E3)', () => {
       await agregarTallaT.selectOption({ index: 1 });
     }
     await page.getByTestId('traspaso-matriz-celda').first().fill('10');
+    // Fila 0.100 — el MOTIVO es obligatorio también en el traspaso.
+    await page.getByTestId('traspaso-motivo').fill('Reacomodo de la prueba');
     await page.getByTestId('traspaso-guardar').click();
     await expect(page.getByText(/Traspaso guardado/)).toBeVisible();
+
+    // Fila 0.100 — al guardar, la pantalla ofrece la HOJA del traspaso (PDF server-side) con el
+    // folio que el traspaso YA tiene. Aquí se comprueba que el papel EXISTE y se puede pedir; que
+    // diga lo correcto lo miden los tests del impreso (unit + integración).
+    await expect(page.getByTestId('traspaso-pt-guardado')).toBeVisible();
+    await expect(page.getByTestId('traspaso-pt-imprimir')).toBeVisible();
 
     // ── EXISTENCIAS: verifica que el modelo aparezca con existencia ─────────────
     await page.goto('/inventarios/existencias');

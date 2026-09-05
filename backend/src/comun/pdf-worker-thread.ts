@@ -40,6 +40,9 @@ const REGISTRO_PDF = {
   'traspaso-tela': async () =>
     (await import('../dominio/inventarios/impresos/impreso-traspaso-tela.js'))
       .generarPdfTraspasoTela,
+  // Fila 0.100 — la gemela de la hoja de tela, para producto terminado (§Post-F9.193 decisión 2).
+  'traspaso-pt': async () =>
+    (await import('../dominio/inventarios/impresos/impreso-traspaso-pt.js')).generarPdfTraspasoPt,
 
   // ── Producción / WIP ─────────────────────────────────────────────────────────
   orden: async () =>

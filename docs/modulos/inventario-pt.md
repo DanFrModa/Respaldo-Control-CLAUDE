@@ -38,6 +38,15 @@ del detalle, NUNCA la vista — ADR-0010 §3). `costoUnit` queda NULL en toda F3
   origen), cancelación (elige el tipo inverso `error-entrada`/`error-salida`), consulta de **existencias**
   (lee la vista `existencia_pt` — aquí SÍ, es consulta), **kardex por modelo** (saldo corrido en memoria)
   y por folio. Permisos `inventario-pt.ver` / `inventario-pt.mover` (A4).
+- `impresos/impreso-traspaso-pt.ts` (fila 0.100) — **hoja del traspaso de PT** en PDF: el papel que
+  acompaña las prendas que salen a otro almacén. Lleva el folio, la fecha, **quién lo registró**, los dos
+  almacenes, el modelo, el **motivo** y la matriz color×talla con la orden de cada renglón. NO genera
+  folio ni documento nuevo — imprime el folio que el traspaso YA tiene (el de la pata de salida), por el
+  id de CUALQUIERA de las dos patas (por eso se **reimprime desde el kardex, modo «Por folio»**). Un
+  traspaso cancelado no se imprime. Espejo de la hoja de tela (`impreso-traspaso-tela.ts`, §Post-F9.38),
+  **incluidas sus dos puertas**: al guardar el traspaso y al buscarlo después por folio. El nombre del usuario se
+  resuelve con `comun/nombres-usuario.ts` (`Movimiento.idUsuario` es un id sin FK, ADR-0005); si no
+  resuelve, sale «—» y la hoja no se degrada (D3).
 - `tipos-movimiento.ts` — catálogo de tipos de movimiento.
 - `migracion.ts` (F3-E6) — **modo migración** dedicado: `crearMovimientoIptMigrado` (ver §Migración).
 
@@ -52,10 +61,34 @@ del detalle, NUNCA la vista — ADR-0010 §3). `costoUnit` queda NULL en toda F3
 ## Pantallas (frontend)
 
 Lista + detalle (teal): existencias (responsive PC+móvil), kardex por modelo, captura de movimiento manual
-y de traspaso, detalle de un movimiento por folio.
+y de traspaso, detalle de un movimiento por folio. Las dos capturas manuales exigen **motivo**.
+
+La **hoja del traspaso** tiene **dos puertas** (fila 0.100), igual que la de tela:
+1. `TraspasosPtPagina` — al guardar aparece el botón **«Hoja del traspaso»** con el folio recién registrado.
+2. `KardexPtPagina`, modo **«Por folio»** — la **reimpresión**: se busca el folio y el detalle vuelve a
+   ofrecer el botón. Guarda: sólo si el movimiento es un traspaso (`origenTipo === 'traspaso'`) y **no**
+   está cancelado. Va con `inventario-pt.ver` (leer y reimprimir no es mover).
+
+⚠️ El botón **no** está en la tabla del kardex *por modelo*: ese renglón (`esquemaKardexPtRenglon`) no
+trae `origenTipo`, y añadírselo sería un cambio de contrato que esta fila no necesita. La reimpresión
+entra por folio.
 
 ## Decisiones de diseño
 
+- **Motivo OBLIGATORIO al mover PT a mano (fila 0.100, §Post-F9.193 decisión 3).** El movimiento manual y
+  el traspaso exigen `motivo` (3–500 caracteres) — *"hoy se mueven mil piezas sin una palabra"* (Daniel).
+  Es el MISMO campo, con el mismo texto y los mismos límites, que ya exigían los ajustes de tela y avío
+  (`esquemaAjusteTelaCrear.motivo`), y se guarda en la MISMA columna que allá: `Movimiento.observaciones`
+  (por eso el campo de ENTRADA se llama `motivo` y el de SALIDA `observaciones`). **Sin migración**: la
+  columna ya existía. Sustituye al viejo `observaciones` opcional del cuerpo: dos textos libres apuntando
+  a la misma columna acabarían con uno de los dos mintiendo.
+  > **REGLA 0-B** — aplica de aquí en adelante. Los movimientos ya guardados sin motivo se quedan con
+  > `observaciones` NULL, se leen y se imprimen tal cual («—» en la hoja); **no se rellenan ni se reparan**.
+- **La hoja del traspaso NO genera folio (fila 0.100, decisión 2).** Daniel: la hoja lleva *"el folio del
+  traspaso que ya existe"*. Un documento paralelo sería una SEGUNDA fuente de verdad del mismo hecho
+  físico cuando el saldo ya se deriva del kardex (D3), y A3 queda intacto: no se toca ninguna secuencia.
+- **Existencias y kardex de PT a Excel: NO se hacen** (decisión de Daniel en la misma fila). Se agregarán
+  si los pide.
 - **D3 existencia = Σ movimientos:** sin columna/tabla de saldo editable. Las validaciones transaccionales
   suman `MovimientoDetPt` DIRECTO bajo lock; la vista `existencia_pt` es **solo** para consulta/tableros.
 - **D4 tallas/colores ilimitados:** el detalle del kardex es modelo×color×talla (catálogos `Color`/`Talla`).
