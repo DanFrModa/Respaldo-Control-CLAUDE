@@ -46,6 +46,8 @@ test.describe('Inventario cíclico (F7-E5)', () => {
       await agregarTalla.selectOption({ index: 1 });
     }
     await page.getByTestId('mov-matriz-celda').first().fill('20');
+    // Fila 0.100 — el MOTIVO es obligatorio: sin él el botón de guardar sigue deshabilitado.
+    await page.getByTestId('mov-motivo').fill('Inventario inicial de la prueba');
     await page.getByTestId('mov-guardar').click();
     await expect(page.getByText(/Movimiento #\d+ guardado/)).toBeVisible();
 

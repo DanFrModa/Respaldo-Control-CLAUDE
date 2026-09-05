@@ -1141,6 +1141,7 @@ describe('Backfill PT por orden (migración F6-E2)', () => {
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-06-21',
+        motivo: 'Alta de existencia para la prueba',
         lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
       },
       bd(),

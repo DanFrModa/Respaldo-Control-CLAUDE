@@ -120990,9 +120990,11 @@
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
                     "description": "Fecha del movimiento (YYYY-MM-DD)."
                   },
-                  "observaciones": {
+                  "motivo": {
                     "type": "string",
-                    "maxLength": 1000
+                    "minLength": 3,
+                    "maxLength": 500,
+                    "description": "Por qué se mueve el producto terminado (obligatorio; se guarda en observaciones)."
                   },
                   "lineas": {
                     "minItems": 1,
@@ -121061,13 +121063,14 @@
                   "idAlmacen",
                   "idModelo",
                   "fecha",
+                  "motivo",
                   "lineas"
                 ],
-                "description": "Datos de un movimiento manual de inventario PT (color×talla, D4)."
+                "description": "Datos de un movimiento manual de inventario PT (color×talla, D4). Motivo obligatorio."
               }
             }
           },
-          "description": "Datos de un movimiento manual de inventario PT (color×talla, D4)."
+          "description": "Datos de un movimiento manual de inventario PT (color×talla, D4). Motivo obligatorio."
         },
         "security": [
           {
@@ -121152,7 +121155,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Observaciones o null."
+                      "description": "Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual)."
                     },
                     "origenTipo": {
                       "anyOf": [
@@ -121509,9 +121512,11 @@
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
                     "description": "Fecha del traspaso (YYYY-MM-DD)."
                   },
-                  "observaciones": {
+                  "motivo": {
                     "type": "string",
-                    "maxLength": 1000
+                    "minLength": 3,
+                    "maxLength": 500,
+                    "description": "Por qué se mueve el producto terminado (obligatorio; se guarda en observaciones)."
                   },
                   "lineas": {
                     "minItems": 1,
@@ -121580,13 +121585,14 @@
                   "idAlmacenDestino",
                   "idModelo",
                   "fecha",
+                  "motivo",
                   "lineas"
                 ],
-                "description": "Datos de un traspaso de PT entre almacenes (color×talla, D4)."
+                "description": "Datos de un traspaso de PT entre almacenes (color×talla, D4). Motivo obligatorio."
               }
             }
           },
-          "description": "Datos de un traspaso de PT entre almacenes (color×talla, D4)."
+          "description": "Datos de un traspaso de PT entre almacenes (color×talla, D4). Motivo obligatorio."
         },
         "security": [
           {
@@ -121674,7 +121680,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Observaciones o null."
+                          "description": "Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual)."
                         },
                         "origenTipo": {
                           "anyOf": [
@@ -121916,7 +121922,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Observaciones o null."
+                          "description": "Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual)."
                         },
                         "origenTipo": {
                           "anyOf": [
@@ -122368,7 +122374,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Observaciones o null."
+                      "description": "Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual)."
                     },
                     "origenTipo": {
                       "anyOf": [
@@ -123326,7 +123332,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Observaciones del movimiento o null."
+                            "description": "Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual)."
                           }
                         },
                         "required": [
@@ -123617,7 +123623,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Observaciones o null."
+                      "description": "Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual)."
                     },
                     "origenTipo": {
                       "anyOf": [
@@ -123789,6 +123795,179 @@
               }
             }
           },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventarios/pt/traspasos/{id}/impreso": {
+      "get": {
+        "summary": "Hoja del traspaso de PT entre almacenes (PDF del folio que ya existe)",
+        "tags": [
+          "inventario-pt"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del recurso."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {

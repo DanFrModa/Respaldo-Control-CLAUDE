@@ -1,8 +1,13 @@
-import { Ban, Loader2Icon, Search } from 'lucide-react';
+import { Ban, Loader2Icon, Printer, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { useCancelarMovimientoPt, useKardexPt, useMovimientoPtPorFolio } from '@/api/inventarios';
+import {
+  urlImpresoTraspasoPt,
+  useCancelarMovimientoPt,
+  useKardexPt,
+  useMovimientoPtPorFolio,
+} from '@/api/inventarios';
 import type { Modelo } from '@/api/modelos';
 import type { MovimientoPt } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
@@ -37,8 +42,13 @@ type Modo = 'modelo' | 'folio';
  * KARDEX de producto terminado (F3-E3, doc 04-Inventarios — IPT_Kardex). Dos modos en una pantalla:
  *  • POR MODELO: los movimientos del modelo en orden cronológico con su SALDO CORRIDO.
  *  • POR FOLIO: el detalle de UN movimiento (su matriz color×talla), con botón para CANCELARLO (genera
- *    un inverso auditado — D3) si el usuario tiene `inventario-pt.mover`.
+ *    un inverso auditado — D3) si el usuario tiene `inventario-pt.mover`, y —cuando ese movimiento es
+ *    un TRASPASO vivo— para REIMPRIMIR su hoja (fila 0.100).
  * Pensada para escritorio (densa). `inventario-pt.ver` gobierna el acceso.
+ *
+ * Fila 0.100 — ésta es la SEGUNDA puerta de la hoja del traspaso, y la que la vuelve recuperable: la
+ * primera (`TraspasosPtPagina`) sólo existe en el instante de guardar. Se buscó el folio, se saca el
+ * papel otra vez. Mismo par de puertas que tiene la hoja de tela desde §Post-F9.38.
  */
 export function KardexPtPagina(): React.JSX.Element {
   const [modo, setModo] = useState<Modo>('modelo');
@@ -296,15 +306,38 @@ function KardexPorFolio(): React.JSX.Element {
                 </p>
               ) : null}
 
-              {puedeMover && !movimiento.cancelado ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setACancelar(movimiento)}
-                  data-testid="kardex-folio-cancelar"
-                >
-                  <Ban className="mr-1.5 size-4" aria-hidden /> Cancelar movimiento
-                </Button>
-              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {/* REIMPRESIÓN de la hoja del traspaso (fila 0.100) — la SEGUNDA puerta, igual que
+                    en telas (`ExistenciasTelasColorPagina`): sin ella el papel sólo existiría en el
+                    instante de guardarlo, y una impresora atascada o una pestaña cerrada lo
+                    perderían para siempre. Se busca el folio aquí y se vuelve a sacar.
+                    Guarda: sólo un TRASPASO tiene esta hoja (un movimiento manual no), y uno
+                    CANCELADO no se reimprime — su papel no debe volver a salir con un bulto. El
+                    backend rechaza los dos casos igual; esto sólo evita ofrecer un botón que
+                    llevaría a un error. `origenTipo` y `cancelado` ya venían en la respuesta del
+                    movimiento por folio: no hace falta tocar el contrato. */}
+                {movimiento.origenTipo === 'traspaso' && !movimiento.cancelado ? (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      window.open(urlImpresoTraspasoPt(movimiento.id), '_blank', 'noopener')
+                    }
+                    data-testid="kardex-folio-imprimir"
+                  >
+                    <Printer className="mr-1.5 size-4" aria-hidden /> Hoja del traspaso
+                  </Button>
+                ) : null}
+
+                {puedeMover && !movimiento.cancelado ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setACancelar(movimiento)}
+                    data-testid="kardex-folio-cancelar"
+                  >
+                    <Ban className="mr-1.5 size-4" aria-hidden /> Cancelar movimiento
+                  </Button>
+                ) : null}
+              </div>
             </div>
           )}
         </CardContent>

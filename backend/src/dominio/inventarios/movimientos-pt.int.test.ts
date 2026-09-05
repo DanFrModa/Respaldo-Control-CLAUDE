@@ -26,6 +26,15 @@ import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../prue
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import {
+  registrarTraspasoPt as registrarTraspasoPtMotor,
+  type LineaMovimientoPt,
+} from '../../comun/kardex.js';
+import { extraerTextoPdf } from '../../comun/pdf-texto.js';
+import {
+  armarDatosImpresoTraspasoPt,
+  generarPdfTraspasoPt,
+} from './impresos/impreso-traspaso-pt.js';
+import {
   cancelarMovimientoPt,
   consultarExistenciasPt,
   kardexPt,
@@ -110,6 +119,7 @@ async function entrar(idAlmacen: number, cantidad: number, idTalla = tallaCH.id)
       idAlmacen,
       idModelo: modelo.id,
       fecha: '2026-06-19',
+      motivo: 'Ajuste de la prueba',
       lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla, cantidad }] }],
     },
     bd(),
@@ -140,6 +150,7 @@ describe('Movimiento manual (F3-E3)', () => {
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-06-20',
+        motivo: 'Ajuste de la prueba',
         lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
       },
       bd(),
@@ -158,6 +169,7 @@ describe('Movimiento manual (F3-E3)', () => {
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] }],
         },
         bd(),
@@ -178,6 +190,7 @@ describe('Movimiento manual (F3-E3)', () => {
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
         },
         bd(),
@@ -193,6 +206,7 @@ describe('Movimiento manual (F3-E3)', () => {
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-06-19',
+        motivo: 'Ajuste de la prueba',
         lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
       },
       bd(),
@@ -204,6 +218,7 @@ describe('Movimiento manual (F3-E3)', () => {
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-06-19',
+        motivo: 'Ajuste de la prueba',
         lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaM.id, cantidad: 1 }] }],
       },
       bd(),
@@ -222,6 +237,7 @@ describe('Traspaso entre almacenes (F3-E3)', () => {
         idAlmacenDestino: almSegundas.id,
         idModelo: modelo.id,
         fecha: '2026-06-20',
+        motivo: 'Ajuste de la prueba',
         lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
       },
       bd(),
@@ -247,6 +263,7 @@ describe('Traspaso entre almacenes (F3-E3)', () => {
           idAlmacenDestino: almSegundas.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] }],
         },
         bd(),
@@ -272,6 +289,7 @@ describe('Traspaso entre almacenes (F3-E3)', () => {
           idAlmacenDestino: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
         },
         bd(),
@@ -326,6 +344,7 @@ describe('Concurrencia: existencia nunca negativa (F3-E3)', () => {
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] }],
         },
         bd(),
@@ -365,6 +384,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
         idAlmacen,
         idModelo: modelo.id,
         fecha: '2026-08-12',
+        motivo: 'Ajuste de la prueba',
         lineas: [{ idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
       },
       bd(),
@@ -383,6 +403,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-08-12',
+        motivo: 'Ajuste de la prueba',
         lineas: [
           { idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad: 8 }] },
         ],
@@ -410,6 +431,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-08-12',
+          motivo: 'Ajuste de la prueba',
           lineas: [
             {
               idColor: colorRojo.id,
@@ -431,6 +453,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-08-12',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
         },
         bd(),
@@ -449,6 +472,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
         idAlmacenDestino: almSegundas.id,
         idModelo: modelo.id,
         fecha: '2026-08-12',
+        motivo: 'Ajuste de la prueba',
         lineas: [
           { idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad: 12 }] },
         ],
@@ -483,6 +507,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
         idAlmacenDestino: almSegundas.id,
         idModelo: modelo.id,
         fecha: '2026-08-12',
+        motivo: 'Ajuste de la prueba',
         lineas: [
           { idColor: colorRojo.id, idOrden: null, tallas: [{ idTalla: tallaCH.id, cantidad: 25 }] },
         ],
@@ -506,6 +531,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-08-12',
+          motivo: 'Ajuste de la prueba',
           lineas: [
             {
               idColor: colorRojo.id,
@@ -544,6 +570,7 @@ describe('Kardex (F3-E3)', () => {
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-06-20',
+        motivo: 'Ajuste de la prueba',
         lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
       },
       bd(),
@@ -566,6 +593,7 @@ describe('Kardex (F3-E3)', () => {
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-06-19',
+        motivo: 'Ajuste de la prueba',
         lineas: [
           {
             idColor: colorRojo.id,
@@ -610,6 +638,7 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
           idAlmacen: bodegaTela.id,
           idModelo: modelo.id,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
         },
         bd(),
@@ -633,6 +662,7 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
           idAlmacenDestino: bodegaTela.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
         },
         bd(),
@@ -656,6 +686,7 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
           idAlmacenDestino: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
         },
         bd(),
@@ -677,6 +708,7 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
           idAlmacen: ajeno.id,
           idModelo: modelo.id,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
         },
         bd(),
@@ -697,6 +729,7 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
           idAlmacen: viejo.id,
           idModelo: modelo.id,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
         },
         bd(),
@@ -714,6 +747,7 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
         idAlmacenDestino: almSegundas.id,
         idModelo: modelo.id,
         fecha: '2026-06-20',
+        motivo: 'Ajuste de la prueba',
         lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
       },
       bd(),
@@ -721,5 +755,224 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
     const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
     expect(existencias.totalExistencia).toBe(30);
     expect(existencias.filas.find((f) => f.idAlmacen === almSegundas.id)?.existencia).toBe(10);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// Fila 0.100 — EL TRASPASO DE PT DEJA RASTRO (§Post-F9.193, decisiones 2 y 3)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+
+describe('Fila 0.100 · el MOTIVO queda guardado (en la misma columna que telas)', () => {
+  it('el motivo del movimiento manual se persiste en `Movimiento.observaciones`', async () => {
+    const mov = await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tEntradaInicial.id,
+        idAlmacen: almPrimeras.id,
+        idModelo: modelo.id,
+        fecha: '2026-09-04',
+        motivo: '  Conteo físico de septiembre  ',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 12 }] }],
+      },
+      bd(),
+    );
+
+    // Recortado por el contrato (`.trim()`), no tal cual llegó.
+    expect(mov.observaciones).toBe('Conteo físico de septiembre');
+    const fila = await cliente.movimiento.findUniqueOrThrow({ where: { id: mov.id } });
+    expect(fila.observaciones).toBe('Conteo físico de septiembre');
+  });
+
+  it('el motivo del traspaso queda en LAS DOS patas (la hoja lo lee de la salida)', async () => {
+    await entrar(almPrimeras.id, 30);
+    const traspaso = await registrarTraspasoPt(
+      sesion(),
+      {
+        idAlmacenOrigen: almPrimeras.id,
+        idAlmacenDestino: almSegundas.id,
+        idModelo: modelo.id,
+        fecha: '2026-09-04',
+        motivo: 'Se pasan a Segundas por manchas',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    expect(traspaso.salida.observaciones).toBe('Se pasan a Segundas por manchas');
+    expect(traspaso.entrada.observaciones).toBe('Se pasan a Segundas por manchas');
+  });
+
+  it('sin motivo NO se guarda nada (ni el movimiento ni el traspaso dejan filas)', async () => {
+    await entrar(almPrimeras.id, 30);
+    const antes = await cliente.movimiento.count();
+
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tEntradaInicial.id,
+          idAlmacen: almPrimeras.id,
+          idModelo: modelo.id,
+          fecha: '2026-09-04',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+        } as never,
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(
+      registrarTraspasoPt(
+        sesion(),
+        {
+          idAlmacenOrigen: almPrimeras.id,
+          idAlmacenDestino: almSegundas.id,
+          idModelo: modelo.id,
+          fecha: '2026-09-04',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+        } as never,
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+
+    expect(await cliente.movimiento.count()).toBe(antes);
+  });
+});
+
+describe('Fila 0.100 · la HOJA del traspaso de PT', () => {
+  /** Registra un traspaso real de `cantidad` piezas y devuelve sus dos patas. */
+  async function traspasar(cantidad: number, motivo: string) {
+    await entrar(almPrimeras.id, cantidad);
+    return registrarTraspasoPt(
+      sesion(),
+      {
+        idAlmacenOrigen: almPrimeras.id,
+        idAlmacenDestino: almSegundas.id,
+        idModelo: modelo.id,
+        fecha: '2026-09-04',
+        motivo,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
+      },
+      bd(),
+    );
+  }
+
+  it('imprime el folio QUE YA EXISTE, los dos almacenes y el motivo (sin folio nuevo, A3)', async () => {
+    const t = await traspasar(10, 'Embarque del viernes');
+    const datos = await armarDatosImpresoTraspasoPt(sesion(), t.salida.id, bd());
+
+    expect(datos.folio).toBe(t.salida.folio);
+    expect(datos.almacenOrigen).toBe(almPrimeras.nombre);
+    expect(datos.almacenDestino).toBe(almSegundas.nombre);
+    expect(datos.motivo).toBe('Embarque del viernes');
+    expect(datos.totalPiezas).toBe(10);
+
+    const texto = (await extraerTextoPdf(await generarPdfTraspasoPt(datos))).join('\n');
+    expect(texto).toContain(String(t.salida.folio));
+    expect(texto).toContain(almPrimeras.nombre);
+    expect(texto).toContain(almSegundas.nombre);
+    expect(texto).toContain('Embarque del viernes');
+  });
+
+  it('dice QUIÉN lo registró, resuelto a nombre contra la tabla de usuarios', async () => {
+    // `Movimiento.idUsuario` guarda sólo el id, SIN FK (ADR-0005): el nombre no viaja por `include`
+    // y hay que ir por él. Aquí se crea la fila del usuario de la sesión para medir que resuelve de
+    // verdad contra la base, no contra un mock.
+    await cliente.usuario.create({
+      data: {
+        id: 'usuario-prueba',
+        username: 'almacen.pt',
+        nombre: 'Almacén de producto terminado',
+        email: 'almacen.pt@ejemplo.invalid',
+      },
+    });
+    const t = await traspasar(10, 'Embarque del viernes');
+    const datos = await armarDatosImpresoTraspasoPt(sesion(), t.salida.id, bd());
+
+    expect(datos.usuario).toBe('Almacén de producto terminado');
+    const texto = (await extraerTextoPdf(await generarPdfTraspasoPt(datos))).join('\n');
+    expect(texto).toContain('Almacén de producto terminado');
+  });
+
+  it('⭐ un usuario que NO existe como fila deja la hoja en «—», nunca la revienta (D3)', async () => {
+    // SIN crear la fila: `usuario-prueba` no existe en la base. Dar de baja o purgar una cuenta no
+    // borra el movimiento que escribió — la hoja sigue saliendo, sólo sin el nombre.
+    const t = await traspasar(10, 'Embarque del viernes');
+    const datos = await armarDatosImpresoTraspasoPt(sesion(), t.salida.id, bd());
+
+    expect(datos.usuario).toBeNull();
+    const texto = (await extraerTextoPdf(await generarPdfTraspasoPt(datos))).join('\n');
+    expect(texto).toContain('REGISTRÓ');
+    expect(texto).toContain(String(t.salida.folio));
+  });
+
+  it('se puede pedir desde CUALQUIERA de las dos patas (reimpresión desde el kardex)', async () => {
+    const t = await traspasar(10, 'Embarque del viernes');
+    const desdeSalida = await armarDatosImpresoTraspasoPt(sesion(), t.salida.id, bd());
+    const desdeEntrada = await armarDatosImpresoTraspasoPt(sesion(), t.entrada.id, bd());
+
+    expect(desdeEntrada).toEqual(desdeSalida);
+  });
+
+  it('⭐ REGLA 0-B — un traspaso VIEJO, guardado SIN motivo, se sigue leyendo e imprimiendo', async () => {
+    // Se fabrica por el MOTOR (no por el dominio) para reproducir exactamente lo que hay en `prueba`
+    // desde antes de esta fila: dos patas de traspaso con `observaciones` NULL. No se repara: se lee.
+    await entrar(almPrimeras.id, 30);
+    const tSalida = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+      where: { codigo: 'transferencia-salida' },
+    });
+    const tEntrada = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+      where: { codigo: 'transferencia-entrada' },
+    });
+    const lineas: LineaMovimientoPt[] = [
+      { idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaCH.id, cantidad: 7 },
+    ];
+    const viejo = await registrarTraspasoPtMotor(
+      sesion(),
+      {
+        idEmpresa: empresa.id,
+        idTipoMovSalida: tSalida.id,
+        idTipoMovEntrada: tEntrada.id,
+        idAlmacenOrigen: almPrimeras.id,
+        idAlmacenDestino: almSegundas.id,
+        fecha: new Date('2026-01-15T00:00:00.000Z'),
+        lineas,
+      },
+      bd(),
+    );
+    expect(viejo.salida.observaciones).toBeNull();
+
+    const datos = await armarDatosImpresoTraspasoPt(sesion(), viejo.salida.id, bd());
+    expect(datos.motivo).toBeNull();
+    expect(datos.totalPiezas).toBe(7);
+
+    // Y la hoja SALE: el dato viejo que falta no degrada nada más del documento.
+    const texto = (await extraerTextoPdf(await generarPdfTraspasoPt(datos))).join('\n');
+    expect(texto).toContain(String(viejo.salida.folio));
+    expect(texto).toContain(almPrimeras.nombre);
+  });
+
+  it('un MOVIMIENTO MANUAL no tiene hoja de traspaso (y lo dice)', async () => {
+    const idMov = await entrar(almPrimeras.id, 30);
+    await expect(armarDatosImpresoTraspasoPt(sesion(), idMov, bd())).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+  });
+
+  it('un movimiento de OTRA empresa no se imprime (A9 → 404)', async () => {
+    const t = await traspasar(10, 'Embarque del viernes');
+    const otra = await crearEmpresaPrueba(cliente, 'Otra empresa SA de CV');
+    await expect(
+      armarDatosImpresoTraspasoPt(
+        sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM_TODOS }),
+        t.salida.id,
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  it('sin `inventario-pt.ver` → ErrorPermiso (A4)', async () => {
+    const t = await traspasar(10, 'Embarque del viernes');
+    await expect(
+      armarDatosImpresoTraspasoPt(sesion(['inventario-pt.mover']), t.salida.id, bd()),
+    ).rejects.toThrow();
   });
 });

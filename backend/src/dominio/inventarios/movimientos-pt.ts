@@ -409,7 +409,10 @@ export async function registrarMovimientoPt(
         fecha: aDateColumna(datos.fecha),
         origenTipo: ORIGEN.movimientoManual,
         lineas: aLineasMotor(datos.idModelo, celdas),
-        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        // Fila 0.100 — el MOTIVO se guarda en `Movimiento.observaciones`, la MISMA columna en la
+        // que telas y avíos guardan el suyo (`dominio/inventarios/telas.ts`). Ya no es opcional:
+        // `validarEntrada` (arriba, en ESTE dominio — A1) rechaza el movimiento sin él.
+        observaciones: datos.motivo,
       },
       { tx },
     );
@@ -470,7 +473,9 @@ export async function registrarTraspasoPt(
         idAlmacenDestino: datos.idAlmacenDestino,
         fecha: aDateColumna(datos.fecha),
         lineas: aLineasMotor(datos.idModelo, celdas),
-        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        // Fila 0.100 — motivo obligatorio, guardado en `observaciones` de las DOS patas (el motor
+        // lo copia): la hoja del traspaso lo imprime desde la pata de salida.
+        observaciones: datos.motivo,
       },
       { tx },
     );

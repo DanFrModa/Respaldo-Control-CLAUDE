@@ -46646,7 +46646,7 @@ export interface paths {
         path?: never;
         cookie?: never;
       };
-      /** @description Datos de un movimiento manual de inventario PT (color×talla, D4). */
+      /** @description Datos de un movimiento manual de inventario PT (color×talla, D4). Motivo obligatorio. */
       requestBody: {
         content: {
           'application/json': {
@@ -46661,7 +46661,8 @@ export interface paths {
              * @description Fecha del movimiento (YYYY-MM-DD).
              */
             fecha: string;
-            observaciones?: string;
+            /** @description Por qué se mueve el producto terminado (obligatorio; se guarda en observaciones). */
+            motivo: string;
             /** @description Matriz color×talla del movimiento (D4). */
             lineas: {
               idColor: number;
@@ -46711,7 +46712,7 @@ export interface paths {
               modelo: string;
               /** @description Fecha del movimiento (YYYY-MM-DD). */
               fecha: string;
-              /** @description Observaciones o null. */
+              /** @description Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual). */
               observaciones: string | null;
               /** @description Discriminador del hecho de origen o null. */
               origenTipo: string | null;
@@ -46858,7 +46859,7 @@ export interface paths {
         path?: never;
         cookie?: never;
       };
-      /** @description Datos de un traspaso de PT entre almacenes (color×talla, D4). */
+      /** @description Datos de un traspaso de PT entre almacenes (color×talla, D4). Motivo obligatorio. */
       requestBody: {
         content: {
           'application/json': {
@@ -46873,7 +46874,8 @@ export interface paths {
              * @description Fecha del traspaso (YYYY-MM-DD).
              */
             fecha: string;
-            observaciones?: string;
+            /** @description Por qué se mueve el producto terminado (obligatorio; se guarda en observaciones). */
+            motivo: string;
             /** @description Matriz color×talla del movimiento (D4). */
             lineas: {
               idColor: number;
@@ -46925,7 +46927,7 @@ export interface paths {
                 modelo: string;
                 /** @description Fecha del movimiento (YYYY-MM-DD). */
                 fecha: string;
-                /** @description Observaciones o null. */
+                /** @description Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual). */
                 observaciones: string | null;
                 /** @description Discriminador del hecho de origen o null. */
                 origenTipo: string | null;
@@ -46992,7 +46994,7 @@ export interface paths {
                 modelo: string;
                 /** @description Fecha del movimiento (YYYY-MM-DD). */
                 fecha: string;
-                /** @description Observaciones o null. */
+                /** @description Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual). */
                 observaciones: string | null;
                 /** @description Discriminador del hecho de origen o null. */
                 origenTipo: string | null;
@@ -47184,7 +47186,7 @@ export interface paths {
               modelo: string;
               /** @description Fecha del movimiento (YYYY-MM-DD). */
               fecha: string;
-              /** @description Observaciones o null. */
+              /** @description Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual). */
               observaciones: string | null;
               /** @description Discriminador del hecho de origen o null. */
               origenTipo: string | null;
@@ -47572,7 +47574,7 @@ export interface paths {
                 saldo: number;
                 /** @description Si el movimiento fue anulado por un inverso. */
                 cancelado: boolean;
-                /** @description Observaciones del movimiento o null. */
+                /** @description Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual). */
                 observaciones: string | null;
               }[];
             };
@@ -47720,7 +47722,7 @@ export interface paths {
               modelo: string;
               /** @description Fecha del movimiento (YYYY-MM-DD). */
               fecha: string;
-              /** @description Observaciones o null. */
+              /** @description Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual). */
               observaciones: string | null;
               /** @description Discriminador del hecho de origen o null. */
               origenTipo: string | null;
@@ -47762,6 +47764,116 @@ export interface paths {
             };
           };
         };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/pt/traspasos/{id}/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Hoja del traspaso de PT entre almacenes (PDF del folio que ya existe) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
         /** @description Respuesta de error de la API. */
         400: {
           headers: {

@@ -1,13 +1,14 @@
+import { Printer } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { useColores } from '@/api/colores';
-import { useCrearTraspasoPt, useExistenciasPt } from '@/api/inventarios';
+import { urlImpresoTraspasoPt, useCrearTraspasoPt, useExistenciasPt } from '@/api/inventarios';
 import { useTallas } from '@/api/tallas';
 import type { Modelo } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import {
@@ -52,6 +53,12 @@ function hoy(): string {
  * tiene nada que traspasar. La excepción de «entrada a un bucket en cero» (regresar del estampado)
  * vive en Movimientos, no aquí: un traspaso no crea piezas.
  *
+ * Fila 0.100 (§Post-F9.193) — el MOTIVO es OBLIGATORIO y al guardar ofrece la HOJA DEL TRASPASO,
+ * el papel que acompaña las prendas (antes de esta fila el inventario de PT no tenía NI UN solo
+ * documento). La hoja NO es un folio nuevo: imprime el que el traspaso YA tiene, y se reimprime
+ * desde el **kardex, en el modo «Por folio»** (`KardexPtPagina`), para que cerrar esta pantalla no
+ * pierda el papel.
+ *
  * `inventario-pt.mover` gobierna la captura.
  */
 export function TraspasosPtPagina(): React.JSX.Element {
@@ -62,11 +69,18 @@ export function TraspasosPtPagina(): React.JSX.Element {
   const [idAlmacenDestino, setIdAlmacenDestino] = useState<string>('');
   const [modelo, setModelo] = useState<Modelo | undefined>(undefined);
   const [fecha, setFecha] = useState(hoy());
-  const [observaciones, setObservaciones] = useState('');
+  // Fila 0.100 — MOTIVO obligatorio del traspaso (§Post-F9.193 decisión 3). Se guarda en las
+  // observaciones de las DOS patas y sale IMPRESO en la hoja que acompaña las prendas.
+  const [motivo, setMotivo] = useState('');
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
   // §Post-F9.40 — de qué ORDEN salen las piezas que se traspasan. `SIN_ORDEN` = bucket «sin orden».
   const [ordenBucket, setOrdenBucket] = useState<string>(SIN_ORDEN);
+  // Fila 0.100 — el traspaso recién guardado, para imprimir la hoja que va con las prendas. NO es
+  // la única vía: la reimpresión vive en el KARDEX, modo «Por folio» (`KardexPtPagina`), donde el
+  // detalle de un traspaso vivo ofrece el mismo botón. Por eso cerrar esta pantalla no pierde el
+  // papel: se busca el folio y se vuelve a sacar.
+  const [recienGuardado, setRecienGuardado] = useState<{ id: number; folio: number } | null>(null);
 
   // Solo almacenes de PT: los DOS extremos del traspaso tienen que serlo (fila 0.137).
   const almacenes = useAlmacenes({
@@ -151,12 +165,16 @@ export function TraspasosPtPagina(): React.JSX.Element {
 
   const total = totalMatriz(lineas);
   const mismoAlmacen = idAlmacenOrigen !== '' && idAlmacenOrigen === idAlmacenDestino;
+  // El mínimo es el MISMO que exige el contrato (3 caracteres, ya recortado): así el botón no
+  // promete un guardado que el servidor va a rechazar.
+  const motivoOk = motivo.trim().length >= 3;
   const puedeGuardar =
     puedeMover &&
     idAlmacenOrigen !== '' &&
     idAlmacenDestino !== '' &&
     !mismoAlmacen &&
     modelo !== undefined &&
+    motivoOk &&
     total > 0 &&
     !crear.isPending;
 
@@ -170,7 +188,7 @@ export function TraspasosPtPagina(): React.JSX.Element {
         idAlmacenDestino: Number(idAlmacenDestino),
         idModelo: modelo.id,
         fecha,
-        ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
+        motivo: motivo.trim(),
         lineas: aLineasApi(lineas, undefined, idOrdenElegida),
       },
       {
@@ -180,6 +198,9 @@ export function TraspasosPtPagina(): React.JSX.Element {
           );
           setLineas([]);
           setTallas([]);
+          setMotivo('');
+          // El folio del traspaso es el de la pata de SALIDA (no se genera ninguno nuevo).
+          setRecienGuardado({ id: traspaso.salida.id, folio: traspaso.salida.folio });
           void existencias.refetch();
         },
         onError: (error) => toast.error(error.message),
@@ -199,6 +220,33 @@ export function TraspasosPtPagina(): React.JSX.Element {
           </p>
         </div>
       </header>
+
+      {/* Hoja del traspaso RECIÉN guardado (fila 0.100): el papel que va con las prendas. Imprime
+          el folio QUE YA EXISTE — no se genera documento nuevo. Si esta pantalla se cierra, la hoja
+          se recupera en el kardex, modo «Por folio»: se busca este folio y el detalle ofrece el
+          mismo botón. */}
+      {recienGuardado !== null ? (
+        <div
+          className="flex flex-wrap items-center gap-3 rounded-md border bg-primary-soft px-3 py-2"
+          data-testid="traspaso-pt-guardado"
+        >
+          <span className="text-sm">
+            Traspaso <b className="num">#{recienGuardado.folio}</b> registrado. Imprime la hoja que
+            va con las prendas.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              window.open(urlImpresoTraspasoPt(recienGuardado.id), '_blank', 'noopener')
+            }
+            data-testid="traspaso-pt-imprimir"
+          >
+            <Printer className="size-4" aria-hidden />
+            Hoja del traspaso
+          </Button>
+        </div>
+      ) : null}
 
       {/* ── Card única: riel del módulo + captura (estándar del grupo, proto `vInventarios`) ── */}
       <div className="overflow-hidden rounded-xl border bg-card">
@@ -304,15 +352,19 @@ export function TraspasosPtPagina(): React.JSX.Element {
                   }
                   testid="traspaso-orden"
                 />
-                <Field>
-                  <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
+                <Field data-invalid={!motivoOk}>
+                  <FieldLabel htmlFor="traspaso-motivo">Motivo (obligatorio)</FieldLabel>
                   <Input
-                    id="obs"
-                    value={observaciones}
-                    onChange={(e) => setObservaciones(e.target.value)}
-                    placeholder="Opcional"
+                    id="traspaso-motivo"
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    placeholder="Por qué se mueve (embarque, reacomodo, va a estampado…)"
                     disabled={!puedeMover}
+                    data-testid="traspaso-motivo"
                   />
+                  <FieldDescription>
+                    Sale IMPRESO en la hoja que acompaña las prendas. Mínimo 3 caracteres.
+                  </FieldDescription>
                 </Field>
               </div>
 

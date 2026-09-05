@@ -51,6 +51,7 @@ describe('dominio Inventario PT (F3-E3) — permisos (deny-by-default, A4)', () 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -67,6 +68,7 @@ describe('dominio Inventario PT (F3-E3) — permisos (deny-by-default, A4)', () 
           idAlmacenDestino: 2,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -103,6 +105,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         bdTipoTraspaso(),
@@ -119,6 +122,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacenDestino: 1, // mismo almacén
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -135,6 +139,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [],
         },
         {},
@@ -151,6 +156,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: -3 }] }],
         },
         {},
@@ -167,6 +173,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '19-06-2026',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -188,6 +195,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-08-12',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, idOrden: 0, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -204,6 +212,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacenDestino: 2,
           idModelo: 1,
           fecha: '2026-08-12',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, idOrden: -7, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -244,10 +253,88 @@ function bdConAlmacenes(porAlmacen: Record<number, { nombre: string; tipo: strin
   return { bd: { tx }, almacenesLeidos };
 }
 
+describe('Motivo OBLIGATORIO al mover PT a mano (fila 0.100, §Post-F9.193 decisión 3)', () => {
+  // El motivo lo exige el DOMINIO (`validarEntrada` corre AQUÍ, no solo en el Zod de la ruta — A1),
+  // así que estas pruebas pasan `{}` como `bd`: revientan ANTES de tocar la base.
+  const movimiento = {
+    idTipoMov: 1,
+    idAlmacen: 1,
+    idModelo: 1,
+    fecha: '2026-09-04',
+    lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+  };
+  const traspaso = {
+    idAlmacenOrigen: 1,
+    idAlmacenDestino: 2,
+    idModelo: 1,
+    fecha: '2026-09-04',
+    lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+  };
+
+  it('un movimiento manual SIN motivo se rechaza', async () => {
+    await expect(
+      registrarMovimientoPt(sesionMover(), movimiento as never, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  /** Captura el error de una promesa para poder inspeccionar sus `detalles` (patrón de telas). */
+  async function errorDe(promesa: Promise<unknown>): Promise<unknown> {
+    return promesa.then(
+      () => null,
+      (e: unknown) => e,
+    );
+  }
+
+  it('un movimiento manual con motivo DEMASIADO CORTO se rechaza (mínimo 3, como en telas)', async () => {
+    // El mensaje LEGIBLE por campo viaja en `detalles.fieldErrors` (formato de `validarEntrada`):
+    // el `message` del error es siempre el genérico, así que afirmar sobre él no probaría nada.
+    const error = await errorDe(
+      registrarMovimientoPt(sesionMover(), { ...movimiento, motivo: 'ab' }, {}),
+    );
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { motivo: ['Explica el motivo (mínimo 3 caracteres)'] },
+    });
+  });
+
+  it('un motivo de PUROS ESPACIOS se rechaza (se recorta antes de medir)', async () => {
+    await expect(
+      registrarMovimientoPt(sesionMover(), { ...movimiento, motivo: '     ' }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('un traspaso SIN motivo se rechaza', async () => {
+    await expect(registrarTraspasoPt(sesionMover(), traspaso as never, {})).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+  });
+
+  it('un traspaso con motivo DEMASIADO CORTO se rechaza', async () => {
+    const error = await errorDe(
+      registrarTraspasoPt(sesionMover(), { ...traspaso, motivo: 'ab' }, {}),
+    );
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { motivo: ['Explica el motivo (mínimo 3 caracteres)'] },
+    });
+  });
+
+  it('un motivo de MÁS de 500 caracteres se rechaza', async () => {
+    const error = await errorDe(
+      registrarMovimientoPt(sesionMover(), { ...movimiento, motivo: 'x'.repeat(501) }, {}),
+    );
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { motivo: ['El motivo no puede tener más de 500 caracteres'] },
+    });
+  });
+});
+
 describe('Traspaso de PT — el guard de TIPO cubre LAS DOS patas (fila 0.137)', () => {
   const traspaso = {
     idModelo: 1,
     fecha: '2026-06-20',
+    motivo: 'Ajuste de la prueba',
     lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
   };
 
