@@ -412,6 +412,37 @@ describe('Reglas del envío de prendas terminadas', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
+  /**
+   * Fila 0.137, SEGUNDA PASADA (producción). Este sitio ya exigía PT, pero a mano y con una segunda
+   * lectura del mismo renglón; ahora lo hace la guarda única del dominio (`exigirAlmacenDelTipo`).
+   * La prueba fija las DOS mitades: el tipo equivocado se rechaza CON SU MENSAJE (el del guard, que
+   * dice qué guarda cada almacén para que el capturador sepa qué elegir) y el correcto pasa.
+   */
+  it('RECHAZA un almacén de origen que NO es de PT, y el de PT sí pasa (guarda de tipo)', async () => {
+    const almTelas = await cliente.almacen.create({
+      data: { nombre: 'Naucalpan', tipo: 'TELA' },
+    });
+    await cortar100();
+    await meterAPt(almPrimeras, 10);
+    // `meterAPt` ya dejó SU movimiento de alta: lo que se mide es que el envío rechazado no sume
+    // ninguno encima, no que el kardex esté vacío.
+    const movimientosAntes = await cliente.movimiento.count();
+
+    await expect(
+      enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almTelas.id }),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+
+    // Y se plantó ANTES de escribir (A2): ni etapa, ni kardex, ni existencia movida.
+    expect(await cliente.etapaMovimiento.count({ where: { tipo: 'envio_maquila' } })).toBe(0);
+    expect(await cliente.movimiento.count()).toBe(movimientosAntes);
+    expect(await existencia(almPrimeras)).toBe(10);
+
+    // La otra mitad: el almacén del tipo CORRECTO pasa y hace lo suyo (saca al tránsito).
+    await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+    expect(await existencia(almPrimeras)).toBe(0);
+    expect(await existencia(almTransito)).toBe(10);
+  });
+
   it('un proceso que CREA producto terminado (costura) no puede enviar prenda terminada', async () => {
     await cortar100();
     await meterAPt(almPrimeras, 10);

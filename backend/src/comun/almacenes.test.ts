@@ -8,7 +8,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { exigirAlmacen, exigirAlmacenDelTipo } from './almacenes.js';
+import { exigirAlmacenDelTipo } from './almacenes.js';
 import { ErrorNoEncontrado, ErrorValidacion } from './errores.js';
 import type { Tx } from './transaccion.js';
 
@@ -92,19 +92,7 @@ describe('exigirAlmacenDelTipo — el tipo del almacén (fila 0.137)', () => {
   });
 });
 
-describe('exigirAlmacen — sigue sin mirar el tipo', () => {
-  it('acepta cualquier tipo mientras exista, esté activo y sea de la empresa', async () => {
-    const { tx } = txCon(usable('TELA'));
-    await expect(exigirAlmacen(tx, 3, 7)).resolves.toBeUndefined();
-  });
-
-  it('mantiene sus mensajes de siempre (no existe / desactivado / otra empresa)', async () => {
-    await expect(exigirAlmacen(txCon(null).tx, 99, 7)).rejects.toThrow(ErrorNoEncontrado);
-    await expect(
-      exigirAlmacen(txCon({ activo: false, idEmpresa: null, nombre: 'X', tipo: 'PT' }).tx, 3, 7),
-    ).rejects.toThrow(/"X" está desactivado/);
-    await expect(
-      exigirAlmacen(txCon({ activo: true, idEmpresa: 99, nombre: 'Y', tipo: 'PT' }).tx, 3, 7),
-    ).rejects.toThrow(/"Y" no es de esta empresa/);
-  });
-});
+// La variante sin tipo (`exigirAlmacen`) se retiró en la SEGUNDA PASADA de la fila 0.137, al pasar
+// los escritores de PRODUCCIÓN a la guarda con tipo: se quedó sin llamadores. Sus tres mensajes
+// (no existe / desactivado / otra empresa) NO perdieron cobertura — los siguen ejercitando los
+// casos de arriba, que es donde ahora viven.

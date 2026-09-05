@@ -509,7 +509,7 @@ describe('Auditorías — reclasificación Primeras↔Segundas (kardex, D3)', ()
   /**
    * Fila 0.137 (hallazgo R4) — `almacenPtPorNombre` exigía el TIPO pero no el ESTADO: con Segundas
    * desactivado, la reclasificación seguía mandando prendas ahí. Ningún otro flujo acepta un
-   * almacén inactivo (`exigirAlmacen`), así que esa existencia quedaba atrapada sin forma de
+   * almacén inactivo (`exigirAlmacenDelTipo`), así que esa existencia quedaba atrapada sin forma de
    * sacarla. Ahora la reclasificación se planta antes de mover nada.
    */
   it('NO reclasifica hacia un almacén DESACTIVADO (R4): se planta y no mueve kardex', async () => {

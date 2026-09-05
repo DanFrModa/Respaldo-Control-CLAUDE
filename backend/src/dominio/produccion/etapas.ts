@@ -66,7 +66,7 @@ import {
 import { ServicioOrden, TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { exigirAlmacen } from '../../comun/almacenes.js';
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -953,17 +953,12 @@ export async function registrarEnvioMaquila(
             'del inventario hacia el tránsito).',
         );
       }
-      await exigirAlmacen(tx, datos.idAlmacenOrigen, orden.idEmpresa);
-      const almacen = await tx.almacen.findUnique({
-        where: { id: datos.idAlmacenOrigen },
-        select: { tipo: true, nombre: true },
-      });
-      if (almacen?.tipo !== 'PT') {
-        throw new ErrorValidacion(
-          `El almacén "${almacen?.nombre ?? String(datos.idAlmacenOrigen)}" no es de producto ` +
-            'terminado; las prendas terminadas solo pueden salir de un almacén de PT.',
-        );
-      }
+      // Fila 0.137, segunda pasada: este sitio YA exigía el tipo PT, pero a mano y con una SEGUNDA
+      // lectura del mismo renglón que la validación de almacén acababa de leer. Se colapsa en la
+      // guarda única del dominio, que hace las cuatro comprobaciones (existe → activo → de la
+      // empresa → del tipo) en UNA consulta. Sigue siendo PT porque esta rama solo corre cuando lo
+      // que se manda son PRENDAS YA TERMINADAS: el envío las saca del kardex de PT al tránsito.
+      await exigirAlmacenDelTipo(tx, datos.idAlmacenOrigen, 'PT', orden.idEmpresa);
     } else if (datos.stockSinOrden) {
       // Sin sacar del almacén, el bucket de existencia no significa nada: decirlo es mejor que
       // guardarlo mudo y que alguien crea que el envío descontó de algún lado.

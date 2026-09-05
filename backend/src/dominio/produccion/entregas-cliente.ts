@@ -49,7 +49,7 @@ import {
 import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { exigirAlmacen } from '../../comun/almacenes.js';
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -389,7 +389,11 @@ export async function registrarEntregaCliente(
     const orden = await resolverOrden(tx, datos.idOrden, sesion.idEmpresaActiva);
     const celdas = aplanarYValidar(datos.lineas, orden);
 
-    await exigirAlmacen(tx, datos.idAlmacen, orden.idEmpresa);
+    // El tipo del almacén (fila 0.137, segunda pasada): la entrega SACA producto terminado (el
+    // kardex PT del modelo de la orden), así que el origen tiene que ser un almacén de PT. Antes
+    // solo se comprobaba que existiera, estuviera activo y fuera de la empresa: nada impedía
+    // "entregar" desde la bodega de telas, donde ese artículo no puede estar.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'PT', orden.idEmpresa);
     // V1-E4b: no se le entrega al cliente desde el almacén de TRÁNSITO — ahí está lo que sigue
     // físicamente en el taller de un tercero. Antes esto no podía pasar (el tránsito nunca tenía
     // existencia); desde que el envío de prendas terminadas lo alimenta, sí.

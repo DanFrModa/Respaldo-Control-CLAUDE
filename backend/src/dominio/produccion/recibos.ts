@@ -68,7 +68,7 @@ import {
 import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { exigirAlmacen } from '../../comun/almacenes.js';
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -855,10 +855,16 @@ export async function registrarReciboMaquila(
           'Hay piezas de segunda: indica el almacén destino de las segundas.',
         );
       }
-      await exigirAlmacen(tx, datos.idAlmacenPrimeras, orden.idEmpresa);
+      // El tipo del almacén (fila 0.137, segunda pasada). Lo que este recibo mete es PRODUCTO
+      // TERMINADO —el kardex que escribe más abajo es el de PT, con el modelo de la orden—, así
+      // que ambos destinos tienen que ser almacenes de PT: sin esto, las primeras de una orden
+      // entraban sin chistar a la bodega de telas y la existencia quedaba en un bucket que nadie
+      // mira. `rechazarAlmacenDeTransito` sigue aparte y NO sobra: el tránsito ES de tipo PT (lo
+      // siembra así `prisma/seed.ts`), o sea que pasa esta guarda y aun así no vale para recibir.
+      await exigirAlmacenDelTipo(tx, datos.idAlmacenPrimeras, 'PT', orden.idEmpresa);
       await rechazarAlmacenDeTransito(tx, datos.idAlmacenPrimeras, 'recibe');
       if (datos.idAlmacenSegundas !== undefined) {
-        await exigirAlmacen(tx, datos.idAlmacenSegundas, orden.idEmpresa);
+        await exigirAlmacenDelTipo(tx, datos.idAlmacenSegundas, 'PT', orden.idEmpresa);
         await rechazarAlmacenDeTransito(tx, datos.idAlmacenSegundas, 'recibe');
       }
     }

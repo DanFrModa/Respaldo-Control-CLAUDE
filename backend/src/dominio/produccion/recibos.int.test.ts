@@ -283,6 +283,91 @@ describe('Recibo de COSTURA (F3-E4)', () => {
     expect(celdaCH).toBeUndefined(); // 0 → se omite
   });
 
+  /**
+   * Fila 0.137, SEGUNDA PASADA (producción). El recibo mete PRODUCTO TERMINADO al kardex, pero
+   * hasta aquí solo comprobaba que el almacén existiera, estuviera activo y fuera de la empresa:
+   * las primeras de una orden entraban sin chistar a la bodega de TELAS y la existencia quedaba en
+   * un bucket que nadie mira. Se prueban los DOS destinos, porque son dos llamadas distintas.
+   */
+  it('RECHAZA un almacén de PRIMERAS que no es de PT, y el de PT sí pasa (guarda de tipo)', async () => {
+    const almTelas = await cliente.almacen.create({
+      data: { nombre: 'Naucalpan', tipo: 'TELA' },
+    });
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almTelas.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+
+    // Se plantó ANTES de escribir (A2): ni recibo, ni entrada de kardex.
+    expect(await cliente.etapaMovimiento.count({ where: { tipo: 'recibo_maquila' } })).toBe(0);
+    expect(await cliente.movimiento.count()).toBe(0);
+
+    // La otra mitad: con el almacén de PT el mismo recibo pasa y sube la existencia.
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(10);
+  });
+
+  it('RECHAZA un almacén de SEGUNDAS que no es de PT (la segunda llamada del guard)', async () => {
+    const almTelas = await cliente.almacen.create({
+      data: { nombre: 'Naucalpan', tipo: 'TELA' },
+    });
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    // Primeras BIEN (almacén de PT) y segundas MAL: la que tiene que fallar es la de segundas, lo
+    // que prueba que la guarda está en las DOS llamadas y no solo en la primera.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          idAlmacenSegundas: almTelas.id,
+          lineas: [
+            {
+              idColor: colorRojo.id,
+              tallas: [
+                { idTalla: tallaCH.id, cantidad: 10, cantidadPrimeras: 7, cantidadSegundas: 3 },
+              ],
+            },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+
+    expect(await cliente.etapaMovimiento.count({ where: { tipo: 'recibo_maquila' } })).toBe(0);
+    expect(await cliente.movimiento.count()).toBe(0);
+  });
+
   it('reparte primeras y segundas a sus almacenes separados', async () => {
     await cortarBase();
     await enviar(procesoCostura, maquileroCostura, 10);
