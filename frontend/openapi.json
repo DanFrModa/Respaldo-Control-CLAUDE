@@ -110,6 +110,7 @@
                           "ordenes.ver",
                           "ordenes.administrar",
                           "ordenes.cancelar",
+                          "ordenes.cerrar",
                           "clientes.modificar",
                           "proveedores.modificar",
                           "etiquetas.modificar",
@@ -56724,9 +56725,10 @@
                           "enum": [
                             "capturada",
                             "completa",
-                            "cancelada"
+                            "cancelada",
+                            "cerrada"
                           ],
-                          "description": "Estado DERIVADO de la orden (no editable)."
+                          "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                         },
                         "idPedidoLinea": {
                           "anyOf": [
@@ -56986,6 +56988,30 @@
                             }
                           ],
                           "description": "Motivo de la cancelación, o null."
+                        },
+                        "cerradaEn": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                        },
+                        "motivoCierre": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Motivo del cierre (opcional), o null."
                         },
                         "ocCliente": {
                           "anyOf": [
@@ -57325,6 +57351,8 @@
                         "fechaCompletada",
                         "requisitos",
                         "motivoCancelada",
+                        "cerradaEn",
+                        "motivoCierre",
                         "ocCliente",
                         "tallasV1",
                         "maquilaOrd",
@@ -60616,7 +60644,8 @@
               "enum": [
                 "capturada",
                 "completa",
-                "cancelada"
+                "cancelada",
+                "cerrada"
               ]
             },
             "in": "query",
@@ -60705,9 +60734,10 @@
                             "enum": [
                               "capturada",
                               "completa",
-                              "cancelada"
+                              "cancelada",
+                              "cerrada"
                             ],
-                            "description": "Estado DERIVADO de la orden (no editable)."
+                            "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                           },
                           "idPedidoLinea": {
                             "anyOf": [
@@ -60967,6 +60997,30 @@
                               }
                             ],
                             "description": "Motivo de la cancelación, o null."
+                          },
+                          "cerradaEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                          },
+                          "motivoCierre": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Motivo del cierre (opcional), o null."
                           },
                           "ocCliente": {
                             "anyOf": [
@@ -61306,6 +61360,8 @@
                           "fechaCompletada",
                           "requisitos",
                           "motivoCancelada",
+                          "cerradaEn",
+                          "motivoCierre",
                           "ocCliente",
                           "tallasV1",
                           "maquilaOrd",
@@ -61752,9 +61808,10 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
-                      "description": "Estado DERIVADO de la orden (no editable)."
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                     },
                     "idPedidoLinea": {
                       "anyOf": [
@@ -62014,6 +62071,30 @@
                         }
                       ],
                       "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
                     },
                     "ocCliente": {
                       "anyOf": [
@@ -62353,6 +62434,8 @@
                     "fechaCompletada",
                     "requisitos",
                     "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
                     "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
@@ -62579,9 +62662,10 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
-                      "description": "Estado DERIVADO de la orden (no editable)."
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                     },
                     "idPedidoLinea": {
                       "anyOf": [
@@ -62841,6 +62925,30 @@
                         }
                       ],
                       "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
                     },
                     "ocCliente": {
                       "anyOf": [
@@ -63180,6 +63288,8 @@
                     "fechaCompletada",
                     "requisitos",
                     "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
                     "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
@@ -63525,9 +63635,10 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
-                      "description": "Estado DERIVADO de la orden (no editable)."
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                     },
                     "idPedidoLinea": {
                       "anyOf": [
@@ -63787,6 +63898,30 @@
                         }
                       ],
                       "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
                     },
                     "ocCliente": {
                       "anyOf": [
@@ -64126,6 +64261,8 @@
                     "fechaCompletada",
                     "requisitos",
                     "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
                     "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
@@ -64434,9 +64571,10 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
-                      "description": "Estado DERIVADO de la orden (no editable)."
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                     },
                     "idPedidoLinea": {
                       "anyOf": [
@@ -64696,6 +64834,30 @@
                         }
                       ],
                       "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
                     },
                     "ocCliente": {
                       "anyOf": [
@@ -65035,6 +65197,8 @@
                     "fechaCompletada",
                     "requisitos",
                     "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
                     "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
@@ -65282,9 +65446,10 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
-                      "description": "Estado DERIVADO de la orden (no editable)."
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                     },
                     "idPedidoLinea": {
                       "anyOf": [
@@ -65544,6 +65709,30 @@
                         }
                       ],
                       "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
                     },
                     "ocCliente": {
                       "anyOf": [
@@ -65883,6 +66072,8 @@
                     "fechaCompletada",
                     "requisitos",
                     "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
                     "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
@@ -66130,9 +66321,10 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
-                      "description": "Estado DERIVADO de la orden (no editable)."
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                     },
                     "idPedidoLinea": {
                       "anyOf": [
@@ -66392,6 +66584,30 @@
                         }
                       ],
                       "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
                     },
                     "ocCliente": {
                       "anyOf": [
@@ -66731,6 +66947,1759 @@
                     "fechaCompletada",
                     "requisitos",
                     "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
+                    "ocCliente",
+                    "tallasV1",
+                    "maquilaOrd",
+                    "aplicacionOrd",
+                    "pagada",
+                    "enRiesgo",
+                    "siRC",
+                    "rcViva",
+                    "lineas",
+                    "totalPiezas",
+                    "referencias",
+                    "comentarios",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Orden de producción (encabezado + matriz + referencias + comentarios)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/{id}/cerrar": {
+      "post": {
+        "summary": "Cerrar una orden (deja de admitir captura y congela su costo unitario)",
+        "tags": [
+          "ordenes"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "description": "Motivo del cierre (OPCIONAL).",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  }
+                },
+                "description": "Cerrar la orden: deja de admitir captura y CONGELA su costo unitario."
+              }
+            }
+          },
+          "description": "Cerrar la orden: deja de admitir captura y CONGELA su costo unitario."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orden de producción (encabezado + matriz + referencias + comentarios).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id interno de la orden."
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña de la orden y del folio."
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "capturada",
+                        "completa",
+                        "cancelada",
+                        "cerrada"
+                      ],
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
+                    },
+                    "idPedidoLinea": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Renglón de pedido de origen (null solo en órdenes históricas migradas)."
+                    },
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Modelo a producir."
+                    },
+                    "codigoModelo": {
+                      "type": "string",
+                      "description": "Código del modelo (para la UI)."
+                    },
+                    "descripcionModelo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción del modelo, o null."
+                    },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente de la orden."
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente (para la UI)."
+                    },
+                    "idMaquilero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Maquilero asignado (Proveedor), o null."
+                    },
+                    "maquilero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero, o null."
+                    },
+                    "idEtiquetaMarca": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Etiqueta de marca, o null."
+                    },
+                    "etiquetaMarca": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la etiqueta de marca, o null."
+                    },
+                    "idTela": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Tela dispuesta, o null."
+                    },
+                    "tela": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la tela, o null."
+                    },
+                    "fecha": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de la orden (YYYY-MM-DD), o null."
+                    },
+                    "fechaEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de entrega comprometida, o null."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones generales, o null."
+                    },
+                    "composicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Composición textil, o null."
+                    },
+                    "compForzada": {
+                      "type": "boolean",
+                      "description": "La composición se capturó a mano."
+                    },
+                    "obsMaquila": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones de maquila, o null."
+                    },
+                    "noCostear": {
+                      "type": "boolean",
+                      "description": "No costear esta orden."
+                    },
+                    "fechaCompletada": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "receta": {
+                          "type": "boolean",
+                          "description": "Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "La receta de la orden tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "receta",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "receta",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
+                    },
+                    "motivoCancelada": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
+                    },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
+                    "tallasV1": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
+                    },
+                    "maquilaOrd": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de maquila de v1 (dato; motor en F3/F6), o null."
+                    },
+                    "aplicacionOrd": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null."
+                    },
+                    "pagada": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Maquila pagada (dato de v1; motor en F6), o null."
+                    },
+                    "enRiesgo": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                    },
+                    "siRC": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                    },
+                    "rcViva": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón (color)."
+                          },
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del color."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color (para la UI)."
+                          },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
+                          "tallas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idTalla": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la talla."
+                                },
+                                "etiquetaTalla": {
+                                  "type": "string",
+                                  "description": "Etiqueta de la talla (para la UI)."
+                                },
+                                "cantidad": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Cantidad de prendas de esta talla."
+                                }
+                              },
+                              "required": [
+                                "idTalla",
+                                "etiquetaTalla",
+                                "cantidad"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Cantidad por talla dentro de un color."
+                            },
+                            "description": "Cantidades por talla."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Suma de las cantidades de las tallas de este color."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idColor",
+                          "color",
+                          "pantone",
+                          "pack",
+                          "tallas",
+                          "totalPiezas"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón (color) de la matriz de una orden."
+                      },
+                      "description": "Matriz: colores con sus tallas."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de prendas de la orden (Σ de todas las tallas)."
+                    },
+                    "referencias": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del valor de referencia."
+                          },
+                          "idClienteCampo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Campo de referencia del cliente."
+                          },
+                          "etiqueta": {
+                            "type": "string",
+                            "description": "Etiqueta del campo (para la UI)."
+                          },
+                          "valor": {
+                            "type": "string",
+                            "description": "Valor capturado."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idClienteCampo",
+                          "etiqueta",
+                          "valor"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Valor de un campo de referencia de la orden."
+                      },
+                      "description": "Valores de referencia del cliente."
+                    },
+                    "comentarios": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del comentario."
+                          },
+                          "idUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Usuario que lo escribió, o null."
+                          },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
+                          "comentario": {
+                            "type": "string",
+                            "description": "Texto del comentario."
+                          },
+                          "fecha": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha del comentario (ISO 8601)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idUsuario",
+                          "nombreUsuario",
+                          "comentario",
+                          "fecha"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Comentario inmutable de una orden."
+                      },
+                      "description": "Comentarios (cronológicos)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folio",
+                    "idEmpresa",
+                    "estado",
+                    "idPedidoLinea",
+                    "idModelo",
+                    "codigoModelo",
+                    "descripcionModelo",
+                    "idCliente",
+                    "cliente",
+                    "idMaquilero",
+                    "maquilero",
+                    "idEtiquetaMarca",
+                    "etiquetaMarca",
+                    "idTela",
+                    "tela",
+                    "fecha",
+                    "fechaEntrega",
+                    "observaciones",
+                    "composicion",
+                    "compForzada",
+                    "obsMaquila",
+                    "noCostear",
+                    "fechaCompletada",
+                    "requisitos",
+                    "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
+                    "ocCliente",
+                    "tallasV1",
+                    "maquilaOrd",
+                    "aplicacionOrd",
+                    "pagada",
+                    "enRiesgo",
+                    "siRC",
+                    "rcViva",
+                    "lineas",
+                    "totalPiezas",
+                    "referencias",
+                    "comentarios",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Orden de producción (encabezado + matriz + referencias + comentarios)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/{id}/reabrir": {
+      "post": {
+        "summary": "Reabrir una orden cerrada (el costo vuelve a calcularse en vivo)",
+        "tags": [
+          "ordenes"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "description": "Motivo de la reapertura (OBLIGATORIO)."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "description": "Reabrir una orden cerrada: el costo vuelve a calcularse en vivo (acto inverso, D3)."
+              }
+            }
+          },
+          "description": "Reabrir una orden cerrada: el costo vuelve a calcularse en vivo (acto inverso, D3)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orden de producción (encabezado + matriz + referencias + comentarios).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id interno de la orden."
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña de la orden y del folio."
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "capturada",
+                        "completa",
+                        "cancelada",
+                        "cerrada"
+                      ],
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
+                    },
+                    "idPedidoLinea": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Renglón de pedido de origen (null solo en órdenes históricas migradas)."
+                    },
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Modelo a producir."
+                    },
+                    "codigoModelo": {
+                      "type": "string",
+                      "description": "Código del modelo (para la UI)."
+                    },
+                    "descripcionModelo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción del modelo, o null."
+                    },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente de la orden."
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente (para la UI)."
+                    },
+                    "idMaquilero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Maquilero asignado (Proveedor), o null."
+                    },
+                    "maquilero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero, o null."
+                    },
+                    "idEtiquetaMarca": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Etiqueta de marca, o null."
+                    },
+                    "etiquetaMarca": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la etiqueta de marca, o null."
+                    },
+                    "idTela": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Tela dispuesta, o null."
+                    },
+                    "tela": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la tela, o null."
+                    },
+                    "fecha": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de la orden (YYYY-MM-DD), o null."
+                    },
+                    "fechaEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de entrega comprometida, o null."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones generales, o null."
+                    },
+                    "composicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Composición textil, o null."
+                    },
+                    "compForzada": {
+                      "type": "boolean",
+                      "description": "La composición se capturó a mano."
+                    },
+                    "obsMaquila": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones de maquila, o null."
+                    },
+                    "noCostear": {
+                      "type": "boolean",
+                      "description": "No costear esta orden."
+                    },
+                    "fechaCompletada": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "receta": {
+                          "type": "boolean",
+                          "description": "Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "La receta de la orden tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "receta",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "receta",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
+                    },
+                    "motivoCancelada": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
+                    },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
+                    "tallasV1": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
+                    },
+                    "maquilaOrd": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de maquila de v1 (dato; motor en F3/F6), o null."
+                    },
+                    "aplicacionOrd": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null."
+                    },
+                    "pagada": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Maquila pagada (dato de v1; motor en F6), o null."
+                    },
+                    "enRiesgo": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                    },
+                    "siRC": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                    },
+                    "rcViva": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón (color)."
+                          },
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del color."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color (para la UI)."
+                          },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
+                          "pack": {
+                            "type": "string",
+                            "description": "PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs."
+                          },
+                          "tallas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idTalla": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la talla."
+                                },
+                                "etiquetaTalla": {
+                                  "type": "string",
+                                  "description": "Etiqueta de la talla (para la UI)."
+                                },
+                                "cantidad": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Cantidad de prendas de esta talla."
+                                }
+                              },
+                              "required": [
+                                "idTalla",
+                                "etiquetaTalla",
+                                "cantidad"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Cantidad por talla dentro de un color."
+                            },
+                            "description": "Cantidades por talla."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Suma de las cantidades de las tallas de este color."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idColor",
+                          "color",
+                          "pantone",
+                          "pack",
+                          "tallas",
+                          "totalPiezas"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón (color) de la matriz de una orden."
+                      },
+                      "description": "Matriz: colores con sus tallas."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de prendas de la orden (Σ de todas las tallas)."
+                    },
+                    "referencias": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del valor de referencia."
+                          },
+                          "idClienteCampo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Campo de referencia del cliente."
+                          },
+                          "etiqueta": {
+                            "type": "string",
+                            "description": "Etiqueta del campo (para la UI)."
+                          },
+                          "valor": {
+                            "type": "string",
+                            "description": "Valor capturado."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idClienteCampo",
+                          "etiqueta",
+                          "valor"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Valor de un campo de referencia de la orden."
+                      },
+                      "description": "Valores de referencia del cliente."
+                    },
+                    "comentarios": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del comentario."
+                          },
+                          "idUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Usuario que lo escribió, o null."
+                          },
+                          "nombreUsuario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo)."
+                          },
+                          "comentario": {
+                            "type": "string",
+                            "description": "Texto del comentario."
+                          },
+                          "fecha": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha del comentario (ISO 8601)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idUsuario",
+                          "nombreUsuario",
+                          "comentario",
+                          "fecha"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Comentario inmutable de una orden."
+                      },
+                      "description": "Comentarios (cronológicos)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folio",
+                    "idEmpresa",
+                    "estado",
+                    "idPedidoLinea",
+                    "idModelo",
+                    "codigoModelo",
+                    "descripcionModelo",
+                    "idCliente",
+                    "cliente",
+                    "idMaquilero",
+                    "maquilero",
+                    "idEtiquetaMarca",
+                    "etiquetaMarca",
+                    "idTela",
+                    "tela",
+                    "fecha",
+                    "fechaEntrega",
+                    "observaciones",
+                    "composicion",
+                    "compForzada",
+                    "obsMaquila",
+                    "noCostear",
+                    "fechaCompletada",
+                    "requisitos",
+                    "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
                     "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
@@ -66996,9 +68965,10 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
-                      "description": "Estado DERIVADO de la orden (no editable)."
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                     },
                     "idPedidoLinea": {
                       "anyOf": [
@@ -67258,6 +69228,30 @@
                         }
                       ],
                       "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
                     },
                     "ocCliente": {
                       "anyOf": [
@@ -67597,6 +69591,8 @@
                     "fechaCompletada",
                     "requisitos",
                     "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
                     "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
@@ -69430,9 +71426,10 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
-                      "description": "Estado DERIVADO de la orden (no editable)."
+                      "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                     },
                     "idPedidoLinea": {
                       "anyOf": [
@@ -69692,6 +71689,30 @@
                         }
                       ],
                       "description": "Motivo de la cancelación, o null."
+                    },
+                    "cerradaEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = \"cerrada\"` es su espejo."
+                    },
+                    "motivoCierre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del cierre (opcional), o null."
                     },
                     "ocCliente": {
                       "anyOf": [
@@ -70031,6 +72052,8 @@
                     "fechaCompletada",
                     "requisitos",
                     "motivoCancelada",
+                    "cerradaEn",
+                    "motivoCierre",
                     "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
@@ -70274,7 +72297,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -72084,7 +74108,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -73801,7 +75826,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -75377,7 +77403,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -76937,7 +78964,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -78484,7 +80512,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -80019,7 +82048,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -81600,7 +83630,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -83158,7 +85189,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -84693,7 +86725,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden (una CANCELADA no se toca)."
                     },
@@ -86314,7 +88347,8 @@
                           "enum": [
                             "capturada",
                             "completa",
-                            "cancelada"
+                            "cancelada",
+                            "cerrada"
                           ],
                           "description": "Estado de la orden (una CANCELADA no se toca)."
                         },
@@ -90908,7 +92942,8 @@
               "enum": [
                 "capturada",
                 "completa",
-                "cancelada"
+                "cancelada",
+                "cerrada"
               ]
             },
             "in": "query",
@@ -90991,9 +93026,10 @@
                             "enum": [
                               "capturada",
                               "completa",
-                              "cancelada"
+                              "cancelada",
+                              "cerrada"
                             ],
-                            "description": "Estado DERIVADO de la orden (no editable)."
+                            "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                           },
                           "fecha": {
                             "anyOf": [
@@ -91312,9 +93348,10 @@
                             "enum": [
                               "capturada",
                               "completa",
-                              "cancelada"
+                              "cancelada",
+                              "cerrada"
                             ],
-                            "description": "Estado DERIVADO de la orden (no editable)."
+                            "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                           },
                           "fecha": {
                             "anyOf": [
@@ -91999,9 +94036,10 @@
                             "enum": [
                               "capturada",
                               "completa",
-                              "cancelada"
+                              "cancelada",
+                              "cerrada"
                             ],
-                            "description": "Estado DERIVADO de la orden (no editable)."
+                            "description": "Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo)."
                           },
                           "idEmpresa": {
                             "type": "integer",
@@ -148495,7 +150533,8 @@
               "enum": [
                 "capturada",
                 "completa",
-                "cancelada"
+                "cancelada",
+                "cerrada"
               ]
             },
             "in": "query",
@@ -148577,7 +150616,8 @@
                             "enum": [
                               "capturada",
                               "completa",
-                              "cancelada"
+                              "cancelada",
+                              "cerrada"
                             ],
                             "description": "Estado de la orden."
                           },
@@ -149024,7 +151064,8 @@
                       "enum": [
                         "capturada",
                         "completa",
-                        "cancelada"
+                        "cancelada",
+                        "cerrada"
                       ],
                       "description": "Estado de la orden."
                     },
@@ -214801,6 +216842,34 @@
                             ],
                             "description": "Costo unitario (o null sin importes / base 0)."
                           },
+                          "motivoSinUnitario": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "sin-base",
+                                  "sin-costo",
+                                  "sin-importes"
+                                ],
+                                "description": "Por qué no hay unitario: sin-base = la base de prorrateo todavía es 0 (p. ej. aún no hay piezas recibidas); sin-costo = la orden no tiene costo capturado; sin-importes = falta el permiso `consultas.ver-importes`."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué `costoUnitario` es null; null cuando SÍ hay unitario (0.061)."
+                          },
+                          "textoSinUnitario": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "La frase a mostrar en lugar del unitario; null cuando sí hay unitario (0.061)."
+                          },
                           "baseProrrateo": {
                             "type": "string",
                             "enum": [
@@ -214822,6 +216891,8 @@
                           "cortado",
                           "costoTotal",
                           "costoUnitario",
+                          "motivoSinUnitario",
+                          "textoSinUnitario",
                           "baseProrrateo"
                         ],
                         "additionalProperties": false
@@ -215524,7 +217595,7 @@
                             "recibido",
                             "vendido"
                           ],
-                          "description": "Base usada (cortado por defecto)."
+                          "description": "Base usada (`recibido` por defecto desde 0.061)."
                         },
                         "cantidadBase": {
                           "type": "integer",
@@ -215541,16 +217612,64 @@
                               "type": "null"
                             }
                           ],
-                          "description": "costoTotal ÷ cantidadBase, o null si la base es 0 o sin importes."
+                          "description": "costoTotal ÷ cantidadBase, o null si la base es 0, no hay costo, o sin importes."
+                        },
+                        "motivoSinUnitario": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "sin-base",
+                                "sin-costo",
+                                "sin-importes"
+                              ],
+                              "description": "Por qué no hay unitario: sin-base = la base de prorrateo todavía es 0 (p. ej. aún no hay piezas recibidas); sin-costo = la orden no tiene costo capturado; sin-importes = falta el permiso `consultas.ver-importes`."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Por qué `costoUnitario` es null; null cuando SÍ hay unitario."
+                        },
+                        "textoSinUnitario": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "La frase que la pantalla debe mostrar en lugar del unitario (p. ej. \"Aún no hay piezas recibidas…\"). La redacta el servidor; null cuando sí hay unitario."
+                        },
+                        "congeladoEn": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Cuándo se CONGELÓ este unitario al cerrar la orden (0.061). Con valor, `cantidadBase` y `costoUnitario` NO se recalculan: son los del cierre. null = se calcula en vivo."
                         }
                       },
                       "required": [
                         "base",
                         "cantidadBase",
-                        "costoUnitario"
+                        "costoUnitario",
+                        "motivoSinUnitario",
+                        "textoSinUnitario",
+                        "congeladoEn"
                       ],
                       "additionalProperties": false,
                       "description": "Costo unitario y su base."
+                    },
+                    "ordenCerrada": {
+                      "type": "boolean",
+                      "description": "⭐ 0.061: la ORDEN está CERRADA — no admite captura de costo y su unitario está congelado. La pantalla lo usa para no ofrecer campos que el servidor va a rechazar."
                     }
                   },
                   "required": [
@@ -215566,7 +217685,8 @@
                     "teorico",
                     "real",
                     "guardado",
-                    "unitario"
+                    "unitario",
+                    "ordenCerrada"
                   ],
                   "additionalProperties": false,
                   "description": "Costo de una orden: teórico + real de compras + guardado + cantidades + unitario."
@@ -215794,8 +217914,7 @@
                     ]
                   },
                   "baseProrrateo": {
-                    "default": "cortado",
-                    "description": "Base de prorrateo. ÚNICA EXCEPCIÓN a \"omitir = conservar\": tiene default, así que OMITIRLA la deja en `cortado` y con ello cambia el costo unitario. Mándala siempre.",
+                    "description": "Base de prorrateo. OMITIR = conservar la ya guardada (y, en el PRIMER costeo, `recibido`). Hasta 0.061 traía `.default(\"cortado\")`, así que un PUT que la omitiera PISABA la base de una orden ya costeada y le cambiaba el unitario sin que nadie lo pidiera.",
                     "type": "string",
                     "enum": [
                       "cortado",
@@ -215816,11 +217935,11 @@
                     ]
                   }
                 },
-                "description": "Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default)."
+                "description": "Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra. Desde 0.061 eso vale TAMBIÉN para `baseProrrateo` (ya no tiene default): omitirla conserva la guardada."
               }
             }
           },
-          "description": "Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default)."
+          "description": "Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra. Desde 0.061 eso vale TAMBIÉN para `baseProrrateo` (ya no tiene default): omitirla conserva la guardada."
         },
         "parameters": [
           {
@@ -216326,7 +218445,7 @@
                             "recibido",
                             "vendido"
                           ],
-                          "description": "Base usada (cortado por defecto)."
+                          "description": "Base usada (`recibido` por defecto desde 0.061)."
                         },
                         "cantidadBase": {
                           "type": "integer",
@@ -216343,16 +218462,64 @@
                               "type": "null"
                             }
                           ],
-                          "description": "costoTotal ÷ cantidadBase, o null si la base es 0 o sin importes."
+                          "description": "costoTotal ÷ cantidadBase, o null si la base es 0, no hay costo, o sin importes."
+                        },
+                        "motivoSinUnitario": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "sin-base",
+                                "sin-costo",
+                                "sin-importes"
+                              ],
+                              "description": "Por qué no hay unitario: sin-base = la base de prorrateo todavía es 0 (p. ej. aún no hay piezas recibidas); sin-costo = la orden no tiene costo capturado; sin-importes = falta el permiso `consultas.ver-importes`."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Por qué `costoUnitario` es null; null cuando SÍ hay unitario."
+                        },
+                        "textoSinUnitario": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "La frase que la pantalla debe mostrar en lugar del unitario (p. ej. \"Aún no hay piezas recibidas…\"). La redacta el servidor; null cuando sí hay unitario."
+                        },
+                        "congeladoEn": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Cuándo se CONGELÓ este unitario al cerrar la orden (0.061). Con valor, `cantidadBase` y `costoUnitario` NO se recalculan: son los del cierre. null = se calcula en vivo."
                         }
                       },
                       "required": [
                         "base",
                         "cantidadBase",
-                        "costoUnitario"
+                        "costoUnitario",
+                        "motivoSinUnitario",
+                        "textoSinUnitario",
+                        "congeladoEn"
                       ],
                       "additionalProperties": false,
                       "description": "Costo unitario y su base."
+                    },
+                    "ordenCerrada": {
+                      "type": "boolean",
+                      "description": "⭐ 0.061: la ORDEN está CERRADA — no admite captura de costo y su unitario está congelado. La pantalla lo usa para no ofrecer campos que el servidor va a rechazar."
                     }
                   },
                   "required": [
@@ -216368,7 +218535,8 @@
                     "teorico",
                     "real",
                     "guardado",
-                    "unitario"
+                    "unitario",
+                    "ordenCerrada"
                   ],
                   "additionalProperties": false,
                   "description": "Costo de una orden: teórico + real de compras + guardado + cantidades + unitario."

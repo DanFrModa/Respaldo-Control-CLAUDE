@@ -19,8 +19,9 @@
  *  • GUARDADO (`*Cost`) — lo que el usuario confirma o AJUSTA; `costoTotal` = Σ de los GUARDADOS
  *    (`telaCost + procesosCost + aviosCost + otros`). Es el dinero que manda.
  *
- * Costo unitario = `costoTotal` ÷ base de prorrateo (D2; default `cortado` = piezas cortadas). Cambiar
- * la base cambia el unitario porque el total es fijo y el divisor varía.
+ * Costo unitario = `costoTotal` ÷ base de prorrateo (D2). ⭐ Desde 0.061 el default es `recibido`
+ * (piezas recibidas de costura, §Post-F9.154(b)); hasta esa versión fue `cortado`. Cambiar la base
+ * cambia el unitario porque el total es fijo y el divisor varía.
  *
  * Innegociables: A1, A2 (guardar es transacción), A4 (`costos.ver`/`costos.capturar`), A7 (Bitácora,
  * módulo financiero), A9 (empresa activa). Importes en `null` sin `consultas.ver-importes`. Una orden
@@ -42,12 +43,17 @@ import { verificarPermiso, tienePermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { exigirOrdenAbierta } from '../produccion/cierre-orden.js';
 import { armarBusquedaConSinonimos } from '../produccion/ordenes.js';
 
 import {
+  BASE_PRORRATEO_DEFAULT,
+  baseProrrateoAGuardar,
   cantidadDeBase,
   cantidadesDeOrden,
   cantidadesDeOrdenes,
+  divisorCongelado,
+  unitarioODeuda,
   type CantidadesOrden,
 } from './cantidades.js';
 import {
@@ -74,6 +80,10 @@ const seleccionOrdenCosto = {
   idModelo: true,
   idCliente: true,
   noCostear: true,
+  // ⭐ 0.061: el cierre de la orden. `cerradaEn` decide DOS cosas: que no se pueda capturar su
+  // costo, y que la lectura devuelva el unitario CONGELADO en vez de recalcularlo en vivo.
+  estado: true,
+  cerradaEn: true,
   maquilaOrd: true,
   aplicacionOrd: true,
   cliente: { select: { nombre: true } },
@@ -195,12 +205,21 @@ function aCostoOrdenSalida(
       }
     : null;
 
-  // Costo unitario: del guardado (total ÷ base guardada) o, si aún no se costea, del teórico ÷ cortado.
-  const base = g ? g.baseProrrateo : 'cortado';
-  const cantidadBase = cantidadDeBase(cant, base);
+  // Costo unitario: del guardado (total ÷ base guardada) o, si aún no se costea, del teórico ÷ la
+  // base POR DEFECTO (`recibido` desde 0.061 — antes `cortado`; ver `cantidades.ts`).
+  const base = g ? g.baseProrrateo : BASE_PRORRATEO_DEFAULT;
   const totalParaUnit = g ? (g.costoTotal == null ? null : g.costoTotal.toNumber()) : teoTotal;
-  const unitarioCrudo =
-    totalParaUnit === null || cantidadBase <= 0 ? null : totalParaUnit / cantidadBase;
+  // ⭐⭐ 0.061 — CONGELADO vs EN VIVO (§Post-F9.154(c)). La orden CERRADA devuelve el divisor y el
+  // unitario que se persistieron al cerrarla; la ABIERTA los recalcula en cada lectura, como
+  // siempre. Es la diferencia entre "el costo ya se cerró" y "el costo va cambiando", que es
+  // exactamente lo que Daniel preguntó.
+  const congeladoEn = orden.cerradaEn === null ? null : (g?.congeladoEn ?? null);
+  const congelado = divisorCongelado(orden, g);
+  const cantidadBase = congelado ?? cantidadDeBase(cant, base);
+  // La regla ÚNICA decide el unitario Y por qué falta cuando falta (`unitarioODeuda`): la misma que
+  // usa la lista de costos, para que las dos puertas no redacten distinto. Con la orden cerrada
+  // recibe el divisor congelado, así que el resultado tampoco puede moverse.
+  const unit = unitarioODeuda(totalParaUnit, cantidadBase, base, verImportes);
 
   return {
     idOrden: orden.id,
@@ -231,8 +250,14 @@ function aCostoOrdenSalida(
     unitario: {
       base,
       cantidadBase,
-      costoUnitario: money(unitarioCrudo),
+      costoUnitario: money(unit.costoUnitario),
+      motivoSinUnitario: unit.motivoSinUnitario,
+      textoSinUnitario: unit.textoSinUnitario,
+      // Con valor, la pantalla sabe que estos números NO se van a mover más (0.061).
+      congeladoEn: congeladoEn === null ? null : congeladoEn.toISOString(),
     },
+    // ⭐ 0.061: la orden CERRADA no admite captura de costo (lo rechaza `guardarCostoOrden`).
+    ordenCerrada: orden.cerradaEn !== null,
   };
 }
 
@@ -300,13 +325,19 @@ export interface OpcionesGuardarCosto {
  *    SIEMPRE al teórico (los procesos no se compran con OC de material).
  * Lo mismo aplica a `otros`/`descOtros`/`observaciones`: omitir = conservar; `null` = borrar.
  *
- * ⚠️ **`baseProrrateo` es la ÚNICA excepción a "omitir = conservar"**, y es a propósito: su esquema
- * Zod trae `.default('cortado')`, así que NUNCA llega `undefined` al dominio — un PUT que la omita
- * la manda a `cortado` y con eso **cambia el costo unitario** (el total no se mueve; el divisor sí).
- * No se convirtió a `.optional()` porque eso sería un cambio de CONTRATO (hoy la respuesta garantiza
- * que `baseProrrateo` siempre viene) y ningún llamador lo necesita: la UI la manda siempre y el ETL
- * de migración deja adrede el default. Si algún día se expone un PATCH parcial, esto hay que
- * revisarlo primero.
+ * ⭐ **`baseProrrateo` YA NO es la excepción a "omitir = conservar" (0.061).** Hasta esta versión su
+ * esquema Zod traía `.default('cortado')`, así que nunca llegaba `undefined` al dominio: **un PUT
+ * que la omitiera PISABA la base de una orden ya costeada** y le cambiaba el costo unitario sin que
+ * nadie lo pidiera (el total no se mueve; el divisor sí). Era un defecto latente documentado como
+ * decisión — y al pasar el default a `recibido` (§Post-F9.154(b)) habría dejado de ser latente: cada
+ * PUT descuidado habría reescrito la base de las órdenes viejas. Hoy el campo es `.optional()` SIN
+ * default y se comporta como todos los demás:
+ *  • si la orden YA estaba costeada, omitirlo CONSERVA la base guardada;
+ *  • si es el PRIMER costeo, cae a {@link BASE_PRORRATEO_DEFAULT} (`recibido`).
+ * La respuesta sigue garantizando que `baseProrrateo` viene siempre (es la fila guardada, no el
+ * cuerpo). El ETL de migración, que la omitía adrede para tomar el default, ahora toma `recibido` en
+ * el primer costeo — y eso es justo lo que la decisión pide para lo que se capture de aquí en
+ * adelante (REGLA 0-B: el histórico ya costeado NO se reescribe).
  *
  * El objeto de salida se arma con lo que esta misma función ya leyó/escribió: **no se recalcula** el
  * costo real para responder. Consecuencia deliberada: a diferencia de antes (cuando el retorno
@@ -338,6 +369,8 @@ export async function guardarCostoOrden(
         'Esta orden está marcada como "no costear": no se puede capturar su costo.',
       );
     }
+    // ⭐ 0.061: la orden CERRADA tiene el costo congelado — capturarlo lo movería. Guarda ÚNICA.
+    exigirOrdenAbierta(orden, 'puede capturar su costo');
 
     // Teórico congelado (× cortado) al momento de guardar (usa la MISMA transacción, A2).
     const cant = await cantidadesDeOrden(idOrden, { tx });
@@ -369,6 +402,11 @@ export async function guardarCostoOrden(
       return porDefecto;
     };
 
+    // La base sigue la MISMA regla que los importes (0.061): omitir conserva; el primer costeo cae
+    // al default. No pasa por `resolver` porque no es un Decimal ni admite `null`; la regla vive
+    // PURA en `cantidades.ts` para poder probarla sin BD.
+    const baseProrrateo = baseProrrateoAGuardar(datos.baseProrrateo, previo?.baseProrrateo);
+
     const telaCost = resolver(datos.telaCost, previo?.telaCost, defaultTela);
     const procesosCost = resolver(datos.procesosCost, previo?.procesosCost, procesosCalc);
     const aviosCost = resolver(datos.aviosCost, previo?.aviosCost, defaultAvios);
@@ -395,7 +433,7 @@ export async function guardarCostoOrden(
       otros: otros === null ? null : new Prisma.Decimal(otros),
       descOtros,
       costoTotal: new Prisma.Decimal(costoTotal),
-      baseProrrateo: datos.baseProrrateo,
+      baseProrrateo,
       observaciones,
     };
 
@@ -421,7 +459,7 @@ export async function guardarCostoOrden(
         aviosCost,
         otros,
         costoTotal,
-        baseProrrateo: datos.baseProrrateo,
+        baseProrrateo,
         ...(calcularReal
           ? { telaReal, aviosReal, realDeCompras: real.calculado.hayCompras }
           : { realOmitido: true }),
@@ -481,10 +519,14 @@ export async function listarCostos(
         idOrden: true,
         costoTotal: true,
         baseProrrateo: true,
+        // ⭐ 0.061: el congelado del cierre (la lista respeta lo mismo que el detalle).
+        congeladoEn: true,
+        cantidadBaseCongelada: true,
         orden: {
           select: {
             folio: true,
             fecha: true,
+            cerradaEn: true,
             idModelo: true,
             modelo: { select: { codigo: true } },
             idCliente: true,
@@ -504,9 +546,12 @@ export async function listarCostos(
 
   const datos = filas.map((f) => {
     const c = cant.get(f.idOrden) ?? { pedido: 0, cortado: 0, recibido: 0, vendido: 0 };
-    const cantidadBase = cantidadDeBase(c, f.baseProrrateo);
+    // ⭐ 0.061: la orden CERRADA usa su divisor CONGELADO; la abierta lo recalcula en vivo. La
+    // MISMA decisión y la MISMA regla que el detalle (`divisorCongelado` + `unitarioODeuda`), para que
+    // la lista y la ficha de la orden nunca digan números distintos.
+    const cantidadBase = divisorCongelado(f.orden, f) ?? cantidadDeBase(c, f.baseProrrateo);
     const total = f.costoTotal == null ? null : f.costoTotal.toNumber();
-    const unit = total === null || cantidadBase <= 0 ? null : total / cantidadBase;
+    const unit = unitarioODeuda(total, cantidadBase, f.baseProrrateo, verImportes);
     return {
       idOrden: f.idOrden,
       folio: Number(f.orden.folio),
@@ -517,7 +562,9 @@ export async function listarCostos(
       fecha: f.orden.fecha === null ? null : f.orden.fecha.toISOString().slice(0, 10),
       cortado: c.cortado,
       costoTotal: money(total),
-      costoUnitario: money(unit),
+      costoUnitario: money(unit.costoUnitario),
+      motivoSinUnitario: unit.motivoSinUnitario,
+      textoSinUnitario: unit.textoSinUnitario,
       baseProrrateo: f.baseProrrateo,
     };
   });

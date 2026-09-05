@@ -331,6 +331,10 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   'notas.ver',
   'ordenes.administrar',
   'ordenes.cancelar',
+  // ⭐ 0.061: cerrar la orden CONGELA su costo ⇒ va al círculo que ya cierra dinero. `Administrador`
+  // y `AdministracionDireccion` lo toman solos ([...CLAVES_PERMISO]); aquí se le da al `Directivo`.
+  // Default del lead — Daniel confirma.
+  'ordenes.cerrar',
   'ordenes.habilitacion',
   'ordenes.modificar',
   'ordenes.precio-maquila',
@@ -1183,6 +1187,11 @@ const TIPOS_MOVIMIENTO_BASE: {
   { codigo: 'salida-composturas', nombre: 'Salida a Composturas', direccion: 'salida' },
   { codigo: 'otras-salidas', nombre: 'Otras Salidas', direccion: 'salida' },
   { codigo: 'otras-entradas', nombre: 'Otras Entradas', direccion: 'entrada' },
+  // ⭐ 0.061 (§Post-F9.154(a), DANIEL): la prenda INCOMPLETA sale sola del almacén de TRÁNSITO al
+  // registrar el recibo. Hasta hoy se quedaba ahí para siempre (nadie la iba a devolver) y sólo
+  // salía con un movimiento manual que nadie hacía. NO se inventaría en ningún lado: es merma.
+  // Lo mueve `dominio/produccion/transito.ts::darSalidaMermaIncompletas`, nunca a mano.
+  { codigo: 'merma-incompletas', nombre: 'Merma por prendas incompletas', direccion: 'salida' },
 ];
 
 /** `IPT_TiposMov.TipoEnSa` → dirección de v2 (1=entrada, 2=salida, 3=traspaso). */

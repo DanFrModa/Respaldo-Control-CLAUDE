@@ -6,6 +6,10 @@
  *  (b) costo teórico de la orden = por-prenda × cortado; unitario sin guardar;
  *  (c) guardar arma costoTotal = Σ guardados; el teórico queda congelado al lado;
  *  (d) la base de prorrateo cambia el unitario (cortado→vendido) y queda visible;
+ *  (d2) ⭐ 0.061: el DEFAULT del divisor es `recibido` (no `cortado`), omitir la base CONSERVA la
+ *       guardada, y sin piezas recibidas la salida DICE por qué no hay unitario;
+ *  (d3) ⭐ 0.061: CERRAR la orden congela el unitario (otro recibo ya no lo mueve) y REABRIRLA lo
+ *       devuelve a cálculo vivo; una orden cerrada no se puede costear;
  *  (e) una orden `noCostear` se rechaza al costear;
  *  (f) lista de costos y márgenes por pedido (fórmula D2);
  *  (g) sin `consultas.ver-importes` los importes salen en null (permiso de importes).
@@ -13,7 +17,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Empresa, PrismaClient } from '../../datos/index.js';
-import { ErrorConflicto } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorPermiso } from '../../comun/errores.js';
 import {
   clientePruebas,
   crearEmpresaPrueba,
@@ -32,6 +36,8 @@ import { obtenerFichaModelo } from '../modelos/bom-modelo.js';
 import { calcularPreCosto, listaPrecios } from './pre-costo.js';
 import { guardarCostoOrden, listarCostos, obtenerCostoOrden } from './costo-orden.js';
 import { margenesPorPedido } from './margenes.js';
+import { cerrarOrden, reabrirOrden } from '../produccion/cierre-orden.js';
+import { realinearEstadoOrdenes } from '../produccion/requisitos-orden.js';
 
 let cliente: PrismaClient;
 /** Id del tipo de arte «bordado» del catálogo único (V1-E3f): el arte no existe sin él. */
@@ -39,6 +45,8 @@ let idTipoArte: number;
 let empresa: Empresa;
 let idModelo: number;
 let idOrden: number;
+/** Proceso de costura (`generaEntradaPt`): sin él la base `recibido` sería siempre 0 (0.061). */
+let idProcesoCostura: number;
 
 const PERM_TODOS: ClavePermiso[] = [
   'costos.ver',
@@ -151,6 +159,26 @@ beforeEach(async () => {
     },
   });
 
+  // ⭐ 0.061: RECIBO de costura de 25 (para la base de prorrateo `recibido`, que desde esta versión
+  // es el DEFAULT). `recibido` sólo suma recibos de procesos con `generaEntradaPt`, así que el
+  // proceso tiene que existir y traer la bandera — si no, la base sería 0 y no se podría medir la
+  // división de verdad.
+  const costura = await cliente.tipoProceso.create({
+    data: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+  });
+  idProcesoCostura = costura.id;
+  await cliente.etapaMovimiento.create({
+    data: {
+      folio: 102n,
+      idEmpresa: empresa.id,
+      idOrden: orden.id,
+      tipo: 'recibo_maquila',
+      idTipoProceso: costura.id,
+      fecha: new Date('2026-06-08T00:00:00.000Z'),
+      detalles: { create: [{ idColor: rojo.id, idTalla: tallaM.id, cantidad: 25 }] },
+    },
+  });
+
   // Entrega a cliente de 20 (para la base de prorrateo `vendido`).
   await cliente.etapaMovimiento.create({
     data: {
@@ -197,18 +225,36 @@ describe('listaPrecios', () => {
 });
 
 describe('obtenerCostoOrden (teórico + unitario)', () => {
-  it('teórico total = por-prenda × cortado; unitario sin guardar = teórico ÷ cortado', async () => {
+  it('teórico total = por-prenda × CORTADO; unitario sin guardar = teórico ÷ RECIBIDO (0.061)', async () => {
     const c = await obtenerCostoOrden(sesion(), idOrden, bd());
     expect(c.cantidades.cortado).toBe(30);
+    expect(c.cantidades.recibido).toBe(25);
     expect(c.cantidades.vendido).toBe(20);
+    // El TEÓRICO sigue refiriéndose a las CORTADAS (es "lo que costó producir lo que se cortó"):
+    // eso NO lo cambió 0.061, que sólo movió el DIVISOR del unitario.
     // por prenda: tela 30, avíos 6, procesos = maquilaOrd 10 + aplicación 2 + bordado 5 = 17.
     expect(c.teorico.telaPorPrenda).toBe(30);
     expect(c.teorico.procesosPorPrenda).toBe(17);
     expect(c.teorico.total).toBe(1590); // (30 + 6 + 17) × 30
     expect(c.guardado).toBeNull();
-    expect(c.unitario.base).toBe('cortado');
-    expect(c.unitario.cantidadBase).toBe(30);
-    expect(c.unitario.costoUnitario).toBe(53); // 1590 / 30
+    // ⭐ 0.061: el default es `recibido`, no `cortado` (§Post-F9.154(b)).
+    expect(c.unitario.base).toBe('recibido');
+    expect(c.unitario.cantidadBase).toBe(25);
+    expect(c.unitario.costoUnitario).toBe(63.6); // 1590 / 25
+    expect(c.unitario.motivoSinUnitario).toBeNull();
+    expect(c.ordenCerrada).toBe(false);
+  });
+
+  it('⭐ 0.061: SIN piezas recibidas no hay unitario, y la salida DICE por qué', async () => {
+    // Es el caso que estrena el divisor nuevo: la orden se cortó pero todavía no vuelve nada de
+    // costura. Antes daba 53 (÷ cortado); ahora dice la verdad — todavía no se sabe.
+    await cliente.etapaMovimiento.deleteMany({ where: { idOrden, tipo: 'recibo_maquila' } });
+    const c = await obtenerCostoOrden(sesion(), idOrden, bd());
+    expect(c.cantidades.cortado).toBe(30); // el corte sigue ahí: no es que falte información
+    expect(c.unitario.cantidadBase).toBe(0);
+    expect(c.unitario.costoUnitario).toBeNull();
+    expect(c.unitario.motivoSinUnitario).toBe('sin-base');
+    expect(c.unitario.textoSinUnitario).toContain('piezas recibidas');
   });
 });
 
@@ -251,6 +297,23 @@ describe('guardarCostoOrden', () => {
     await expect(
       guardarCostoOrden(sesion(), idOrden, { baseProrrateo: 'cortado' }, bd()),
     ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('⭐ 0.061: OMITIR la base CONSERVA la guardada (ya no la pisa a `cortado`)', async () => {
+    // El defecto que esta fila cerró: el `.default("cortado")` del Zod hacía que un PUT que
+    // omitiera el campo REESCRIBIERA la base de una orden ya costeada, cambiándole el unitario sin
+    // que nadie lo pidiera. Con el default en `recibido` habría sido peor todavía.
+    await guardarCostoOrden(sesion(), idOrden, { baseProrrateo: 'vendido' }, bd());
+    const g = await guardarCostoOrden(sesion(), idOrden, { telaCost: 900 }, bd());
+    expect(g.guardado?.baseProrrateo).toBe('vendido');
+    expect(g.unitario.base).toBe('vendido');
+    expect(g.unitario.cantidadBase).toBe(20);
+  });
+
+  it('⭐ 0.061: en el PRIMER costeo, omitir la base cae a `recibido` (el default nuevo)', async () => {
+    const g = await guardarCostoOrden(sesion(), idOrden, { telaCost: 900 }, bd());
+    expect(g.guardado?.baseProrrateo).toBe('recibido');
+    expect(g.unitario.cantidadBase).toBe(25);
   });
 
   it('registra Bitácora (A7) al guardar', async () => {
@@ -532,5 +595,310 @@ describe('V1-E3e — el mismo renglón vale lo mismo en la RECETA, el PRE-COSTO 
     // que lo que fija la regla es el importe: 1 × 6 = 6.
     expect(pre.avios[0]?.consumoPorPrenda).toBe(1);
     expect(pre.totalAvios).toBe(6);
+  });
+});
+
+// ── ⭐⭐ 0.061 · CERRAR LA ORDEN CONGELA EL COSTO (§Post-F9.154(c)) ──────────────────────────────
+
+describe('cerrarOrden / reabrirOrden: el costo deja de "ir cambiando"', () => {
+  /**
+   * Sesión con permiso de cerrar (además de ver/capturar costos).
+   *
+   * ⚠️ Lleva TAMBIÉN `ordenes.ver`, y no es decorado: `cerrarOrden`/`reabrirOrden` **devuelven la
+   * orden** y la leen con `obtenerOrden`, que lo exige. Sin él el acto lanza `ErrorPermiso` —y
+   * ahora lo lanza ANTES de escribir nada, ver la prueba del «403-tras-commit» de más abajo—.
+   */
+  const sesionCierre = () => sesion([...PERM_TODOS, 'ordenes.cerrar', 'ordenes.ver']);
+
+  /** Mete OTRO recibo de costura de `piezas` — lo que movería el divisor si no estuviera congelado. */
+  async function otroReciboDeCostura(piezas: number, folio: bigint): Promise<void> {
+    const linea = await cliente.ordenLinea.findFirstOrThrow({
+      where: { idOrden },
+      select: { idColor: true, tallas: { select: { idTalla: true } } },
+    });
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'recibo_maquila',
+        idTipoProceso: idProcesoCostura,
+        fecha: new Date('2026-06-25T00:00:00.000Z'),
+        detalles: {
+          create: [
+            {
+              idColor: linea.idColor,
+              idTalla: linea.tallas[0]?.idTalla ?? 0,
+              cantidad: piezas,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  it('⭐ EL CORAZÓN: cerrar CONGELA cantidad y unitario, y otro recibo YA NO los mueve', async () => {
+    // Antes de 0.061 el dinero se persistía pero la CANTIDAD se re-sumaba en cada lectura: con el
+    // divisor en `recibido`, el unitario habría quedado vivo hasta el último recibo, para siempre.
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+    const antes = await obtenerCostoOrden(sesionCierre(), idOrden, bd());
+    expect(antes.unitario.cantidadBase).toBe(25);
+    expect(antes.unitario.costoUnitario).toBe(63.6); // 1590 / 25
+
+    const cerrada = await cerrarOrden(
+      sesionCierre(),
+      idOrden,
+      { motivo: 'temporada cerrada' },
+      bd(),
+    );
+    expect(cerrada.estado).toBe('cerrada');
+    expect(cerrada.cerradaEn).not.toBeNull();
+    expect(cerrada.motivoCierre).toBe('temporada cerrada');
+
+    // Se persistieron LAS DOS MITADES (hasta ahora sólo el dinero).
+    const fila = await cliente.costoOrden.findUniqueOrThrow({ where: { idOrden } });
+    expect(fila.cantidadBaseCongelada).toBe(25);
+    expect(fila.costoUnitarioCongelado?.toNumber()).toBe(63.6);
+    expect(fila.congeladoEn).not.toBeNull();
+
+    // ⭐ Y AHORA LA PRUEBA DE VERDAD: llega otro recibo (por un camino que no pasa por la guarda,
+    // justo el escenario contra el que el congelado es defensa en profundidad) y el costo NO se
+    // mueve. Sin congelar, la base pasaría a 35 y el unitario a 45.43.
+    await otroReciboDeCostura(10, 300n);
+    const despues = await obtenerCostoOrden(sesionCierre(), idOrden, bd());
+    expect(despues.cantidades.recibido).toBe(35); // la cantidad DERIVADA sí subió…
+    expect(despues.unitario.cantidadBase).toBe(25); // …pero el DIVISOR del costo no
+    expect(despues.unitario.costoUnitario).toBe(63.6);
+    expect(despues.unitario.congeladoEn).not.toBeNull();
+    expect(despues.ordenCerrada).toBe(true);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ⭐⭐ EL MARGEN POR PEDIDO ES EL **QUINTO** PUBLICADOR DEL COSTO UNITARIO (0.061).
+  //
+  // `margenes.ts` calcula `costo_unit = costo_total / base_cant` en SQL crudo, con `base_cant`
+  // derivado por un `CASE` sobre subconsultas de `etapa_movimiento_det`: no pasaba por
+  // `divisorCongelado` ni miraba `cerrada_en`. Medido con sonda contra Postgres: un recibo
+  // POSTERIOR al cierre casi DUPLICABA el margen de una orden cerrada (36.40 → 68.20 por pieza)
+  // mientras su ficha seguía diciendo 63.60. Y es explotable por el mismo camino que el EDR: la
+  // subconsulta de `recibido` filtra por `genera_entrada_pt`, bandera que se edita desde el CRUD.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  it('⭐ 0.061: el MARGEN por pedido usa el divisor CONGELADO (el 5º publicador)', async () => {
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+
+    // Con la orden viva: 1590 / 25 recibidas = 63.60 por prenda → margen 100 − 63.60 = 36.40.
+    const antes = await margenesPorPedido(sesionCierre(), {}, bd());
+    expect(antes.filas[0]?.margenPesosPorPieza).toBeCloseTo(36.4, 4);
+
+    await cerrarOrden(sesionCierre(), idOrden, { motivo: 'temporada cerrada' }, bd());
+    // …y AHORA llega otro recibo por un camino que no pasa por la guarda (25 piezas más).
+    await otroReciboDeCostura(25, 305n);
+
+    const despues = await margenesPorPedido(sesionCierre(), {}, bd());
+    // El margen NO se mueve: sigue dividiendo entre las 25 congeladas.
+    // Sin el arreglo daría 68.20 (100 − 1590/50), casi el DOBLE, para una orden ya cerrada.
+    expect(despues.filas[0]?.margenPesosPorPieza).toBeCloseTo(36.4, 4);
+    expect(despues.filas[0]?.margenPromedio).toBeCloseTo(0.364, 4);
+  });
+
+  it('0.061 · con la orden ABIERTA el mismo recibo SÍ mueve el margen (rama gemela)', async () => {
+    // Sin ésta, un congelado que se aplicara SIEMPRE también pasaría la de arriba.
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+    await otroReciboDeCostura(25, 306n);
+
+    const m = await margenesPorPedido(sesionCierre(), {}, bd());
+    expect(m.filas[0]?.margenPesosPorPieza).toBeCloseTo(68.2, 4); // 100 − 1590/50
+  });
+
+  /**
+   * ⚠️ LA TERCERA RAMA, y la que menos se ve: la orden REABIERTA.
+   *
+   * Reabrir **no borra** el congelado (D3: se marca con `descongeladoEn`), así que una orden
+   * reabierta sigue teniendo `cantidad_base_congelada` y `congelado_en` puestos: lo ÚNICO que la
+   * distingue de una cerrada es `cerrada_en`. Sin esta prueba, un `CASE` que congelara «siempre que
+   * haya cantidad congelada» —sin mirar `cerrada_en`— pasaba las otras dos y dejaba la orden
+   * reabierta clavada en su divisor viejo. Medido con mutación: quitar `cerrada_en IS NOT NULL` de
+   * la consulta NO rompía ninguna prueba hasta que existió ésta.
+   */
+  it('0.061 · una orden REABIERTA vuelve al margen VIVO (el congelado quedó de historia)', async () => {
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await otroReciboDeCostura(25, 307n);
+    await reabrirOrden(sesionCierre(), idOrden, { motivo: 'faltaba un recibo' }, bd());
+
+    // El sello del congelado SIGUE en la fila (no se borró) — por eso la consulta tiene que
+    // mirar `cerrada_en`, no la mera presencia de `cantidad_base_congelada`.
+    const fila = await cliente.costoOrden.findUniqueOrThrow({ where: { idOrden } });
+    expect(fila.cantidadBaseCongelada).toBe(25);
+    expect(fila.congeladoEn).not.toBeNull();
+    expect(fila.descongeladoEn).not.toBeNull();
+
+    const m = await margenesPorPedido(sesionCierre(), {}, bd());
+    expect(m.filas[0]?.margenPesosPorPieza).toBeCloseTo(68.2, 4); // vivo otra vez: 100 − 1590/50
+  });
+
+  /**
+   * ⭐⭐ LA TERCERA SUTILEZA DEL `CASE`: un divisor congelado de **CERO se respeta COMO CERO**.
+   *
+   * Por eso la condición del SQL mira `IS NOT NULL` y **no** `> 0`. Una orden que se cierra con
+   * costo capturado y **sin una sola pieza recibida** congela el divisor en 0: su margen tiene que
+   * quedar NULL **y seguir NULL** aunque después lleguen recibos — es el mismo defecto que esta
+   * fila cierra, en su subcaso más fácil de perder.
+   *
+   * ⚠️ **Sin esta prueba no había red.** Cambiar `IS NOT NULL` por `> 0` dejaba los tres archivos
+   * de publicadores en verde (60/60): el cero caía al divisor VIVO y el margen reaparecía. Los
+   * otros cuatro de los CINCO publicadores tienen la sutileza cubierta porque **llaman** a
+   * `divisorCongelado`; `margenes.ts` es SQL agregado y la **reimplementa**, así que necesita la suya.
+   */
+  it('0.061 · un divisor congelado en CERO se respeta como cero (el margen no reaparece)', async () => {
+    // Orden costeada pero sin recibos: se cierra con el divisor en 0.
+    await cliente.etapaMovimiento.deleteMany({ where: { idOrden, tipo: 'recibo_maquila' } });
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+    const antes = await obtenerCostoOrden(sesionCierre(), idOrden, bd());
+    expect(antes.unitario.cantidadBase).toBe(0);
+    expect(antes.unitario.motivoSinUnitario).toBe('sin-base');
+
+    await cerrarOrden(sesionCierre(), idOrden, { motivo: 'no se llegó a producir' }, bd());
+
+    // Se congeló el CERO, no un NULL: eso es lo que distingue «cerrada sin piezas» de «sin congelar»
+    // — y hay dinero capturado, así que la orden SÍ entra en el reporte de márgenes.
+    const fila = await cliente.costoOrden.findUniqueOrThrow({ where: { idOrden } });
+    expect(fila.cantidadBaseCongelada).toBe(0);
+    expect(fila.costoUnitarioCongelado).toBeNull();
+    expect(fila.congeladoEn).not.toBeNull();
+    expect(fila.costoTotal?.toNumber()).toBe(1590);
+
+    expect(
+      (await margenesPorPedido(sesionCierre(), {}, bd())).filas[0]?.margenPesosPorPieza,
+    ).toBeNull();
+
+    // ⭐ LO QUE PROTEGE: llegan recibos DESPUÉS del cierre y el margen NO puede reaparecer.
+    await otroReciboDeCostura(25, 308n);
+    const despues = await margenesPorPedido(sesionCierre(), {}, bd());
+    expect(despues.filas[0]?.margenPesosPorPieza).toBeNull();
+    expect(despues.filas[0]?.margenPromedio).toBeNull();
+  });
+
+  it('la LISTA de costos respeta el congelado igual que la ficha (una sola regla)', async () => {
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await otroReciboDeCostura(10, 301n);
+    const lista = await listarCostos(sesionCierre(), {}, bd());
+    expect(lista.datos[0]?.costoUnitario).toBe(63.6);
+  });
+
+  it('REABRIR devuelve el costo a cálculo vivo y MARCA lo congelado (no lo borra, D3)', async () => {
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await otroReciboDeCostura(10, 302n);
+
+    const abierta = await reabrirOrden(
+      sesionCierre(),
+      idOrden,
+      { motivo: 'faltó un recibo' },
+      bd(),
+    );
+    expect(abierta.cerradaEn).toBeNull();
+    expect(abierta.motivoCierre).toBeNull();
+    // El estado se vuelve a DERIVAR de los requisitos (no se "restaura" el que tenía).
+    expect(['capturada', 'completa']).toContain(abierta.estado);
+
+    const vivo = await obtenerCostoOrden(sesionCierre(), idOrden, bd());
+    expect(vivo.unitario.cantidadBase).toBe(35); // ahora sí cuenta el recibo nuevo
+    expect(vivo.unitario.congeladoEn).toBeNull();
+    expect(vivo.ordenCerrada).toBe(false);
+
+    // D3: lo congelado NO se borró — quedó marcado como historia.
+    const fila = await cliente.costoOrden.findUniqueOrThrow({ where: { idOrden } });
+    expect(fila.cantidadBaseCongelada).toBe(25);
+    expect(fila.congeladoEn).not.toBeNull();
+    expect(fila.descongeladoEn).not.toBeNull();
+  });
+
+  it('una orden CERRADA no se puede costear', async () => {
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await expect(
+      guardarCostoOrden(sesionCierre(), idOrden, { telaCost: 1 }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('SIN `ordenes.cerrar` no se cierra ni se reabre (A4)', async () => {
+    await expect(cerrarOrden(sesion(), idOrden, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+    await expect(reabrirOrden(sesion(), idOrden, { motivo: 'x' }, bd())).rejects.toBeInstanceOf(
+      ErrorPermiso,
+    );
+  });
+
+  it('🔴 SIN `ordenes.ver` el 403 sale ANTES de escribir: la orden NO queda cerrada', async () => {
+    // El «403-tras-commit» de F8-E3. `cerrarOrden` DEVUELVE la orden y la lee con `obtenerOrden`,
+    // que exige `ordenes.ver`: si esa comprobación se dejaba para el final, una sesión con
+    // `ordenes.cerrar` y sin `ordenes.ver` cerraba la orden —commit incluido, costo congelado— y
+    // recibía un error, así que el usuario creía que no había pasado nada. Lo cazó la suite de
+    // integración corrida en local.
+    const sinVer = sesion([...PERM_TODOS, 'ordenes.cerrar']); // sin `ordenes.ver`
+
+    await expect(cerrarOrden(sinVer, idOrden, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+
+    // Y lo que importa: NADA se escribió.
+    const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+    expect(orden.cerradaEn).toBeNull();
+    expect(orden.estado).not.toBe('cerrada');
+  });
+
+  it('cerrar DOS veces se rechaza (no se re-congela en silencio con números nuevos)', async () => {
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await expect(cerrarOrden(sesionCierre(), idOrden, {}, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+  });
+
+  it('reabrir una orden que NO está cerrada se rechaza', async () => {
+    await expect(
+      reabrirOrden(sesionCierre(), idOrden, { motivo: 'x' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('una orden CANCELADA no se cierra (son dos finales distintos y sólo cabe uno)', async () => {
+    await cliente.orden.update({ where: { id: idOrden }, data: { estado: 'cancelada' } });
+    await expect(cerrarOrden(sesionCierre(), idOrden, {}, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+  });
+
+  it('cerrar una orden SIN costo capturado no inventa ninguno (ni crea la fila)', async () => {
+    const cerrada = await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    expect(cerrada.estado).toBe('cerrada');
+    expect(await cliente.costoOrden.findUnique({ where: { idOrden } })).toBeNull();
+    const c = await obtenerCostoOrden(sesionCierre(), idOrden, bd());
+    expect(c.guardado).toBeNull();
+    expect(c.ordenCerrada).toBe(true);
+  });
+
+  it('el estado `cerrada` SOBREVIVE a un recálculo por requisitos (no se deriva)', async () => {
+    // Si `cambiosEstadoPorRequisitos` no lo respetara como a `cancelada`, el primer recálculo
+    // borraría el cierre y el badge mentiría con `cerradaEn` todavía puesta.
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await realinearEstadoOrdenes(cliente, [idOrden]);
+    const fila = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+    expect(fila.estado).toBe('cerrada');
+    expect(fila.cerradaEn).not.toBeNull();
+  });
+
+  it('deja BITÁCORA (A7) del cierre con los números congelados, y de la reapertura', async () => {
+    await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
+    await cerrarOrden(sesionCierre(), idOrden, { motivo: 'fin' }, bd());
+    await reabrirOrden(sesionCierre(), idOrden, { motivo: 'otra vez' }, bd());
+    const log = await cliente.bitacora.findMany({
+      where: { entidad: 'Orden', idEntidad: String(idOrden) },
+      orderBy: { id: 'asc' },
+    });
+    const actos = log.map((l) => (l.datos as { acto?: string } | null)?.acto);
+    expect(actos).toContain('cerrar-orden');
+    expect(actos).toContain('reabrir-orden');
+    const cierre = log.find((l) => (l.datos as { acto?: string } | null)?.acto === 'cerrar-orden');
+    expect(
+      (cierre?.datos as { cantidadBaseCongelada?: number } | null)?.cantidadBaseCongelada,
+    ).toBe(25);
   });
 });

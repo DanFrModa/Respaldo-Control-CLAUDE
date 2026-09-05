@@ -47,7 +47,10 @@ Construido en F7 (etapas E1 = costo por orden, E2 = EDR mensual, E6 = ETL de cie
   `procesosCalc`/`procesosCost` (**maquila + estampado + otros procesos**),
   `aviosCalc`/`aviosCost`/**`aviosReal`** (**habilitación de costura + empaque**), `otros`/`descOtros`,
   `costoTotal` (Σ de los **guardados** — los `*Real` NO entran), `baseProrrateo`
-  (default `cortado`). Todo NULLABLE (patrón *ceronulo*: un componente sin capturar cuenta como 0).
+  (⭐ default **`recibido`** desde 0.061; hasta esa versión, `cortado`) y el **costo congelado** del
+  cierre de la orden (`cantidadBaseCongelada`, `costoUnitarioCongelado`, `congeladoEn`,
+  `descongeladoEn` — ver §Fórmulas). Todo NULLABLE (patrón *ceronulo*: un componente sin capturar
+  cuenta como 0).
   Los `*Real` (26-jul-2026) **congelan el real de compras** al guardar: trazabilidad de con qué se
   costeó, NULL en todo lo costeado antes de la columna.
   **La REGALÍA NO es componente** (D2, 2026-07-02): va sobre la venta → NO hay `regaliasCalc/Cost`.
@@ -65,8 +68,34 @@ Construido en F7 (etapas E1 = costo por orden, E2 = EDR mensual, E6 = ETL de cie
   ACTUAL** (D1). Los totales teóricos = por-prenda × piezas **cortadas**.
 - **`costoTotal`** (el dinero REAL) = `telaCost + procesosCost + aviosCost + otros`. La **regalía NO
   entra** (D2).
-- **Costo unitario** = `costoTotal ÷ cantidadBase`, con `cantidadBase` según `baseProrrateo` (default
-  `cortado`). Cambiar la base cambia el unitario (el total es fijo, el divisor varía) — D2.
+- **Costo unitario** = `costoTotal ÷ cantidadBase`, con `cantidadBase` según `baseProrrateo`. Cambiar
+  la base cambia el unitario (el total es fijo, el divisor varía) — D2.
+  - ⭐ **El default es `recibido` desde 0.061** (§Post-F9.154(b), DANIEL; antes era `cortado`).
+    *«Las 10 faltantes se las voy a cobrar al maquilero… esas las sacaría de la ecuación. Y las
+    segundas también se venden a un Saldero. Las únicas que se pierden por completo son las
+    incompletas.»* ⇒ primeras y segundas **sí** entran al divisor (se venden), faltantes **no** (se
+    cobran en EsMa) e incompletas **tampoco** (son la merma). Dividir entre las CORTADAS quedó
+    descartado porque **escondería el costo de la merma**. ⚠️ Sólo hacia adelante: la migración **no
+    reescribe** las órdenes ya costeadas (REGLA 0-B).
+  - ⚠️ Imprecisión **declarada y no corregida**: el cobro del faltante al maquilero NO baja el costo
+    de la orden (vive en EsMa, otra cuenta).
+  - **Cuando la base es 0** (una orden recién cortada, sin recibos), no hay unitario y la salida
+    **DICE POR QUÉ**: `motivoSinUnitario` (`sin-base` | `sin-costo` | `sin-importes`) + la frase
+    `textoSinUnitario`, que **redacta el servidor** (`unitarioODeuda`, `cantidades.ts`) para que la
+    ficha de costeo y la lista de costos no puedan decir cosas distintas.
+- ⭐⭐ **EL COSTO SE CONGELA AL CERRAR LA ORDEN** (0.061 — §Post-F9.154(c); *«¿en qué momento se
+  define que ya se cerró el costo? ¿O va cambiando?»*). Hasta 0.061 **iba cambiando**: el dinero se
+  persistía, pero la **cantidad** del divisor se re-sumaba en CADA lectura — con `recibido` el
+  unitario habría quedado vivo hasta el último recibo, para siempre. Al **cerrar la orden** (acto
+  explícito, permiso `ordenes.cerrar`, ver `docs/modulos/produccion-wip.md`) se persisten
+  `CostoOrden.cantidadBaseCongelada` + `costoUnitarioCongelado` + `congeladoEn`, y **toda lectura
+  posterior usa el divisor congelado**. Son **CINCO** los sitios que publican un costo unitario, y
+  los cinco lo respetan: la **ficha** de costeo y la **lista** de costos (`costos/costo-orden.ts`),
+  el **EDR** (`edr/edr.ts`), la columna «costo actual» del **listado de modelos**
+  (`modelos/modelos.ts`) y los **márgenes por pedido** (`costos/margenes.ts`, que lo aplica en SQL).
+  La regla vive en un solo sitio (`divisorCongelado`, `costos/cantidades.ts`). La orden
+  **abierta** sigue calculando en vivo. Cerrar además **rechaza capturar el costo**. **Reabrir** lo
+  devuelve a cálculo vivo y **marca** lo congelado con `descongeladoEn` — no lo borra (D3).
 - **Precio de venta sugerido**: redondeo **AL ALZA** (D2); la regalía se calcula **sobre la venta**,
   no dentro del costo (D2).
 
@@ -138,11 +167,13 @@ costo real del material  =  IMPORTE DIRECTO  +  IMPORTE VALUADO
   previo intacto). `procesosCost` sigue al teórico. El usuario siempre puede teclear su valor. Y si la
   orden **ya estaba costeada**, **omitir** un componente lo **CONSERVA** (para borrarlo hay que mandar
   `null` explícito) — antes omitirlo lo pisaba con el default. Aplica igual a
-  `otros`/`descOtros`/`observaciones`. **`baseProrrateo` es la ÚNICA excepción**: su Zod trae
-  `.default('cortado')`, así que nunca llega `undefined` al dominio y **omitirla la resetea a
-  `cortado`**, cambiando el costo unitario (el total no se mueve; el divisor sí). Se dejó así a
-  propósito — cambiarla a `.optional()` sería un cambio de contrato y hoy la UI la manda siempre y el
-  ETL usa el default a conciencia; hay que revisarlo si algún día se expone un PATCH parcial.
+  `otros`/`descOtros`/`observaciones`. ⭐ **Y desde 0.061 también a `baseProrrateo`, que era la
+  ÚNICA excepción**: su Zod traía `.default('cortado')`, así que nunca llegaba `undefined` al dominio
+  y **un PUT que la omitiera PISABA la base de una orden ya costeada**, cambiándole el unitario sin
+  que nadie lo pidiera (el total no se mueve; el divisor sí). Era un defecto latente documentado como
+  decisión, y al pasar el default a `recibido` habría dejado de ser latente. Hoy el campo es
+  `.optional()` **sin default**: omitirlo **CONSERVA** la base guardada y, en el **primer** costeo,
+  cae a `recibido` (`baseProrrateoAGuardar`, `cantidades.ts`).
 - **Trazabilidad:** el real se **congela** al guardar en `CostoOrden.telaReal`/`aviosReal` (columnas
   nuevas, nullable ⇒ NULL en todo lo costeado antes; **no** entran a `costoTotal`) y
   `GET /api/costos/ordenes/{idOrden}/real` devuelve el **desglose por material**: qué se compró, a qué

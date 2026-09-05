@@ -95,6 +95,7 @@ export interface paths {
                 | 'ordenes.ver'
                 | 'ordenes.administrar'
                 | 'ordenes.cancelar'
+                | 'ordenes.cerrar'
                 | 'clientes.modificar'
                 | 'proveedores.modificar'
                 | 'etiquetas.modificar'
@@ -23588,10 +23589,10 @@ export interface paths {
                 /** @description Empresa dueña de la orden y del folio. */
                 idEmpresa: number;
                 /**
-                 * @description Estado DERIVADO de la orden (no editable).
+                 * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                  * @enum {string}
                  */
-                estado: 'capturada' | 'completa' | 'cancelada';
+                estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
                 /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
                 idPedidoLinea: number | null;
                 /** @description Modelo a producir. */
@@ -23647,6 +23648,10 @@ export interface paths {
                 };
                 /** @description Motivo de la cancelación, o null. */
                 motivoCancelada: string | null;
+                /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+                cerradaEn: string | null;
+                /** @description Motivo del cierre (opcional), o null. */
+                motivoCierre: string | null;
                 /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
                 ocCliente: string | null;
                 /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -25142,7 +25147,7 @@ export interface paths {
           /** @description Filtra por año de la fecha. */
           anio?: number;
           /** @description Filtra por estado. */
-          estado?: 'capturada' | 'completa' | 'cancelada';
+          estado?: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
           /** @description Incluye las órdenes canceladas (cancelación suave). */
           incluirCanceladas?: string;
           /** @description Columna de orden. */
@@ -25172,10 +25177,10 @@ export interface paths {
                 /** @description Empresa dueña de la orden y del folio. */
                 idEmpresa: number;
                 /**
-                 * @description Estado DERIVADO de la orden (no editable).
+                 * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                  * @enum {string}
                  */
-                estado: 'capturada' | 'completa' | 'cancelada';
+                estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
                 /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
                 idPedidoLinea: number | null;
                 /** @description Modelo a producir. */
@@ -25231,6 +25236,10 @@ export interface paths {
                 };
                 /** @description Motivo de la cancelación, o null. */
                 motivoCancelada: string | null;
+                /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+                cerradaEn: string | null;
+                /** @description Motivo del cierre (opcional), o null. */
+                motivoCierre: string | null;
                 /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
                 ocCliente: string | null;
                 /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -25484,10 +25493,10 @@ export interface paths {
               /** @description Empresa dueña de la orden y del folio. */
               idEmpresa: number;
               /**
-               * @description Estado DERIVADO de la orden (no editable).
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
               idPedidoLinea: number | null;
               /** @description Modelo a producir. */
@@ -25543,6 +25552,10 @@ export interface paths {
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -25751,10 +25764,10 @@ export interface paths {
               /** @description Empresa dueña de la orden y del folio. */
               idEmpresa: number;
               /**
-               * @description Estado DERIVADO de la orden (no editable).
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
               idPedidoLinea: number | null;
               /** @description Modelo a producir. */
@@ -25810,6 +25823,10 @@ export interface paths {
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -26035,10 +26052,10 @@ export interface paths {
               /** @description Empresa dueña de la orden y del folio. */
               idEmpresa: number;
               /**
-               * @description Estado DERIVADO de la orden (no editable).
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
               idPedidoLinea: number | null;
               /** @description Modelo a producir. */
@@ -26094,6 +26111,10 @@ export interface paths {
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -26325,10 +26346,10 @@ export interface paths {
               /** @description Empresa dueña de la orden y del folio. */
               idEmpresa: number;
               /**
-               * @description Estado DERIVADO de la orden (no editable).
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
               idPedidoLinea: number | null;
               /** @description Modelo a producir. */
@@ -26384,6 +26405,10 @@ export interface paths {
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -26602,10 +26627,10 @@ export interface paths {
               /** @description Empresa dueña de la orden y del folio. */
               idEmpresa: number;
               /**
-               * @description Estado DERIVADO de la orden (no editable).
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
               idPedidoLinea: number | null;
               /** @description Modelo a producir. */
@@ -26661,6 +26686,10 @@ export interface paths {
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -26878,10 +26907,10 @@ export interface paths {
               /** @description Empresa dueña de la orden y del folio. */
               idEmpresa: number;
               /**
-               * @description Estado DERIVADO de la orden (no editable).
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
               idPedidoLinea: number | null;
               /** @description Modelo a producir. */
@@ -26937,6 +26966,572 @@ export interface paths {
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
+              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              ocCliente: string | null;
+              /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
+              tallasV1: string | null;
+              /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
+              maquilaOrd: number | null;
+              /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
+              aplicacionOrd: number | null;
+              /** @description Maquila pagada (dato de v1; motor en F6), o null. */
+              pagada: boolean | null;
+              /** @description Bandera RC de v1 (dato; motor en F5), o null. */
+              enRiesgo: boolean | null;
+              /** @description Bandera RC de v1 (dato; motor en F5), o null. */
+              siRC: boolean | null;
+              /** @description Bandera RC de v1 (dato; motor en F5), o null. */
+              rcViva: boolean | null;
+              /** @description Matriz: colores con sus tallas. */
+              lineas: {
+                /** @description Id del renglón (color). */
+                id: number;
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color (para la UI). */
+                color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (para la UI). */
+                  etiquetaTalla: string;
+                  /** @description Cantidad de prendas de esta talla. */
+                  cantidad: number;
+                }[];
+                /** @description Suma de las cantidades de las tallas de este color. */
+                totalPiezas: number;
+              }[];
+              /** @description Total de prendas de la orden (Σ de todas las tallas). */
+              totalPiezas: number;
+              /** @description Valores de referencia del cliente. */
+              referencias: {
+                /** @description Id del valor de referencia. */
+                id: number;
+                /** @description Campo de referencia del cliente. */
+                idClienteCampo: number;
+                /** @description Etiqueta del campo (para la UI). */
+                etiqueta: string;
+                /** @description Valor capturado. */
+                valor: string;
+              }[];
+              /** @description Comentarios (cronológicos). */
+              comentarios: {
+                /** @description Id del comentario. */
+                id: number;
+                /** @description Usuario que lo escribió, o null. */
+                idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
+                /** @description Texto del comentario. */
+                comentario: string;
+                /**
+                 * Format: date-time
+                 * @description Fecha del comentario (ISO 8601).
+                 */
+                fecha: string;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/cerrar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cerrar una orden (deja de admitir captura y congela su costo unitario) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cerrar la orden: deja de admitir captura y CONGELA su costo unitario. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo del cierre (OPCIONAL). */
+            motivo?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Orden de producción (encabezado + matriz + referencias + comentarios). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la orden. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña de la orden y del folio. */
+              idEmpresa: number;
+              /**
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
+              /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
+              idPedidoLinea: number | null;
+              /** @description Modelo a producir. */
+              idModelo: number;
+              /** @description Código del modelo (para la UI). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Cliente de la orden. */
+              idCliente: number;
+              /** @description Nombre del cliente (para la UI). */
+              cliente: string;
+              /** @description Maquilero asignado (Proveedor), o null. */
+              idMaquilero: number | null;
+              /** @description Nombre del maquilero, o null. */
+              maquilero: string | null;
+              /** @description Etiqueta de marca, o null. */
+              idEtiquetaMarca: number | null;
+              /** @description Nombre de la etiqueta de marca, o null. */
+              etiquetaMarca: string | null;
+              /** @description Tela dispuesta, o null. */
+              idTela: number | null;
+              /** @description Nombre de la tela, o null. */
+              tela: string | null;
+              /** @description Fecha de la orden (YYYY-MM-DD), o null. */
+              fecha: string | null;
+              /** @description Fecha de entrega comprometida, o null. */
+              fechaEntrega: string | null;
+              /** @description Observaciones generales, o null. */
+              observaciones: string | null;
+              /** @description Composición textil, o null. */
+              composicion: string | null;
+              /** @description La composición se capturó a mano. */
+              compForzada: boolean;
+              /** @description Observaciones de maquila, o null. */
+              obsMaquila: string | null;
+              /** @description No costear esta orden. */
+              noCostear: boolean;
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
+              fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'receta' | 'arte')[];
+              };
+              /** @description Motivo de la cancelación, o null. */
+              motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
+              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              ocCliente: string | null;
+              /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
+              tallasV1: string | null;
+              /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
+              maquilaOrd: number | null;
+              /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
+              aplicacionOrd: number | null;
+              /** @description Maquila pagada (dato de v1; motor en F6), o null. */
+              pagada: boolean | null;
+              /** @description Bandera RC de v1 (dato; motor en F5), o null. */
+              enRiesgo: boolean | null;
+              /** @description Bandera RC de v1 (dato; motor en F5), o null. */
+              siRC: boolean | null;
+              /** @description Bandera RC de v1 (dato; motor en F5), o null. */
+              rcViva: boolean | null;
+              /** @description Matriz: colores con sus tallas. */
+              lineas: {
+                /** @description Id del renglón (color). */
+                id: number;
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color (para la UI). */
+                color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
+                /** @description PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = la orden no maneja packs. */
+                pack: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (para la UI). */
+                  etiquetaTalla: string;
+                  /** @description Cantidad de prendas de esta talla. */
+                  cantidad: number;
+                }[];
+                /** @description Suma de las cantidades de las tallas de este color. */
+                totalPiezas: number;
+              }[];
+              /** @description Total de prendas de la orden (Σ de todas las tallas). */
+              totalPiezas: number;
+              /** @description Valores de referencia del cliente. */
+              referencias: {
+                /** @description Id del valor de referencia. */
+                id: number;
+                /** @description Campo de referencia del cliente. */
+                idClienteCampo: number;
+                /** @description Etiqueta del campo (para la UI). */
+                etiqueta: string;
+                /** @description Valor capturado. */
+                valor: string;
+              }[];
+              /** @description Comentarios (cronológicos). */
+              comentarios: {
+                /** @description Id del comentario. */
+                id: number;
+                /** @description Usuario que lo escribió, o null. */
+                idUsuario: string | null;
+                /** @description Nombre de quien lo escribió; null si el id no resuelve (el comentario se sigue viendo). */
+                nombreUsuario: string | null;
+                /** @description Texto del comentario. */
+                comentario: string;
+                /**
+                 * Format: date-time
+                 * @description Fecha del comentario (ISO 8601).
+                 */
+                fecha: string;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/reabrir': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reabrir una orden cerrada (el costo vuelve a calcularse en vivo) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Reabrir una orden cerrada: el costo vuelve a calcularse en vivo (acto inverso, D3). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo de la reapertura (OBLIGATORIO). */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Orden de producción (encabezado + matriz + referencias + comentarios). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la orden. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña de la orden y del folio. */
+              idEmpresa: number;
+              /**
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
+              /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
+              idPedidoLinea: number | null;
+              /** @description Modelo a producir. */
+              idModelo: number;
+              /** @description Código del modelo (para la UI). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Cliente de la orden. */
+              idCliente: number;
+              /** @description Nombre del cliente (para la UI). */
+              cliente: string;
+              /** @description Maquilero asignado (Proveedor), o null. */
+              idMaquilero: number | null;
+              /** @description Nombre del maquilero, o null. */
+              maquilero: string | null;
+              /** @description Etiqueta de marca, o null. */
+              idEtiquetaMarca: number | null;
+              /** @description Nombre de la etiqueta de marca, o null. */
+              etiquetaMarca: string | null;
+              /** @description Tela dispuesta, o null. */
+              idTela: number | null;
+              /** @description Nombre de la tela, o null. */
+              tela: string | null;
+              /** @description Fecha de la orden (YYYY-MM-DD), o null. */
+              fecha: string | null;
+              /** @description Fecha de entrega comprometida, o null. */
+              fechaEntrega: string | null;
+              /** @description Observaciones generales, o null. */
+              observaciones: string | null;
+              /** @description Composición textil, o null. */
+              composicion: string | null;
+              /** @description La composición se capturó a mano. */
+              compForzada: boolean;
+              /** @description Observaciones de maquila, o null. */
+              obsMaquila: string | null;
+              /** @description No costear esta orden. */
+              noCostear: boolean;
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
+              fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'receta' | 'arte')[];
+              };
+              /** @description Motivo de la cancelación, o null. */
+              motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -27158,10 +27753,10 @@ export interface paths {
               /** @description Empresa dueña de la orden y del folio. */
               idEmpresa: number;
               /**
-               * @description Estado DERIVADO de la orden (no editable).
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
               idPedidoLinea: number | null;
               /** @description Modelo a producir. */
@@ -27217,6 +27812,10 @@ export interface paths {
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -28105,10 +28704,10 @@ export interface paths {
               /** @description Empresa dueña de la orden y del folio. */
               idEmpresa: number;
               /**
-               * @description Estado DERIVADO de la orden (no editable).
+               * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Renglón de pedido de origen (null solo en órdenes históricas migradas). */
               idPedidoLinea: number | null;
               /** @description Modelo a producir. */
@@ -28164,6 +28763,10 @@ export interface paths {
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
+              /** @description Cuándo se CERRÓ la orden (fin de su vida administrativa; su costo quedó congelado), o null si está abierta. Es la verdad autoritativa: `estado = "cerrada"` es su espejo. */
+              cerradaEn: string | null;
+              /** @description Motivo del cierre (opcional), o null. */
+              motivoCierre: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
@@ -28377,7 +28980,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -28895,7 +29498,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -29377,7 +29980,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -29863,7 +30466,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -30333,7 +30936,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -30808,7 +31411,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -31278,7 +31881,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -31763,7 +32366,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -32241,7 +32844,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -32711,7 +33314,7 @@ export interface paths {
                * @description Estado de la orden (una CANCELADA no se toca).
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
               totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -33206,7 +33809,7 @@ export interface paths {
                  * @description Estado de la orden (una CANCELADA no se toca).
                  * @enum {string}
                  */
-                estado: 'capturada' | 'completa' | 'cancelada';
+                estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
                 /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
                 totalPiezas: number;
                 /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
@@ -35297,7 +35900,7 @@ export interface paths {
           /** @description Filtra por año de la fecha. */
           anio?: number;
           /** @description Filtra por estado. */
-          estado?: 'capturada' | 'completa' | 'cancelada';
+          estado?: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
           /** @description Incluye las órdenes canceladas (cancelación suave). */
           incluirCanceladas?: string;
           /** @description Columna de orden. */
@@ -35325,10 +35928,10 @@ export interface paths {
                 /** @description Folio consecutivo por empresa. */
                 folio: number;
                 /**
-                 * @description Estado DERIVADO de la orden (no editable).
+                 * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                  * @enum {string}
                  */
-                estado: 'capturada' | 'completa' | 'cancelada';
+                estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
                 /** @description Fecha de la orden (YYYY-MM-DD), o null. */
                 fecha: string | null;
                 /** @description Fecha de entrega comprometida, o null. */
@@ -35457,10 +36060,10 @@ export interface paths {
                 /** @description Folio consecutivo por empresa. */
                 folio: number;
                 /**
-                 * @description Estado DERIVADO de la orden (no editable).
+                 * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                  * @enum {string}
                  */
-                estado: 'capturada' | 'completa' | 'cancelada';
+                estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
                 /** @description Fecha de la orden (YYYY-MM-DD), o null. */
                 fecha: string | null;
                 /** @description Fecha de entrega comprometida, o null. */
@@ -35731,10 +36334,10 @@ export interface paths {
                 /** @description No. OP (folio consecutivo por empresa). */
                 folio: number;
                 /**
-                 * @description Estado DERIVADO de la orden (no editable).
+                 * @description Estado de la orden: capturada/completa DERIVADOS, cancelada (cancelación suave) y cerrada (acto explícito de 0.061 que congela el costo; no editable como campo).
                  * @enum {string}
                  */
-                estado: 'capturada' | 'completa' | 'cancelada';
+                estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
                 /** @description Empresa de la orden (A9). */
                 idEmpresa: number;
                 /** @description Nombre de la empresa (FR Moda / Marilyn Fitness). */
@@ -57497,7 +58100,7 @@ export interface paths {
           /** @description Filtra por cliente. */
           idCliente?: number;
           /** @description Filtra por estado de la orden. */
-          estado?: 'capturada' | 'completa' | 'cancelada';
+          estado?: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
           /** @description Si true, solo órdenes con algo pendiente (por cortar/enviar/recibir/entregar). */
           soloPendientes?: string;
           /** @description Columna de orden. */
@@ -57528,7 +58131,7 @@ export interface paths {
                  * @description Estado de la orden.
                  * @enum {string}
                  */
-                estado: 'capturada' | 'completa' | 'cancelada';
+                estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
                 /** @description Fecha de la orden (YYYY-MM-DD) o null. */
                 fecha: string | null;
                 /** @description Fecha de entrega comprometida o null. */
@@ -57713,7 +58316,7 @@ export interface paths {
                * @description Estado de la orden.
                * @enum {string}
                */
-              estado: 'capturada' | 'completa' | 'cancelada';
+              estado: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
               /** @description Modelo a producir. */
               idModelo: number;
               /** @description Código del modelo. */
@@ -86013,6 +86616,10 @@ export interface paths {
                 costoTotal: number | null;
                 /** @description Costo unitario (o null sin importes / base 0). */
                 costoUnitario: number | null;
+                /** @description Por qué `costoUnitario` es null; null cuando SÍ hay unitario (0.061). */
+                motivoSinUnitario: ('sin-base' | 'sin-costo' | 'sin-importes') | null;
+                /** @description La frase a mostrar en lugar del unitario; null cuando sí hay unitario (0.061). */
+                textoSinUnitario: string | null;
                 /**
                  * @description Base de prorrateo guardada.
                  * @enum {string}
@@ -86256,15 +86863,23 @@ export interface paths {
               /** @description Costo unitario y su base. */
               unitario: {
                 /**
-                 * @description Base usada (cortado por defecto).
+                 * @description Base usada (`recibido` por defecto desde 0.061).
                  * @enum {string}
                  */
                 base: 'cortado' | 'recibido' | 'vendido';
                 /** @description Piezas de la base (divisor). */
                 cantidadBase: number;
-                /** @description costoTotal ÷ cantidadBase, o null si la base es 0 o sin importes. */
+                /** @description costoTotal ÷ cantidadBase, o null si la base es 0, no hay costo, o sin importes. */
                 costoUnitario: number | null;
+                /** @description Por qué `costoUnitario` es null; null cuando SÍ hay unitario. */
+                motivoSinUnitario: ('sin-base' | 'sin-costo' | 'sin-importes') | null;
+                /** @description La frase que la pantalla debe mostrar en lugar del unitario (p. ej. "Aún no hay piezas recibidas…"). La redacta el servidor; null cuando sí hay unitario. */
+                textoSinUnitario: string | null;
+                /** @description Cuándo se CONGELÓ este unitario al cerrar la orden (0.061). Con valor, `cantidadBase` y `costoUnitario` NO se recalculan: son los del cierre. null = se calcula en vivo. */
+                congeladoEn: string | null;
               };
+              /** @description ⭐ 0.061: la ORDEN está CERRADA — no admite captura de costo y su unitario está congelado. La pantalla lo usa para no ofrecer campos que el servidor va a rechazar. */
+              ordenCerrada: boolean;
             };
           };
         };
@@ -86361,7 +86976,7 @@ export interface paths {
         };
         cookie?: never;
       };
-      /** @description Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default). */
+      /** @description Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra. Desde 0.061 eso vale TAMBIÉN para `baseProrrateo` (ya no tiene default): omitirla conserva la guardada. */
       requestBody: {
         content: {
           'application/json': {
@@ -86376,8 +86991,7 @@ export interface paths {
             /** @description Descripción de otros. OMITIR = conservar lo ya guardado. `null` = borrar. */
             descOtros?: string | null;
             /**
-             * @description Base de prorrateo. ÚNICA EXCEPCIÓN a "omitir = conservar": tiene default, así que OMITIRLA la deja en `cortado` y con ello cambia el costo unitario. Mándala siempre.
-             * @default cortado
+             * @description Base de prorrateo. OMITIR = conservar la ya guardada (y, en el PRIMER costeo, `recibido`). Hasta 0.061 traía `.default("cortado")`, así que un PUT que la omitiera PISABA la base de una orden ya costeada y le cambiaba el unitario sin que nadie lo pidiera.
              * @enum {string}
              */
             baseProrrateo?: 'cortado' | 'recibido' | 'vendido';
@@ -86503,15 +87117,23 @@ export interface paths {
               /** @description Costo unitario y su base. */
               unitario: {
                 /**
-                 * @description Base usada (cortado por defecto).
+                 * @description Base usada (`recibido` por defecto desde 0.061).
                  * @enum {string}
                  */
                 base: 'cortado' | 'recibido' | 'vendido';
                 /** @description Piezas de la base (divisor). */
                 cantidadBase: number;
-                /** @description costoTotal ÷ cantidadBase, o null si la base es 0 o sin importes. */
+                /** @description costoTotal ÷ cantidadBase, o null si la base es 0, no hay costo, o sin importes. */
                 costoUnitario: number | null;
+                /** @description Por qué `costoUnitario` es null; null cuando SÍ hay unitario. */
+                motivoSinUnitario: ('sin-base' | 'sin-costo' | 'sin-importes') | null;
+                /** @description La frase que la pantalla debe mostrar en lugar del unitario (p. ej. "Aún no hay piezas recibidas…"). La redacta el servidor; null cuando sí hay unitario. */
+                textoSinUnitario: string | null;
+                /** @description Cuándo se CONGELÓ este unitario al cerrar la orden (0.061). Con valor, `cantidadBase` y `costoUnitario` NO se recalculan: son los del cierre. null = se calcula en vivo. */
+                congeladoEn: string | null;
               };
+              /** @description ⭐ 0.061: la ORDEN está CERRADA — no admite captura de costo y su unitario está congelado. La pantalla lo usa para no ofrecer campos que el servidor va a rechazar. */
+              ordenCerrada: boolean;
             };
           };
         };

@@ -38,6 +38,7 @@ import {
   crearPedidoReal,
   listarPedidosReales,
 } from './pedidos-reales.js';
+import { cerrarOrden, reabrirOrden } from '../produccion/cierre-orden.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
 /**
@@ -597,6 +598,88 @@ describe('⭐ cancelar un pedido dice la verdad sobre sus OPs (V1-E4)', () => {
     await expect(
       cancelarPedido(s, idPedido, { cancelarOrdenes: true }, bd(), archivos),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ⭐⭐ 0.061 — LA PUERTA 17: la cascada del pedido NO puede pisar una orden CERRADA.
+  //
+  // Este barrido es el ÚNICO camino del sistema que escribe el estado de una OP sin pasar por
+  // `cancelarOrden`, y su filtro era «no cancelada»: una orden cerrada entraba y quedaba con
+  // `estado='cancelada'` y `cerradaEn` PUESTA a la vez —dos finales para la misma orden—, con el
+  // costo congelado todavía en vigor. Y quedaba ATRAPADA: la ficha esconde «Reabrir» cuando el
+  // estado es `cancelada`, y reabrirla por API le borraba la cancelación (el estado se re-deriva).
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  describe('⭐ 0.061 — y NO arrastra las órdenes CERRADAS', () => {
+    const PERM_CON_CIERRE: ClavePermiso[] = [
+      ...PERM_CON_CANCELAR,
+      'ordenes.cancelar',
+      'ordenes.cerrar',
+    ];
+
+    it('🔴 se RECHAZA nombrando la orden cerrada, y NADA se mueve', async () => {
+      const s = sesion(PERM_CON_CIERRE);
+      const { idPedido, idOrden, folioOrden } = await pedidoConOp();
+      await cerrarOrden(s, idOrden, { motivo: 'temporada cerrada' }, bd());
+
+      const error = await cancelarPedido(
+        s,
+        idPedido,
+        { cancelarOrdenes: true, motivo: 'El cliente canceló la compra' },
+        bd(),
+        archivos,
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ErrorConflicto);
+      // El mensaje la NOMBRA por folio y dice la salida, que el usuario no puede adivinar.
+      expect((error as Error).message).toContain(String(folioOrden));
+      expect((error as Error).message).toMatch(/CERRADA/i);
+      expect((error as Error).message).toMatch(/[Rr]eábrelas/);
+
+      // Y NADA se movió: ni el pedido, ni el estado de la OP, ni su cierre. La transacción entera
+      // se deshizo — que es la mitad que importa: un rechazo a medias sería peor que el defecto.
+      const pedido = await cliente.pedido.findUniqueOrThrow({ where: { id: idPedido } });
+      expect(pedido.pedCancelado).toBe(false);
+      const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+      expect(orden.estado).toBe('cerrada');
+      expect(orden.cerradaEn).not.toBeNull();
+      expect(orden.motivoCancelada).toBeNull();
+    });
+
+    it('reabierta, la MISMA cancelación en cascada pasa (el freno era el cierre)', async () => {
+      // La rama gemela: sin ella, un rechazo que bloqueara SIEMPRE también pasaría la de arriba.
+      const s = sesion(PERM_CON_CIERRE);
+      const { idPedido, idOrden } = await pedidoConOp();
+      await cerrarOrden(s, idOrden, {}, bd());
+      await reabrirOrden(s, idOrden, { motivo: 'hay que cancelar el pedido entero' }, bd());
+
+      const resultado = await cancelarPedido(
+        s,
+        idPedido,
+        { cancelarOrdenes: true, motivo: 'El cliente canceló la compra' },
+        bd(),
+        archivos,
+      );
+
+      expect(resultado.pedCancelado).toBe(true);
+      const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+      expect(orden.estado).toBe('cancelada');
+      expect(orden.cerradaEn).toBeNull();
+    });
+
+    it('el rechazo NO depende de la cascada: sin `cancelarOrdenes` sigue avisando de la viva', async () => {
+      // Una orden cerrada sigue contando como «no cancelada» para el aviso de siempre: cancelar el
+      // pedido tampoco la detiene, así que el usuario tiene que enterarse igual.
+      const s = sesion(PERM_CON_CIERRE);
+      const { idPedido, idOrden, folioOrden } = await pedidoConOp();
+      await cerrarOrden(s, idOrden, {}, bd());
+
+      const error = await cancelarPedido(s, idPedido, {}, bd(), archivos).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ErrorConflicto);
+      expect((error as Error).message).toContain(String(folioOrden));
+      const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+      expect(orden.estado).toBe('cerrada');
+    });
   });
 
   it('las OPs YA canceladas no estorban: el pedido se cancela sin pedir nada más', async () => {

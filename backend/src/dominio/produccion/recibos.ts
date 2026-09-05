@@ -11,7 +11,8 @@
  *     (primeras/segundas) → el WIP "recibido" SUBE (derivado por suma, sin acumuladores). ⭐ Desde
  *     V1-E8k (§Post-F9.136) el detalle lleva además `cantidadIncompletas` —prendas que llegaron sin
  *     terminar de coser—, FUERA de `cantidad`: no suben el "recibido", no entran a inventario y no
- *     se pagan. Desde V1-E8v (§Post-F9.147) SÍ cierran el pendiente: ya volvieron del taller. La
+ *     se pagan. Desde V1-E8v (§Post-F9.147) SÍ cierran el pendiente: ya volvieron del taller, y desde
+ *     0.061 (§Post-F9.154(a)) SALEN SOLAS del almacén de tránsito como MERMA (punto 3.d). La
  *     aritmética del concepto vive en `incompletas.ts`.
  *  2. Validación `recibido ≤ enviado` ESTRICTO (decisión (g)): por suma directa de
  *     `EtapaMovimientoDet` bajo bloqueo de la orden, excluyendo canceladas — NUNCA la vista. ⭐
@@ -30,7 +31,13 @@
  *          segundas (traspaso). Aquí es donde la prenda que salió PRIMERA y vuelve SEGUNDA se
  *          reclasifica de verdad, y donde lo que no vuelve se queda vivo en tránsito;
  *       c) ninguna de las dos (estampado ANTES de costura, sobre bultos cortados) ⇒ no toca kardex.
- *     `costoUnit` queda NULL en los tres casos (D1/D2).
+ *       d) ⭐ **y en el caso (b), las INCOMPLETAS SALEN del tránsito como MERMA** (0.061 —
+ *          §Post-F9.154(a), DANIEL): una SALIDA con el tipo `merma-incompletas` que no entra a
+ *          ningún otro almacén, porque esas prendas se pierden. Antes se quedaban en tránsito para
+ *          siempre. Va en la MISMA transacción y sellada con el origen del recibo, así que
+ *          cancelarlo la revierte sin código propio. En (a) y (c) no aplica: esas piezas nunca
+ *          entraron al kardex de PT. NO es retroactiva (REGLA 0-B). Ver `transito.ts`.
+ *     `costoUnit` queda NULL en los cuatro casos (D1/D2).
  *  4. `EsMaCargo(propuesto)` para TODO proceso (costura Y estampado): cantidad recibida × precio
  *     del envío (el precio puede nacer NULL — por eso la validación del admin es obligatoria, F3-E4).
  *     ⭐ SALVO si el recibo trae SOLO prendas incompletas (V1-E8k): ésas no se pagan, y un cargo de
@@ -97,7 +104,9 @@ import {
   normalizarPack,
   ordenManejaPacks,
 } from './packs.js';
+import { exigirOrdenAbierta, exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import {
+  darSalidaMermaIncompletas,
   devolverPrendasDeTransito,
   formaDelEnvioVivo,
   rechazarAlmacenDeTransito,
@@ -188,7 +197,10 @@ async function resolverOrden(
     where: { id: idOrden, idEmpresa: idEmpresaActiva },
     select: {
       idEmpresa: true,
+      folio: true,
       estado: true,
+      // 0.061: la guarda de la orden CERRADA mira esta columna, no el estado.
+      cerradaEn: true,
       lineas: { select: { idColor: true, pack: true, tallas: { select: { idTalla: true } } } },
     },
   });
@@ -198,6 +210,8 @@ async function resolverOrden(
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada; no se le pueden capturar etapas.');
   }
+  // ⭐ 0.061: una orden CERRADA no admite captura nueva (su costo quedó congelado). Guarda ÚNICA.
+  exigirOrdenAbierta(orden, 'le pueden capturar recibos');
   const colores = new Set<number>();
   const tallasPorColor = new Map<number, Set<number>>();
   const packsPorColor = new Map<number, Set<string>>();
@@ -887,11 +901,19 @@ export async function registrarReciboMaquila(
     // (3) EFECTO SOBRE EL KARDEX DE PT. Dos formas, según de dónde vengan las prendas (V1-E4b):
     //   • `devuelveAPt` — ya existían y estaban en TRÁNSITO (el envío las sacó del almacén porque el
     //     proceso va después de la costura): vuelven con un TRASPASO tránsito → primeras/segundas.
-    //     Las que no vuelvan se quedan en tránsito, vivas, a cargo del maquilero (§Post-F9.61).
+    //     Las que no vuelvan se quedan en tránsito, vivas, a cargo del maquilero (§Post-F9.61) —
+    //     ése es el FALTANTE, que se le cobra al cerrar la orden con él (fila 0.109).
     //   • `creaPt` — el proceso las CREA (costura): ENTRADA nueva al kardex.
     // En ambas, primeras y segundas van a SU almacén (la reclasificación es un movimiento, no una
     // edición de saldo — D3) y el motor abre todo dentro de ESTA transacción ({ tx }).
-    if (meteAPt) {
+    // ⭐ 0.061 (§Post-F9.154(a)): las INCOMPLETAS salen del TRÁNSITO como MERMA, en esta misma
+    // transacción. Sólo cuando el envío sacó PRENDA TERMINADA (`devuelveAPt`): si el proceso es la
+    // costura, esas piezas nunca entraron al kardex de PT y no hay de dónde sacarlas.
+    // ⚠️ Es INDEPENDIENTE de `meteAPt`, que exige `totalRecibido > 0`: un recibo puede traer SÓLO
+    // incompletas (el maquilero devolvió las 5 que no pudo coser y nada más) y ésas también salen.
+    const mermaIncompletas = devuelveAPt && totalIncompletas > 0;
+
+    if (meteAPt || mermaIncompletas) {
       const idModelo = await modeloDeLaOrden(tx, datos.idOrden);
       // PT por orden (F6-E2): lo que entra queda etiquetado con la orden del recibo.
       //
@@ -926,7 +948,28 @@ export async function registrarReciboMaquila(
       const lineasPrimeras = plegarPorCelda((c) => c.primeras);
       const lineasSegundas = plegarPorCelda((c) => c.segundas);
 
-      if (devuelveAPt) {
+      // ⭐ MERMA de las incompletas (0.061): salen del TRÁNSITO y no entran a ningún lado. Se hace
+      // ANTES de devolver las buenas a propósito — así, si el tránsito no tuviera las piezas, el
+      // recibo se rechaza entero (A2) en vez de dejar la mitad del movimiento hecha.
+      if (mermaIncompletas) {
+        await darSalidaMermaIncompletas(sesion, tx, {
+          idEmpresa: orden.idEmpresa,
+          idModelo,
+          idOrdenBucket,
+          fecha: aDateColumna(datos.fecha),
+          origenTipo: ORIGEN.reciboMaquila,
+          origenId: String(recibo.id),
+          celdas: plegarPorCelda((c) => c.incompletas).map((l) => ({
+            idColor: l.idColor,
+            idTalla: l.idTalla,
+            cantidad: l.cantidad,
+          })),
+        });
+      }
+
+      // Con `meteAPt` en falso el recibo trae PURAS incompletas: la merma ya salió y no hay nada
+      // bueno que inventariar.
+      if (meteAPt && devuelveAPt) {
         const devolver = async (
           idAlmacenDestino: number | null,
           lineas: LineaMovimientoPt[],
@@ -949,7 +992,7 @@ export async function registrarReciboMaquila(
         };
         await devolver(idAlmacenPrimeras, lineasPrimeras);
         await devolver(idAlmacenSegundas, lineasSegundas);
-      } else {
+      } else if (meteAPt) {
         const tipoEntrada = await tipoPorCodigo(tx, COD_ENTRADA_MAQUILA);
         if (lineasPrimeras.length > 0 && idAlmacenPrimeras !== null) {
           await registrarMovimientoPtMotor(
@@ -1031,6 +1074,9 @@ export async function registrarReciboMaquila(
         // A7: las incompletas son parte del acto y NO están en `totalRecibido` — si no se anotan
         // aparte, la bitácora del recibo no dice todo lo que el maquilero entregó.
         totalIncompletas,
+        // A7 (0.061): si las incompletas SALIERON del tránsito como merma, el renglón lo dice —
+        // es un movimiento de inventario que nació de este recibo y hay que poder rastrearlo.
+        mermaIncompletas,
         cargoEsMa: totalRecibido > 0,
       },
     });
@@ -1119,6 +1165,9 @@ export async function cancelarReciboMaquila(
     if (recibo.canceladoEn !== null) {
       throw new ErrorConflicto(`El recibo ${Number(recibo.folio)} ya está cancelado.`);
     }
+    // ⭐ 0.061: cancelar un recibo mueve el inventario Y el divisor del costo. Sobre una orden
+    // CERRADA hay que reabrirla primero (acto inverso auditado, no una edición).
+    await exigirOrdenAbiertaPorId(tx, recibo.idOrden, 'puede cancelar su recibo');
 
     // Serializa la orden para que la reversión del kardex y la verificación del cargo sean coherentes.
     await bloquearEtapasDeOrden(tx, sesion.idEmpresaActiva, recibo.idOrden);

@@ -166,12 +166,20 @@ enviado = primeras + segundas + faltantes + incompletas
   la cola de validación de cargos, los recibos semanales y el PDF del recibo. Detalle en
   `docs/modulos/esma.md`.
 
-- ⚠️ **Deuda con nombre:** con proceso DESPUÉS de la costura (envío de prenda ya terminada, V1-E4b),
-  las incompletas **se quedan en el almacén Tránsito** — no vuelven a primeras ni a segundas porque no
-  se inventarían. Coherente con *«se pierden esas prendas»*, pero deja saldo vivo ahí. Darles salida
-  pide un tipo de movimiento nuevo (¿merma?) y **es decisión de negocio sin tomar**. Caso marginal (la
-  incompleta casi siempre aparece en el recibo de costura, donde no hay tránsito). Ver
-  `HOJA-DE-RUTA.md` §4.
+- ⭐ **La incompleta SALE del tránsito como MERMA (0.061 — §Post-F9.154(a); antes era deuda).** Con
+  proceso DESPUÉS de la costura (envío de prenda ya terminada, V1-E4b) las incompletas **se quedaban
+  en el almacén Tránsito para siempre**: no volvían a primeras ni a segundas porque no se inventarían,
+  y darles salida pedía un tipo de movimiento nuevo que era decisión de negocio sin tomar. **Daniel la
+  tomó**: al registrar el recibo salen solas, con el tipo de movimiento `merma-incompletas`
+  (dirección `salida`), en la MISMA transacción y selladas con el origen del recibo — así que
+  **cancelar el recibo las devuelve al tránsito** con su inverso auditado (D3), sin código propio.
+  Con eso el WIP y el kardex vuelven a cuadrar: lo que queda vivo en tránsito es exactamente el
+  FALTANTE, que es lo que el WIP reclama.
+  - Sólo aplica cuando el envío sacó **prenda terminada**. En el recibo de costura las piezas nunca
+    entraron al kardex de PT, así que no hay de dónde sacarlas (y no hay merma que registrar).
+  - **No es retroactiva (REGLA 0-B):** lo capturado antes de 0.061 dejó sus piezas en tránsito y ahí
+    se quedan; si estorban se limpian con un movimiento manual de PT con su motivo.
+  - Estrenar esta versión pide **`SEED_ON_START=true`** (el tipo de movimiento es nuevo).
 
 ## ⭐⭐ Cerrar la orden con un maquilero: el FALTANTE por fin se puede cobrar (V1, fila 0.109)
 
@@ -273,10 +281,62 @@ un cobro por cada uno.
   lo consume (el despachador del auto-avance ignora en silencio los tipos que no conoce), y está puesto
   para que el **congelado del costo** (fila 0.061) se cuelgue de ahí sin rediseñar el acto.
 
+## ⭐⭐ CERRAR LA ORDEN ENTERA y congelar su costo (0.061 — §Post-F9.154(c))
+
+**No es lo mismo que cerrar con un maquilero** (§ de arriba, fila 0.109): aquél es por **orden ×
+maquilero × proceso** y salda un pendiente; éste es de la **ORDEN ENTERA** y no habla de nadie en
+particular. Se puede cerrar la orden sin haber cerrado con ningún maquilero, y al revés — aunque lo
+natural es saldar a los maquileros primero, porque la orden cerrada ya no lo deja hacer.
+
+**La pregunta que lo originó** (DANIEL): *«¿en qué momento se define que ya se cerró el costo? ¿O va
+cambiando?»* La respuesta medida era: **iba cambiando**. El DINERO se persistía
+(`CostoOrden.costoTotal`), pero la CANTIDAD del divisor se **re-sumaba en cada lectura**. Con el
+divisor en `cortado` casi no se notaba; al pasarlo a `recibido` (la otra mitad de 0.061) el costo
+unitario habría quedado **vivo hasta el último recibo, para siempre**.
+
+- **Es un ACTO EXPLÍCITO, nunca automático.** Un cierre por «ya se entregó el 100 %» no sirve, y lo
+  desmiente la decisión hermana: como los FALTANTES se cobran y las INCOMPLETAS se merman, esas
+  piezas **no vuelven** ⇒ una orden que perdió piezas nunca llega al 100 % y su costo no se
+  congelaría jamás. Lo cierra una persona, con permiso propio y bitácora.
+- **Dónde vive:** `backend/src/dominio/produccion/cierre-orden.ts` — `cerrarOrden` / `reabrirOrden` /
+  `exigirOrdenAbierta`. Rutas `POST /api/ordenes/{id}/cerrar` y `/reabrir`. En la UI, botón
+  **Cerrar/Reabrir** en la ficha de la orden (sin entrada de menú nueva).
+- **Qué guarda:** `Orden.cerradaEn` (⭐ **la verdad autoritativa**) + `cerradaPorId` + `motivoCierre`,
+  y `estado = cerrada`, que es su **espejo visible** (badge y filtros).
+- **`cerrada` NO redefine a `completa`.** `completa` habla de la completitud de la **CAPTURA**
+  (tallas + receta liberada + arte); `cerrada`, de que la orden **terminó**. Se puede cerrar una
+  `capturada`, y al reabrir el estado derivado **se vuelve a computar**. `cerrada`, igual que
+  `cancelada`, es **intocable** para los recálculos por requisitos.
+- **Congela el costo:** persiste `CostoOrden.cantidadBaseCongelada` + `costoUnitarioCongelado` +
+  `congeladoEn`. Desde ahí, la ficha de costeo y la lista de costos devuelven **eso**; las órdenes
+  abiertas siguen en vivo. Un cierre **no** recalcula, **no** costea lo que no estaba costeado, y
+  **no** toca kardex, WIP, EsMa ni RC.
+- **Cierra la puerta a la captura**, con **una sola guarda** aplicada en cada punto de escritura:
+  etapas (corte, envío, empaque) y su cancelación · recibos y su cancelación · entregas y su
+  cancelación · cierre con maquilero y su deshacer · guardar el costo · encabezado, matriz,
+  copiar-matriz, referencias y **cancelar la orden** · precio real de maquila · las mutaciones de la
+  receta congelada · y la **cancelación en cascada al cancelar su PEDIDO**, que escribe el estado de
+  las OPs directo y por eso lleva su propia comprobación (las nombra por folio y manda a reabrirlas).
+- **Siguen libres, y cada uno por su razón:** consultar e imprimir · los **comentarios** (una nota no
+  mueve ningún número) · los **adjuntos y las fotos** (son documentales) · `Orden.pagada`
+  (`esma/orden-pagada.ts`: dice si al maquilero ya se le pagó, un hecho de la cuenta del tercero que
+  no toca el costo de la orden ni su divisor) · y ⭐ **cerrar la receta** (`cerrarReceta`), que es la
+  ÚNICA operación de receta que una orden cerrada admite: si la orden se cierra con la receta
+  ABIERTA, ésa es la única forma de soltar el candado de la compra, y un candado que sólo se abre es
+  una trampa (ver `permitirOrdenNoViva` en `receta-orden.ts`). No toca ni un renglón ni un peso.
+- **Reversible sólo por reapertura auditada (D3):** `reabrirOrden`, **mismo permiso**, **motivo
+  obligatorio** (el del cierre es opcional: cerrar es el final normal de una orden). Lo congelado
+  **no se borra: se MARCA** (`descongeladoEn`), para que quede constancia de con qué números se
+  cerró. Cerrar dos veces se rechaza; una orden **cancelada** no se cierra.
+- **Estrenar esta versión pide `SEED_ON_START=true`** (permiso nuevo) **y las dos migraciones**
+  `20260904130000_estado_orden_cerrada` (sólo el valor del enum, en su propia transacción) y
+  `20260904130100_cerrar_la_orden_y_congelar_el_costo`.
+
 ## Permisos (RBAC, A4)
 
 `produccion.corte` · `produccion.envio` · `produccion.recibo` · `produccion.entrega` ·
-`produccion.cancelar` · `produccion.wip-ver` · `esma.cargo-validar`.
+`produccion.cancelar` · `produccion.wip-ver` · `esma.cargo-validar` · ⭐ **`ordenes.cerrar`** (0.061 —
+cerrar y reabrir la orden entera; el mismo permiso para las dos direcciones).
 
 ## El `generaEntradaPt` — qué decide, y qué NO decide
 

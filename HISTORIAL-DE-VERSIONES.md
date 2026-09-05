@@ -71,6 +71,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.114 · 5-sep-2026 · **en prueba** — **Cerrar la orden: el costo se congela, y la prenda incompleta sale como merma**
+
+### Qué se puede hacer ahora que antes no
+
+- **Cerrar una orden.** Antes no existía: los estados eran «capturada», «completa» y «cancelada», y
+  «completa» **nunca significó terminada** —quería decir que la captura estaba completa (tallas, receta,
+  arte)—. Ahora cerrar es un acto propio, con su permiso, su sello de quién y cuándo, y su motivo opcional.
+- **Al cerrar, el costo se congela.** Es la respuesta a lo que preguntó Daniel: *«¿en qué momento se define
+  que ya se cerró el costo, o va cambiando?»*. Va cambiando **hasta que se cierra**; de ahí en adelante el
+  unitario y la cantidad quedan sellados y ningún recibo posterior los mueve.
+- **Reabrir**, cuando de verdad haga falta: exige motivo, queda auditado, y el costo vuelve a estar vivo.
+- **La prenda que se quedó incompleta en el taller sale como merma**, automáticamente, con su movimiento de
+  almacén. Ya no queda colgada en tránsito esperando a alguien.
+
+### Qué cambió y puede sorprender
+
+- **El costo unitario ahora se reparte entre lo RECIBIDO, no entre lo cortado.** Es más fiel: lo que se
+  cortó y no volvió no debería abaratar la prenda. ⚠️ El cambio aplica **sólo hacia adelante**: las órdenes
+  que ya se costearon conservan la base con la que se calcularon, y nada las reescribe por detrás.
+- **Una orden cerrada se cierra de verdad**: no se le puede editar el encabezado, ni la matriz de tallas, ni
+  las referencias, ni el precio de maquila, ni la receta, ni cancelarla. Lo que sí se puede seguir haciendo:
+  consultarla, imprimirla, comentarla y adjuntarle archivos.
+- **Cerrarla dos veces se rechaza** (hay que reabrir primero): así nadie re-congela un costo distinto sin
+  darse cuenta. **Cancelar una orden cerrada también se rechaza** — antes eso dejaba dos finales a la vez.
+- Como las incompletas **no vuelven**, una orden que perdió piezas nunca llega al 100 % entregado. Por eso
+  el cierre es un acto de alguien y no algo que el sistema adivine.
+
+### Qué sigue pendiente o roto
+
+- Daniel tiene que **confirmar seis decisiones** que van con valor por omisión (están en `DECISIONES.md`
+  §Post-F9.200): quién puede cerrar y reabrir, qué queda bloqueado, si el motivo es obligatorio, y qué pasa
+  al cerrar una orden cancelada, al cerrar dos veces y al reabrir.
+- Nada de esto es retroactivo: las órdenes viejas no traen el dato y **no se les inventa**.
+
 ## 0.113 · 4-sep-2026 · **en prueba** — **Lo que espera tu decisión ya se ve junto al saldo**: los recibos por validar cuentan
 
 ### Qué se puede hacer ahora que antes no

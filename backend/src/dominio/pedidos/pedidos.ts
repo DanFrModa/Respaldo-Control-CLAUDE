@@ -50,6 +50,9 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+// ⭐ 0.061: la guarda ÚNICA de la orden CERRADA (`dominio/produccion/cierre-orden.ts`).
+import { exigirOrdenAbierta } from '../produccion/cierre-orden.js';
+
 import {
   filtroOrdenesVivasDeLineas,
   numerosProduccionPorLinea,
@@ -788,7 +791,9 @@ export async function cancelarPedido(
         estado: { not: 'cancelada' },
         pedidoLinea: { idPedido: id },
       },
-      select: { id: true, folio: true },
+      // ⭐ 0.061: `cerradaEn` es lo que decide si la orden admite escritura. Sin traerla, este
+      // barrido pisaba órdenes CERRADAS (ver abajo).
+      select: { id: true, folio: true, estado: true, cerradaEn: true },
       orderBy: { folio: 'asc' },
     });
 
@@ -799,8 +804,37 @@ export async function cancelarPedido(
           `El pedido ${Number(actual.folio)} tiene ${String(ordenesVivas.length)} orden(es) de producción VIVA(S) (${folios}): cancelarlo NO las detiene, se seguirían cortando. Cancélalas también (marca la opción y captura el motivo) o cancélalas una por una desde Órdenes.`,
         );
       }
+
+      // ⭐⭐ 0.061 — LA PUERTA 17, Y LA ÚNICA QUE ESCRIBÍA EN CASCADA (§Post-F9.154(c)).
+      //
+      // Este barrido cancela las OPs del pedido escribiendo `tx.orden.update` DIRECTO, sin pasar
+      // por `cancelarOrden`. Y su filtro es «no cancelada», así que una orden CERRADA entraba: se
+      // quedaba con `estado='cancelada'` y `cerradaEn` PUESTA a la vez —dos finales para la misma
+      // orden—, con el costo congelado todavía en vigor (`divisorCongelado` mira `cerradaEn`, no el
+      // estado). Y peor: la ficha esconde «Reabrir» cuando el estado es `cancelada`, así que la
+      // orden quedaba atrapada desde la pantalla; reabrirla por API le borraba la cancelación,
+      // porque el estado se vuelve a derivar de los requisitos. Es el mismo agujero que
+      // `realinearEstadoOrdenes` ya tenía tapado (`notIn: ['cancelada','cerrada']`), destapado en
+      // el otro extremo del sistema.
+      //
+      // 🔑 SE RECHAZA NOMBRÁNDOLAS, que es lo que hace el resto del sistema con una orden cerrada
+      // (no se la salta en silencio): quien cancela el pedido tiene que decidir a conciencia sobre
+      // una orden que YA terminó su vida administrativa y cuyo costo está cerrado. Reabrirla es un
+      // acto con permiso y bitácora, y tiene que seguir siéndolo también por este camino.
+      const cerradas = ordenesVivas.filter((o) => o.cerradaEn !== null);
+      if (cerradas.length > 0) {
+        const foliosCerrados = cerradas.map((o) => String(Number(o.folio))).join(', ');
+        throw new ErrorConflicto(
+          `El pedido ${Number(actual.folio)} tiene ${String(cerradas.length)} orden(es) CERRADA(S) (${foliosCerrados}): su costo quedó congelado y no se pueden cancelar en cascada. Reábrelas primero (permiso "ordenes.cerrar" — queda auditado) o cancela el pedido sin arrastrar las OPs.`,
+        );
+      }
+
       const motivoOrden = `Pedido ${Number(actual.folio)} cancelado: ${motivo}`;
       for (const orden of ordenesVivas) {
+        // Cinturón: la comprobación de arriba da el mensaje bueno (las nombra TODAS de una vez);
+        // ésta es la guarda ÚNICA del sistema, y sigue aquí para que un cambio futuro en la
+        // consulta no vuelva a abrir el agujero en silencio.
+        exigirOrdenAbierta(orden, 'puede cancelar en cascada al cancelar su pedido');
         await tx.orden.update({
           where: { id: orden.id },
           data: {
