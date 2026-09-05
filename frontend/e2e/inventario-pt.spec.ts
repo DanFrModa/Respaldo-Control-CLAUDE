@@ -100,5 +100,8 @@ test.describe('Inventario PT operable (F3-E3)', () => {
     // La tabla del kardex aparece con renglones (entrada + las dos patas del traspaso).
     await expect(page.getByTestId('kardex-tabla')).toBeVisible();
     await expect(page.getByText(/Inventario Inicial/).first()).toBeVisible();
+    // Fila 0.138 — el kardex es SIEMPRE de un periodo (aquí, el de por omisión): la pantalla dice
+    // cuál. Sin esta línea, una lista corta se leería como «no hay más movimientos».
+    await expect(page.getByTestId('kardex-periodo')).toBeVisible();
   });
 });

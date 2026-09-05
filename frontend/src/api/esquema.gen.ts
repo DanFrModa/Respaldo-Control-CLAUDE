@@ -47513,6 +47513,12 @@ export interface paths {
           idAlmacen?: number;
           /** @description Filtra por una orden de producción (F6-E2). */
           idOrden?: number;
+          /** @description Primer día del periodo (YYYY-MM-DD), INCLUSIVE. */
+          desde?: string;
+          /** @description Último día del periodo (YYYY-MM-DD), INCLUSIVE. */
+          hasta?: string;
+          /** @description Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`). */
+          limite?: number;
         };
         header?: never;
         path?: never;
@@ -47520,7 +47526,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Kardex de un modelo (movimientos con saldo corrido). */
+        /** @description Kardex de un modelo en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen exactamente qué pedazo se está viendo. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -47531,6 +47537,37 @@ export interface paths {
               idModelo: number;
               /** @description Código del modelo. */
               modelo: string;
+              /** @description Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive). */
+              desde: string;
+              /** @description Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope. */
+              hasta: string | null;
+              /** @description true cuando `desde` lo puso el dominio porque nadie pidió periodo. */
+              ventanaPorOmision: boolean;
+              /** @description Tope de renglones que se aplicó. */
+              limite: number;
+              /** @description true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde). */
+              truncado: boolean;
+              /** @description Saldo de los artículos del periodo justo ANTES del primer renglón devuelto. */
+              saldosIniciales: {
+                /** @description Color del artículo. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Talla del artículo. */
+                idTalla: number;
+                /** @description Etiqueta de la talla. */
+                etiquetaTalla: string;
+                /** @description Almacén del artículo. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Orden del artículo, o null (bucket sin orden). */
+                idOrden: number | null;
+                /** @description Folio de la orden, o null. */
+                folioOrden: number | null;
+                /** @description Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false). */
+                saldo: number;
+              }[];
               /** @description Movimientos en orden cronológico. */
               renglones: {
                 /** @description Id del movimiento. */

@@ -57,6 +57,7 @@ import { z } from 'zod';
 import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { ZONA_DEL_NEGOCIO } from '../../comun/fecha-negocio.js';
 import {
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
   exigirExistenciaPt,
@@ -648,14 +649,123 @@ const esquemaConsultaExistenciasPt = z.object({
   agrupar: z.enum(['color-talla']).optional(),
 });
 
-/** Forma de DOMINIO de los filtros del kardex por modelo (ya coaccionados). */
-const esquemaConsultaKardexPt = z.object({
-  idModelo: z.number().int().positive(),
-  idColor: z.number().int().positive().optional(),
-  idTalla: z.number().int().positive().optional(),
-  idAlmacen: z.number().int().positive().optional(),
-  idOrden: z.number().int().positive().optional(),
-});
+// ── El PERIODO del kardex (fila 0.138) ──────────────────────────────────────────────────────────
+//
+// Daniel, en el repaso de inventarios: *«con diez años cargados, pedirlo trae todo»*. Y era literal:
+// medido contra una base sintética de 10 años (100 000 movimientos / 500 000 renglones de detalle),
+// `kardexPt` de UN modelo devolvía **25 000 renglones y 8.3 MB de JSON** en una sola respuesta.
+//
+// La cura tiene dos piezas, y las DOS viven aquí (A1: ni la ruta ni la pantalla deciden nada):
+//  1. Un PERIODO (`desde`/`hasta`) que se resuelve EN SERVIDOR (`WHERE movimientos.fecha …`), nunca
+//     filtrando en el cliente lo que ya llegó.
+//  2. Una VENTANA POR OMISIÓN cuando nadie pide periodo: sin esto, la pantalla que hoy no manda
+//     fechas seguiría pidiendo los diez años y el defecto seguiría vivo para quien no toque el
+//     filtro — que es justo la mayoría.
+//
+// Y como el rango solo no acota nada (quien escriba `desde=2016-01-01` vuelve al punto de partida),
+// hay además un TOPE DURO de renglones. Los tres datos —periodo efectivo, tope y si hubo corte—
+// VIAJAN EN LA RESPUESTA, para que la pantalla pueda decirlo: nadie debe creer que está viendo todo
+// cuando está viendo un pedazo.
+
+/**
+ * Meses de la ventana por omisión cuando NADIE pide `desde`.
+ *
+ * Doce, no tres ni uno: un año es el ciclo completo del negocio (las dos temporadas y la
+ * comparación contra el mismo mes del año pasado), y de un plumazo deja fuera el ~90 % de un
+ * histórico de diez años. Un periodo más largo se pide a mano — y entonces es una decisión
+ * consciente, no el precio por omisión de abrir la pantalla.
+ */
+export const MESES_VENTANA_KARDEX_PT = 12;
+
+/** Renglones que devuelve el kardex si el llamador no pide otro tope. */
+export const RENGLONES_KARDEX_PT_POR_OMISION = 1000;
+
+/** Tope DURO de renglones: ni pidiéndolo se pasa de aquí (es el techo que el rango no garantiza). */
+export const TOPE_RENGLONES_KARDEX_PT = 5000;
+
+/**
+ * Forma de DOMINIO de los filtros del kardex por modelo (ya coaccionados).
+ *
+ * **Se EXPORTA para que el contrato pueda compararse contra él** (`contrato/esquemas/
+ * tope-kardex-honesto.test.ts`), no porque nadie más lo use: es el objeto que de verdad valida, y
+ * una prueba que interrogue a un intermediario «equivalente» es un guardián ciego (la cicatriz está
+ * escrita en `contrato/esquemas/paginacion-honesta.test.ts`).
+ */
+export const esquemaConsultaKardexPt = z
+  .object({
+    idModelo: z.number().int().positive(),
+    idColor: z.number().int().positive().optional(),
+    idTalla: z.number().int().positive().optional(),
+    idAlmacen: z.number().int().positive().optional(),
+    idOrden: z.number().int().positive().optional(),
+    /** Primer día del periodo (YYYY-MM-DD), INCLUSIVE. */
+    desde: z.iso.date({ error: 'La fecha «desde» no es válida (YYYY-MM-DD)' }).optional(),
+    /** Último día del periodo (YYYY-MM-DD), INCLUSIVE. */
+    hasta: z.iso.date({ error: 'La fecha «hasta» no es válida (YYYY-MM-DD)' }).optional(),
+    limite: z
+      .number()
+      .int()
+      .min(1)
+      .max(TOPE_RENGLONES_KARDEX_PT)
+      .default(RENGLONES_KARDEX_PT_POR_OMISION),
+  })
+  .refine((f) => f.desde === undefined || f.hasta === undefined || f.desde <= f.hasta, {
+    error: 'El periodo está al revés: «desde» no puede ser posterior a «hasta».',
+    path: ['desde'],
+  });
+
+/** El periodo que el kardex REALMENTE consultó (lo que viaja de vuelta a la pantalla). */
+export interface VentanaKardexPt {
+  /** Primer día consultado (YYYY-MM-DD, inclusive). SIEMPRE hay uno: nunca se lee sin piso. */
+  desde: string;
+  /** Último día consultado (YYYY-MM-DD, inclusive), o `null` si no se puso techo. */
+  hasta: string | null;
+  /** `true` cuando el `desde` lo puso esta función porque nadie pidió periodo. */
+  porOmision: boolean;
+}
+
+/** El día de HOY tal como lo vive el negocio (México), en YYYY-MM-DD. */
+function hoyDelNegocio(ahora: Date): string {
+  // `en-CA` da exactamente `YYYY-MM-DD`; la zona se toma de `comun/fecha-negocio` para no tener
+  // dos husos distintos en el sistema (el servidor corre en UTC y la gente captura en -06:00).
+  return ahora.toLocaleDateString('en-CA', { timeZone: ZONA_DEL_NEGOCIO });
+}
+
+/**
+ * Resuelve el PERIODO del kardex. Función PURA (por eso se prueba sin base de datos).
+ *
+ * Reglas, y son las que la respuesta declara:
+ *  • Los dos extremos son INCLUSIVOS: un movimiento fechado el mismo día que `hasta` SÍ entra
+ *    (`fecha` es una columna `date`, así que no hay trampa de horas).
+ *  • Si NO viene `desde`, se pone uno: {@link MESES_VENTANA_KARDEX_PT} meses hacia atrás desde
+ *    `hasta` si lo hay, o desde hoy si no. Es decir, **el periodo SIEMPRE tiene piso**, y por eso
+ *    pedir el kardex no puede volver a traer diez años.
+ *  • Si viene `hasta` sin `desde`, la ventana son los 12 meses que TERMINAN en `hasta` (no «todo
+ *    hasta esa fecha»): la garantía de piso vale también ahí.
+ *  • Si no viene `hasta`, no se pone techo — un movimiento con fecha futura (los hay: se capturan
+ *    con la fecha del documento) sigue apareciendo, que es lo que uno espera al abrir el kardex.
+ */
+export function resolverVentanaKardexPt(
+  filtros: { desde?: string | undefined; hasta?: string | undefined },
+  ahora: Date = new Date(),
+): VentanaKardexPt {
+  const hasta = filtros.hasta ?? null;
+  if (filtros.desde !== undefined) {
+    return { desde: filtros.desde, hasta, porOmision: false };
+  }
+  const ancla = filtros.hasta ?? hoyDelNegocio(ahora);
+  const [anio, mes, dia] = ancla.split('-').map(Number);
+  // Aritmética de CALENDARIO en UTC (nada de restar milisegundos): un mes no dura siempre lo mismo.
+  const piso = new Date(
+    Date.UTC(anio as number, (mes as number) - 1 - MESES_VENTANA_KARDEX_PT, dia),
+  );
+  return { desde: piso.toISOString().slice(0, 10), hasta, porOmision: true };
+}
+
+/** Convierte un YYYY-MM-DD del periodo al `Date` que espera una columna `date` de Postgres. */
+function diaDelPeriodo(iso: string): Date {
+  return new Date(`${iso}T00:00:00.000Z`);
+}
 
 /** Parámetros de la consulta de existencias (forma de dominio). */
 export type ParametrosExistenciasPt = z.input<typeof esquemaConsultaExistenciasPt>;
@@ -810,13 +920,44 @@ export type ParametrosKardexPt = z.input<typeof esquemaConsultaKardexPt>;
 
 /**
  * KARDEX por MODELO (doc 04-Inventarios — IPT_Kardex): lista CRONOLÓGICA de los movimientos de PT del
- * modelo, con SALDO CORRIDO (running total) por artículo. Opcionalmente filtra color/talla/almacén.
- * Lee `MovimientoDetPt` DIRECTO (sin la vista — la vista no preserva el orden cronológico). El saldo
- * corrido se calcula EN MEMORIA por artículo (idColor:idTalla:idAlmacen) en orden (folio asc): un
- * artículo concreto es lo único que comparte saldo; el saldo de cada renglón es el del artículo de
- * ESE renglón tras aplicar su efecto. Los movimientos cancelados se MARCAN pero su inverso ya
- * neutraliza el saldo (ambos aparecen en el kardex). Permiso `inventario-pt.ver` (A4); empresa activa
- * (A9).
+ * modelo EN UN PERIODO, con SALDO CORRIDO (running total) por artículo. Opcionalmente filtra
+ * color/talla/almacén/orden. Lee `MovimientoDetPt` DIRECTO (sin la vista — la vista no preserva el
+ * orden cronológico). El saldo corrido se calcula EN MEMORIA por artículo
+ * (idColor:idTalla:idAlmacen:idOrden) en orden (folio asc): un artículo concreto es lo único que
+ * comparte saldo; el saldo de cada renglón es el del artículo de ESE renglón tras aplicar su efecto.
+ * Los movimientos cancelados se MARCAN pero su inverso ya neutraliza el saldo (ambos aparecen en el
+ * kardex). Permiso `inventario-pt.ver` (A4); empresa activa (A9). SOLO LEE (D3 intacto).
+ *
+ * ⭐ FILA 0.138 — EL PERIODO, y por qué el saldo sigue siendo verdad. El filtro de fechas se aplica
+ * en el `WHERE` (servidor), NUNCA recortando en el cliente lo que ya llegó; y si nadie pide periodo
+ * se aplica la ventana por omisión de {@link resolverVentanaKardexPt}. Pero recortar por fecha, a
+ * secas, ROMPERÍA la columna «Saldo»: el primer renglón de la ventana arrancaría en cero y todos los
+ * saldos de abajo serían falsos. Por eso el periodo trae de la mano su SALDO ANTERIOR: una sola
+ * consulta agregada suma, por artículo, todo lo que pasó ANTES de `desde`, y con ese número se
+ * siembra el saldo corrido. Así cada saldo que se enseña es el saldo de verdad del artículo, no el
+ * del pedazo que se está mirando.
+ *
+ * Y como un rango que el usuario escribe no acota nada por sí solo (`desde=2016-01-01` es otra vez
+ * todo el histórico), hay un TOPE DURO de renglones: se piden `limite + 1` y, si vino de más, se
+ * corta el excedente y se marca `truncado`.
+ *
+ * ⭐⭐ EL CORTE SE LLEVA LO VIEJO, NO LO NUEVO — y por qué eso obligó a mover el saldo anterior.
+ * La primera versión de esta función pedía `folio ASC` y tiraba la cola. Parecía inocuo porque se
+ * midió contra una base sintética cuyos folios NO guardaban relación con la fecha (correlación
+ * medida: −0.0007). Pero el folio es la **secuencia atómica por empresa (A3)**: en producción crece
+ * con el tiempo, o sea que `ORDER BY folio ASC LIMIT 1000` devuelve **los mil MÁS VIEJOS de la
+ * ventana**. Medido sobre una base con folios cronológicos (25 000 renglones, 2 340 en los últimos
+ * doce meses): la pantalla decía «Periodo: 2025-09-05 en adelante» y enseñaba **2025-09-05 →
+ * 2026-02-07**, escondiendo los siete meses recientes — justo lo que uno abre un kardex a mirar.
+ *
+ * Ahora se pide `folio DESC` y se invierte: **lo que se ve es el FINAL del periodo**. El precio es
+ * que el saldo anterior ya no puede ser «lo de antes de `desde`» (habría que sumarle además los
+ * renglones que el corte se saltó), así que pasa a ser algo más simple y más fuerte: **lo que el
+ * artículo traía justo antes del PRIMER RENGLÓN QUE SE VE**, calculado con la MISMA llave de orden
+ * que la lista (`(folio, id)`), no con la fecha. Cuando no hay corte, ese punto es el inicio del
+ * periodo y el número es idéntico al de antes; cuando lo hay, sigue siendo exacto. Usar la misma
+ * llave para ordenar y para cortar es lo que hace que dos movimientos del mismo día a ambos lados
+ * del límite no se cuenten dos veces ni se pierdan.
  */
 export async function kardexPt(
   sesion: SesionUsuario,
@@ -836,6 +977,10 @@ export async function kardexPt(
     throw new ErrorNoEncontrado('Modelo', filtros.idModelo);
   }
 
+  const ventana = resolverVentanaKardexPt(filtros);
+  const desdeDia = diaDelPeriodo(ventana.desde);
+  const hastaDia = ventana.hasta === null ? undefined : diaDelPeriodo(ventana.hasta);
+
   const detalles = await cliente.movimientoDetPt.findMany({
     where: {
       idModelo: filtros.idModelo,
@@ -845,9 +990,15 @@ export async function kardexPt(
       movimiento: {
         idEmpresa,
         ...(filtros.idAlmacen === undefined ? {} : { idAlmacen: filtros.idAlmacen }),
+        // El PERIODO, resuelto en SERVIDOR. Los dos extremos inclusivos: `fecha` es `date`, así que
+        // `lte` del último día lo incluye entero (no hay medianoche que se coma el día).
+        fecha: { gte: desdeDia, ...(hastaDia === undefined ? {} : { lte: hastaDia }) },
       },
     },
     select: {
+      // El `id` del detalle NO es decorativo: junto con el folio forma la llave de orden, y con
+      // ella se ancla el saldo anterior en el punto exacto donde arranca la lista.
+      id: true,
       idColor: true,
       idTalla: true,
       idOrden: true,
@@ -870,14 +1021,49 @@ export async function kardexPt(
         },
       },
     },
-    // Orden cronológico estable: por folio (secuencia atómica por empresa, A3), luego por id de
-    // detalle para desempatar renglones del mismo movimiento.
-    orderBy: [{ movimiento: { folio: 'asc' } }, { id: 'asc' }],
+    // ⭐ DESCENDENTE a propósito (ver el encabezado): cuando el periodo no cabe en `limite`, lo que
+    // se conserva es el FINAL. La llave es la misma de siempre —folio (secuencia atómica por
+    // empresa, A3) y luego el id del detalle para desempatar renglones del mismo movimiento—, sólo
+    // que recorrida al revés; la lista se invierte abajo y sale igual de cronológica.
+    orderBy: [{ movimiento: { folio: 'desc' } }, { id: 'desc' }],
+    // Uno de más: es la forma barata de saber que hay más SIN pagar un `count` sobre diez años.
+    take: filtros.limite + 1,
   });
 
-  // Saldo corrido por artículo (color:talla:almacén): el efecto se aplica por la dirección.
-  const saldoPorArticulo = new Map<string, number>();
-  const renglones: KardexPtRenglon[] = detalles.map((d) => {
+  const truncado = detalles.length > filtros.limite;
+  // Los `limite` MÁS NUEVOS, devueltos en orden cronológico (el `slice` ya copia: no se muta).
+  const enPeriodo = detalles.slice(0, filtros.limite).reverse();
+
+  // SALDO ANTERIOR por artículo: lo que cada uno traía JUSTO ANTES del primer renglón que se ve.
+  // Es lo que hace verdadera la columna «Saldo» cuando el kardex viene recortado —por fechas o por
+  // el tope—. Sin renglones no hay punto de anclaje NI nada que explicar: se ahorra la consulta.
+  const ancla = enPeriodo[0];
+  const saldosPrevios =
+    ancla === undefined
+      ? []
+      : await saldosAntesDelPeriodo(cliente, {
+          idEmpresa,
+          idModelo: filtros.idModelo,
+          idColor: filtros.idColor,
+          idTalla: filtros.idTalla,
+          idAlmacen: filtros.idAlmacen,
+          idOrden: filtros.idOrden,
+          desde: desdeDia,
+          hasta: hastaDia,
+          anclaFolio: ancla.movimiento.folio,
+          anclaIdDetalle: ancla.id,
+        });
+
+  // Saldo corrido por artículo (color:talla:almacén:orden), SEMBRADO con el saldo anterior.
+  const saldoPorArticulo = new Map<string, number>(
+    saldosPrevios.map((s) => [
+      claveArticuloPt(s.idColor, s.idTalla, s.idAlmacen, s.idOrden),
+      s.saldo,
+    ]),
+  );
+  const articulosDelPeriodo = new Set<string>();
+
+  const renglones: KardexPtRenglon[] = enPeriodo.map((d) => {
     const m = d.movimiento;
     const esEntrada = m.tipoMov.direccion === DireccionMovimiento.entrada;
     const esSalida = m.tipoMov.direccion === DireccionMovimiento.salida;
@@ -886,7 +1072,8 @@ export async function kardexPt(
 
     // PT por orden (F6-E2): el saldo corrido es por artículo×ALMACÉN×ORDEN (el bucket "sin orden"
     // —`id_orden` NULL— lleva su propio saldo, separado de las prendas con orden).
-    const claveArt = `${d.idColor}:${d.idTalla}:${m.idAlmacen}:${d.idOrden ?? 'sin'}`;
+    const claveArt = claveArticuloPt(d.idColor, d.idTalla, m.idAlmacen, d.idOrden);
+    articulosDelPeriodo.add(claveArt);
     const saldoPrevio = saldoPorArticulo.get(claveArt) ?? 0;
     const saldo = saldoPrevio + entrada - salida;
     saldoPorArticulo.set(claveArt, saldo);
@@ -915,7 +1102,176 @@ export async function kardexPt(
     };
   });
 
-  return { idModelo: modelo.id, modelo: modelo.codigo, renglones };
+  return {
+    idModelo: modelo.id,
+    modelo: modelo.codigo,
+    desde: ventana.desde,
+    hasta: ventana.hasta,
+    ventanaPorOmision: ventana.porOmision,
+    limite: filtros.limite,
+    truncado,
+    // Sólo los artículos que SE MOVIERON en el periodo: son los que la tabla enseña y los únicos
+    // cuyo saldo hay que poder explicar. Lo que no se movió no es kardex del periodo — es
+    // existencia, y para eso está la pantalla de Existencias.
+    saldosIniciales: saldosPrevios.filter((s) =>
+      articulosDelPeriodo.has(claveArticuloPt(s.idColor, s.idTalla, s.idAlmacen, s.idOrden)),
+    ),
+    renglones,
+  };
+}
+
+/** La llave del saldo corrido: un artículo es color×talla×almacén×orden (el NULL es su propio cubo). */
+function claveArticuloPt(
+  idColor: number,
+  idTalla: number,
+  idAlmacen: number,
+  idOrden: number | null,
+): string {
+  return `${String(idColor)}:${String(idTalla)}:${String(idAlmacen)}:${idOrden === null ? 'sin' : String(idOrden)}`;
+}
+
+/** Filtros con los que se calcula el saldo anterior (los MISMOS del kardex, más el punto de corte). */
+interface FiltrosSaldoAnterior {
+  idEmpresa: number;
+  idModelo: number;
+  idColor?: number | undefined;
+  idTalla?: number | undefined;
+  idAlmacen?: number | undefined;
+  idOrden?: number | undefined;
+  /** Primer día del periodo. Todo lo ESTRICTAMENTE anterior a este día es «antes del periodo». */
+  desde: Date;
+  /** Último día del periodo, o `undefined` si no hay techo. */
+  hasta?: Date | undefined;
+  /** Folio del PRIMER renglón que se va a enseñar (el punto donde arranca el saldo corrido). */
+  anclaFolio: bigint;
+  /** Id del detalle de ese mismo renglón: desempata los renglones del mismo movimiento. */
+  anclaIdDetalle: number;
+}
+
+/**
+ * SALDO ANTERIOR por artículo: Σ(cantidad·signo) de todo lo que ese artículo movió ANTES del punto
+ * donde arranca la lista (D3 — la existencia siempre es suma de movimientos, nunca un saldo
+ * guardado). Ese punto son dos cosas a la vez, y por eso la condición tiene dos ramas:
+ *
+ *  1. **Todo lo anterior al periodo** (`fecha < desde`) — el saldo de apertura de siempre.
+ *  2. **Lo del periodo que el TOPE dejó fuera por arriba** (dentro del periodo, pero con
+ *     `(folio, id)` anterior al primer renglón visible). Cuando no hubo corte esta rama está vacía
+ *     y el resultado es idéntico al del punto 1.
+ *
+ * Las dos ramas son excluyentes (una mira `fecha <`, la otra `fecha >=`), así que nada se cuenta
+ * dos veces. Y la segunda usa **la misma llave con la que la lista se ordena y se corta**, no la
+ * fecha: es lo que evita que dos movimientos del mismo día a ambos lados del límite se dupliquen o
+ * se pierdan.
+ *
+ * ⚠️ **A9 y el MODELO son de CORRECCIÓN; color/talla/almacén/orden son de RENDIMIENTO.** La llave de
+ * agrupación es color×talla×almacén×orden, así que un renglón de otro color cae en OTRO grupo y el
+ * llamador lo descarta; pero `id_empresa` y `id_modelo` **no** están en esa llave: quitarlos sumaría
+ * los movimientos de otra empresa o de otro modelo DENTRO del mismo grupo y todos los saldos de la
+ * columna mentirían a la vez. Por eso esos dos tienen prueba que muere al quitarlos y los otros
+ * cuatro no pueden tenerla — se dice aquí en vez de fingirla.
+ *
+ * Va en SQL crudo a propósito: el signo lo da `tipos_movimiento_inventario.direccion`, que cuelga
+ * del encabezado `movimientos`, y Prisma no sabe agrupar por columnas de una relación. La suma es
+ * la MISMA expresión que aplica el saldo corrido de arriba (entrada suma, salida resta, `traspaso`
+ * no mueve saldo: sus dos patas se registran como tipos de dirección salida/entrada). Se agrega en
+ * un CTE y los nombres se pegan DESPUÉS, para que los JOIN de catálogo trabajen sobre el puñado de
+ * grupos y no sobre el histórico entero.
+ */
+async function saldosAntesDelPeriodo(
+  cliente: ReturnType<typeof clienteLectura>,
+  filtros: FiltrosSaldoAnterior,
+): Promise<KardexPtLista['saldosIniciales']> {
+  // El periodo, tal como lo aplica la lista (mismos bordes inclusivos).
+  const dentroDelPeriodo =
+    filtros.hasta === undefined
+      ? Prisma.sql`m."fecha" >= ${filtros.desde}::date`
+      : Prisma.sql`m."fecha" >= ${filtros.desde}::date AND m."fecha" <= ${filtros.hasta}::date`;
+
+  const condiciones: Prisma.Sql[] = [
+    Prisma.sql`d."id_modelo" = ${filtros.idModelo}`,
+    Prisma.sql`m."id_empresa" = ${filtros.idEmpresa}`,
+    // Rama 1: antes del periodo. Rama 2: dentro del periodo pero antes del primer renglón visible
+    // (lo que el tope se llevó por arriba). Excluyentes entre sí.
+    Prisma.sql`(
+      m."fecha" < ${filtros.desde}::date
+      OR (
+        ${dentroDelPeriodo}
+        AND (m."folio", d."id") < (${filtros.anclaFolio}::bigint, ${filtros.anclaIdDetalle}::int)
+      )
+    )`,
+  ];
+  if (filtros.idColor !== undefined)
+    condiciones.push(Prisma.sql`d."id_color" = ${filtros.idColor}`);
+  if (filtros.idTalla !== undefined)
+    condiciones.push(Prisma.sql`d."id_talla" = ${filtros.idTalla}`);
+  if (filtros.idOrden !== undefined)
+    condiciones.push(Prisma.sql`d."id_orden" = ${filtros.idOrden}`);
+  if (filtros.idAlmacen !== undefined)
+    condiciones.push(Prisma.sql`m."id_almacen" = ${filtros.idAlmacen}`);
+  const where = Prisma.join(condiciones, ' AND ');
+
+  const filas = await cliente.$queryRaw<
+    {
+      idColor: number;
+      color: string;
+      idTalla: number;
+      etiquetaTalla: string;
+      idAlmacen: number;
+      almacen: string;
+      idOrden: number | null;
+      folioOrden: bigint | null;
+      saldo: bigint;
+    }[]
+  >(Prisma.sql`
+    WITH previos AS (
+      SELECT
+        d."id_color"   AS "idColor",
+        d."id_talla"   AS "idTalla",
+        m."id_almacen" AS "idAlmacen",
+        d."id_orden"   AS "idOrden",
+        SUM(
+          CASE
+            WHEN t."direccion" = 'entrada' THEN d."cantidad"
+            WHEN t."direccion" = 'salida'  THEN -d."cantidad"
+            ELSE 0
+          END
+        )::bigint AS "saldo"
+      FROM "movimiento_det_pt" d
+      JOIN "movimientos" m ON m."id" = d."id_movimiento"
+      JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+      WHERE ${where}
+      GROUP BY 1, 2, 3, 4
+    )
+    SELECT
+      p."idColor",
+      c."nombre"   AS "color",
+      p."idTalla",
+      ta."etiqueta" AS "etiquetaTalla",
+      p."idAlmacen",
+      a."nombre"   AS "almacen",
+      p."idOrden",
+      o."folio"    AS "folioOrden",
+      p."saldo"
+    FROM previos p
+    JOIN "colores"   c  ON c."id"  = p."idColor"
+    JOIN "tallas"    ta ON ta."id" = p."idTalla"
+    JOIN "almacenes" a  ON a."id"  = p."idAlmacen"
+    LEFT JOIN "ordenes" o ON o."id" = p."idOrden"
+    WHERE p."saldo" <> 0
+    ORDER BY c."nombre" ASC, ta."orden" ASC, a."nombre" ASC, o."folio" ASC NULLS FIRST
+  `);
+
+  return filas.map((f) => ({
+    idColor: f.idColor,
+    color: f.color,
+    idTalla: f.idTalla,
+    etiquetaTalla: f.etiquetaTalla,
+    idAlmacen: f.idAlmacen,
+    almacen: f.almacen,
+    idOrden: f.idOrden,
+    folioOrden: f.folioOrden === null ? null : Number(f.folioOrden),
+    saldo: Number(f.saldo),
+  }));
 }
 
 /**

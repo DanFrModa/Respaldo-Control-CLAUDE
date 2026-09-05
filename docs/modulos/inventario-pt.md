@@ -38,6 +38,7 @@ del detalle, NUNCA la vista — ADR-0010 §3). `costoUnit` queda NULL en toda F3
   origen), cancelación (elige el tipo inverso `error-entrada`/`error-salida`), consulta de **existencias**
   (lee la vista `existencia_pt` — aquí SÍ, es consulta), **kardex por modelo** (saldo corrido en memoria)
   y por folio. Permisos `inventario-pt.ver` / `inventario-pt.mover` (A4).
+  **El kardex por modelo es SIEMPRE de un PERIODO (fila 0.138)** — ver la sección de abajo.
 - `impresos/impreso-traspaso-pt.ts` (fila 0.100) — **hoja del traspaso de PT** en PDF: el papel que
   acompaña las prendas que salen a otro almacén. Lleva el folio, la fecha, **quién lo registró**, los dos
   almacenes, el modelo, el **motivo** y la matriz color×talla con la orden de cada renglón. NO genera
@@ -49,6 +50,150 @@ del detalle, NUNCA la vista — ADR-0010 §3). `costoUnit` queda NULL en toda F3
   resuelve, sale «—» y la hoja no se degrada (D3).
 - `tipos-movimiento.ts` — catálogo de tipos de movimiento.
 - `migracion.ts` (F3-E6) — **modo migración** dedicado: `crearMovimientoIptMigrado` (ver §Migración).
+
+## El kardex por modelo es de un PERIODO (fila 0.138)
+
+Antes, pedir el kardex de un modelo traía **todo su histórico**. Medido contra una base sintética de diez
+años (100 000 movimientos / 500 000 renglones de detalle): **25 000 renglones y 8.3 MB de JSON en una sola
+respuesta**. Daniel lo dijo en el repaso de inventarios: *«con diez años cargados, pedirlo trae todo»*.
+
+Hoy `kardexPt` acota, y las reglas viven en el **dominio** (A1 — ni la ruta ni la pantalla deciden):
+
+| Regla | Qué hace |
+|---|---|
+| `desde` / `hasta` (YYYY-MM-DD) | Periodo, **ambos bordes INCLUSIVOS**. Se resuelve en el `WHERE` (`movimientos.fecha`), nunca recortando en el cliente lo que ya llegó. |
+| Ventana por omisión | Si no viene `desde`, se pone **hoy − 12 meses** (o `hasta` − 12 meses si sólo vino el techo). O sea: **el periodo SIEMPRE tiene piso**. Sin techo, para que un movimiento con fecha futura siga saliendo. |
+| Tope duro `limite` | 1 000 renglones por omisión, **máximo 5 000**. Un rango ancho (`desde=2016-01-01`) no puede volver a traer todo. |
+| ⭐ Dirección del corte | Cuando el periodo no cabe, se conserva **el FINAL** (`folio DESC` + inversión), no el principio. |
+
+⭐ **Y el periodo trae de la mano su SALDO ANTERIOR (`saldosIniciales`).** Recortar a secas rompe la
+columna «Saldo»: el primer renglón arrancaría en cero y todos los de abajo serían falsos. Una consulta
+agregada suma, por artículo (color×talla×almacén×orden), todo lo que ese artículo movió **antes del primer
+renglón visible** (D3: Σ de movimientos, jamás un saldo guardado) y con eso se siembra el saldo corrido.
+Son dos ramas: lo anterior a `desde`, más —si hubo corte— lo del periodo que quedó por arriba, comparado
+con **la misma llave `(folio, id)` con la que la lista se ordena y se corta**, no con la fecha; eso es lo
+que impide que dos movimientos del mismo día a ambos lados del límite se dupliquen o se pierdan.
+
+🔑 **El invariante que lo respalda, y que hay una prueba que lo fija:** *el saldo del último renglón
+visible no depende de `limite`*. Medido sobre un artículo con 625 movimientos y existencia real 13 125:
+con tope 5 000/1 000/100/10/1 el último renglón dice **13 125 en los cinco casos** — el saldo anterior
+absorbe exactamente lo que el corte se llevó.
+
+⚠️ **A9 y el MODELO son de corrección; color/talla/almacén/orden son de rendimiento.** La llave de
+agrupación del saldo anterior es color×talla×almacén×orden, así que un renglón de otro color cae en otro
+grupo y se descarta; pero `id_empresa` y `id_modelo` **no** están en esa llave, y quitarlos sumaría lo
+ajeno dentro del mismo grupo. Por eso esos dos tienen prueba que muere al quitarlos y los otros cuatro no
+pueden tenerla — dicho en el código en vez de fingido con una prueba que no mide nada.
+
+La respuesta **declara qué pedazo se está viendo** (`desde`, `hasta`, `ventanaPorOmision`, `limite`,
+`truncado`) y la pantalla lo pinta, con dos campos de fecha en la barra de filtros. Sin esa línea, una
+ventana por omisión se leería como «este modelo no tiene más movimientos». Cuando corta, la pantalla dice
+que se ven **los más recientes** y que lo anterior queda fuera pero **el saldo sí lo cuenta**.
+
+### Sin índice nuevo, y por qué (medido)
+
+El candidato era `movimientos(id_empresa, fecha)`. Medido en PostgreSQL 16 con 500 000 renglones de
+detalle, con la consulta que Prisma emite de verdad:
+
+| | consulta de renglones | consulta del saldo anterior |
+|---|---|---|
+| **SIN** índice | ~39 ms | ~68 ms |
+| **CON** índice | ~33 ms | ~109 ms (**peor**) |
+
+La selectividad la da `movimiento_det_pt.id_modelo` —ya es columna líder de
+`@@index([idModelo, idColor, idTalla])`— y el salto a `movimientos` va por su PK. En el saldo anterior el
+índice **empeora** el plan: `fecha < desde` toca ~90 % de las filas y el planeador se va igual a `Seq
+Scan`, pagando de más. **No se puso**: encarecería cada escritura del kardex —la operación más frecuente
+del módulo— a cambio de nada.
+
+**Cuándo volver a mirarlo** (umbral concreto, no corazonada): correr el `EXPLAIN (ANALYZE, BUFFERS)` del
+kardex y comparar los bloques del `Seq Scan on movimientos` contra los del `Bitmap Heap Scan on
+movimiento_det_pt`. Hoy son ~1 000 contra ~4 700 (el 18 %). **Si el seq scan pasa a leer MÁS bloques que
+el detalle del modelo, el índice empieza a pagar.** En la práctica eso ocurre cuando `movimientos` crece
+mucho más rápido que los renglones del modelo típico — orientativamente, por encima del **millón de filas
+en `movimientos`** con modelos de pocos miles de renglones.
+
+> ⚠️ **QUÉ NO PRUEBA LA BASE SINTÉTICA.** Sirve para **tamaño y tiempo**, y **no** para saber qué ve el
+> usuario cuando la lista se corta. Sus folios se generaron sin relación con la fecha (correlación medida
+> folio↔fecha: **−0.0007**; el folio 1 está fechado 2026-08-13 y el 100 000 en 2018-09-27), mientras que en
+> producción el folio es la **secuencia atómica por empresa (A3)** y por tanto crece con el tiempo. Ese
+> detalle escondió un defecto real: con `ORDER BY folio ASC LIMIT 1000`, en una base de folios
+> cronológicos la pantalla decía «Periodo: 2025-09-05 en adelante» y enseñaba **hasta 2026-02-07**,
+> ocultando los siete meses recientes. **Cualquier medición sobre el corte se hace con una base cuyo folio
+> sea monótono con la fecha**, o directamente contra `prueba`.
+
+### Cómo medir esto en `prueba` (queda por hacer — es de Gabriel)
+
+La fila pedía medir **existencias y kardex** con el histórico cargado. Lo de arriba es sintético; esto es
+lo que falta, y se corre contra la base de `prueba`.
+
+**1 · Volumen del kardex** (`psql` contra `prueba`, o el runner de SQL de Railway):
+
+```sql
+SELECT count(*) AS movimientos FROM movimientos;
+SELECT count(*) AS renglones   FROM movimiento_det_pt;
+SELECT min(fecha), max(fecha) FROM movimientos;
+
+-- Reparto por año: cuánto pesa el histórico viejo.
+SELECT date_part('year', m.fecha) AS anio, count(*) AS renglones
+FROM movimiento_det_pt d JOIN movimientos m ON m.id = d.id_movimiento
+GROUP BY 1 ORDER BY 1;
+
+-- ⭐ El MODELO más pesado: es el que hay que abrir para medir el peor caso real.
+SELECT mo.codigo, count(*) AS total,
+       count(*) FILTER (WHERE m.fecha >= current_date - interval '12 months') AS ult12m
+FROM movimiento_det_pt d
+JOIN movimientos m  ON m.id  = d.id_movimiento
+JOIN modelos     mo ON mo.id = d.id_modelo
+GROUP BY 1 ORDER BY 2 DESC LIMIT 10;
+
+-- ⭐ Y la comprobación que la base sintética NO puede dar: ¿el folio es cronológico?
+-- El folio es consecutivo POR EMPRESA (A3), así que la correlación se mide DENTRO de una empresa:
+-- mezclar dos numeraciones en el mismo `corr()` da un número que no significa nada. Hoy sólo hay
+-- una empresa y sale igual, pero el día que haya dos, sin el WHERE deja de ser cierto.
+SELECT id_empresa,
+       corr(folio::float8, extract(epoch FROM fecha)) AS correlacion_folio_fecha
+FROM movimientos GROUP BY 1;
+```
+
+**Qué mirar:** si `ult12m` del modelo más pesado supera **1 000**, la pantalla va a avisar de corte para
+ese modelo — y ahí se decide si 1 000 es el número bueno o conviene subirlo (el techo es 5 000). La
+correlación debe salir **cercana a 1**: si sale cerca de 0, el folio no es cronológico en producción y hay
+que revisar la dirección del corte.
+
+**2 · El kardex, en la pantalla** (`/inventarios/kardex`, con DevTools › Network abierto). Abrir el modelo
+más pesado del punto 1 y anotar, de `GET /api/inventarios/pt/kardex`, **tamaño transferido y tiempo**:
+
+| Caso | Qué pedir | Qué anotar |
+|---|---|---|
+| Por omisión | sólo elegir el modelo | tamaño, tiempo, y si sale el aviso de corte |
+| Diez años a mano | `?idModelo=…&desde=2016-01-01` | tamaño, tiempo |
+| Tope máximo | `?idModelo=…&desde=2016-01-01&limite=5000` | tamaño, tiempo |
+
+**Criterio:** por omisión debería quedar **por debajo de ~400 KB y ~1 s**. Si el caso «diez años a mano»
+con `limite=5000` pasa de **~2 MB o ~3 s**, conviene bajar el techo de 5 000.
+
+**3 · ⭐ EXISTENCIAS, que esta fila NO tocó y puede ser fila propia.** `consultarExistenciasPt` lee la
+vista `existencia_pt` con su propio SQL crudo y **no tiene tope ni paginación**: sin filtro de modelo
+devuelve la vista entera.
+
+```sql
+SELECT count(*) AS filas_vista FROM existencia_pt;
+SELECT count(*) AS con_saldo   FROM existencia_pt WHERE existencia <> 0;
+-- Y el peor caso de la pantalla, tal cual lo pide sin filtros:
+EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM existencia_pt WHERE id_empresa = 1 AND existencia <> 0;
+```
+
+Luego, en `/inventarios/existencias` **sin elegir modelo**, anotar tamaño y tiempo de
+`GET /api/inventarios/pt/existencias`.
+
+> 📌 **Ya hay un primer número, y no es tranquilizador.** Corrido contra una base de 525 000 renglones
+> (sintética, no `prueba`): `existencia_pt` devolvió **56 860 filas en 614 ms**, sin tope ni paginación,
+> en una sola respuesta. Confirma la forma del problema; falta el número de `prueba` para dimensionarlo.
+
+**Criterio:** por encima de **~5 000 filas** (o ~1 MB / ~2 s) esa pantalla necesita su propia fila. El
+rango de fechas **no aplica ahí** —una existencia no tiene fecha—: lo que aplicaría es paginación o exigir
+modelo/almacén, y eso es un cambio de contrato que esta fila no hizo.
 
 > **`IPT_Revision` (recuadre del viejo) NO se construye.** Con kardex puro no hay saldo materializado que
 > "recuadrar"; cualquier ajuste es un movimiento de ajuste o un inverso auditado.

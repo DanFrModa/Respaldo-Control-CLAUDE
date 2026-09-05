@@ -576,7 +576,10 @@ describe('Kardex (F3-E3)', () => {
       bd(),
     ); // saldo 20
 
-    const kardex = await kardexPt(sesion(), { idModelo: modelo.id }, bd());
+    // `desde` explícito A PROPÓSITO (fila 0.138): sin él manda la ventana por omisión, que se
+    // mueve con el calendario — y este test, con fechas fijas de 2026, se pondría rojo solo al
+    // pasar el año. Lo que aquí se mide es el saldo corrido, no el periodo.
+    const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-01-01' }, bd());
     expect(kardex.modelo).toBe('A-100');
     expect(kardex.renglones).toHaveLength(2);
     expect(kardex.renglones[0]?.entrada).toBe(30);
@@ -616,6 +619,561 @@ describe('Kardex (F3-E3)', () => {
     await expect(obtenerMovimientoPorFolio(sesion(), 999_999, bd())).rejects.toBeInstanceOf(
       ErrorNoEncontrado,
     );
+  });
+});
+
+/**
+ * ⭐ FILA 0.138 — EL KARDEX POR FECHAS, contra Postgres de verdad.
+ *
+ * Lo que se mide aquí es lo que el unit NO puede: que el recorte lo hace el `WHERE` y no un
+ * `filter()` sobre lo que ya llegó. Por eso casi todas las aserciones son «este movimiento NO está
+ * en la respuesta»: si el filtro viviera en el cliente, el renglón habría viajado igual.
+ *
+ * Nació de un defecto medido: con diez años cargados, el kardex de un modelo devolvía 25 000
+ * renglones y 8.3 MB en una sola respuesta.
+ */
+describe('El kardex por FECHAS (fila 0.138)', () => {
+  /** Registra una entrada de `cantidad` piezas (Rojo/CH) con la fecha dada. Devuelve el folio. */
+  async function entradaEn(fecha: string, cantidad: number): Promise<number> {
+    const mov = await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tEntradaInicial.id,
+        idAlmacen: almPrimeras.id,
+        idModelo: modelo.id,
+        fecha,
+        motivo: 'Ajuste de la prueba',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
+      },
+      bd(),
+    );
+    return mov.folio;
+  }
+
+  /** `AAAA-MM-DD` de hoy en el huso del negocio, corrido `meses` hacia atrás. */
+  function haceMeses(meses: number): string {
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    const [a, m, d] = hoy.split('-').map(Number);
+    return new Date(Date.UTC(a as number, (m as number) - 1 - meses, d)).toISOString().slice(0, 10);
+  }
+
+  it('⭐ un movimiento FUERA del periodo NO llega: el recorte lo hace el servidor', async () => {
+    await entradaEn('2026-01-15', 30); // fuera
+    const folioDentro = await entradaEn('2026-06-20', 7); // dentro
+
+    const kardex = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-06-01', hasta: '2026-06-30' },
+      bd(),
+    );
+
+    expect(kardex.renglones).toHaveLength(1);
+    expect(kardex.renglones[0]?.folio).toBe(folioDentro);
+    expect(kardex.renglones.some((r) => r.fecha === '2026-01-15')).toBe(false);
+    expect(kardex.desde).toBe('2026-06-01');
+    expect(kardex.hasta).toBe('2026-06-30');
+    expect(kardex.ventanaPorOmision).toBe(false);
+    expect(kardex.truncado).toBe(false);
+  });
+
+  /**
+   * ⭐⭐ LA PRUEBA DE QUE EL FILTRO ESTÁ EN EL `WHERE` Y NO EN JAVASCRIPT.
+   *
+   * Las demás pruebas de este bloque miran la salida, y la salida sale igual si alguien trae los
+   * diez años y luego los recorta en memoria — que es justo lo que la fila prohíbe. Ésta las
+   * distingue, cruzando el periodo con el TOPE:
+   *
+   *  • Filtrando en el SERVIDOR: la base sólo ve el movimiento de enero, el tope de 2 no lo alcanza
+   *    y llega 1 renglón.
+   *  • Filtrando DESPUÉS de traer: el tope se llevaría los 3 de junio (son los más nuevos, y la
+   *    consulta pide por folio DESCENDENTE), el recorte por fecha los tiraría todos y llegarían 0.
+   *
+   * Es decir: si esta prueba dice 1, el `WHERE` hizo el trabajo.
+   *
+   * ⚠️ El periodo va en el extremo VIEJO a propósito: cuando el corte se llevaba la cola, este mismo
+   * caso se escribía al revés. Si algún día el orden del `take` vuelve a cambiar, hay que darle la
+   * vuelta otra vez — lo que no puede es quedarse como está y seguir pareciendo que mide algo.
+   */
+  it('⭐⭐ el filtro va en la CONSULTA, no en memoria (el tope no se come el periodo)', async () => {
+    const folioEnero = await entradaEn('2026-01-15', 1);
+    await entradaEn('2026-06-01', 1);
+    await entradaEn('2026-06-02', 1);
+    await entradaEn('2026-06-03', 1);
+
+    const kardex = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-01-01', hasta: '2026-01-31', limite: 2 },
+      bd(),
+    );
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([folioEnero]);
+    expect(kardex.truncado).toBe(false);
+  });
+
+  it('⭐ los DOS bordes son INCLUSIVOS: el primer día y el último día SÍ entran', async () => {
+    const folioPrimero = await entradaEn('2026-06-01', 5);
+    const folioUltimo = await entradaEn('2026-06-30', 5);
+
+    const dentro = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-06-01', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(dentro.renglones.map((r) => r.folio)).toEqual([folioPrimero, folioUltimo]);
+  });
+
+  it('y un día más allá de cada borde ya deja el movimiento fuera', async () => {
+    const folioPrimero = await entradaEn('2026-06-01', 5);
+    const folioUltimo = await entradaEn('2026-06-30', 5);
+
+    // Un día DESPUÉS del primero: se cae el primero.
+    const sinPrimero = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-06-02', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(sinPrimero.renglones.map((r) => r.folio)).toEqual([folioUltimo]);
+
+    // Un día ANTES del último: se cae el último.
+    const sinUltimo = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-06-01', hasta: '2026-06-29' },
+      bd(),
+    );
+    expect(sinUltimo.renglones.map((r) => r.folio)).toEqual([folioPrimero]);
+  });
+
+  it('⭐ SIN periodo, la ventana por omisión deja fuera lo viejo (y lo dice)', async () => {
+    await entradaEn(haceMeses(24), 40); // dos años atrás: fuera de la ventana de 12 meses
+    const folioReciente = await entradaEn(haceMeses(1), 6); // el mes pasado: dentro
+
+    const porOmision = await kardexPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(porOmision.renglones.map((r) => r.folio)).toEqual([folioReciente]);
+    expect(porOmision.ventanaPorOmision).toBe(true);
+    expect(porOmision.desde).toBe(haceMeses(12));
+    expect(porOmision.hasta).toBeNull();
+
+    // Y el histórico NO se perdió: pedirlo a mano lo trae. La ventana es un default, no un candado.
+    const completo = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2000-01-01' }, bd());
+    expect(completo.renglones).toHaveLength(2);
+    expect(completo.ventanaPorOmision).toBe(false);
+  });
+
+  it('⭐ el SALDO del periodo arranca del saldo anterior, no de cero', async () => {
+    await entradaEn('2026-01-15', 30); // antes del periodo
+    await entradaEn('2026-06-20', 7); // dentro
+
+    const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+
+    // Si el saldo anterior se ignorara, este renglón diría 7 — y el kardex mentiría.
+    expect(kardex.renglones).toHaveLength(1);
+    expect(kardex.renglones[0]?.entrada).toBe(7);
+    expect(kardex.renglones[0]?.saldo).toBe(37);
+
+    // Y el saldo anterior viaja explícito, para que la pantalla pueda enseñar de dónde sale.
+    expect(kardex.saldosIniciales).toHaveLength(1);
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
+    expect(kardex.saldosIniciales[0]?.color).toBe('Rojo');
+    expect(kardex.saldosIniciales[0]?.etiquetaTalla).toBe('CH');
+    expect(kardex.saldosIniciales[0]?.almacen).toBe('Primeras');
+    expect(kardex.saldosIniciales[0]?.idOrden).toBeNull();
+  });
+
+  it('el saldo anterior RESTA las salidas anteriores (no es un total de entradas)', async () => {
+    await entradaEn('2026-01-15', 30);
+    await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tEntregaCliente.id,
+        idAlmacen: almPrimeras.id,
+        idModelo: modelo.id,
+        fecha: '2026-02-10',
+        motivo: 'Ajuste de la prueba',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 12 }] }],
+      },
+      bd(),
+    );
+    await entradaEn('2026-06-20', 1);
+
+    const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(18);
+    expect(kardex.renglones[0]?.saldo).toBe(19);
+  });
+
+  it('sólo trae el saldo anterior de los artículos QUE SE MOVIERON en el periodo', async () => {
+    await entradaEn('2026-01-15', 30); // Rojo/CH — se moverá en el periodo
+    await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tEntradaInicial.id,
+        idAlmacen: almPrimeras.id,
+        idModelo: modelo.id,
+        fecha: '2026-01-16',
+        motivo: 'Ajuste de la prueba',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaM.id, cantidad: 50 }] }],
+      },
+      bd(),
+    ); // Rojo/M — quieto durante el periodo
+    await entradaEn('2026-06-20', 7);
+
+    const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+    expect(kardex.saldosIniciales.map((s) => s.etiquetaTalla)).toEqual(['CH']);
+  });
+
+  /**
+   * ⭐⭐ EL CORTE SE LLEVA LO VIEJO, NO LO NUEVO.
+   *
+   * Aquí vive el defecto que casi se cuela: el folio es la secuencia atómica por empresa (A3), o sea
+   * que crece con el tiempo, y `ORDER BY folio ASC LIMIT n` devolvía **los n más viejos** de la
+   * ventana. Medido contra una base con folios cronológicos (25 000 renglones, 2 340 en doce meses),
+   * la pantalla decía «Periodo: 2025-09-05 en adelante» y enseñaba hasta **2026-02-07**: siete meses
+   * recientes escondidos. Un kardex se abre para ver el final.
+   *
+   * Lo que fija esta prueba es la DIRECCIÓN, y el saldo que la acompaña.
+   */
+  it('⭐⭐ el TOPE conserva el FINAL del periodo, y el saldo sigue cuadrando', async () => {
+    const folios = [
+      await entradaEn('2026-06-01', 1),
+      await entradaEn('2026-06-02', 1),
+      await entradaEn('2026-06-03', 1),
+    ];
+
+    const cortado = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-01-01', limite: 2 },
+      bd(),
+    );
+    expect(cortado.renglones).toHaveLength(2);
+    expect(cortado.truncado).toBe(true);
+    expect(cortado.limite).toBe(2);
+    // Los DOS ÚLTIMOS, en orden cronológico. Con el corte al revés esto sería [folios0, folios1].
+    expect(cortado.renglones.map((r) => r.folio)).toEqual([folios[1], folios[2]]);
+
+    // Y el saldo NO arranca de cero ni del saldo del periodo: arranca de lo que había justo antes
+    // del primer renglón visible — o sea, contando el movimiento que el tope se saltó.
+    expect(cortado.saldosIniciales).toHaveLength(1);
+    expect(cortado.saldosIniciales[0]?.saldo).toBe(1);
+    expect(cortado.renglones.map((r) => r.saldo)).toEqual([2, 3]);
+
+    // Con sitio para los tres, no hay corte, no hay saldo anterior y el último saldo es el mismo.
+    const completo = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-01-01', limite: 3 },
+      bd(),
+    );
+    expect(completo.renglones).toHaveLength(3);
+    expect(completo.truncado).toBe(false);
+    expect(completo.saldosIniciales).toHaveLength(0);
+    expect(completo.renglones.map((r) => r.saldo)).toEqual([1, 2, 3]);
+  });
+
+  /**
+   * ⭐ EL BORDE DEL CORTE, QUE ES POR FOLIO Y NO POR FECHA. Tres movimientos **del mismo día**, tope
+   * de 2: el que queda fuera es uno de ese día, así que el saldo anterior tiene que contarlo. Si el
+   * anclaje usara la fecha (`fecha < la del primer renglón visible`) ese movimiento no entraría en
+   * ninguna de las dos partes y el saldo se quedaría corto — el mismo error de borde de `<`/`<=`,
+   * pero por folio.
+   */
+  it('⭐ tres movimientos del MISMO día con tope 2: el que se cae cuenta en el saldo anterior', async () => {
+    const folios = [
+      await entradaEn('2026-06-10', 5),
+      await entradaEn('2026-06-10', 7),
+      await entradaEn('2026-06-10', 9),
+    ];
+
+    const kardex = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-06-01', limite: 2 },
+      bd(),
+    );
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([folios[1], folios[2]]);
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(5);
+    expect(kardex.renglones.map((r) => r.saldo)).toEqual([12, 21]);
+  });
+
+  /**
+   * ⭐⭐ CADA CONDICIÓN DE LA CONSULTA DEL SALDO ANTERIOR, CON UNA ASERCIÓN QUE MUERE AL QUITARLA.
+   *
+   * ⚠️ POR QUÉ ESTE BLOQUE EXISTE. `saldosAntesDelPeriodo` es SQL crudo y su modo de falla es el
+   * peor que hay: si alguien toca su `WHERE`, **todas las filas de la columna «Saldo» mienten a la
+   * vez y mienten de forma creíble** — nada se ve raro, sólo los números están mal. Las primeras
+   * pruebas del periodo miraban `renglones` y **nunca `saldosIniciales`**, así que seis mutaciones
+   * de esa consulta sobrevivían enteras.
+   *
+   * 🔑 Y LA LÍNEA FINA, que hay que entender antes de añadir nada aquí: **no todas las condiciones
+   * pueden tener una prueba que muera.** La llave de agrupación es color×talla×almacén×orden, y el
+   * llamador se queda sólo con los artículos que aparecen en el periodo. Entonces:
+   *  • `id_empresa` (A9), `id_modelo`, el borde de fecha y el ancla **NO** están en esa llave:
+   *    quitarlos suma cosas ajenas DENTRO del mismo grupo ⇒ contaminación real ⇒ prueba que muere.
+   *  • `id_color`/`id_talla`/`id_almacen`/`id_orden` del `WHERE` **sí** están en la llave: quitarlos
+   *    sólo produce grupos de más que el llamador descarta ⇒ son guardas de RENDIMIENTO, y ninguna
+   *    aserción puede morir al quitarlas. Lo que sí se puede fijar —y se fija abajo— es que esas
+   *    cuatro dimensiones **no se mezclen entre sí**, que es lo que se rompería si alguien tocara
+   *    el `GROUP BY`.
+   */
+  describe('el SALDO ANTERIOR, condición por condición', () => {
+    /** Entrada de Rojo/CH con fecha, almacén y (opcionalmente) empresa/modelo/color/talla propios. */
+    async function entrada(opciones: {
+      fecha: string;
+      cantidad: number;
+      idAlmacen?: number;
+      idModelo?: number;
+      idColor?: number;
+      idTalla?: number;
+      idOrden?: number | null;
+      idEmpresa?: number;
+      salida?: boolean;
+    }): Promise<number> {
+      const ses = sesionDePrueba({
+        idEmpresaActiva: opciones.idEmpresa ?? empresa.id,
+        permisos: PERM_TODOS,
+      });
+      const mov = await registrarMovimientoPt(
+        ses,
+        {
+          idTipoMov: opciones.salida === true ? tEntregaCliente.id : tEntradaInicial.id,
+          idAlmacen: opciones.idAlmacen ?? almPrimeras.id,
+          idModelo: opciones.idModelo ?? modelo.id,
+          fecha: opciones.fecha,
+          motivo: 'Ajuste de la prueba',
+          lineas: [
+            {
+              idColor: opciones.idColor ?? colorRojo.id,
+              ...(opciones.idOrden === undefined ? {} : { idOrden: opciones.idOrden }),
+              tallas: [{ idTalla: opciones.idTalla ?? tallaCH.id, cantidad: opciones.cantidad }],
+            },
+          ],
+        },
+        bd(),
+      );
+      return mov.folio;
+    }
+
+    it('⭐ A9: el saldo anterior de OTRA EMPRESA no se suma al de la mía', async () => {
+      // La llave de agrupación NO lleva empresa: sin el filtro, estos 999 caerían en MI grupo.
+      const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa de Prueba');
+      await entrada({ fecha: '2026-01-10', cantidad: 999, idEmpresa: otra.id });
+      await entrada({ fecha: '2026-01-15', cantidad: 30 });
+      await entrada({ fecha: '2026-06-20', cantidad: 7 });
+
+      const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+      expect(kardex.saldosIniciales).toHaveLength(1);
+      expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
+      expect(kardex.renglones[0]?.saldo).toBe(37);
+    });
+
+    it('⭐ el saldo anterior es DEL MODELO pedido, no de todos', async () => {
+      // El modelo tampoco está en la llave de agrupación: mismo riesgo que la empresa.
+      const otroModelo = await cliente.modelo.create({ data: { codigo: 'B-200' } });
+      await entrada({ fecha: '2026-01-10', cantidad: 500, idModelo: otroModelo.id });
+      await entrada({ fecha: '2026-01-15', cantidad: 30 });
+      await entrada({ fecha: '2026-06-20', cantidad: 7 });
+
+      const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+      expect(kardex.saldosIniciales).toHaveLength(1);
+      expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
+    });
+
+    it('⭐ EL BORDE: un movimiento fechado EXACTAMENTE en `desde` es del periodo, no del saldo anterior', async () => {
+      // Con `<=` en vez de `<` este movimiento se contaría DOS veces: en el saldo anterior y como
+      // renglón. Es el caso que separa un borde de otro, y por eso lleva un día propio.
+      await entrada({ fecha: '2026-01-15', cantidad: 30 });
+      const folioBorde = await entrada({ fecha: '2026-06-01', cantidad: 7 });
+
+      const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+      expect(kardex.renglones.map((r) => r.folio)).toEqual([folioBorde]);
+      expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
+      expect(kardex.renglones[0]?.saldo).toBe(37); // 30 + 7, no 44
+    });
+
+    it('⭐⭐ EL INVARIANTE: el último saldo visible NO depende del tope (y cuadra con la existencia)', async () => {
+      // La prueba más fuerte del anclaje: se corte donde se corte, el último renglón tiene que
+      // decir la existencia REAL del artículo (Σ kardex, D3). Si el saldo anterior se calculara
+      // con la fecha en vez de con la llave del corte, esto se desmoronaría en cuanto `truncado`.
+      for (const dia of ['01', '02', '03', '04', '05']) {
+        await entrada({ fecha: `2026-06-${dia}`, cantidad: 10 });
+      }
+      const existencia = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+      expect(existencia.totalExistencia).toBe(50);
+
+      for (const limite of [5, 3, 2, 1]) {
+        const k = await kardexPt(
+          sesion(),
+          { idModelo: modelo.id, desde: '2026-01-01', limite },
+          bd(),
+        );
+        expect(k.renglones).toHaveLength(Math.min(limite, 5));
+        expect(k.renglones[k.renglones.length - 1]?.saldo).toBe(50);
+      }
+    });
+
+    it('⭐ el saldo anterior es POR ORDEN: dos órdenes del mismo artículo no comparten saldo', async () => {
+      // Muere si `claveArticuloPt` deja de mirar la orden: las dos se fundirían en un solo saldo.
+      const cli = await cliente.cliente.create({ data: { nombre: 'Cliente del kardex' } });
+      const ordenA = (
+        await cliente.orden.create({
+          data: { folio: 7001n, idEmpresa: empresa.id, idModelo: modelo.id, idCliente: cli.id },
+        })
+      ).id;
+      const ordenB = (
+        await cliente.orden.create({
+          data: { folio: 7002n, idEmpresa: empresa.id, idModelo: modelo.id, idCliente: cli.id },
+        })
+      ).id;
+
+      await entrada({ fecha: '2026-01-10', cantidad: 40, idOrden: ordenA });
+      await entrada({ fecha: '2026-01-11', cantidad: 5, idOrden: ordenB });
+      await entrada({ fecha: '2026-06-20', cantidad: 1, idOrden: ordenA });
+      await entrada({ fecha: '2026-06-21', cantidad: 2, idOrden: ordenB });
+
+      const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+      const porOrden = new Map(kardex.saldosIniciales.map((s) => [s.idOrden, s.saldo]));
+      expect(porOrden.get(ordenA)).toBe(40);
+      expect(porOrden.get(ordenB)).toBe(5);
+      // Y el saldo corrido de cada renglón sigue su propia orden (41 y 7, no 46 y 48).
+      expect(kardex.renglones.map((r) => r.saldo)).toEqual([41, 7]);
+    });
+
+    /**
+     * ⭐⭐ EL DESEMPATE `d."id"`: LO QUE PASA CUANDO EL CORTE CAE **DENTRO** DE UN MOVIMIENTO.
+     *
+     * ⚠️ POR QUÉ FALTABA, que es lo interesante: todas las demás pruebas de este archivo capturan
+     * movimientos de UN SOLO renglón, así que `(folio, id)` degenera en `folio` y el desempate
+     * nunca se ejercita — se podía **borrar `d."id"` de la comparación y las 56 pruebas seguían en
+     * verde**. Pero en este sistema un movimiento de UN renglón es la excepción: lo normal es la
+     * matriz color×talla (D4), o sea **varios renglones compartiendo folio**. Y el tope corta por
+     * renglones, no por movimientos: tarde o temprano cae en medio de una matriz.
+     *
+     * El caso: una matriz de dos tallas y un tope que parte el movimiento por la mitad. El renglón
+     * que queda fuera tiene EL MISMO folio que el ancla, así que sólo el `id` puede distinguirlo.
+     * Sin desempate, sus 100 piezas no entran ni en la lista ni en el saldo anterior: **se
+     * evaporan en silencio**, que es exactamente la mentira creíble que esta fila vino a impedir.
+     */
+    it('⭐⭐ el corte DENTRO de una matriz color×talla no pierde el renglón que quedó fuera', async () => {
+      // Un movimiento, DOS renglones (mismo folio); luego otro movimiento de la misma talla CH.
+      await registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tEntradaInicial.id,
+          idAlmacen: almPrimeras.id,
+          idModelo: modelo.id,
+          fecha: '2026-06-10',
+          motivo: 'Ajuste de la prueba',
+          lineas: [
+            {
+              idColor: colorRojo.id,
+              tallas: [
+                { idTalla: tallaCH.id, cantidad: 100 },
+                { idTalla: tallaM.id, cantidad: 200 },
+              ],
+            },
+          ],
+        },
+        bd(),
+      );
+      await entrada({ fecha: '2026-06-11', cantidad: 7 }); // Rojo/CH
+
+      // Premisa que esta prueba da por buena y por eso deja fijada: dentro de un movimiento los
+      // renglones salen en el ORDEN EN QUE SE CAPTURARON (por `id`), no en cualquiera.
+      const enteroKardex = await kardexPt(
+        sesion(),
+        { idModelo: modelo.id, desde: '2026-01-01', limite: 3 },
+        bd(),
+      );
+      expect(enteroKardex.renglones.map((r) => [r.etiquetaTalla, r.saldo])).toEqual([
+        ['CH', 100],
+        ['M', 200],
+        ['CH', 107],
+      ]);
+
+      // Y ahora el corte JUSTO EN MEDIO de esa matriz: se queda fuera el renglón CH del primer
+      // movimiento, que comparte folio con el ancla.
+      const cortado = await kardexPt(
+        sesion(),
+        { idModelo: modelo.id, desde: '2026-01-01', limite: 2 },
+        bd(),
+      );
+      expect(cortado.truncado).toBe(true);
+      expect(cortado.renglones.map((r) => r.etiquetaTalla)).toEqual(['M', 'CH']);
+
+      // ⭐ EL NÚMERO QUE LO DELATA: 107, no 7. Sin el desempate por `id`, las 100 piezas del renglón
+      // cortado no las recoge nadie y este saldo diría 7.
+      expect(cortado.renglones[1]?.saldo).toBe(107);
+      // Y el saldo anterior las declara, para que se vea de dónde salen.
+      const chPrevio = cortado.saldosIniciales.find((x) => x.etiquetaTalla === 'CH');
+      expect(chPrevio?.saldo).toBe(100);
+    });
+
+    it('un artículo que quedó en CERO antes del periodo no ensucia el saldo anterior', async () => {
+      // Muere si se quita el `HAVING saldo <> 0`: aparecería un renglón «Saldo anterior: 0».
+      await entrada({ fecha: '2026-01-10', cantidad: 20 });
+      await entrada({ fecha: '2026-01-11', cantidad: 20, salida: true });
+      await entrada({ fecha: '2026-06-20', cantidad: 3 });
+
+      const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+      expect(kardex.saldosIniciales).toHaveLength(0);
+      expect(kardex.renglones[0]?.saldo).toBe(3);
+    });
+
+    it('⭐ las cuatro dimensiones del artículo NO se mezclan entre sí (color/talla/almacén/orden)', async () => {
+      // Ésta es la red del `GROUP BY` (las condiciones equivalentes del `WHERE` son de rendimiento,
+      // ver la nota del bloque): cada artículo trae SU saldo, no la suma de sus vecinos.
+      const cli = await cliente.cliente.create({ data: { nombre: 'Cliente mezcla' } });
+      const orden = (
+        await cliente.orden.create({
+          data: { folio: 7003n, idEmpresa: empresa.id, idModelo: modelo.id, idCliente: cli.id },
+        })
+      ).id;
+      const colorAzul = await cliente.color.create({ data: { nombre: 'Azul' } });
+
+      // Cuatro artículos que sólo se diferencian en UNA dimensión cada uno.
+      await entrada({ fecha: '2026-01-10', cantidad: 11 }); //  Rojo/CH/Primeras/sin orden
+      await entrada({ fecha: '2026-01-10', cantidad: 22, idColor: colorAzul.id }); // otro COLOR
+      await entrada({ fecha: '2026-01-10', cantidad: 33, idTalla: tallaM.id }); // otra TALLA
+      await entrada({ fecha: '2026-01-10', cantidad: 44, idAlmacen: almSegundas.id }); // otro ALMACÉN
+      await entrada({ fecha: '2026-01-10', cantidad: 55, idOrden: orden }); // otra ORDEN
+
+      // Los cinco se mueven en el periodo, para que los cinco tengan que salir.
+      await entrada({ fecha: '2026-06-20', cantidad: 1 });
+      await entrada({ fecha: '2026-06-20', cantidad: 1, idColor: colorAzul.id });
+      await entrada({ fecha: '2026-06-20', cantidad: 1, idTalla: tallaM.id });
+      await entrada({ fecha: '2026-06-20', cantidad: 1, idAlmacen: almSegundas.id });
+      await entrada({ fecha: '2026-06-20', cantidad: 1, idOrden: orden });
+
+      const kardex = await kardexPt(sesion(), { idModelo: modelo.id, desde: '2026-06-01' }, bd());
+      const saldos = kardex.saldosIniciales.map((s) => s.saldo).sort((x, y) => x - y);
+      expect(saldos).toEqual([11, 22, 33, 44, 55]);
+
+      // ⚠️ Y el saldo CORRIDO de cada renglón, que es la otra mitad: la consulta agrupa bien, pero
+      // el saldo se lleva en memoria con `claveArticuloPt`. Si esa llave dejara de mirar una de las
+      // cuatro dimensiones, dos artículos compartirían saldo y la de arriba seguiría en verde —
+      // porque el arreglo `saldosIniciales` lo arma el SQL, no la llave.
+      const corridos = kardex.renglones.map((r) => r.saldo).sort((x, y) => x - y);
+      expect(corridos).toEqual([12, 23, 34, 45, 56]);
+    });
+  });
+
+  it('el periodo convive con los demás filtros (almacén) sin colarse nada', async () => {
+    await entradaEn('2026-06-10', 4); // Primeras
+    await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tEntradaInicial.id,
+        idAlmacen: almSegundas.id,
+        idModelo: modelo.id,
+        fecha: '2026-06-11',
+        motivo: 'Ajuste de la prueba',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 9 }] }],
+      },
+      bd(),
+    );
+
+    const soloSegundas = await kardexPt(
+      sesion(),
+      { idModelo: modelo.id, desde: '2026-06-01', idAlmacen: almSegundas.id },
+      bd(),
+    );
+    expect(soloSegundas.renglones).toHaveLength(1);
+    expect(soloSegundas.renglones[0]?.almacen).toBe('Segundas');
   });
 });
 
