@@ -71,6 +71,30 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.115 · 5-sep-2026 · **en prueba** — **El traspaso de producto terminado deja rastro: motivo obligatorio y hoja impresa**
+
+### Qué se puede hacer ahora que antes no
+
+- **Imprimir la hoja del traspaso** de producto terminado, con su folio, los dos almacenes, quién lo hizo, el
+  motivo y el detalle por modelo, color y talla. Hasta hoy el producto terminado **no tenía ni un solo papel**:
+  se movían mil piezas de una bodega a otra y no quedaba nada que firmar ni que archivar.
+- El folio **no es nuevo**: es el que el traspaso ya tenía. La hoja sólo lo enseña.
+
+### Qué cambió y puede sorprender
+
+- **Meter o sacar producto terminado a mano ahora exige escribir el motivo**, igual que ya pasaba con telas y
+  avíos. Sin motivo, el sistema no lo guarda. Es un campo corto, pero es la diferencia entre un inventario que
+  se puede explicar y uno que no.
+- Aplica **de aquí en adelante**. Los movimientos que ya están guardados sin motivo se siguen viendo e
+  imprimiendo igual; no se les inventa nada ni se los marca como incompletos.
+- La **cancelación** ya pedía motivo desde antes: eso no cambia.
+
+### Qué sigue pendiente o roto
+
+- **Existencias y kardex de producto terminado a Excel no se hicieron**, por decisión de Daniel: la hoja de
+  traspaso era lo que pidió. Se agregan el día que los pida.
+- Sin migración, sin permisos nuevos, sin re-seed.
+
 ## 0.114 · 5-sep-2026 · **en prueba** — **Cerrar la orden: el costo se congela, y la prenda incompleta sale como merma**
 
 ### Qué se puede hacer ahora que antes no
