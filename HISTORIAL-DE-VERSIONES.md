@@ -71,6 +71,48 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.117 · 5-sep-2026 · **en prueba** — **Los dos avisos de la salida de tela: uno que ahora existe y otro que dejó de gritar siempre**
+
+### Qué se puede hacer ahora que antes no
+
+- **Al sacar tela para una orden, el sistema avisa si sacas más de lo que la orden pide.** Antes no comparaba
+  contra nada: se podía sacar el doble sin que nadie chistara. **Avisa y deja pasar** — no bloquea.
+- Y cuenta **lo que ya se sacó antes** para esa orden, así que sacar de a poquito no lo evade: si dos salidas
+  sumadas se pasan del pedido, lo dice.
+- **El aviso de «riesgo de tono» dejó de salir siempre.** Ahora sale **sólo cuando de verdad hay más de un
+  lote** de ese color en el almacén — y **enseña cuáles son**, con su folio y su fecha, para que quien surte
+  escoja a conciencia.
+- El aviso de sobre-salida también se puso en la **pantalla vieja** de salida de tela: ya no está en el menú,
+  pero seguía registrando salidas, así que era la puerta de atrás para saltárselo.
+
+### Qué cambió y puede sorprender
+
+- **Se compara el total de cada tela, no cada color por separado.** Si de una misma tela te pasas en un color
+  y te quedas corto en otro, y el total cuadra, el sistema no dice nada. Es la misma regla con la que el
+  comprador ve sus materiales, y se hizo así a propósito para no tener dos cuentas distintas de lo mismo.
+- **Se compara sólo el cuerpo de la tela, no el acompañante**, porque la orden no dice cuánto complemento
+  lleva. El aviso lo dice con esas palabras («sacas 400 **de cuerpo**») para que nadie lo lea como el total
+  que sale del anaquel.
+- ⚠️ **En el almacén del cortador vas a ver siempre una línea gris** diciendo que el sistema no sabe de qué
+  lotes es esa tela. **Es lo esperado, no un error**: a ese almacén la tela llega **traspasada** desde la
+  bodega, y el traspaso todavía no arrastra el número de lote, así que el sistema sólo puede decir cuánta
+  tela hay, no de qué partidas es. Por eso esa línea va **en gris y no como alerta** — la alerta naranja se
+  reserva para cuando de verdad hay dos o más lotes entre los que escoger. Que el lote viaje en el traspaso
+  es una decisión pendiente de Daniel (fila 0.142).
+- Cuando en un almacén hay **varios lotes de un color y además tela llegada por traspaso**, la lista de lotes
+  dice cuánta tela hay cuyo origen no se puede nombrar — **para que nadie lea la lista como si fuera todo lo
+  que hay**.
+- Si la orden **no tiene explosión de materiales guardada** (las migradas del sistema viejo no la tienen), la
+  pantalla lo dice en vez de callarse: el silencio significaría «vas bien» cuando en realidad es «no tengo
+  contra qué compararte».
+
+### Qué sigue pendiente o roto
+
+- **Nada de esta versión.** Sin migración, sin permisos nuevos y sin nada que capturar.
+- Lo que queda abierto es la **fila 0.142**, que espera decisión de Daniel: hacer que el número de lote viaje
+  en el traspaso. Es lo único que permitiría que el aviso de tono funcione **en el almacén donde se escoge el
+  rollo**, que es el único sitio donde de verdad sirve.
+
 ## 0.116 · 5-sep-2026 · **en prueba** — **Producción tampoco puede meter la prenda en la bodega equivocada**
 
 ### Qué se puede hacer ahora que antes no

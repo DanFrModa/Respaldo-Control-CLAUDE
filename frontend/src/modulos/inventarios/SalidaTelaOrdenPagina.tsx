@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useSalidaTelaAOrden } from '@/api/inventario-materiales';
+import { usePreviaSalidaTelaColor, useSalidaTelaAOrden } from '@/api/inventario-materiales';
 import { useOrden } from '@/api/ordenes';
 import type { Orden } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorOrden } from '@/modulos/produccion/SelectorOrden';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoSobreSalidaTela } from './AvisoSobreSalidaTela';
 import { CapturaRenglonesTela, type RenglonTela } from './CapturaRenglonesTela';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
@@ -36,6 +37,13 @@ function leerIdOrdenDeepLink(state: unknown): number | null {
  * de E5 la referenciará SIN generar otro movimiento. Captura PC: orden + almacén + renglones
  * tela×lote. El servidor valida que no deje existencia negativa (D3, bajo lock). `inventario-telas.mover`
  * gobierna la captura.
+ *
+ * ⭐ Fila 0.101: aunque sea legada, sigue DESCONTANDO tela contra una orden — así que también lleva
+ * el aviso de **SOBRE-SALIDA** (Daniel §Post-F9.193 dec. 8). Sin él, capturar por aquí era la puerta
+ * trasera por la que se saca de más sin que nadie diga nada. El veredicto lo da el SERVIDOR
+ * (`usePreviaSalidaTelaColor` con `lineasTela`, la MISMA regla que la pantalla por color): esta
+ * pantalla no compara nada (A1). El aviso de tono NO aplica aquí — el flujo por lote no tiene ni
+ * color ni partida entre las que escoger. AVISA, nunca bloquea.
  *
  * ⚠️ VISTA LEGADA (etapa A2): la salida OPERATIVA es ahora POR TELA+COLOR
  * (`SalidaTelaColorOrdenPagina`, en `/inventarios/telas/salida-orden` — a donde apuntan el menú y
@@ -84,6 +92,23 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
       void navigate(location.pathname, { replace: true, state: null });
     }
   }, [idDeepLink, ordenDeepLinkData, ordenDeepLink.isError, location.pathname, navigate]);
+
+  /**
+   * Cuerpo de la PREVIA (fila 0.101): los renglones van como `lineasTela` (tela SIN color) — de eso
+   * sólo sale el aviso (a), que compara por tela. Sin orden, almacén o renglones no se dispara.
+   */
+  const cuerpoPrevia = useMemo(
+    () =>
+      orden === undefined || idAlmacen === '' || renglones.length === 0
+        ? undefined
+        : {
+            idOrden: orden.id,
+            idAlmacen: Number(idAlmacen),
+            lineasTela: renglones.map((r) => ({ idTela: r.idTela, cantidad: r.cantidad })),
+          },
+    [orden, idAlmacen, renglones],
+  );
+  const previa = usePreviaSalidaTelaColor(cuerpoPrevia);
 
   const total = renglones.reduce((s, r) => s + r.cantidad, 0);
   const puedeGuardar =
@@ -214,6 +239,11 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
                     soloLectura={!puedeMover}
                   />
                 </div>
+
+                {/* ⭐⭐ AVISO (a) — SOBRE-SALIDA (fila 0.101): MISMO componente y MISMO
+                    veredicto que la pantalla por color; aquí sin el de tono, que no aplica al
+                    flujo por lote (no hay ni color ni partida entre las que escoger). */}
+                <AvisoSobreSalidaTela datos={previa.data} testId="salida-aviso-sobre-salida" />
 
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-muted-foreground">

@@ -129257,6 +129257,493 @@
         }
       }
     },
+    "/api/inventarios/telas/color/salidas-orden/previa": {
+      "post": {
+        "summary": "Avisos de una salida de tela por color: sobre-salida contra lo que la orden pide y riesgo de tono",
+        "tags": [
+          "inventario-telas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idOrden": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Orden de producción a la que se ligaría la salida."
+                  },
+                  "idAlmacen": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Almacén del que se sacaría: acota las partidas del riesgo de tono."
+                  },
+                  "lineas": {
+                    "default": [],
+                    "description": "Renglones por TELA+COLOR (flujo vigente).",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idTelaColor": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "cantidad": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "cantidadComplemento": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "idTelaColor",
+                        "cantidad"
+                      ]
+                    }
+                  },
+                  "lineasTela": {
+                    "default": [],
+                    "description": "Renglones por TELA sin color (pantalla LEGADA por lote).",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idTela": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "cantidad": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "idTela",
+                        "cantidad"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "idOrden",
+                  "idAlmacen"
+                ],
+                "description": "Captura en curso de una salida de tela (por color o por lote), para pedir sus avisos."
+              }
+            }
+          },
+          "description": "Captura en curso de una salida de tela (por color o por lote), para pedir sus avisos."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avisos de una salida de tela por color: sobre-salida y riesgo de tono.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "idAlmacen": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "tieneExplosion": {
+                      "type": "boolean",
+                      "description": "¿La orden tiene snapshot de explosión? Sin él, el aviso (a) no tiene con qué."
+                    },
+                    "telas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "tela": {
+                            "type": "string"
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de consumo del BOM (KG/M) o null."
+                          },
+                          "requerido": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Lo que la orden PIDE de esta tela (snapshot de la explosión); null = no lo dice."
+                          },
+                          "yaSalido": {
+                            "type": "number",
+                            "description": "Σ de las salidas VIVAS ya ligadas a la orden (sin canceladas)."
+                          },
+                          "aSacar": {
+                            "type": "number",
+                            "description": "Cuerpo que se está a punto de sacar de esta tela en esta captura."
+                          },
+                          "excedente": {
+                            "type": "number",
+                            "description": "Cuánto se pasa: max(0, yaSalido + aSacar − requerido). 0 = no se pasa."
+                          },
+                          "sobreSalida": {
+                            "type": "boolean",
+                            "description": "VEREDICTO del dominio: la salida pasa de lo que la orden pide."
+                          },
+                          "colores": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Colores capturados de esta tela (para nombrarla)."
+                          }
+                        },
+                        "required": [
+                          "idTela",
+                          "tela",
+                          "unidad",
+                          "requerido",
+                          "yaSalido",
+                          "aSacar",
+                          "excedente",
+                          "sobreSalida",
+                          "colores"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "colores": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTelaColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "telaColor": {
+                            "type": "string"
+                          },
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "tela": {
+                            "type": "string"
+                          },
+                          "estadoTono": {
+                            "type": "string",
+                            "enum": [
+                              "sin-riesgo",
+                              "varias-partidas",
+                              "origen-desconocido"
+                            ],
+                            "description": "VEREDICTO del dominio: `varias-partidas` = más de una partida conocida (avisa y las lista); `origen-desconocido` = hay más existencia que la que las partidas conocidas explican, típicamente tela llegada por traspaso (avisa diciendo que NO se sabe); `sin-riesgo` = calla."
+                          },
+                          "existencia": {
+                            "type": "number",
+                            "description": "Existencia del color EN ESE ALMACÉN (cuerpo + complemento, Σ de movimientos)."
+                          },
+                          "entradoConocido": {
+                            "type": "number",
+                            "description": "Σ de lo que ENTRÓ con partida conocida a ese almacén (acumulado histórico: nadie le descuenta las salidas, así que puede ser MAYOR que la existencia de hoy)."
+                          },
+                          "sinNombrar": {
+                            "type": "number",
+                            "description": "Cuánta de la existencia de hoy NO explica ninguna partida conocida = max(0, existencia − entradoConocido). > 0 es lo que enciende `origen-desconocido`, y es el número que la pantalla enseña cuando hay partidas listadas pero la lista no lo cubre todo."
+                          },
+                          "partidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "folio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Folio de la partida (A3)."
+                                },
+                                "loteProveedor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Lote del proveedor o null."
+                                },
+                                "factura": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Factura/remisión que la amparó o null."
+                                },
+                                "fecha": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Fecha de la entrada (YYYY-MM-DD) o null."
+                                },
+                                "entrado": {
+                                  "type": "number",
+                                  "description": "Cuánto ENTRÓ de esta partida a este almacén (cuerpo + complemento)."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "folio",
+                                "loteProveedor",
+                                "factura",
+                                "fecha",
+                                "entrado"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Las partidas conocidas del color en ese almacén (para escoger a conciencia)."
+                          }
+                        },
+                        "required": [
+                          "idTelaColor",
+                          "telaColor",
+                          "idTela",
+                          "tela",
+                          "estadoTono",
+                          "existencia",
+                          "entradoConocido",
+                          "sinNombrar",
+                          "partidas"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "haySobreSalida": {
+                      "type": "boolean",
+                      "description": "¿Alguna tela se pasa de lo que la orden pide?"
+                    },
+                    "hayRiesgoTono": {
+                      "type": "boolean",
+                      "description": "¿Algún color trae riesgo de tono (varias partidas, u origen desconocido)?"
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folioOrden",
+                    "idAlmacen",
+                    "tieneExplosion",
+                    "telas",
+                    "colores",
+                    "haySobreSalida",
+                    "hayRiesgoTono"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Avisos de una salida de tela por color: sobre-salida y riesgo de tono."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventarios/telas/color/traspasos": {
       "post": {
         "summary": "Traspasar tela por color entre almacenes (salida del origen + entrada al destino)",
