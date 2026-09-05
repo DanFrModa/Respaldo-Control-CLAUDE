@@ -368,27 +368,54 @@ export type SaldoQuery = z.infer<typeof esquemaSaldoQuery>;
  * y por eso NO entra al saldo. Se publica junto al saldo para que el dinero excluido se vea (y se
  * entienda que espera una decisión) en vez de desaparecer sin explicación.
  *
- * Los CARGOS `propuesto` no salen aquí: hasta que se validan no tienen importe (cantidad y precio
- * reales son NULL). Su lugar es la cola de validación de cargos.
+ * ⭐ Incluye los CUATRO conceptos (V1, fila 0.111). Los CARGOS `propuesto` —lo que espera que
+ * alguien fije cantidad y precio: el recibo de una maquila y, desde la 0.114, también el CORTE y el
+ * EMPAQUE de la orden— faltaban aquí, y por eso un maquilero con diez cargos sin validar y nada más
+ * tenía saldo 0, pendiente 0 y era invisible en el tablero, en la bandeja de CxP y en la corrida
+ * semanal. Su importe no está guardado pero se DERIVA (piezas de la etapa × precio de referencia);
+ * cuando ni eso se puede, la partida cuenta igual y el cargo se anota en `cargosSinPrecio`.
  */
 export const esquemaPendienteRevisionEsMa = z
   .object({
     abonos: z.number().nullable().describe('Σ abonos capturados sin revisar (o null).'),
     pagos: z.number().nullable().describe('Σ pagos capturados sin revisar (o null).'),
     descuentos: z.number().nullable().describe('Σ descuentos capturados sin revisar (o null).'),
+    cargos: z
+      .number()
+      .nullable()
+      .describe(
+        'Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar ' +
+          '(o null si se ocultan importes).',
+      ),
     neto: z
       .number()
       .nullable()
-      .describe('Neto con el mismo signo del saldo: abonos − pagos − descuentos (o null).'),
+      .describe(
+        'Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null).',
+      ),
     partidas: z
       .number()
       .int()
       .describe(
-        'Cuántas partidas esperan revisión. Es un conteo, no un importe: NO se oculta, y es lo ' +
-          'que decide si hay algo pendiente (los importes pueden netear cero y aun así haberlas).',
+        'Cuántas partidas esperan revisión (los tres movimientos planos capturados más los ' +
+          'cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si ' +
+          'hay algo pendiente (los importes pueden netear cero y aun así haberlas).',
+      ),
+    cargosPartidas: z
+      .number()
+      .int()
+      .describe('Cuántas de esas partidas son cargos por validar (conteo: NO se oculta).'),
+    cargosSinPrecio: z
+      .number()
+      .int()
+      .describe(
+        'De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan ' +
+          'como partida pero no aportan importe (conteo: NO se oculta).',
       ),
   })
-  .describe('Importes capturados que aún esperan revisión (fuera del saldo).');
+  .describe(
+    'Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar.',
+  );
 
 /** Forma del bloque de pendiente de revisión. */
 export type PendienteRevisionEsMa = z.infer<typeof esquemaPendienteRevisionEsMa>;
@@ -413,7 +440,7 @@ export const esquemaSaldoSalida = z
     totalDescuentos: z.number().nullable().describe('Σ descuentos revisados (o null).'),
     saldo: z.number().nullable().describe('Saldo derivado (o null si se ocultan importes).'),
     pendienteRevision: esquemaPendienteRevisionEsMa.describe(
-      'Lo capturado que aún no se revisa: no suma al saldo, pero se ve.',
+      'Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar.',
     ),
   })
   .describe('Saldo derivado de la cuenta de un maquilero.');
@@ -752,7 +779,7 @@ export const esquemaSaldoTodosFila = z
     totalDescuentos: z.number().nullable().describe('Σ descuentos revisados (o null).'),
     saldo: z.number().nullable().describe('Saldo derivado (o null si se ocultan importes).'),
     pendienteRevision: esquemaPendienteRevisionEsMa.describe(
-      'Lo capturado que aún no se revisa: no suma al saldo, pero se ve.',
+      'Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar.',
     ),
   })
   .describe('Saldo de un maquilero en el tablero.');
@@ -776,6 +803,13 @@ export const esquemaSaldosTodosSalida = z
       .number()
       .nullable()
       .describe('Σ del pendiente neto de todas las filas (o null si se ocultan importes).'),
+    totalCargosPorValidar: z
+      .number()
+      .int()
+      .describe(
+        'Σ de los cargos sin validar de todas las filas (conteo: NO se oculta). Lo agrega el ' +
+          'servidor para que la pantalla no tenga que sumar la columna.',
+      ),
   })
   .describe('Saldos de todos los maquileros.');
 

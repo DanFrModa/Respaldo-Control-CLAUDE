@@ -48,6 +48,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { importePropuestoDelCargo, precioDeReferenciaDelCargo } from './cargo-propuesto.js';
 import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { resolverConFactura } from './facturacion.js';
 
@@ -84,26 +85,20 @@ function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
     0,
   );
 
-  // (e) Precio de referencia por proceso: costura → maquilaOrd; estampado/aplicación/otros → aplicacionOrd.
-  //
-  // ⭐ 0.114 — un cargo de SERVICIO (corte/empaque) NO tiene precio en la orden y no se le inventa
-  // uno: la OP trae `maquilaOrd`/`aplicacionOrd`, que son precios de MAQUILA, y cobrarle al cortador
-  // el precio de la costura sería peor que no proponerle nada. Su referencia es el `precioPactado`
-  // que se tecleó en SU etapa — el mismo camino de fallback que ya usaban los recibos sin precio en
-  // la orden. Sin precio pactado, el cargo llega sin precio a la cola y quien valida lo teclea.
-  const precioOrden =
-    c.servicio !== null
-      ? null
-      : c.tipoProceso?.codigo === 'costura'
-        ? c.orden.maquilaOrd
-        : c.orden.aplicacionOrd;
-  const precioPropuesto =
-    precioOrden != null
-      ? precioOrden.toNumber()
-      : c.etapaRecibo?.precioPactado == null
-        ? null
-        : c.etapaRecibo.precioPactado.toNumber();
-  const importePropuesto = precioPropuesto === null ? null : cantidadPropuesta * precioPropuesto;
+  // (e) Precio de referencia por proceso: costura → maquilaOrd; estampado/aplicación/otros →
+  // aplicacionOrd, con caída al precio pactado del envío; y un cargo de SERVICIO (corte/empaque,
+  // 0.114) va SÓLO con el precio pactado de su etapa. La regla NO se escribe aquí (V1, fila 0.111):
+  // sale de `cargo-propuesto.ts`, que es la MISMA que usa el bloque «por revisar» del saldo —en
+  // Prisma y en SQL—. Estaba sólo aquí, y al necesitarla el tablero habría nacido una segunda copia
+  // con vida propia.
+  const precioPropuesto = precioDeReferenciaDelCargo({
+    servicio: c.servicio,
+    codigoProceso: c.tipoProceso?.codigo ?? null,
+    maquilaOrd: c.orden.maquilaOrd?.toNumber() ?? null,
+    aplicacionOrd: c.orden.aplicacionOrd?.toNumber() ?? null,
+    precioPactado: c.etapaRecibo?.precioPactado?.toNumber() ?? null,
+  });
+  const importePropuesto = importePropuestoDelCargo(cantidadPropuesta, precioPropuesto);
 
   const cantidadReal = c.cantidadReal === null ? null : c.cantidadReal.toNumber();
   const precioReal = c.precioReal === null ? null : c.precioReal.toNumber();

@@ -51,6 +51,45 @@ export function partidas(n: number): string {
   return `${String(n)} ${n === 1 ? 'partida' : 'partidas'}`;
 }
 
+/** «1 cargo» / «3 cargos» — el conteo de cargos propuestos con su sustantivo. */
+function cargos(n: number): string {
+  return `${String(n)} ${n === 1 ? 'cargo' : 'cargos'}`;
+}
+
+/**
+ * DESGLOSE de los CARGOS POR VALIDAR dentro de «por revisar» (V1, fila 0.111), o `null` si no hay
+ * ninguno — que es el caso de casi todas las filas.
+ *
+ * Los cargos `propuesto` entran al mismo bloque que los movimientos capturados, así que sin este
+ * desglose el número de la columna crecería sin decir por qué. Dice las tres cosas que importan y
+ * en ese orden: CUÁNTOS cargos esperan la decisión de Daniel, CUÁNTO suman los que se pueden valuar
+ * y —sólo si aplica— cuántos NO se pueden valuar por falta de precio.
+ *
+ * 🔴 Se dice «cargos» y NO «recibos» a propósito (0.114). Un recibo de maquila propone un cargo,
+ * pero el CORTE y el EMPAQUE también proponen el suyo y **no generan recibos** —ésa es su
+ * definición, la misma que encabeza `TIPOS_IDA_Y_VUELTA` en este archivo—. Llamarle «1 recibo por
+ * validar» a la fila de un cortador sería nombrarle algo que no existe; «cargo» es además la
+ * palabra que él ya ve en la pantalla que los valida («Validación de cargos»).
+ *
+ * ⚠️ Los que no tienen precio se anuncian aparte a propósito: aportan 0 al importe, y sin decirlo un
+ * maquilero con tres cargos sin precio enseñaría «$0.00» y parecería que no hay nada que decidir.
+ * El importe se omite cuando viaja en `null` (sin `consultas.ver-importes`): el conteo NO es dinero
+ * y se sigue viendo.
+ */
+export function textoCargosPorValidar(
+  p: Pick<EsMaPendienteRevision, 'cargos' | 'cargosPartidas' | 'cargosSinPrecio'>,
+): string | null {
+  if (p.cargosPartidas === 0) {
+    return null;
+  }
+  const piezas = [
+    `${cargos(p.cargosPartidas)} por validar`,
+    ...(p.cargos === null ? [] : [moneda(p.cargos)]),
+    ...(p.cargosSinPrecio > 0 ? [`${String(p.cargosSinPrecio)} sin precio`] : []),
+  ];
+  return piezas.join(' · ');
+}
+
 /**
  * TEXTO de un bloque «por revisar» (V1, fila 0.115) — el mismo en el tablero de EsMa y en la bandeja
  * de CxP, escritorio y móvil. Lleva SIEMPRE el CONTEO de partidas, y el importe sólo cuando se puede

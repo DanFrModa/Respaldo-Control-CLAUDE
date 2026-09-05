@@ -92,7 +92,16 @@ function desglosadoFake(): DesglosadoSalida {
       totalPagos: 0,
       totalDescuentos: 0,
       saldo: 80,
-      pendienteRevision: { abonos: 500, pagos: 500, descuentos: 0, neto: 0, partidas: 2 },
+      pendienteRevision: {
+        abonos: 500,
+        pagos: 500,
+        descuentos: 0,
+        cargos: 0,
+        neto: 0,
+        partidas: 2,
+        cargosPartidas: 0,
+        cargosSinPrecio: 0,
+      },
     },
   };
 }
@@ -197,7 +206,16 @@ describe('el Excel declara lo que espera revisión', () => {
       pagos: base.pagos.map((p) => ({ ...p, estadoRevision: 'revisado' as const })),
       saldo: {
         ...base.saldo,
-        pendienteRevision: { abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 0 },
+        pendienteRevision: {
+          abonos: 0,
+          pagos: 0,
+          descuentos: 0,
+          cargos: 0,
+          neto: 0,
+          partidas: 0,
+          cargosPartidas: 0,
+          cargosSinPrecio: 0,
+        },
       },
     });
     expect(resumen(libro).get('Partidas por revisar')).toBe(0);

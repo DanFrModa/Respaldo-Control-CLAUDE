@@ -597,7 +597,12 @@ describe('El SIGNO del cobro: al maquilero se le DESCUENTA, no se le carga', () 
     // «Propone, no cobra»: capturado ⇒ el saldo NO se mueve, pero se ve como pendiente de revisión.
     const saldoPropuesto = await saldoDeMaquilero(sesion(), maquileroA.id, {}, bd());
     expect(saldoPropuesto.saldo).toBe(saldoAntes.saldo);
-    expect(saldoPropuesto.pendienteRevision.partidas).toBe(1);
+    // ⭐ DOS partidas, no una (V1, fila 0.111). La que mide esta prueba es el DESCUENTO capturado;
+    // la otra es el CARGO `propuesto` que `recibir()` dejó al registrar el recibo de maquila, y que
+    // desde la 0.111 también cuenta como algo esperando la decisión de Daniel. Antes existía igual
+    // —el recibo estaba ahí— pero no lo contaba nadie: ése era justo el hueco de la fila.
+    expect(saldoPropuesto.pendienteRevision.partidas).toBe(2);
+    expect(saldoPropuesto.pendienteRevision.cargosPartidas).toBe(1);
     expect(saldoPropuesto.pendienteRevision.descuentos).toBe(40);
 
     // Y al revisarlo: BAJA 40. Un CARGO habría SUBIDO 40 — le habríamos pagado las prendas que no
@@ -605,7 +610,10 @@ describe('El SIGNO del cobro: al maquilero se le DESCUENTA, no se le carga', () 
     await revisarMovimiento(sesion(), 'descuento', cierre.idDescuento as number, bd());
     const saldoRevisado = await saldoDeMaquilero(sesion(), maquileroA.id, {}, bd());
     expect(saldoRevisado.saldo).toBe((saldoAntes.saldo ?? 0) - 40);
-    expect(saldoRevisado.pendienteRevision.partidas).toBe(0);
+    // El descuento salió del pendiente (se revisó); queda el cargo del recibo, que sigue sin validar.
+    expect(saldoRevisado.pendienteRevision.partidas).toBe(1);
+    expect(saldoRevisado.pendienteRevision.descuentos).toBe(0);
+    expect(saldoRevisado.pendienteRevision.cargosPartidas).toBe(1);
   });
 
   it('(k) el estado de cuenta lo enseña con su OP y la palabra «faltante»; deshecho, desaparece', async () => {
@@ -626,7 +634,13 @@ describe('El SIGNO del cobro: al maquilero se le DESCUENTA, no se le carga', () 
     const cuentaDespues = await estadoCuentaMaquilero(sesion(), maquileroA.id, {}, bd());
     expect(cuentaDespues.movimientos.some((m) => m.concepto === 'descuento')).toBe(false);
     const saldoFinal = await saldoDeMaquilero(sesion(), maquileroA.id, {}, bd());
-    expect(saldoFinal.pendienteRevision.partidas).toBe(0);
+    // ⭐ Queda UNA partida, no cero (V1, fila 0.111): deshacer el cierre borra el DESCUENTO, no el
+    // RECIBO —el maquilero entregó esas 95 prendas y hay que pagárselas—, y su cargo `propuesto`
+    // sigue esperando validación. Lo que esta prueba mide es que el descuento desapareció, y eso se
+    // asevera arriba por concepto; el conteo se ajusta para no fingir que no hay nada pendiente.
+    expect(saldoFinal.pendienteRevision.partidas).toBe(1);
+    expect(saldoFinal.pendienteRevision.cargosPartidas).toBe(1);
+    expect(saldoFinal.pendienteRevision.descuentos).toBe(0);
   });
 });
 

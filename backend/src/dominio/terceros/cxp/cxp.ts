@@ -47,6 +47,7 @@ import {
 import {
   armarPendiente,
   hayPendiente,
+  PENDIENTE_VACIO,
   pendienteParaSalida,
   tieneSaldo,
   type PendienteRevision,
@@ -324,7 +325,7 @@ function netearFila(f: FilaAgregadoCxp): FilaNeta {
     d31a60: c.d31a60,
     mas60: c.mas60,
     maquila: 0,
-    maquilaPorRevisar: armarPendiente(0, 0, 0, 0),
+    maquilaPorRevisar: armarPendiente(PENDIENTE_VACIO),
     saldo: 0,
   };
   fila.saldo = saldoDeFila(fila);
@@ -366,14 +367,25 @@ function calcularResumen(
   };
 }
 
-/** Σ del pendiente de maquila de las filas dadas (lo que espera revisión y NO suma a ningún saldo). */
+/**
+ * Σ del pendiente de maquila de las filas dadas (lo que espera revisión y NO suma a ningún saldo).
+ *
+ * ⚠️ El conteo TOTAL se rearma sumando sus dos mitades por separado —las partidas planas y los cargos
+ * propuestos—, no `partidas` a secas: `armarPendiente` vuelve a sumarlas, y pasarle el total ya
+ * sumado contaría los cargos DOS veces en el resumen de la bandeja.
+ */
 function sumarPorRevisar(filas: FilaNeta[]): PendienteRevision {
-  return armarPendiente(
-    filas.reduce((s, f) => s + f.maquilaPorRevisar.abonos, 0),
-    filas.reduce((s, f) => s + f.maquilaPorRevisar.pagos, 0),
-    filas.reduce((s, f) => s + f.maquilaPorRevisar.descuentos, 0),
-    filas.reduce((s, f) => s + f.maquilaPorRevisar.partidas, 0),
-  );
+  const suma = (dato: (p: PendienteRevision) => number): number =>
+    filas.reduce((s, f) => s + dato(f.maquilaPorRevisar), 0);
+  return armarPendiente({
+    abonos: suma((p) => p.abonos),
+    pagos: suma((p) => p.pagos),
+    descuentos: suma((p) => p.descuentos),
+    cargos: suma((p) => p.cargos),
+    partidasPlanas: suma((p) => p.partidas - p.cargosPartidas),
+    cargosPartidas: suma((p) => p.cargosPartidas),
+    cargosSinPrecio: suma((p) => p.cargosSinPrecio),
+  });
 }
 
 /**

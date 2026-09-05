@@ -216,7 +216,8 @@ export async function estadoCuentaMaquilero(
       monto,
       estadoRevision: c.estado,
       // La marca del renglón sale de la MISMA definición que la suma (formula-saldo.ts): así el
-      // detalle y el total no pueden volver a contradecirse (fila 0.115).
+      // detalle y el total no pueden volver a contradecirse (fila 0.115). Desde la 0.111 ese cargo
+      // también SUMA en el bloque «por revisar» del pie, con su importe derivado.
       pendienteRevision: pendienteDeRevisionCargo(c),
     });
   }

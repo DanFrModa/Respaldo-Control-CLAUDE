@@ -23,6 +23,7 @@ import { clienteLectura, type ContextoBd, type Tx } from '../../comun/transaccio
 import type { PrismaClient } from '../../datos/index.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { sqlCargosPropuestosPorMaquilero } from './cargo-propuesto.js';
 import {
   armarPendiente,
   hayPendiente,
@@ -55,8 +56,14 @@ interface FilaCruda {
   pendienteAbonos: Prisma.Decimal;
   pendientePagos: Prisma.Decimal;
   pendienteDescuentos: Prisma.Decimal;
-  /** CUÁNTAS partidas esperan revisión (bigint en Postgres → se castea a int en el SELECT). */
+  /** Σ del importe PROPUESTO de los cargos que esperan validación y se pueden valuar (fila 0.111). */
+  pendienteCargos: Prisma.Decimal;
+  /** CUÁNTAS partidas PLANAS esperan revisión (bigint en Postgres → se castea a int en el SELECT). */
   pendientePartidas: number;
+  /** CUÁNTOS cargos `propuesto` esperan validación (se puedan valuar o no). */
+  cargosPartidas: number;
+  /** De ésos, cuántos NO se pueden valuar (sin precio de referencia). */
+  cargosSinPrecio: number;
 }
 
 /**
@@ -104,8 +111,11 @@ export async function saldosDeTodosMaquileros(
       COALESCE(a."pendiente", 0)::numeric  AS "pendienteAbonos",
       COALESCE(pg."pendiente", 0)::numeric AS "pendientePagos",
       COALESCE(d."pendiente", 0)::numeric  AS "pendienteDescuentos",
+      COALESCE(cp."importe", 0)::numeric   AS "pendienteCargos",
       (COALESCE(a."partidas", 0) + COALESCE(pg."partidas", 0)
-        + COALESCE(d."partidas", 0))::int  AS "pendientePartidas"
+        + COALESCE(d."partidas", 0))::int  AS "pendientePartidas",
+      COALESCE(cp."partidas", 0)::int      AS "cargosPartidas",
+      COALESCE(cp."sin_precio", 0)::int    AS "cargosSinPrecio"
     FROM "proveedores" p
     LEFT JOIN (
       SELECT "id_maquilero", SUM("cantidad_real" * "precio_real") AS "total"
@@ -113,6 +123,11 @@ export async function saldosDeTodosMaquileros(
       WHERE "id_empresa" = ${idEmpresa} AND ${sqlCuenta('cargo')} ${factura}
       GROUP BY "id_maquilero"
     ) c ON c."id_maquilero" = p."id"
+    -- Los CARGOS PROPUESTOS (fila 0.111): cuántos esperan validación, cuánto suman los que se
+    -- pueden valuar y cuántos no. La subconsulta entera (criterio, precio de referencia y todo) la
+    -- da cargo-propuesto.ts, para que el tablero y el lote de CxP no puedan valuar distinto.
+    LEFT JOIN (${sqlCargosPropuestosPorMaquilero(idEmpresa, factura)})
+      cp ON cp."id_maquilero" = p."id"
     LEFT JOIN (
       SELECT "id_maquilero",
         SUM("monto") FILTER (WHERE ${sqlCuenta('abono')})    AS "total",
@@ -167,12 +182,15 @@ export async function saldosDeTodosMaquileros(
       nombreCorto: f.nombreCorto,
       ...totales,
       saldo: saldoDeTotales(totales),
-      pendiente: armarPendiente(
-        f.pendienteAbonos.toNumber(),
-        f.pendientePagos.toNumber(),
-        f.pendienteDescuentos.toNumber(),
-        f.pendientePartidas,
-      ),
+      pendiente: armarPendiente({
+        abonos: f.pendienteAbonos.toNumber(),
+        pagos: f.pendientePagos.toNumber(),
+        descuentos: f.pendienteDescuentos.toNumber(),
+        cargos: f.pendienteCargos.toNumber(),
+        partidasPlanas: f.pendientePartidas,
+        cargosPartidas: f.cargosPartidas,
+        cargosSinPrecio: f.cargosSinPrecio,
+      }),
     };
   });
 
@@ -204,10 +222,24 @@ export async function saldosDeTodosMaquileros(
         abonos: redondear2(visibles.reduce((s, f) => s + f.pendiente.abonos, 0)),
         pagos: redondear2(visibles.reduce((s, f) => s + f.pendiente.pagos, 0)),
         descuentos: redondear2(visibles.reduce((s, f) => s + f.pendiente.descuentos, 0)),
+        // Los cargos propuestos van en el total con el MISMO signo que en cada fila: si el neto de
+        // arriba los dejara fuera, la suma de la columna no cuadraría con el pie de la pantalla.
+        cargos: redondear2(visibles.reduce((s, f) => s + f.pendiente.cargos, 0)),
       })
     : null;
 
-  return { conFactura: filtros.conFactura ?? null, filas, totalSaldo, totalPendienteNeto };
+  // El CONTEO de recibos sin validar de toda la pantalla lo agrega el SERVIDOR (A1: nada de sumar
+  // una columna en el cliente), y NO se oculta: no es dinero, y sin él quien no puede ver importes
+  // no sabría cuántas decisiones tiene encima.
+  const totalCargosPorValidar = visibles.reduce((s, f) => s + f.pendiente.cargosPartidas, 0);
+
+  return {
+    conFactura: filtros.conFactura ?? null,
+    filas,
+    totalSaldo,
+    totalPendienteNeto,
+    totalCargosPorValidar,
+  };
 }
 
 /** Fila cruda del agregado EsMa por maquilero (subtotales en `numeric` → Decimal, cero-drift). */
@@ -220,8 +252,14 @@ interface SaldoEsMaLoteCruda {
   pendienteAbonos: Prisma.Decimal;
   pendientePagos: Prisma.Decimal;
   pendienteDescuentos: Prisma.Decimal;
-  /** CUÁNTAS partidas esperan revisión (bigint en Postgres → se castea a int en el SELECT). */
+  /** Σ del importe PROPUESTO de los cargos que esperan validación y se pueden valuar (fila 0.111). */
+  pendienteCargos: Prisma.Decimal;
+  /** CUÁNTAS partidas PLANAS esperan revisión (bigint en Postgres → se castea a int en el SELECT). */
   pendientePartidas: number;
+  /** CUÁNTOS cargos `propuesto` esperan validación (se puedan valuar o no). */
+  cargosPartidas: number;
+  /** De ésos, cuántos NO se pueden valuar (sin precio de referencia). */
+  cargosSinPrecio: number;
 }
 
 /** Lo que el lote entrega por maquilero: su saldo (sólo lo revisado) y lo que aún espera revisión. */
@@ -266,8 +304,11 @@ export async function saldosEsMaPorMaquilero(
       COALESCE(a."pendiente", 0)::numeric  AS "pendienteAbonos",
       COALESCE(pg."pendiente", 0)::numeric AS "pendientePagos",
       COALESCE(d."pendiente", 0)::numeric  AS "pendienteDescuentos",
+      COALESCE(cp."importe", 0)::numeric   AS "pendienteCargos",
       (COALESCE(a."partidas", 0) + COALESCE(pg."partidas", 0)
-        + COALESCE(d."partidas", 0))::int  AS "pendientePartidas"
+        + COALESCE(d."partidas", 0))::int  AS "pendientePartidas",
+      COALESCE(cp."partidas", 0)::int      AS "cargosPartidas",
+      COALESCE(cp."sin_precio", 0)::int    AS "cargosSinPrecio"
     FROM "proveedores" p
     LEFT JOIN (
       SELECT "id_maquilero", SUM("cantidad_real" * "precio_real") AS "total"
@@ -275,6 +316,11 @@ export async function saldosEsMaPorMaquilero(
       WHERE "id_empresa" = ${idEmpresa} AND ${sqlCuenta('cargo')} ${factura}
       GROUP BY "id_maquilero"
     ) c ON c."id_maquilero" = p."id"
+    -- Los CARGOS PROPUESTOS (fila 0.111): cuántos esperan validación, cuánto suman los que se
+    -- pueden valuar y cuántos no. La subconsulta entera (criterio, precio de referencia y todo) la
+    -- da cargo-propuesto.ts, para que el tablero y el lote de CxP no puedan valuar distinto.
+    LEFT JOIN (${sqlCargosPropuestosPorMaquilero(idEmpresa, factura)})
+      cp ON cp."id_maquilero" = p."id"
     LEFT JOIN (
       SELECT "id_maquilero",
         SUM("monto") FILTER (WHERE ${sqlCuenta('abono')})    AS "total",
@@ -304,6 +350,7 @@ export async function saldosEsMaPorMaquilero(
     ) d ON d."id_maquilero" = p."id"
     WHERE c."id_maquilero" IS NOT NULL OR a."id_maquilero" IS NOT NULL
        OR pg."id_maquilero" IS NOT NULL OR d."id_maquilero" IS NOT NULL
+       OR cp."id_maquilero" IS NOT NULL
   `);
 
   const mapa = new Map<number, AporteEsMaLote>();
@@ -315,12 +362,15 @@ export async function saldosEsMaPorMaquilero(
       totalPagos: redondear2(f.totalPagos.toNumber()),
       totalDescuentos: redondear2(f.totalDescuentos.toNumber()),
     });
-    const pendiente = armarPendiente(
-      f.pendienteAbonos.toNumber(),
-      f.pendientePagos.toNumber(),
-      f.pendienteDescuentos.toNumber(),
-      f.pendientePartidas,
-    );
+    const pendiente = armarPendiente({
+      abonos: f.pendienteAbonos.toNumber(),
+      pagos: f.pendientePagos.toNumber(),
+      descuentos: f.pendienteDescuentos.toNumber(),
+      cargos: f.pendienteCargos.toNumber(),
+      partidasPlanas: f.pendientePartidas,
+      cargosPartidas: f.cargosPartidas,
+      cargosSinPrecio: f.cargosSinPrecio,
+    });
     // Mismo corte que el tablero (§Post-F9.188a), con las MISMAS funciones: saldo ≠ 0 **o** algo
     // esperando revisión.
     if (tieneSaldo(saldo) || hayPendiente(pendiente)) {

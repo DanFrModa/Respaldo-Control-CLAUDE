@@ -10,7 +10,9 @@
  *  (f) partir un pago son DOS renglones y NO se colapsan en el concentrado (§Post-F9.185(e));
  *  (g) ⭐ ejecutar hace nacer el pago EsMa a cuenta y el movimiento de CxP, y baja los saldos;
  *  (h) una corrida cerrada NO se edita (D3), y una ejecutada no se vuelve a ejecutar;
- *  (i) el concentrado sale ordenado por monto y sin los renglones en cero.
+ *  (i) el concentrado sale ordenado por monto y sin los renglones en cero;
+ *  (n) V1 fila 0.111: el «por revisar» de la fila incluye los RECIBOS SIN VALIDAR del maquilero, y
+ *      `pideDecision` lo sube arriba aunque su saldo sea 0.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -34,6 +36,7 @@ import {
   guardarRenglonCorrida,
   listarCorridas,
   obtenerCorridaDetalle,
+  pideDecision,
 } from './corrida.js';
 
 let cliente: PrismaClient;
@@ -1081,5 +1084,125 @@ describe('(i) el concentrado', () => {
     const lista = await listarCorridas(sesion(), {}, bd());
     expect(lista.total).toBe(2);
     expect(lista.filas.map((c) => c.conFactura).sort()).toEqual([false, true]);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// (n) ⭐ LOS RECIBOS SIN VALIDAR LLEGAN HASTA LA CORRIDA (V1, fila 0.111)
+//
+// La corrida es la tercera puerta del mismo dato: enseña el «por revisar» del maquilero al lado de
+// su saldo, y `pideDecision` decide qué filas suben arriba. Como el universo se lo pide al MISMO
+// agregado que la bandeja de CxP, un recibo sin validar tiene que llegar hasta aquí SOLO — y esta
+// prueba existe para que no deje de llegar el día que alguien toque el camino.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('(n) el maquilero con recibos por validar pide decisión en la corrida', () => {
+  /** Recibo de maquila SIN VALIDAR (cargo `propuesto`) de `piezas` × el precio de costura de la orden. */
+  async function sembrarReciboSinValidar(
+    idMaquilero: number,
+    piezas: number,
+    precioOrden: number,
+  ): Promise<void> {
+    const tipoProceso = await cliente.tipoProceso.create({
+      data: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+    });
+    const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Cliente Corrida' } });
+    const pedido = await cliente.pedido.create({
+      data: { folio: 1n, idEmpresa: empresa.id, idCliente: clienteNegocio.id },
+    });
+    const modelo = await cliente.modelo.create({
+      data: { codigo: 'MOD-C', descripcion: 'Modelo corrida' },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: piezas, precio: 100 },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 1n,
+        idEmpresa: empresa.id,
+        idPedidoLinea: linea.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocio.id,
+        maquilaOrd: precioOrden,
+      },
+    });
+    const color = await cliente.color.create({ data: { nombre: 'Verde corrida' } });
+    const talla = await cliente.talla.create({ data: { etiqueta: 'CH' } });
+    const recibo = await cliente.etapaMovimiento.create({
+      data: {
+        folio: 1n,
+        idEmpresa: empresa.id,
+        idOrden: orden.id,
+        tipo: 'recibo_maquila',
+        idTipoProceso: tipoProceso.id,
+        idTercero: idMaquilero,
+        fecha: new Date('2026-09-01T00:00:00Z'),
+        detalles: { create: { idColor: color.id, idTalla: talla.id, cantidad: piezas } },
+      },
+    });
+    await cliente.esMaCargo.create({
+      data: {
+        idEmpresa: empresa.id,
+        idEtapaRecibo: recibo.id,
+        idMaquilero,
+        idOrden: orden.id,
+        idTipoProceso: tipoProceso.id,
+        estado: 'propuesto',
+      },
+    });
+  }
+
+  it('su fila trae el «por revisar» con el recibo, y `pideDecision` la sube', async () => {
+    await sembrarReciboSinValidar(taller.id, 10, 8);
+
+    const id = await abrirCorrida(false);
+    const detalle = await obtenerCorridaDetalle(sesion(), id, bd());
+    const fila = detalle.secciones.flatMap((s) => s.filas).find((f) => f.idProveedor === taller.id);
+    if (fila === undefined) throw new Error('la corrida no trajo al taller');
+    // El saldo sigue en 0 (nadie ha validado cuánto se le paga) y aun así hay una decisión encima.
+    expect(fila.saldo).toBe(0);
+    expect(fila.porRevisarPartidas).toBe(1);
+    expect(fila.porRevisarNeto).toBe(80);
+    expect(pideDecision(fila)).toBe(true);
+  });
+
+  it('el transportista (que no es maquila) sigue sin «por revisar» aunque SÍ esté en la corrida', async () => {
+    // La cubeta es de EsMa: un proveedor que no es maquilero no puede heredar partidas de nadie.
+    //
+    // ⚠️ Hay que SEMBRARLE una deuda primero. El universo de la corrida es «saldo ≠ 0 **o** algo
+    // pendiente», así que sin movimientos el transportista NI SIQUIERA SALE, `fila` es `undefined`
+    // y `fila?.porRevisarPartidas` también — con lo que la prueba pasaba en verde sin mirar nada y
+    // habría seguido verde aunque el «por revisar» se le colara a un proveedor. Con la factura de
+    // CxP la fila EXISTE, y entonces sus dos campos sí significan algo.
+    await registrarMovimientoCxp(
+      sesion(),
+      transportista.id,
+      // `entrada_sin_factura` es el CARGO que sí se captura a mano (la `factura_proveedor` nace del
+      // CFDI importado). Sube el saldo del proveedor y cae en el segmento SIN factura, que es el de
+      // esta corrida.
+      { fecha: '2026-09-01', origen: 'entrada_sin_factura', importe: 1_500, esFiscal: false },
+      bd(),
+    );
+    // Y un maquilero CON recibo sin validar en la misma corrida: si el agregado se desbordara a
+    // todas las filas, éste tendría partidas y el transportista también.
+    await sembrarReciboSinValidar(taller.id, 10, 8);
+
+    const id = await abrirCorrida(false);
+    const detalle = await obtenerCorridaDetalle(sesion(), id, bd());
+    const filas = detalle.secciones.flatMap((s) => s.filas);
+
+    const fila = filas.find((f) => f.idProveedor === transportista.id);
+    if (fila === undefined) throw new Error('la corrida no trajo al transportista');
+    expect(fila.saldo).toBe(1_500);
+    expect(fila.porRevisarPartidas).toBe(0);
+    expect(fila.porRevisarNeto).toBeNull();
+    // Sí pide decisión —se le deben 1,500— pero por su SALDO, no por un «por revisar» heredado.
+    // Es la distinción que importa: `pideDecision` mira tres cosas y sólo una es la de esta fila.
+    expect(pideDecision(fila)).toBe(true);
+    expect(pideDecision({ ...fila, saldo: 0 })).toBe(false);
+
+    // El maquilero de al lado sí lo trae: la diferencia es del rubro, no de que nadie lo tenga.
+    const filaTaller = filas.find((f) => f.idProveedor === taller.id);
+    if (filaTaller === undefined) throw new Error('la corrida no trajo al taller');
+    expect(filaTaller.porRevisarPartidas).toBe(1);
   });
 });

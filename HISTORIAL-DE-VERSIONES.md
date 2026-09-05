@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.113 · 4-sep-2026 · **en prueba** — **Lo que espera tu decisión ya se ve junto al saldo**: los recibos por validar cuentan
+
+### Qué se puede hacer ahora que antes no
+
+- En el **tablero de saldos de maquileros**, la columna «Por revisar» ya no cuenta sólo abonos, descuentos y
+  pagos capturados: **también los recibos, cortes y empaques que esperan que Daniel los valide**, con su
+  importe propuesto (precio de la orden por proceso, o el precio pactado del corte y del empaque) y su
+  conteo. Debajo de cada renglón se lee cuántos son y cuánto valen, y arriba el total de la semana.
+- Un maquilero cuyo **único** movimiento sea un recibo sin validar **ya aparece**. Antes tenía saldo cero,
+  pendiente cero y era invisible: justo el trabajo que hay que decidir cada semana no se veía por ningún lado.
+- Lo mismo se hereda en la **bandeja de Cuentas por pagar** (cubeta «maquila por revisar») y en la **corrida
+  semanal de pagos**, que sube esa fila como que pide decisión. Sin pantalla nueva, como pidió Daniel.
+- Si un cargo aún **no tiene precio**, se cuenta como partida y se dice aparte que no se puede valuar, en vez
+  de desaparecer o de valer cero.
+
+### Qué cambió y puede sorprender
+
+- **Los importes por revisar no suman al saldo** (el saldo sigue siendo sólo lo revisado): son dinero que
+  espera una decisión, y se enseñan al lado, nunca dentro.
+- Un cargo propuesto todavía **no tiene marcada la modalidad de factura**, así que cae entero en la relación
+  **sin factura** al partir por segmento. Es el mismo criterio único de siempre.
+- Los cargos marcados **sin costo** (segundas que no se pagan) no cuentan ni como pendiente ni como importe.
+- ⚠️ **Van a aparecer más nombres de los que esperas, y está bien.** Desde que el corte y el empaque se
+  cobran como servicio (versión 0.107), **cada corte registrado crea un cargo esperando validación**, así
+  que todo cortador con un corte sin validar va a salir en el tablero, en la bandeja de cuentas por pagar
+  y arriba en la corrida semanal. No es un defecto: son exactamente las decisiones que están esperando a
+  Daniel. Y si la etapa de corte no traía precio pactado, esos cargos salen **«sin precio»** — no heredan
+  el de la orden, a propósito.
+
+### Qué sigue pendiente o roto
+
+- Nada nuevo. Sin migración, sin permisos, sin re-seed.
+
 ## 0.112 · 4-sep-2026 · **en prueba** — **El recibo del proveedor de arte ya lleva la foto**
 
 ### Qué se puede hacer ahora que antes no

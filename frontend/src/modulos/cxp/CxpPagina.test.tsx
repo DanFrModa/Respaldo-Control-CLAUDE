@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ReactRouterDom from 'react-router-dom';
@@ -39,7 +39,16 @@ function ultimaConsulta(): CxpBandejaQuery {
 }
 
 /** Nada capturado sin revisar (lo normal). */
-const sinPorRevisar = { abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 0 };
+const sinPorRevisar = {
+  abonos: 0,
+  pagos: 0,
+  descuentos: 0,
+  cargos: 0,
+  neto: 0,
+  partidas: 0,
+  cargosPartidas: 0,
+  cargosSinPrecio: 0,
+};
 
 const conCartera: CxpBandeja = {
   filas: [
@@ -196,7 +205,16 @@ describe('CxpPagina · maquila por revisar', () => {
     d31a60: 0,
     mas60: 0,
     maquila: 0,
-    maquilaPorRevisar: { abonos: 400, pagos: 0, descuentos: 0, neto: 400, partidas: 1 },
+    maquilaPorRevisar: {
+      abonos: 400,
+      pagos: 0,
+      descuentos: 0,
+      cargos: 0,
+      neto: 400,
+      partidas: 1,
+      cargosPartidas: 0,
+      cargosSinPrecio: 0,
+    },
   };
 
   it('⭐ el maquilero con TODO sin revisar se ve, con saldo 0 y su «por revisar» explicado', () => {
@@ -225,6 +243,68 @@ describe('CxpPagina · maquila por revisar', () => {
     expect(kpi).toHaveTextContent('$400.00');
   });
 
+  it('⭐ el desglose de los CARGOS por validar viaja en el `title` de la celda (V1, fila 0.111)', () => {
+    // 🔴 Sin esta prueba el `title={textoCargosPorValidar(...)}` de la celda se podía BORRAR entero
+    // y las 9 pruebas de este archivo seguían verdes: todos los fixtures traían `cargosPartidas: 0`,
+    // así que el atributo nunca se pintaba. La bandeja HEREDA el número del mismo agregado que el
+    // tablero de EsMa, y el desglose es lo que explica por qué creció.
+    const conCargos: CxpBandeja['filas'][number] = {
+      ...todoCapturado,
+      idProveedor: 12,
+      proveedor: 'Maquila Con Cargos',
+      maquilaPorRevisar: {
+        abonos: 0,
+        pagos: 0,
+        descuentos: 0,
+        cargos: 1_200,
+        neto: 1_200,
+        partidas: 3,
+        cargosPartidas: 3,
+        cargosSinPrecio: 1,
+      },
+    };
+    estado.valor = {
+      data: {
+        ...conCartera,
+        filas: [conCargos],
+        total: 1,
+        resumen: { ...conCartera.resumen, maquilaPorRevisar: conCargos.maquilaPorRevisar },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver', 'consultas.ver-importes']),
+    });
+    const fila = screen.getByTestId('cxp-fila-12');
+    // El número visible es el neto del bloque entero…
+    expect(fila).toHaveTextContent('$1,200.00');
+    // …y el `title` explica de qué está hecho, con la MISMA fuente de texto que EsMa (`comun.ts`).
+    expect(
+      within(fila).getByTitle('3 cargos por validar · $1,200.00 · 1 sin precio'),
+    ).toBeInTheDocument();
+  });
+
+  it('sin cargos por validar, la celda no lleva ese `title`', () => {
+    estado.valor = {
+      data: {
+        ...conCartera,
+        filas: [todoCapturado],
+        total: 1,
+        resumen: { ...conCartera.resumen, maquilaPorRevisar: todoCapturado.maquilaPorRevisar },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<CxpPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver', 'consultas.ver-importes']),
+    });
+    const fila = screen.getByTestId('cxp-fila-11');
+    expect(within(fila).queryByTitle(/por validar/)).toBeNull();
+  });
+
   it('con los importes ocultos, dice CUÁNTAS partidas (el conteo nunca se oculta)', () => {
     estado.valor = {
       data: {
@@ -242,8 +322,11 @@ describe('CxpPagina · maquila por revisar', () => {
               abonos: null,
               pagos: null,
               descuentos: null,
+              cargos: null,
               neto: null,
               partidas: 2,
+              cargosPartidas: 0,
+              cargosSinPrecio: 0,
             },
           },
         ],
@@ -258,8 +341,11 @@ describe('CxpPagina · maquila por revisar', () => {
             abonos: null,
             pagos: null,
             descuentos: null,
+            cargos: null,
             neto: null,
             partidas: 2,
+            cargosPartidas: 0,
+            cargosSinPrecio: 0,
           },
         },
       },

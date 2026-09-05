@@ -26,7 +26,7 @@ import { esquemaBandejaCxpQuery } from '../../../contrato/index.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 import { Prisma } from '../../../datos/index.js';
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
-import { armarPendiente } from '../../esma/formula-saldo.js';
+import { armarPendiente, PENDIENTE_VACIO } from '../../esma/formula-saldo.js';
 
 import { segmentoCartera } from './facturacion-cxp.js';
 
@@ -93,7 +93,9 @@ function aporteEsMaDe(segmento: Segmento): Map<number, unknown> {
   if (segmento === 'con') {
     return vacio;
   }
-  return new Map<number, unknown>([[9, { saldo: 300, pendiente: armarPendiente(0, 0, 0, 0) }]]);
+  return new Map<number, unknown>([
+    [9, { saldo: 300, pendiente: armarPendiente(PENDIENTE_VACIO) }],
+  ]);
 }
 
 /**

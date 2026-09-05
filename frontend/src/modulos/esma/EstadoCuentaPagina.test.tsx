@@ -19,7 +19,16 @@ const saldo: EsMaSaldo = {
   totalPagos: 200,
   totalDescuentos: 0,
   saldo: 800,
-  pendienteRevision: { abonos: 0, pagos: 0, descuentos: 0, neto: 0, partidas: 0 },
+  pendienteRevision: {
+    abonos: 0,
+    pagos: 0,
+    descuentos: 0,
+    cargos: 0,
+    neto: 0,
+    partidas: 0,
+    cargosPartidas: 0,
+    cargosSinPrecio: 0,
+  },
 };
 
 const estadoConMovimientos: EsMaEstadoCuenta = {
