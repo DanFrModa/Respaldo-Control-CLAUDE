@@ -71,6 +71,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.118 · 5-sep-2026 · **en prueba** — **El kardex de producto terminado ya no vuelca diez años de golpe**
+
+### Qué se puede hacer ahora que antes no
+
+- **Pedir el kardex de un modelo por un periodo.** Hay dos campos de fecha, y al abrirlo se ven **los
+  últimos doce meses** sin tener que pedir nada. Antes traía **todo el histórico**: en la medición, un
+  modelo con mucho movimiento devolvía **25 000 renglones y 8,3 MB en una sola consulta**. Ahora son mil
+  renglones y 335 KB.
+- **El filtro lo hace el servidor**, no la pantalla: lo que no está en el periodo **no viaja**.
+
+### Qué cambió y puede sorprender
+
+- **Al abrir el kardex verás los últimos doce meses, no todo.** La pantalla lo dice arriba de la tabla, y
+  siempre puedes pedir otro periodo con las fechas.
+- Si el modelo tiene tanto movimiento que el periodo no cabe, **se muestran los más recientes, no los más
+  viejos**, y la pantalla avisa de que cortó. ⚠️ Esto casi se va con el defecto contrario: la primera
+  versión enseñaba **el principio** del periodo —que en un kardex es justo lo que menos se quiere ver— y
+  no se notó porque la base de pruebas tenía los folios revueltos, mientras que los de verdad son
+  cronológicos.
+- ⭐ **Y arriba de la tabla aparece el «saldo anterior» de cada artículo.** Es la pieza que hace que todo
+  esto sea honesto: cortar por fecha **rompía la columna «Saldo»** —el primer renglón habría arrancado en
+  cero y todos los de abajo habrían mentido—. Con el saldo anterior, **la columna «Saldo» sigue diciendo
+  la existencia real aunque la lista venga cortada**.
+- **Si pides sólo la fecha final**, el periodo son los doce meses **anteriores** a esa fecha. Y **si no
+  pones fecha final no hay tope**: siguen saliendo los movimientos con fecha futura, que se capturan con
+  la fecha del documento.
+
+### Qué sigue pendiente o roto
+
+- **Sin migración y sin índice nuevo**, y eso está medido: el índice candidato cambia el plan de la
+  consulta pero **no el tiempo**, y en la consulta del saldo anterior **la empeora**. Un índice que no hace
+  falta encarece cada escritura del kardex, que es lo que más se hace en el módulo.
+- ⏳ **Falta medir el volumen real en `prueba`**, con el histórico cargado. Las consultas ya están escritas
+  y probadas en `docs/modulos/inventario-pt.md`, listas para correr.
+- 🔴 **Y de paso apareció otra cosa que necesita su propia fila**: la pantalla de **existencias** de producto
+  terminado **no tiene tope ni paginación** — devuelve la vista entera. En la medición fueron **56 860
+  filas de una vez**. Ahí el rango de fechas no aplica (una existencia no tiene fecha): habría que paginar
+  o exigir modelo o almacén.
+
 ## 0.117 · 5-sep-2026 · **en prueba** — **Los dos avisos de la salida de tela: uno que ahora existe y otro que dejó de gritar siempre**
 
 ### Qué se puede hacer ahora que antes no

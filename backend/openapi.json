@@ -123169,6 +123169,39 @@
             "name": "idOrden",
             "required": false,
             "description": "Filtra por una orden de producción (F6-E2)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Primer día del periodo (YYYY-MM-DD), INCLUSIVE."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Último día del periodo (YYYY-MM-DD), INCLUSIVE."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "description": "Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`)."
           }
         ],
         "security": [
@@ -123178,7 +123211,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Kardex de un modelo (movimientos con saldo corrido).",
+            "description": "Kardex de un modelo en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen exactamente qué pedazo se está viendo.",
             "content": {
               "application/json": {
                 "schema": {
@@ -123193,6 +123226,118 @@
                     "modelo": {
                       "type": "string",
                       "description": "Código del modelo."
+                    },
+                    "desde": {
+                      "type": "string",
+                      "description": "Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive)."
+                    },
+                    "hasta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope."
+                    },
+                    "ventanaPorOmision": {
+                      "type": "boolean",
+                      "description": "true cuando `desde` lo puso el dominio porque nadie pidió periodo."
+                    },
+                    "limite": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tope de renglones que se aplicó."
+                    },
+                    "truncado": {
+                      "type": "boolean",
+                      "description": "true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde)."
+                    },
+                    "saldosIniciales": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Color del artículo."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color."
+                          },
+                          "idTalla": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Talla del artículo."
+                          },
+                          "etiquetaTalla": {
+                            "type": "string",
+                            "description": "Etiqueta de la talla."
+                          },
+                          "idAlmacen": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Almacén del artículo."
+                          },
+                          "almacen": {
+                            "type": "string",
+                            "description": "Nombre del almacén."
+                          },
+                          "idOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Orden del artículo, o null (bucket sin orden)."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden, o null."
+                          },
+                          "saldo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false)."
+                          }
+                        },
+                        "required": [
+                          "idColor",
+                          "color",
+                          "idTalla",
+                          "etiquetaTalla",
+                          "idAlmacen",
+                          "almacen",
+                          "idOrden",
+                          "folioOrden",
+                          "saldo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Saldo de los artículos del periodo justo ANTES del primer renglón devuelto."
                     },
                     "renglones": {
                       "type": "array",
@@ -123365,10 +123510,16 @@
                   "required": [
                     "idModelo",
                     "modelo",
+                    "desde",
+                    "hasta",
+                    "ventanaPorOmision",
+                    "limite",
+                    "truncado",
+                    "saldosIniciales",
                     "renglones"
                   ],
                   "additionalProperties": false,
-                  "description": "Kardex de un modelo (movimientos con saldo corrido)."
+                  "description": "Kardex de un modelo en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen exactamente qué pedazo se está viendo."
                 }
               }
             }

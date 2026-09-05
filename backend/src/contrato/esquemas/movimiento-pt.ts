@@ -397,8 +397,30 @@ export const esquemaKardexPtQuery = z
       .positive()
       .optional()
       .describe('Filtra por una orden de producción (F6-E2).'),
+    desde: z.iso
+      .date({ error: 'La fecha «desde» no es válida (YYYY-MM-DD)' })
+      .optional()
+      .describe('Primer día del periodo (YYYY-MM-DD), INCLUSIVE.'),
+    hasta: z.iso
+      .date({ error: 'La fecha «hasta» no es válida (YYYY-MM-DD)' })
+      .optional()
+      .describe('Último día del periodo (YYYY-MM-DD), INCLUSIVE.'),
+    limite: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(5000)
+      .optional()
+      .describe(
+        'Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta ' +
+          'siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`).',
+      ),
   })
-  .describe('Filtros del kardex de un modelo.');
+  .describe(
+    'Filtros del kardex de un modelo. El PERIODO manda: si no se pide `desde`, el dominio pone ' +
+      'una ventana por omisión (ver `desde`/`ventanaPorOmision` de la respuesta) — pedir el ' +
+      'kardex NUNCA trae diez años.',
+  );
 
 /** Parámetros del kardex por modelo ya coaccionados. */
 export type KardexPtQuery = z.infer<typeof esquemaKardexPtQuery>;
@@ -442,14 +464,71 @@ const esquemaKardexPtRenglon = z.object({
 /** Un renglón del kardex tal como lo devuelve la API. */
 export type KardexPtRenglon = z.infer<typeof esquemaKardexPtRenglon>;
 
+/**
+ * SALDO ANTERIOR de un artículo (color×talla×almacén×orden): lo que YA traía justo antes del PRIMER
+ * RENGLÓN que se devuelve. Es lo que vuelve verdadera la columna «Saldo» cuando el kardex viene
+ * recortado — sin él, el primer renglón arrancaría en cero y el saldo corrido diría una mentira.
+ *
+ * Cuando `truncado` es `false` ese punto es el inicio del periodo, así que es el saldo de apertura
+ * de toda la vida. Cuando es `true` la lista trae el FINAL del periodo, y entonces este número ya
+ * incluye también los movimientos del periodo que el tope dejó fuera por arriba: sigue siendo el
+ * saldo exacto desde el que arranca lo que se ve.
+ *
+ * Sólo vienen los artículos que APARECEN en los renglones devueltos (los que no se movieron no son
+ * parte de este kardex; su existencia se consulta en Existencias) y sólo si el saldo no es cero.
+ */
+const esquemaKardexPtSaldoInicial = z.object({
+  idColor: z.number().int().describe('Color del artículo.'),
+  color: z.string().describe('Nombre del color.'),
+  idTalla: z.number().int().describe('Talla del artículo.'),
+  etiquetaTalla: z.string().describe('Etiqueta de la talla.'),
+  idAlmacen: z.number().int().describe('Almacén del artículo.'),
+  almacen: z.string().describe('Nombre del almacén.'),
+  idOrden: z.number().int().nullable().describe('Orden del artículo, o null (bucket sin orden).'),
+  folioOrden: z.number().int().nullable().describe('Folio de la orden, o null.'),
+  saldo: z
+    .number()
+    .int()
+    .describe(
+      'Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo ' +
+        'sólo cuando `truncado` es false).',
+    ),
+});
+
+/** Un saldo anterior tal como lo devuelve la API. */
+export type KardexPtSaldoInicial = z.infer<typeof esquemaKardexPtSaldoInicial>;
+
 /** Respuesta del kardex por modelo (movimientos cronológicos con saldo corrido). */
 export const esquemaKardexPtLista = z
   .object({
     idModelo: z.number().int().describe('Modelo del kardex.'),
     modelo: z.string().describe('Código del modelo.'),
+    desde: z
+      .string()
+      .describe('Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive).'),
+    hasta: z
+      .string()
+      .nullable()
+      .describe('Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope.'),
+    ventanaPorOmision: z
+      .boolean()
+      .describe('true cuando `desde` lo puso el dominio porque nadie pidió periodo.'),
+    limite: z.number().int().describe('Tope de renglones que se aplicó.'),
+    truncado: z
+      .boolean()
+      .describe(
+        'true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo ' +
+          'que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde).',
+      ),
+    saldosIniciales: z
+      .array(esquemaKardexPtSaldoInicial)
+      .describe('Saldo de los artículos del periodo justo ANTES del primer renglón devuelto.'),
     renglones: z.array(esquemaKardexPtRenglon).describe('Movimientos en orden cronológico.'),
   })
-  .describe('Kardex de un modelo (movimientos con saldo corrido).');
+  .describe(
+    'Kardex de un modelo en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es ' +
+      'todo el histórico — `desde`/`hasta`/`limite` dicen exactamente qué pedazo se está viendo.',
+  );
 
 /** Forma de la respuesta del kardex por modelo. */
 export type KardexPtLista = z.infer<typeof esquemaKardexPtLista>;

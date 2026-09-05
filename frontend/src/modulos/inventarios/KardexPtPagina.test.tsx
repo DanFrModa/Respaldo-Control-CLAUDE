@@ -17,11 +17,17 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ApiInventarios from '@/api/inventarios';
+import type { Modelo } from '@/api/modelos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { KardexPtPagina } from './KardexPtPagina';
 
 const usePorFolioMock = vi.fn<() => Record<string, unknown>>();
+/** Fila 0.138 — configurable, y ADEMÁS captura la query: así se ve QUÉ le pide la pantalla al API. */
+const useKardexMock =
+  vi.fn<
+    (query: Record<string, unknown> | undefined, habilitado?: boolean) => Record<string, unknown>
+  >();
 
 vi.mock('@/api/inventarios', async (importarOriginal) => {
   // Solo se sustituyen los hooks (los que tocan la red). `urlImpresoTraspasoPt` se toma DEL MÓDULO
@@ -30,16 +36,25 @@ vi.mock('@/api/inventarios', async (importarOriginal) => {
   // ruta en sí la fija `src/api/inventarios.impreso-traspaso.test.ts` contra el contrato.
   const real = await importarOriginal<typeof ApiInventarios>();
   return {
-    useKardexPt: () => ({ data: undefined, isPending: false, isError: false }),
+    useKardexPt: (query: Record<string, unknown> | undefined, habilitado?: boolean) =>
+      useKardexMock(query, habilitado),
     useMovimientoPtPorFolio: () => usePorFolioMock(),
     useCancelarMovimientoPt: () => ({ mutate: vi.fn(), isPending: false }),
     urlImpresoTraspasoPt: real.urlImpresoTraspasoPt,
   };
 });
 
+/** Un modelo para poder ELEGIRLO en el combobox (los tests del periodo lo necesitan). */
+const modeloDePrueba = {
+  id: 1,
+  codigo: 'A-100',
+  descripcion: 'Playera',
+  origen: 'produccion',
+} as unknown as Modelo;
+
 vi.mock('@/api/modelos', () => ({
   useModelos: () => ({
-    data: { datos: [], total: 0, pagina: 1, porPagina: 8, totalPaginas: 0 },
+    data: { datos: [modeloDePrueba], total: 1, pagina: 1, porPagina: 8, totalPaginas: 1 },
     isPending: false,
     isError: false,
   }),
@@ -91,6 +106,11 @@ async function buscarFolio(usuario: ReturnType<typeof userEvent.setup>): Promise
   await usuario.type(screen.getByTestId('kardex-folio-input'), '9910');
   await usuario.click(screen.getByTestId('kardex-folio-buscar'));
 }
+
+beforeEach(() => {
+  useKardexMock.mockReset();
+  useKardexMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+});
 
 describe('KardexPtPagina · modo por folio — fila 0.100 (reimpresión de la hoja)', () => {
   beforeEach(() => {
@@ -175,5 +195,206 @@ describe('KardexPtPagina · modo por folio — fila 0.100 (reimpresión de la ho
 
     expect(screen.getByTestId('kardex-folio-imprimir')).toBeInTheDocument();
     expect(screen.queryByTestId('kardex-folio-cancelar')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐ FILA 0.138 — EL PERIODO EN LA PANTALLA.
+ *
+ * El recorte lo hace el servidor; lo que a esta pantalla le toca es (1) MANDAR las fechas —no
+ * recortar aquí lo que ya llegó— y (2) DECIR qué pedazo se está viendo. Lo segundo no es adorno:
+ * con una ventana por omisión, una lista corta se leería como «este modelo no tiene más
+ * movimientos», que es exactamente lo contrario de lo que pasa.
+ */
+describe('KardexPtPagina · modo por modelo — el PERIODO (fila 0.138)', () => {
+  /** Respuesta del kardex con los campos del periodo (los mismos que declara el contrato). */
+  function respuesta(sobrescribir: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      idModelo: 1,
+      modelo: 'A-100',
+      desde: '2025-09-05',
+      hasta: null,
+      ventanaPorOmision: true,
+      limite: 1000,
+      truncado: false,
+      saldosIniciales: [],
+      renglones: [
+        {
+          idMovimiento: 1,
+          folio: 10,
+          fecha: '2026-06-20',
+          idTipoMov: 1,
+          tipoMov: 'Inventario Inicial',
+          direccion: 'entrada',
+          idAlmacen: 3,
+          almacen: 'Primeras',
+          idColor: 7,
+          color: 'Rojo',
+          idTalla: 11,
+          etiquetaTalla: 'CH',
+          idOrden: null,
+          folioOrden: null,
+          numOrdenV1: null,
+          entrada: 7,
+          salida: 0,
+          saldo: 37,
+          cancelado: false,
+          observaciones: null,
+        },
+      ],
+      ...sobrescribir,
+    };
+  }
+
+  /** Elige el modelo en el combobox (la tabla y el periodo sólo aparecen con modelo). */
+  async function elegirModelo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await usuario.click(screen.getByTestId('selector-modelo-busqueda'));
+    await usuario.click(screen.getByTestId('selector-modelo-opcion'));
+  }
+
+  it('⭐ las fechas VIAJAN al servidor (la pantalla no recorta lo que ya llegó)', async () => {
+    useKardexMock.mockReturnValue({ data: respuesta(), isPending: false, isError: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    // Sin fechas escritas no se mandan: el servidor pone su ventana por omisión.
+    expect(useKardexMock).toHaveBeenLastCalledWith({ idModelo: 1 }, true);
+
+    await usuario.type(screen.getByTestId('kardex-desde'), '2026-06-01');
+    await usuario.type(screen.getByTestId('kardex-hasta'), '2026-06-30');
+
+    expect(useKardexMock).toHaveBeenLastCalledWith(
+      { idModelo: 1, desde: '2026-06-01', hasta: '2026-06-30' },
+      true,
+    );
+  });
+
+  it('⭐ dice QUÉ periodo está viendo, y avisa cuando es el de por omisión', async () => {
+    useKardexMock.mockReturnValue({ data: respuesta(), isPending: false, isError: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const periodo = screen.getByTestId('kardex-periodo');
+    expect(periodo).toHaveTextContent('2025-09-05');
+    expect(periodo).toHaveTextContent(/últimos 12 meses por omisión/);
+  });
+
+  /**
+   * ⭐ SIN TECHO NO ES «HASTA HOY». El servidor deja `hasta` abierto a propósito para que salgan los
+   * movimientos con fecha FUTURA (se capturan con la fecha del documento). La línea decía «a hoy» y
+   * la tabla enseñaba un renglón de 2027: la única línea cuyo trabajo es no mentir, mintiendo.
+   */
+  it('⭐ sin fecha de corte NO dice «a hoy» (y la tabla sí trae fechas futuras)', async () => {
+    useKardexMock.mockReturnValue({
+      data: respuesta({
+        desde: '2027-01-01',
+        hasta: null,
+        ventanaPorOmision: false,
+        renglones: [
+          { ...(respuesta().renglones as Record<string, unknown>[])[0], fecha: '2027-03-15' },
+        ],
+      }),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const periodo = screen.getByTestId('kardex-periodo');
+    expect(periodo).not.toHaveTextContent(/hoy/);
+    expect(periodo).toHaveTextContent(/en adelante/);
+    // Y el renglón posterior a hoy está ahí: por eso «a hoy» era falso, no impreciso.
+    expect(screen.getByTestId('kardex-tabla')).toHaveTextContent('2027-03-15');
+  });
+
+  /**
+   * ⭐ CON SÓLO «HASTA», la ventana son los 12 meses que TERMINAN ahí. Decir «últimos 12 meses por
+   * omisión — pon fechas» era doblemente falso: ni son los últimos doce, ni el usuario dejó de
+   * poner fechas (puso una).
+   */
+  it('⭐ con sólo «hasta», explica que son los 12 meses ANTERIORES a esa fecha', async () => {
+    useKardexMock.mockReturnValue({
+      data: respuesta({ desde: '2019-03-31', hasta: '2020-03-31', ventanaPorOmision: true }),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const periodo = screen.getByTestId('kardex-periodo');
+    expect(periodo).toHaveTextContent(/12 meses ANTERIORES a esa fecha/);
+    expect(periodo).not.toHaveTextContent(/últimos 12 meses/);
+  });
+
+  it('con un periodo pedido a mano ya no dice «por omisión»', async () => {
+    useKardexMock.mockReturnValue({
+      data: respuesta({ desde: '2026-06-01', hasta: '2026-06-30', ventanaPorOmision: false }),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const periodo = screen.getByTestId('kardex-periodo');
+    expect(periodo).toHaveTextContent('2026-06-30');
+    expect(periodo).not.toHaveTextContent(/por omisión/);
+  });
+
+  it('⭐ si la lista vino CORTADA lo dice — nadie debe creer que está viendo todo', async () => {
+    useKardexMock.mockReturnValue({
+      data: respuesta({ truncado: true, limite: 1000 }),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    // ⭐ Y dice QUÉ pedazo se ve: los más RECIENTES. Lo que se pierde es el principio del periodo.
+    expect(screen.getByTestId('kardex-truncado')).toHaveTextContent(/más\s+RECIENTES/);
+  });
+
+  it('sin corte, no hay aviso (el aviso tiene que significar algo)', async () => {
+    useKardexMock.mockReturnValue({ data: respuesta(), isPending: false, isError: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    expect(screen.queryByTestId('kardex-truncado')).not.toBeInTheDocument();
+  });
+
+  it('⭐ enseña el SALDO ANTERIOR: de ahí arranca la columna Saldo del periodo', async () => {
+    useKardexMock.mockReturnValue({
+      data: respuesta({
+        saldosIniciales: [
+          {
+            idColor: 7,
+            color: 'Rojo',
+            idTalla: 11,
+            etiquetaTalla: 'CH',
+            idAlmacen: 3,
+            almacen: 'Primeras',
+            idOrden: null,
+            folioOrden: null,
+            saldo: 30,
+          },
+        ],
+      }),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const fila = screen.getByTestId('kardex-saldo-inicial');
+    expect(fila).toHaveTextContent('Saldo anterior');
+    expect(fila).toHaveTextContent('30');
+    expect(fila).toHaveTextContent('Rojo');
   });
 });
