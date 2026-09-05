@@ -82,9 +82,16 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
 
-  // Solo entrada/salida (los `traspaso` van por la otra pantalla).
+  // Solo entrada/salida (los `traspaso` van por la otra pantalla), y NUNCA los dos rótulos que la
+  // fila 0.104 reservó a la dirección: «Devolución a Proveedor» y «Venta de Material» nacieron para
+  // telas y avíos, pero el catálogo de tipos es GLOBAL y se colaban aquí — ofreciéndole a cualquiera
+  // con `inventario-pt.mover` el rótulo que Daniel se reservó. El backend los rechaza igual (A1);
+  // esto es para no enseñar una puerta que no abre. La venta de producto terminado tiene su propia
+  // fila (0.130), con cliente y precio.
   const tiposMov = useTiposMovimiento();
-  const tiposCaptura = (tiposMov.data?.datos ?? []).filter((t) => t.direccion !== 'traspaso');
+  const tiposCaptura = (tiposMov.data?.datos ?? []).filter(
+    (t) => t.direccion !== 'traspaso' && t.capturaManual,
+  );
 
   // Solo almacenes de PT: el dominio rechaza un movimiento de producto terminado contra una bodega de telas o de avíos (fila 0.137), así que el desplegable ni los ofrece.
   const almacenes = useAlmacenes({

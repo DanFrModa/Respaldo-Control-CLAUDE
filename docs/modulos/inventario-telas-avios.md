@@ -118,6 +118,52 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - `migracion.ts` (F4-E6) — helpers modo migración: `crearMovimientoTelaMigrado`,
   `crearTraspasoTelaMigrado`, `asegurarLoteLegacyTela` (vía el motor de kardex; A1/A2/A3/A7).
 
+## ⭐ La salida que NO es por OP — devolución y venta (fila 0.104, 5-sep-2026)
+
+**Daniel** (2-sep): *«el 99 % sale por medio de una OP pero deberíamos tener la opción de sacar
+alguna venta o cualquier otra cosa»*; y al cerrarlo (§Post-F9.193 resp. 12): *«sacar por ejemplo una
+**devolución**, o una **venta de avíos que ya no se usen**… que no sea mediante la descarga o
+aplicación a una OP. Esto **autorizado siempre por mí**. Lo mismo en telas»*.
+
+Hasta esta fila, de telas y avíos sólo se podía sacar material **por orden**, **por nota** o con un
+**ajuste** de conteo. Ahora hay una cuarta puerta, y **sólo ajusta inventario**: no genera nota de
+crédito, no toca CxP ni la facturación (*«por ahora que toque sólo inventarios»*). A qué proveedor se
+le devolvió o a quién se le vendió viaja en el **motivo obligatorio**, no en una FK.
+
+- **Dominio:** `salida-sin-orden.ts` (las DECISIONES: permiso y concepto→tipo de movimiento) +
+  `registrarSalidaTelaColorSinOrden` en `partidas-telas.ts` y `registrarSalidaAvioSinOrden` en
+  `avios.ts` (la orquestación, que reusa el MISMO no-negativo bajo lock de las demás salidas — D3).
+- **Permiso PROPIO `salida-material.registrar`** (módulo propio `salida-material`), en
+  `SOLO_ADMINISTRADOR`: lo llevan sólo `Administrador` y `AdministracionDireccion`. NO se reusó
+  `inventario-telas.mover`/`inventario-avios.mover`, que hoy bajan hasta `Secretarial`. **El mismo
+  permiso gobierna la CANCELACIÓN** de estas salidas (el inverso devuelve el material al inventario,
+  o sea deshace la decisión) **por las TRES puertas que pueden alcanzarlas**: la del flujo por color
+  (`partidas-telas.ts`), la de avíos (`avios.ts`) y la LEGADA por lote (`telas.ts`), que acepta
+  cualquier movimiento con renglones de tela — incluidos los del flujo por color. Las demás
+  cancelaciones siguen con su `.mover` de siempre.
+- **El concepto elige un tipo de movimiento DEDICADO** (mismo criterio que `ajuste-ciclico-*` de
+  F7-E5: que el kardex sepa distinguir): `devolucion-proveedor` → *Devolución a Proveedor*,
+  `venta` → *Venta de Material* (los dos NUEVOS, entran por **seed**), `otro` → *Otras Salidas* (uno
+  de los 19 canónicos del sistema viejo; no estrena tipo para un caso que nadie ha nombrado).
+- **Traza:** `origenTipo = salida-sin-orden`, sin `origenId` (no hay entidad detrás). Es lo que
+  permite exigir la llave del dueño al cancelar.
+- **API:** `POST /inventarios/telas/color/salidas-sin-orden` y `POST /inventarios/avios/salidas-sin-orden`.
+- **Pantalla:** «Salida de material sin orden» (`/inventarios/salida-sin-orden`), con las dos
+  dimensiones en pestañas. Cuelga del grupo Inventarios, **no** de «Telas» ni de «Avíos»: sirve a las
+  dos, y la decisión de Daniel fue una sola.
+- **En producto terminado NO se construyó la salida** —la pantalla de movimientos de PT ya ofrece
+  `venta-mostrador` y `otras-salidas` desde el sistema viejo, y su gemela con precio y cliente es la
+  fila **0.130**—, **pero esa pantalla SÍ cambió**: los dos rótulos nuevos son de catálogo GLOBAL y
+  se colaron a su desplegable, ofreciéndole a cualquiera con `inventario-pt.mover` el rótulo que
+  Daniel se reservó. Ahora **están reservados**: el dominio los rechaza en los **CUATRO** escritores
+  genéricos (ajuste de tela por color, ajuste LEGADO de tela por lote, ajuste de avíos y movimiento
+  manual de PT) y el API los marca con `capturaManual: false` para que ninguna pantalla los ofrezca. Sólo los escriben las dos
+  funciones de esta fila, que los resuelven por código.
+  🔑 **Por qué era obligatorio:** un tipo dedicado es, implícitamente, una afirmación sobre QUIÉN lo
+  escribió. Si cualquiera puede estampar «Venta de Material», el rótulo no clasifica mejor —
+  clasifica igual de mal y con más confianza, porque quien lea el kardex creerá que esa salida la
+  autorizó el dueño.
+
 ## Lotes (D5)
 
 `Lote` (proveedor, factura, fecha, idColor — el lote define el teñido) + `LoteComponente` (idTela,

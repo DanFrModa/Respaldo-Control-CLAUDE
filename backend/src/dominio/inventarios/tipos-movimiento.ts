@@ -13,6 +13,17 @@ import { z } from 'zod';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { CODIGOS_TIPO_RESERVADOS } from './salida-sin-orden.js';
+
+/**
+ * Un tipo de movimiento con la bandera que dice si se puede ELEGIR en una captura manual.
+ *
+ * 🔑 La decide el DOMINIO (A1), no la pantalla ni el mapper de la ruta: es la misma lista de
+ * códigos reservados que rechazan los escritores genéricos (`salida-sin-orden.ts`), leída UNA vez.
+ * Así la pantalla no tiene que repetir los códigos —el defecto que CLAUDE.md llama «un dato
+ * repetido en N sitios»— y cualquier pantalla futura que liste tipos hereda la regla gratis.
+ */
+export type TipoMovimientoConCaptura = TipoMovimientoInventario & { capturaManual: boolean };
 
 /**
  * Parámetros del listado de tipos de movimiento (ya coaccionados): la ruta REST coacciona el
@@ -35,7 +46,7 @@ export async function listarTiposMovimiento(
   sesion: SesionUsuario,
   parametros: ParametrosListarTiposMovimiento = {},
   bd?: ContextoBd,
-): Promise<TipoMovimientoInventario[]> {
+): Promise<TipoMovimientoConCaptura[]> {
   verificarPermiso(sesion, 'inventario-pt.ver');
   const filtros = validarEntrada(esquemaListarTiposMovimiento, parametros);
 
@@ -44,8 +55,12 @@ export async function listarTiposMovimiento(
     ...(filtros.direccion === undefined ? {} : { direccion: filtros.direccion }),
   };
 
-  return clienteLectura(bd).tipoMovimientoInventario.findMany({
+  const tipos = await clienteLectura(bd).tipoMovimientoInventario.findMany({
     where,
     orderBy: { id: 'asc' },
   });
+  return tipos.map((tipo) => ({
+    ...tipo,
+    capturaManual: !CODIGOS_TIPO_RESERVADOS.has(tipo.codigo),
+  }));
 }

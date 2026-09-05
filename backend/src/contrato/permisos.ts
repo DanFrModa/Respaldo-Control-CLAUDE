@@ -108,6 +108,13 @@ export const MODULOS_PERMISO = {
   // módulos NUEVOS del kardex de materiales de v2 (D3). Mismo esquema ver/mover que `inventario-pt`.
   'inventario-telas': 'Inventario de telas (kardex)',
   'inventario-avios': 'Inventario de avíos (kardex)',
+  // ── LA SALIDA QUE NO ES POR OP (fila 0.104, §Post-F9.193 respuesta 12) ──
+  // Módulo APARTE, y de una sola clave, a propósito: sacar material SIN orden es un acto
+  // excepcional que Daniel reservó para sí («siempre autorizada sólo por mí. Nadie más»), y
+  // colgarlo de `inventario-telas`/`inventario-avios` lo habría metido en la misma bolsa que el
+  // `.mover` que hoy tiene medio organigrama. Cubre las DOS dimensiones (telas y avíos) porque la
+  // decisión de Daniel es UNA («Lo mismo en telas»): un solo permiso que se da o no se da.
+  'salida-material': 'Salidas de material sin orden',
   // ── Notas de salida estructuradas (Módulo 5, F4-E5, R4/R9) ──
   // El documento de envío de materiales a un maquilero contra una orden de producción.
   notas: 'Notas de salida',
@@ -1035,6 +1042,32 @@ export const CATALOGO_PERMISOS = [
     clave: 'inventario-avios.mover',
     modulo: 'inventario-avios',
     descripcion: 'Capturar ajustes y traspasos de avíos (F4-E1, R4)',
+  },
+
+  // ── ⭐ LA SALIDA QUE NO ES POR OP (fila 0.104) ────────────────────────────────────────────────
+  //
+  // DANIEL, 2-sep-2026: *«el 99 % sale por medio de una OP pero deberíamos tener la opción de
+  // sacar alguna venta o cualquier otra cosa»*. Y al cerrarlo, 3-sep: *«por ahora que toque sólo
+  // inventarios… pero sí debe existir una salida por otro medio que sólo ajuste de inventario…
+  // siempre autorizada sólo por mí. Nadie más»*. El 4-sep (§Post-F9.193 respuesta 12) nombró los
+  // casos: *«sacar por ejemplo una devolución, o una venta de avíos que ya no se usen… Lo mismo
+  // en telas»*.
+  //
+  // 🔑 POR QUÉ ES UN PERMISO PROPIO Y NO `inventario-telas.mover` / `inventario-avios.mover`: esos
+  // dos los lleva hoy medio organigrama (hasta `Secretarial`, herencia de la cascada vieja — ver
+  // `prisma/seed.ts`), así que reusarlos habría sido justo lo contrario de lo que Daniel pidió.
+  // Éste nace en `SOLO_ADMINISTRADOR`: sólo `Administrador` y `AdministracionDireccion` (los
+  // niveles 1 y 20 del sistema viejo) lo llevan; ningún perfil operativo lo otorga.
+  //
+  // 🔑 Y GOBIERNA TAMBIÉN LA CANCELACIÓN de esas salidas: cancelar es el movimiento INVERSO que
+  // vuelve a meter el material al inventario (D3), o sea deshacer la decisión de sacarlo. Si eso
+  // se quedara sólo con `.mover`, cualquiera podría revertir lo que sólo Daniel puede autorizar.
+  {
+    clave: 'salida-material.registrar',
+    modulo: 'salida-material',
+    descripcion:
+      'Sacar telas o avíos SIN orden de producción (devolución al proveedor, venta de material ' +
+      'que ya no se usa u otra causa) y cancelar esas salidas. Sólo ajusta inventario (F4/0.104)',
   },
 
   // ── Estados de cuenta de maquileros (EsMa, F3-E4) — permisos NUEVOS de v2 ────

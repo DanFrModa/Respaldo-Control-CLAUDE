@@ -59,6 +59,19 @@ export const ORIGEN = {
    * sistema contra el saldo que leyó bajo lock.
    */
   conteoTela: 'conteo-tela',
+  /**
+   * ⭐ Salida de TELA o de AVÍO que NO va a ninguna orden (fila 0.104, §Post-F9.193 resp. 12):
+   * devolución al proveedor, venta de material que ya no se usa u otra causa. SIN `origenId`: no
+   * hay entidad detrás — el hecho es la captura misma, y el *por qué* viaja en el tipo de
+   * movimiento (`devolucion-proveedor` / `venta-material` / `otras-salidas`) más el motivo
+   * obligatorio de las observaciones.
+   *
+   * 🔑 Este discriminador NO es decorativo: es lo que permite que la CANCELACIÓN de una de estas
+   * salidas exija el permiso `salida-material.registrar` y no baste con `inventario-*.mover`
+   * (`dominio/inventarios/salida-sin-orden.ts`). Sin él, cualquiera con `.mover` podría deshacer
+   * lo que sólo el dueño puede autorizar.
+   */
+  salidaSinOrden: 'salida-sin-orden',
 } as const;
 
 /** Discriminador válido de `Movimiento.origenTipo`. */

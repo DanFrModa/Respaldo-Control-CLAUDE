@@ -7,6 +7,9 @@
  * Endpoints (empresa activa = A9):
  *  • `POST /inventarios/avios/ajustes`               (`inventario-avios.mover`) → ajuste (conteo físico/corrección).
  *  • `POST /inventarios/avios/traspasos`             (`inventario-avios.mover`) → traspaso (2 patas).
+ *  • `POST /inventarios/avios/salidas-sin-orden`     (`salida-material.registrar`) → ⭐ salida que NO
+ *    va a ninguna orden (devolución al proveedor / venta de avíos que ya no se usan / otra causa —
+ *    fila 0.104). Permiso PROPIO y sólo del administrador: NO basta `inventario-avios.mover`.
  *  • `POST /inventarios/avios/movimientos/:id/cancelar` (`inventario-avios.mover`) → inverso auditado.
  *  • `GET  /inventarios/avios/existencias`           (`inventario-avios.ver`)   → existencias multi-almacén (vista).
  *  • `GET  /inventarios/avios/kardex`                (`inventario-avios.ver`)   → kardex por avío.
@@ -17,6 +20,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
   esquemaAjusteAvioCrear,
+  esquemaSalidaAvioSinOrdenCrear,
   esquemaTraspasoAvioCrear,
   esquemaMovimientoMaterialCancelarCuerpo,
   esquemaMovimientoAvioSalida,
@@ -35,6 +39,7 @@ import {
   cancelarMovimientoAvio,
   consultarExistenciasAvio,
   kardexAvio,
+  registrarSalidaAvioSinOrden,
   traspasarAvio,
 } from '../../dominio/inventarios/avios.js';
 
@@ -93,6 +98,29 @@ export const rutasInventarioAvios: FastifyPluginCallbackZod = (app, _opciones, d
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const traspaso = await traspasarAvio(sesion, request.body);
       return reply.code(201).send(traspaso);
+    },
+  });
+
+  // ── ⭐ Salida de avío que NO va a ninguna orden (fila 0.104) ─────────────────
+  // DANIEL (§Post-F9.193 resp. 12): *«una venta de avíos que ya no se usen… que no sea mediante la
+  // descarga o aplicación a una OP. Esto autorizado siempre por mí»*. Gate: el permiso PROPIO
+  // `salida-material.registrar`, no el `.mover`. La guarda de verdad la repite el dominio (A1).
+  app.route({
+    method: 'POST',
+    url: '/inventarios/avios/salidas-sin-orden',
+    preHandler: app.conPermiso('salida-material.registrar'),
+    schema: {
+      tags: ['inventario-avios'],
+      summary:
+        'Registrar una salida de avío SIN orden (devolución al proveedor, venta de material u otra causa)',
+      security: SEGURIDAD_SESION,
+      body: esquemaSalidaAvioSinOrdenCrear,
+      response: { 201: esquemaMovimientoAvioSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const movimiento = await registrarSalidaAvioSinOrden(sesion, request.body);
+      return reply.code(201).send(movimiento);
     },
   });
 

@@ -12136,6 +12136,49 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.201) LAS CUATRO QUE DEPENDÍAN DE DANIEL — contestadas de una vez (5-sep-2026)
+
+**Contexto.** El lead le enumeró a Daniel qué falta para cerrar la V1 y le puso delante **las cuatro cosas
+que dependían de él**, cada una con un default para confirmar o ajustar. Daniel: *«De acuerdo con todo los
+defaults»* — y de ahí salió una quinta decisión, que él preguntó por su cuenta.
+
+1. **⭐ FILA 0.142 — QUE LA PARTIDA VIAJE EN EL TRASPASO: SÍ, SE HACE.** Era la **única de las cuatro que
+   bloqueaba trabajo**. Hoy la pata de entrada de un traspaso se escribe sin lote de origen, así que en un
+   almacén alimentado sólo por traspasos —**el del cortador**, que es donde arranca la pantalla de salida de
+   tela— el sistema **nunca** sabe de qué lotes es la tela del anaquel, y las dos mitades de lo que Daniel
+   pidió en §Post-F9.193 (*«sólo cuando hay más de una partida»* y *«con la lista de partidas a la vista»*)
+   **no se pueden entregar ahí**. ⇒ El traspaso conserva el lote de origen (y su reparto, si la pata mueve
+   varios). **Aditivo y sin backfill** (REGLA 0-B): cambia lo que se escribe de aquí en adelante y no toca
+   ni un movimiento ya registrado; la tela vieja se queda sin lote y la línea neutra sigue saliendo para
+   ella. Se preguntó en vez de hacerse porque **toca el motor del kardex y D3**.
+2. **FILA 0.131 — LOS ARCHIVOS DE LA CARGA DE APERTURA: las muestras YA; el corte de SINUBE, EL DÍA DEL
+   ARRANQUE.** Cualquier corte anterior se desactualiza y habría que rehacerlo. Con las muestras (un Excel
+   de estados de cuenta **con** factura, otro **sin**, el archivo de SINUBE y unos XML) el lead mide la
+   estructura y ajusta el cargador para que lea *esa* forma, cargando **cada factura pendiente con su
+   fecha** para que la antigüedad funcione desde el día uno. El día del arranque sólo se corre.
+3. **FILA 0.097 (FINANZAS) VA ANTES QUE LA 0.096 (INVENTARIOS).** El repaso de Finanzas se hace primero, en
+   una sesión de Daniel con el sistema abierto, y **el lead le prepara antes una pasada medida** de qué hay
+   construido y qué está a medias — el método del 13-ago: *que JUZGUE y no DESCUBRA*. Lo que salga nace con
+   su propio número.
+4. **EL REPASO DE INVENTARIOS, DESPUÉS DE QUE ATERRICEN SUS FILAS** (0.099, 0.102, 0.103, 0.104, 0.130,
+   0.143). Si entra antes, juzgaría pantallas que ya se sabe que van a cambiar.
+5. **⭐ LOS XML HISTÓRICOS: SÓLO LOS VIVOS.** Daniel preguntó dónde se cargan los archivos y, con la
+   respuesta, decidió: *«Solo los que están vivos. Tanto de clientes como de proveedores»* ⇒ **se importan
+   únicamente los CFDI de facturas PENDIENTES DE PAGO (o de cobro)**, no el histórico completo. Son los que
+   forman la cartera y hacen que la antigüedad sirva desde el día uno; los ya saldados no cambian ningún
+   saldo. **No es una puerta que se cierre**: el cargador masivo admite el resto después si el contador los
+   pide.
+
+**Y cómo llegan los archivos, que fue la duda que abrió el punto 5.** Hay **tres caminos distintos** y no
+uno solo: (a) los **XML sueltos** tienen pantalla — *Cuentas por pagar → «Importar CFDI»* y *Cuentas por
+cobrar → «Importar CFDI»*, **uno a la vez**; (b) los **XML en volumen** van por el cargador masivo, que lee
+una **carpeta entera** y lo corre el lead; (c) el **corte de SINUBE y los Excel** **no tienen pantalla, a
+propósito** — es una carga de una sola vez que hay que cuadrar antes de aplicar, y una pantalla invitaría a
+repetirla. 🔴 **Y la regla que las cruza todas: los archivos con datos reales NO entran al repositorio** —
+ni las muestras—, y el lead **los abre y los revisa antes de usarlos** aunque vengan presentados como
+irrelevantes. Es la cicatriz del 3-sep (fila 0.123): unos Excel «ya limpios» traían **77 nombres completos
+pegados a lo que se le paga a cada quien**, y el repositorio es público.
+
 #### (Post-F9.200) Cerrar la orden y congelar el costo — los seis valores por omisión (fila 0.061, 4-sep-2026)
 
 **Contexto.** Daniel decidió el 30-ago (§Post-F9.154) que la prenda incompleta sale de tránsito como merma,

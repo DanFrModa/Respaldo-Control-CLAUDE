@@ -806,6 +806,22 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         ],
       },
       {
+        // ⭐⭐ LA SALIDA QUE NO ES POR OP (fila 0.104). Va como HOJA de primer nivel del grupo, no
+        // colgando de «Telas» ni de «Avíos», porque sirve a LAS DOS dimensiones en pestañas —
+        // igual que la decisión de Daniel, que fue una sola («Lo mismo en telas»). Meterla bajo uno
+        // de los dos padres la escondería justo de quien la busca por el otro, que es el defecto
+        // que ya se corrigió dos veces en este mismo menú (el ajuste en agosto y el traspaso en la
+        // fila 0.098). Su gate es el permiso PROPIO: a quien no lo tenga, la entrada ni le aparece.
+        clave: 'salida-material-sin-orden',
+        titulo: 'Salida de material sin orden',
+        descripcion:
+          'Sacar telas o avíos que no van a ninguna orden: devolución al proveedor, venta de material que ya no se usa u otra causa',
+        ruta: '/inventarios/salida-sin-orden',
+        icono: 'paquete',
+        permisos: ['salida-material.registrar'],
+        subVista: true,
+      },
+      {
         clave: 'compras',
         titulo: 'Compras / MRP',
         descripcion: 'Explosión de materiales, órdenes de compra y recepciones',
@@ -1696,6 +1712,9 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
           'inventario-materiales-traspasos',
         ],
       },
+      // ⭐ La salida sin orden entra al RIEL como hoja: sólo la ve quien tiene el permiso (que es
+      // el administrador), y a él le tiene que aparecer sin ir a buscarla por ⌘K.
+      { tipo: 'hoja', clave: 'salida-material-sin-orden' },
       {
         // Compras es PADRE desplegable (pedido de Daniel, 11-ago-2026: «en Compras no hay un
         // submenú de Recepción de compras»): como hoja colapsada solo navegaba a las Órdenes de

@@ -551,6 +551,18 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
       'y dar de alta un concepto es dar de alta A DÓNDE puede salir dinero fuera del padrón de ' +
       'proveedores.',
   },
+  // ── ⭐⭐ La salida de material que NO va a una orden (fila 0.104), §Post-F9.193 resp. 12 ────
+  {
+    clave: 'salida-material.registrar',
+    razon:
+      'SÓLO el administrador (va también en SOLO_ADMINISTRADOR del seed). Daniel lo pidió para él ' +
+      'con esas palabras: *«sí debe existir una salida por otro medio que sólo ajuste de ' +
+      'inventario… siempre autorizada sólo por mí. Nadie más»*. NO baja a Directivo ni a ' +
+      'Gerencial, y desde luego no a los perfiles que ya llevan `inventario-telas.mover` / ' +
+      '`inventario-avios.mover` — reusar aquéllos era exactamente lo que la fila vino a evitar. ' +
+      'Gobierna también la CANCELACIÓN de estas salidas: el inverso devuelve el material al ' +
+      'inventario, o sea deshace la misma decisión.',
+  },
   // ── ⭐⭐ Cerrar la orden y CONGELAR su costo (fila 0.061), §Post-F9.154(c) ──────────────────
   {
     clave: 'ordenes.cerrar',
