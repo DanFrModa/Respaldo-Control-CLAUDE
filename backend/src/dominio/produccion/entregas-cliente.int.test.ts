@@ -236,6 +236,44 @@ describe('Entrega a cliente — salida de PT (F3-E5)', () => {
     expect(existencias.totalExistencia).toBe(10);
   });
 
+  /**
+   * Fila 0.137, SEGUNDA PASADA (producción). Hasta aquí la entrega solo comprobaba que el almacén
+   * existiera, estuviera activo y fuera de la empresa: nada impedía "entregarle al cliente" desde
+   * la bodega de TELAS, donde ese producto terminado no puede estar. Ahora pasa por la guarda de
+   * tipo del dominio (A1), no por el desplegable de la pantalla.
+   */
+  it('RECHAZA entregar desde un almacén que NO es de PT, y el de PT sí pasa (guarda de tipo)', async () => {
+    await meterAInventario(10);
+    const almTelas = await cliente.almacen.create({
+      data: { nombre: 'Naucalpan', tipo: 'TELA' },
+    });
+
+    await expect(
+      registrarEntregaCliente(
+        sesion(),
+        {
+          idOrden,
+          idAlmacen: almTelas.id,
+          fecha: '2026-06-21',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+
+    // Se plantó ANTES de escribir (A2): ni entrega ni salida de kardex.
+    expect(
+      await cliente.etapaMovimiento.count({ where: { idOrden, tipo: 'entrega_cliente' } }),
+    ).toBe(0);
+    const intactas = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(intactas.totalExistencia).toBe(10);
+
+    // La otra mitad: desde el almacén de PT la entrega sí procede.
+    await entregar(6);
+    const despues = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(despues.totalExistencia).toBe(4);
+  });
+
   it('(c) dos entregas CONCURRENTES del mismo artículo NO dejan negativo', async () => {
     await meterAInventario(10);
     // Dos entregas de 6 (12 > 10): a lo sumo UNA pasa.

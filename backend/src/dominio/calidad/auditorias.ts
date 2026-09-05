@@ -579,7 +579,7 @@ async function tipoMovPorCodigo(tx: Tx, codigo: string): Promise<number> {
  *
  * El `activo: true` es de la fila 0.137 (hallazgo R4 del reviewer): faltaba, así que una
  * reclasificación Primeras↔Segundas podía mover prendas a un almacén DESACTIVADO —el resto del
- * sistema ya no lo ofrece ni lo acepta (`exigirAlmacen`), y la existencia habría quedado atrapada
+ * sistema ya no lo ofrece ni lo acepta (`exigirAlmacenDelTipo`), y la existencia habría quedado
  * ahí sin forma de sacarla por los flujos normales. El tipo ya se exigía; el estado no.
  */
 async function almacenPtPorNombre(tx: Tx, nombre: string, idEmpresa: number): Promise<number> {

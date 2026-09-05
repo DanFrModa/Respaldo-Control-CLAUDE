@@ -119,7 +119,8 @@ async function tipoPorCodigo(tx: Tx, codigo: string): Promise<{ id: number; nomb
 
 /**
  * Resuelve el ALMACÉN DE TRÁNSITO usable por una empresa: el que trae la bandera
- * `esTransitoProceso`, activo, GLOBAL o de esa empresa (A9 — mismo criterio que `exigirAlmacen`).
+ * `esTransitoProceso`, activo, GLOBAL o de esa empresa (A9 — mismo criterio que
+ * `exigirAlmacenDelTipo`).
  * Se busca por la BANDERA, jamás por el nombre: el nombre lo puede editar cualquiera desde el
  * catálogo de almacenes y el flujo se rompería en silencio.
  *
@@ -193,8 +194,9 @@ export async function rechazarAlmacenDeTransito(
   idAlmacen: number,
   queSeIntenta: string,
 ): Promise<void> {
-  // El almacén ya viene validado por `exigirAlmacen` (existe, activo y de esta empresa o global,
-  // A9): aquí solo se mira la bandera.
+  // El almacén ya viene validado por `exigirAlmacenDelTipo` (existe, activo, de esta empresa o
+  // global y de tipo PT, A9): aquí solo se mira la bandera. Y por eso esta comprobación NO sobra
+  // pese a la guarda de tipo — el tránsito ES un almacén de PT, así que la pasa sin problema.
   const almacen = await tx.almacen.findFirst({
     where: { id: idAlmacen, esTransitoProceso: true },
     select: { nombre: true },

@@ -71,6 +71,33 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.116 · 5-sep-2026 · **en prueba** — **Producción tampoco puede meter la prenda en la bodega equivocada**
+
+### Qué se puede hacer ahora que antes no
+
+- Nada nuevo que capturar: esta versión **cierra un hueco**. Una versión anterior ya impidió que el
+  material acabara en un almacén del tipo equivocado en inventarios, compras y notas de salida, pero
+  **producción se quedó fuera** de aquella pasada. Ahora también: **recibir de maquila** (tanto las
+  primeras como las segundas), **entregar al cliente** y **enviar prenda terminada al taller** exigen
+  que el almacén sea de **producto terminado**.
+- Antes, la lista de la pantalla acotaba… y nada más. Quien entrara por otro camino podía meter prendas
+  en la bodega de telas y **el sistema lo aceptaba en silencio**.
+
+### Qué cambió y puede sorprender
+
+- **No vas a notar nada operando normal.** La comprobación coincide exactamente con lo que la pantalla
+  ya ofrecía, así que **no rechaza nada legítimo**: sólo cierra la puerta de atrás.
+- El **almacén de tránsito** —donde vive lo que está físicamente en el taller de un tercero— es de
+  producto terminado, así que *pasa* esta comprobación… y **sigue estando prohibido** para recibir o
+  entregar. Son dos reglas distintas y las dos siguen puestas.
+- Al medirlo apareció algo que nadie sabía: en el **envío de prenda terminada** la comprobación **ya
+  existía, hecha a mano** — y volvía a leer de la base el mismo dato que acababa de leer. Ahora es una
+  sola consulta. Más importante: **ese chequeo no tenía ni una prueba que lo vigilara**; ahora sí.
+
+### Qué sigue pendiente o roto
+
+- Nada de esta versión. No hay migración, ni permisos nuevos, ni nada que capturar.
+
 ## 0.115 · 5-sep-2026 · **en prueba** — **El traspaso de producto terminado deja rastro: motivo obligatorio y hoja impresa**
 
 ### Qué se puede hacer ahora que antes no

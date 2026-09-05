@@ -14,11 +14,15 @@
  * chistar a la bodega de telas (y una entrada de tela a un almacén de PT). Eso parte el inventario
  * en buckets que nadie va a mirar: la existencia sigue cuadrando en la suma del kardex, pero la
  * mercancía no está donde el sistema dice. A1 manda que esa validación viva en el DOMINIO, no en
- * el desplegable → {@link exigirAlmacenDelTipo}, que es {@link exigirAlmacen} + el tipo.
+ * el desplegable → {@link exigirAlmacenDelTipo}.
  *
- * REGLA DE USO: todo escritor que reciba un `idAlmacen` llama a `exigirAlmacenDelTipo` con el tipo
- * del artículo que mueve, DENTRO de su transacción y ANTES de escribir. `exigirAlmacen` (sin tipo)
- * se conserva para los pocos casos donde el tipo lo garantiza otra cosa.
+ * REGLA DE USO: todo escritor que reciba un `idAlmacen` llama a {@link exigirAlmacenDelTipo} con el
+ * tipo del artículo que mueve, DENTRO de su transacción y ANTES de escribir. Es la ÚNICA puerta.
+ * Hubo una variante sin tipo (`exigirAlmacen`) mientras la fila 0.137 convertía a los escritores de
+ * inventarios, compras, notas de salida y conteo cíclico; se retiró en la SEGUNDA PASADA, al
+ * convertir los de PRODUCCIÓN (recibo de maquila, entrega a cliente y envío de prenda terminada),
+ * que eran sus últimos tres llamadores. Dejar a mano una versión más débil de la misma
+ * comprobación solo servía para que el siguiente escritor eligiera la equivocada.
  *
  * NO se llama en las CANCELACIONES ni en el modo MIGRACIÓN:
  *  • La cancelación es un movimiento INVERSO sobre el almacén del movimiento ORIGINAL (D3). Un
@@ -71,21 +75,11 @@ async function leerAlmacenUsable(
 }
 
 /**
- * Verifica que un almacén exista, esté ACTIVO y sea GLOBAL o de la empresa dada (A9). Lanza
- * `ErrorNoEncontrado` si no existe y `ErrorValidacion` si está desactivado o es de otra empresa.
- * Pensado para llamarse DENTRO de la transacción del flujo, antes de cualquier escritura.
- *
- * ⚠️ NO mira el TIPO del almacén: úsalo solo cuando el tipo lo garantice otra cosa (p. ej. el
- * almacén se resolvió con un `where` que ya lo filtra). Para todo lo demás, {@link exigirAlmacenDelTipo}.
- */
-export async function exigirAlmacen(tx: Tx, idAlmacen: number, idEmpresa: number): Promise<void> {
-  await leerAlmacenUsable(tx, idAlmacen, idEmpresa);
-}
-
-/**
- * Igual que {@link exigirAlmacen} y ADEMÁS exige que el almacén sea del `tipo` que corresponde al
- * artículo que se está moviendo (fila 0.137). Lanza `ErrorValidacion` con el nombre del almacén y
- * qué guarda cada uno, para que el capturador sepa qué elegir sin adivinar.
+ * Verifica que un almacén exista, esté ACTIVO, sea GLOBAL o de la empresa dada (A9) y sea del
+ * `tipo` que corresponde al artículo que se está moviendo (fila 0.137). Lanza `ErrorNoEncontrado`
+ * si no existe y `ErrorValidacion` si está desactivado, es de otra empresa o es de otro tipo — este
+ * último con el nombre del almacén y qué guarda cada uno, para que el capturador sepa qué elegir
+ * sin adivinar. Pensado para llamarse DENTRO de la transacción del flujo, antes de escribir nada.
  *
  * El orden de las verificaciones importa: existe → activo → de la empresa → del tipo. Un almacén
  * privado de OTRA empresa "no existe" para esta sesión (A9), así que su mensaje gana al del tipo:
