@@ -31,6 +31,14 @@ export const esquemaTipoMovimientoSalida = z
       .enum(DIRECCIONES_MOVIMIENTO)
       .describe('Dirección: entrada (+), salida (−) o traspaso.'),
     activo: z.boolean().describe('Falso si está desactivado.'),
+    capturaManual: z
+      .boolean()
+      .describe(
+        '¿Se puede elegir en una captura MANUAL de movimiento? Falso en los tipos RESERVADOS a ' +
+          'un flujo con permiso propio (fila 0.104: «Devolución a Proveedor» y «Venta de ' +
+          'Material», que sólo escribe la salida de material sin orden). El servidor los rechaza ' +
+          'igual si llegan; esta bandera existe para que ninguna pantalla los ofrezca.',
+      ),
   })
   .describe('Tipo de movimiento de inventario (catálogo de solo lectura en F3).');
 

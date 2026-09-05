@@ -74,6 +74,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { rechazarTipoReservado } from './salida-sin-orden.js';
 
 // ── Códigos estables de los tipos de movimiento que el dominio resuelve por nombre ───────────────
 
@@ -379,6 +380,12 @@ export async function registrarMovimientoPt(
   const idEmpresa = sesion.idEmpresaActiva;
 
   const idMovimiento = await enTransaccion(async (tx) => {
+    // ⛔ Fila 0.104 — «Devolución a Proveedor» y «Venta de Material» NO son movimientos manuales
+    // de producto terminado. Nacieron en esa fila para telas y avíos, y como el catálogo de tipos
+    // es global se colaban al desplegable de esta pantalla: cualquiera con `inventario-pt.mover`
+    // podía estampar el rótulo que Daniel se reservó, y quien leyera el kardex creería que esa
+    // salida la autorizó él. La venta de PT tiene su propia fila (0.130), con cliente y precio.
+    await rechazarTipoReservado(tx, datos.idTipoMov);
     const tipo = await tipoPorCodigoId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
       throw new ErrorValidacion(

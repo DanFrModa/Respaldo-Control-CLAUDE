@@ -1300,6 +1300,14 @@ export type PreviaSalidaTelaRenglon = PreviaSalidaTelaColor['telas'][number];
 export type PreviaSalidaColorRenglon = PreviaSalidaTelaColor['colores'][number];
 /** Una partida de la lista del aviso de tono. */
 export type PreviaSalidaPartida = PreviaSalidaColorRenglon['partidas'][number];
+/**
+ * ⭐ Cuerpo de una salida de tela por color que NO va a ninguna orden (fila 0.104): devolución al
+ * proveedor, venta de material que ya no se usa u otra causa. Sólo ajusta inventario.
+ */
+export type SalidaTelaColorSinOrdenCrear =
+  paths['/api/inventarios/telas/color/salidas-sin-orden']['post']['requestBody']['content']['application/json'];
+/** Por qué sale el material cuando no va a ninguna orden (enum cerrado del contrato). */
+export type ConceptoSalidaSinOrden = SalidaTelaColorSinOrdenCrear['concepto'];
 /** Cuerpo de un traspaso de tela por color. */
 export type TraspasoTelaColorCrear =
   paths['/api/inventarios/telas/color/traspasos']['post']['requestBody']['content']['application/json'];
@@ -1347,6 +1355,9 @@ export type AjusteAvioCrear =
 /** Cuerpo de un traspaso de avío (`POST /api/inventarios/avios/traspasos`). */
 export type TraspasoAvioCrear =
   paths['/api/inventarios/avios/traspasos']['post']['requestBody']['content']['application/json'];
+/** ⭐ Cuerpo de una salida de avío que NO va a ninguna orden (fila 0.104). */
+export type SalidaAvioSinOrdenCrear =
+  paths['/api/inventarios/avios/salidas-sin-orden']['post']['requestBody']['content']['application/json'];
 /** Resultado de un traspaso de avío: las dos patas. */
 export type TraspasoAvio =
   paths['/api/inventarios/avios/traspasos']['post']['responses']['201']['content']['application/json'];

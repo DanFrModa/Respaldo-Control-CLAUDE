@@ -241,6 +241,18 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
       'cuánto. *«Yo voy decidiendo los montos a pagar de cada uno. Manualmente.»* Ver la relación ' +
       'sí se reparte (`pagos.corrida-ver`); armarla no.',
   },
+  // ── ⭐ La salida de material que NO va a una orden (fila 0.104) ──
+  {
+    clave: 'salida-material.registrar',
+    razon:
+      'Daniel la pidió para él y con esas palabras (§Post-F9.193 resp. 12, 3-sep-2026): *"sí debe ' +
+      'existir una salida por otro medio que sólo ajuste de inventario… siempre autorizada sólo ' +
+      'por mí. Nadie más"*. Sacar tela o avíos SIN orden (devolución al proveedor, venta de ' +
+      'material que ya no se usa) es la única salida de material que no deja rastro en ninguna OP, ' +
+      'así que NO puede ir con el `inventario-telas.mover`/`inventario-avios.mover` que hoy lleva ' +
+      'medio organigrama. Gobierna también CANCELARLAS: el inverso devuelve el material al ' +
+      'inventario, o sea deshace la misma decisión.',
+  },
   // ── La marcha atrás de la firma de compra ──
   {
     clave: 'compras.desautorizar',
@@ -1311,17 +1323,60 @@ const TIPOS_MOVIMIENTO_F7: {
   { codigo: 'ajuste-ciclico-salida', nombre: 'Ajuste por Cíclico (Salida)', direccion: 'salida' },
 ];
 
+/**
+ * ⭐ Tipos de movimiento NUEVOS de la fila **0.104** — LA SALIDA QUE NO ES POR OP.
+ *
+ * DANIEL (§Post-F9.193 resp. 12): *«debería de haber manera de sacar por ejemplo una devolución, o
+ * una venta de avíos que ya no se usen… que no sea mediante la descarga o aplicación a una OP…
+ * Lo mismo en telas»*.
+ *
+ * 🔑 **Por qué DEDICADOS y no un `ajuste-salida` con el motivo en prosa:** el kardex es la ventana
+ * por la que se pregunta «¿a dónde se fue esta tela?», y ahí sólo se ve el NOMBRE del tipo. Con el
+ * ajuste genérico, una devolución y una venta quedarían indistinguibles entre sí y revueltas con
+ * las correcciones de conteo. Mismo criterio (y mismas palabras) con que F7-E5 estrenó
+ * `ajuste-ciclico-*`. El tercer concepto de la fila —«otra causa»— NO estrena tipo: reusa el
+ * `otras-salidas` que ya venía en los 19 canónicos del sistema viejo.
+ *
+ * Entran por SEED (no por migración) y sirven a las DOS dimensiones (tela y avío).
+ */
+const TIPOS_MOVIMIENTO_SALIDA_SIN_ORDEN: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  { codigo: 'devolucion-proveedor', nombre: 'Devolución a Proveedor', direccion: 'salida' },
+  { codigo: 'venta-material', nombre: 'Venta de Material', direccion: 'salida' },
+];
+
+/**
+ * TODOS los tipos de movimiento que el seed siembra: los 19 canónicos del CSV viejo + los 2 de
+ * F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex de telas y avíos) + los 2 de F7-E5 (ajuste
+ * por cíclico) + los 2 de la fila 0.104 (salida sin orden).
+ *
+ * 🔴 **Está EXPORTADA para que se pueda cruzar a máquina con lo que el dominio EXIGE.** Un flujo
+ * que resuelve su tipo por `codigo` y no lo encuentra sembrado nace muerto en `prueba`, y el
+ * defecto no lo caza ninguna prueba de dominio: la cicatriz del proyecto es una fila rechazada
+ * **por el despliegue, no por el código**, porque la siembra no creaba algo que la guarda pedía.
+ * `dominio/inventarios/salida-sin-orden.test.ts` compara esta lista contra
+ * `CODIGO_TIPO_MOV_POR_CONCEPTO` y truena si falta uno.
+ */
+export const TIPOS_MOVIMIENTO_A_SEMBRAR: readonly {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  ...TIPOS_MOVIMIENTO_BASE,
+  ...TIPOS_MOVIMIENTO_V2,
+  ...TIPOS_MOVIMIENTO_F4,
+  ...TIPOS_MOVIMIENTO_F7,
+  ...TIPOS_MOVIMIENTO_SALIDA_SIN_ORDEN,
+];
+
 async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
   await verificarTiposMovimientoContraCsv();
-  // Los 19 canónicos del CSV + los 2 nuevos de F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex
-  // de telas y avíos) + los 2 de F7-E5 (ajuste por cíclico). Idempotente: el `update: {}` no pisa
-  // nombre/dirección/activo si ya existen (pudieron editarse en producción).
-  for (const tipo of [
-    ...TIPOS_MOVIMIENTO_BASE,
-    ...TIPOS_MOVIMIENTO_V2,
-    ...TIPOS_MOVIMIENTO_F4,
-    ...TIPOS_MOVIMIENTO_F7,
-  ]) {
+  // Idempotente: el `update: {}` no pisa nombre/dirección/activo si ya existen (pudieron editarse
+  // en producción).
+  for (const tipo of TIPOS_MOVIMIENTO_A_SEMBRAR) {
     await prisma.tipoMovimientoInventario.upsert({
       where: { codigo: tipo.codigo },
       update: {},

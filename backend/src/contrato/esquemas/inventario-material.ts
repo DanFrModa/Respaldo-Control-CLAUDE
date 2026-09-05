@@ -454,6 +454,63 @@ export const esquemaSalidaTelaColorCrear = z
 /** Datos validados de una salida de tela por color a orden. */
 export type DatosSalidaTelaColorCrear = z.infer<typeof esquemaSalidaTelaColorCrear>;
 
+// ── ⭐ LA SALIDA QUE NO ES POR OP (fila 0.104) ───────────────────────────────────────────────────
+//
+// DANIEL (§Post-F9.193 resp. 12, 4-sep-2026): *«debería de haber manera de sacar por ejemplo una
+// devolución, o una venta de avíos que ya no se usen… que no sea mediante la descarga o aplicación
+// a una OP. Esto autorizado siempre por mí. Lo mismo en telas»*. Y antes (3-sep): *«sí debe existir
+// una salida por otro medio que sólo ajuste de inventario»*.
+//
+// 🔑 EL CONCEPTO NO ES TEXTO LIBRE. Una salida sin orden tiene que decir POR QUÉ existe, y decirlo
+// de una forma que el kardex pueda leer: por eso el concepto es un ENUM cerrado que el dominio
+// traduce a un TIPO DE MOVIMIENTO dedicado. El motivo en prosa (obligatorio, como en el ajuste)
+// va aparte: sirve para el detalle («devolución de la factura 8842»), no para clasificar.
+
+/**
+ * Por qué sale el material cuando no va a ninguna orden. Los dos primeros son los que Daniel
+ * nombró; `otro` es el «o cualquier otra cosa» del 2-sep-2026 y NO estrena tipo de movimiento
+ * (reusa el «Otras Salidas» que ya existe desde el sistema viejo).
+ */
+export const esquemaConceptoSalidaSinOrden = z
+  .enum(['devolucion-proveedor', 'venta', 'otro'])
+  .describe(
+    'Por qué sale el material sin orden: devolución al proveedor, venta de material que ya no ' +
+      'se usa, u otra causa.',
+  );
+
+/** Por qué sale el material cuando no va a ninguna orden. */
+export type ConceptoSalidaSinOrden = z.infer<typeof esquemaConceptoSalidaSinOrden>;
+
+/** Campos comunes del encabezado de una salida sin orden (misma forma para tela y avío). */
+const camposSalidaSinOrden = {
+  concepto: esquemaConceptoSalidaSinOrden,
+  idAlmacen: idPositivo('el almacén'),
+  fecha: z.iso.date({ error: 'La fecha de la salida es obligatoria (YYYY-MM-DD)' }),
+  motivo: z
+    .string({ error: 'El motivo es obligatorio' })
+    .trim()
+    .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+    .max(500)
+    .describe('Detalle de la salida (a qué proveedor se devolvió, a quién se le vendió…).'),
+} as const;
+
+/**
+ * Alta de una SALIDA de TELA por color que NO va a ninguna orden (fila 0.104). Sólo ajusta
+ * inventario: no toca compras, ni CxP, ni notas de crédito. No lleva partida (el consumo empareja
+ * por tela+color) y no deja negativo ninguno de los dos componentes (dominio, bajo lock).
+ */
+export const esquemaSalidaTelaColorSinOrdenCrear = z
+  .object({
+    ...camposSalidaSinOrden,
+    lineas: z
+      .array(esquemaTelaColorLineaSalida)
+      .min(1, { error: 'Captura al menos un renglón de tela y color' }),
+  })
+  .describe('Salida de tela por color SIN orden (devolución / venta / otra). Sólo inventario.');
+
+/** Datos validados de una salida de tela por color sin orden. */
+export type DatosSalidaTelaColorSinOrdenCrear = z.infer<typeof esquemaSalidaTelaColorSinOrdenCrear>;
+
 /** Alta de un TRASPASO de tela POR COLOR entre dos almacenes (ambas cantidades juntas). */
 export const esquemaTraspasoTelaColorCrear = z
   .object({
@@ -1116,6 +1173,23 @@ export const esquemaTraspasoAvioCrear = z
 
 /** Datos validados de un traspaso de avío. */
 export type DatosTraspasoAvioCrear = z.infer<typeof esquemaTraspasoAvioCrear>;
+
+/**
+ * Alta de una SALIDA de AVÍO que NO va a ninguna orden (fila 0.104 — el caso que Daniel nombró
+ * con nombre y apellido: *«una venta de avíos que ya no se usen»*). Sólo ajusta inventario; no
+ * deja existencia negativa (dominio, bajo lock).
+ */
+export const esquemaSalidaAvioSinOrdenCrear = z
+  .object({
+    ...camposSalidaSinOrden,
+    lineas: z
+      .array(esquemaAjusteAvioLinea)
+      .min(1, { error: 'Captura al menos un renglón de avío' }),
+  })
+  .describe('Salida de avío SIN orden (devolución / venta / otra). Sólo inventario.');
+
+/** Datos validados de una salida de avío sin orden. */
+export type DatosSalidaAvioSinOrdenCrear = z.infer<typeof esquemaSalidaAvioSinOrdenCrear>;
 
 /** Un renglón de la salida de un movimiento de avío. */
 const esquemaMovAvioRenglonSalida = z.object({

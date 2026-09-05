@@ -67,9 +67,22 @@ test.describe('Inicio de sesión', () => {
     }
 
     // Hojas directas visibles sin desplegar nada.
-    for (const hoja of ['Resumen', 'Pedidos', 'Proveedores', 'Cuentas por cobrar']) {
+    // ⭐ «Salida de material sin orden» (fila 0.104) es hoja del grupo Inventarios y la ve SÓLO
+    // quien tiene `salida-material.registrar` — que es el administrador con el que corre esta
+    // prueba. Es la única cobertura de CI sobre esa pantalla, así que aquí se comprueba que existe
+    // y que lleva a su ruta (si el gate se ensanchara o se estrechara de más, esto se cae).
+    for (const hoja of [
+      'Resumen',
+      'Pedidos',
+      'Proveedores',
+      'Cuentas por cobrar',
+      'Salida de material sin orden',
+    ]) {
       await expect(navegacion.getByRole('link', { name: hoja, exact: true })).toBeVisible();
     }
+    await expect(
+      navegacion.getByRole('link', { name: 'Salida de material sin orden', exact: true }),
+    ).toHaveAttribute('href', '/inventarios/salida-sin-orden');
 
     // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 8 padres desplegables
     // (Desarrollo, Producción, Inventario PT, Telas, Avíos, Compras / MRP, Clientes, Catálogos

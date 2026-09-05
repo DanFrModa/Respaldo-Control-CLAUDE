@@ -58,7 +58,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 109 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 110 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
     // (106 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
@@ -69,9 +69,10 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // del modelo (§Post-F9.35)— y solo sobrevive su galería; +1 en V1-E3h: la bandeja «Recetas
     // por liberar» de Desarrollo (§Post-F9.72); +1 en V1-E8r: su hermana «Recetas por revisar»,
     // la cola de la revisión de receta (§Post-F9.140); +1 en V1-E9p: «Promesas incumplidas», la
-    // lista del DUEÑO con lo que se vendió y no se consiguió (§Post-F9.144(b)). Lo que cambia es
-    // SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(109);
+    // lista del DUEÑO con lo que se vendió y no se consiguió (§Post-F9.144(b)); +1 en la fila
+    // 0.104: «Salida de material sin orden» (la devolución / venta de telas y avíos que no pasa
+    // por ninguna OP, §Post-F9.193 resp. 12). Lo que cambia es SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(110);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -189,8 +190,10 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
       (m) => m.subVista === true && m.ruta.startsWith('/inventarios/'),
     );
     // +4 en A2: ajuste/traspaso de telas por color y las vistas legadas por lote (existencias y
-    // salida a orden); +1 en B1: entradas de tela por factura/remisión.
-    expect(inventarios).toHaveLength(15);
+    // salida a orden); +1 en B1: entradas de tela por factura/remisión; +1 en la fila 0.104: la
+    // salida de material sin orden (cuelga del grupo, no de «Telas» ni de «Avíos», porque sirve a
+    // las dos dimensiones).
+    expect(inventarios).toHaveLength(16);
   });
 
   it('busca por clave: hojas, padres (ruta legada /compras) e inexistentes', () => {
@@ -347,6 +350,11 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
             'inventario-materiales-traspasos',
           ],
         },
+        // ⭐ Fila 0.104: la salida de material que NO va a una orden. HOJA de primer nivel porque
+        // sirve a las DOS dimensiones (telas y avíos) en pestañas — la decisión de Daniel fue una
+        // sola («Lo mismo en telas»), y meterla bajo uno de los dos padres la escondería de quien
+        // la busque por el otro. Sólo la ve quien tiene `salida-material.registrar`.
+        { clave: 'salida-material-sin-orden', padre: false },
         {
           // Daniel, 11-ago-2026: Compras pasó a DESPLEGABLE — como hoja colapsada, Recepción /
           // Estatus / Explosión no tenían ENTRADA EN EL MENÚ ni enlace estable (solo ⌘K/URL; la
@@ -559,15 +567,34 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       'inventario-telas-traspaso',
     );
 
-    // Ninguna de las 4 entradas del grupo Inventarios navega ya: todas despliegan.
+    // Ninguno de los 4 PADRES del grupo Inventarios queda colapsado: todos despliegan. (La quinta
+    // entrada, «Salida de material sin orden» de la fila 0.104, es una HOJA de verdad —una
+    // pantalla propia, como `pedidos` o `ruta-critica` en otros grupos—, no un padre escondido
+    // detrás de una de sus pantallas, que es el defecto que este caso vigila.)
     const grupo = RIEL_GRUPOS.find((g) => g.clave === 'inventarios');
     expect(grupo?.entradas.map((e) => e.clave)).toEqual([
       'inventarios',
       'telas',
       'avios',
+      'salida-material-sin-orden',
       'compras',
     ]);
+    const salidaSinOrden = grupo?.entradas.find((e) => e.clave === 'salida-material-sin-orden');
+    expect(salidaSinOrden, 'la salida sin orden debe estar en el grupo').toBeDefined();
+    // `hijos === undefined` es el discriminante de la unión: además de comprobar que NO es un
+    // padre, es lo que le deja ver a TypeScript que aquí hay una hoja (con `ruta` y `permisos`).
+    if (salidaSinOrden !== undefined && salidaSinOrden.hijos === undefined) {
+      expect(salidaSinOrden.ruta).toBe('/inventarios/salida-sin-orden');
+      expect(
+        salidaSinOrden.permisos,
+        'gate propio: sólo lo ve quien puede sacar sin orden',
+      ).toEqual(['salida-material.registrar']);
+    } else {
+      expect.unreachable('la salida sin orden es una hoja, no un padre desplegable');
+    }
+
     for (const entrada of grupo?.entradas ?? []) {
+      if (entrada.clave === 'salida-material-sin-orden') continue;
       expect(entrada.hijos, `${entrada.clave} debe ser desplegable`).toBeDefined();
     }
   });

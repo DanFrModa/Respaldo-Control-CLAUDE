@@ -69,13 +69,45 @@ function existenciasPorConsulta(
 const TIPOS_MOV_OK = {
   data: {
     datos: [
-      { id: 1, codigo: 'inventario-inicial', nombre: 'Inventario Inicial', direccion: 'entrada' },
-      { id: 5, codigo: 'entrega-cliente', nombre: 'Entrega a Cliente', direccion: 'salida' },
+      {
+        id: 1,
+        codigo: 'inventario-inicial',
+        nombre: 'Inventario Inicial',
+        direccion: 'entrada',
+        capturaManual: true,
+      },
+      {
+        id: 5,
+        codigo: 'entrega-cliente',
+        nombre: 'Entrega a Cliente',
+        direccion: 'salida',
+        capturaManual: true,
+      },
       {
         id: 9,
         codigo: 'transferencia-almacenes',
         nombre: 'Transferencia entre almacenes',
         direccion: 'traspaso',
+        capturaManual: true,
+      },
+      // ⛔ Fila 0.104 — los dos rótulos RESERVADOS a la salida de material sin orden. El catálogo
+      // de tipos es GLOBAL, así que el API los DEVUELVE también aquí; lo que no puede pasar es que
+      // esta pantalla los OFREZCA (el servidor los rechaza igual, pero no se enseña una puerta que
+      // no abre). Van con dirección `salida` a propósito: el filtro viejo, que sólo miraba
+      // `direccion !== 'traspaso'`, los dejaba pasar.
+      {
+        id: 30,
+        codigo: 'devolucion-proveedor',
+        nombre: 'Devolución a Proveedor',
+        direccion: 'salida',
+        capturaManual: false,
+      },
+      {
+        id: 31,
+        codigo: 'venta-material',
+        nombre: 'Venta de Material',
+        direccion: 'salida',
+        capturaManual: false,
       },
     ],
   },
@@ -187,6 +219,29 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     expect(textos.some((t) => t.includes('Inventario Inicial'))).toBe(true);
     expect(textos.some((t) => t.includes('Entrega a Cliente'))).toBe(true);
     expect(textos.some((t) => t.includes('Transferencia entre almacenes'))).toBe(false);
+  });
+
+  it('⛔ el dropdown NO ofrece los rótulos RESERVADOS a la salida sin orden (fila 0.104)', async () => {
+    // «Devolución a Proveedor» y «Venta de Material» nacieron en la 0.104 para telas y avíos, pero
+    // el catálogo de tipos es GLOBAL: se colaban aquí, y cualquiera con `inventario-pt.mover`
+    // —que son 8 de los 9 perfiles— podía estampar el rótulo que Daniel se reservó. Quien luego
+    // leyera el kardex creería que esa salida la autorizó él. La venta de producto terminado tiene
+    // su propia fila (0.130), con cliente y precio.
+    //
+    // Ojo con lo que fija esta prueba: NO basta con excluir por dirección (las dos son `salida`,
+    // igual que «Entrega a Cliente», que sí debe estar). La pantalla se fía de la bandera
+    // `capturaManual` que decide el SERVIDOR, para no repetir los códigos aquí.
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const textos = [...screen.getByTestId('mov-tipo').querySelectorAll('option')].map(
+      (o) => o.textContent ?? '',
+    );
+    expect(textos.some((t) => t.includes('Devolución a Proveedor'))).toBe(false);
+    expect(textos.some((t) => t.includes('Venta de Material'))).toBe(false);
+    // Y las salidas legítimas siguen ahí: la reserva no se llevó por delante lo de siempre.
+    expect(textos.some((t) => t.includes('Entrega a Cliente'))).toBe(true);
   });
 
   it('guardar arranca DESHABILITADO y se habilita al completar la captura', async () => {

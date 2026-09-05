@@ -22,6 +22,9 @@
  *  • `POST /inventarios/telas/color/salidas-orden/previa` (`inventario-telas.mover`) → SOLO LECTURA:
  *    los dos avisos de la captura en curso (sobre-salida contra lo que la orden pide + riesgo de
  *    tono con la lista de partidas). No registra nada y NUNCA bloquea (fila 0.101).
+ *  • `POST /inventarios/telas/color/salidas-sin-orden` (`salida-material.registrar`) → ⭐ salida que
+ *    NO va a ninguna orden (devolución al proveedor / venta de material / otra causa — fila 0.104).
+ *    Permiso PROPIO y sólo del administrador: NO basta `inventario-telas.mover`.
  *  • `POST /inventarios/telas/color/traspasos`       (`inventario-telas.mover`) → traspaso (2 patas, ambas cantidades).
  *  • `POST /inventarios/telas/color/movimientos/:id/cancelar` (`inventario-telas.mover`) → inverso auditado.
  *  • `GET  /inventarios/telas/color/existencias`     (`inventario-telas.ver`)   → agrupadas tela → colores.
@@ -51,6 +54,7 @@ import {
   esquemaConteoTelaColorCrear,
   esquemaConteoTelaColorSalida,
   esquemaSalidaTelaColorCrear,
+  esquemaSalidaTelaColorSinOrdenCrear,
   esquemaTraspasoTelaColorCrear,
   esquemaMovimientoTelaColorSalida,
   esquemaTraspasoTelaColorSalida,
@@ -85,6 +89,7 @@ import {
   listarPartidasTela,
   registrarConteoTelaColor,
   registrarSalidaTelaColorAOrden,
+  registrarSalidaTelaColorSinOrden,
   saldosTelaColorParaConteo,
   traspasarTelaColor,
 } from '../../dominio/inventarios/partidas-telas.js';
@@ -334,6 +339,30 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return previaSalidaTelaColorAOrden(sesion, request.body);
+    },
+  });
+
+  // ── ⭐ Salida por color que NO va a ninguna orden (fila 0.104) ───────────────
+  // DANIEL (§Post-F9.193 resp. 12): *«sacar por ejemplo una devolución, o una venta… que no sea
+  // mediante la descarga o aplicación a una OP. Esto autorizado siempre por mí»*. El gate es el
+  // permiso PROPIO `salida-material.registrar` —no el `.mover` que lleva medio organigrama—, y la
+  // guarda de verdad la vuelve a hacer el dominio (A1): esto sólo evita el viaje.
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/salidas-sin-orden',
+    preHandler: app.conPermiso('salida-material.registrar'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Registrar una salida de tela por color SIN orden (devolución al proveedor, venta u otra causa)',
+      security: SEGURIDAD_SESION,
+      body: esquemaSalidaTelaColorSinOrdenCrear,
+      response: { 201: esquemaMovimientoTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const movimiento = await registrarSalidaTelaColorSinOrden(sesion, request.body);
+      return reply.code(201).send(movimiento);
     },
   });
 

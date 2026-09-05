@@ -169,6 +169,10 @@ describe('catálogo de permisos', () => {
       'rc.programar',
       'rc.ruta-ver',
       'roles.administrar',
+      // ⭐ La salida de material que NO va a una orden (fila 0.104, §Post-F9.193 resp. 12):
+      // devolución al proveedor / venta de material que ya no se usa. Módulo propio, permiso
+      // propio, y sólo del administrador (Daniel: «siempre autorizada sólo por mí. Nadie más»).
+      'salida-material.registrar',
       'tallas.administrar',
       'tallas.ver',
       // Catálogos de materiales (F1-E3): telas unificadas (D5) + categorías + colores.

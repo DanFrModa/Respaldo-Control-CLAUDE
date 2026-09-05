@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.119 · 5-sep-2026 · **en prueba** — **Sacar material sin que vaya a ninguna orden — y que sólo la dirección pueda hacerlo**
+
+### Qué se puede hacer ahora que antes no
+
+- **Sacar tela o avíos sin pasarlos por una orden de producción**, para los dos casos que faltaban: una
+  **devolución al proveedor** y la **venta de material que ya no se usa**. Sólo ajusta el inventario — no
+  genera nota de crédito ni toca la cuenta del proveedor —, y **a quién se le devolvió o vendió se anota en
+  el motivo, que es obligatorio**.
+- **La registra sólo la dirección, y sólo la dirección puede cancelarla.** No hay una segunda puerta por
+  donde alguien más pueda hacer lo mismo con otro nombre.
+- **En el kardex se distingue una devolución de una venta y de un ajuste de conteo**, porque cada una lleva
+  su propio rótulo en vez de irse todas al cajón de «otras salidas».
+
+### Qué cambió y puede sorprender
+
+- Aparece una entrada nueva en el menú de Inventarios, **«Salida de material sin orden»**, pero **sólo la
+  ven quienes pueden usarla** (Administrador y Administración / Dirección).
+- **Los dos rótulos nuevos —«Devolución a Proveedor» y «Venta de Material»— quedan RESERVADOS**: ya no se
+  pueden elegir en los ajustes de telas, ni en los de avíos, ni en los movimientos manuales de producto
+  terminado. Si alguien los usaba desde ahí, ahora tiene que entrar por la pantalla nueva.
+  ⭐ Esto no estaba en el plan original y **es la mitad del valor de la versión**: un rótulo dedicado sólo
+  significa algo si **nadie más puede estamparlo**; si cualquiera puede, clasifica igual de mal que antes y
+  con más confianza.
+- Cancelar una de estas salidas **genera el movimiento inverso auditado** de siempre: nada se edita ni se
+  borra.
+
+### Qué sigue pendiente o roto
+
+- **Sin migración.** Lo que **sí siembra** la versión: el permiso `salida-material.registrar` y los dos
+  tipos de movimiento nuevos — por eso aparecen el menú y los rótulos.
+- Esta salida **no toca finanzas**: si la devolución al proveedor debe convertirse en una nota de crédito,
+  eso se sigue haciendo aparte.
+
 ## 0.118 · 5-sep-2026 · **en prueba** — **El kardex de producto terminado ya no vuelca diez años de golpe**
 
 ### Qué se puede hacer ahora que antes no

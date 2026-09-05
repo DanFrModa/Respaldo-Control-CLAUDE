@@ -18,6 +18,7 @@
  */
 import {
   esquemaAjusteAvioCrear,
+  esquemaSalidaAvioSinOrdenCrear,
   esquemaTraspasoAvioCrear,
   esquemaMovimientoMaterialCancelarCuerpo,
   type DatosAjusteAvioLinea,
@@ -51,6 +52,12 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import {
+  CODIGO_TIPO_MOV_POR_CONCEPTO,
+  exigirPermisoParaCancelarSalidaSinOrden,
+  exigirPermisoSalidaSinOrden,
+  rechazarTipoReservado,
+} from './salida-sin-orden.js';
 
 // ── Códigos estables de tipos de movimiento ──────────────────────────────────────────────────────
 
@@ -243,6 +250,8 @@ async function obtenerMovimientoAvio(
 
 export type EntradaAjusteAvio = z.input<typeof esquemaAjusteAvioCrear>;
 export type EntradaTraspasoAvio = z.input<typeof esquemaTraspasoAvioCrear>;
+/** Datos de una salida de avío que NO va a ninguna orden (fila 0.104). */
+export type EntradaSalidaAvioSinOrden = z.input<typeof esquemaSalidaAvioSinOrdenCrear>;
 
 /**
  * Registra un AJUSTE de inventario de AVÍO (conteo físico inicial / corrección — R4). El tipo de
@@ -266,6 +275,8 @@ export async function ajustarInventarioAvio(
     // Fila 0.137 — el almacén del ajuste tiene que ser de AVIO (además de existir, estar activo y
     // ser de esta empresa, A9). Antes no se miraba nada de eso aquí.
     await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'AVIO', idEmpresa);
+    // Fila 0.104 — ver `partidas-telas.ts`: los dos rótulos reservados no se capturan por aquí.
+    await rechazarTipoReservado(tx, datos.idTipoMov);
     const tipo = await tipoPorId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
       throw new ErrorValidacion(
@@ -298,6 +309,71 @@ export async function ajustarInventarioAvio(
         idAlmacen: datos.idAlmacen,
         fecha: aDateColumna(datos.fecha),
         origenTipo: ORIGEN.movimientoManual,
+        lineas,
+        observaciones: datos.motivo,
+      },
+      { tx },
+    );
+    return movimiento.id;
+  }, bd);
+
+  return obtenerMovimientoAvio(idMovimiento, idEmpresa, verImportes, bd);
+}
+
+/**
+ * ⭐ Registra una SALIDA de AVÍO que **no va a ninguna orden** (fila 0.104). Es el caso que Daniel
+ * nombró con nombre y apellido (§Post-F9.193 resp. 12): *«una venta de avíos que ya no se usen»*,
+ * y su hermano, la devolución al proveedor. **Sólo ajusta inventario**: no toca compras, CxP ni
+ * facturación — *«por ahora que toque sólo inventarios»*.
+ *
+ * Salida de kardex normal y corriente (D3), así que reusa lo de esta casa: el mismo
+ * `validarNoNegativoAvio` (advisory lock + suma directa de `MovimientoDetAvio`, nunca la vista) y
+ * el mismo motor `registrarMovimientoAvio`. Lo propio de la fila son las tres decisiones que viven
+ * en `salida-sin-orden.ts`: la llave del dueño (`salida-material.registrar`, exigida ANTES que
+ * nada), el `concepto` que elige un tipo de movimiento DEDICADO para que el kardex distinga
+ * devolución de venta, y la traza `origenTipo = salida-sin-orden` (sin `origenId`: no hay entidad
+ * detrás) que después obliga a tener esa misma llave para cancelarla. Motivo OBLIGATORIO (A7).
+ */
+export async function registrarSalidaAvioSinOrden(
+  sesion: SesionUsuario,
+  entrada: EntradaSalidaAvioSinOrden,
+  bd?: ContextoBd,
+): Promise<MovimientoAvioSalida> {
+  exigirPermisoSalidaSinOrden(sesion);
+  const datos = validarEntrada(esquemaSalidaAvioSinOrdenCrear, entrada);
+  const idEmpresa = sesion.idEmpresaActiva;
+  const verImportes = tienePermiso(sesion, 'telas.ver-totales');
+  validarRenglonesAvioUnicos(datos.lineas);
+
+  const idMovimiento = await enTransaccion(async (tx) => {
+    // El avío sale de un almacén de AVIO, y de uno usable por ESTA empresa (A9 — fila 0.137).
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'AVIO', idEmpresa);
+    const tipo = await tipoPorCodigo(tx, CODIGO_TIPO_MOV_POR_CONCEPTO[datos.concepto]);
+    const genericos = await cargarGenericos(
+      tx,
+      datos.lineas.map((l) => l.idAvio),
+    );
+    await validarNoNegativoAvio(
+      tx,
+      idEmpresa,
+      datos.idAlmacen,
+      datos.lineas.map((l) => ({ idAvio: l.idAvio, cantidad: l.cantidad })),
+    );
+
+    const lineas: LineaMovimientoAvio[] = datos.lineas.map((l) => ({
+      idAvio: l.idAvio,
+      ...(l.idLote === undefined ? {} : { idLote: l.idLote }),
+      esGenerico: genericos.get(l.idAvio) ?? false,
+      cantidad: l.cantidad,
+    }));
+    const movimiento = await registrarMovimientoAvioMotor(
+      sesion,
+      {
+        idEmpresa,
+        idTipoMov: tipo.id,
+        idAlmacen: datos.idAlmacen,
+        fecha: aDateColumna(datos.fecha),
+        origenTipo: ORIGEN.salidaSinOrden,
         lineas,
         observaciones: datos.motivo,
       },
@@ -383,6 +459,11 @@ export async function traspasarAvio(
  * CANCELA un movimiento de AVÍO generando su INVERSO auditado (D3/A7): `entrada` → `ajuste-salida`;
  * `salida` → `ajuste-entrada`. El inverso no valida no-negativo (debe poder registrarse siempre).
  * Permiso `inventario-avios.mover`. Solo movimientos de la empresa activa (A9). No se re-cancela.
+ *
+ * ⭐ **Y una llave EXTRA para las salidas sin orden (fila 0.104):** si el movimiento nació de una
+ * salida que no iba a ninguna orden (`origenTipo = salida-sin-orden`), cancelarlo devuelve el avío
+ * al inventario — o sea, deshace la decisión que Daniel se reservó. Para ésas se exige ADEMÁS
+ * `salida-material.registrar` (ver `salida-sin-orden.ts`). Para todo lo demás, no cambia nada.
  */
 export async function cancelarMovimientoAvio(
   sesion: SesionUsuario,
@@ -400,13 +481,18 @@ export async function cancelarMovimientoAvio(
       where: { id: idMovimiento, idEmpresa },
       select: {
         id: true,
+        origenTipo: true,
         tipoMov: { select: { direccion: true } },
+        idMovimientoInverso: true,
         detallesAvio: { select: { id: true } },
       },
     });
     if (original === null || original.detallesAvio.length === 0) {
       throw new ErrorNoEncontrado('Movimiento de avío', idMovimiento);
     }
+    // Fila 0.104: la marcha atrás de una salida sin orden —y la de esa marcha atrás— piden la
+    // MISMA llave que la salida.
+    await exigirPermisoParaCancelarSalidaSinOrden(tx, sesion, original);
     const codigoInverso =
       original.tipoMov.direccion === DireccionMovimiento.entrada
         ? COD_AJUSTE_SALIDA

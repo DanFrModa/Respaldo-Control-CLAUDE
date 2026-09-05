@@ -31,6 +31,7 @@ import {
   esquemaConteoTelaColorCrear,
   esquemaSaldosTelaColorQuery,
   esquemaSalidaTelaColorCrear,
+  esquemaSalidaTelaColorSinOrdenCrear,
   esquemaTraspasoTelaColorCrear,
   esquemaMovimientoMaterialCancelarCuerpo,
   type ConteoTelaColorRenglonSalida,
@@ -70,6 +71,12 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import {
+  CODIGO_TIPO_MOV_POR_CONCEPTO,
+  exigirPermisoParaCancelarSalidaSinOrden,
+  exigirPermisoSalidaSinOrden,
+  rechazarTipoReservado,
+} from './salida-sin-orden.js';
 import { aDateColumna, aNumero, tipoPorCodigo, tipoPorId } from './telas.js';
 
 /** Clave de la secuencia de folios de partida (A3 — consecutivo por empresa, jamás Max()+1). */
@@ -393,6 +400,8 @@ export type EntradaAjusteTelaColor = z.input<typeof esquemaAjusteTelaColorCrear>
 export type EntradaSalidaTelaColor = z.input<typeof esquemaSalidaTelaColorCrear>;
 /** Datos de un traspaso por color. */
 export type EntradaTraspasoTelaColor = z.input<typeof esquemaTraspasoTelaColorCrear>;
+/** Datos de una salida por color que NO va a ninguna orden (fila 0.104). */
+export type EntradaSalidaTelaColorSinOrden = z.input<typeof esquemaSalidaTelaColorSinOrdenCrear>;
 
 /**
  * Registra un AJUSTE de inventario de tela POR COLOR (conteo físico / arranque desde cero /
@@ -417,6 +426,9 @@ export async function ajustarInventarioTelaColor(
     // Fila 0.137 — el almacén del ajuste tiene que ser de TELA (además de existir, estar activo y
     // ser de esta empresa, A9). Antes no se miraba nada de eso aquí.
     await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
+    // Fila 0.104 — un ajuste NO puede estampar «Devolución a Proveedor» ni «Venta de Material»:
+    // esos dos rótulos sólo los escribe la salida sin orden, que exige la llave del dueño.
+    await rechazarTipoReservado(tx, datos.idTipoMov);
     const tipo = await tipoPorId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
       throw new ErrorValidacion(
@@ -989,6 +1001,62 @@ export async function registrarSalidaTelaColorAOrden(
 }
 
 /**
+ * ⭐ Registra una SALIDA de tela POR COLOR que **no va a ninguna orden** (fila 0.104 — DANIEL,
+ * §Post-F9.193 resp. 12: *«Lo mismo en telas»*): devolución al proveedor, venta de material que ya
+ * no se usa, u otra causa. **Sólo ajusta inventario**: no toca compras, CxP ni facturación.
+ *
+ * Es una salida de kardex como cualquier otra (D3) y por eso reusa TODO lo de esta casa: el mismo
+ * `resolverColores` (con las reglas del complemento), el MISMO `validarNoNegativoTelaColor` (bajo
+ * `pg_advisory_xact_lock` + suma directa de `MovimientoDetTela`, nunca la vista) y el mismo motor
+ * `registrarMovimientoTela`. Lo único propio son las tres decisiones de la fila:
+ *
+ *  • **Quién** — `salida-material.registrar`, la llave del dueño, NO `inventario-telas.mover`
+ *    (`salida-sin-orden.ts` explica por qué). Se exige lo PRIMERO, antes de validar la captura.
+ *  • **Por qué** — el `concepto` elige un tipo de movimiento DEDICADO, para que el kardex sepa
+ *    distinguir una devolución de una venta y las dos de un ajuste de conteo.
+ *  • **Traza** — `origenTipo = salida-sin-orden` y SIN `origenId` (no hay entidad detrás). Eso es
+ *    lo que después obliga a tener la misma llave para CANCELARLA.
+ *
+ * Sin partida (`idPartida` NULL, como toda salida: el consumo empareja por tela+color) y con
+ * motivo OBLIGATORIO, que va a las observaciones del movimiento (A7).
+ */
+export async function registrarSalidaTelaColorSinOrden(
+  sesion: SesionUsuario,
+  entrada: EntradaSalidaTelaColorSinOrden,
+  bd?: ContextoBd,
+): Promise<MovimientoTelaColorSalida> {
+  exigirPermisoSalidaSinOrden(sesion);
+  const datos = validarEntrada(esquemaSalidaTelaColorSinOrdenCrear, entrada);
+  const idEmpresa = sesion.idEmpresaActiva;
+  const verImportes = tienePermiso(sesion, 'telas.ver-totales');
+
+  const idMovimiento = await enTransaccion(async (tx) => {
+    // La tela sale de un almacén de TELA, y de uno usable por ESTA empresa (A9 — fila 0.137).
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
+    const tipo = await tipoPorCodigo(tx, CODIGO_TIPO_MOV_POR_CONCEPTO[datos.concepto]);
+    const colores = await resolverColores(tx, datos.lineas);
+    await validarNoNegativoTelaColor(tx, idEmpresa, datos.idAlmacen, datos.lineas, colores);
+
+    const movimiento = await registrarMovimientoTelaMotor(
+      sesion,
+      {
+        idEmpresa,
+        idTipoMov: tipo.id,
+        idAlmacen: datos.idAlmacen,
+        fecha: aDateColumna(datos.fecha),
+        origenTipo: ORIGEN.salidaSinOrden,
+        lineas: aLineasMotor(datos.lineas, colores),
+        observaciones: datos.motivo,
+      },
+      { tx },
+    );
+    return movimiento.id;
+  }, bd);
+
+  return obtenerMovimientoTelaColor(idMovimiento, idEmpresa, verImportes, bd);
+}
+
+/**
  * Registra un TRASPASO de tela POR COLOR entre dos almacenes de la empresa activa: DOS patas
  * atómicas (salida del origen + entrada al destino) en UNA transacción (A2, patrón
  * `registrarTraspasoTela`), con AMBAS cantidades juntas. Valida que el ORIGEN aguante los dos
@@ -1050,6 +1118,12 @@ export async function traspasarTelaColor(
  * suma por color). `entrada` → inverso `ajuste-salida`; `salida` → inverso `ajuste-entrada`. El
  * inverso es de corrección: NO valida no-negativo. Permiso `inventario-telas.mover`; empresa
  * activa (A9). No se re-cancela ni se cancela una sola pata de un traspaso (motor).
+ *
+ * ⭐ **Y una llave EXTRA para las salidas sin orden (fila 0.104):** si el movimiento nació de una
+ * salida que no iba a ninguna orden (`origenTipo = salida-sin-orden`), cancelarlo devuelve el
+ * material al inventario — o sea, deshace la decisión que Daniel se reservó. Para ésas se exige
+ * ADEMÁS `salida-material.registrar` (ver `salida-sin-orden.ts`). Para todo lo demás, este
+ * permiso no cambia nada.
  */
 export async function cancelarMovimientoTelaColor(
   sesion: SesionUsuario,
@@ -1067,13 +1141,18 @@ export async function cancelarMovimientoTelaColor(
       where: { id: idMovimiento, idEmpresa },
       select: {
         id: true,
+        origenTipo: true,
         tipoMov: { select: { direccion: true } },
+        idMovimientoInverso: true,
         detallesTela: { select: { idTelaColor: true } },
       },
     });
     if (original === null || !original.detallesTela.some((d) => d.idTelaColor !== null)) {
       throw new ErrorNoEncontrado('Movimiento de tela por color', idMovimiento);
     }
+    // Fila 0.104: la marcha atrás de una salida sin orden —y la marcha atrás de esa marcha atrás—
+    // piden la MISMA llave que la salida.
+    await exigirPermisoParaCancelarSalidaSinOrden(tx, sesion, original);
     const codigoInverso =
       original.tipoMov.direccion === DireccionMovimiento.entrada
         ? COD_AJUSTE_SALIDA

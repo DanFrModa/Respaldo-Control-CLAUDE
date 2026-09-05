@@ -63,6 +63,7 @@ import { AjusteTelaColorPagina } from '@/modulos/inventarios/AjusteTelaColorPagi
 import { TraspasoTelaColorPagina } from '@/modulos/inventarios/TraspasoTelaColorPagina';
 import { EntradasTelaPagina } from '@/modulos/inventarios/EntradasTelaPagina';
 import { CapturaEntradaTelaPagina } from '@/modulos/inventarios/CapturaEntradaTelaPagina';
+import { SalidaSinOrdenPagina } from '@/modulos/inventarios/SalidaSinOrdenPagina';
 import { SalidaTelaColorOrdenPagina } from '@/modulos/inventarios/SalidaTelaColorOrdenPagina';
 import { InventariosPagina } from '@/modulos/inventarios/InventariosPagina';
 import { KardexMaterialesPagina } from '@/modulos/inventarios/KardexMaterialesPagina';
@@ -281,6 +282,8 @@ const router = createBrowserRouter([
           { path: 'inventarios/materiales/kardex', element: <KardexMaterialesPagina /> },
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
+          // ⭐ LA SALIDA QUE NO ES POR OP (fila 0.104): telas y avíos, sólo inventario.
+          { path: 'inventarios/salida-sin-orden', element: <SalidaSinOrdenPagina /> },
           // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4), corazón contable (F6-E4) y la
           // experiencia de usuario del estado de cuenta (F6-E5). Rutas estáticas antes de cualquier :param.
           // La corrida semanal de pagos (0.113) y su catálogo de conceptos (0.125).
