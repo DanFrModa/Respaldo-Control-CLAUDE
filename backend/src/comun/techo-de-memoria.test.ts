@@ -28,6 +28,29 @@
  * 19.7 M → 23.3 M instanciaciones) y la memoria casi igual. O sea: no es urgente. Este guardián no
  * viene a apretar nada — viene a que el día que el margen se acabe, nadie ponga otra venda sin
  * enterarse.
+ *
+ * ## 🔴 Ese día llegó — para el LINT (5-sep-2026)
+ *
+ * **El guardián hizo su trabajo:** con el CI en rojo y prisa, el lead subió el techo a 8192 en los
+ * tres sitios de `ci.yml`; esta prueba se puso roja, el cambio se revirtió y la decisión subió a
+ * Gabriel en vez de quedarse en un `git push`. Es exactamente el desenlace para el que existe.
+ *
+ * Lo que se midió antes de mover nada:
+ *  • el lint muere con **exit 134** contra 6144, **pico 6011 MiB**, reproducido dos veces;
+ *  • **partirlo por carpetas NO ayuda**: `eslint src/dominio` a solas revienta con **4096 y con
+ *    5120**. El costo no está en cuántos archivos se le den, está en el grafo de tipos que cada uno
+ *    obliga a cargar entero;
+ *  • las dos palancas de configuración **ya estaban puestas**: `parserOptions.projectService` y el
+ *    ignore del cliente generado de Prisma (`src/datos/generated/`, 22 MB / 181 `.ts`);
+ *  • a **8192 pasa**, con **pico 7034 MiB** (~14 % de margen).
+ *
+ * Decisión de Gabriel: subir **sólo el paso del lint**, dejando `typecheck`, `build` y el
+ * `Dockerfile` en 6144 — el Dockerfile **no corre eslint**, así que no queda ningún hermano atrás
+ * (que es la rama gemela que este guardián vigila), y la memoria del runner de GitHub **sí** es
+ * medible (16 GB) mientras que la del contenedor que construye en Railway no lo es.
+ *
+ * ⛔ **Para el lint, la venda se acabó.** Con ~14 % de margen y sin salidas baratas, la próxima vez
+ * toca la cura (adelgazar el programa de tipos), no el número.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, extname, join, relative } from 'node:path';
@@ -38,13 +61,19 @@ import { describe, expect, it } from 'vitest';
 const RAIZ_REPO = fileURLToPath(new URL('../../..', import.meta.url));
 
 /**
- * El techo que hoy comparten todos los sitios. **Ninguno puede pasar de aquí.**
+ * El techo más alto que hoy fija cualquier sitio. **Ninguno puede pasar de aquí.**
  *
- * 6144 no es un número redondo por gusto: el `Dockerfile` lo bisecó (3072 muere, 4096 pasa por un
- * pelo, 6144 pasa) y eligió 6144 para no quedarse en el borde y para que el compilador tenga UN
+ * 6144 no era un número redondo por gusto: el `Dockerfile` lo bisecó (3072 muere, 4096 pasa por un
+ * pelo, 6144 pasa) y eligió 6144 para no quedarse en el borde y para que el compilador tuviera UN
  * solo número en todos lados.
+ *
+ * 🔴 **Ese «un solo número» se rompió el 5-sep-2026, a propósito y por decisión de Gabriel** (ver el
+ * registro de abajo): el **lint** subió a 8192 y los otros tres sitios se quedaron en 6144. El
+ * máximo sube con él porque este guardián compara contra el registro sitio por sitio; lo que sigue
+ * prohibido —y es lo que esta constante atrapa— es que un techo **suelto**, en un sitio que nadie
+ * declaró, se cuele por encima del más alto que alguien miró.
  */
-const TECHO_MAXIMO = 6144;
+const TECHO_MAXIMO = 8192;
 
 interface SitioConTecho {
   /** Ruta relativa a la raíz del repo, con `/`. */
@@ -63,9 +92,21 @@ interface SitioConTecho {
 const SITIOS_CON_TECHO: SitioConTecho[] = [
   {
     archivo: '.github/workflows/ci.yml',
-    valores: [6144, 6144, 6144],
+    // 🔴 EL LINT VA APARTE DESDE EL 5-sep-2026 (decisión de Gabriel). Tercera muerte por OOM del
+    // mismo paso (exit 134 contra 6144, pico 6011 MiB, reproducido dos veces) y la primera en la
+    // que las dos salidas baratas se midieron MUERTAS antes de mover el número: partir el lint por
+    // carpetas no ayuda (`eslint src/dominio` a solas revienta con 4096 y con 5120 — el costo está
+    // en el grafo de tipos, no en cuántos archivos se le den) y `eslint.config.js` YA usa
+    // `parserOptions.projectService` y YA ignora el cliente generado de Prisma (22 MB). A 8192
+    // pasa, con un pico de 7034 MiB (~14 % de margen).
+    //
+    // Sube SÓLO aquí porque el `Dockerfile` NO corre eslint: no queda ningún hermano atrás, que es
+    // la rama gemela que este guardián vigila. Y sube aquí y no allá porque la memoria del runner
+    // de GitHub es medible (16 GB) y la del contenedor que construye en Railway no lo es.
+    valores: [8192, 6144, 6144],
     paraQue:
-      'los tres pasos del job `backend` que cargan el grafo de tipos: lint, typecheck y build',
+      'los tres pasos del job `backend` que cargan el grafo de tipos: lint (8192 desde el ' +
+      '5-sep-2026), typecheck y build',
   },
   {
     archivo: 'backend/Dockerfile',
@@ -82,9 +123,15 @@ const LAS_TRES_CURAS =
   '  1. separar el proyecto de TypeScript en proyectos más chicos;\n' +
   '  2. compilar con `--build` incremental;\n' +
   '  3. adelgazar los tipos generados (Prisma y Zod son los que pesan).\n' +
-  'Y si de verdad hay que mover el número, muévelo en TODOS los sitios que corren el MISMO ' +
-  'compilador —`ci.yml` y `backend/Dockerfile` son procesos distintos y el uno no alcanza al ' +
+  'Y si de verdad hay que mover el número, muévelo en TODOS los sitios que corren EL MISMO ' +
+  'PROGRAMA —`ci.yml` y `backend/Dockerfile` son procesos distintos y el uno no alcanza al ' +
   'otro— y actualiza el registro de `comun/techo-de-memoria.test.ts` diciendo por qué.\n' +
+  '⚠️ «El mismo programa» NO es «todos»: el lint subió solo a 8192 el 5-sep-2026 porque el ' +
+  'Dockerfile no corre eslint, y ahí no quedaba ningún hermano atrás. Un `tsc` que suba, en ' +
+  'cambio, tiene que subir en los tres sitios que lo corren.\n' +
+  '⛔ Y para el LINT esta venda ya se gastó: con ~14 % de margen y las dos salidas baratas ' +
+  'medidas muertas (partirlo no ayuda; `projectService` y el ignore del cliente de Prisma ya ' +
+  'están puestos), la próxima vez toca la cura, no el número.\n' +
   '⚠️ Un techo POR ENCIMA de la memoria que el contenedor puede dar no protege, EMPEORA: cambia ' +
   'un OOM limpio de V8 (exit 134) por el OOM-killer del kernel (exit 137, «Killed»).';
 
