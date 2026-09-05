@@ -10,8 +10,13 @@
  * Solución en el PUNTO COMÚN: no hay un helper único por donde salgan los PDFs (cada ruta arma su
  * `Content-Type` + `Content-Disposition`), así que el punto verdaderamente común es un hook
  * `onSend` de la raíz de la app: TODA respuesta cuyo `Content-Type` sea de documento generado
- * (PDF o XLSX) sale con `Cache-Control: no-store`. Cubre los ~25 impresos de hoy y, sobre todo,
- * los que se agreguen mañana sin que nadie tenga que acordarse.
+ * (PDF, XLSX o ZIP) sale con `Cache-Control: no-store`. Cubre los ~25 impresos de hoy y, sobre
+ * todo, los que se agreguen mañana sin que nadie tenga que acordarse.
+ *
+ * ⚠️ **Y "sin que nadie tenga que acordarse" NO se cumplió solo:** la 0.140 agregó un tipo nuevo
+ * (el ZIP del impreso por lote) y salió sin `no-store` hasta que un reviewer lo midió. Por eso la
+ * prueba de este archivo recorre **todas** las respuestas binarias que el API sabe producir: si
+ * mañana aparece otra, que se caiga aquí y no en la pantalla de alguien.
  *
  * Lo que NO toca (a propósito):
  *  • Cualquier respuesta que YA traiga su propio `Cache-Control` — el hook respeta la decisión
@@ -32,6 +37,10 @@ export const CACHE_CONTROL_DOCUMENTOS = 'no-store';
 const MIMES_DOCUMENTO = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  // ⭐ 0.140: el impreso de órdenes POR LOTE responde un ZIP con varios PDF cuando el lote no cabe
+  // en un archivo. Es un documento generado como cualquier otro —se rehace en cada petición— y sin
+  // esta línea salía sin `no-store`, que es LITERALMENTE el incidente del 26-jul de aquí arriba.
+  'application/zip',
 ];
 
 /** ¿Este `Content-Type` es de un documento generado? (tolera el `; charset=…` y mayúsculas). */

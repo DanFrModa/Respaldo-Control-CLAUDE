@@ -29,9 +29,11 @@ import {
   bloqueFotosArte as bloqueArteFicha,
   recortarFotosArte,
   AVISO_FOTO_FALTANTE,
-  MAX_BYTES_FOTO_ARTE,
   MAX_FOTOS_ARTE as MAX_FOTOS_FICHA_ARTE,
 } from './bloque-fotos-arte.js';
+// 0.140: el tope de bytes por imagen se mudó a `imagenes-impreso.ts` (lo comparten TODOS los
+// impresos, no solo los del proveedor de arte). La aserción es la misma, contra el mismo número.
+import { MAX_BYTES_IMAGEN_IMPRESO } from './imagenes-impreso.js';
 
 describe('armarTablaEtapa (F3-E2)', () => {
   it('proyecta la matriz a columnas (tallas) y filas (colores) con totales correctos', () => {
@@ -255,7 +257,7 @@ describe('armarDatosImpresoFichaArte — las fotos del arte llegan a la ficha (0
       archivos: archivosFake().servicio,
       descargarImagen,
     });
-    expect(descargarImagen).toHaveBeenCalledWith('https://r2/k1', MAX_BYTES_FOTO_ARTE);
+    expect(descargarImagen).toHaveBeenCalledWith('https://r2/k1', MAX_BYTES_IMAGEN_IMPRESO);
   });
 
   it('🔑 una foto que NO se pudo bajar deja HUECO (dataUrl null) y las demás sí salen', async () => {

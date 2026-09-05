@@ -639,9 +639,11 @@ export const esquemaOrdenesImpresoCuerpo = z
       )
       .min(1, { error: 'Indica al menos una orden a imprimir' })
       .max(100, { error: 'No se pueden imprimir más de 100 órdenes a la vez' })
-      .describe('Ids de las órdenes a consolidar en el PDF (una por página).'),
+      .describe('Ids de las órdenes a imprimir, una por página.'),
   })
-  .describe('Lote de órdenes a imprimir en un solo PDF.');
+  .describe(
+    'Lote de órdenes a imprimir. Sale UN PDF si el lote cabe en un archivo y un ZIP con varios PDF si no (0.140); mira el `Content-Type` de la respuesta.',
+  );
 
 /** Datos validados del cuerpo de impresión por lote. */
 export type DatosOrdenesImpreso = z.infer<typeof esquemaOrdenesImpresoCuerpo>;

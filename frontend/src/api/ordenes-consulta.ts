@@ -116,9 +116,14 @@ export function imprimirOrden(id: number): void {
 }
 
 /**
- * Descarga el PDF CONSOLIDADO de un lote de órdenes (`POST /api/ordenes/impresos`). Como es un
- * binario, se hace `fetch` con el body de ids, se toma el `blob` y se dispara la descarga con un
- * objectURL temporal. Lanza `ErrorDeApi` si el servidor responde error (intenta leer su JSON).
+ * Descarga el impreso de un lote de órdenes (`POST /api/ordenes/impresos`). Como es un binario, se
+ * hace `fetch` con el body de ids, se toma el `blob` y se dispara la descarga con un objectURL
+ * temporal. Lanza `ErrorDeApi` si el servidor responde error (intenta leer su JSON).
+ *
+ * ⭐ 0.140 (2ª ronda) — **puede llegar UN PDF o un ZIP con varios PDF.** Un solo archivo con cien
+ * órdenes obligaba a dejar hojas sin sus imágenes (el servidor tiene un tope de memoria para las
+ * imágenes de un PDF); partiéndolo, ninguna hoja sale coja. Cuál de los dos vino lo dice el
+ * `Content-Type`, y de ahí sale la EXTENSIÓN: ponerle `.pdf` a un ZIP daría un archivo que no abre.
  */
 export async function imprimirLoteOrdenes(ids: number[]): Promise<void> {
   const respuesta = await fetch('/api/ordenes/impresos', {
@@ -132,12 +137,24 @@ export async function imprimirLoteOrdenes(ids: number[]): Promise<void> {
     const cuerpo: unknown = await respuesta.json().catch(() => null);
     throw new ErrorDeApi(cuerpo);
   }
-  const blob = await respuesta.blob();
+  // ⚠️ 0.140 (3ª ronda) — El ZIP se manda EN FLUJO, así que un fallo a media descarga llega DESPUÉS
+  // de la cabecera 200: `respuesta.ok` ya dijo que sí y lo que se corta es el cuerpo. Sin este
+  // `catch`, el usuario se quedaba con un archivo truncado que no abre y un «no se pudo generar»
+  // que no le decía qué hacer. Pasa cuando el lote es tan pesado que el ZIP no cabe en el formato
+  // (4 GiB), y la salida es siempre la misma: pedir menos órdenes de una vez.
+  const blob = await respuesta.blob().catch(() => {
+    throw new Error(
+      `No se pudo terminar la descarga de las ${String(ids.length)} órdenes: el archivo es demasiado grande. ` +
+        'Selecciona menos órdenes e imprímelas en dos tandas.',
+    );
+  });
+  // La extensión sale del tipo REAL de la respuesta, no de lo que esperábamos.
+  const esZip = (respuesta.headers.get('content-type') ?? '').includes('zip');
   const url = URL.createObjectURL(blob);
   try {
     const enlace = document.createElement('a');
     enlace.href = url;
-    enlace.download = `ordenes-${ids.length}.pdf`;
+    enlace.download = `ordenes-${ids.length}.${esZip ? 'zip' : 'pdf'}`;
     document.body.appendChild(enlace);
     enlace.click();
     enlace.remove();

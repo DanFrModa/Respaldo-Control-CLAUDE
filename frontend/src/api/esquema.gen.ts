@@ -36700,7 +36700,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Imprimir varias órdenes en un solo PDF (una por página) */
+    /**
+     * Imprimir varias órdenes (una por página): un PDF, o un ZIP con varios PDF si el lote no cabe en uno
+     * @description Responde `application/pdf` cuando el lote entra en un solo archivo y `application/zip` con varios PDF cuando no (el servidor lo parte para que ninguna hoja salga sin sus imágenes). Distínguelo por el `Content-Type`: el `Content-Disposition` trae el nombre con su extensión.
+     */
     post: {
       parameters: {
         query?: never;
@@ -36708,11 +36711,11 @@ export interface paths {
         path?: never;
         cookie?: never;
       };
-      /** @description Lote de órdenes a imprimir en un solo PDF. */
+      /** @description Lote de órdenes a imprimir. Sale UN PDF si el lote cabe en un archivo y un ZIP con varios PDF si no (0.140); mira el `Content-Type` de la respuesta. */
       requestBody: {
         content: {
           'application/json': {
-            /** @description Ids de las órdenes a consolidar en el PDF (una por página). */
+            /** @description Ids de las órdenes a imprimir, una por página. */
             ids: number[];
           };
         };

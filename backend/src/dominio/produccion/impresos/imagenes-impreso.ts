@@ -18,6 +18,14 @@
  * {@link descargarImagenComoDataUrl} baja una imagen por su URL GET prefirmada y la devuelve como
  * data-URL, o `null` si algo falla. Vive aquí —y no en un impreso— porque la comparten todos.
  *
+ * ── Cuánto pueden pesar (0.140) ────────────────────────────────────────────────────────────────
+ * Y aquí viven también los DOS topes de memoria de las imágenes de un impreso, juntos a propósito:
+ * {@link MAX_BYTES_IMAGEN_IMPRESO} (cuánto puede pesar UNA imagen; más que eso sale como hueco) y
+ * {@link PRESUPUESTO_IMAGENES_LOTE} con {@link nuevoPresupuestoImagenes} (cuánto puede retener a la
+ * vez UNA impresión POR LOTE, para que su pico no crezca con el número de órdenes). Estaban —el
+ * primero— en la ficha de arte y —el segundo— en ningún lado: el impreso de la orden bajaba sin
+ * tope y el lote multiplicaba eso por cien.
+ *
  * ── Cuántas caben y cómo se presignan (0.106) ───────────────────────────────────────────────────
  * {@link recortarAlTope} (el tope + el conteo de lo que quedó fuera) y {@link presignarKeys} (el
  * presign best-effort por imagen) también se comparten: nacieron en la ficha de arte (0.094) y la
@@ -56,10 +64,178 @@ export interface ArteModeloParaImpreso {
 }
 
 /**
+ * ⭐⭐ 0.140 — **TOPE DURO DE BYTES POR IMAGEN, UNO SOLO PARA TODOS LOS IMPRESOS.**
+ *
+ * Las fotos se suben con el límite general de archivos (50 MB). Una sola hoja puede llevar siete
+ * imágenes (3 fotos del modelo + 4 de arte, los topes del impreso de la orden), y cada una vive en
+ * memoria por partida triple mientras se construye el PDF: el Buffer bajado, la data-URL en base64
+ * (que abulta 4/3) y otra copia al cruzar al worker de PDF por `postMessage` (clon estructurado).
+ * A 50 MB por foto eso es más de medio giga de pico **por una hoja**, capaz de tumbar el contenedor
+ * —y con él la app para TODOS, no solo para quien imprimió—. Con 12 MB el peor caso de una hoja
+ * baja a ~84 MB de imagen, y pasa de sobra cualquier foto de cámara o de celular.
+ *
+ * ⚠️ Y no falla en silencio: una foto que rebasa el tope se imprime como HUECO (igual que una que
+ * no se pudo traer), así que en el papel se ve que esa imagen existe y no llegó.
+ *
+ * 🔑 **UN SOLO NÚMERO, EN UN SOLO SITIO.** Nació en la ficha de arte (0.094) como
+ * `MAX_BYTES_FOTO_ARTE` y la 0.140 lo subió aquí al descubrir que el impreso de la ORDEN —el que
+ * se imprime por lote, hasta 100 hojas de un golpe— bajaba **sin tope ninguno**. Vive junto a
+ * {@link descargarImagenComoDataUrl}, que es quien lo aplica, para que no pueda haber un segundo
+ * número diciendo lo mismo en otro archivo: si mañana sube o baja, sube o baja para todos.
+ */
+export const MAX_BYTES_IMAGEN_IMPRESO = 12 * 1024 * 1024;
+
+/**
+ * Lo que ocupa en memoria UNA imagen al tope, ya convertida a data-URL: base64 abulta 4/3. Es la
+ * unidad en la que se mide {@link PRESUPUESTO_IMAGENES_LOTE}, porque la data-URL —no el Buffer— es
+ * lo que se RETIENE hasta que el PDF está hecho.
+ */
+export const MAX_RETENIDO_POR_IMAGEN = Math.ceil((MAX_BYTES_IMAGEN_IMPRESO * 4) / 3);
+
+/**
+ * ⭐⭐ 0.140 — **PRESUPUESTO DE IMÁGENES DE UN PDF**: cuántos bytes de imagen puede retener a la vez
+ * UNA impresión, sin importar cuántas órdenes lleve el lote que la pidió.
+ *
+ * ── Por qué un presupuesto de BYTES y no un tope de órdenes ─────────────────────────────────────
+ * MEDIDO (las cifras y el banco, en `docs/modulos/impreso-orden.md`, que es su único sitio): con 7
+ * imágenes de 2 MB por orden el pico del proceso crecía **≈ 120 MB por cada orden** del lote —unas
+ * nueve veces los bytes de sus imágenes, entre la data-URL del padre, el clon del worker, el
+ * decodificado y el PDF—, o sea ~13 GB a 100 órdenes, y el contenedor no llega. Con las fotos al
+ * tope de 12 MB son **≈ 685 MB por orden**. Un tope de órdenes NO cierra el agujero (20 órdenes al
+ * peor caso siguen siendo giga y medio de imágenes); lo que hay que acotar son los BYTES.
+ *
+ * ── Qué se garantiza, y de qué depende DE VERDAD ────────────────────────────────────────────────
+ * Lo único que hay que garantizar es que **una hoja sobre presupuesto RECIÉN ESTRENADO salga
+ * entera**: eso es lo que hace que rehacer la orden en un PDF nuevo (el corte) sirva de algo.
+ *
+ * 🔑 **Y el umbral no es el que parece.** Una hoja al peor caso RETIENE 7 × 16 = 112 MB, pero el
+ * presupuesto **no necesita 112 MB** para dejarla entera: como las imágenes de un bloque preguntan
+ * TODAS antes de que cobre ninguna, y las fotos del modelo llegan ya presignadas —ganan la carrera
+ * y cobran primero—, al arte le basta con que sobre algo después de ellas. MEDIDO, el umbral exacto
+ * es `MAX_FOTOS × MAX_RETENIDO_POR_IMAGEN` = **48 MB**: con 48 la hoja sale coja y con 49 sale
+ * entera. Los 128 MB de hoy dan **2.7× de margen** sobre eso.
+ *
+ * ⚠️ Escrito así porque la 2ª ronda afirmó que la garantía venía de «112 < 128», y no: con 100 MB
+ * —o con 60— la hoja también sale entera. Quien vigila esto es una prueba de CONDUCTA sensible al
+ * número (baja el presupuesto por debajo del umbral y se pone roja), no una desigualdad decorativa.
+ *
+ * 🔴 Lo que la 1ª ronda afirmó y era FALSO: «la hoja que va detrás de una al peor caso tampoco
+ * pierde nada». MEDIDO: pierde. Con el presupuesto de producción y hojas al peor caso, la 2ª hoja
+ * salía con **3/3 fotos del modelo y 0/4 artes** —perdía justo el arte, que es lo que el papel manda
+ * a conseguir antes de producir— y la 3ª no conservaba nada. La desigualdad `128 > 112` es cierta y
+ * no implicaba eso, porque las imágenes de una hoja **no preguntan todas antes de cobrar**. Por eso
+ * hoy quien cuida esto es una prueba de CONDUCTA y no una de aritmética.
+ *
+ * ⭐ Y por eso el lote **se parte en varios PDFs** ({@link PRESUPUESTO_IMAGENES_LOTE} por PDF, no
+ * por lote): así el caso normal deja de perder imágenes en vez de administrar la pérdida.
+ */
+export const PRESUPUESTO_IMAGENES_LOTE = 128 * 1024 * 1024;
+
+/**
+ * ⭐⭐ **EL PISO DE UNA HOJA (Daniel, 2ª ronda de la 0.140): «Al menos una de arte y una del
+ * modelo.»**
+ *
+ * Una hoja nunca debe quedar CIEGA de un lado. Cuando el bolsón común se acaba, cada hoja conserva
+ * un **permiso de paso** para UNA imagen de arte y UNA foto del modelo: esas dos se bajan igual, y
+ * se cobran a su precio real. Si la orden no tiene arte (o no tiene fotos), su permiso simplemente
+ * no se usa: no se guarda sitio para algo que no existe.
+ *
+ * ⚠️ **Y hay que decir qué es esto de verdad: un CINTURÓN, no la protección de todos los días.** Con
+ * el corte del lote en varios PDF, **en producción el piso no llega a usarse nunca**: la orden que
+ * saldría coja se rehace estrenando presupuesto, y un presupuesto entero siempre cubre una hoja al
+ * peor caso. El piso (y con él el hueco `'lote-lleno'` del papel) sólo entraría en juego si alguien
+ * bajara el presupuesto por debajo de lo que una hoja puede pedir, o subiera los topes de imágenes
+ * por hoja. Se conserva porque el día que eso pase es justo el día en que hace falta — pero no es
+ * lo que hoy evita que una hoja salga sin imágenes; eso lo hace el corte.
+ *
+ * ⚠️ **Lo que cuesta, dicho:** una hoja puede pasarse del presupuesto por sus dos imágenes de piso
+ * (como mucho 2 × {@link MAX_RETENIDO_POR_IMAGEN} = 32 MB). Como sólo se arma una hoja a la vez, el
+ * techo sigue siendo «presupuesto + una hoja» y **sigue sin depender del número de órdenes**.
+ *
+ * 🔴 **El piso se decide ANTES de bajar la primera imagen, y eso es la mitad del arreglo.** Dentro
+ * de una hoja los dos bloques NO preguntan a la vez: las fotos del modelo llegan ya presignadas y
+ * los artes tienen que pasar por {@link presignarKeys}, así que las fotos preguntaban, bajaban y
+ * **cobraban** antes de que el arte llegara a preguntar. MEDIDO en la 2ª hoja al peor caso: 3/3
+ * fotos decorativas y **0/4 artes** — la prioridad decidida por un accidente de concurrencia, y al
+ * revés, porque el arte es justo la imagen que el papel manda a conseguir antes de producir. Un
+ * piso que se apartara DESPUÉS de esa carrera no serviría de nada.
+ */
+export interface PisoHoja {
+  /**
+   * ¿Puede bajarse esta imagen? `true` si queda bolsón común **o** si esta hoja todavía no ha
+   * gastado el sitio garantizado de esa clase. `false` = hueco con su aviso en el papel.
+   */
+  puedeBajar(clase: ClaseImagen): boolean;
+  /** Descuenta del bolsón lo que la imagen ocupa de verdad (la longitud de su data-URL). */
+  cobrar(clase: ClaseImagen, bytesRetenidos: number): void;
+}
+
+/** Las dos clases de imagen de una hoja de piso, que es lo que el piso distingue. */
+export type ClaseImagen = 'arte' | 'foto';
+
+/**
+ * El presupuesto de imágenes de UN PDF, mientras se arma. Lo crea quien orquesta la impresión y lo
+ * comparten todas las órdenes de ESE PDF: es lo que hace que el pico no crezca con el lote.
+ *
+ * ── Cómo cobra, y por qué así ───────────────────────────────────────────────────────────────────
+ * Se pregunta ANTES de pedir cada imagen y se descuenta DESPUÉS, con lo que la imagen ocupa de
+ * verdad. Se probó también a **apartar el peor caso** antes de bajar y se descartó MIDIÉNDOLO: como
+ * las imágenes de un bloque se bajan en paralelo, apartar 16 MB × 7 se come el presupuesto aunque
+ * las fotos pesen 2 MB. Y apartar el peor caso **sólo para el piso** también se midió y también se
+ * descartó: dejaba a la hoja siguiente PEOR que sin piso (se quedaba sin sus fotos porque el
+ * apartado se había llevado lo que quedaba). Por eso el piso **no aparta bytes por adelantado**:
+ * es un permiso de paso que se cobra al precio real.
+ */
+export interface PresupuestoImagenes {
+  /**
+   * Abre una hoja y le da su piso. Se llama UNA vez por orden, antes de tocar la red — que es lo
+   * que lo hace inmune a quién pregunte primero.
+   */
+  abrirHoja(): PisoHoja;
+}
+
+/**
+ * Crea el presupuesto de UN PDF. El parámetro existe para las PRUEBAS (poder ejercer el límite con
+ * cifras chicas); en producción se usa {@link PRESUPUESTO_IMAGENES_LOTE}.
+ */
+export function nuevoPresupuestoImagenes(
+  bytesTotales: number = PRESUPUESTO_IMAGENES_LOTE,
+): PresupuestoImagenes {
+  let restante = bytesTotales;
+  return {
+    abrirHoja(): PisoHoja {
+      // El piso de ESTA hoja: un permiso de paso por clase, sin gastar todavía. Se decide aquí
+      // —antes de la primera descarga— y no dentro de los bloques, porque los dos bloques no
+      // preguntan a la vez y quien decidiera al vuelo estaría decidiendo por carrera.
+      const pisoLibre: Record<ClaseImagen, boolean> = { arte: true, foto: true };
+      return {
+        puedeBajar(clase: ClaseImagen): boolean {
+          if (restante > 0) {
+            return true;
+          }
+          // Bolsón agotado: sólo pasa la PRIMERA de cada clase, y sólo una vez por hoja.
+          if (pisoLibre[clase]) {
+            pisoLibre[clase] = false;
+            return true;
+          }
+          return false;
+        },
+        cobrar(_clase: ClaseImagen, bytesRetenidos: number): void {
+          restante -= Math.max(0, bytesRetenidos);
+        },
+      };
+    },
+  };
+}
+
+/**
  * Descarga de una imagen a data-URL, inyectable en los tests (sin R2 ni red).
  *
  * `maxBytes` es un tope DURO opcional: sin él baja lo que venga (el comportamiento histórico del
  * impreso de la orden); con él, una imagen más pesada se trata como "no se pudo traer" (`null`).
+ * Los impresos le pasan SIEMPRE {@link MAX_BYTES_IMAGEN_IMPRESO}; el parámetro sigue siendo
+ * opcional porque sin él es como se prueba el control negativo (que sin tope una imagen enorme sí
+ * se incrusta).
  */
 export type DescargarImagen = (url: string, maxBytes?: number) => Promise<string | null>;
 

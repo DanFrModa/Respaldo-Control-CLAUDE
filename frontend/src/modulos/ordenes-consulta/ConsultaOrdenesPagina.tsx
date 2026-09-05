@@ -16,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ErrorDeApi } from '@/api/errores';
 import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
@@ -62,7 +61,8 @@ function leerTextoState(state: unknown, clave: string): string | undefined {
 /**
  * CONSULTA de Órdenes (F2-E4): la operación diaria de localizar/imprimir órdenes. Tabla LIGERA
  * (servidor) con filtros (cliente/año/modelo/estado/canceladas) + búsqueda combinada (folio, modelo,
- * cliente, referencia D7). Selección múltiple de filas para imprimir en LOTE (PDF consolidado) +
+ * cliente, referencia D7). Selección múltiple de filas para imprimir en LOTE (un PDF, o un ZIP con
+ * varios PDF si el lote no cabe en uno — 0.140) +
  * impresión individual. Cada fila enlaza al detalle de captura existente (módulo Órdenes de E3).
  * Los saltos a proceso/OC/notas/costos van como stubs deshabilitados (F3/F4/F7).
  *
@@ -150,8 +150,13 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
     try {
       await imprimirLoteOrdenes(ids);
     } catch (error) {
+      // Cualquier Error con mensaje propio se muestra tal cual —`ErrorDeApi` también lo es, así que
+      // los errores del servidor siguen llegando igual—: el genérico tapaba el aviso del lote
+      // demasiado grande, que es el único que le dice al usuario qué hacer (0.140).
       const mensaje =
-        error instanceof ErrorDeApi ? error.message : 'No se pudo generar el PDF del lote.';
+        error instanceof Error && error.message !== ''
+          ? error.message
+          : 'No se pudo generar el impreso del lote.';
       toast.error(mensaje);
     } finally {
       setImprimiendoLote(false);

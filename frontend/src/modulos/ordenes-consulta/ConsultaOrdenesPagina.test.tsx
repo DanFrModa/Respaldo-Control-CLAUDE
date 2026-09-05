@@ -33,6 +33,9 @@ vi.mock('@/api/ordenes-consulta', () => ({
 vi.mock('@/api/clientes', () => ({
   useClientes: () => ({ data: { datos: [] }, isPending: false }),
 }));
+// 0.140: el aviso del lote demasiado grande sale por aquí; hay que poder leerlo.
+const toastError = vi.fn<(mensaje: string) => void>();
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: (m: string) => toastError(m) } }));
 
 function ordenLigera(id: number, folio: number, extra: Partial<OrdenLigera> = {}): OrdenLigera {
   return {
@@ -73,6 +76,7 @@ describe('<ConsultaOrdenesPagina>', () => {
     useConsultaOrdenes.mockReset();
     imprimirOrden.mockReset();
     imprimirLoteOrdenes.mockReset();
+    toastError.mockReset();
     ultimaQuery = undefined;
   });
 
@@ -126,6 +130,41 @@ describe('<ConsultaOrdenesPagina>', () => {
 
     await usuario.click(screen.getByTestId('imprimir-lote'));
     expect(imprimirLoteOrdenes).toHaveBeenCalledWith([1, 2]);
+  });
+
+  it('🔴 0.140 — si el lote falla, se ve SU aviso, no el genérico', async () => {
+    // El único mensaje que le dice al usuario qué hacer («imprímelas en dos tandas») nace en
+    // `imprimirLoteOrdenes`. Antes la página lo tapaba con un texto fijo salvo que fuera
+    // `ErrorDeApi`, así que el aviso útil no llegaba nunca a la pantalla.
+    const usuario = userEvent.setup();
+    useConsultaOrdenes.mockReturnValue(conDatos([ordenLigera(1, 101)]));
+    imprimirLoteOrdenes.mockRejectedValue(
+      new Error('No se pudo terminar la descarga: imprímelas en dos tandas.'),
+    );
+    renderConProveedores(<ConsultaOrdenesPagina />, {
+      sesion: estadoSesionDePrueba(['ordenes.ver']),
+    });
+
+    await usuario.click(screen.getByTestId('seleccionar-todas'));
+    await usuario.click(screen.getByTestId('imprimir-lote'));
+
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastError.mock.calls[0]?.[0]).toContain('dos tandas');
+  });
+
+  it('un fallo SIN mensaje propio cae en el aviso genérico', async () => {
+    const usuario = userEvent.setup();
+    useConsultaOrdenes.mockReturnValue(conDatos([ordenLigera(1, 101)]));
+    imprimirLoteOrdenes.mockRejectedValue(new Error(''));
+    renderConProveedores(<ConsultaOrdenesPagina />, {
+      sesion: estadoSesionDePrueba(['ordenes.ver']),
+    });
+
+    await usuario.click(screen.getByTestId('seleccionar-todas'));
+    await usuario.click(screen.getByTestId('imprimir-lote'));
+
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastError.mock.calls[0]?.[0]).toBe('No se pudo generar el impreso del lote.');
   });
 
   it('imprime una orden individual', async () => {

@@ -11,7 +11,8 @@
  *  • Sección AVÍOS = los avíos de la RECETA DE LA ORDEN marcados `paraProduccion` y no excluidos
  *    (V1-E3d: el papel dice lo que ESTA orden lleva, no lo que lleva la plantilla) (rotulada "Avíos" — el
  *    renombrado de vocabulario de Daniel; la estructura interna sigue llamándose `habilitacion`).
- *  • Impresión por lote = UN solo PDF consolidado, una orden por página (salto entre órdenes).
+ *  • Impresión por lote = una orden por página. Sale en UN PDF si el lote cabe en uno y, si no, en
+ *    VARIOS PDF dentro de un ZIP (0.140: se parte para que ninguna hoja salga sin sus imágenes).
  *
  * Innegociables aplicados:
  *  • A1 — TODA la lógica de armado vive aquí (dominio); la ruta (corte 2) solo valida permiso+Zod
@@ -49,6 +50,25 @@
  *    de desaparecer y dejar que otra ocupe su lugar. Es la cura que la ficha de arte (0.094) ya
  *    tenía; aquí faltaba, y con ella un papel que decía «3 artes» para una prenda de 5 se producía
  *    mal. Lo compartido vive en `imagenes-impreso.ts` (`recortarAlTope`, `presignarKeys`).
+ *
+ * ⭐⭐ 0.140 — Y ESTE PAPEL SE IMPRIME POR LOTE, ASÍ QUE LLEVA DOS TOPES DE MEMORIA Y UN CORTE:
+ *  • un tope POR IMAGEN (12 MB, el mismo que ya usaban la ficha de arte y el recibo);
+ *  • un PRESUPUESTO de imágenes POR PDF, que comparten las órdenes de ese archivo;
+ *  • y, cuando el presupuesto se acaba, el lote **se corta y sigue en otro PDF**.
+ *
+ * Hasta esta fila no había nada de eso: `POST /ordenes/impresos` acepta 100 órdenes, cada una
+ * bajaba sus imágenes SIN TOPE y las cien se acumulaban antes de cruzar enteras al worker del PDF.
+ * MEDIDO: el pico crecía ≈ 120 MB por orden con fotos de 2 MB (a 100 órdenes, del orden de 13 GB) y
+ * ≈ 685 MB por orden con fotos al tope. Con el corte **deja de crecer**: de 20 a 100 órdenes el pico
+ * sube ~200 MB EN TOTAL (contra los ~9.6 GB que habría subido antes), y esos 200 MB caben dentro de
+ * la dispersión entre corridas. Las cifras —y el techo real, que NO es una promesa redonda— están
+ * en `docs/modulos/impreso-orden.md`, que es su único sitio.
+ *
+ * 🔑 Y lo que le importa a quien recibe el papel: **ninguna hoja sale coja**. La 1ª ronda de esta
+ * fila repartía UN presupuesto entre las cien órdenes y sólo las ~7 primeras conservaban sus
+ * imágenes (651 huecos en 93 hojas a 100 órdenes); partir el lote lo convierte en varios archivos
+ * completos. Y si aun así una hoja se queda sin bolsón, su PISO le garantiza al menos una imagen de
+ * arte y una del modelo, para que nunca salga ciega de un lado (Daniel).
  *
  * Tela (petición Daniel, jul-2026): el campo TELA del encabezado ya no depende solo de lo que se
  * capturó a mano en la orden (`Orden.idTela`): se arma con la(s) tela(s) que REALMENTE se
@@ -107,10 +127,15 @@ import {
   anteponerPrincipal,
   descargarImagenComoDataUrl,
   fotosArteDeLaOrden,
+  nuevoPresupuestoImagenes,
   porRondas,
   presignarKeys,
   recortarAlTope,
+  MAX_BYTES_IMAGEN_IMPRESO,
+  type ClaseImagen,
   type DescargarImagen,
+  type PisoHoja,
+  type PresupuestoImagenes,
 } from './imagenes-impreso.js';
 import { obtenerOrden } from '../ordenes.js';
 
@@ -125,6 +150,19 @@ export interface FotoImpreso {
    * imagen ocupaba su lugar, así que la hoja de piso se veía completa sin estarlo.
    */
   dataUrl: string | null;
+  /**
+   * ⭐ 0.140 — POR QUÉ está vacío el hueco, cuando el motivo NO es el de siempre. Ausente = «no se
+   * pudo traer» (presign rechazado, red caída, HTTP ≠ 2xx, cuerpo vacío, o pasada de peso): el
+   * hueco de toda la vida, con su texto de siempre. `'lote-lleno'` = la impresión POR LOTE ya gastó
+   * su presupuesto de imágenes (`PRESUPUESTO_IMAGENES_LOTE`, en `imagenes-impreso.ts`) y esta
+   * imagen **ni se pidió**.
+   *
+   * Existe porque un hueco que no dice por qué está vacío manda a buscar una foto rota que está
+   * perfectamente bien: el aviso del lote dice, en cambio, qué hacer (imprimir esa orden sola).
+   * Sigue el criterio de la ficha de arte, que también tiene una frase por situación
+   * (`AVISO_FOTO_FALTANTE`) en vez de una sola genérica.
+   */
+  motivoHueco?: 'lote-lleno';
   /**
    * Rótulo opcional debajo de la imagen (lo usan los ARTES del BOM: el nombre del
    * bordado/estampado). Las fotos del modelo y los adjuntos de la orden van sin rótulo.
@@ -364,6 +402,19 @@ export interface DepsImpreso {
   leerArteOrdenFotos?: typeof leerArteOrdenParaImpreso;
   listarAdjuntos?: typeof listarAdjuntos;
   leerTelasCompradas?: LeerTelasCompradas;
+  /**
+   * ⭐ 0.140 — PRESUPUESTO DE IMÁGENES DE **UN PDF**, compartido por las órdenes que caben en él.
+   * Lo crea {@link impresoOrdenesPorPartes} y lo renueva en cada corte. Ausente (el impreso de UNA
+   * orden, y todos los tests históricos) = sin presupuesto ni piso: se baja lo que la orden pida,
+   * con el tope por imagen y nada más.
+   */
+  presupuestoImagenes?: PresupuestoImagenes;
+  /**
+   * ⭐ 0.140 (2ª ronda) — Cómo se estrena presupuesto en cada corte del lote. Existe para las
+   * PRUEBAS (poder ejercer el corte con cifras chicas); en producción es
+   * {@link nuevoPresupuestoImagenes} con su tamaño de siempre.
+   */
+  nuevoPresupuesto?: () => PresupuestoImagenes;
 }
 
 /**
@@ -582,18 +633,31 @@ export async function armarDatosImpresoOrden(
 
   // Presign (sólo de las keys que sobrevivieron al tope) + bytes. Una imagen que no llegue queda
   // con `dataUrl: null` → HUECO en el papel, nunca un descarte mudo.
+  //
+  // ⭐⭐ 0.140 (2ª ronda, Daniel) — **EL PISO DE LA HOJA SE ABRE AQUÍ, ANTES DE TOCAR LA RED**:
+  // «al menos una de arte y una del modelo». Apartarlo aquí —y no dentro de cada bloque— es lo que
+  // lo hace inmune a quién pregunte primero: los dos bloques NO preguntan a la vez (las fotos del
+  // modelo llegan ya presignadas y los artes pasan por `presignarKeys`), así que las fotos cobraban
+  // antes de que el arte preguntara y la 2ª hoja al peor caso salía con 3/3 fotos y 0/4 artes.
+  // Con el piso abierto de antemano, cada hoja tiene garantizada UNA imagen de cada clase, decida
+  // lo que decida la carrera.
+  const piso = deps.presupuestoImagenes?.abrirHoja();
   const [fotosImpreso, artesImpreso] = await Promise.all([
     bajarImagenesPedidas(
       fotosAImprimir,
       archivos,
       descargarImagen,
       `de las fotos del modelo de la orden ${String(id)}`,
+      'foto',
+      piso,
     ),
     bajarImagenesPedidas(
       artesAImprimir,
       archivos,
       descargarImagen,
       `del arte de la orden ${String(id)}`,
+      'arte',
+      piso,
     ),
   ]);
 
@@ -640,6 +704,24 @@ export async function armarDatosImpresoOrden(
  * descarga—: la que no llegue sale con `dataUrl: null`, que en el papel es un HUECO con su aviso.
  * Nunca lanza: un impreso jamás se trunca por una imagen que no se pudo traer.
  *
+ * ⭐⭐ 0.140 — LAS TRES COSAS QUE ACOTAN **ESTA FUNCIÓN**, que hasta esta fila este papel no
+ * tenía ninguna. (Son tres de las **cuatro** piezas del freno de memoria: la que falta —el corte
+ * del lote en varios PDF— no vive aquí sino en {@link impresoOrdenesPorPartes}, y es la que de
+ * verdad evita que una hoja salga coja.)
+ *  • **tope por imagen**: se baja con {@link MAX_BYTES_IMAGEN_IMPRESO}, el mismo que ya usaban la
+ *    ficha de arte y el recibo. Una foto más pesada no se incrusta y sale como HUECO —el hueco de
+ *    siempre, porque para el papel es exactamente lo mismo: la imagen existe y no llegó—;
+ *  • **presupuesto del PDF**: si viene `piso`, se le pregunta antes de pedir cada imagen y se le
+ *    cobra después lo que la data-URL ocupa de verdad. Cuando se gastó, la imagen **ni se pide a
+ *    R2** y sale como hueco `'lote-lleno'`, que en el papel dice qué hacer;
+ *  • **el piso de la hoja**: con el bolsón agotado sigue pasando UNA imagen de cada clase, para que
+ *    ninguna hoja quede ciega de un lado (cinturón: con el corte del lote no llega a usarse).
+ *
+ * ⚠️ Como las imágenes de una hoja se bajan EN PARALELO, entre la pregunta y el cobro caben las
+ * siete de una hoja: lo retenido puede pasarse del presupuesto por —como mucho— una hoja al peor
+ * caso. El techo sigue sin depender del número de órdenes, que es lo que aquí se persigue (el
+ * porqué de cobrar lo real y no apartar el peor caso está en `imagenes-impreso.ts`).
+ *
  * ⚠️ Las URLs del presign vuelven SOLO de las pedidas que traían key, así que se re-casan por
  * posición recorriendo la lista en orden; las que ya venían con URL pasan tal cual. Casarlas de
  * otro modo (filtrar y mapear por índice) es justo el corrimiento que haría que una imagen saliera
@@ -650,6 +732,8 @@ async function bajarImagenesPedidas(
   archivos: ServicioArchivos,
   descargarImagen: DescargarImagen,
   contexto: string,
+  clase: ClaseImagen,
+  piso?: PisoHoja,
 ): Promise<FotoImpreso[]> {
   const { urls, fallos, primerMotivo } = await presignarKeys(
     pedidas.flatMap((pedida) => (pedida.origen.tipo === 'key' ? [pedida.origen.valor] : [])),
@@ -671,11 +755,29 @@ async function bajarImagenesPedidas(
       siguienteKey += 1;
     }
   }
-  const dataUrls = await Promise.all(
-    urlsPorPedida.map(async (url) => (url === null ? null : await descargarImagen(url))),
+  const bajadas = await Promise.all(
+    urlsPorPedida.map(async (url): Promise<{ dataUrl: string | null; loteLleno?: true }> => {
+      if (url === null) {
+        return { dataUrl: null };
+      }
+      // El presupuesto se consulta ANTES de tocar la red: si ya se gastó —piso incluido—, esta
+      // imagen no le cuesta a R2 ni un viaje, y en el papel se dice (no desaparece: 0.106).
+      if (piso !== undefined && !piso.puedeBajar(clase)) {
+        return { dataUrl: null, loteLleno: true };
+      }
+      const dataUrl = await descargarImagen(url, MAX_BYTES_IMAGEN_IMPRESO);
+      // Y se cobra lo que de verdad se RETIENE: la data-URL (o nada, si la imagen no llegó).
+      piso?.cobrar(clase, dataUrl?.length ?? 0);
+      return { dataUrl };
+    }),
   );
+  // ⚠️ El presupuesto agotado NO se loguea aquí: en un lote de 100 órdenes esto se llama 200 veces
+  // (dos bloques por hoja) y llenaría el log de líneas idénticas. El aviso sale UNA vez por lote,
+  // en `impresoOrdenesPorPartes`, que es quien sabe cuántas órdenes llevaba ese PDF y cuántas
+  // imágenes se quedaron sin sitio. En el PAPEL sí se dice imagen por imagen, que es donde sirve.
   return pedidas.map((pedida, i) => ({
-    dataUrl: dataUrls[i] ?? null,
+    dataUrl: bajadas[i]?.dataUrl ?? null,
+    ...(bajadas[i]?.loteLleno === true ? { motivoHueco: 'lote-lleno' as const } : {}),
     ...(pedida.titulo === undefined ? {} : { titulo: pedida.titulo }),
     ...(pedida.principal === true ? { principal: true } : {}),
   }));
@@ -787,6 +889,28 @@ function bandaCancelada(datos: DatosImpresoOrden): ReactElement | null {
 }
 
 /**
+ * ⭐ 0.140 — LO QUE DICE CADA HUECO DE ESTE PAPEL. Las cuatro frases viven juntas a propósito, igual
+ * que las dos de la ficha de arte (`AVISO_FOTO_FALTANTE`): verlas en el mismo sitio es lo que
+ * impide que mañana se separen sin que nadie lo note.
+ *
+ * Dos ejes, y los dos son reales:
+ *  • **qué imagen falta** — una foto del MODELO no se pide igual que una foto del ARTE;
+ *  • **por qué falta** — «no se pudo traer» manda a buscar una imagen rota; «no cupo en el lote»
+ *    manda a hacer algo distinto y que sí sirve: imprimir esa orden sola. Decirle lo primero a
+ *    quien tiene un papel del segundo caso es mandarlo a arreglar algo que no está roto.
+ */
+export const AVISO_HUECO = {
+  /** Foto del modelo que ESTA orden manda y no llegó (R2, red, peso). */
+  fotoNoLlego: 'Esta foto del modelo no se pudo traer.',
+  /** Foto del modelo que no se pidió: la impresión por lote ya gastó su presupuesto de imágenes. */
+  fotoLoteLleno: 'Esta foto no cupo en la impresión por lote. Imprime esta orden sola para verla.',
+  /** Imagen de arte que ESTA orden manda y no llegó. */
+  arteNoLlego: 'Esta foto del arte no se pudo traer. Pídela antes de producir.',
+  /** Imagen de arte que no se pidió por el presupuesto del lote. */
+  arteLoteLleno: 'Este arte no cupo en la impresión por lote. Imprime esta orden sola para verlo.',
+} as const;
+
+/**
  * Bloque de fotos del modelo (vacío si no hay ninguna que imprimir: el impreso de siempre).
  *
  * A PROPÓSITO se muestran hasta {@link MAX_FOTOS} (la principal SIEMPRE, luego las que sigan por
@@ -812,7 +936,13 @@ export function bloqueFotos(datos: DatosImpresoOrden): ReactElement | null {
         ? h(
             View,
             { key: `foto-${String(i)}`, style: estilos.fotoHueco },
-            h(Text, { style: estilos.huecoTexto }, 'Esta foto del modelo no se pudo traer.'),
+            h(
+              Text,
+              { style: estilos.huecoTexto },
+              foto.motivoHueco === 'lote-lleno'
+                ? AVISO_HUECO.fotoLoteLleno
+                : AVISO_HUECO.fotoNoLlego,
+            ),
           )
         : h(Image, { key: `foto-${String(i)}`, style: estilos.foto, src: foto.dataUrl }),
     ),
@@ -1024,7 +1154,9 @@ export function bloqueArtes(datos: DatosImpresoOrden): ReactElement | null {
                 h(
                   Text,
                   { style: estilos.huecoTexto },
-                  'Esta foto del arte no se pudo traer. Pídela antes de producir.',
+                  arte.motivoHueco === 'lote-lleno'
+                    ? AVISO_HUECO.arteLoteLleno
+                    : AVISO_HUECO.arteNoLlego,
                 ),
               )
             : h(Image, { style: estilos.arteFoto, src: arte.dataUrl }),
@@ -1145,8 +1277,11 @@ export async function generarPdfOrden(datos: DatosImpresoOrden): Promise<Buffer>
 }
 
 /**
- * Genera UN solo PDF consolidado de VARIAS órdenes (una por página, salto entre órdenes), a partir
- * de sus datos ya resueltos. Las órdenes salen en el mismo orden de la lista recibida.
+ * Genera UN PDF con VARIAS órdenes (una por página, salto entre órdenes), a partir de sus datos ya
+ * resueltos. Las órdenes salen en el mismo orden de la lista recibida.
+ *
+ * ⚠️ «UN PDF» es **una PARTE del lote**, no el lote entero: desde la 0.140 un lote grande se corta
+ * en varias partes y cada una pasa por aquí (ver {@link impresoOrdenesPorPartes}).
  */
 export async function generarPdfOrdenes(ordenes: DatosImpresoOrden[]): Promise<Buffer> {
   return renderToBuffer(documentoOrdenes(ordenes));
@@ -1177,23 +1312,102 @@ export async function impresoOrden(
   return { buffer, folio: datos.folio };
 }
 
+/** Las imágenes que esta hoja pidió y NO se bajaron por el presupuesto (no por un fallo). */
+function huecosPorPresupuesto(orden: DatosImpresoOrden): number {
+  return [...orden.fotos, ...orden.artes].filter((i) => i.motivoHueco === 'lote-lleno').length;
+}
+
 /**
- * Resuelve los datos de VARIAS órdenes (en el orden de `ids`, todas de la empresa activa — A9) y
- * devuelve UN solo PDF consolidado (una orden por página). Si algún id no existe / no es de la
- * empresa activa, `armarDatosImpresoOrden` lanza `ErrorNoEncontrado` (404) y NO se genera nada.
+ * ⭐ 0.140 (2ª ronda) — UN AVISO POR PDF **sólo cuando de verdad se perdió algo**, que ahora es el
+ * borde y no el caso normal: partir el lote en varios PDF hace que una hoja sólo pierda imágenes si
+ * ella sola no cabe en un presupuesto entero.
+ *
+ * Va aquí y no dentro de la descarga a propósito: allí se llamaría dos veces por hoja y un lote de
+ * 100 órdenes dejaría 200 líneas iguales en el log, que es la forma más segura de que nadie lea
+ * ninguna. Quien tiene el papel en la mano ya lo ve imagen por imagen.
  */
-export async function impresoOrdenes(
+function avisarSiLaParteSeQuedoSinImagenes(ordenes: readonly DatosImpresoOrden[]): void {
+  const hojasAfectadas = ordenes.filter((orden) => huecosPorPresupuesto(orden) > 0);
+  if (hojasAfectadas.length === 0) {
+    return;
+  }
+  const huecos = hojasAfectadas.reduce((total, orden) => total + huecosPorPresupuesto(orden), 0);
+  console.warn(
+    `Un PDF de impresos de ${String(ordenes.length)} orden(es) agotó su presupuesto de imágenes: ` +
+      `${String(huecos)} imagen(es) de ${String(hojasAfectadas.length)} hoja(s) salieron como hueco. ` +
+      'Cada hoja conserva al menos una imagen de arte y una del modelo (el piso), y la hoja sale entera.',
+  );
+}
+
+/**
+ * ⭐⭐ 0.140 (2ª ronda, Daniel: *«se corta en archivos de ~7 órdenes y se arma uno a la vez»*) —
+ * **RESUELVE UN LOTE COMO VARIOS PDFs, UNO A LA VEZ.**
+ *
+ * Devuelve los PDF de uno en uno (en el orden de `ids`, todas las órdenes de la empresa activa —
+ * A9). Si algún id no existe o no es de la empresa activa, `armarDatosImpresoOrden` lanza
+ * `ErrorNoEncontrado` (404) y no se emite nada más.
+ *
+ * ── Por qué se parte, y por qué en «~7» que nadie escribió a mano ───────────────────────────────
+ * La 1ª ronda metía las 100 órdenes en UN PDF con un presupuesto de imágenes compartido, y el
+ * resultado medido era que **sólo las ~7 primeras conservaban sus imágenes**: a 100 órdenes salían
+ * 651 huecos en 93 hojas. Eso no es acotar la memoria, es administrar una pérdida. Partiendo el
+ * lote, cada PDF **estrena presupuesto** y ninguna hoja sale coja; el corte cae solo donde el
+ * presupuesto se acaba, así que el «~7» **es una consecuencia del tamaño de las fotos**, no un
+ * número escrito en el código: con fotos chicas caben muchas más órdenes por archivo y con fotos al
+ * tope, menos.
+ *
+ * ── Cómo se decide el corte, sin adivinar ───────────────────────────────────────────────────────
+ * No se puede saber lo que pesan las imágenes de una orden hasta bajarlas, así que el corte se
+ * decide **por lo que de verdad se consumió**: se van metiendo órdenes mientras entren enteras y,
+ * en cuanto una sale con huecos por presupuesto, se cierra el PDF anterior y **esa orden se rehace
+ * con presupuesto nuevo**. Como un presupuesto entero siempre da para una hoja al peor caso, la
+ * orden rehecha entra completa y el proceso termina siempre.
+ *
+ * ⚠️ **El precio, dicho:** la orden que cae justo en el corte se arma DOS veces (sus imágenes se
+ * bajan otra vez). Es una hoja por archivo —del orden del 15 % de descargas de más en un lote
+ * grande—, y se paga a cambio de que ninguna hoja salga coja.
+ *
+ * 🔑 **Y sólo hay un PDF vivo a la vez**: la parte se suelta en cuanto se emite. Por eso el pico no
+ * crece con el número de órdenes, que es el criterio que esta fila no puede incumplir.
+ */
+export async function* impresoOrdenesPorPartes(
   sesion: SesionUsuario,
   ids: number[],
   bd?: ContextoBd,
   deps: DepsImpreso = {},
-): Promise<Buffer> {
-  // Secuencial para que un id inválido falle con un 404 claro (y para no abrir N descargas a la vez).
-  const ordenes: DatosImpresoOrden[] = [];
-  for (const id of ids) {
-    ordenes.push(await armarDatosImpresoOrden(sesion, id, bd, deps));
-  }
+): AsyncGenerator<Buffer, void, undefined> {
+  const nuevoPresupuesto = deps.nuevoPresupuesto ?? (() => nuevoPresupuestoImagenes());
+  let presupuesto = deps.presupuestoImagenes ?? nuevoPresupuesto();
+  let parte: DatosImpresoOrden[] = [];
+
   // Mismo criterio de A9 que `impresoOrden`: el logo sale de la empresa ACTIVA de la sesión (todas
   // las órdenes del lote son de ella, `armarDatosImpresoOrden` ya lo garantiza).
-  return renderizarPdfEnWorker('ordenes', ordenes, { idEmpresa: sesion.idEmpresaActiva });
+  const renderizar = async (ordenes: DatosImpresoOrden[]): Promise<Buffer> => {
+    avisarSiLaParteSeQuedoSinImagenes(ordenes);
+    return renderizarPdfEnWorker('ordenes', ordenes, { idEmpresa: sesion.idEmpresaActiva });
+  };
+
+  // Secuencial para que un id inválido falle con un 404 claro (y para no abrir N descargas a la vez).
+  for (const id of ids) {
+    let datos = await armarDatosImpresoOrden(sesion, id, bd, {
+      ...deps,
+      presupuestoImagenes: presupuesto,
+    });
+    // ¿Salió coja Y hay algo antes en este PDF? Entonces no es que la orden no quepa: es que ya no
+    // cabía AQUÍ. Se cierra el archivo y se rehace la orden estrenando presupuesto.
+    if (huecosPorPresupuesto(datos) > 0 && parte.length > 0) {
+      const cerrada = parte;
+      parte = [];
+      yield await renderizar(cerrada);
+      presupuesto = nuevoPresupuesto();
+      datos = await armarDatosImpresoOrden(sesion, id, bd, {
+        ...deps,
+        presupuestoImagenes: presupuesto,
+      });
+    }
+    parte.push(datos);
+  }
+  if (parte.length > 0) {
+    yield await renderizar(parte);
+  }
 }

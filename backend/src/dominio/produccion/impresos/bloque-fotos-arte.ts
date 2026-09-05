@@ -32,6 +32,7 @@ import {
   leerFotosArteDeLaOrdenPorId,
   presignarKeys,
   recortarAlTope,
+  MAX_BYTES_IMAGEN_IMPRESO,
   type DescargarImagen,
   type FotoArteDeLaOrden,
 } from './imagenes-impreso.js';
@@ -51,18 +52,6 @@ import {
  * Lo que se recorta NO se esconde: el título de la sección dice cuántas se muestran del total.
  */
 export const MAX_FOTOS_ARTE = 4;
-
-/**
- * Tope DURO de bytes por foto de arte. Las fotos se suben con el límite general de archivos
- * (50 MB): cuatro de ese tamaño serían ~200 MB de Buffer, ~267 MB más de data-URL en base64 (que
- * abulta 4/3) y otra copia al cruzar al worker de PDF por `postMessage` — más de medio giga de pico
- * por UNA hoja de piso, capaz de tumbar el contenedor. Con 12 MB por foto el peor caso baja a ~48 MB
- * de imagen, y pasa de sobra cualquier foto de cámara o de celular.
- *
- * ⚠️ Y no falla en silencio: una foto que rebasa el tope se imprime como HUECO (igual que una que
- * no se pudo traer), así que en el papel se ve que esa imagen existe y no llegó.
- */
-export const MAX_BYTES_FOTO_ARTE = 12 * 1024 * 1024;
 
 /** Una imagen del arte tal como la pinta el papel. */
 export interface FotoArteImpresa {
@@ -127,7 +116,9 @@ export interface DepsFotosArteImpresas {
  *     también (el hueco).
  *  2. **El presign de cada key** (`allSettled`, no `all`): si R2 rechaza UNA, esa sale como HUECO y
  *     las demás siguen saliendo.
- *  3. **La descarga de bytes** de cada imagen: `null` (fallo, vacío o pasada de peso) → HUECO.
+ *  3. **La descarga de bytes** de cada imagen, con el tope duro de {@link MAX_BYTES_IMAGEN_IMPRESO}
+ *     (0.140: el número se mudó a `imagenes-impreso.ts`, que es de donde lo toman TODOS los
+ *     impresos): `null` (fallo, vacío o pasada de peso) → HUECO.
  *
  * ⚠️ En estas hojas una imagen que existe y no llegó **se dice**: quien la tiene en la mano ve que
  * falta algo y lo pide, en vez de trabajar creyendo que no había arte.
@@ -187,7 +178,7 @@ export async function resolverFotosArte(
   // Capa 3: bytes por imagen, con tope duro de peso. `null` (fallo o pasada de peso) → hueco.
   const dataUrls = await Promise.all(
     urls.map(async (url) =>
-      url === null ? null : await descargarImagen(url, MAX_BYTES_FOTO_ARTE),
+      url === null ? null : await descargarImagen(url, MAX_BYTES_IMAGEN_IMPRESO),
     ),
   );
   if (fallos > 0) {

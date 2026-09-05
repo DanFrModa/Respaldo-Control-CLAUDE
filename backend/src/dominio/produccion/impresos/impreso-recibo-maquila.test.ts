@@ -15,8 +15,10 @@ import type { ServicioArchivos } from '../../../comun/archivos.js';
 import { extraerTextoPdf } from '../../../comun/pdf-texto.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ReciboSalida } from '../../../contrato/index.js';
-import type { FotoArteDeLaOrden } from './imagenes-impreso.js';
-import { AVISO_FOTO_FALTANTE, MAX_BYTES_FOTO_ARTE, MAX_FOTOS_ARTE } from './bloque-fotos-arte.js';
+// 0.140: el tope de bytes por imagen se mudó a `imagenes-impreso.ts` (lo comparten TODOS los
+// impresos, no solo los del proveedor de arte). La aserción es la misma, contra el mismo número.
+import { MAX_BYTES_IMAGEN_IMPRESO, type FotoArteDeLaOrden } from './imagenes-impreso.js';
+import { AVISO_FOTO_FALTANTE, MAX_FOTOS_ARTE } from './bloque-fotos-arte.js';
 // La LÍNEA BASE del conteo de imágenes se mide contra un documento DISTINTO que por diseño nunca
 // lleva arte (ver `imagenesEnPdf` más abajo). Es el mismo recurso que usa el test de la ficha.
 import { generarPdfEnvio, type DatosImpresoEnvio } from './impreso-envio-maquila.js';
@@ -238,7 +240,7 @@ describe('armarDatosImpresoRecibo — las fotos del arte llegan al recibo (0.107
       archivos: archivosFake().servicio,
       descargarImagen,
     });
-    expect(descargarImagen).toHaveBeenCalledWith('https://r2/k1', MAX_BYTES_FOTO_ARTE);
+    expect(descargarImagen).toHaveBeenCalledWith('https://r2/k1', MAX_BYTES_IMAGEN_IMPRESO);
   });
 
   it('🔑 una foto que NO se pudo bajar deja HUECO (dataUrl null) y las demás sí salen', async () => {
