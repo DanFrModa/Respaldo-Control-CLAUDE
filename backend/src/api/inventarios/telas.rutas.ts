@@ -19,6 +19,9 @@
  *  • `POST /inventarios/telas/color/conteos`         (`inventario-telas.mover`) → conteo físico (lo contado → diferencia).
  *  • `GET  /inventarios/telas/color/saldos`          (`inventario-telas.ver`)   → saldos (Σ directa) para el conteo.
  *  • `POST /inventarios/telas/color/salidas-orden`   (`inventario-telas.mover`) → salida a orden (sin partida).
+ *  • `POST /inventarios/telas/color/salidas-orden/previa` (`inventario-telas.mover`) → SOLO LECTURA:
+ *    los dos avisos de la captura en curso (sobre-salida contra lo que la orden pide + riesgo de
+ *    tono con la lista de partidas). No registra nada y NUNCA bloquea (fila 0.101).
  *  • `POST /inventarios/telas/color/traspasos`       (`inventario-telas.mover`) → traspaso (2 patas, ambas cantidades).
  *  • `POST /inventarios/telas/color/movimientos/:id/cancelar` (`inventario-telas.mover`) → inverso auditado.
  *  • `GET  /inventarios/telas/color/existencias`     (`inventario-telas.ver`)   → agrupadas tela → colores.
@@ -57,6 +60,8 @@ import {
   esquemaKardexTelaColorLista,
   esquemaPartidasTelaQuery,
   esquemaPartidasTelaLista,
+  esquemaPreviaSalidaTelaColorCrear,
+  esquemaPreviaSalidaTelaColorSalida,
   esquemaParamIdMaterial,
   esquemaErrorApi,
 } from '../../contrato/index.js';
@@ -83,6 +88,7 @@ import {
   saldosTelaColorParaConteo,
   traspasarTelaColor,
 } from '../../dominio/inventarios/partidas-telas.js';
+import { previaSalidaTelaColorAOrden } from '../../dominio/inventarios/previa-salida-tela-orden.js';
 
 const respuestasError = {
   400: esquemaErrorApi,
@@ -303,6 +309,31 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const movimiento = await registrarSalidaTelaColorAOrden(sesion, request.body);
       return reply.code(201).send(movimiento);
+    },
+  });
+
+  // ── ⭐⭐ PREVIA de la salida por color: los DOS avisos, decididos por el dominio (fila 0.101) ──
+  // Daniel §Post-F9.193 (dec. 8 y 9): avisar la sobre-salida contra lo que la orden pide, y sacar
+  // el aviso de tono SÓLO cuando hay más de una partida del color —con la lista a la vista—. Va
+  // por POST porque el cuerpo es la CAPTURA EN CURSO (N renglones), no un filtro de URL; es SOLO
+  // LECTURA (no registra ningún movimiento) y su respuesta AVISA, nunca bloquea. Sirve a las DOS
+  // pantallas que sacan tela a una orden: la vigente por color (`lineas`) y la LEGADA por lote
+  // (`lineasTela`, tela sin color — sólo el aviso de sobre-salida).
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/salidas-orden/previa',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Avisos de una salida de tela por color: sobre-salida contra lo que la orden pide y riesgo de tono',
+      security: SEGURIDAD_SESION,
+      body: esquemaPreviaSalidaTelaColorCrear,
+      response: { 200: esquemaPreviaSalidaTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return previaSalidaTelaColorAOrden(sesion, request.body);
     },
   });
 

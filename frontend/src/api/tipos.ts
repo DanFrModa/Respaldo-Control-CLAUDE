@@ -1285,6 +1285,21 @@ export type SaldosTelaColorQuery = NonNullable<
 /** Cuerpo de una salida de tela por color a orden. */
 export type SalidaTelaColorCrear =
   paths['/api/inventarios/telas/color/salidas-orden']['post']['requestBody']['content']['application/json'];
+/**
+ * ⭐⭐ LOS DOS AVISOS de la salida de tela (fila 0.101): cuerpo de la PREVIA — la captura en curso
+ * que se manda al servidor para que él decida si hay sobre-salida y si hay riesgo de tono.
+ */
+export type PreviaSalidaTelaColorCrear =
+  paths['/api/inventarios/telas/color/salidas-orden/previa']['post']['requestBody']['content']['application/json'];
+/** Los dos avisos ya DECIDIDOS por el dominio (la pantalla no compara nada, A1). */
+export type PreviaSalidaTelaColor =
+  paths['/api/inventarios/telas/color/salidas-orden/previa']['post']['responses']['200']['content']['application/json'];
+/** El aviso (a) de UNA tela: lo que la orden pide, lo ya salido y cuánto se pasa. */
+export type PreviaSalidaTelaRenglon = PreviaSalidaTelaColor['telas'][number];
+/** El aviso (b) de UN color: si hay riesgo de tono y las partidas entre las que se escoge. */
+export type PreviaSalidaColorRenglon = PreviaSalidaTelaColor['colores'][number];
+/** Una partida de la lista del aviso de tono. */
+export type PreviaSalidaPartida = PreviaSalidaColorRenglon['partidas'][number];
 /** Cuerpo de un traspaso de tela por color. */
 export type TraspasoTelaColorCrear =
   paths['/api/inventarios/telas/color/traspasos']['post']['requestBody']['content']['application/json'];

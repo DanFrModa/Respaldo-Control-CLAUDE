@@ -914,6 +914,155 @@ export const esquemaPartidasTelaLista = z
 /** Forma de la respuesta de la búsqueda de partidas. */
 export type PartidasTelaLista = z.infer<typeof esquemaPartidasTelaLista>;
 
+// ── ⭐⭐ LOS DOS AVISOS DE LA SALIDA DE TELA (fila 0.101 — Daniel §Post-F9.193, dec. 8 y 9) ───────
+//
+// La previa de la salida: se manda LA CAPTURA EN CURSO y el servidor devuelve **los dos veredictos
+// ya tomados** —¿se pasa de lo que la orden pide? ¿hay más de una partida de este color?— con los
+// números y las partidas que los sostienen. La pantalla NO compara nada (A1): pinta lo que el
+// dominio (`inventarios/previa-salida-tela-orden.ts`) le dice. Los dos avisos AVISAN y ninguno
+// BLOQUEA: esta previa no registra nada y su respuesta jamás apaga el botón de guardar.
+
+/**
+ * Un renglón capturado en la pantalla LEGADA por lote (`Salida a orden por lote`): tela SIN color.
+ * Sólo alimenta el aviso (a) —la comparación es por TELA de todos modos—; del riesgo de tono no
+ * tiene nada que decir, porque en ese flujo no hay ni color ni partida.
+ */
+const esquemaPreviaSalidaLineaTela = z.object({
+  idTela: idPositivo('la tela'),
+  cantidad: z.number().nonnegative({ error: 'La cantidad no puede ser negativa' }),
+});
+
+/** Cuerpo de la previa: la orden, el almacén del que se saca y los renglones ya capturados. */
+export const esquemaPreviaSalidaTelaColorCrear = z
+  .object({
+    idOrden: idPositivo('la orden').describe('Orden de producción a la que se ligaría la salida.'),
+    idAlmacen: idPositivo('el almacén').describe(
+      'Almacén del que se sacaría: acota las partidas del riesgo de tono.',
+    ),
+    lineas: z
+      .array(esquemaTelaColorLineaSalida)
+      .default([])
+      .describe('Renglones por TELA+COLOR (flujo vigente).'),
+    lineasTela: z
+      .array(esquemaPreviaSalidaLineaTela)
+      .default([])
+      .describe('Renglones por TELA sin color (pantalla LEGADA por lote).'),
+  })
+  .refine((c) => c.lineas.length + c.lineasTela.length > 0, {
+    error: 'Captura al menos un renglón',
+  })
+  .describe(
+    'Captura en curso de una salida de tela (por color o por lote), para pedir sus avisos.',
+  );
+
+/** Datos validados de la previa de la salida por color. */
+export type DatosPreviaSalidaTelaColor = z.infer<typeof esquemaPreviaSalidaTelaColorCrear>;
+
+/**
+ * ⭐ AVISO (a) — SOBRE-SALIDA, por TELA. `requerido` es la Σ del snapshot de la explosión
+ * (`RequerimientoOrden`), **la misma cifra que ve el comprador**; `null` = la orden no tiene esa
+ * tela en su explosión y por eso NO se avisa nada (no hay contra qué comparar).
+ */
+const esquemaPreviaSalidaTelaRenglon = z.object({
+  idTela: z.number().int(),
+  tela: z.string(),
+  unidad: z.string().nullable().describe('Unidad de consumo del BOM (KG/M) o null.'),
+  requerido: z
+    .number()
+    .nullable()
+    .describe('Lo que la orden PIDE de esta tela (snapshot de la explosión); null = no lo dice.'),
+  yaSalido: z.number().describe('Σ de las salidas VIVAS ya ligadas a la orden (sin canceladas).'),
+  aSacar: z.number().describe('Cuerpo que se está a punto de sacar de esta tela en esta captura.'),
+  excedente: z
+    .number()
+    .describe('Cuánto se pasa: max(0, yaSalido + aSacar − requerido). 0 = no se pasa.'),
+  sobreSalida: z
+    .boolean()
+    .describe('VEREDICTO del dominio: la salida pasa de lo que la orden pide.'),
+  colores: z.array(z.string()).describe('Colores capturados de esta tela (para nombrarla).'),
+});
+
+/** Un renglón del aviso de sobre-salida (por tela). */
+export type PreviaSalidaTelaRenglon = z.infer<typeof esquemaPreviaSalidaTelaRenglon>;
+
+/** Una PARTIDA viva del color en el almacén del que se saca (la lista del aviso de tono). */
+const esquemaPreviaSalidaPartida = z.object({
+  id: z.number().int(),
+  folio: z.number().int().describe('Folio de la partida (A3).'),
+  loteProveedor: z.string().nullable().describe('Lote del proveedor o null.'),
+  factura: z.string().nullable().describe('Factura/remisión que la amparó o null.'),
+  fecha: z.string().nullable().describe('Fecha de la entrada (YYYY-MM-DD) o null.'),
+  entrado: z
+    .number()
+    .describe('Cuánto ENTRÓ de esta partida a este almacén (cuerpo + complemento).'),
+});
+
+/** Una partida de la lista del aviso de tono. */
+export type PreviaSalidaPartida = z.infer<typeof esquemaPreviaSalidaPartida>;
+
+/**
+ * ⭐ AVISO (b) — RIESGO DE TONO, por TELA+COLOR. El veredicto tiene **TRES** valores, no dos: el
+ * tercero existe porque la tela que llega por TRASPASO entra **sin partida**, y contar partidas
+ * hacía que el aviso se callara justo en el almacén del cortador —donde alguien está escogiendo el
+ * rollo—. La ignorancia no se presenta como tranquilidad.
+ */
+const esquemaPreviaSalidaColorRenglon = z.object({
+  idTelaColor: z.number().int(),
+  telaColor: z.string(),
+  idTela: z.number().int(),
+  tela: z.string(),
+  estadoTono: z
+    .enum(['sin-riesgo', 'varias-partidas', 'origen-desconocido'])
+    .describe(
+      'VEREDICTO del dominio: `varias-partidas` = más de una partida conocida (avisa y las lista); ' +
+        '`origen-desconocido` = hay más existencia que la que las partidas conocidas explican, ' +
+        'típicamente tela llegada por traspaso (avisa diciendo que NO se sabe); `sin-riesgo` = calla.',
+    ),
+  existencia: z
+    .number()
+    .describe('Existencia del color EN ESE ALMACÉN (cuerpo + complemento, Σ de movimientos).'),
+  entradoConocido: z
+    .number()
+    .describe(
+      'Σ de lo que ENTRÓ con partida conocida a ese almacén (acumulado histórico: nadie le ' +
+        'descuenta las salidas, así que puede ser MAYOR que la existencia de hoy).',
+    ),
+  sinNombrar: z
+    .number()
+    .describe(
+      'Cuánta de la existencia de hoy NO explica ninguna partida conocida = max(0, existencia − ' +
+        'entradoConocido). > 0 es lo que enciende `origen-desconocido`, y es el número que la ' +
+        'pantalla enseña cuando hay partidas listadas pero la lista no lo cubre todo.',
+    ),
+  partidas: z
+    .array(esquemaPreviaSalidaPartida)
+    .describe('Las partidas conocidas del color en ese almacén (para escoger a conciencia).'),
+});
+
+/** Un renglón del aviso de riesgo de tono (por color). */
+export type PreviaSalidaColorRenglon = z.infer<typeof esquemaPreviaSalidaColorRenglon>;
+
+/** Respuesta de la previa: los dos avisos, ya decididos por el dominio. */
+export const esquemaPreviaSalidaTelaColorSalida = z
+  .object({
+    idOrden: z.number().int(),
+    folioOrden: z.number().int(),
+    idAlmacen: z.number().int(),
+    tieneExplosion: z
+      .boolean()
+      .describe('¿La orden tiene snapshot de explosión? Sin él, el aviso (a) no tiene con qué.'),
+    telas: z.array(esquemaPreviaSalidaTelaRenglon),
+    colores: z.array(esquemaPreviaSalidaColorRenglon),
+    haySobreSalida: z.boolean().describe('¿Alguna tela se pasa de lo que la orden pide?'),
+    hayRiesgoTono: z
+      .boolean()
+      .describe('¿Algún color trae riesgo de tono (varias partidas, u origen desconocido)?'),
+  })
+  .describe('Avisos de una salida de tela por color: sobre-salida y riesgo de tono.');
+
+/** Forma de la respuesta de la previa de la salida. */
+export type PreviaSalidaTelaColorSalida = z.infer<typeof esquemaPreviaSalidaTelaColorSalida>;
+
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // AVÍOS
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

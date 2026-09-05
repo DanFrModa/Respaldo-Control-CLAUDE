@@ -32,6 +32,8 @@ import type {
   MovimientoTelaColor,
   PartidasTela,
   PartidasTelaQuery,
+  PreviaSalidaTelaColor,
+  PreviaSalidaTelaColorCrear,
   SaldosTelaColor,
   SaldosTelaColorQuery,
   SalidaTelaColorCrear,
@@ -112,6 +114,21 @@ async function obtenerSaldosTelaColor(query: SaldosTelaColorQuery): Promise<Sald
 
 async function salidaTelaColorAOrden(cuerpo: SalidaTelaColorCrear): Promise<MovimientoTelaColor> {
   const { data, error } = await api.POST('/api/inventarios/telas/color/salidas-orden', {
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * ⭐⭐ PREVIA de la salida por color (fila 0.101): manda LA CAPTURA EN CURSO y trae los DOS avisos
+ * ya decididos. Va por POST porque el cuerpo son N renglones, no un filtro de URL — mismo patrón
+ * que la vista previa de la fusión de departamentos.
+ */
+async function previaSalidaTelaColor(
+  cuerpo: PreviaSalidaTelaColorCrear,
+): Promise<PreviaSalidaTelaColor> {
+  const { data, error } = await api.POST('/api/inventarios/telas/color/salidas-orden/previa', {
     body: cuerpo,
   });
   if (!data) throw new ErrorDeApi(error);
@@ -298,6 +315,32 @@ export function useSaldosTelaColor(
     queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'telas-color', 'saldos', query],
     queryFn: () => obtenerSaldosTelaColor(query as SaldosTelaColorQuery),
     enabled: query !== undefined,
+  });
+}
+
+/**
+ * ⭐⭐ LOS DOS AVISOS de la salida de tela a orden (fila 0.101 — Daniel §Post-F9.193, dec. 8 y 9).
+ *
+ * 🔴 La pantalla NO compara nada (A1): manda lo capturado y el SERVIDOR devuelve los veredictos
+ * (`sobreSalida` / `riesgoTono`) con los números y las partidas que los sostienen. «Lo que la orden
+ * pide» sale del snapshot de la explosión —la MISMA cifra que ve el comprador—, no de una segunda
+ * cuenta hecha aquí. Deshabilitada mientras no haya orden, almacén y al menos un renglón: sin eso
+ * no hay nada que avisar.
+ *
+ * ⚠️ Si la consulta falla, la pantalla **no enseña ningún aviso y no interrumpe a nadie**: es una
+ * advertencia, no una guarda. Lo que protege el inventario (no-negativo bajo lock, D3) vive en el
+ * registro de la salida, que sí falla en voz alta.
+ */
+export function usePreviaSalidaTelaColor(
+  cuerpo: PreviaSalidaTelaColorCrear | undefined,
+): UseQueryResult<PreviaSalidaTelaColor, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'telas-color', 'salida-previa', cuerpo],
+    queryFn: () => previaSalidaTelaColor(cuerpo as PreviaSalidaTelaColorCrear),
+    enabled: cuerpo !== undefined,
+    // Mientras se recalcula, el aviso anterior sigue en pantalla: quitarlo y devolverlo hace que
+    // el bloque parpadee cada vez que se agrega un renglón.
+    placeholderData: keepPreviousData,
   });
 }
 

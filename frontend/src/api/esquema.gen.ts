@@ -49806,6 +49806,208 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/inventarios/telas/color/salidas-orden/previa': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Avisos de una salida de tela por color: sobre-salida contra lo que la orden pide y riesgo de tono */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Captura en curso de una salida de tela (por color o por lote), para pedir sus avisos. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Orden de producción a la que se ligaría la salida. */
+            idOrden: number;
+            /** @description Almacén del que se sacaría: acota las partidas del riesgo de tono. */
+            idAlmacen: number;
+            /**
+             * @description Renglones por TELA+COLOR (flujo vigente).
+             * @default []
+             */
+            lineas?: {
+              idTelaColor: number;
+              cantidad: number;
+              cantidadComplemento?: number;
+            }[];
+            /**
+             * @description Renglones por TELA sin color (pantalla LEGADA por lote).
+             * @default []
+             */
+            lineasTela?: {
+              idTela: number;
+              cantidad: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Avisos de una salida de tela por color: sobre-salida y riesgo de tono. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folioOrden: number;
+              idAlmacen: number;
+              /** @description ¿La orden tiene snapshot de explosión? Sin él, el aviso (a) no tiene con qué. */
+              tieneExplosion: boolean;
+              telas: {
+                idTela: number;
+                tela: string;
+                /** @description Unidad de consumo del BOM (KG/M) o null. */
+                unidad: string | null;
+                /** @description Lo que la orden PIDE de esta tela (snapshot de la explosión); null = no lo dice. */
+                requerido: number | null;
+                /** @description Σ de las salidas VIVAS ya ligadas a la orden (sin canceladas). */
+                yaSalido: number;
+                /** @description Cuerpo que se está a punto de sacar de esta tela en esta captura. */
+                aSacar: number;
+                /** @description Cuánto se pasa: max(0, yaSalido + aSacar − requerido). 0 = no se pasa. */
+                excedente: number;
+                /** @description VEREDICTO del dominio: la salida pasa de lo que la orden pide. */
+                sobreSalida: boolean;
+                /** @description Colores capturados de esta tela (para nombrarla). */
+                colores: string[];
+              }[];
+              colores: {
+                idTelaColor: number;
+                telaColor: string;
+                idTela: number;
+                tela: string;
+                /**
+                 * @description VEREDICTO del dominio: `varias-partidas` = más de una partida conocida (avisa y las lista); `origen-desconocido` = hay más existencia que la que las partidas conocidas explican, típicamente tela llegada por traspaso (avisa diciendo que NO se sabe); `sin-riesgo` = calla.
+                 * @enum {string}
+                 */
+                estadoTono: 'sin-riesgo' | 'varias-partidas' | 'origen-desconocido';
+                /** @description Existencia del color EN ESE ALMACÉN (cuerpo + complemento, Σ de movimientos). */
+                existencia: number;
+                /** @description Σ de lo que ENTRÓ con partida conocida a ese almacén (acumulado histórico: nadie le descuenta las salidas, así que puede ser MAYOR que la existencia de hoy). */
+                entradoConocido: number;
+                /** @description Cuánta de la existencia de hoy NO explica ninguna partida conocida = max(0, existencia − entradoConocido). > 0 es lo que enciende `origen-desconocido`, y es el número que la pantalla enseña cuando hay partidas listadas pero la lista no lo cubre todo. */
+                sinNombrar: number;
+                /** @description Las partidas conocidas del color en ese almacén (para escoger a conciencia). */
+                partidas: {
+                  id: number;
+                  /** @description Folio de la partida (A3). */
+                  folio: number;
+                  /** @description Lote del proveedor o null. */
+                  loteProveedor: string | null;
+                  /** @description Factura/remisión que la amparó o null. */
+                  factura: string | null;
+                  /** @description Fecha de la entrada (YYYY-MM-DD) o null. */
+                  fecha: string | null;
+                  /** @description Cuánto ENTRÓ de esta partida a este almacén (cuerpo + complemento). */
+                  entrado: number;
+                }[];
+              }[];
+              /** @description ¿Alguna tela se pasa de lo que la orden pide? */
+              haySobreSalida: boolean;
+              /** @description ¿Algún color trae riesgo de tono (varias partidas, u origen desconocido)? */
+              hayRiesgoTono: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/inventarios/telas/color/traspasos': {
     parameters: {
       query?: never;
