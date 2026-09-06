@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { crearColorYTalla, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirEnSelectPorPrefijo, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del INVENTARIO CÍCLICO (F7-E5) contra el stack real. Cubre el flujo de la ficha:
@@ -55,7 +55,10 @@ test.describe('Inventario cíclico (F7-E5)', () => {
     await page.goto('/indicadores/ciclicos');
     await expect(page.getByRole('heading', { name: 'Inventarios cíclicos' })).toBeVisible();
     await page.getByTestId('ic-nuevo').click();
-    await page.getByTestId('ic-almacen').selectOption({ label: 'Primeras' });
+    // Por PREFIJO, no por `label` exacto: aquí la opción lleva pegada la dimensión que se va a
+    // contar («Primeras · Producto terminado»), y atar el spec a esa etiqueta literal lo rompe en
+    // cuanto alguien la retoque — que es justo el rojo de CI que este ayudante vino a cerrar.
+    await elegirEnSelectPorPrefijo(page.getByTestId('ic-almacen'), 'Primeras');
     await page.getByTestId('ic-selector-modelo-busqueda').fill(codigoModelo);
     await page.getByTestId('ic-selector-modelo-opcion').first().click();
     await page.getByTestId('ic-guardar').click();
