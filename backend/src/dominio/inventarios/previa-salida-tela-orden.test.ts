@@ -221,10 +221,13 @@ describe('aviso (b) — riesgo de tono: TRES estados, no dos', () => {
   });
 
   // ⭐⭐ EL TERCER ESTADO. Desde la fila 0.142 el traspaso SÍ nombra el lote, así que este caso ya no
-  // es «el almacén del cortador»: es la tela que NADIE puede nombrar — la traspasada antes de la
-  // 0.142 (REGLA 0-B: no se repara hacia atrás), la que entra por el ajuste de ENTRADA del conteo
-  // CÍCLICO (que no crea partida a propósito) y la devuelta al cancelar una salida que tampoco
-  // llevaba lote. Sigue habiendo tela sin nombre, y el aviso sigue diciéndolo.
+  // es «el almacén del cortador»: es la tela que NADIE puede nombrar, y entra por CUATRO puertas —
+  // la traspasada antes de la 0.142 (REGLA 0-B: no se repara hacia atrás), la que entra por el
+  // ajuste de ENTRADA del conteo CÍCLICO (que no crea partida a propósito), la devuelta al cancelar
+  // una salida que tampoco llevaba lote, y la de un traspaso de HOY cuyo origen tampoco podía
+  // nombrarla (incluido el remanente que deja el tope del reparto). El mapa completo, con el porqué
+  // de cada una, está en la cabecera de `previa-salida-tela-orden.ts`. Sigue habiendo tela sin
+  // nombre, y el aviso sigue diciéndolo.
   it('HAY TELA pero NINGÚN lote vivo que la explique = ORIGEN DESCONOCIDO: avisa', () => {
     const [color] = evaluarRiesgoDeTono(
       [linea(11, 'Marino', FELPA, 100)],

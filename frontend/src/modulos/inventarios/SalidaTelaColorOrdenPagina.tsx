@@ -43,9 +43,11 @@ function leerIdDeepLink(state: unknown, clave: string): number | null {
  * `origen-desconocido` → **línea neutra** que dice que el sistema no sabe de qué partidas es esa
  * tela (acompaña, no interrumpe); `sin-riesgo` → nada. ⭐ **Desde la fila 0.142 el TRASPASO nombra el
  * lote**, así que en el almacén del cortador —donde arranca esta pantalla— ya hay lista que enseñar;
- * la línea neutra queda para la tela que nadie puede nombrar: la **traspasada antes de esa fila**, la
- * que entra por el **ajuste de entrada del conteo cíclico** (que no crea partida a propósito) y la
- * que vuelve al **cancelar una salida** que tampoco llevaba lote. Los tres estados y sus límites, en
+ * la línea neutra queda para la tela que nadie puede nombrar, que entra por **cuatro** puertas: la
+ * **traspasada antes de esa fila**, la del **ajuste de entrada del conteo cíclico** (que no crea
+ * partida a propósito), la que vuelve al **cancelar una salida** que tampoco llevaba lote y la de un
+ * **traspaso de hoy cuyo origen tampoco podía nombrarla** —incluido el remanente que deja el tope
+ * del reparto—. Los tres estados, las cuatro puertas y sus límites, en
  * `dominio/inventarios/previa-salida-tela-orden.ts`.
  * En la misma fila entró el aviso de **SOBRE-SALIDA** (Daniel §Post-F9.193 dec. 8): si lo que se
  * saca —contando lo que YA salió antes— pasa de lo que la orden pide, se dice. **Los dos avisos
@@ -341,8 +343,9 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                               .join(' · ')}
                             {/* 🔴 LA LISTA NO SIEMPRE ES TODO LO QUE HAY. Si además entró tela sin
                                 lote (conteo cíclico, salida cancelada, traspasos anteriores a la
-                                0.142), enseñar sólo los lotes conocidos haría creer que esos son el
-                                anaquel entero. No se presenta como completo lo que no lo es.
+                                0.142, o un traspaso de hoy desde una bodega que tampoco la sabía
+                                nombrar), enseñar sólo los lotes conocidos haría creer que esos son
+                                el anaquel entero. No se presenta como completo lo que no lo es.
                                 `sinNombrar` lo calcula el dominio; aquí no se resta nada. */}
                             {c.sinNombrar > 0
                               ? `, y hay ${c.sinNombrar.toLocaleString('es-MX')} más cuyo origen no se puede nombrar`
@@ -358,8 +361,9 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                     decisión, no un descuido. Desde la fila 0.142 el traspaso SÍ nombra el lote, así
                     que este estado ya NO es el caso normal del almacén del cortador: queda para la
                     tela que nadie puede nombrar —la traspasada ANTES de esa fila (REGLA 0-B: no se
-                    repara), la del ajuste de entrada del conteo cíclico y la devuelta al cancelar
-                    una salida que tampoco llevaba lote—. Sigue en
+                    repara), la del ajuste de entrada del conteo cíclico, la devuelta al cancelar una
+                    salida que tampoco llevaba lote y la que llega de un traspaso cuyo ORIGEN tampoco
+                    la sabía nombrar—. Sigue en
                     gris: pintarlo en ámbar quemaría la alarma de arriba, que es la que trae la lista
                     de entre las que escoger. Acompaña, no interrumpe. */}
                 {coloresSinPartidas.length > 0 ? (
@@ -371,8 +375,9 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                     <p>
                       El sistema <strong>no sabe de qué partidas</strong> es esta tela: entró sin
                       lote (traspasada antes de que el traspaso llevara el lote, ajustada por un
-                      conteo cíclico o devuelta de una salida cancelada), así que puede haber varios
-                      tonos. Verifícalo físicamente antes de cortar.
+                      conteo cíclico, devuelta de una salida cancelada, o traspasada desde una
+                      bodega que tampoco sabía de qué lote era), así que puede haber varios tonos.
+                      Verifícalo físicamente antes de cortar.
                     </p>
                     <ul className="list-disc space-y-0.5 pl-4">
                       {coloresSinPartidas.map((c) => (

@@ -49,13 +49,22 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
     repartirían el mismo lote dos veces en silencio.
   - **Lo que ningún lote explica viaja SIN lote (`NULL`), sin error**: la tela traspasada ANTES de
     esta fila se queda sin nombre y **no se repara** (REGLA 0-B: aditivo, sin backfill, sin
-    migración). ⭐ **Las otras dos puertas que meten tela sin lote, medidas una por una:** el **ajuste
-    de ENTRADA del conteo cíclico** (`indicadores/ciclico/tela.ts` — no crea partida a propósito:
-    una hoja de conteo no tiene factura ni lote del proveedor) y la **cancelación de una salida que
-    tampoco llevaba lote**, cuyo inverso copia el `idPartida` NULL del original. 🔴 **NO es una
-    puerta el «sobrante» de un conteo por color**, aunque esta doc lo dijo: sobrante = *contado <
-    sistema* = **salida**, y una salida baja la existencia; el faltante, que sí es entrada, **crea
-    partida**.
+    migración). ⭐ **Las otras TRES puertas que meten tela sin lote, medidas una por una:** el
+    **ajuste de ENTRADA del conteo cíclico** (`indicadores/ciclico/tela.ts` — no crea partida a
+    propósito: una hoja de conteo no tiene factura ni lote del proveedor), la **cancelación de una
+    salida que tampoco llevaba lote**, cuyo inverso copia el `idPartida` NULL del original, y **un
+    traspaso de HOY cuyo origen tampoco pueda nombrarla** —incluido el remanente que deja el tope
+    del reparto—, porque la tela sin nombre **se propaga** de almacén en almacén: el traspaso no
+    inventa lotes. *(Esta cuarta faltaba cuando el mapa se declaraba «completo»; la cazó el reviewer
+    en la 3ª vuelta.)* 📌 **«Medidas» quiere decir que cada una tiene su prueba de integración,
+    y dos de ellas se escribieron en la 4ª vuelta justo porque la palabra estaba de más**: el ajuste
+    del cíclico en `indicadores/inventario-ciclico.int.test.ts` (*«el ajuste de ENTRADA de TELA no
+    crea partida»*) y la **cancelación de una salida sin lote** en
+    `inventarios/partidas-telas.int.test.ts` (hasta entonces era un corolario razonado del caso que
+    sí estaba medido: cancelar una ENTRADA, que sí lleva partida); la tela vieja y la propagación ya
+    estaban en ese mismo archivo (*«la tela que ningún lote explica viaja SIN lote»*). 🔴 **NO es una puerta el «sobrante» de un conteo por color**, aunque esta doc
+    lo dijo: sobrante = *contado < sistema* = **salida**, y una salida baja la existencia; el
+    faltante, que sí es entrada, **crea partida**.
   - **La hoja del traspaso sale desglosada por lote** (número del proveedor + folio de partida; «—»
     cuando no hay).
 - 🔻 **CONSECUENCIA QUE HAY QUE SABER: el saldo por lote NUNCA cuadra del todo en un almacén que

@@ -110,9 +110,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   Es **lo esperado, no una carencia**: esta versión cambia lo que se escribe de aquí en adelante y **no
   toca ni un movimiento ya registrado**. Esa tela seguirá diciendo *«no se sabe de qué lote es»* hasta que
   se consuma, y está bien que lo diga: es la verdad.
-- **La misma línea gris sale para otras dos cosas que tampoco tienen lote**: la tela que entra por un
+- **La misma línea gris sale para otras TRES cosas que tampoco tienen lote**: la tela que entra por un
   **ajuste de conteo cíclico** —esa hoja no trae factura ni número de lote, así que no hay lote que
-  ponerle— y la que **vuelve al almacén al cancelar una salida** que tampoco lo llevaba.
+  ponerle—, la que **vuelve al almacén al cancelar una salida** que tampoco lo llevaba, y la que llega
+  de **una bodega que tampoco sabía de qué lote era** (la tela sin nombre se pasa de bodega en bodega:
+  el envío no inventa lotes).
 - **Al sacar tela para una orden se sigue sin decir de qué lote sale** (eso no cambió y no estaba en esta
   versión). Tiene una consecuencia que conviene conocer: en un almacén que consume, **la lista de lotes
   puede enseñar uno que producción ya se llevó**. El aviso peca de decir de más, nunca de callar.

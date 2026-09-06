@@ -20,10 +20,12 @@
  * **lote del proveedor**. Es lo que hace útil el papel en el anaquel: quien recibe puede casar el
  * rollo físico —que trae el número del proveedor escrito— con lo que dice la nota, en vez de recibir
  * «300 kg de marino» sin saber de cuál tono. Un renglón que ninguna partida explica sale con «—», que
- * es la verdad; y eso pasa por **cuatro** motivos, no sólo uno: tela traspasada **antes** de la 0.142
- * (REGLA 0-B), tela entrada por el **ajuste de entrada del conteo cíclico**, tela devuelta al
- * **cancelar una salida** que tampoco llevaba lote, y **el remanente que el TOPE deja sin nombrar**
- * cuando los lotes del origen reclaman más de lo que la existencia respalda.
+ * es la verdad; y eso pasa por **cuatro** motivos, no sólo uno — los mismos cuatro del mapa de
+ * `dominio/inventarios/previa-salida-tela-orden.ts`: tela traspasada **antes** de la 0.142 (REGLA
+ * 0-B), tela entrada por el **ajuste de entrada del conteo cíclico**, tela devuelta al **cancelar
+ * una salida** que tampoco llevaba lote, y **tela que el traspaso de hoy tampoco puede nombrar**
+ * —porque el origen ya la tenía anónima, o porque el TOPE del reparto se niega a nombrar un lote
+ * que la existencia no respalda—.
  *
  * REIMPRIMIBLE desde el historial (el kardex por color), no solo al momento de guardar — mismo
  * criterio que la reimpresión de producción de V1-E3a. Y un traspaso CANCELADO **no se imprime**: su

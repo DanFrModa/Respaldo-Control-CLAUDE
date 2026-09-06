@@ -621,6 +621,38 @@ describe('(i) Hoja de TELA — alta, captura con el saldo a la vista, aviso y aj
     ]);
   });
 
+  // ⭐⭐ EL AJUSTE DE **ENTRADA** DE TELA NO CREA PARTIDA, y esto se mide AQUÍ porque otra fila lo usa
+  // como hecho: es una de las CUATRO puertas por las que entra tela que nadie puede nombrar, y de
+  // ahí sale el tercer estado del aviso de riesgo de tono (`inventarios/previa-salida-tela-orden.ts`,
+  // fila 0.142). El hecho estaba escrito en el TSDoc de `ciclico/tela.ts` y repetido en varios
+  // documentos, pero **ninguna prueba lo sostenía**: una afirmación que sólo vive en prosa se cae
+  // sola el día que alguien «mejore» el ajuste fabricándole una partida vacía, y el aviso de tono
+  // empezaría a callar sin que nada se ponga rojo.
+  it('⭐ el ajuste de ENTRADA de TELA no crea partida: entra SIN lote (lo que la 0.142 da por hecho)', async () => {
+    await moverTela(colorMarino, 100, 40);
+    const inv = await crearInventarioCiclico(sesion(), { idAlmacen: almTelas.id }, bd());
+    const renglon = (await obtenerConteo(sesion(), inv.id, bd())).renglones[0]!;
+    // Se cuenta MÁS de lo que el sistema creía ⇒ el ajuste entra por la diferencia.
+    await capturarConteo(
+      sesion(),
+      inv.id,
+      { renglones: [{ idDet: renglon.idDet, cantReal: 105, cantRealComplemento: 40 }] },
+      bd(),
+    );
+    const aplicado = await generarAjusteCiclico(sesion(), inv.id, {}, bd());
+    expect(aplicado.aplicado).toBe(true);
+
+    const movs = await movimientosDeAjuste();
+    expect(movs).toHaveLength(1);
+    expect(movs[0]!.tipoMov.codigo).toBe('ajuste-ciclico-entrada');
+    expect(Number(movs[0]!.detallesTela[0]!.cantidad)).toBe(5);
+    // 🔴 LO QUE ESTA PRUEBA FIJA: entra SIN partida. Una hoja de conteo no trae ni factura ni lote
+    // del proveedor, así que fabricar una partida vacía ensuciaría la traza de entradas con un
+    // documento que no existe (`ciclico/tela.ts`). El precio es que esa tela queda sin nombre, y el
+    // aviso de tono lo DICE en vez de callarlo.
+    expect(movs[0]!.detallesTela[0]!.idPartida).toBeNull();
+  });
+
   it('el alcance de una hoja de telas se acota con TELAS: mandar modelos o avíos se rechaza', async () => {
     await moverTela(colorMarino, 10, 5);
     await expect(

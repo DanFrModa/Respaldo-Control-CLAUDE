@@ -617,6 +617,47 @@ describe('cancelación = inverso auditado (D3, NUNCA edita/borra)', () => {
       cancelarMovimientoTelaColor(sesion(), mov.id, { motivo: 'Otra vez' }, bd()),
     ).rejects.toThrow(ErrorConflicto);
   });
+
+  // ⭐⭐ LA OTRA MITAD DE «EL INVERSO COPIA LA PARTIDA», y es la que importa para el aviso de tono:
+  // si el original NO llevaba lote, el inverso tampoco ⇒ **cancelar una salida mete tela SIN nombre
+  // en el anaquel**. Es la segunda de las cuatro puertas del mapa de `previa-salida-tela-orden.ts`,
+  // y hasta ahora vivía sólo como corolario razonado del caso de arriba (que cancela una ENTRADA,
+  // que sí lleva partida). Se mide para que la palabra «medidas» del doc de módulo sea verdad.
+  it('⭐ cancelar una salida SIN lote devuelve la tela SIN lote (la 2ª puerta del mapa)', async () => {
+    await entrarColor(colorMarino.id, 100, 40, { loteProveedor: 'L-3' });
+    const idOrden = await crearOrden();
+    const salida = await registrarSalidaTelaColorAOrden(
+      sesion(),
+      {
+        idOrden,
+        idAlmacen: almA.id,
+        fecha: '2026-08-06',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 60, cantidadComplemento: 25 }],
+      },
+      bd(),
+    );
+    expect(salida.renglones[0]?.idPartida).toBeNull(); // P3: el consumo empareja por color
+
+    const cancelado = await cancelarMovimientoTelaColor(
+      sesion(),
+      salida.id,
+      { motivo: 'La orden se surtió de otra bodega' },
+      bd(),
+    );
+    expect(cancelado.cancelado).toBe(true);
+
+    // 🔴 El INVERSO es una ENTRADA (devuelve la tela al anaquel) y va SIN partida: nadie sabe de qué
+    // lote era lo que se había sacado, así que inventarle uno sería mentir. Ésa es exactamente la
+    // tela que enciende el tercer estado del aviso de tono.
+    const inverso = await cliente.movimiento.findFirstOrThrow({
+      where: { idEmpresa: empresa.id, origenTipo: 'cancelacion' },
+      include: { detallesTela: true, tipoMov: { select: { direccion: true } } },
+    });
+    expect(inverso.tipoMov.direccion).toBe('entrada');
+    expect(inverso.detallesTela).toHaveLength(1);
+    expect(inverso.detallesTela[0]?.idPartida).toBeNull();
+    expect(Number(inverso.detallesTela[0]?.cantidad ?? -1)).toBe(60);
+  });
 });
 
 describe('existencias agrupadas y kardex de dos componentes', () => {

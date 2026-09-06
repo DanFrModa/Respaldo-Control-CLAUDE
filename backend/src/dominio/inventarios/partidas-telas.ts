@@ -319,8 +319,13 @@ export interface RepartoPorPartida {
  * ⚠️ **Lo que ninguna partida alcanza a explicar viaja SIN lote (`null`), sin error.** Pasa siempre
  * que el origen tenga tela que nadie nombró: la que llegó por traspaso ANTES de esta fila (REGLA
  * 0-B: no se repara hacia atrás), la que entra por el **ajuste de ENTRADA del conteo cíclico** (que
- * no crea partida a propósito) y la que devolvió la cancelación de una salida que tampoco llevaba
- * lote. Callar y mover la tela es lo correcto: el traspaso NO es el sitio donde se inventan lotes.
+ * no crea partida a propósito), la que devolvió la cancelación de una salida que tampoco llevaba
+ * lote y —desde el tope de abajo— **la que el propio reparto se niega a nombrar** porque la
+ * existencia no la respalda. Callar y mover la tela es lo correcto: el traspaso NO es el sitio
+ * donde se inventan lotes. 🔁 Y como este reparto lo consume `traspasarTelaColor`, que pasa el MISMO
+ * arreglo de renglones a las DOS patas, **la tela sin nombre se PROPAGA** al destino igual de
+ * anónima, que es la verdad. El mapa completo de las cuatro puertas por las que entra tela sin lote
+ * vive en la cabecera de `previa-salida-tela-orden.ts`.
  *
  * ⚠️ **Un renglón capturado en 0/0 sobrevive** (sale como renglón sin partida) para que lo rechace
  * `validarLineasTela` del motor con su mensaje, en vez de desaparecer del movimiento en silencio.

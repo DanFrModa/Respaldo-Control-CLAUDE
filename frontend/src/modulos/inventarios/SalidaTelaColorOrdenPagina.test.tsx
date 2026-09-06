@@ -286,10 +286,13 @@ describe('SalidaTelaColorOrdenPagina (A2 — salida por color)', () => {
 
   // ⭐⭐ EL TERCER ESTADO: tela que ningún lote explica. El aviso tiene que DECIR que no se sabe, no
   // callar — callar sería presentar la ignorancia como tranquilidad, justo enfrente de quien está
-  // escogiendo el rollo. ⚠️ Desde la fila 0.142 esa tela **ya no viene de un traspaso** (ésos nombran
-  // el lote): viene del ajuste de entrada del conteo cíclico, de una salida cancelada, o de un
-  // traspaso anterior a esa fila. Esta prueba dicta el estado directamente —lo decide el SERVIDOR—,
-  // así que no monta ninguno de esos caminos: mide lo único que le toca, que es cómo se pinta.
+  // escogiendo el rollo. ⚠️ Desde la fila 0.142 el traspaso NOMBRA el lote, así que ésta dejó de ser
+  // la tela «normal» del almacén del cortador — pero **no se acabó**: sale del ajuste de entrada del
+  // conteo cíclico, de una salida cancelada, de un traspaso anterior a esa fila y **también de un
+  // traspaso de hoy cuyo origen tampoco podía nombrarla** (incluido el remanente que deja el tope
+  // del reparto). El mapa completo, en `dominio/inventarios/previa-salida-tela-orden.ts`. Esta
+  // prueba dicta el estado directamente —lo decide el SERVIDOR—, así que no monta ninguno de esos
+  // caminos: mide lo único que le toca, que es cómo se pinta.
   // ⭐⭐ LA LISTA NO ES TODO LO QUE HAY, y la pantalla tiene que decirlo. Con dos lotes conocidos y
   // 200 kg más que nada explica, enseñar sólo «#501 · #502» haría creer que ésos son el anaquel
   // entero — presentar como completo lo que no lo es.
