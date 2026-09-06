@@ -10,6 +10,8 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
+  AjusteCiclico,
+  CiclicoRenglonAgregar,
   ConteoCiclico,
   ConteoCiclicoCapturar,
   ExactitudCiclico,
@@ -20,9 +22,10 @@ import type {
 } from './tipos';
 
 /**
- * Capa de datos del INVENTARIO CÍCLICO (Módulo Indicadores / Almacén, F7-E5). Cliente TIPADO del
- * OpenAPI; CERO lógica de negocio (A1): el backend congela el teórico (D6), sirve el conteo CIEGO y
- * aplica el ajuste como MOVIMIENTO de kardex (D3).
+ * Capa de datos del INVENTARIO CÍCLICO (Módulo Indicadores / Almacén, F7-E5; extendido a telas y
+ * avíos en la fila 0.099). Cliente TIPADO del OpenAPI; CERO lógica de negocio (A1): el backend
+ * congela el teórico (D6), sirve el conteo (ciego en PT, con el saldo a la vista en telas y avíos),
+ * avisa si el almacén se movió y aplica el ajuste como MOVIMIENTO de kardex (D3).
  */
 export const CLAVE_CICLICOS = ['ciclicos'] as const;
 
@@ -111,12 +114,44 @@ export function useCapturarConteo(): UseMutationResult<
   });
 }
 
-export function useGenerarAjusteCiclico(): UseMutationResult<ExactitudCiclico, ErrorDeApi, number> {
+/**
+ * Agrega a la hoja un artículo que el alta no enumeró (mercancía con existencia cero, §Post-F9.193).
+ */
+export function useAgregarRenglonCiclico(): UseMutationResult<
+  ConteoCiclico,
+  ErrorDeApi,
+  { id: number; cuerpo: CiclicoRenglonAgregar }
+> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async ({ id, cuerpo }) => {
+      const { data, error } = await api.POST('/api/indicadores/ciclicos/{id}/renglones', {
+        params: { path: { id } },
+        body: cuerpo,
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_CICLICOS }),
+  });
+}
+
+/**
+ * Genera el ajuste. ⚠️ Un 200 NO significa que se aplicó: si el almacén se movió entre el alta y el
+ * cierre, el servidor responde `aplicado: false` con el AVISO y sin escribir nada (decisión 6:
+ * avisar y dejar decidir, no bloquear). Reintentar con `confirmarMovimiento: true` aplica.
+ */
+export function useGenerarAjusteCiclico(): UseMutationResult<
+  AjusteCiclico,
+  ErrorDeApi,
+  { id: number; confirmarMovimiento?: boolean }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, confirmarMovimiento = false }) => {
       const { data, error } = await api.POST('/api/indicadores/ciclicos/{id}/ajuste', {
         params: { path: { id } },
+        body: { confirmarMovimiento },
       });
       if (!data) throw new ErrorDeApi(error);
       return data;

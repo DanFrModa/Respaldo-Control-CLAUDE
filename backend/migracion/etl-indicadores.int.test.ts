@@ -190,7 +190,7 @@ describe('ETL de indicadores F7-E6 (integración, fixtures committeados)', () =>
     const uno = await cliente.inventarioCiclico.findFirstOrThrow({ select: { id: true } });
     const ex = await consultarExactitud(sesion, uno.id, { cliente });
     expect(ex.renglones).toHaveLength(1);
-    expect(ex.renglones[0]?.idMovimientoAjuste).toBeNull(); // sin ajuste de kardex (D6)
+    expect(ex.renglones[0]?.ajustes).toEqual([]); // sin ajuste de kardex (D6)
   });
 
   // ── VENTANA TEMPORAL (§Post-F9.24) ───────────────────────────────────────────────────────────

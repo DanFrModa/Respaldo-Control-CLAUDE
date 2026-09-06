@@ -9,7 +9,10 @@ import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
+  esquemaAjusteCiclicoSalida,
+  esquemaCiclicoRenglonAgregar,
   esquemaErrorApi,
+  esquemaInventarioCiclicoAjuste,
   esquemaInventarioCiclicoCancelar,
   esquemaInventarioCiclicoConteo,
   esquemaInventarioCiclicoCrear,
@@ -22,6 +25,7 @@ import {
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
+  agregarRenglonCiclico,
   cancelarInventarioCiclico,
   capturarConteo,
   consultarExactitud,
@@ -151,6 +155,24 @@ export const rutasCiclicos: FastifyPluginCallbackZod = (app, _opciones, done) =>
   });
 
   app.route({
+    method: 'POST',
+    url: '/indicadores/ciclicos/:id/renglones',
+    preHandler: guardConteo,
+    schema: {
+      tags: ['indicadores'],
+      summary: 'Agregar a la hoja un artículo que el sistema cree que no tiene',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaCiclicoRenglonAgregar,
+      response: { 200: esquemaConteoSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return agregarRenglonCiclico(sesion, request.params.id, request.body);
+    },
+  });
+
+  app.route({
     method: 'GET',
     url: '/indicadores/ciclicos/:id/exactitud',
     preHandler: guardConsulta,
@@ -174,13 +196,18 @@ export const rutasCiclicos: FastifyPluginCallbackZod = (app, _opciones, done) =>
     schema: {
       tags: ['indicadores'],
       summary: 'Generar el ajuste (movimientos de kardex, D3)',
+      description:
+        'Si el almacén se movió entre el alta y el cierre, responde 200 con `aplicado: false` y el ' +
+        'AVISO de qué artículos se movieron, SIN escribir nada (decisión 6: avisar y dejar decidir, ' +
+        'no bloquear). Repetir con `confirmarMovimiento: true` aplica.',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
-      response: { 200: esquemaExactitudSalida, ...respuestasError },
+      body: esquemaInventarioCiclicoAjuste,
+      response: { 200: esquemaAjusteCiclicoSalida, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      return generarAjusteCiclico(sesion, request.params.id);
+      return generarAjusteCiclico(sesion, request.params.id, request.body);
     },
   });
 
@@ -208,7 +235,7 @@ export const rutasCiclicos: FastifyPluginCallbackZod = (app, _opciones, done) =>
     preHandler: guardHoja,
     schema: {
       tags: ['indicadores'],
-      summary: 'Hoja de conteo en PDF (CIEGA — sin teórico, R9)',
+      summary: 'Hoja de conteo en PDF (R9; ciega en PT — sin teórico, D6)',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       response: { ...respuestasError },

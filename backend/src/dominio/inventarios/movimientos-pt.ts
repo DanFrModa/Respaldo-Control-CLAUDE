@@ -74,6 +74,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { DONDE_CANCELAR_AJUSTE_CICLICO } from './cancelacion-comun.js';
 import { rechazarTipoReservado } from './salida-sin-orden.js';
 
 // ── Códigos estables de los tipos de movimiento que el dominio resuelve por nombre ───────────────
@@ -516,9 +517,8 @@ const DONDE_CANCELAR: Record<string, string> = {
   // `ajuste-ciclico` es el estado en el que el cíclico se niega a deshacerse. Mandar ahí al usuario
   // sería mandarlo a una puerta cerrada con llave — misma redacción que `migracion`, que es el otro
   // caso sin marcha atrás.
-  [ORIGEN.ajusteCiclico]:
-    'lo generó el AJUSTE de un INVENTARIO CÍCLICO ya cerrado, que no tiene marcha atrás. Si el ' +
-    'conteo estuvo mal, corrige la existencia con un movimiento manual NUEVO, no anulando el ajuste',
+  // La frase vive en `cancelacion-comun.ts`: telas y avíos dicen EXACTAMENTE lo mismo (fila 0.099).
+  [ORIGEN.ajusteCiclico]: DONDE_CANCELAR_AJUSTE_CICLICO,
   [ORIGEN.cancelacion]:
     'YA ES el inverso de otro movimiento (una cancelación): cancelar una cancelación no revierte ' +
     'nada, solo enreda la historia',

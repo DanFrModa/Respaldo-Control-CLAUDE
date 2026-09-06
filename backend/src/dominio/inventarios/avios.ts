@@ -52,6 +52,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirCancelableFueraDelCiclico } from './cancelacion-comun.js';
 import {
   CODIGO_TIPO_MOV_POR_CONCEPTO,
   exigirPermisoParaCancelarSalidaSinOrden,
@@ -492,6 +493,9 @@ export async function cancelarMovimientoAvio(
     }
     // Fila 0.104: la marcha atrás de una salida sin orden —y la de esa marcha atrás— piden la
     // MISMA llave que la salida.
+    // Fila 0.099 — el ajuste de un cíclico NO se deshace desde Inventarios (la hoja quedaría
+    // `cerrado` mientras el kardex dice otra cosa). Misma puerta de atrás que cerró la 0.104.
+    exigirCancelableFueraDelCiclico(original.origenTipo);
     await exigirPermisoParaCancelarSalidaSinOrden(tx, sesion, original);
     const codigoInverso =
       original.tipoMov.direccion === DireccionMovimiento.entrada

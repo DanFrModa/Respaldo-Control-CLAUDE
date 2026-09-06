@@ -34,16 +34,34 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
 
 type EstadoFiltro = '' | 'abierto' | 'contado' | 'cerrado' | 'cancelado';
+type DimensionFiltro = '' | 'PT' | 'TELA' | 'AVIO';
+
+/** Cómo se le dice al usuario qué cuenta cada hoja. */
+function etiquetaDimension(dimension: InventarioCiclicoResumen['dimension']): string {
+  if (dimension === 'TELA') return 'Telas';
+  if (dimension === 'AVIO') return 'Avíos';
+  return 'Producto terminado';
+}
 
 /**
- * INVENTARIOS CÍCLICOS — lista + alta (F7-E5; doc 05 §Almacén; re-vestida R9 a TABLA-FIRST). El ALTA
- * congela el teórico (D6); el conteo es CIEGO (otra pantalla) y el ajuste se aplica como MOVIMIENTO de
- * kardex (D3). page-head + toolbar (estado) + TABLA DENSA. Bajo `indicadores.ciclicos-*` (el backend
- * re-verifica cada acción, A1).
+ * INVENTARIOS CÍCLICOS — lista + alta (F7-E5; doc 05 §Almacén; re-vestida R9 a TABLA-FIRST;
+ * extendida a telas y avíos en la fila 0.099). El ALTA congela el teórico (D6); el conteo va en otra
+ * pantalla y el ajuste se aplica como MOVIMIENTO de kardex (D3). page-head + toolbar (estado +
+ * dimensión) + TABLA DENSA. Bajo `indicadores.ciclicos-*` (el backend re-verifica cada acción, A1).
+ *
+ * ⭐ **QUÉ se cuenta lo decide el ALMACÉN, no el usuario.** En el alta se elige el almacén —de
+ * cualquiera de los tres tipos— y el servidor deriva de su tipo si la hoja cuenta producto
+ * terminado, telas o avíos. Por eso el diálogo no tiene un desplegable de "tipo de conteo": tenerlo
+ * sería ofrecer combinaciones que el servidor va a rechazar.
  */
 export function InventariosCiclicosPagina(): React.JSX.Element {
   const [estado, setEstado] = useState<EstadoFiltro>('');
-  const query: InventariosCiclicosQuery = { porPagina: 100, ...(estado === '' ? {} : { estado }) };
+  const [dimension, setDimension] = useState<DimensionFiltro>('');
+  const query: InventariosCiclicosQuery = {
+    porPagina: 100,
+    ...(estado === '' ? {} : { estado }),
+    ...(dimension === '' ? {} : { dimension }),
+  };
   const consulta = useInventariosCiclicos(query);
   const [alta, setAlta] = useState(false);
   const cancelar = useCancelarCiclico();
@@ -86,6 +104,18 @@ export function InventariosCiclicosPagina(): React.JSX.Element {
             <option value="cerrado">Cerrados</option>
             <option value="cancelado">Cancelados</option>
           </SelectNativo>
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            value={dimension}
+            onChange={(e) => setDimension(e.target.value as DimensionFiltro)}
+            aria-label="Filtrar por qué se cuenta"
+            data-testid="ic-dimension"
+          >
+            <option value="">Todo</option>
+            <option value="PT">Producto terminado</option>
+            <option value="TELA">Telas</option>
+            <option value="AVIO">Avíos</option>
+          </SelectNativo>
           <div className="ml-auto">
             <span className="text-[12px] text-faint">
               {filas.length.toLocaleString('es-MX')} inventarios
@@ -103,6 +133,7 @@ export function InventariosCiclicosPagina(): React.JSX.Element {
               <TablaDensaEncabezado>
                 <TablaDensaFila>
                   <TablaDensaHead>Folio</TablaDensaHead>
+                  <TablaDensaHead>Cuenta</TablaDensaHead>
                   <TablaDensaHead>Almacén</TablaDensaHead>
                   <TablaDensaHead>Fecha</TablaDensaHead>
                   <TablaDensaHead>Estado</TablaDensaHead>
@@ -114,6 +145,7 @@ export function InventariosCiclicosPagina(): React.JSX.Element {
                 {filas.map((c) => (
                   <TablaDensaFila key={c.id} data-testid={`ic-fila-${c.id}`}>
                     <TablaDensaCelda className="font-medium">#{c.folio}</TablaDensaCelda>
+                    <TablaDensaCelda>{etiquetaDimension(c.dimension)}</TablaDensaCelda>
                     <TablaDensaCelda>{c.almacen}</TablaDensaCelda>
                     <TablaDensaCelda className="text-muted-foreground">{c.fecha}</TablaDensaCelda>
                     <TablaDensaCelda>
@@ -230,17 +262,22 @@ function DialogoAlta({
   alCerrar: () => void;
 }): React.JSX.Element {
   const crear = useCrearCiclico();
-  // Solo almacenes de PT: el cíclico cuenta producto terminado (fila 0.137).
+  // TODOS los almacenes: el cíclico ya cuenta las tres dimensiones (fila 0.099) y es el TIPO del
+  // almacén elegido el que decide cuál. Filtrarlos a `PT` aquí volvería a esconder las otras dos.
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
-    tipo: 'PT',
   });
   const [idAlmacen, setIdAlmacen] = useState('');
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [observaciones, setObservaciones] = useState('');
+
+  const elegido = (almacenes.data?.datos ?? []).find((a) => String(a.id) === idAlmacen);
+  // El alcance por MODELO sólo existe en producto terminado; en telas y avíos el servidor rechaza
+  // esa lista (sería un filtro que no filtra). Ofrecerlo sería invitar a un error.
+  const conAlcanceModelo = elegido?.tipo === 'PT';
 
   function guardar(e: React.FormEvent): void {
     e.preventDefault();
@@ -251,7 +288,7 @@ function DialogoAlta({
     crear.mutate(
       {
         idAlmacen: Number(idAlmacen),
-        ...(modelo === null ? {} : { idsModelo: [modelo.id] }),
+        ...(modelo === null || !conAlcanceModelo ? {} : { idsModelo: [modelo.id] }),
         ...(observaciones.trim() === '' ? {} : { observaciones: observaciones.trim() }),
       },
       {
@@ -276,8 +313,8 @@ function DialogoAlta({
           <DialogHeader>
             <DialogTitle>Nuevo inventario cíclico</DialogTitle>
             <DialogDescription>
-              El alta congela el teórico ahora mismo. Elige el almacén y, si quieres, acota a un
-              modelo.
+              El alta congela el teórico ahora mismo. Elige el almacén: lo que se cuenta (producto
+              terminado, telas o avíos) lo dice su tipo.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -286,37 +323,42 @@ function DialogoAlta({
               <SelectNativo
                 id="ic-almacen"
                 value={idAlmacen}
-                onChange={(e) => setIdAlmacen(e.target.value)}
+                onChange={(e) => {
+                  setIdAlmacen(e.target.value);
+                  setModelo(null);
+                }}
                 data-testid="ic-almacen"
               >
                 <option value="">Selecciona…</option>
                 {(almacenes.data?.datos ?? []).map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.nombre}
+                    {a.nombre} · {etiquetaDimension(a.tipo)}
                   </option>
                 ))}
               </SelectNativo>
             </Field>
-            <Field>
-              <FieldLabel>Alcance (modelo)</FieldLabel>
-              {modelo === null ? (
-                <SelectorModelo
-                  idSeleccionado={undefined}
-                  alSeleccionar={(m) => setModelo(m)}
-                  testid="ic-selector-modelo"
-                />
-              ) : (
-                <div className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
-                  <span className="font-medium">{modelo.codigo}</span>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setModelo(null)}>
-                    Quitar (todo el almacén)
-                  </Button>
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Sin modelo = todo el almacén (artículos con existencia).
-              </p>
-            </Field>
+            {conAlcanceModelo && (
+              <Field>
+                <FieldLabel>Alcance (modelo)</FieldLabel>
+                {modelo === null ? (
+                  <SelectorModelo
+                    idSeleccionado={undefined}
+                    alSeleccionar={(m) => setModelo(m)}
+                    testid="ic-selector-modelo"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                    <span className="font-medium">{modelo.codigo}</span>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setModelo(null)}>
+                      Quitar (todo el almacén)
+                    </Button>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Sin modelo = todo el almacén (artículos con existencia).
+                </p>
+              </Field>
+            )}
             <Field>
               <FieldLabel htmlFor="ic-obs">Observaciones</FieldLabel>
               <Input
