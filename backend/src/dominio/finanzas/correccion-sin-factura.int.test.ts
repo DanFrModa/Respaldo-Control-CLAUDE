@@ -61,6 +61,7 @@ import {
   calcularSaldoTercero,
   registrarMovimientoTercero,
 } from '../terceros/cuenta-terceros.js';
+import { insertarAperturasMigradas } from '../terceros/migracion.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -1445,5 +1446,181 @@ describe('🟠 sin `consultas.ver-importes`, el importe se oculta en LAS DOS fue
       bd(),
     );
     expect(maquila.movimientos.find((m) => m.id === abono.id)?.importeGuardado).toBeNull();
+  });
+
+  // ⚠️ Las dos de abajo cierran las ramas que quedaban SIN pinzar: la compuerta estaba probada por
+  // PRODUCTOR (motor · maquila · CxP) pero siempre sobre el ABONO, así que abrirla en la rama del
+  // PAGO o en la del DESCUENTO dejaba la suite entera en verde. No había fuga; lo que faltaba era
+  // el candado sobre un dato de dinero.
+  it('🟠 el PAGO de maquila tampoco filtra su importe (rama sin aserción hasta hoy)', async () => {
+    // Pago LIBRE (sin aplicaciones), que es la forma en que existen los históricos.
+    const pago = await cliente.pagoMaquilero.create({
+      data: {
+        idEmpresa: empresa.id,
+        idMaquilero: maquilero.id,
+        monto: 250,
+        fecha: new Date('2026-09-01T00:00:00.000Z'),
+        conFactura: false,
+        estadoRevision: 'revisado',
+      },
+    });
+    const sinImportes = PERM_TODOS.filter((p) => p !== 'consultas.ver-importes');
+    const maquila = await estadoCuentaMaquilero(
+      sesion({ permisos: sinImportes }),
+      maquilero.id,
+      {},
+      bd(),
+    );
+    const fila = maquila.movimientos.find((m) => m.concepto === 'pago' && m.id === pago.id);
+    expect(fila).toBeDefined(); // el renglón se ve…
+    expect(fila?.importeGuardado).toBeNull(); // …pero su importe, no
+  });
+
+  it('🟠 y el DESCUENTO en la vista de CxP tampoco (la otra rama sin aserción)', async () => {
+    const descuento = await cliente.descuentoMaquilero.create({
+      data: {
+        idEmpresa: empresa.id,
+        idMaquilero: maquilero.id,
+        monto: 300,
+        fecha: new Date('2026-09-01T00:00:00.000Z'),
+        conFactura: false,
+        estadoRevision: 'revisado',
+      },
+    });
+    const sinImportes = PERM_TODOS.filter((p) => p !== 'consultas.ver-importes');
+    const edc = await estadoDeCuentaTercero(
+      sesion({ permisos: sinImportes }),
+      'proveedor',
+      maquilero.id,
+      {},
+      bd(),
+    );
+    const fila = edc.movimientos.find(
+      (m) => m.fuente === 'esma' && m.origen === 'descuento' && m.id === descuento.id,
+    );
+    expect(fila).toBeDefined();
+    expect(fila?.importeGuardado).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// 🟡 LA TERCERA FORMA DEL MISMO DEFECTO, EN EL SERVIDOR — un valor que nadie propuso, revalidado
+//
+// La forma es siempre la misma: *el sistema vuelve a juzgar un dato que el usuario no tocó, y le
+// niega la corrección por él*. En el cajón era el IMPORTE (0 y negativos). Aquí es la NOTA:
+// `corregirMovimientoTercero` reenviaba las observaciones ORIGINALES por
+// `esquemaMovimientoTerceroCrear`, que las limita a **1000 caracteres** — mientras el ETL de
+// apertura (`terceros/migracion.ts`, un `createManyAndReturn` que NO pasa por Zod) las escribe **sin
+// validar ninguna** desde una columna de texto libre del CSV (`migracion/loaders/terceros-saldos.ts`).
+//
+// ⚠️ No es alcanzable con datos capturados a mano: el alta normal ya corta en 1000. Se despierta el
+// día que corra el ETL de apertura (hoy «LISTO SIN CORRER», espera el corte de SINUBE). Por eso la
+// prueba entra por la MISMA puerta que el ETL, y no fabricando la fila a mano: si mañana la
+// migración empieza a validar, esta prueba deja de tener sentido sola y se entera.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('🟡 un movimiento MIGRADO con una nota larguísima se corrige igual', () => {
+  /** Más allá del tope de 1000 del contrato: exactamente lo que el ETL puede dejar escrito. */
+  const NOTA_LARGA = `saldo de apertura SINUBE — ${'x'.repeat(1200)}`;
+
+  beforeEach(async () => {
+    await montarEsMa();
+  });
+
+  /** Un movimiento como los que deja el ETL de apertura: por el dominio en modo migración. */
+  async function migradoConNotaLarga(): Promise<number> {
+    await insertarAperturasMigradas(
+      sesion(),
+      empresa.id,
+      { tipoTercero: 'proveedor', idTercero: proveedor.id, diasCredito: 0 },
+      'AperturaTerceroPrueba',
+      [
+        {
+          origen: 'pago',
+          fecha: new Date('2026-09-01T00:00:00.000Z'),
+          importe: 500,
+          esFiscal: false,
+          observaciones: NOTA_LARGA,
+          claveFuente: `apertura-nota-larga-${String(Date.now())}`,
+        },
+      ],
+      bd(),
+    );
+    const fila = await cliente.movimientoTercero.findFirstOrThrow({
+      where: { idEmpresa: empresa.id, observaciones: NOTA_LARGA },
+      orderBy: { id: 'desc' },
+    });
+    return fila.id;
+  }
+
+  it('la nota migrada de verdad supera el tope del contrato (si no, no se prueba nada)', async () => {
+    const id = await migradoConNotaLarga();
+    const fila = await cliente.movimientoTercero.findUniqueOrThrow({ where: { id } });
+    expect((fila.observaciones ?? '').length).toBeGreaterThan(1000);
+  });
+
+  it('🔴 CORREGIR SÓLO LA FECHA no revalida la nota que nadie tocó', async () => {
+    const id = await migradoConNotaLarga();
+    const nuevo = await corregirMovimientoTercero(
+      sesion(),
+      id,
+      { fecha: '2026-09-08', motivo: 'era de la otra semana' },
+      bd(),
+    );
+    const fila = await cliente.movimientoTercero.findUniqueOrThrow({ where: { id: nuevo.id } });
+    expect(fila.fecha.toISOString().slice(0, 10)).toBe('2026-09-08');
+    // ⭐ Y la nota SE CONSERVA entera: no revalidarla no puede significar perderla.
+    expect(fila.observaciones).toBe(NOTA_LARGA);
+    expect(fila.idMovimientoCorregido).toBe(id);
+  });
+
+  it('⭐ y corregir el IMPORTE tampoco la revalida (ni la pierde)', async () => {
+    const id = await migradoConNotaLarga();
+    const nuevo = await corregirMovimientoTercero(
+      sesion(),
+      id,
+      { importe: 120, motivo: 'era el flete chico' },
+      bd(),
+    );
+    const fila = await cliente.movimientoTercero.findUniqueOrThrow({ where: { id: nuevo.id } });
+    expect(fila.monto.toNumber()).toBe(-120);
+    expect(fila.observaciones).toBe(NOTA_LARGA);
+  });
+
+  it('🔴 pero la nota que el usuario SÍ propone se valida: 1001 caracteres se rechazan', async () => {
+    // La otra mitad de la regla. No revalidar lo arrastrado NO es dejar de validar lo capturado:
+    // si esto pasara, el arreglo habría abierto un agujero en vez de cerrar uno.
+    const id = await migradoConNotaLarga();
+    await expect(
+      corregirMovimientoTercero(
+        sesion(),
+        id,
+        { observaciones: 'y'.repeat(1001), motivo: 'a ver si cuela' },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorValidacion);
+  });
+
+  it('⭐ y la nota propuesta CORTA sí sustituye a la larga', async () => {
+    const id = await migradoConNotaLarga();
+    const nuevo = await corregirMovimientoTercero(
+      sesion(),
+      id,
+      { observaciones: 'saldo apertura', motivo: 'la nota venía con basura' },
+      bd(),
+    );
+    const fila = await cliente.movimientoTercero.findUniqueOrThrow({ where: { id: nuevo.id } });
+    expect(fila.observaciones).toBe('saldo apertura');
+  });
+
+  it('⭐ y BORRAR la nota (null) sigue funcionando', async () => {
+    const id = await migradoConNotaLarga();
+    const nuevo = await corregirMovimientoTercero(
+      sesion(),
+      id,
+      { observaciones: null, motivo: 'la nota sobraba' },
+      bd(),
+    );
+    const fila = await cliente.movimientoTercero.findUniqueOrThrow({ where: { id: nuevo.id } });
+    expect(fila.observaciones).toBeNull();
   });
 });

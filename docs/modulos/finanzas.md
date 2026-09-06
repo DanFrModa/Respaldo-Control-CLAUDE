@@ -284,6 +284,35 @@ importe **NUEVO**, así que sólo sale cuando el usuario propone uno (el campo s
 con el que nació), y el `min` del campo es **`0`** — el suelo de lo que el dato puede valer, no el de
 lo que se puede teclear. Que un importe nuevo sea mayor que 0 lo exigen `enviar` y el servidor.
 
+### La tercera forma del mismo defecto: la nota que nadie tocó (y el ETL que la despierta)
+
+El defecto del importe tiene una **forma general**, y conviene nombrarla porque va a volver:
+*el sistema vuelve a juzgar un dato que el usuario no propuso, y le niega la corrección por él.*
+
+En el servidor apareció con las **observaciones**. `corregirMovimientoTercero` capturaba el
+sustituto reenviando la nota original por `esquemaMovimientoTerceroCrear`, que la limita a **1000
+caracteres**. Pero el **ETL de apertura de terceros** las escribe **sin validar ninguna**
+(`dominio/terceros/migracion.ts::insertarAperturasMigradas` inserta con `createManyAndReturn`, que
+no pasa por Zod) desde una columna de texto libre del CSV (`migracion/loaders/terceros-saldos.ts`).
+⇒ Sobre un movimiento migrado con una nota larga, **corregir sólo la fecha devolvía 400** —
+*«Too big: expected string to have <=1000 characters»*— por un campo que nadie había tocado.
+
+⚠️ **No era alcanzable con datos capturados a mano** (el alta normal ya corta en 1000): **se despierta
+el día que se corra ese ETL**, que hoy está *«LISTO SIN CORRER»* esperando el corte de SINUBE. Por eso
+el aviso vive también **pegado al ETL**, en el TSDoc de `insertarAperturasMigradas`: quien lo corra
+tiene que poder enterarse sin leer este documento.
+
+**La regla que queda, en las dos mitades:**
+
+| La nota… | Por dónde viaja | ¿Se valida? |
+|---|---|---|
+| la **PROPONE** el usuario | `entrada` (el contrato) | **Sí** — es captura suya, y 1001 caracteres se rechazan |
+| sólo se **ARRASTRA** | `extras.observacionesConservadas` (canal del dominio) | **No** — nadie la propuso |
+
+🔑 **Y la segunda mitad no es opcional: no revalidarla no puede significar perderla.** Si la nota
+arrastrada no viajara por ningún camino, corregir la fecha la borraría en silencio — un defecto peor
+que el que se venía a arreglar. Las pruebas pinzan las dos mitades por separado.
+
 ### Efecto de fondo: los tres movimientos planos vuelven a ser el mismo criterio
 
 La condición de **estar vivo** (`canceladoEn IS NULL`) sube de ser sólo del descuento a serlo de los

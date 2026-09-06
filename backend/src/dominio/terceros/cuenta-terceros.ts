@@ -213,11 +213,22 @@ export async function registrarMovimientoTerceroInterno(
   entrada: z.input<typeof esquemaMovimientoTerceroCrear>,
   bd?: ContextoBd,
   /**
-   * Columnas que NO son parte del contrato del API y sólo puede poner el dominio. Hoy sólo la liga
-   * de la CORRECCIÓN (fila 0.145): el movimiento nuevo apunta al que sustituye. Va como parámetro
-   * aparte —y no como un campo más de `entrada`— justamente para que ninguna ruta pueda mandarla.
+   * Columnas que NO son parte del contrato del API y sólo puede poner el dominio. Van como parámetro
+   * aparte —y no como campos más de `entrada`— justamente para que ninguna ruta pueda mandarlas.
+   *
+   *  • `idMovimientoCorregido` (fila 0.145): el movimiento nuevo apunta al que sustituye.
+   *
+   *  • `observacionesConservadas` (fila 0.145): la nota que la corrección **ARRASTRA** tal cual,
+   *    porque el usuario no la tocó. Va por aquí y NO por `entrada` para que **no se vuelva a
+   *    validar**: `esquemaMovimientoTerceroCrear` limita las observaciones a 1000 caracteres, pero
+   *    el ETL de apertura las escribe **sin validar ninguna** (`terceros/migracion.ts`, un
+   *    `createManyAndReturn` que no pasa por Zod) desde una columna de texto libre del CSV
+   *    (`migracion/loaders/terceros-saldos.ts`). Reenviándola por `entrada`, corregir **sólo la
+   *    fecha** de un movimiento migrado con una nota larga devolvería **400 por un campo que el
+   *    usuario ni tocó** — el mismo defecto que el cajón tenía con el importe, ahora del lado del
+   *    servidor. Lo que el usuario PROPONE sí viaja por `entrada` y sí se valida: es entrada suya.
    */
-  extras?: { idMovimientoCorregido?: number },
+  extras?: { idMovimientoCorregido?: number; observacionesConservadas?: string },
 ): Promise<MovimientoTerceroSalida> {
   const datos: DatosMovimientoTerceroCrear = validarEntrada(esquemaMovimientoTerceroCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
@@ -258,7 +269,12 @@ export async function registrarMovimientoTerceroInterno(
         ...(datos.idArchivoCfdi === undefined ? {} : { idArchivoCfdi: datos.idArchivoCfdi }),
         ...(datos.refTipo === undefined ? {} : { refTipo: datos.refTipo }),
         ...(datos.refId === undefined ? {} : { refId: datos.refId }),
+        // Las dos fuentes de la nota son EXCLUYENTES por construcción (ver `extras`): la propuesta
+        // por el usuario pasa por Zod; la arrastrada por una corrección, no.
         ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        ...(extras?.observacionesConservadas === undefined
+          ? {}
+          : { observaciones: extras.observacionesConservadas }),
         ...(extras?.idMovimientoCorregido === undefined
           ? {}
           : { idMovimientoCorregido: extras.idMovimientoCorregido }),
@@ -449,6 +465,27 @@ export async function cancelarMovimientoTerceroInterno(
  *    renglón con comprobante fiscal queda intocable **aunque sea del mismo proveedor** — el segmento
  *    es del MOVIMIENTO, no del tercero (un proveedor `ambos` tiene de los dos);
  *  • vivo y no siendo él mismo un inverso de cancelación (eso lo re-verifica el cancelador).
+ *
+ * ## 🔴 NO SE REVALIDA LO QUE NADIE PROPUSO — y por qué importa el día del ETL de apertura
+ *
+ * La nota del movimiento viaja por DOS caminos distintos según de quién sea:
+ *
+ *  • la que el usuario **PROPONE** va por `entrada` y la valida Zod (`.max(1000)`), como toda
+ *    captura suya;
+ *  • la que sólo se **ARRASTRA** —porque él no la tocó— va por `extras.observacionesConservadas`,
+ *    el canal del dominio, y **no se vuelve a validar**.
+ *
+ * ⚠️ **No es una sutileza: es un 400 esperando fecha.** El ETL de apertura de terceros escribe las
+ * observaciones **sin validar ninguna** ({@link insertarAperturasMigradas} inserta con
+ * `createManyAndReturn`, que no pasa por Zod) desde una columna de texto libre del CSV
+ * (`migracion/loaders/terceros-saldos.ts`). Reenviando siempre la nota por `entrada`, corregir
+ * **sólo la fecha** de un movimiento migrado con una nota de más de 1000 caracteres fallaba con
+ * *«Too big: expected string to have <=1000 characters»* — **por un campo que el usuario ni tocó**.
+ * Es la misma forma del defecto que el cajón tenía con el importe, del lado del servidor.
+ *
+ * 🔑 Y la otra mitad, que la prueba también pinza: **no revalidarla no puede significar perderla**.
+ * Si la nota arrastrada no se pasara por ningún camino, corregir la fecha borraría la nota en
+ * silencio — un defecto peor que el que se venía a arreglar.
  */
 export async function corregirMovimientoTercero(
   sesion: SesionUsuario,
@@ -509,6 +546,8 @@ export async function corregirMovimientoTercero(
     if (!cambios.hayCambio) {
       throw new ErrorValidacion(MENSAJE_SIN_CAMBIOS);
     }
+    // ¿La nota es ENTRADA del usuario, o sólo se arrastra? De eso depende si se valida o no.
+    const propusoObservaciones = datos.observaciones !== undefined;
 
     await cancelarMovimientoTerceroInterno(sesion, id, { motivo: datos.motivo }, { tx });
 
@@ -532,10 +571,23 @@ export async function corregirMovimientoTercero(
         esFiscal: false,
         ...(original.refTipo === null ? {} : { refTipo: original.refTipo }),
         ...(original.refId === null ? {} : { refId: original.refId }),
-        ...(cambios.observaciones === null ? {} : { observaciones: cambios.observaciones }),
+        // 🔴 LA NOTA SÓLO PASA POR EL CONTRATO SI EL USUARIO LA PROPUSO. Si sólo se arrastra, viaja
+        // por `extras` —el canal del dominio— y NO se vuelve a validar: ver el TSDoc de
+        // `registrarMovimientoTerceroInterno`. Reenviarla siempre por aquí hacía que corregir la
+        // fecha de un movimiento MIGRADO con una nota de más de 1000 caracteres fallara con 400 por
+        // un campo que nadie tocó. Es el mismo principio que el cajón aplica al importe: **no se
+        // revalida lo que nadie propuso.**
+        ...(propusoObservaciones && cambios.observaciones !== null
+          ? { observaciones: cambios.observaciones }
+          : {}),
       },
       { tx },
-      { idMovimientoCorregido: original.id },
+      {
+        idMovimientoCorregido: original.id,
+        ...(!propusoObservaciones && cambios.observaciones !== null
+          ? { observacionesConservadas: cambios.observaciones }
+          : {}),
+      },
     );
 
     // A7 «con rastro»: qué decía ANTES, qué dice ahora, quién y por qué. Va sobre el movimiento
