@@ -105,42 +105,70 @@ const CARGO_REVISADO = { estado: CARGO_VALIDADO };
 const CARGO_SIN_COSTO_CUENTA = false;
 
 /**
- * Los tres movimientos PLANOS (abono/pago/descuento) comparten forma y estado de revisión, así que
- * comparten definición: un solo lugar donde dice qué es «revisado» y qué es «pendiente».
- */
-const PLANO: DefinicionConcepto = {
-  columnas: { estadoRevision: 'estado_revision' },
-  cuenta: { estadoRevision: REVISADO },
-  pendiente: { estadoRevision: CAPTURADO },
-};
-
-/**
- * ⭐ EL DESCUENTO tiene UNA condición más que sus dos hermanos (V1, fila 0.109): estar VIVO. Es el
- * único de los tres movimientos planos que se puede cancelar, porque es el que puede nacer de un
- * acto reversible — el CIERRE de una orden con un maquilero, que propone cobrarle el faltante y que
- * se puede DESHACER mientras nadie lo haya revisado.
+ * Los tres movimientos PLANOS (abono/pago/descuento) comparten forma, estado de revisión **y
+ * cancelación suave**, así que comparten definición: un solo lugar donde dice qué es «revisado», qué
+ * es «pendiente» y qué está VIVO.
  *
- * 🔴 LA CONDICIÓN VA EN LOS **DOS** CRITERIOS, y el segundo es el que casi se olvida: un descuento
+ * ⭐ LA CONDICIÓN DE ESTAR VIVO ERA SÓLO DEL DESCUENTO hasta la fila 0.145 (la puso la 0.109, cuando
+ * el deshacer de un cierre de orden fue lo único capaz de cancelar un movimiento plano). Desde la
+ * 0.145 los TRES se pueden cancelar —la CORRECCIÓN de un movimiento sin factura cancela el viejo y
+ * captura el bueno—, así que la condición sube al PLANO y los tres conceptos vuelven a ser idénticos.
+ *
+ * 🔴 LA CONDICIÓN VA EN LOS **DOS** CRITERIOS, y el segundo es el que casi se olvida: un movimiento
  * cancelado obviamente no puede sumar al saldo (`cuenta`), pero tampoco puede seguir apareciendo
  * como *«esperando tu decisión»* (`pendiente`) — si no, el tablero de EsMa y la bandeja de CxP
  * enseñarían para siempre una partida por revisar que ya no existe. Al vivir aquí, la condición
  * viaja sola a las cinco sumas: `saldos.ts` (Prisma), los dos SQL crudos de `saldos-todos.ts`, y de
  * ahí a CxP y a terceros.
  */
-const DESCUENTO: DefinicionConcepto = {
+const PLANO: DefinicionConcepto = {
   columnas: { estadoRevision: 'estado_revision', canceladoEn: 'cancelado_en' },
   cuenta: { estadoRevision: REVISADO, canceladoEn: null },
   pendiente: { estadoRevision: CAPTURADO, canceladoEn: null },
 };
 
 /**
- * El descuento VIVO, a secas (sin decir nada de su revisión). Lo usan las pantallas que LISTAN
- * descuentos —el estado de cuenta, el detalle desglosado, los movimientos del maquilero, la
+ * El movimiento plano VIVO, a secas (sin decir nada de su revisión). Lo usan las pantallas que
+ * LISTAN movimientos —el estado de cuenta, el detalle desglosado, los movimientos del maquilero, la
  * convivencia con terceros—, que no suman saldo pero tampoco pueden enseñar un movimiento que se
  * canceló. Sale de la MISMA constante que los criterios de arriba: si mañana «vivo» cambia de
  * forma, cambia en un solo sitio.
+ *
+ * Los tres se declaran por separado sólo para que cada uno lleve el `WhereInput` de SU modelo: así
+ * un campo mal escrito no compila.
  */
 export const WHERE_VIVO_DESCUENTO: Prisma.DescuentoMaquileroWhereInput = { canceladoEn: null };
+/** El ABONO vivo (no cancelado). Gemelo de {@link WHERE_VIVO_DESCUENTO} desde la fila 0.145. */
+export const WHERE_VIVO_ABONO: Prisma.AbonoMaquileroWhereInput = { canceladoEn: null };
+/** El PAGO vivo (no cancelado). Gemelo de {@link WHERE_VIVO_DESCUENTO} desde la fila 0.145. */
+export const WHERE_VIVO_PAGO: Prisma.PagoMaquileroWhereInput = { canceladoEn: null };
+
+/**
+ * El MISMO criterio de «vivo» en SQL crudo, para intercalar en un `WHERE … AND ${…}`. Sale entre
+ * paréntesis por la misma razón que los demás fragmentos de este módulo (un `OR` del que llama no
+ * puede comerse la condición).
+ *
+ * Lo usa `migracion/cuadre-f6.ts`, que suma los movimientos planos **sin** filtrar por revisión —a
+ * propósito: compara contra un Access que no conocía ese concepto— pero **sí** tiene que excluir los
+ * anulados, porque «sin revisar» es *todavía no decidido* y «anulado» es *no existe*. Vive aquí para
+ * que ese archivo no escriba el nombre de la columna por su cuenta.
+ *
+ * 🔴 EL NOMBRE DE LA COLUMNA SE LEE DE {@link PLANO}, no se escribe otra vez. `columnaSegura` valida
+ * la FORMA del identificador, no que sea **la misma** columna: con el literal escrito a mano, el día
+ * que `DEFINICION` renombrara `cancelado_en`, `sqlCuenta` la seguiría y este fragmento **no** — la
+ * divergencia exacta que este archivo existe para impedir. Si la columna desaparece del criterio,
+ * esto revienta al cargar el módulo en vez de generar un SQL que filtra por algo que ya no existe.
+ */
+const COLUMNA_CANCELADO = PLANO.columnas.canceladoEn;
+if (COLUMNA_CANCELADO === undefined) {
+  throw new Error(
+    'El criterio del movimiento plano perdió su columna de cancelación: `SQL_VIVO_PLANO` no puede ' +
+      'derivarse. Revisa `PLANO.columnas` en este mismo archivo.',
+  );
+}
+export const SQL_VIVO_PLANO: Prisma.Sql = Prisma.sql`(${Prisma.raw(
+  `"${columnaSegura(COLUMNA_CANCELADO)}"`,
+)} IS NULL)`;
 
 /**
  * ⭐ EL CRITERIO, UNA SOLA VEZ. Todo lo demás de este módulo se deriva de aquí.
@@ -163,7 +191,7 @@ const DEFINICION: Readonly<Record<ConceptoSaldo, DefinicionConcepto>> = {
   },
   abono: PLANO,
   pago: PLANO,
-  descuento: DESCUENTO,
+  descuento: PLANO,
 };
 
 // ── Cláusulas para PRISMA ────────────────────────────────────────────────────────────────────────

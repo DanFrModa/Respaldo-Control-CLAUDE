@@ -26,7 +26,7 @@
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, Prisma, type PrismaClient } from '../src/datos/index.js';
-import { sqlCuenta } from '../src/dominio/esma/formula-saldo.js';
+import { SQL_VIVO_PLANO, sqlCuenta } from '../src/dominio/esma/formula-saldo.js';
 import { saldosDeTodosMaquileros } from '../src/dominio/esma/saldos-todos.js';
 import { conciliarEsMa } from '../src/dominio/esma/conciliacion.js';
 
@@ -240,6 +240,14 @@ async function calcularSaldos(cliente: PrismaClient): Promise<SaldosF6> {
   // planos entran TODOS —revisados o no— a propósito: aquí se compara contra un v1 (Access) que no
   // conocía el estado de revisión, y un movimiento bien migrado pero sin revisar NO es un error de
   // migración. Por eso este número puede ser mayor que el saldo operativo del dominio.
+  //
+  // ⭐⭐ PERO LOS ANULADOS SÍ SE EXCLUYEN (fila 0.145). Es la excepción a la frase de arriba, y no es
+  // una inconsistencia: «sin revisar» significa *todavía no decidido*, y por eso cuenta; **anulado
+  // significa que no existe**. Desde la 0.145 los tres movimientos planos se pueden anular (al
+  // CORREGIRLOS nace su sustituto), así que sin este filtro el cuadre sumaría el viejo Y el nuevo y
+  // reportaría un descuadre FALSO contra Access en cuanto se corrija el primer movimiento — un
+  // informe de migración que grita por algo que se hizo bien. La condición se le pide a la
+  // definición única, igual que la del cargo.
   const filasV2 = await cliente.$queryRaw<FilaV2[]>(Prisma.sql`
     SELECT p."id" AS "idMaquilero", p."nombre" AS "nombre",
       COALESCE(c."total", 0)::float8 AS "cargos",
@@ -254,15 +262,15 @@ async function calcularSaldos(cliente: PrismaClient): Promise<SaldosF6> {
     ) c ON c."id_maquilero" = p."id"
     LEFT JOIN (
       SELECT "id_maquilero", SUM("monto") AS "total" FROM "abono_maquilero"
-      WHERE "id_empresa" = ${idEmpresa} GROUP BY "id_maquilero"
+      WHERE "id_empresa" = ${idEmpresa} AND ${SQL_VIVO_PLANO} GROUP BY "id_maquilero"
     ) a ON a."id_maquilero" = p."id"
     LEFT JOIN (
       SELECT "id_maquilero", SUM("monto") AS "total" FROM "pago_maquilero"
-      WHERE "id_empresa" = ${idEmpresa} GROUP BY "id_maquilero"
+      WHERE "id_empresa" = ${idEmpresa} AND ${SQL_VIVO_PLANO} GROUP BY "id_maquilero"
     ) pg ON pg."id_maquilero" = p."id"
     LEFT JOIN (
       SELECT "id_maquilero", SUM("monto") AS "total" FROM "descuento_maquilero"
-      WHERE "id_empresa" = ${idEmpresa} GROUP BY "id_maquilero"
+      WHERE "id_empresa" = ${idEmpresa} AND ${SQL_VIVO_PLANO} GROUP BY "id_maquilero"
     ) d ON d."id_maquilero" = p."id"
     WHERE c."total" IS NOT NULL OR a."total" IS NOT NULL
        OR pg."total" IS NOT NULL OR d."total" IS NOT NULL

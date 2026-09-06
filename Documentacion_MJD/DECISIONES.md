@@ -12136,128 +12136,6 @@ nuevo **sí** pasan.
 
 ---
 
-#### (Post-F9.204) — LA REPARACIÓN COMO TERCER SERVICIO SOBRE LA ORDEN (fila 0.144, 6-sep-2026): las cuatro las decidió Daniel
-
-**Cómo nació.** Daniel, por su cuenta: *«a veces hay que hacer reparaciones a un modelo… funciona
-similar a lo que es empaque o el corte. Es sólo una cantidad a un precio que se le paga y **se le debe
-de cargar al costo**. Me parece que el desarrollo que hiciste con lo del corte y empaque ya está
-variable para poder meter un servicio más, ¿no?»*
-
-**Lo que se midió antes de contestarle — su instinto acierta en una mitad, y hay una sorpresa en la otra:**
-- ✅ **El PAGO sí está preparado.** `crearCargoDeServicio` (`dominio/produccion/etapas.ts:596`) recibe el
-  servicio **por parámetro**; el CHECK de la migración de la 0.114 es
-  `(id_tipo_proceso IS NULL) <> (servicio IS NULL)` y **no nombra valores**, así que un tercer servicio
-  no lo rompe; y la etiqueta vive en un `Record<ServicioOrden,string>` **exhaustivo**
-  (`dominio/esma/etiqueta-cargo.ts:21`), de modo que al ampliar el enum **el compilador obliga** a
-  nombrarla. ⚠️ **Pero NO es un catálogo de pantalla:** es el enum de BD `ServicioOrden { corte, empaque }`
-  (`schema.prisma:4336`) ⇒ meter la reparación es **migración + los puntos que marque el compilador**.
-  Es código, no captura. Se le dijo así.
-- 🔴 **EL COSTO NO EXISTE — ni para la reparación, NI para corte y empaque.** `costo-orden.ts:162-165`
-  calcula `procesos = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes`, y **ningún
-  archivo de `dominio/costos/` ni de `dominio/edr/` lee `EsMaCargo`** (verificado enumerando sus
-  lectores: sólo terceros/esma/produccion). ⇒ **hoy se paga el corte y ese dinero NO llega al costo de
-  la prenda** salvo que alguien lo teclee en «procesos». **Es la pieza que falta, y falta para los tres.**
-
-**LAS CUATRO DECISIONES DE DANIEL:**
-1. **Se paga POR PIEZA reparada**, con su cantidad y su precio — como corte y empaque. *(Suyo: «es sólo
-   una cantidad a un precio».)*
-2. ⭐ **La registra CUALQUIER proveedor que ya tenga un rol de maquila** (`ROLES_MAQUILA_ESMA`:
-   costura, estampado, bordado, lavado, aplicación, corte, empaque). **SIN rol nuevo y SIN casilla que
-   marcar.** Lo levantó él: *«el reparador puede ser un proveedor de empaque o de maquila… no sé cómo
-   vamos a manejar eso. Tú recomiéndame»*, y aceptó la recomendación. **Las razones, en su orden:**
-   (a) un rol nuevo obligaría a **repetir el paseo manual de la 0.114** —marcar «Empaque» taller por
-   taller—, y por lo que él describe habría que marcárselo a casi todos; (b) **es la verdad del negocio**:
-   el reparador *es* su maquilero, y un rol aparte modelaría una frontera que en su taller no existe;
-   (c) al estar todos en `ROLES_MAQUILA_ESMA`, **el reparador cae solo** en el rubro maquila de la
-   corrida semanal y en su estado de cuenta, sin enseñarle nada nuevo a finanzas.
-   ⚙️ **Lo que exige técnicamente:** `exigirTerceroConRol` (`etapas.ts:705`, `:826`) pide **UN** rol
-   exacto ⇒ hace falta una **variante que acepte una LISTA**.
-   ⛔ **Descartado abrirlo a cualquier proveedor:** dejaría registrar una reparación a nombre del que
-   vende tela. 📌 Y si algún día el selector largo estorba, **la casilla se puede añadir después sin
-   romper nada**: lo guardado apunta al proveedor, no al rol.
-3. **Avisa, NO bloquea** contra lo recibido — como el empaque. Reparar dos veces la misma pieza es real.
-4. ⭐ **El costo recoge lo REAL pagado** (cargos de corte + empaque + reparación) en vez de teclearse.
-   ⚠️ Esto **toca el motor de costeo**, que es el que produce las cifras que ya se están viendo ⇒
-   **considerar partirla en dos entregas**: (a) la reparación se paga; (b) el costo recoge los tres.
-   Decidir con el diff delante.
-
-⛔ **Lo que NO se hace:** convertir la reparación en un `TipoProceso` — la metería al flujo envío→recibo
-que Daniel dijo que estos servicios **no** son (§Post-F9.195). `idTipoProceso = NULL` sigue siendo la
-marca de «servicio sobre la orden».
-
-#### (Post-F9.205) — LA TANDA DE RESPUESTAS DEL 6-sep-2026 (tarde): once decisiones, y una que CORRIGE al lead
-
-**Contexto.** El lead le puso a Daniel las preguntas abiertas de tres bloques con su default. Contestó
-casi todas. Se registran **con sus palabras**, no parafraseadas.
-
-**1. ⭐ EL LOTE SE PUEDE ELEGIR A MANO (cambia el alcance).** *«Está bien que decida el sistema **pero
-que haya posibilidad de seleccionar otro si es que el cortador decide un lote específico**.»*
-⇒ El **FIFO automático se queda** tal cual. La **selección manual va en FILA APARTE**, encima: la 0.142
-lleva tres rondas y sólo cubre el reparto automático; añadirle pantalla reabriría el ciclo y retrasaría
-lo que ya sirve. Decisión de alcance del lead, comunicada.
-
-**2. `0.143` · existencias de PT:** *«Está bien paginar»* ⇒ default (b) confirmado.
-
-**3. ⭐ `0.140` · IMPRESO POR LOTE — DE 10 EN 10.** *«Casi nunca imprimo tantas de golpe. Si es problema
-la memoria, **pon de 10 en 10 máximo** y listo.»* ⇒ el tope duro pasa de **100 a 10** órdenes por PDF.
-⚠️ **El tope de peso por imagen SIGUE haciendo falta**, medido: 10 × 7 × 12 MB ≈ **840 MB**. La decisión
-reduce el riesgo 10×, **no lo elimina**. Se construyen las dos cosas.
-
-**4. Corrida de pagos ejecutada:** *«Si. Está bien el default»* ⇒ **no** hay botón que revierta la
-corrida completa; se corrige movimiento por movimiento. Y **sí** se arregla que un **borrador vacío** se
-pueda borrar (hoy se queda en la lista para siempre).
-
-**5. ⭐ ESMA NO SE FUSIONA — y la razón la dio él.** *«Lo que pasa con EsMa de Access es que **es un
-estado de cuenta especializado para maquileros porque desde ahí reviso entradas y defino el renglón que
-abona a su estado de cuenta**. Si lo quieres fusionar con cuentas por pagar, **esa funcionalidad es sólo
-del maquilero, no de otros proveedores**. No sé cómo lo harías»* → y al oír la propuesta: *«Ok. Lo que
-comentas de EsMa»*.
-🔑 **EsMa NO es "otra vista del mismo saldo": es su MESA DE TRABAJO del maquilero.** Tiene una función
-que CxP no tiene y que no aplica a un proveedor de telas. ⇒ **Las dos pantallas se quedan**, con papeles
-distintos: **EsMa = donde se DECIDE** (revisar lo recibido, definir qué se abona, descuentos);
-**CxP = el libro único del dinero**. Lo que se arregla son las **tres contradicciones medidas**:
-(a) **no cuentan a la misma gente** —un maquilero dado de baja con saldo vivo sale en CxP y no en
-EsMa, así que sumar una columna y la otra da distinto—; (b) desde CxP se **ven** los renglones de
-maquila pero **no se pueden tocar** (la 0.145 abre esa puerta); (c) **ninguna pantalla dice que la otra
-existe**. Y se **quita del menú la etiqueta de «interina»** que EsMa arrastra desde antes de F9.
-⚠️ **Esto DESMIENTE el enunciado de la fila 0.135**, que trataba la convivencia como duplicidad a
-eliminar. No lo es: **es división del trabajo**, y fusionarlas le quitaría la pantalla donde opera.
-
-**6. 🔴 LOS PLAZOS DEL MAQUILERO — DANIEL CORRIGE AL LEAD, y el dato cambia el diseño.**
-*«Los maquileros cobran normalmente en **una o dos semanas máximo**. **No hay plazos de 30 días.** El
-que estás viendo (bordados computarizados) **es un proveedor de etiqueta**. O sea: los maquileros cobran
-en el **99 % de las veces esa misma semana o la siguiente**. No más.»*
-🔴 **Lo que el lead afirmó y era FALSO:** que «los 8 y 30 días del archivo son los días de crédito de dos
-**maquileros**». BORDADOS COMPUTARIZADOS **no es maquilero**. El dato se leyó del Excel **sin cruzarlo
-con quien conoce a los terceros** — la cicatriz de siempre.
-⭐ **Consecuencia de diseño para la fila 0.121 y para el aging:** la antigüedad de un **maquilero** NO se
-mide con la escala del **proveedor**. Proveedor: 30/60/90 (Daniel usa **150/200/250**). Maquilero: **la
-semana en curso o la siguiente** ⇒ **un maquilero a 30 días no es "vencido normal": es una ANOMALÍA que
-debe saltar a la vista.** Meterlos en cubetas de 30/60/90 haría que **todo maquilero atrasado se vea "al
-corriente"**, que es justo el defecto que la 0.121 viene a curar. ⇒ **Los tramos de maquila van en
-SEMANAS y son propios.** Default propuesto **7 / 14 / 21+**, a confirmar al construir la fila.
-
-**7. Cancelar un pago/abono de maquilero:** *«Ok»* — y añadió: *«**Aunque me gustaría poder editarlo yo
-cuando sea sin factura. Mismo criterio que los estados de cuenta de proveedores que no tienen
-facturas**»*. ⇒ **Es exactamente la fila 0.145**, ya construida: corrige **por movimiento**, no por
-proveedor, y deja intocable el renglón con CFDI detrás aunque sea del mismo tercero.
-
-**8. Constancia de situación fiscal:** *«Si»* ⇒ obligatoria **también para clientes**, como bloqueo suave.
-
-**9. CFDI en volumen:** *«De acuerdo con default»* ⇒ arrastrar varios XML a la misma pantalla, con
-resumen de importados / duplicados / sin proveedor.
-
-**10. Los XML de apertura:** *«Si son con facturas, voy a subir **todos los XML que estén vivos**»* ⇒
-ratifica §Post-F9.201·5 y **los aporta él**.
-
-**11. Las muestras de la carga de apertura:** *«Mañana subo una prueba»* ⇒ **desbloquea la fila 0.131**.
-
-⏳ **SIGUEN ABIERTAS de §Post-F9.206:** P1, P3, P4 y las dos del recuadro — **(i)** ¿el sistema supone
-que lo consumido sin apuntar salió de lo más viejo? y **(ii)** ¿nombrar un lote acotado o **mandar la
-tela sin nombre** cuando no está seguro? La **(ii)** se le repreguntó sin jerga por ser la única donde
-el default elige *arriesgarse a nombrar* en vez de *callar*.
-
-
 #### (Post-F9.206) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default. ✅ **P2 RATIFICADA por Daniel** (§Post-F9.205·1, con una adición) · ⏳ **P1, P3 y P4 siguen pendientes**
 
 **Lo que SÍ decidió Daniel ya está escrito y no se repite aquí:** es el punto **1 de §Post-F9.201** —
@@ -12376,6 +12254,256 @@ otra conversación: obligaría a escoger lote en cada salida, que es justo lo qu
 
 ---
 
+#### (Post-F9.205) — LA TANDA DE RESPUESTAS DEL 6-sep-2026 (tarde): once decisiones, y una que CORRIGE al lead
+
+**Contexto.** El lead le puso a Daniel las preguntas abiertas de tres bloques con su default. Contestó
+casi todas. Se registran **con sus palabras**, no parafraseadas.
+
+**1. ⭐ EL LOTE SE PUEDE ELEGIR A MANO (cambia el alcance).** *«Está bien que decida el sistema **pero
+que haya posibilidad de seleccionar otro si es que el cortador decide un lote específico**.»*
+⇒ El **FIFO automático se queda** tal cual. La **selección manual va en FILA APARTE**, encima: la 0.142
+lleva tres rondas y sólo cubre el reparto automático; añadirle pantalla reabriría el ciclo y retrasaría
+lo que ya sirve. Decisión de alcance del lead, comunicada.
+
+**2. `0.143` · existencias de PT:** *«Está bien paginar»* ⇒ default (b) confirmado.
+
+**3. ⭐ `0.140` · IMPRESO POR LOTE — DE 10 EN 10.** *«Casi nunca imprimo tantas de golpe. Si es problema
+la memoria, **pon de 10 en 10 máximo** y listo.»* ⇒ el tope duro pasa de **100 a 10** órdenes por PDF.
+⚠️ **El tope de peso por imagen SIGUE haciendo falta**, medido: 10 × 7 × 12 MB ≈ **840 MB**. La decisión
+reduce el riesgo 10×, **no lo elimina**. Se construyen las dos cosas.
+
+**4. Corrida de pagos ejecutada:** *«Si. Está bien el default»* ⇒ **no** hay botón que revierta la
+corrida completa; se corrige movimiento por movimiento. Y **sí** se arregla que un **borrador vacío** se
+pueda borrar (hoy se queda en la lista para siempre).
+
+**5. ⭐ ESMA NO SE FUSIONA — y la razón la dio él.** *«Lo que pasa con EsMa de Access es que **es un
+estado de cuenta especializado para maquileros porque desde ahí reviso entradas y defino el renglón que
+abona a su estado de cuenta**. Si lo quieres fusionar con cuentas por pagar, **esa funcionalidad es sólo
+del maquilero, no de otros proveedores**. No sé cómo lo harías»* → y al oír la propuesta: *«Ok. Lo que
+comentas de EsMa»*.
+🔑 **EsMa NO es "otra vista del mismo saldo": es su MESA DE TRABAJO del maquilero.** Tiene una función
+que CxP no tiene y que no aplica a un proveedor de telas. ⇒ **Las dos pantallas se quedan**, con papeles
+distintos: **EsMa = donde se DECIDE** (revisar lo recibido, definir qué se abona, descuentos);
+**CxP = el libro único del dinero**. Lo que se arregla son las **tres contradicciones medidas**:
+(a) **no cuentan a la misma gente** —un maquilero dado de baja con saldo vivo sale en CxP y no en
+EsMa, así que sumar una columna y la otra da distinto—; (b) desde CxP se **ven** los renglones de
+maquila pero **no se pueden tocar** (la 0.145 abre esa puerta); (c) **ninguna pantalla dice que la otra
+existe**. Y se **quita del menú la etiqueta de «interina»** que EsMa arrastra desde antes de F9.
+⚠️ **Esto DESMIENTE el enunciado de la fila 0.135**, que trataba la convivencia como duplicidad a
+eliminar. No lo es: **es división del trabajo**, y fusionarlas le quitaría la pantalla donde opera.
+
+**6. 🔴 LOS PLAZOS DEL MAQUILERO — DANIEL CORRIGE AL LEAD, y el dato cambia el diseño.**
+*«Los maquileros cobran normalmente en **una o dos semanas máximo**. **No hay plazos de 30 días.** El
+que estás viendo (bordados computarizados) **es un proveedor de etiqueta**. O sea: los maquileros cobran
+en el **99 % de las veces esa misma semana o la siguiente**. No más.»*
+🔴 **Lo que el lead afirmó y era FALSO:** que «los 8 y 30 días del archivo son los días de crédito de dos
+**maquileros**». BORDADOS COMPUTARIZADOS **no es maquilero**. El dato se leyó del Excel **sin cruzarlo
+con quien conoce a los terceros** — la cicatriz de siempre.
+⭐ **Consecuencia de diseño para la fila 0.121 y para el aging:** la antigüedad de un **maquilero** NO se
+mide con la escala del **proveedor**. Proveedor: 30/60/90 (Daniel usa **150/200/250**). Maquilero: **la
+semana en curso o la siguiente** ⇒ **un maquilero a 30 días no es "vencido normal": es una ANOMALÍA que
+debe saltar a la vista.** Meterlos en cubetas de 30/60/90 haría que **todo maquilero atrasado se vea "al
+corriente"**, que es justo el defecto que la 0.121 viene a curar. ⇒ **Los tramos de maquila van en
+SEMANAS y son propios.** Default propuesto **7 / 14 / 21+**, a confirmar al construir la fila.
+
+**7. Cancelar un pago/abono de maquilero:** *«Ok»* — y añadió: *«**Aunque me gustaría poder editarlo yo
+cuando sea sin factura. Mismo criterio que los estados de cuenta de proveedores que no tienen
+facturas**»*. ⇒ **Es exactamente la fila 0.145**, ya construida: corrige **por movimiento**, no por
+proveedor, y deja intocable el renglón con CFDI detrás aunque sea del mismo tercero.
+
+**8. Constancia de situación fiscal:** *«Si»* ⇒ obligatoria **también para clientes**, como bloqueo suave.
+
+**9. CFDI en volumen:** *«De acuerdo con default»* ⇒ arrastrar varios XML a la misma pantalla, con
+resumen de importados / duplicados / sin proveedor.
+
+**10. Los XML de apertura:** *«Si son con facturas, voy a subir **todos los XML que estén vivos**»* ⇒
+ratifica §Post-F9.201·5 y **los aporta él**.
+
+**11. Las muestras de la carga de apertura:** *«Mañana subo una prueba»* ⇒ **desbloquea la fila 0.131**.
+
+⏳ **SIGUEN ABIERTAS de §Post-F9.206:** P1, P3, P4 y las dos del recuadro — **(i)** ¿el sistema supone
+que lo consumido sin apuntar salió de lo más viejo? y **(ii)** ¿nombrar un lote acotado o **mandar la
+tela sin nombre** cuando no está seguro? La **(ii)** se le repreguntó sin jerga por ser la única donde
+el default elige *arriesgarse a nombrar* en vez de *callar*.
+
+
+#### (Post-F9.204) — LA REPARACIÓN COMO TERCER SERVICIO SOBRE LA ORDEN (fila 0.144, 6-sep-2026): las cuatro las decidió Daniel
+
+**Cómo nació.** Daniel, por su cuenta: *«a veces hay que hacer reparaciones a un modelo… funciona
+similar a lo que es empaque o el corte. Es sólo una cantidad a un precio que se le paga y **se le debe
+de cargar al costo**. Me parece que el desarrollo que hiciste con lo del corte y empaque ya está
+variable para poder meter un servicio más, ¿no?»*
+
+**Lo que se midió antes de contestarle — su instinto acierta en una mitad, y hay una sorpresa en la otra:**
+- ✅ **El PAGO sí está preparado.** `crearCargoDeServicio` (`dominio/produccion/etapas.ts:596`) recibe el
+  servicio **por parámetro**; el CHECK de la migración de la 0.114 es
+  `(id_tipo_proceso IS NULL) <> (servicio IS NULL)` y **no nombra valores**, así que un tercer servicio
+  no lo rompe; y la etiqueta vive en un `Record<ServicioOrden,string>` **exhaustivo**
+  (`dominio/esma/etiqueta-cargo.ts:21`), de modo que al ampliar el enum **el compilador obliga** a
+  nombrarla. ⚠️ **Pero NO es un catálogo de pantalla:** es el enum de BD `ServicioOrden { corte, empaque }`
+  (`schema.prisma:4336`) ⇒ meter la reparación es **migración + los puntos que marque el compilador**.
+  Es código, no captura. Se le dijo así.
+- 🔴 **EL COSTO NO EXISTE — ni para la reparación, NI para corte y empaque.** `costo-orden.ts:162-165`
+  calcula `procesos = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes`, y **ningún
+  archivo de `dominio/costos/` ni de `dominio/edr/` lee `EsMaCargo`** (verificado enumerando sus
+  lectores: sólo terceros/esma/produccion). ⇒ **hoy se paga el corte y ese dinero NO llega al costo de
+  la prenda** salvo que alguien lo teclee en «procesos». **Es la pieza que falta, y falta para los tres.**
+
+**LAS CUATRO DECISIONES DE DANIEL:**
+1. **Se paga POR PIEZA reparada**, con su cantidad y su precio — como corte y empaque. *(Suyo: «es sólo
+   una cantidad a un precio».)*
+2. ⭐ **La registra CUALQUIER proveedor que ya tenga un rol de maquila** (`ROLES_MAQUILA_ESMA`:
+   costura, estampado, bordado, lavado, aplicación, corte, empaque). **SIN rol nuevo y SIN casilla que
+   marcar.** Lo levantó él: *«el reparador puede ser un proveedor de empaque o de maquila… no sé cómo
+   vamos a manejar eso. Tú recomiéndame»*, y aceptó la recomendación. **Las razones, en su orden:**
+   (a) un rol nuevo obligaría a **repetir el paseo manual de la 0.114** —marcar «Empaque» taller por
+   taller—, y por lo que él describe habría que marcárselo a casi todos; (b) **es la verdad del negocio**:
+   el reparador *es* su maquilero, y un rol aparte modelaría una frontera que en su taller no existe;
+   (c) al estar todos en `ROLES_MAQUILA_ESMA`, **el reparador cae solo** en el rubro maquila de la
+   corrida semanal y en su estado de cuenta, sin enseñarle nada nuevo a finanzas.
+   ⚙️ **Lo que exige técnicamente:** `exigirTerceroConRol` (`etapas.ts:705`, `:826`) pide **UN** rol
+   exacto ⇒ hace falta una **variante que acepte una LISTA**.
+   ⛔ **Descartado abrirlo a cualquier proveedor:** dejaría registrar una reparación a nombre del que
+   vende tela. 📌 Y si algún día el selector largo estorba, **la casilla se puede añadir después sin
+   romper nada**: lo guardado apunta al proveedor, no al rol.
+3. **Avisa, NO bloquea** contra lo recibido — como el empaque. Reparar dos veces la misma pieza es real.
+4. ⭐ **El costo recoge lo REAL pagado** (cargos de corte + empaque + reparación) en vez de teclearse.
+   ⚠️ Esto **toca el motor de costeo**, que es el que produce las cifras que ya se están viendo ⇒
+   **considerar partirla en dos entregas**: (a) la reparación se paga; (b) el costo recoge los tres.
+   Decidir con el diff delante.
+
+⛔ **Lo que NO se hace:** convertir la reparación en un `TipoProceso` — la metería al flujo envío→recibo
+que Daniel dijo que estos servicios **no** son (§Post-F9.195). `idTipoProceso = NULL` sigue siendo la
+marca de «servicio sobre la orden».
+
+#### (Post-F9.203) ⭐⭐ CORREGIR UN MOVIMIENTO SIN FACTURA — «sólo yo, ni con permiso» (fila 0.145, 6-sep-2026)
+
+**Lo que pidió Daniel, textual (6-sep-2026):**
+
+> *«Quiero tener manera de modificar cualquier registro que se meta en cualquier estado de cuenta de
+> los proveedores **sin factura**. **Sólo yo. Nadie más ni con permiso. Sólo yo.**»*
+
+Y sobre la FORMA, después de que se le planteara el costo de guardar el rastro:
+
+> *«Sí, está bien **con rastro**.»*
+
+---
+
+### De dónde nace: una asimetría medida
+
+De los cuatro conceptos de EsMa, **sólo el descuento** se podía cancelar (`esma/formula-saldo.ts`,
+fila 0.109, y sólo para el *deshacer* de un cierre de orden). ⇒ **un abono o un pago a un maquilero
+capturado por error NO se podía anular NUNCA.** En Cuentas por pagar, en cambio, se cancela todo
+desde F9-E1. Esta decisión cierra esa asimetría — y la cierra con la forma que Daniel pidió, que **no
+es «cancelar»**.
+
+### (a) LA FORMA: un gesto para quien corrige, dos hechos para la contabilidad
+
+En pantalla se comporta como **editar**: se abre el renglón con sus valores, se cambia lo que haga
+falta, se guarda. Por dentro, **en UNA transacción**: el movimiento viejo queda **cancelado** —con su
+**inverso auditado**, en el motor de terceros— y nace uno **nuevo** que lo sustituye, **ligado** a él.
+
+⇒ **D3 queda intacto**: nada se edita ni se borra, el saldo sigue siendo Σ de movimientos y el pasado
+se sigue pudiendo reconstruir. Lo que cambia no es la regla: es que ahora hay **una forma de
+ejercerla en un solo gesto**, en vez de pedirle al dueño que cancele y vuelva a capturar.
+
+🔑 **Eso es exactamente lo que significa «con rastro»**, y es lo que Daniel aprobó cuando se le dijo
+que costaba: la corrección **no ahorra el asiento**, ahorra los **clics**.
+
+### (b) «SÓLO YO, NI CON PERMISO» ⇒ una BANDERA en la PERSONA, no un permiso
+
+Campo nuevo `Usuario.puedeCorregirSinFactura`, con el patrón que el sistema ya tenía para
+`Usuario.esAuditor` — pero **un paso más allá**: `esAuditor` sí se asigna desde Administración de
+perfiles; ésta **no se asigna desde ninguna pantalla ni desde ningún endpoint**. Se prende **sólo por
+base de datos**.
+
+**Las tres cosas que se descartaron, con su razón:**
+
+1. **NO un permiso nuevo** (`cxp.corregir` o parecido). Un permiso existe para **repartirse**, y
+   Daniel dijo *«ni con permiso»* con esas palabras. Crear uno habría sido contestar otra pregunta.
+2. **NO reusar `roles.administrar`** ni ningún permiso de administración como interruptor de «es el
+   dueño». Es **exactamente el defecto de la fila 0.120** que el propio Daniel señaló: un permiso que
+   gobierna el gobierno del sistema acabó decidiendo cinco cosas que no tenían que ver con él.
+3. **NO exigirla sólo en la ruta.** La bandera se exige **en el DOMINIO** (A1): quien llame por otro
+   camino —otra ruta, un script, una composición futura— topa con la misma pared.
+
+⚠️ **La bandera NO exime del permiso del módulo.** Corregir sigue pidiendo `terceros.administrar` /
+`cxp.administrar` (motor) o `esma.modificar` / `esma.ver-pagos` (EsMa), y si el movimiento estaba
+`revisado` también `esma.revisar` —porque el corregido **hereda** ese estado, y nacer `revisado` es un
+acto de validación (regla de la fila 0.128)—. La bandera **abre una puerta que no existía**; no abre
+las demás. Todo falla **cerrado**.
+
+### (c) «SIN FACTURA» es del MOVIMIENTO, no del proveedor
+
+Medido: `resolverConFactura` (`dominio/esma/facturacion.ts`) lo decide **movimiento por movimiento**,
+y un proveedor de modalidad `ambos` tiene de los dos. ⇒ **un renglón con CFDI detrás queda INTOCABLE
+aunque sea del mismo proveedor**, y el de al lado sí se corrige. Es una guarda dura, **con prueba en los DOS libros** —el
+motor y EsMa—. ⚠️ No siempre fue así: en la primera vuelta la de EsMa se podía **borrar entera con la
+suite en verde**, y lo cazó el reviewer mutando esa línea. Si algún día alguien vuelve a tocarla,
+tiene que caerse `correccion-sin-factura.int.test.ts` §«m17».
+
+**Por qué el renglón con factura no entra:** un comprobante fiscal **se cancela ante el SAT y se
+vuelve a timbrar**; no se edita por dentro. Corregirlo aquí dejaría la contabilidad y el sistema
+diciendo cosas distintas del mismo documento.
+
+📌 El **`conFactura` sin definir (`null`)** de lo migrado cuenta como **sin factura** —es lo que ya
+hace la partición `whereSegmentoFactura('sin')` desde la 0.113—, así que lo viejo también se puede
+corregir. **REGLA 0-B**: el dato viejo se tolera, no se repara.
+
+### (d) Lo que la corrección NO cambia
+
+**Importe, fecha y observaciones.** El **proveedor** y el **tipo de movimiento** no son campos del
+cuerpo (`z.strictObject` ⇒ mandarlos es un **400 explícito**, no un cambio ignorado en silencio) y el
+servidor los toma **del movimiento corregido**. *Cambiar de proveedor o de concepto no es corregir un
+renglón: es otro renglón* — y para eso ya existían cancelar y capturar de nuevo.
+
+Una corrección **que no cambia nada** se rechaza: quemaría dos folios y metería dos renglones vacíos
+de contenido en el estado de cuenta.
+
+### (e) ⭐⭐ El caso difícil, resuelto: el PAGO ya aplicado a cargos
+
+Un pago de EsMa no es un renglón suelto: **consume «prendas por pagar»** de cargos concretos y de ahí
+se deriva el estatus `Orden.pagada`. Cancelarlo cambiando sólo su renglón habría dejado los cargos
+**marcados como pagados con dinero que ya no existe** — el maquilero dejaría de cobrar lo que se le
+debe.
+
+**Cómo se resolvió, sin romper D3:** las prendas por pagar se cuentan por la **suma VIVA** de
+`PagoAplicacion` (las de pagos no cancelados). Corregir un pago aplicado **deshace su aplicación y la
+vuelve a hacer** —bajo el bloqueo por maquilero, con `cantidadPagada` y `Orden.pagada` recalculados—,
+de modo que las prendas **no se duplican ni se pierden**. Las filas de `PagoAplicacion` del pago
+cancelado **NO se borran**: siguen ahí como rastro; lo que cambia es que la suma que manda las
+excluye.
+
+### (f) Los DOS LÍMITES declarados (no callados)
+
+1. **El IMPORTE de un pago APLICADO no se corrige.** Su monto no es un dato suelto: es
+   `Σ(prendas × precio del cargo)`, y el modelo promete `monto = Σ aplicaciones.importe`. Se corrigen
+   su fecha y sus observaciones; para cambiar el dinero hay que cambiar las prendas aplicadas, y eso
+   es capturar el pago de nuevo. La pantalla lo **dice** en el propio cajón, no lo esconde.
+2. **El DESCUENTO que propuso un CIERRE de orden no se corrige suelto.** Su liga al cierre es única e
+   intransferible: el sustituto no podría heredarla y el *deshacer* del cierre se quedaría buscando un
+   descuento que ya nadie usa. Se arregla **deshaciendo el cierre**.
+
+### (g) Efecto de fondo: los tres movimientos planos vuelven a ser el mismo criterio
+
+La condición de **estar vivo** (`canceladoEn IS NULL`) sube de ser sólo del descuento a serlo de los
+**tres** movimientos planos, en la definición única de `esma/formula-saldo.ts`. Como esa definición
+alimenta a la vez a Prisma y al SQL crudo, la condición viaja sola a **las cinco sumas del saldo** y a
+las listas: un movimiento cancelado ni suma al saldo ni sigue apareciendo como «esperando tu
+decisión».
+
+### (h) Cómo lo sabe la pantalla
+
+**No lo adivina.** Cada renglón del estado de cuenta llega del servidor con su `corregible` ya
+calculado (bandera + sin factura + vivo + no ser un inverso + —en EsMa— no ser un cargo de recibo) y
+su `importeCorregible`. Así nunca se ofrece un botón que el servidor vaya a rechazar, ni al revés. Por
+eso la bandera **no** viaja en `GET /api/sesion`: la interfaz no debe re-derivar la regla.
+
+🔧 **PASO MANUAL, y es el único:** la bandera se prende **en la base de datos**
+(`UPDATE usuarios SET puede_corregir_sin_factura = TRUE WHERE username = '…'`). Ninguna pantalla la
+reparte, ningún seed la siembra y ningún endpoint la escribe — que es justo lo que Daniel pidió.
+
+- **Aplica en:** fila **0.145**. **Fecha:** 2026-09-06.
 #### (Post-F9.202) — EL CONTEO CÍCLICO DE LAS TRES DIMENSIONES (fila 0.099, 6-sep-2026): un hallazgo que cambió el alcance y dos decisiones tomadas solas, con default
 
 Las **cuatro decisiones del dueño** que esta fila ejecuta ya están escritas y **no se repiten aquí**: son los puntos **4, 5 y 6** de §Post-F9.193 (se captura *lo contado* con el saldo a la vista; el cíclico se extiende a telas y avíos; si el almacén se movió, **avisar y dejar decidir, no bloquear**) más la adenda de la misma sección (**se puede anotar mercancía con existencia cero**). Lo que sigue es lo que apareció **al construirla**.

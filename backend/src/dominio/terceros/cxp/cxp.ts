@@ -22,6 +22,7 @@
 import {
   esquemaMovimientoCxpCrear,
   esquemaBandejaCxpQuery,
+  type esquemaCorreccionSinFactura,
   type DatosMovimientoCxpCrear,
   type BandejaCxpQuery,
   type BandejaCxpSalida,
@@ -42,6 +43,7 @@ import { Prisma } from '../../../datos/index.js';
 import {
   registrarMovimientoTercero,
   cancelarMovimientoTercero,
+  corregirMovimientoTercero,
   estadoDeCuentaTercero,
 } from '../cuenta-terceros.js';
 import {
@@ -176,6 +178,35 @@ export async function cancelarMovimientoCxp(
     throw new ErrorNoEncontrado('MovimientoTercero', id);
   }
   return cancelarMovimientoTercero(sesion, id, cuerpo, bd);
+}
+
+// ── CORRECCIÓN de un movimiento SIN FACTURA (fila 0.145) ────────────────────────────────────────────
+
+/**
+ * ⭐ CORRIGE un movimiento de CxP SIN FACTURA (anular + recapturar en una transacción, D3). Verifica
+ * que el movimiento sea de un PROVEEDOR (la ruta de CxP no corrige movimientos de CxC) y delega al
+ * motor {@link corregirMovimientoTercero}, que pone la BANDERA de la persona y el resto de guardas.
+ *
+ * Permiso `cxp.administrar` (+ `terceros.administrar` del motor, defensa en profundidad) **y**, por
+ * encima de los dos, la bandera `Usuario.puedeCorregirSinFactura`, que no es un permiso y no se
+ * reparte con ningún rol. Empresa activa (A9).
+ */
+export async function corregirMovimientoCxp(
+  sesion: SesionUsuario,
+  id: number,
+  cuerpo: z.input<typeof esquemaCorreccionSinFactura>,
+  bd?: ContextoBd,
+): Promise<MovimientoTerceroSalida> {
+  verificarPermiso(sesion, 'cxp.administrar');
+  const cliente = clienteLectura(bd);
+  const mov = await cliente.movimientoTercero.findFirst({
+    where: { id, idEmpresa: sesion.idEmpresaActiva },
+    select: { tipoTercero: true },
+  });
+  if (mov === null || mov.tipoTercero !== 'proveedor') {
+    throw new ErrorNoEncontrado('MovimientoTercero', id);
+  }
+  return corregirMovimientoTercero(sesion, id, cuerpo, bd);
 }
 
 // ── Estado de cuenta del proveedor (delega al motor, con permiso de CxP) ────────────────────────────

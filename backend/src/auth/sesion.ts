@@ -92,7 +92,10 @@ export async function armarSesionUsuario(
   // ellas, pero aquí se corta antes para devolver 401, no un 200 sin permisos.)
   const estado = await clienteLectura(bd).usuario.findUnique({
     where: { id: usuario.id },
-    select: { activo: true, bloqueado: true },
+    // ⭐ `puedeCorregirSinFactura` (fila 0.145) se lee AQUÍ, en la misma consulta que ya se hacía:
+    // es una capacidad de la PERSONA, no un permiso de rol, así que no pasa por
+    // `cargarPermisosDeUsuario`. Ver `comun/permisos.ts` §verificarCorrectorSinFactura.
+    select: { activo: true, bloqueado: true, puedeCorregirSinFactura: true },
   });
   if (estado === null || !estado.activo || estado.bloqueado) {
     return null;
@@ -112,5 +115,6 @@ export async function armarSesionUsuario(
     idEmpresaActiva: empresa.id,
     nombreEmpresaActiva: empresa.nombre,
     permisos,
+    puedeCorregirSinFactura: estado.puedeCorregirSinFactura,
   };
 }

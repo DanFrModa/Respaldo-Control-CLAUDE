@@ -34,6 +34,8 @@ function sesionDemo(idEmpresa: number): SesionUsuario {
     idEmpresaActiva: idEmpresa,
     nombreEmpresaActiva: 'FR Moda',
     permisos: new Set<ClavePermiso>(CLAVES_PERMISO),
+    // Fila 0.145: los datos demo no corrigen nada (la bandera es de una persona, no de un script).
+    puedeCorregirSinFactura: false,
   };
 }
 

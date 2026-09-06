@@ -32,7 +32,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { resolverConFactura, type ModalidadFacturacion } from './facturacion.js';
-import { WHERE_VIVO_DESCUENTO } from './formula-saldo.js';
+import { WHERE_VIVO_ABONO, WHERE_VIVO_DESCUENTO, WHERE_VIVO_PAGO } from './formula-saldo.js';
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
@@ -143,7 +143,9 @@ export async function listarAbonosMaquilero(
   verificarPermiso(sesion, 'esma.ver-pagos');
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const filas = await clienteLectura(bd).abonoMaquilero.findMany({
-    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero },
+    // VIVOS: el abono que sustituyó una corrección no se lista (fila 0.145), igual que el descuento
+    // que canceló un deshacer de cierre. El criterio sale de la definición única.
+    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero, ...WHERE_VIVO_ABONO },
     orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
     include: incluirMaquilero,
   });
@@ -251,7 +253,9 @@ export async function revisarMovimiento(
     const actual =
       concepto === 'abono'
         ? await tx.abonoMaquilero.findFirst({
-            where: { id, idEmpresa },
+            // ⭐ Fila 0.145: un abono CANCELADO (lo sustituyó una corrección) no existe para la
+            // revisión — mismo motivo que el descuento de la 0.109.
+            where: { id, idEmpresa, ...WHERE_VIVO_ABONO },
             select: { estadoRevision: true },
           })
         : concepto === 'descuento'
@@ -263,7 +267,8 @@ export async function revisarMovimiento(
               select: { estadoRevision: true },
             })
           : await tx.pagoMaquilero.findFirst({
-              where: { id, idEmpresa },
+              // ⭐ Fila 0.145: ídem para el pago.
+              where: { id, idEmpresa, ...WHERE_VIVO_PAGO },
               select: { estadoRevision: true },
             });
 
@@ -284,13 +289,19 @@ export async function revisarMovimiento(
     const condicion = { id, idEmpresa, estadoRevision: 'capturado' as const };
     const cambiadas =
       concepto === 'abono'
-        ? await tx.abonoMaquilero.updateMany({ where: condicion, data: datos })
+        ? await tx.abonoMaquilero.updateMany({
+            where: { ...condicion, ...WHERE_VIVO_ABONO },
+            data: datos,
+          })
         : concepto === 'descuento'
           ? await tx.descuentoMaquilero.updateMany({
               where: { ...condicion, ...WHERE_VIVO_DESCUENTO },
               data: datos,
             })
-          : await tx.pagoMaquilero.updateMany({ where: condicion, data: datos });
+          : await tx.pagoMaquilero.updateMany({
+              where: { ...condicion, ...WHERE_VIVO_PAGO },
+              data: datos,
+            });
     if (cambiadas.count === 0) {
       throw new ErrorConflicto(
         'Esa partida cambió mientras se revisaba (otra persona la revisó o la canceló). ' +

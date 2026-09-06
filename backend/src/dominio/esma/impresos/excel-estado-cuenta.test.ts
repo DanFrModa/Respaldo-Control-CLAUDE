@@ -62,6 +62,8 @@ function desglosadoFake(): DesglosadoSalida {
         observaciones: null,
         estadoRevision: 'capturado' as const,
         aplicaciones: [],
+        canceladoEn: null,
+        motivoCancelacion: null,
         creadoEn: '2026-06-22T00:00:00.000Z',
       },
     ],

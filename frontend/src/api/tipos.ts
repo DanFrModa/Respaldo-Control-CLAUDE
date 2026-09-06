@@ -2035,6 +2035,21 @@ export type CxpOrigen = CxpMovimientoCrear['origen'];
 export type CxpMovimientoCancelar =
   paths['/api/cxp/movimientos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
 
+/**
+ * ⭐ Fila 0.145 — cuerpo de la CORRECCIÓN de un movimiento SIN FACTURA
+ * (`POST /api/cxp/movimientos/{id}/corregir`). Sólo importe, fecha y observaciones (+ el motivo,
+ * obligatorio): el proveedor y el tipo de movimiento NO son campos de este cuerpo a propósito.
+ */
+export type CorreccionSinFactura =
+  paths['/api/cxp/movimientos/{id}/corregir']['post']['requestBody']['content']['application/json'];
+
+/** ⭐ Fila 0.145 — resultado de corregir un movimiento de EsMa (qué se anuló y qué nació). */
+export type EsMaCorreccion =
+  paths['/api/esma/movimientos/{concepto}/{id}/corregir']['post']['responses']['200']['content']['application/json'];
+/** Concepto corregible de EsMa (abono/descuento/pago; el cargo no se corrige). */
+export type EsMaConceptoCorregible =
+  paths['/api/esma/movimientos/{concepto}/{id}/corregir']['post']['parameters']['path']['concepto'];
+
 // ── Importación de CFDI de proveedores (Módulo 14, F9-E3; R11) ──────────────────
 /** Previsualización de un CFDI (`POST /api/terceros/cfdi/previsualizar`). */
 export type CfdiPrevisualizacion =

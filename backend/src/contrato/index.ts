@@ -1627,6 +1627,16 @@ export {
   type RevisionSalida,
 } from './esquemas/esma.js';
 
+// ── Corrección de un movimiento SIN FACTURA (fila 0.145; §Post-F9.203) ──
+export {
+  CONCEPTOS_CORREGIBLES_ESMA,
+  esquemaCorreccionSinFactura,
+  esquemaCorreccionEsMaSalida,
+  type ConceptoCorregibleEsMaClave,
+  type CorreccionEsMaSalida,
+  type DatosCorreccionSinFactura,
+} from './esquemas/correccion.js';
+
 // ── Motor de cuenta corriente de terceros (Módulo 14, F9-E1; D12/D15/R10) ──
 export {
   TIPOS_TERCERO,

@@ -36,6 +36,7 @@ import {
   pendienteParaSalida,
   saldoDeTotales,
   SIGNO_SALDO,
+  SQL_VIVO_PLANO,
   sqlCuenta,
   sqlPendiente,
   tieneSaldo,
@@ -155,25 +156,44 @@ describe('formula-saldo · el SQL y el Prisma salen del MISMO criterio', () => {
     }
   });
 
-  it('abono y pago comparten criterio; el DESCUENTO lleva UNA condición más: estar VIVO', () => {
-    // Hasta la fila 0.109 los TRES planos compartían criterio y esta prueba lo exigía. Ya no, y el
-    // cambio es de negocio, no de forma: el descuento es el único que puede NACER DE UN ACTO
-    // REVERSIBLE —el cierre de una orden con un maquilero, que propone cobrarle el faltante y que se
-    // puede DESHACER— y por eso es el único que se cancela. La condición `cancelado_en IS NULL` va
-    // en los DOS criterios: un descuento cancelado ni suma al saldo ni sigue esperando revisión.
+  it('los TRES movimientos planos comparten criterio, y los tres exigen estar VIVOS', () => {
+    // Historia de esta prueba, que es la historia del criterio:
+    //  • hasta la 0.109 los tres planos compartían criterio y esto lo exigía;
+    //  • la 0.109 le dio al DESCUENTO —y sólo a él— la condición de estar vivo, porque era el único
+    //    que podía nacer de un acto reversible (el cierre de una orden con un maquilero);
+    //  • la 0.145 se la dio también al ABONO y al PAGO, porque la CORRECCIÓN de un movimiento sin
+    //    factura cancela el viejo y captura el bueno. Los tres vuelven a ser el mismo criterio.
+    //
+    // 🔴 Lo que esta prueba impide de verdad: que un movimiento CANCELADO vuelva a sumar al saldo o
+    // a aparecer como «esperando tu decisión» porque alguien tocó un concepto y no los otros dos.
     expect(sqlCuenta('abono').sql).toBe(sqlCuenta('pago').sql);
+    expect(sqlCuenta('abono').sql).toBe(sqlCuenta('descuento').sql);
     expect(sqlPendiente('abono').sql).toBe(sqlPendiente('pago').sql);
+    expect(sqlPendiente('abono').sql).toBe(sqlPendiente('descuento').sql);
 
-    // El descuento = lo mismo que sus hermanos MÁS la condición de vivo (en los dos criterios).
-    for (const fragmento of [sqlCuenta('descuento').sql, sqlPendiente('descuento').sql]) {
-      expect(condicionesDe(fragmento)).toContain('"cancelado_en" IS NULL');
+    for (const concepto of ['abono', 'pago', 'descuento'] as const) {
+      for (const fragmento of [sqlCuenta(concepto).sql, sqlPendiente(concepto).sql]) {
+        expect(condicionesDe(fragmento), `${concepto}: ${fragmento}`).toContain(
+          '"cancelado_en" IS NULL',
+        );
+      }
     }
-    expect(condicionesDe(sqlCuenta('descuento').sql).sort()).toEqual(
-      [...condicionesDe(sqlCuenta('abono').sql), '"cancelado_en" IS NULL'].sort(),
-    );
-    expect(condicionesDe(sqlPendiente('descuento').sql).sort()).toEqual(
-      [...condicionesDe(sqlPendiente('abono').sql), '"cancelado_en" IS NULL'].sort(),
-    );
+  });
+
+  it('⭐ `SQL_VIVO_PLANO` DERIVA su columna del criterio, no la escribe otra vez', () => {
+    // `columnaSegura` valida la FORMA del identificador, no que sea LA MISMA columna. Con el nombre
+    // escrito a mano, el día que el criterio renombrara `cancelado_en` este fragmento se quedaría
+    // atrás mientras `sqlCuenta` la seguía — la divergencia que este archivo existe para impedir.
+    // Se comprueba contra el criterio EMITIDO, no contra un literal de la prueba.
+    const delCriterio = condicionesDe(sqlCuenta('abono').sql).find((c) => c.includes('IS NULL'));
+    expect(delCriterio).toBeDefined();
+    expect(SQL_VIVO_PLANO.sql).toBe(`(${String(delCriterio)})`);
+    expect(SQL_VIVO_PLANO.values).toEqual([]);
+  });
+
+  it('`SQL_VIVO_PLANO` va ENTRE PARÉNTESIS (se intercala en un AND ajeno)', () => {
+    expect(SQL_VIVO_PLANO.sql.startsWith('(')).toBe(true);
+    expect(SQL_VIVO_PLANO.sql.endsWith(')')).toBe(true);
   });
 
   it('lo que entra CRUDO al SQL se valida: columnas y valores', () => {
@@ -580,6 +600,31 @@ const CONSUMIDORES_DEL_SALDO = [
   'src/dominio/esma/orden-pagada.ts',
   'src/dominio/terceros/convivencia-esma.ts',
 ];
+
+describe('⭐ guardia · `cuadre-f6.ts` excluye los ANULADOS en sus tres sumas planas', () => {
+  // Es una guarda de TEXTO, y lo digo: no hay `cuadre-f6.test.ts` (el script habla con Access y con
+  // Postgres a la vez). Lo que vigila es concreto y suficiente: que las tres subconsultas de los
+  // movimientos planos lleven el fragmento de «vivo». Sin él, en cuanto se corrija el PRIMER
+  // movimiento el cuadre sumaría el viejo Y el nuevo y reportaría un descuadre FALSO contra Access —
+  // un informe de migración gritando por algo que se hizo bien.
+  const RUTA_CUADRE = join(RAIZ, 'migracion', 'cuadre-f6.ts');
+
+  it('las tres tablas planas piden `SQL_VIVO_PLANO`', () => {
+    const codigo = sinComentarios(readFileSync(RUTA_CUADRE, 'utf8'));
+    for (const tabla of ['abono_maquilero', 'pago_maquilero', 'descuento_maquilero']) {
+      const sub = codigo.slice(codigo.indexOf(`FROM "${tabla}"`));
+      const hastaElCierre = sub.slice(0, sub.indexOf('GROUP BY'));
+      expect(hastaElCierre, `la suma de ${tabla} no excluye los anulados`).toContain(
+        'SQL_VIVO_PLANO',
+      );
+    }
+  });
+
+  it('y no lo escribe a mano: la columna sale del módulo, no del texto del script', () => {
+    const codigo = sinComentarios(readFileSync(RUTA_CUADRE, 'utf8'));
+    expect(codigo).not.toMatch(/"?cancelado_en"?\s+IS\s+NULL/i);
+  });
+});
 
 describe('⭐ guardia (1/2) · los detectores reconocen una quinta copia sintética', () => {
   // Es, letra por letra, lo que un reviewer escribió para demostrar que la guardia anterior no

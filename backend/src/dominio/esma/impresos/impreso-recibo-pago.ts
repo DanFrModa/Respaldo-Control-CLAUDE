@@ -54,6 +54,16 @@ export interface DatosImpresoReciboPago {
   conFactura: boolean | null;
   observaciones: string | null;
   renglones: RenglonImpresoPago[];
+  /**
+   * ⭐⭐ Fila 0.145 — si el pago fue ANULADO (porque se corrigió), cuándo y por qué. `null` = vivo.
+   *
+   * Este recibo es **el papel que se le entrega al maquilero**. Antes de la 0.145 un pago no se
+   * podía anular, así que el impreso no tenía nada que decir; ahora sí, y callarlo significaría
+   * imprimir un comprobante cobrable de un pago que ya no existe. Por eso el documento **no se
+   * niega a salir** —puede hacer falta la copia del anulado— pero sale con su sello encima.
+   */
+  canceladoEn: string | null;
+  motivoCancelacion: string | null;
 }
 
 /** El nombre del PAGADOR de una empresa: razón social si la tiene, si no su nombre (decisión (h)). */
@@ -96,6 +106,8 @@ export async function armarDatosImpresoReciboPago(
     monto: pago.monto ?? 0,
     conFactura: pago.conFactura,
     observaciones: pago.observaciones,
+    canceladoEn: pago.canceladoEn,
+    motivoCancelacion: pago.motivoCancelacion,
     renglones: pago.aplicaciones.map((a) => ({
       folioOrden: a.folioOrden,
       tipoProceso: a.tipoProceso,
@@ -120,10 +132,60 @@ const estilos = StyleSheet.create({
   celdaOrden: { width: 80 },
   celdaProceso: { flexGrow: 1, flexBasis: 0 },
   celdaNum: { width: 70, textAlign: 'right' },
+  // ⭐ Fila 0.145 — el sello del recibo ANULADO. Va arriba del todo, con el color de alarma de la
+  // paleta y a cuerpo grande: tiene que leerse antes que el importe, que es lo que alguien cobraría.
+  selloCancelado: {
+    borderWidth: 2,
+    borderColor: PALETA.crit,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+  },
+  selloTitulo: { fontSize: 16, fontFamily: FUENTE.negrita, color: PALETA.crit },
+  selloTexto: { fontSize: 9, color: PALETA.crit, marginTop: 3 },
   firma: { marginTop: 56, alignItems: 'center' },
   lineaFirma: { borderTopWidth: 1, borderTopColor: PALETA.tinta, width: 240, marginBottom: 4 },
   firmaTexto: { fontSize: 9 },
 });
+
+/**
+ * ⭐⭐ Fila 0.145 — EL TEXTO DEL SELLO de un recibo ANULADO, o `null` si el pago está vivo.
+ *
+ * Se separa del render —y se exporta— para poder probarlo **sin generar un PDF**: lo que hay que
+ * garantizar no es que el documento salga, es que **diga que está anulado**, y eso dentro de un
+ * buffer binario no se puede afirmar de forma legible.
+ *
+ * Por qué existe: este recibo es el papel que se le entrega al maquilero. Antes de la 0.145 un pago
+ * no se podía anular; ahora sí, y un comprobante anulado que no lo diga **se puede cobrar dos
+ * veces**.
+ */
+export function textoSelloAnulado(
+  datos: Pick<DatosImpresoReciboPago, 'canceladoEn' | 'motivoCancelacion'>,
+): { titulo: string; detalle: string } | null {
+  if (datos.canceladoEn === null) {
+    return null;
+  }
+  return {
+    titulo: 'RECIBO ANULADO — NO ES COMPROBANTE DE PAGO',
+    detalle:
+      `Este pago se corrigió el ${datos.canceladoEn.slice(0, 10)} y fue sustituido por otro.` +
+      (datos.motivoCancelacion === null ? '' : ` Motivo: ${datos.motivoCancelacion}`),
+  };
+}
+
+/** El sello del recibo anulado como bloque del documento, o `null` si el pago vive. */
+function selloAnulado(datos: DatosImpresoReciboPago): ReactElement | null {
+  const sello = textoSelloAnulado(datos);
+  if (sello === null) {
+    return null;
+  }
+  return h(
+    View,
+    { style: estilos.selloCancelado, key: 'sello' },
+    h(Text, { style: estilos.selloTitulo }, sello.titulo),
+    h(Text, { style: estilos.selloTexto }, sello.detalle),
+  );
+}
 
 /** Un campo etiqueta/valor. */
 function campo(etiqueta: string, valor: string): ReactElement {
@@ -185,6 +247,8 @@ function paginaReciboPago(datos: DatosImpresoReciboPago): ReactElement {
       titulo: 'Recibo de pago de maquila — CONTROL v2',
       derecha: { etiqueta: 'No. pago', valor: String(datos.folioPago), grande: true },
     }),
+    // ⭐⭐ Fila 0.145 — EL SELLO, antes que nada (ver {@link textoSelloAnulado}).
+    selloAnulado(datos),
     h(
       Text,
       { style: estilos.parrafo, key: 'parrafo' },

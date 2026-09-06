@@ -37,6 +37,14 @@ export interface SesionUsuario {
   nombreEmpresaActiva: string;
   /** Permisos efectivos (unión de los permisos de todos sus roles). */
   permisos: ReadonlySet<ClavePermiso>;
+  /**
+   * ⭐ ¿Esta PERSONA puede CORREGIR movimientos SIN FACTURA? (fila 0.145, `Usuario.puedeCorregirSinFactura`).
+   *
+   * No es un permiso y NO se comporta como uno: no está en el catálogo de `ClavePermiso`, ningún rol
+   * la otorga y ninguna pantalla la asigna. Viaja en la sesión —igual que la empresa activa— porque
+   * el DOMINIO tiene que poder exigirla (A1), no sólo la ruta. Ver {@link verificarCorrectorSinFactura}.
+   */
+  puedeCorregirSinFactura: boolean;
 }
 
 /**
@@ -55,6 +63,35 @@ export function tienePermiso(sesion: SesionUsuario, clave: ClavePermiso): boolea
 export function verificarPermiso(sesion: SesionUsuario, clave: ClavePermiso): void {
   if (!sesion.permisos.has(clave)) {
     throw new ErrorPermiso(undefined, clave);
+  }
+}
+
+/**
+ * ⭐⭐ Exige la BANDERA de corrección de movimientos SIN FACTURA (fila 0.145). Lanza `ErrorPermiso`
+ * (403) si la persona no la tiene.
+ *
+ * DANIEL (6-sep-2026, §Post-F9.203): *«Quiero tener manera de modificar cualquier registro que se
+ * meta en cualquier estado de cuenta de los proveedores sin factura. **Sólo yo. Nadie más ni con
+ * permiso. Sólo yo.»***
+ *
+ * 🔴 POR QUÉ NO ES UN PERMISO, y por qué esto vive aquí y no en una ruta:
+ *  • *«ni con permiso»* descarta crear un `cxp.corregir` asignable: un permiso existe para
+ *    repartirse, y éste no se reparte.
+ *  • Reusar `roles.administrar` (o cualquier permiso de admin) como interruptor de «es el dueño» es
+ *    EXACTAMENTE el defecto que Daniel señaló en la fila 0.120: un permiso que gobierna el gobierno
+ *    del sistema acabó decidiendo cinco cosas que no tenían que ver con él.
+ *  • El precedente de la casa para «una capacidad de la PERSONA» es `Usuario.esAuditor`. Ésta va un
+ *    paso más allá: `esAuditor` sí se asigna desde Administración de perfiles; ésta **no se asigna
+ *    desde ningún lado**, sólo por base de datos.
+ *  • Y va en el DOMINIO (A1) porque la pantalla esconde pero el servidor decide: quien llame al
+ *    dominio por otro camino —otra ruta, un script, una composición futura— topa con la misma pared.
+ */
+export function verificarCorrectorSinFactura(sesion: SesionUsuario): void {
+  if (!sesion.puedeCorregirSinFactura) {
+    throw new ErrorPermiso(
+      'Corregir un movimiento sin factura está reservado a la dirección: no se otorga con ningún ' +
+        'permiso ni desde ninguna pantalla.',
+    );
   }
 }
 

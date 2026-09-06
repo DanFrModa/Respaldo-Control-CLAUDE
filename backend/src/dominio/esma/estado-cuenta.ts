@@ -46,11 +46,15 @@ import {
   pendienteDeRevisionCargo,
   pendienteDeRevisionPlano,
   WHERE_CARGO_REVISADO,
+  WHERE_VIVO_ABONO,
   WHERE_VIVO_DESCUENTO,
+  WHERE_VIVO_PAGO,
   whereSegmentoFactura,
   type SegmentoFactura,
   type WhereSegmentoFactura,
 } from './formula-saldo.js';
+import { esSinFactura, importeGuardadoDe } from '../finanzas/correccion-comun.js';
+
 import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { saldoDeMaquilero } from './saldos.js';
 
@@ -137,6 +141,9 @@ export async function estadoCuentaMaquilero(
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
+  // Fila 0.145: la bandera de la PERSONA (no un permiso). Sin ella todos los renglones viajan con
+  // `corregible: false` y la pantalla no pinta el botón.
+  const puedeCorregir = sesion.puedeCorregirSinFactura;
 
   const maquilero = await exigirMaquilero(cliente, idMaquilero);
   const factura = conFacturaWhere(filtros.conFactura);
@@ -170,8 +177,23 @@ export async function estadoCuentaMaquilero(
   // Abonos / descuentos / pagos del periodo (por su fecha date-only).
   const [abonos, descuentos, pagos] = await Promise.all([
     cliente.abonoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero, ...factura, ...rangoFecha(filtros.desde, filtros.hasta) },
-      select: { id: true, monto: true, fecha: true, observaciones: true, estadoRevision: true },
+      // VIVOS (fila 0.145): el abono que sustituyó una corrección no es movimiento.
+      where: {
+        idEmpresa,
+        idMaquilero,
+        ...WHERE_VIVO_ABONO,
+        ...factura,
+        ...rangoFecha(filtros.desde, filtros.hasta),
+      },
+      // `conFactura` (fila 0.145): decide si el renglón se puede corregir.
+      select: {
+        id: true,
+        monto: true,
+        fecha: true,
+        observaciones: true,
+        estadoRevision: true,
+        conFactura: true,
+      },
     }),
     cliente.descuentoMaquilero.findMany({
       // VIVOS: un descuento que un deshacer de cierre canceló no se enseña (V1, fila 0.109). El
@@ -183,19 +205,48 @@ export async function estadoCuentaMaquilero(
         ...factura,
         ...rangoFecha(filtros.desde, filtros.hasta),
       },
-      select: { id: true, monto: true, fecha: true, observaciones: true, estadoRevision: true },
+      // `conFactura` + `idCierreMaquila` (fila 0.145): deciden si se puede corregir.
+      select: {
+        id: true,
+        monto: true,
+        fecha: true,
+        observaciones: true,
+        estadoRevision: true,
+        conFactura: true,
+        idCierreMaquila: true,
+      },
     }),
     cliente.pagoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero, ...factura, ...rangoFecha(filtros.desde, filtros.hasta) },
+      // VIVOS (fila 0.145): ver la nota del abono.
+      where: {
+        idEmpresa,
+        idMaquilero,
+        ...WHERE_VIVO_PAGO,
+        ...factura,
+        ...rangoFecha(filtros.desde, filtros.hasta),
+      },
       select: {
         id: true,
         monto: true,
         fecha: true,
         estadoRevision: true,
+        // `conFactura` + `observaciones` (fila 0.145) + las aplicaciones (que además dicen si el
+        // importe se puede corregir).
+        conFactura: true,
+        observaciones: true,
         aplicaciones: { select: { cargo: { select: { orden: { select: { folio: true } } } } } },
       },
     }),
   ]);
+
+  /** Fila 0.145: un abono vivo y SIN factura se corrige entero (importe incluido). */
+  const corrigeAbono = (conFactura: boolean | null): boolean =>
+    puedeCorregir && esSinFactura(conFactura);
+  /** Fila 0.145: el descuento, además, no puede venir del cierre de una orden. */
+  const corrigeDescuento = (d: {
+    conFactura: boolean | null;
+    idCierreMaquila: number | null;
+  }): boolean => puedeCorregir && esSinFactura(d.conFactura) && d.idCierreMaquila === null;
 
   const movimientos: EstadoCuentaMovimiento[] = [];
 
@@ -219,6 +270,14 @@ export async function estadoCuentaMaquilero(
       // detalle y el total no pueden volver a contradecirse (fila 0.115). Desde la 0.111 ese cargo
       // también SUMA en el bloque «por revisar» del pie, con su importe derivado.
       pendienteRevision: pendienteDeRevisionCargo(c),
+      // Fila 0.145: el CARGO no se corrige — no es un movimiento que alguien «meta» en el estado de
+      // cuenta, nace de un recibo de maquila y tiene su propio camino (validarlo / cancelarlo).
+      corregible: false,
+      importeCorregible: false,
+      // El «texto guardado» de un cargo no existe: su referencia la compone la lectura.
+      observacionesGuardadas: null,
+      // El importe de un cargo se DERIVA (cantidad × precio) y no es corregible: nada que sembrar.
+      importeGuardado: null,
     });
   }
 
@@ -231,6 +290,14 @@ export async function estadoCuentaMaquilero(
       monto: oculto(a.monto.toNumber()),
       estadoRevision: a.estadoRevision,
       pendienteRevision: pendienteDeRevisionPlano(a.estadoRevision),
+      corregible: corrigeAbono(a.conFactura),
+      importeCorregible: corrigeAbono(a.conFactura),
+      observacionesGuardadas: a.observaciones,
+      // ⭐ El importe GUARDADO. Lo normaliza `importeGuardadoDe` (positivo + oculto sólo por
+      // permiso): la regla NO se escribe aquí, porque cuando estaba en cada sitio el motor la
+      // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
+      // —que es, por definición, el caso de lo capturado por error—.
+      importeGuardado: importeGuardadoDe(a.monto.toNumber(), puedeVerImportes),
     });
   }
 
@@ -243,7 +310,15 @@ export async function estadoCuentaMaquilero(
       // Descuento resta: signo negativo.
       monto: puedeVerImportes ? -redondear2(d.monto.toNumber()) : null,
       estadoRevision: d.estadoRevision,
+      // Fila 0.145: el descuento que nació de un CIERRE de orden es del cierre; se arregla
+      // deshaciéndolo, no corrigiéndolo suelto (su liga al cierre es única e intransferible).
       pendienteRevision: pendienteDeRevisionPlano(d.estadoRevision),
+      corregible: corrigeDescuento(d),
+      importeCorregible: corrigeDescuento(d),
+      observacionesGuardadas: d.observaciones,
+      // POSITIVO lo pone `importeGuardadoDe`, y hace falta por DOS motivos: `monto` va negativo
+      // aquí (es la aportación al saldo) y además hay movimientos MIGRADOS guardados en negativo.
+      importeGuardado: importeGuardadoDe(d.monto.toNumber(), puedeVerImportes),
     });
   }
 
@@ -263,6 +338,11 @@ export async function estadoCuentaMaquilero(
       monto: puedeVerImportes ? -redondear2(p.monto.toNumber()) : null,
       estadoRevision: p.estadoRevision,
       pendienteRevision: pendienteDeRevisionPlano(p.estadoRevision),
+      corregible: puedeCorregir && esSinFactura(p.conFactura),
+      // Un pago APLICADO a cargos no cambia de importe: sale de las prendas por el precio del cargo.
+      importeCorregible: puedeCorregir && esSinFactura(p.conFactura) && p.aplicaciones.length === 0,
+      observacionesGuardadas: p.observaciones,
+      importeGuardado: importeGuardadoDe(p.monto.toNumber(), puedeVerImportes),
     });
   }
 
@@ -413,7 +493,14 @@ export async function estadoCuentaDesglosado(
 
   const [abonosRaw, descuentosRaw, pagosRaw] = await Promise.all([
     cliente.abonoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero, ...factura, ...rangoFecha(filtros.desde, filtros.hasta) },
+      // VIVOS (fila 0.145): ver la nota del estado de cuenta unificado.
+      where: {
+        idEmpresa,
+        idMaquilero,
+        ...WHERE_VIVO_ABONO,
+        ...factura,
+        ...rangoFecha(filtros.desde, filtros.hasta),
+      },
       orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
     }),
     cliente.descuentoMaquilero.findMany({
@@ -428,7 +515,14 @@ export async function estadoCuentaDesglosado(
       orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
     }),
     cliente.pagoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero, ...factura, ...rangoFecha(filtros.desde, filtros.hasta) },
+      // VIVOS (fila 0.145): ver la nota del estado de cuenta unificado.
+      where: {
+        idEmpresa,
+        idMaquilero,
+        ...WHERE_VIVO_PAGO,
+        ...factura,
+        ...rangoFecha(filtros.desde, filtros.hasta),
+      },
       orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
       include: {
         aplicaciones: {
@@ -472,6 +566,10 @@ export async function estadoCuentaDesglosado(
       cantidad: ap.cantidad.toNumber(),
       importe: puedeVerImportes ? ap.importe.toNumber() : null,
     })),
+    // Este desglosado ya filtra los pagos VIVOS, así que aquí siempre van en null; se rellenan de
+    // todos modos —y no con un literal— para que el día que el filtro cambie no se mienta.
+    canceladoEn: p.canceladoEn === null ? null : p.canceladoEn.toISOString(),
+    motivoCancelacion: p.motivoCancelacion,
     creadoEn: p.creadoEn.toISOString(),
   }));
 

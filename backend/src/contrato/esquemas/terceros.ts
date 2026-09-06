@@ -222,6 +222,69 @@ export const esquemaMovimientoTerceroSalida = z
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     cancelado: z.boolean().describe('¿El movimiento fue cancelado (existe su inverso)?'),
     esInverso: z.boolean().describe('¿Es un movimiento inverso de cancelación?'),
+    /**
+     * ⭐ Fila 0.145 — el movimiento al que ÉSTE sustituye, si nació de una corrección. Sólo la
+     * fuente `motor`; en EsMa va siempre en null (la liga vive en la tabla de cada concepto).
+     */
+    idMovimientoCorregido: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Movimiento al que este renglón sustituye (corrección), o null.'),
+    /**
+     * ⭐ Fila 0.145 — ¿QUIEN PIDE ESTA LISTA puede corregir este renglón? Lo decide el SERVIDOR y no
+     * la pantalla, porque son cinco condiciones y ninguna es adivinable desde el cliente: la bandera
+     * de la persona, que el renglón sea SIN factura, que esté vivo, que no sea un inverso ni una
+     * cancelación, y —en EsMa— que sea un movimiento plano y no un cargo de recibo. Para quien no
+     * tiene la bandera viaja `false` en todos los renglones, y el botón simplemente no existe.
+     */
+    corregible: z.boolean().describe('¿Quien consulta puede corregir este renglón?'),
+    /**
+     * ⭐ Fila 0.145 — las observaciones TAL COMO ESTÁN GUARDADAS, sin los adornos que la lectura les
+     * pone. No es un duplicado de `observaciones`: para los renglones de EsMa, aquél lleva pegada la
+     * nota *«(pendiente de revisión)»* que explica por qué su importe sale vacío, y para un cargo es
+     * una referencia compuesta («Orden #12 · Costura»). El cajón de CORRECCIÓN necesita el dato
+     * crudo: si arrancara del texto adornado, guardar dejaría el adorno dentro del movimiento.
+     */
+    observacionesGuardadas: z
+      .string()
+      .nullable()
+      .describe('Observaciones tal como están guardadas (sin los adornos de la lectura).'),
+    /**
+     * ⭐⭐ Fila 0.145 — el IMPORTE del movimiento **en POSITIVO** (el signo lo pone el origen) y sin la
+     * aritmética de la lectura. Lo normaliza `dominio/finanzas/correccion-comun.ts::importeGuardadoDe`,
+     * compartido por el motor y por las seis ramas de EsMa — porque cuando la regla estaba escrita a
+     * mano en cada sitio, el motor la cumplía y EsMa **no**, y los movimientos migrados con monto
+     * negativo llegaban en negativo y dejaban el cajón de corrección inservible.
+     *
+     * 🔴 En todo renglón **CORREGIBLE**, `null` significa **exactamente una cosa**: quien consulta no
+     * puede ver importes. Esa promesa es la que deja al cajón decir *«no tienes permiso para ver
+     * importes»* sin mentir. (El CARGO de EsMa también viaja en `null` **con** permiso, porque no
+     * tiene importe capturado —se deriva de cantidad × precio—; por eso mismo **nunca es
+     * corregible**, y el cajón no llega a abrirse sobre él.)
+     *
+     * 🔴 NO es un duplicado de `monto`, y la diferencia es la que rompía la corrección: `monto` es
+     * la *aportación al saldo*, así que lleva SIGNO y viaja en `null` también cuando el renglón
+     * **todavía no está revisado** (no aporta). Un movimiento «capturado por error» es, por
+     * definición, uno **que aún no se revisó** —el caso central de esta fila—, de modo que el cajón
+     * de corrección veía `monto: null`, deshabilitaba el importe y encima lo explicaba con un
+     * mensaje sobre permisos que era **falso**. Este campo dice sólo una cosa: cuánto vale el
+     * movimiento; y su `null` significa sólo una: no puedes ver importes.
+     */
+    importeGuardado: z
+      .number()
+      .nullable()
+      .describe(
+        'Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ' +
+          'ocultan importes.',
+      ),
+    /**
+     * ⭐ Fila 0.145 — ¿se le puede cambiar el IMPORTE? Es `false` en un PAGO de EsMa ya APLICADO a
+     * cargos: ahí el importe no es un dato suelto, es `Σ(prendas × precio del cargo)`, y cambiarlo
+     * sin cambiar las prendas rompería esa promesa. En ese caso la fecha y las observaciones sí se
+     * corrigen. `false` también, obviamente, cuando `corregible` es `false`.
+     */
+    importeCorregible: z.boolean().describe('¿La corrección puede cambiar el importe?'),
     creadoEn: z.iso.datetime().describe('Cuándo se registró (ISO).'),
     creadoPorId: z.string().nullable().describe('Id de quien lo registró o null.'),
   })

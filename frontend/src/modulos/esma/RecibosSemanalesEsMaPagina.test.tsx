@@ -49,6 +49,7 @@ vi.mock('@/api/esma', () => ({
   // Los que necesita `EstadoCuentaPagina` (la otra mitad del contraste).
   useEstadoCuenta: () => ({ data: undefined, isPending: false, isError: false, error: null }),
   useRevisarMovimiento: () => ({ mutate: vi.fn(), isPending: false }),
+  useCorregirMovimientoEsMa: () => ({ mutate: vi.fn(), isPending: false }),
   useSaldoMaquilero: () => ({ data: undefined, isPending: false, isError: false, error: null }),
   imprimirEstadoCuenta: vi.fn(),
   descargarExcelEstadoCuenta: vi.fn(),
