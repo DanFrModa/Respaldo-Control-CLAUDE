@@ -117,6 +117,13 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
   edita/borra), `consultarExistencias` / `kardex`.
 - `migracion.ts` (F4-E6) — helpers modo migración: `crearMovimientoTelaMigrado`,
   `crearTraspasoTelaMigrado`, `asegurarLoteLegacyTela` (vía el motor de kardex; A1/A2/A3/A7).
+- `cancelacion-comun.ts` (fila 0.099) — ⚠️ **lo que NO se cancela desde aquí**: un movimiento nacido
+  del **ajuste de un inventario cíclico** (`origenTipo = ajuste-ciclico`). La hoja de conteo quedó
+  `cerrado` y `cancelarInventarioCiclico` rechaza justo ese estado, así que revertir el movimiento
+  dejaría al kardex contando una historia distinta de la que cuenta la hoja. El rechazo vive una
+  sola vez y lo aplican **las tres** puertas (`telas.ts`, `partidas-telas.ts`, `avios.ts`) — la misma
+  puerta trasera que cerró la 0.104. Si el conteo estuvo mal, se corrige con un **movimiento manual
+  NUEVO** (compatible con D3). El cíclico se documenta en `docs/modulos/indicadores.md`.
 
 ## ⭐ La salida que NO es por OP — devolución y venta (fila 0.104, 5-sep-2026)
 

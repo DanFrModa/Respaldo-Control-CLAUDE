@@ -45,7 +45,7 @@ const estilos = StyleSheet.create({
   metaDer: { alignItems: 'flex-end' },
   metaTitulo: { fontSize: 12, fontFamily: FUENTE.negrita, color: PALETA.tinta },
   metaLinea: { fontSize: 8, color: PALETA.muted, marginTop: 2 },
-  // Celda con más alto (renglón para anotar el conteo físico a mano) — conteo ciego.
+  // Celda con más alto: la casilla en blanco donde se anota a mano lo contado.
   celda: {
     borderWidth: 0.5,
     borderColor: PALETA.borde,
@@ -93,7 +93,11 @@ function columnasDe(renglones: readonly RenglonHoja[]): {
     { titulo: 'Artículo', ancho: 120 },
     { titulo: 'Detalle' },
     ...(conSistema ? [{ titulo: 'Sistema', ancho: 60, derecha: true }] : []),
-    { titulo: conComplemento ? 'Contado' : 'Cantidad contada', ancho: conComplemento ? 90 : 130, contar: true },
+    {
+      titulo: conComplemento ? 'Contado' : 'Cantidad contada',
+      ancho: conComplemento ? 90 : 130,
+      contar: true,
+    },
     ...(conComplemento ? [{ titulo: 'Contado (2º comp.)', ancho: 90, contar: true }] : []),
   ];
   return { columnas, conSistema, conComplemento };
@@ -105,7 +109,12 @@ function conUnidad(valor: number | undefined, unidad: string | null): string {
   return unidad === null ? String(valor) : `${String(valor)} ${unidad}`;
 }
 
-/** Genera el PDF de la hoja de conteo (CIEGA — sin teórico). */
+/**
+ * Genera el PDF de la hoja de conteo de las TRES dimensiones. Es CIEGA (sin el teórico) SÓLO en
+ * producto terminado (D6); en telas y avíos imprime la columna «Sistema», que es lo mismo que ve la
+ * pantalla (§Post-F9.193 punto 4). Quién es quién lo decide el DOMINIO —`leerConteoParaHoja` omite
+ * la clave `cantTeorica` en el conteo ciego—, no esta plantilla.
+ */
 export async function impresoHojaConteo(
   sesion: SesionUsuario,
   idInventarioCiclico: number,
@@ -128,7 +137,7 @@ export interface PayloadPdfHojaConteo {
   datos: Awaited<ReturnType<typeof leerConteoParaHoja>>;
 }
 
-/** Render PURO de la hoja de conteo ciega (datos ya resueltos → Buffer). */
+/** Render PURO de la hoja de conteo (datos ya resueltos → Buffer). */
 export async function generarPdfHojaConteo(payload: PayloadPdfHojaConteo): Promise<Buffer> {
   const { pagador, datos } = payload;
   const titulo = `Hoja de conteo — Cíclico #${String(datos.folio)}`;

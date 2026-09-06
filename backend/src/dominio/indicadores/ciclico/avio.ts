@@ -11,7 +11,10 @@
  * Un avío no tiene segundo componente: `complemento` es SIEMPRE `null` (ver {@link Componentes}).
  */
 import { Prisma } from '../../../datos/index.js';
-import type { DatosCiclicoRenglonAgregar, DatosInventarioCiclicoCrear } from '../../../contrato/index.js';
+import type {
+  DatosCiclicoRenglonAgregar,
+  DatosInventarioCiclicoCrear,
+} from '../../../contrato/index.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../../comun/errores.js';
 import {
   bloquearAvio,
@@ -126,7 +129,9 @@ export const adaptadorAvio: AdaptadorCiclico = {
         cantTeorica: true,
         cantReal: true,
         avio: { select: { clave: true, descripcion: true, unidad: true } },
-        movimientoAjuste: { select: { id: true, folio: true, tipoMov: { select: { direccion: true } } } },
+        movimientoAjuste: {
+          select: { id: true, folio: true, tipoMov: { select: { direccion: true } } },
+        },
       },
       orderBy: [{ avio: { clave: 'asc' } }, { id: 'asc' }],
     });
@@ -163,7 +168,9 @@ export const adaptadorAvio: AdaptadorCiclico = {
       }
     }
     const ahora = new Date();
-    const valores = capturas.map((c) => Prisma.sql`(${c.idDet}::int, ${c.cantReal}::decimal(14,4))`);
+    const valores = capturas.map(
+      (c) => Prisma.sql`(${c.idDet}::int, ${c.cantReal}::decimal(14,4))`,
+    );
     await tx.$executeRaw(Prisma.sql`
       UPDATE "inventario_ciclico_det_avio" AS d
       SET "cant_real" = v."cant_real",

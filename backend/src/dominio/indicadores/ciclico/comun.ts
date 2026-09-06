@@ -16,7 +16,10 @@ export const COD_AJUSTE_SALIDA = 'ajuste-ciclico-salida';
  * GENÉRICOS: el encabezado del kardex es el mismo para PT, tela y avío (ADR-0010 §2), así que las
  * tres dimensiones ajustan con `ajuste-ciclico-entrada`/`-salida` y no hace falta sembrar ninguno.
  */
-export async function tipoPorCodigo(tx: Tx, codigo: string): Promise<{ id: number; nombre: string }> {
+export async function tipoPorCodigo(
+  tx: Tx,
+  codigo: string,
+): Promise<{ id: number; nombre: string }> {
   const tipo = await tx.tipoMovimientoInventario.findUnique({
     where: { codigo },
     select: { id: true, nombre: true, activo: true },

@@ -27,6 +27,8 @@ export const DONDE_CANCELAR_AJUSTE_CICLICO =
  */
 export function exigirCancelableFueraDelCiclico(origenTipo: string | null): void {
   if (origenTipo === (ORIGEN.ajusteCiclico as OrigenMovimiento as string)) {
-    throw new ErrorValidacion(`Este movimiento no se cancela desde aquí: ${DONDE_CANCELAR_AJUSTE_CICLICO}.`);
+    throw new ErrorValidacion(
+      `Este movimiento no se cancela desde aquí: ${DONDE_CANCELAR_AJUSTE_CICLICO}.`,
+    );
   }
 }

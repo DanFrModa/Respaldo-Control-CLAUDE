@@ -229,17 +229,27 @@ export type InventariosCiclicosPagina = z.infer<typeof esquemaInventariosCiclico
 export const esquemaConteoRenglon = z
   .object({
     idDet: z.number().int(),
-    titulo: z.string().describe('El artículo: código del modelo, nombre de la tela o clave del avío.'),
+    titulo: z
+      .string()
+      .describe('El artículo: código del modelo, nombre de la tela o clave del avío.'),
     subtitulo: z
       .string()
       .nullable()
-      .describe('Lo que lo distingue: color·talla·orden, el color de la tela, la descripción del avío.'),
-    unidad: z.string().nullable().describe('Unidad de la cantidad (m, kg, pza…); null si no aplica.'),
+      .describe(
+        'Lo que lo distingue: color·talla·orden, el color de la tela, la descripción del avío.',
+      ),
+    unidad: z
+      .string()
+      .nullable()
+      .describe('Unidad de la cantidad (m, kg, pza…); null si no aplica.'),
     cantTeorica: z
       .number()
       .optional()
       .describe('Saldo del sistema al abrir la hoja. AUSENTE en PT (conteo ciego, D6).'),
-    cantReal: z.number().nullable().describe('Cantidad física capturada; null si no se ha contado.'),
+    cantReal: z
+      .number()
+      .nullable()
+      .describe('Cantidad física capturada; null si no se ha contado.'),
     nombreComplemento: z
       .string()
       .nullable()

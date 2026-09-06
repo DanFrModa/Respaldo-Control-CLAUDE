@@ -82,7 +82,11 @@ export interface RenglonCiclico {
   subtitulo: string | null;
   /** Unidad de la cantidad (m, kg, pza…); null si no aplica. */
   unidad: string | null;
-  /** Nombre del segundo componente (D5); null si el artículo no lleva. */
+  /**
+   * Nombre del segundo componente (D5); null si ESTE RENGLÓN no lo lleva. Lo decide el teórico
+   * CONGELADO ({@link RenglonCiclico.cantTeoricaComplemento}), nunca el catálogo de hoy: una hoja
+   * abierta ya fijó su forma, y el ajuste sólo puede mover el componente que congeló.
+   */
   nombreComplemento: string | null;
   cantTeorica: number;
   cantTeoricaComplemento: number | null;
@@ -90,6 +94,20 @@ export interface RenglonCiclico {
   cantRealComplemento: number | null;
   ajustes: AjusteEnlazado[];
 }
+
+/**
+ * Qué renglones de una hoja YA ABIERTA llevan segundo componente, por {@link textoClave} (fila
+ * 0.099). Lo arma el motor a partir del teórico CONGELADO y se lo pasa al adaptador al re-leer la
+ * existencia para cerrar.
+ *
+ * ⚠️ **Por qué existe.** La forma de una hoja la fija el ALTA: el ajuste sólo puede mover el
+ * componente cuyo teórico congeló. Si el catálogo cambia con la hoja abierta —a una tela se le quita
+ * el `nombreComplemento`—, el adaptador leería la existencia del complemento como «no aplica» aunque
+ * el kardex tenga saldo de verdad ahí: el cierre creería que el almacén se movió y, al confirmar,
+ * la salida del complemento chocaría contra un no-negativo calculado sobre un 0 falso, dejando una
+ * hoja imposible de cerrar. Con esta forma, el que manda es lo congelado.
+ */
+export type FormaCongelada = ReadonlyMap<string, boolean>;
 
 /** Un renglón a sembrar: su llave y el teórico ya congelado. */
 export interface RenglonASembrar {
@@ -149,11 +167,15 @@ export interface AdaptadorCiclico {
    * ADR-0010 §3) DESPUÉS de tomar su bloqueo. El adaptador toma los locks en SU orden determinista
    * (el mismo que usan las salidas de esa dimensión), que es lo que evita el interbloqueo con
    * operaciones cruzadas. Devuelve un mapa por {@link textoClave}.
+   *
+   * `formaCongelada` sólo viaja al CERRAR la hoja (ver {@link FormaCongelada}); al CONGELAR va
+   * ausente, porque en ese momento el catálogo de hoy ES la verdad.
    */
   leerExistenciasBloqueadas(
     tx: Tx,
     ctx: ContextoDimension,
     claves: readonly ClaveArticulo[],
+    formaCongelada?: FormaCongelada,
   ): Promise<Map<string, Componentes>>;
 
   /** Siembra renglones POR LOTES (`createMany`) — nunca uno por uno (es la pantalla del arranque). */
@@ -186,7 +208,10 @@ export interface AdaptadorCiclico {
   ): Promise<void>;
 
   /** Cuántos renglones tiene la hoja y cuántos están contados (para el estado). */
-  contar(cliente: ClienteLectura, idInventario: number): Promise<{ total: number; contados: number }>;
+  contar(
+    cliente: ClienteLectura,
+    idInventario: number,
+  ): Promise<{ total: number; contados: number }>;
 
   /** (3) Escribe UN movimiento de kardex con todas las líneas de una dirección. Devuelve su id. */
   registrarAjuste(

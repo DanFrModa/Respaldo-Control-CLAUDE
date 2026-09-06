@@ -15,7 +15,8 @@ inventario cíclico, E6 = ETL de cierre). Es el **módulo 11** del plan.
 - **Fichas confiables** (F7-E4): checklist de confiabilidad de la ficha técnica **por orden**.
 - **Muestrarios pendientes** (F7-E4): seguimiento boards/muestras (solicitud → entrega) con KPI de
   cumplimiento.
-- **Inventario cíclico** (F7-E5): conteo físico **contra el kardex propio de v2** (D6).
+- **Inventario cíclico** (F7-E5; **extendido a las TRES dimensiones en la fila 0.099**): conteo
+  físico **contra el kardex propio de v2** (D6), de **producto terminado, telas o avíos**.
 - **Tableros/KPIs directivos** (F7-E3): sobre **vistas materializadas** que refresca un job de
   pg-boss; la captura nunca espera un recálculo (muestra "datos al: `<fecha>`").
 
@@ -31,9 +32,18 @@ inventario cíclico, E6 = ETL de cierre). Es el **módulo 11** del plan.
     El indicador **% de fichas confiables** = Σ reactivos OK ÷ Σ evaluados, agregado en SQL.
   - `muestrarios.ts` — `crearMuestrario` / `actualizarMuestrario` / `entregarMuestrario` /
     `cancelarMuestrario` + el KPI de cumplimiento (`fechaEntregado ≤ fechaRequerida`).
-  - `inventario-ciclico.ts` — `crearInventarioCiclico` (ALTA que **CONGELA el teórico** desde el
-    kardex, D6), `capturarConteo` (**ciego**), `consultarExactitud`, `generarAjusteCiclico` (el ajuste
-    es un **movimiento de kardex**, D3, nunca una edición de saldo) y `cancelarInventarioCiclico`.
+  - `inventario-ciclico.ts` — el **MOTOR** del cíclico, común a las tres dimensiones:
+    `crearInventarioCiclico` (ALTA que **CONGELA el teórico** desde el kardex, D6),
+    `capturarConteo`, `agregarRenglonCiclico` (mercancía que el sistema cree que **no tiene**),
+    `consultarExactitud`, `generarAjusteCiclico` (el ajuste es un **movimiento de kardex**, D3, nunca
+    una edición de saldo) y `cancelarInventarioCiclico`. `planearAjuste` está **exportada para
+    probarse**: es la aritmética pura del cierre (las dos patas + el aviso).
+  - `ciclico/` (fila 0.099) — **un ADAPTADOR por dimensión** (`pt.ts` / `tela.ts` / `avio.ts`) detrás
+    del contrato de `tipos.ts`, más su `registro.ts`. El adaptador aporta las cuatro operaciones que
+    dependen de la LLAVE del artículo —**enumerar**, **congelar/re-leer la existencia bajo bloqueo**,
+    **aplicar el ajuste al kardex** y **describir** el artículo— y declara su `escala` (0 en PT, 4 en
+    telas y avíos), si su conteo es ciego y qué permiso EXTRA exige su ajuste. Sumar una cuarta
+    dimensión es escribir su adaptador y añadirlo al registro.
   - `kpis.ts` / `fechas.ts` — los tableros sobre vistas materializadas y el gate de "fecha libre".
   - `migracion.ts` (F7-E6) — `crearInventarioCiclicoMigrado`: modo migración del cíclico histórico
     (ver abajo).
@@ -51,18 +61,99 @@ inventario cíclico, E6 = ETL de cierre). Es el **módulo 11** del plan.
 - **`FichaVerificacion`**: una fila **reactivo × orden** (`hecho`, `revisorId`, `fecha`).
 - **`Muestrario`**: solicitud → entrega, con `boardsOK`/`muestrasOK`, `fechaEntregado` y cancelación
   suave; `idCliente`/`idTemporada` a los catálogos.
-- **`InventarioCiclico`** / **`InventarioCiclicoDet`**: encabezado (folio A3, almacén, estado) +
-  detalle a la granularidad REAL del kardex (**modelo×color×talla×orden×almacén**, ADR-0014).
-  `cantTeorica` congelada, `cantReal` (conteo ciego), `idMovimientoAjuste` (traza del ajuste D3).
+- **`InventarioCiclico`**: encabezado (folio A3, almacén, estado) + **`dimension`** (`PT`/`TELA`/
+  `AVIO`, fila 0.099) — se DERIVA del tipo del almacén al dar de alta y se **persiste** aquí para que
+  el resto del ciclo no tenga que volver a preguntar. La migración la agregó con `DEFAULT 'PT'`, así
+  que las hojas que ya existían se quedaron donde estaban (**sin backfill**, REGLA 0-B).
+- **Un detalle POR DIMENSIÓN**, espejo del kardex — no columnas anulables de las tres en una misma
+  tabla:
+  - **`InventarioCiclicoDet`** (PT): granularidad REAL del kardex de PT
+    (**modelo×color×talla×orden×almacén**, ADR-0014), cantidades **enteras**, `idMovimientoAjuste`.
+  - **`InventarioCiclicoDetTela`**: un renglón por **tela×color** (la dimensión de
+    `existencia_tela_color`), `Decimal(14,4)`, con **dos** pares teórico/real —cuerpo y complemento
+    (D5)— y **dos** ligas de ajuste, porque un mismo renglón puede necesitar a la vez una entrada
+    (lo que faltó) y una salida (lo que sobró).
+  - **`InventarioCiclicoDetAvio`**: un renglón por **avío** (el lote NO entra, R4), `Decimal(14,4)`.
+
+  En los tres: `cantTeorica` congelada, `cantReal` (lo contado) y la traza del movimiento de ajuste
+  (D3).
 - **`KpiRefresco`**: sello de la última materialización de las vistas de KPIs.
 
 ## Inventario cíclico contra el kardex propio (D6 / D3 / D4)
 
 El **alta CONGELA** `cantTeorica` = Σ de movimientos del artículo **en ese instante** (bajo lock por
-artículo, suma directa NUNCA la vista); el **conteo es CIEGO** (el capturista no ve el teórico); el
-**ajuste** aplica el delta como **movimiento de kardex** (entrada/salida), jamás editando un saldo
-(D3). Las salidas validan no-negativo bajo lock por artículo. Máquina de estados
+artículo, suma directa NUNCA la vista); se **captura LO CONTADO**, nunca una diferencia; el **ajuste**
+aplica el delta como **movimiento de kardex** (entrada/salida), jamás editando un saldo (D3). Las
+salidas validan no-negativo bajo lock por artículo. Máquina de estados
 `abierto → contado → cerrado` (o `cancelado`).
+
+### Las TRES dimensiones, y quién elige (fila 0.099)
+
+**La dimensión la manda el TIPO DEL ALMACÉN**, no un campo que teclee nadie: desde la fila 0.137 un
+almacén guarda una sola clase de mercancía, así que un conteo suyo sólo puede ser de ésa. Al dar de
+alta se lee el tipo del almacén, se deriva la dimensión (`PT`/`TELA`/`AVIO`) y se **persiste** en el
+encabezado; de ahí en adelante manda ella. `exigirAlmacenDelTipo` es la **única** puerta que lo
+verifica, y se pasa por ella **TRES veces** —al abrir, al agregar un renglón a mano y al cerrar—,
+porque una hoja vive días y en ese rato el almacén pudo desactivarse o cambiar de tipo (el catálogo
+lo permite mientras no tenga movimientos). **No hay una segunda barrera más abajo**: el motor de
+kardex no mira el almacén, así que quitar cualquiera de las tres deja el hueco entero.
+
+Diferencias por dimensión:
+
+| | Producto terminado | Telas | Avíos |
+|---|---|---|---|
+| Llave | modelo×color×talla×orden | tela×color | avío |
+| Escala | entero (piezas) | `Decimal(14,4)` | `Decimal(14,4)` |
+| Segundo componente (D5) | — | sí, si la hoja lo **congeló** | — |
+| Conteo | **CIEGO** (D6) | con el **saldo a la vista** | con el **saldo a la vista** |
+| Permiso EXTRA del ajuste | — | `inventario-telas.mover` | `inventario-avios.mover` |
+
+El conteo con el saldo a la vista en telas y avíos es decisión de Daniel (§Post-F9.193 punto 4); el
+ciego de PT se queda como estaba (D6). La hoja impresa hace lo mismo que la pantalla: la columna
+«Sistema» sale **sólo** cuando el conteo no es ciego. Y el permiso extra existe porque el ajuste
+escribe en el kardex de SU dimensión: abrir el cíclico a telas sin eso le habría dado a cualquiera
+con permiso de cíclicos la llave para mover el inventario de telas, que antes no tenía.
+
+⚠️ **La forma de una hoja ABIERTA la fija lo CONGELADO, no el catálogo de hoy.** Quién lleva segundo
+componente sale de `cantTeoricaComplemento`, no del `nombreComplemento` que la tela tenga en este
+momento: el ajuste sólo puede mover el componente cuyo teórico congeló. Por eso la existencia actual
+también se re-lee con la forma congelada al cerrar.
+
+### El AVISO de «el almacén se movió» (§Post-F9.193 punto 6)
+
+La diferencia se calcula contra el teórico **congelado** —el conteo físico es contemporáneo de ese
+valor—, pero si el almacén se movió entre el alta y el cierre, el sistema **avisa y deja decidir, NO
+bloquea**. Antes de la fila 0.099 nadie avisaba **en ninguna dimensión, PT incluida**: con 100
+congelado, 95 contado y 20 piezas que entraron de verdad en medio, se escribía −5 y quedaban 115
+mientras el anaquel decía 95, sin una palabra.
+
+Ahora el primer `POST /api/indicadores/ciclicos/:id/ajuste` vuelve con `aplicado: false` y el aviso —artículo por artículo, con
+lo congelado, lo que hay AHORA, lo contado, el ajuste y **en cuánto va a quedar la existencia**— y
+**sin escribir nada**. El segundo, con `confirmarMovimiento: true`, aplica. El aviso es un **dato de
+la respuesta (200), nunca una excepción**.
+
+### Renglones agregados a mano
+
+Se puede anotar **mercancía con existencia CERO** (`agregarRenglonCiclico`): el alta enumera sólo lo
+que tiene existencia, así que lo que el sistema cree que no tiene entra a mano. Por eso el alta
+**ya no rechaza una hoja vacía** — contar un almacén que el sistema cree vacío es el caso de uso del
+arranque, no un error. El teórico del renglón nuevo se congela igual que el del alta (bajo lock, Σ
+directa): normalmente es 0, y si el artículo se movió de verdad nace con lo que hay.
+
+### El ajuste no se deshace desde Inventarios
+
+Un movimiento con `origenTipo = ajuste-ciclico` **no se cancela por la vía normal**: la hoja quedaría
+`cerrado` contando otra historia que el kardex. La regla vive **una sola vez** en
+`dominio/inventarios/cancelacion-comun.ts` y la aplican las tres puertas de material (telas por lote,
+telas por color y avíos); PT ya lo cerraba por otro camino (sólo cancela a mano lo que se capturó a
+mano). Si el conteo estuvo mal, se corrige con un **movimiento manual nuevo** — compatible con D3.
+
+### Almacén de telas en el seed
+
+El seed siembra un almacén global **«Almacén de telas»** (tipo `TELA`), idempotente, hermano del
+«Almacén de avíos» de la fila 0.137. Sin él, una base sembrada **sin correr el ETL** no tenía ni un
+almacén de tipo TELA —sólo el ETL los creaba— y la pantalla del arranque de telas se quedaba sin
+almacén que ofrecer.
 
 ## Migración del histórico (F7-E6)
 
@@ -100,8 +191,12 @@ faltantes / datos inválidos) y se explican por renglón.
 
 ## Decisiones aplicadas
 
-- **D6** — inventario cíclico contra el **kardex propio** (teórico congelado, conteo ciego, ajuste por
-  movimiento); el **histórico Proscai** es externo, no comparable, sin ajuste.
+- **D6** — inventario cíclico contra el **kardex propio** (teórico congelado, conteo ciego **en PT**,
+  ajuste por movimiento); el **histórico Proscai** es externo, no comparable, sin ajuste.
+- **§Post-F9.193 puntos 4·5·6** (fila 0.099) — se captura **lo contado** con el saldo del sistema a la
+  vista (telas y avíos); el cíclico se extiende a **telas y avíos**; si el almacén se movió entre el
+  alta y el cierre, **avisar y dejar decidir, no bloquear**; y se puede anotar mercancía con
+  existencia **cero**.
 - **D11** — KPIs directivos; captura preservada (`revisorId`/`capturadoPor` del histórico).
 - **D4/A6** — motor de productividad **configurable por área** (filas, no tablas paralelas).
 - **ADR-0007** (catálogos globales), **ADR-0014** (PT por orden), **A1/A2/A3/A7/A9**.

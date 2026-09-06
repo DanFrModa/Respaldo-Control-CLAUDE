@@ -20,9 +20,15 @@
 -- `movimiento_det_avio`—, no enteros: se cuentan metros y kilos. El detalle de PT
 -- (`inventario_ciclico_det`, `INTEGER`) NO se toca.
 --
--- SIN permisos nuevos y SIN semillas nuevas: el conteo sigue bajo `indicadores.ciclicos-*` y el
--- ajuste reusa los tipos de movimiento `ajuste-ciclico-entrada` / `ajuste-ciclico-salida`, que ya
--- son genéricos (el encabezado del kardex es el mismo para PT/tela/avío — ADR-0010 §2).
+-- SIN permisos nuevos: el conteo sigue bajo `indicadores.ciclicos-*`, y el ajuste reusa los tipos de
+-- movimiento `ajuste-ciclico-entrada` / `ajuste-ciclico-salida`, que ya son genéricos (el encabezado
+-- del kardex es el mismo para PT/tela/avío — ADR-0010 §2).
+--
+-- ⚠️ PERO SÍ HAY UNA SEMILLA NUEVA, y quien despliegue tiene que saberla: el seed siembra un almacén
+-- GLOBAL de tipo TELA («Almacén de telas»). Hasta ahora el seed no creaba NINGUNO de ese tipo —sólo
+-- el ETL de Access los creaba—, así que en una base sin ETL el guard de tipo de la fila 0.137 dejaba
+-- al cíclico de telas (la pantalla del ARRANQUE) sin un solo almacén que ofrecer. Es idempotente y
+-- `SEED_ON_START=true` ya está permanente en `prueba`, así que aparece solo en el próximo arranque.
 
 -- CreateEnum
 CREATE TYPE "dimension_inventario_ciclico" AS ENUM ('PT', 'TELA', 'AVIO');

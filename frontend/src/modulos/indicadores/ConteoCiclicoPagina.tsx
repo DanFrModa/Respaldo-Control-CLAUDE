@@ -190,9 +190,7 @@ export function ConteoCiclicoPagina(): React.JSX.Element {
                 valor={valores[r.idDet] ?? ''}
                 complemento={complementos[r.idDet] ?? ''}
                 alCambiar={(v) => setValores((prev) => ({ ...prev, [r.idDet]: v }))}
-                alCambiarComplemento={(v) =>
-                  setComplementos((prev) => ({ ...prev, [r.idDet]: v }))
-                }
+                alCambiarComplemento={(v) => setComplementos((prev) => ({ ...prev, [r.idDet]: v }))}
               />
             ))}
             {renglones.length === 0 && (
@@ -201,7 +199,9 @@ export function ConteoCiclicoPagina(): React.JSX.Element {
               </p>
             )}
             {renglones.length > 0 && visibles.length === 0 && (
-              <p className="text-sm text-muted-foreground">Ningún renglón coincide con el filtro.</p>
+              <p className="text-sm text-muted-foreground">
+                Ningún renglón coincide con el filtro.
+              </p>
             )}
           </div>
 
@@ -242,7 +242,9 @@ function etiquetaDimension(dimension: ConteoCiclico['dimension']): string {
 /** Número con su unidad, o `—` si no hay dato. */
 function conUnidad(valor: number | undefined, unidad: string | null): string {
   if (valor === undefined) return '—';
-  return unidad === null ? valor.toLocaleString('es-MX') : `${valor.toLocaleString('es-MX')} ${unidad}`;
+  return unidad === null
+    ? valor.toLocaleString('es-MX')
+    : `${valor.toLocaleString('es-MX')} ${unidad}`;
 }
 
 /**

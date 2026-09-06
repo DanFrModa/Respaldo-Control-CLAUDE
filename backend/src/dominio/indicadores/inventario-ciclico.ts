@@ -19,8 +19,12 @@
  * que decide cuál es el **TIPO DEL ALMACÉN** —no un campo que teclee nadie—: un almacén guarda una
  * sola clase de mercancía (fila 0.137), así que un conteo suyo sólo puede ser de ésa. La dimensión
  * se DERIVA al dar de alta y se PERSISTE en el encabezado; de ahí en adelante manda ella, y
- * `exigirAlmacenDelTipo` es la única puerta que la verifica (al alta y otra vez al cerrar, porque
- * entre una cosa y otra el almacén pudo desactivarse o cambiar).
+ * `exigirAlmacenDelTipo` es la única puerta que la verifica. Se pasa por ella **TRES veces**: al dar
+ * de alta ({@link crearInventarioCiclico}), al agregar un renglón a mano
+ * ({@link agregarRenglonCiclico}) y al cerrar ({@link generarAjusteCiclico}). No es redundancia: una
+ * hoja vive días, y en ese rato el almacén pudo desactivarse o cambiar de tipo
+ * (`api/admin/almacenes` lo permite mientras no tenga movimientos), sin que exista una segunda
+ * barrera más abajo — el motor de kardex NO valida el almacén.
  *
  * Lo que depende de la LLAVE del artículo —enumerar, congelar bajo bloqueo, aplicar el ajuste al
  * kardex y describir el artículo— vive detrás de un ADAPTADOR por dimensión (`ciclico/tipos.ts`);
@@ -62,7 +66,7 @@ import {
   type InventariosCiclicosPagina,
   type InventariosCiclicosQuery,
 } from '../../contrato/index.js';
-import { Prisma, type EstadoInventarioCiclico } from '../../datos/index.js';
+import type { EstadoInventarioCiclico, Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacenDelTipo, tipoDeAlmacenUsable } from '../../comun/almacenes.js';
@@ -573,11 +577,13 @@ export async function capturarConteo(
       if (renglon === undefined) {
         throw new ErrorValidacion('Algún renglón no pertenece a este inventario cíclico.');
       }
-      const llevaComplemento = renglon.nombreComplemento !== null;
+      // ⚠️ Quién lleva SEGUNDO COMPONENTE lo dice el teórico CONGELADO, no el catálogo de hoy: una
+      // hoja abierta ya decidió su forma al congelarse, y el ajuste sólo puede mover el componente
+      // que congeló. Si se decidiera por el catálogo, ponerle `nombreComplemento` a una tela
+      // DESPUÉS del alta obligaría a capturar un número que el ajuste ignoraría en silencio.
+      const llevaComplemento = renglon.cantTeoricaComplemento !== null;
       if (!llevaComplemento && r.cantRealComplemento !== undefined) {
-        throw new ErrorValidacion(
-          `«${renglon.titulo}» no tiene un segundo componente que contar.`,
-        );
+        throw new ErrorValidacion(`«${renglon.titulo}» no tiene un segundo componente que contar.`);
       }
       if (llevaComplemento && r.cantRealComplemento === undefined) {
         // Dar por contado un renglón con la mitad sin contar dejaría un componente fuera del
@@ -824,10 +830,7 @@ export function planearAjuste(
           existenciaActual: c.datos.existenciaActual,
           cantReal: c.datos.cantReal,
           ajuste: c.datos.diferencia,
-          existenciaResultante: redondear(
-            c.datos.existenciaActual + c.datos.diferencia,
-            escala,
-          ),
+          existenciaResultante: redondear(c.datos.existenciaActual + c.datos.diferencia, escala),
         });
       }
     }
@@ -887,7 +890,10 @@ export async function generarAjusteCiclico(
   bd?: ContextoBd,
 ): Promise<AjusteCiclicoSalida> {
   verificarPermiso(sesion, 'indicadores.ciclicos-consulta');
-  const datos: DatosInventarioCiclicoAjuste = validarEntrada(esquemaInventarioCiclicoAjuste, cuerpo);
+  const datos: DatosInventarioCiclicoAjuste = validarEntrada(
+    esquemaInventarioCiclicoAjuste,
+    cuerpo,
+  );
   const idEmpresa = sesion.idEmpresaActiva;
 
   const resultado = await enTransaccion(async (tx) => {
@@ -946,10 +952,14 @@ export async function generarAjusteCiclico(
     }
 
     const ctx: ContextoDimension = { idEmpresa, idAlmacen: inv.idAlmacen };
+    // La existencia ACTUAL se re-lee con la FORMA CONGELADA de la hoja (qué renglones llevan
+    // segundo componente), no con el catálogo de hoy: si a una tela le quitaron el complemento con
+    // la hoja abierta, su saldo sigue estando en el kardex y el cierre tiene que verlo.
     const existencias = await ad.leerExistenciasBloqueadas(
       tx,
       ctx,
       renglones.map((r) => r.clave),
+      new Map(renglones.map((r) => [textoClave(r.clave), r.cantTeoricaComplemento !== null])),
     );
     const plan = planearAjuste(renglones, existencias, ad.escala);
 
@@ -1083,7 +1093,9 @@ export async function cancelarInventarioCiclico(
       throw new ErrorNoEncontrado('InventarioCiclico', id);
     }
     if (inv.estado === 'cerrado') {
-      throw new ErrorConflicto('El inventario cíclico ya está cerrado (con ajuste): no se cancela.');
+      throw new ErrorConflicto(
+        'El inventario cíclico ya está cerrado (con ajuste): no se cancela.',
+      );
     }
     if (inv.estado === 'cancelado') {
       throw new ErrorConflicto('El inventario cíclico ya estaba cancelado.');

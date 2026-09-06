@@ -9,7 +9,10 @@
  * queda como estaba — eso no lo cambió ninguna decisión.
  */
 import { Prisma } from '../../../datos/index.js';
-import type { DatosCiclicoRenglonAgregar, DatosInventarioCiclicoCrear } from '../../../contrato/index.js';
+import type {
+  DatosCiclicoRenglonAgregar,
+  DatosInventarioCiclicoCrear,
+} from '../../../contrato/index.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../../comun/errores.js';
 import {
   bloquearArticuloPt,
@@ -158,7 +161,9 @@ export const adaptadorPt: AdaptadorCiclico = {
     }
     const { idModelo, idColor, idTalla } = entrada;
     if (idModelo === undefined || idColor === undefined || idTalla === undefined) {
-      throw new ErrorValidacion('Para agregar un renglón de producto terminado indica modelo, color y talla.');
+      throw new ErrorValidacion(
+        'Para agregar un renglón de producto terminado indica modelo, color y talla.',
+      );
     }
     const [modelo, color, talla] = await Promise.all([
       tx.modelo.findUnique({ where: { id: idModelo }, select: { id: true } }),
@@ -196,7 +201,9 @@ export const adaptadorPt: AdaptadorCiclico = {
         color: { select: { nombre: true } },
         talla: { select: { etiqueta: true, orden: true } },
         orden: { select: { folio: true } },
-        movimientoAjuste: { select: { id: true, folio: true, tipoMov: { select: { direccion: true } } } },
+        movimientoAjuste: {
+          select: { id: true, folio: true, tipoMov: { select: { direccion: true } } },
+        },
       },
       orderBy: [
         { modelo: { codigo: 'asc' } },

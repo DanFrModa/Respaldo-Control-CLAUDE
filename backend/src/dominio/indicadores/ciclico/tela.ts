@@ -21,7 +21,10 @@
  * documentos que no existen. El renglón de kardex del ajuste va sin partida, igual que las salidas.
  */
 import { Prisma } from '../../../datos/index.js';
-import type { DatosCiclicoRenglonAgregar, DatosInventarioCiclicoCrear } from '../../../contrato/index.js';
+import type {
+  DatosCiclicoRenglonAgregar,
+  DatosInventarioCiclicoCrear,
+} from '../../../contrato/index.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../../comun/errores.js';
 import {
   bloquearTelaColor,
@@ -89,7 +92,7 @@ export const adaptadorTela: AdaptadorCiclico = {
     return filas.map((f) => ({ idTelaColor: f.idTelaColor }));
   },
 
-  async leerExistenciasBloqueadas(tx, ctx, claves) {
+  async leerExistenciasBloqueadas(tx, ctx, claves, formaCongelada) {
     const ids = [...new Set(claves.map(idColorDe))].sort((a, b) => a - b);
     const mapa = new Map<string, Componentes>();
     if (ids.length === 0) return mapa;
@@ -111,11 +114,15 @@ export const adaptadorTela: AdaptadorCiclico = {
     const llevaComplemento = new Map(colores.map((c) => [c.id, c.tela.nombreComplemento !== null]));
     for (const id of ids) {
       const e = porColor.get(id);
-      mapa.set(textoClave({ idTelaColor: id }), {
+      const clave = textoClave({ idTelaColor: id });
+      // Al CERRAR manda lo CONGELADO (la hoja ya fijó su forma al abrirse); al CONGELAR no hay
+      // forma previa y manda el catálogo de hoy, que en ese instante ES la verdad.
+      const lleva = formaCongelada?.get(clave) ?? llevaComplemento.get(id) === true;
+      mapa.set(clave, {
         cuerpo: e?.cuerpo ?? 0,
         // Una tela SIN complemento no tiene complemento que congelar ni que mover, aunque una fila
         // vieja hubiera dejado un saldo fantasma ahí (se TOLERA, no se compensa — REGLA 0-B).
-        complemento: llevaComplemento.get(id) === true ? (e?.complemento ?? 0) : null,
+        complemento: lleva ? (e?.complemento ?? 0) : null,
       });
     }
     return mapa;
@@ -142,13 +149,18 @@ export const adaptadorTela: AdaptadorCiclico = {
       entrada.idTalla !== undefined ||
       entrada.idAvio !== undefined
     ) {
-      throw new ErrorValidacion('Esta hoja cuenta telas: el renglón se agrega con un color de tela.');
+      throw new ErrorValidacion(
+        'Esta hoja cuenta telas: el renglón se agrega con un color de tela.',
+      );
     }
     const { idTelaColor } = entrada;
     if (idTelaColor === undefined) {
       throw new ErrorValidacion('Para agregar un renglón de telas indica el color de la tela.');
     }
-    const color = await tx.telaColor.findUnique({ where: { id: idTelaColor }, select: { id: true } });
+    const color = await tx.telaColor.findUnique({
+      where: { id: idTelaColor },
+      select: { id: true },
+    });
     if (color === null) throw new ErrorNoEncontrado('TelaColor', idTelaColor);
     return { idTelaColor };
   },
@@ -172,7 +184,11 @@ export const adaptadorTela: AdaptadorCiclico = {
         movimientoAjusteEntrada: { select: { id: true, folio: true } },
         movimientoAjusteSalida: { select: { id: true, folio: true } },
       },
-      orderBy: [{ telaColor: { tela: { nombre: 'asc' } } }, { telaColor: { nombre: 'asc' } }, { id: 'asc' }],
+      orderBy: [
+        { telaColor: { tela: { nombre: 'asc' } } },
+        { telaColor: { nombre: 'asc' } },
+        { id: 'asc' },
+      ],
     });
     return filas.map<RenglonCiclico>((d) => ({
       idDet: d.id,
@@ -180,7 +196,15 @@ export const adaptadorTela: AdaptadorCiclico = {
       titulo: d.telaColor.tela.nombre,
       subtitulo: d.telaColor.nombre,
       unidad: d.telaColor.tela.unidadMedida === 'KG' ? 'kg' : 'm',
-      nombreComplemento: d.telaColor.tela.nombreComplemento,
+      // ⚠️ Quién lleva complemento lo dice lo CONGELADO en la hoja, NO el catálogo de hoy. Si a una
+      // tela se le pone (o se le quita) `nombreComplemento` DESPUÉS del alta, la hoja abierta no
+      // cambia de forma: el ajuste sólo puede mover el componente cuyo teórico congeló, así que
+      // pedir o esconder el segundo número por el catálogo dejaría a la captura pidiendo una cifra
+      // que el ajuste ignora en silencio. El catálogo sólo aporta la ETIQUETA.
+      nombreComplemento:
+        d.cantTeoricaComplemento === null
+          ? null
+          : (d.telaColor.tela.nombreComplemento ?? 'complemento'),
       cantTeorica: Number(d.cantTeorica),
       cantTeoricaComplemento: aNumero(d.cantTeoricaComplemento),
       cantReal: aNumero(d.cantReal),

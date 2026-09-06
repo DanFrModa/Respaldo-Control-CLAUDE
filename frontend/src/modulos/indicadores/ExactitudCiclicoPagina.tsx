@@ -213,9 +213,7 @@ export function ExactitudCiclicoPagina(): React.JSX.Element {
                         <TablaDensaCelda className="font-medium">{r.titulo}</TablaDensaCelda>
                         <TablaDensaCelda>{r.subtitulo ?? '—'}</TablaDensaCelda>
                         <TablaDensaCelda className="text-muted-foreground">
-                          {r.nombreComplemento === null
-                            ? '—'
-                            : `cuerpo / ${r.nombreComplemento}`}
+                          {r.nombreComplemento === null ? '—' : `cuerpo / ${r.nombreComplemento}`}
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica>
                           {cifra(r.cantTeorica, r.unidad)}
@@ -247,7 +245,10 @@ export function ExactitudCiclicoPagina(): React.JSX.Element {
                           {r.ajustes.length === 0
                             ? '—'
                             : r.ajustes
-                                .map((a) => `#${String(a.folio)} ${a.direccion === 'entrada' ? '↑' : '↓'}`)
+                                .map(
+                                  (a) =>
+                                    `#${String(a.folio)} ${a.direccion === 'entrada' ? '↑' : '↓'}`,
+                                )
                                 .join(' · ')}
                         </TablaDensaCelda>
                       </TablaDensaFila>

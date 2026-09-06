@@ -27,13 +27,19 @@ vi.mock('@/api/inventario-ciclico', () => ({
 
 // Los catálogos del diálogo «Agregar artículo» y los combobox no son el objeto de esta prueba:
 // se sustituyen por lo mínimo para que la pantalla monte.
-vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [{ id: 3, nombre: 'Rojo' }] } }) }));
+vi.mock('@/api/colores', () => ({
+  useColores: () => ({ data: { datos: [{ id: 3, nombre: 'Rojo' }] } }),
+}));
 vi.mock('@/api/tallas', () => ({
   useTallasActivas: () => ({ data: { datos: [{ id: 4, etiqueta: 'CH' }] } }),
 }));
 vi.mock('@/api/telas', () => ({ useTela: () => ({ data: undefined }) }));
 vi.mock('@/modulos/inventarios/SelectorModelo', () => ({
-  SelectorModelo: ({ alSeleccionar }: { alSeleccionar: (m: { id: number; codigo: string }) => void }) => (
+  SelectorModelo: ({
+    alSeleccionar,
+  }: {
+    alSeleccionar: (m: { id: number; codigo: string }) => void;
+  }) => (
     <button type="button" onClick={() => alSeleccionar({ id: 2, codigo: 'A-100' })}>
       elegir modelo
     </button>
@@ -41,7 +47,11 @@ vi.mock('@/modulos/inventarios/SelectorModelo', () => ({
 }));
 vi.mock('@/modulos/inventarios/SelectorTela', () => ({ SelectorTela: () => <div /> }));
 vi.mock('@/modulos/inventarios/SelectorAvio', () => ({
-  SelectorAvio: ({ alSeleccionar }: { alSeleccionar: (a: { id: number; clave: string }) => void }) => (
+  SelectorAvio: ({
+    alSeleccionar,
+  }: {
+    alSeleccionar: (a: { id: number; clave: string }) => void;
+  }) => (
     <button type="button" onClick={() => alSeleccionar({ id: 8, clave: 'BOT-01' })}>
       elegir avío
     </button>
@@ -145,7 +155,12 @@ describe('<ConteoCiclicoPagina>', () => {
   });
 
   it('avisa cuando el inventario ya está cerrado', () => {
-    render({ data: conteoPt({ estado: 'cerrado' }), isPending: false, isError: false, error: null });
+    render({
+      data: conteoPt({ estado: 'cerrado' }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
     expect(screen.getByText(/no admite más conteo/i)).toBeInTheDocument();
   });
 
