@@ -390,7 +390,7 @@ export interface RepartoPorPartida {
  *
  * 🔑 **La raíz de las tres cosas es la misma: P3.** Mientras la salida a orden no nombre lote, el
  * sistema no sabe de CUÁL salió lo consumido. Está declarado para Daniel en `DECISIONES.md`
- * §Post-F9.203 (recuadro final), porque afecta a lo que él tiene que ratificar.
+ * §Post-F9.206 (recuadro final), porque afecta a lo que él tiene que ratificar.
  *
  * ⚠️ **Y por qué este mismo tope NO se aplica al aviso de riesgo de tono** (`previa-salida-tela-
  * orden.ts`), aunque el saldo inflado también le afecte: ahí el error seguro va en la dirección

@@ -12136,6 +12136,55 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.204) — LA REPARACIÓN COMO TERCER SERVICIO SOBRE LA ORDEN (fila 0.144, 6-sep-2026): las cuatro las decidió Daniel
+
+**Cómo nació.** Daniel, por su cuenta: *«a veces hay que hacer reparaciones a un modelo… funciona
+similar a lo que es empaque o el corte. Es sólo una cantidad a un precio que se le paga y **se le debe
+de cargar al costo**. Me parece que el desarrollo que hiciste con lo del corte y empaque ya está
+variable para poder meter un servicio más, ¿no?»*
+
+**Lo que se midió antes de contestarle — su instinto acierta en una mitad, y hay una sorpresa en la otra:**
+- ✅ **El PAGO sí está preparado.** `crearCargoDeServicio` (`dominio/produccion/etapas.ts:596`) recibe el
+  servicio **por parámetro**; el CHECK de la migración de la 0.114 es
+  `(id_tipo_proceso IS NULL) <> (servicio IS NULL)` y **no nombra valores**, así que un tercer servicio
+  no lo rompe; y la etiqueta vive en un `Record<ServicioOrden,string>` **exhaustivo**
+  (`dominio/esma/etiqueta-cargo.ts:21`), de modo que al ampliar el enum **el compilador obliga** a
+  nombrarla. ⚠️ **Pero NO es un catálogo de pantalla:** es el enum de BD `ServicioOrden { corte, empaque }`
+  (`schema.prisma:4336`) ⇒ meter la reparación es **migración + los puntos que marque el compilador**.
+  Es código, no captura. Se le dijo así.
+- 🔴 **EL COSTO NO EXISTE — ni para la reparación, NI para corte y empaque.** `costo-orden.ts:162-165`
+  calcula `procesos = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes`, y **ningún
+  archivo de `dominio/costos/` ni de `dominio/edr/` lee `EsMaCargo`** (verificado enumerando sus
+  lectores: sólo terceros/esma/produccion). ⇒ **hoy se paga el corte y ese dinero NO llega al costo de
+  la prenda** salvo que alguien lo teclee en «procesos». **Es la pieza que falta, y falta para los tres.**
+
+**LAS CUATRO DECISIONES DE DANIEL:**
+1. **Se paga POR PIEZA reparada**, con su cantidad y su precio — como corte y empaque. *(Suyo: «es sólo
+   una cantidad a un precio».)*
+2. ⭐ **La registra CUALQUIER proveedor que ya tenga un rol de maquila** (`ROLES_MAQUILA_ESMA`:
+   costura, estampado, bordado, lavado, aplicación, corte, empaque). **SIN rol nuevo y SIN casilla que
+   marcar.** Lo levantó él: *«el reparador puede ser un proveedor de empaque o de maquila… no sé cómo
+   vamos a manejar eso. Tú recomiéndame»*, y aceptó la recomendación. **Las razones, en su orden:**
+   (a) un rol nuevo obligaría a **repetir el paseo manual de la 0.114** —marcar «Empaque» taller por
+   taller—, y por lo que él describe habría que marcárselo a casi todos; (b) **es la verdad del negocio**:
+   el reparador *es* su maquilero, y un rol aparte modelaría una frontera que en su taller no existe;
+   (c) al estar todos en `ROLES_MAQUILA_ESMA`, **el reparador cae solo** en el rubro maquila de la
+   corrida semanal y en su estado de cuenta, sin enseñarle nada nuevo a finanzas.
+   ⚙️ **Lo que exige técnicamente:** `exigirTerceroConRol` (`etapas.ts:705`, `:826`) pide **UN** rol
+   exacto ⇒ hace falta una **variante que acepte una LISTA**.
+   ⛔ **Descartado abrirlo a cualquier proveedor:** dejaría registrar una reparación a nombre del que
+   vende tela. 📌 Y si algún día el selector largo estorba, **la casilla se puede añadir después sin
+   romper nada**: lo guardado apunta al proveedor, no al rol.
+3. **Avisa, NO bloquea** contra lo recibido — como el empaque. Reparar dos veces la misma pieza es real.
+4. ⭐ **El costo recoge lo REAL pagado** (cargos de corte + empaque + reparación) en vez de teclearse.
+   ⚠️ Esto **toca el motor de costeo**, que es el que produce las cifras que ya se están viendo ⇒
+   **considerar partirla en dos entregas**: (a) la reparación se paga; (b) el costo recoge los tres.
+   Decidir con el diff delante.
+
+⛔ **Lo que NO se hace:** convertir la reparación en un `TipoProceso` — la metería al flujo envío→recibo
+que Daniel dijo que estos servicios **no** son (§Post-F9.195). `idTipoProceso = NULL` sigue siendo la
+marca de «servicio sobre la orden».
+
 #### (Post-F9.205) — LA TANDA DE RESPUESTAS DEL 6-sep-2026 (tarde): once decisiones, y una que CORRIGE al lead
 
 **Contexto.** El lead le puso a Daniel las preguntas abiertas de tres bloques con su default. Contestó
@@ -12203,13 +12252,13 @@ ratifica §Post-F9.201·5 y **los aporta él**.
 
 **11. Las muestras de la carga de apertura:** *«Mañana subo una prueba»* ⇒ **desbloquea la fila 0.131**.
 
-⏳ **SIGUEN ABIERTAS de §Post-F9.203:** P1, P3, P4 y las dos del recuadro — **(i)** ¿el sistema supone
+⏳ **SIGUEN ABIERTAS de §Post-F9.206:** P1, P3, P4 y las dos del recuadro — **(i)** ¿el sistema supone
 que lo consumido sin apuntar salió de lo más viejo? y **(ii)** ¿nombrar un lote acotado o **mandar la
 tela sin nombre** cuando no está seguro? La **(ii)** se le repreguntó sin jerga por ser la única donde
 el default elige *arriesgarse a nombrar* en vez de *callar*.
 
 
-#### (Post-F9.203) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default. ✅ **P2 RATIFICADA por Daniel** (§Post-F9.205·1, con una adición) · ⏳ **P1, P3 y P4 siguen pendientes**
+#### (Post-F9.206) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default. ✅ **P2 RATIFICADA por Daniel** (§Post-F9.205·1, con una adición) · ⏳ **P1, P3 y P4 siguen pendientes**
 
 **Lo que SÍ decidió Daniel ya está escrito y no se repite aquí:** es el punto **1 de §Post-F9.201** —
 *«el traspaso conserva el lote de origen (y su reparto, si la pata mueve varios); aditivo y sin backfill»*.

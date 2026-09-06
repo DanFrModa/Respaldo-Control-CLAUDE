@@ -689,7 +689,7 @@ describe('riesgo de tono: los TRES estados contra la base', () => {
       select: { idPartida: true, cantidad: true },
     });
     // ⚠️ ESTO ES LO QUE HACE, y se escribe tal cual en vez de fingir que hace otra cosa: nombra
-    // `L-FANTASMA`. La raíz sigue siendo P3 y está declarada en DECISIONES §Post-F9.203.
+    // `L-FANTASMA`. La raíz sigue siendo P3 y está declarada en DECISIONES §Post-F9.206.
     expect(detalles).toHaveLength(1);
     expect(detalles[0]?.idPartida).not.toBeNull();
 

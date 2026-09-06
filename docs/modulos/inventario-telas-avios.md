@@ -102,7 +102,7 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
     tela sin lote y el déficit coincide exactamente con lo del fantasma).
   - 🔻 **Y tampoco cura la raíz:** con varios lotes vivos y consumo parcial, el nombre puede ser el
     del lote de al lado. Todo esto es P3, y está pendiente de que **Daniel lo vea** antes de
-    ratificar P2/P3 (`DECISIONES.md §Post-F9.203`, recuadro final).
+    ratificar P2/P3 (`DECISIONES.md §Post-F9.206`, recuadro final).
   - ⚠️ **El mismo tope NO se aplica al aviso de tono**, a propósito: ahí sobrar-listar es inofensivo
     (alguien mira el anaquel de más) y esconder sería callar un aviso real. En el papel del traspaso
     es al revés: sobre-nombrar **es** la mentira. Misma cifra, dos usos, dos criterios.
