@@ -12136,6 +12136,137 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.203) ⭐⭐ CORREGIR UN MOVIMIENTO SIN FACTURA — «sólo yo, ni con permiso» (fila 0.145, 6-sep-2026)
+
+**Lo que pidió Daniel, textual (6-sep-2026):**
+
+> *«Quiero tener manera de modificar cualquier registro que se meta en cualquier estado de cuenta de
+> los proveedores **sin factura**. **Sólo yo. Nadie más ni con permiso. Sólo yo.**»*
+
+Y sobre la FORMA, después de que se le planteara el costo de guardar el rastro:
+
+> *«Sí, está bien **con rastro**.»*
+
+---
+
+### De dónde nace: una asimetría medida
+
+De los cuatro conceptos de EsMa, **sólo el descuento** se podía cancelar (`esma/formula-saldo.ts`,
+fila 0.109, y sólo para el *deshacer* de un cierre de orden). ⇒ **un abono o un pago a un maquilero
+capturado por error NO se podía anular NUNCA.** En Cuentas por pagar, en cambio, se cancela todo
+desde F9-E1. Esta decisión cierra esa asimetría — y la cierra con la forma que Daniel pidió, que **no
+es «cancelar»**.
+
+### (a) LA FORMA: un gesto para quien corrige, dos hechos para la contabilidad
+
+En pantalla se comporta como **editar**: se abre el renglón con sus valores, se cambia lo que haga
+falta, se guarda. Por dentro, **en UNA transacción**: el movimiento viejo queda **cancelado** —con su
+**inverso auditado**, en el motor de terceros— y nace uno **nuevo** que lo sustituye, **ligado** a él.
+
+⇒ **D3 queda intacto**: nada se edita ni se borra, el saldo sigue siendo Σ de movimientos y el pasado
+se sigue pudiendo reconstruir. Lo que cambia no es la regla: es que ahora hay **una forma de
+ejercerla en un solo gesto**, en vez de pedirle al dueño que cancele y vuelva a capturar.
+
+🔑 **Eso es exactamente lo que significa «con rastro»**, y es lo que Daniel aprobó cuando se le dijo
+que costaba: la corrección **no ahorra el asiento**, ahorra los **clics**.
+
+### (b) «SÓLO YO, NI CON PERMISO» ⇒ una BANDERA en la PERSONA, no un permiso
+
+Campo nuevo `Usuario.puedeCorregirSinFactura`, con el patrón que el sistema ya tenía para
+`Usuario.esAuditor` — pero **un paso más allá**: `esAuditor` sí se asigna desde Administración de
+perfiles; ésta **no se asigna desde ninguna pantalla ni desde ningún endpoint**. Se prende **sólo por
+base de datos**.
+
+**Las tres cosas que se descartaron, con su razón:**
+
+1. **NO un permiso nuevo** (`cxp.corregir` o parecido). Un permiso existe para **repartirse**, y
+   Daniel dijo *«ni con permiso»* con esas palabras. Crear uno habría sido contestar otra pregunta.
+2. **NO reusar `roles.administrar`** ni ningún permiso de administración como interruptor de «es el
+   dueño». Es **exactamente el defecto de la fila 0.120** que el propio Daniel señaló: un permiso que
+   gobierna el gobierno del sistema acabó decidiendo cinco cosas que no tenían que ver con él.
+3. **NO exigirla sólo en la ruta.** La bandera se exige **en el DOMINIO** (A1): quien llame por otro
+   camino —otra ruta, un script, una composición futura— topa con la misma pared.
+
+⚠️ **La bandera NO exime del permiso del módulo.** Corregir sigue pidiendo `terceros.administrar` /
+`cxp.administrar` (motor) o `esma.modificar` / `esma.ver-pagos` (EsMa), y si el movimiento estaba
+`revisado` también `esma.revisar` —porque el corregido **hereda** ese estado, y nacer `revisado` es un
+acto de validación (regla de la fila 0.128)—. La bandera **abre una puerta que no existía**; no abre
+las demás. Todo falla **cerrado**.
+
+### (c) «SIN FACTURA» es del MOVIMIENTO, no del proveedor
+
+Medido: `resolverConFactura` (`dominio/esma/facturacion.ts`) lo decide **movimiento por movimiento**,
+y un proveedor de modalidad `ambos` tiene de los dos. ⇒ **un renglón con CFDI detrás queda INTOCABLE
+aunque sea del mismo proveedor**, y el de al lado sí se corrige. Es una guarda dura, **con prueba en los DOS libros** —el
+motor y EsMa—. ⚠️ No siempre fue así: en la primera vuelta la de EsMa se podía **borrar entera con la
+suite en verde**, y lo cazó el reviewer mutando esa línea. Si algún día alguien vuelve a tocarla,
+tiene que caerse `correccion-sin-factura.int.test.ts` §«m17».
+
+**Por qué el renglón con factura no entra:** un comprobante fiscal **se cancela ante el SAT y se
+vuelve a timbrar**; no se edita por dentro. Corregirlo aquí dejaría la contabilidad y el sistema
+diciendo cosas distintas del mismo documento.
+
+📌 El **`conFactura` sin definir (`null`)** de lo migrado cuenta como **sin factura** —es lo que ya
+hace la partición `whereSegmentoFactura('sin')` desde la 0.113—, así que lo viejo también se puede
+corregir. **REGLA 0-B**: el dato viejo se tolera, no se repara.
+
+### (d) Lo que la corrección NO cambia
+
+**Importe, fecha y observaciones.** El **proveedor** y el **tipo de movimiento** no son campos del
+cuerpo (`z.strictObject` ⇒ mandarlos es un **400 explícito**, no un cambio ignorado en silencio) y el
+servidor los toma **del movimiento corregido**. *Cambiar de proveedor o de concepto no es corregir un
+renglón: es otro renglón* — y para eso ya existían cancelar y capturar de nuevo.
+
+Una corrección **que no cambia nada** se rechaza: quemaría dos folios y metería dos renglones vacíos
+de contenido en el estado de cuenta.
+
+### (e) ⭐⭐ El caso difícil, resuelto: el PAGO ya aplicado a cargos
+
+Un pago de EsMa no es un renglón suelto: **consume «prendas por pagar»** de cargos concretos y de ahí
+se deriva el estatus `Orden.pagada`. Cancelarlo cambiando sólo su renglón habría dejado los cargos
+**marcados como pagados con dinero que ya no existe** — el maquilero dejaría de cobrar lo que se le
+debe.
+
+**Cómo se resolvió, sin romper D3:** las prendas por pagar se cuentan por la **suma VIVA** de
+`PagoAplicacion` (las de pagos no cancelados). Corregir un pago aplicado **deshace su aplicación y la
+vuelve a hacer** —bajo el bloqueo por maquilero, con `cantidadPagada` y `Orden.pagada` recalculados—,
+de modo que las prendas **no se duplican ni se pierden**. Las filas de `PagoAplicacion` del pago
+cancelado **NO se borran**: siguen ahí como rastro; lo que cambia es que la suma que manda las
+excluye.
+
+### (f) Los DOS LÍMITES declarados (no callados)
+
+1. **El IMPORTE de un pago APLICADO no se corrige.** Su monto no es un dato suelto: es
+   `Σ(prendas × precio del cargo)`, y el modelo promete `monto = Σ aplicaciones.importe`. Se corrigen
+   su fecha y sus observaciones; para cambiar el dinero hay que cambiar las prendas aplicadas, y eso
+   es capturar el pago de nuevo. La pantalla lo **dice** en el propio cajón, no lo esconde.
+2. **El DESCUENTO que propuso un CIERRE de orden no se corrige suelto.** Su liga al cierre es única e
+   intransferible: el sustituto no podría heredarla y el *deshacer* del cierre se quedaría buscando un
+   descuento que ya nadie usa. Se arregla **deshaciendo el cierre**.
+
+### (g) Efecto de fondo: los tres movimientos planos vuelven a ser el mismo criterio
+
+La condición de **estar vivo** (`canceladoEn IS NULL`) sube de ser sólo del descuento a serlo de los
+**tres** movimientos planos, en la definición única de `esma/formula-saldo.ts`. Como esa definición
+alimenta a la vez a Prisma y al SQL crudo, la condición viaja sola a **las cinco sumas del saldo** y a
+las listas: un movimiento cancelado ni suma al saldo ni sigue apareciendo como «esperando tu
+decisión».
+
+### (h) Cómo lo sabe la pantalla
+
+**No lo adivina.** Cada renglón del estado de cuenta llega del servidor con su `corregible` ya
+calculado (bandera + sin factura + vivo + no ser un inverso + —en EsMa— no ser un cargo de recibo) y
+su `importeCorregible`. Así nunca se ofrece un botón que el servidor vaya a rechazar, ni al revés. Por
+eso la bandera **no** viaja en `GET /api/sesion`: la interfaz no debe re-derivar la regla.
+
+🔧 **PASO MANUAL, y es el único:** la bandera se prende **en la base de datos**
+(`UPDATE usuarios SET puede_corregir_sin_factura = TRUE WHERE username = '…'`). Ninguna pantalla la
+reparte, ningún seed la siembra y ningún endpoint la escribe — que es justo lo que Daniel pidió.
+
+- **Aplica en:** fila **0.145**. **Fecha:** 2026-09-06.
+
+---
+
 #### (Post-F9.201) LAS CUATRO QUE DEPENDÍAN DE DANIEL — contestadas de una vez (5-sep-2026)
 
 **Contexto.** El lead le enumeró a Daniel qué falta para cerrar la V1 y le puso delante **las cuatro cosas

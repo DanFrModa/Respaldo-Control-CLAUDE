@@ -27,6 +27,9 @@ export function sesionDePrueba(
     idEmpresaActiva: 1,
     nombreEmpresaActiva: 'FR Moda SA de CV',
     permisos: new Set<ClavePermiso>(permisos ?? []),
+    // ⭐ Fila 0.145: la bandera de corrección arranca APAGADA en toda sesión de prueba. Quien pruebe
+    // la corrección tiene que prenderla a propósito — así ninguna prueba la hereda por descuido.
+    puedeCorregirSinFactura: false,
     ...resto,
   };
 }

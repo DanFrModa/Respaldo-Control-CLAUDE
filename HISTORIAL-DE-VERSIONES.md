@@ -71,6 +71,84 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.121 · 6-sep-2026 · **en prueba** — **Corregir un movimiento sin factura del estado de cuenta de un proveedor**
+
+### Qué se puede hacer ahora que antes no
+
+- **Arreglar un renglón mal capturado en el estado de cuenta de un proveedor**, sin que haya que
+  pedirle a nadie que invente un movimiento contrario. Se abre el renglón, se cambia el **importe**, la
+  **fecha** o las **observaciones**, se dice **por qué**, y se guarda. Un solo gesto.
+- **Y por fin se puede en la cuenta de los MAQUILEROS.** Hasta hoy, un abono o un pago a un maquilero
+  capturado por error **no se podía tocar de ninguna forma**: de los cuatro conceptos de esa cuenta,
+  sólo el descuento tenía marcha atrás.
+  ⚠️ **Ojo con el alcance:** lo que se puede es **sustituirlo por el bueno**, no *eliminarlo a secas*.
+  Un abono capturado **por duplicado** —donde lo correcto sería que no exista— sigue sin poder
+  quitarse: lo más chico que se puede dejar es un centavo. Cancelar sin sustituir, como sí hace
+  Cuentas por pagar, **no se construyó en esta versión**.
+- **Un pago que ya estaba repartido entre recibos también se corrige** —su fecha y sus observaciones— y
+  **el reparto se rehace solo**: las prendas que cubría no se cuentan dos veces ni se quedan sin cubrir, y
+  la orden no deja de estar pagada.
+
+### Qué cambió y puede sorprender
+
+- **Aparece un botón «Corregir»** en los dos estados de cuenta del proveedor: el de Cuentas por pagar y el
+  de maquila. **Sólo lo ve quien tiene la llave** (ver el último bloque); para todos los demás el botón
+  sencillamente no existe.
+- **Los renglones CON FACTURA no se pueden corregir**, aunque sean del mismo proveedor. Un proveedor que
+  factura de las dos formas verá unos renglones con botón y otros sin él, y es a propósito: **una factura
+  se cancela ante el SAT y se vuelve a hacer**, no se edita por dentro.
+- **Corregir no borra nada — pero los dos estados de cuenta lo enseñan distinto, y conviene saberlo:**
+  - En **Cuentas por pagar**, el renglón viejo **se queda a la vista**, tachado, con su movimiento
+    contrario al lado y el motivo escrito.
+  - En **maquila**, el renglón viejo **desaparece del listado**: ahí la anulación no genera un
+    movimiento contrario, se marca el propio renglón, y los listados sólo enseñan los vivos. Sigue
+    guardado —el rastro está, y la bitácora dice quién, cuándo y qué decía antes—, pero **no se ve en
+    la pantalla**.
+  - En los dos casos el saldo cuenta **sólo el bueno**.
+- **Dos cosas que el botón NO deja cambiar** (la primera se explica en la pantalla; la segunda,
+  todavía no — ver el último bloque):
+  1. **El importe de un pago ya repartido entre recibos.** Ese número no se teclea: sale de las prendas
+     por el precio de cada recibo. Se corrigen su fecha y sus observaciones; para cambiar el dinero hay
+     que cambiar las prendas, y eso es capturar el pago de nuevo.
+  2. **El descuento que nació al cerrar una orden con un maquilero.** Ése es del cierre: se arregla
+     **deshaciendo el cierre** y volviéndolo a cerrar con el importe correcto.
+- **Tampoco se puede cambiar de proveedor ni de tipo de movimiento.** Eso no es corregir un renglón: es
+  otro renglón, y para eso sigue estando cancelar y capturar de nuevo.
+- **Los renglones viejos que llegaron sin importe —en cero o en negativo— se corrigen igual.** El
+  sistema anterior traía movimientos así: los *«saldo anterior»*, que venían en negativo, y los que
+  simplemente venían en blanco, que se cargan como cero. Son justo los que más se van a querer tocar.
+  Se les corrige la **fecha** y las **observaciones** sin escribir nada en el importe; y si además se
+  le quiere poner importe, tiene que ser **mayor a 0**, como a cualquier otro renglón.
+- ⭐ **El RECIBO en PDF de un pago corregido sale con un sello arriba: «RECIBO ANULADO — NO ES
+  COMPROBANTE DE PAGO»**, con la fecha y el motivo. El recibo del pago bueno sale normal. El del
+  anulado se puede seguir imprimiendo —a veces hace falta la copia—, pero **ya no se puede confundir
+  con uno cobrable**.
+- **Un cargo de maquila (el que nace de un recibo) no tiene botón**: no es algo que alguien «meta» en el
+  estado de cuenta, y ya tenía su propio camino (validarlo o cancelarlo).
+- **Los pagos de la corrida semanal se pueden corregir**, y cuando se corrige uno, **la relación de esa
+  semana sigue mostrando lo que se emitió ese día**. No es un descuido: la relación es el registro de lo
+  que salió entonces, y la corrección es un hecho posterior que queda ligado a él.
+
+### Qué sigue pendiente o roto
+
+- 🔧 **EL BOTÓN NO LE APARECE A NADIE HASTA QUE SE PRENDA LA LLAVE EN LA BASE DE DATOS.** Es un
+  `UPDATE` a mano sobre el usuario de Daniel; **ninguna pantalla la reparte, ningún permiso la otorga y
+  ningún arranque del sistema la siembra**. ⭐ **Eso NO es una carencia: es exactamente lo que se pidió**
+  —*«sólo yo, nadie más ni con permiso»*—. Mientras no se corra ese `UPDATE`, la función existe y no la
+  puede usar nadie, que es el estado seguro.
+- **La llave no sustituye a los permisos del módulo.** Quien la tenga sigue necesitando poder operar
+  cuentas por pagar o la cuenta del maquilero; la llave **añade** un candado, no quita los otros.
+- **El límite del descuento del cierre no se explica en la pantalla.** Ese renglón simplemente no trae
+  botón, y no hay un texto que diga por qué. Se sabe por su propia descripción (dice de qué orden es el
+  faltante) y el sistema lo explica entero si se llega por otro camino, pero **en la pantalla es una
+  ausencia, no una explicación**. Queda anotado.
+- **Cancelar un movimiento de maquila SIN sustituirlo sigue sin existir.** Ver el primer bloque: esta
+  versión sustituye, no elimina.
+- **Sin datos que reparar.** La versión cambia lo que se puede hacer de hoy en adelante; no toca ni un
+  movimiento de los que ya están capturados.
+- **La versión NO siembra permisos nuevos ni catálogos**; sí lleva **cambios en la base** (las columnas
+  del rastro y de la llave), que se aplican solos al desplegar.
+
 ## 0.119 · 5-sep-2026 · **en prueba** — **Sacar material sin que vaya a ninguna orden — y que sólo la dirección pueda hacerlo**
 
 ### Qué se puede hacer ahora que antes no

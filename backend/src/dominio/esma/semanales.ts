@@ -23,6 +23,8 @@ import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { WHERE_VIVO_PAGO } from './formula-saldo.js';
+
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
   return new Date(`${valor}T00:00:00.000Z`);
@@ -70,7 +72,15 @@ export async function pagosSemanales(
   // su `estadoRevision`, así que quien lee la semana ve cuáles siguen sin autorizar.
   // NO "arreglar" esto copiándole el criterio al saldo: cambiaría la pregunta.
   const pagos = await cliente.pagoMaquilero.findMany({
-    where: { idEmpresa: sesion.idEmpresaActiva, ...rangoFecha(filtros.desde, filtros.hasta) },
+    // ⭐ VIVOS (fila 0.145). Es la ÚNICA condición que esta consulta sí comparte con el saldo, y por
+    // una razón distinta: un pago CANCELADO —porque se corrigió— nunca salió de la chequera. Dejarlo
+    // aquí haría que el corte de caja de la semana contara dos veces el mismo dinero (el cancelado y
+    // el que lo sustituye). El filtro de REVISIÓN sigue sin aplicarse, a propósito (ver arriba).
+    where: {
+      idEmpresa: sesion.idEmpresaActiva,
+      ...WHERE_VIVO_PAGO,
+      ...rangoFecha(filtros.desde, filtros.hasta),
+    },
     orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
     select: {
       id: true,

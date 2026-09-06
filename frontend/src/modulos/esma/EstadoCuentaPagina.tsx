@@ -3,6 +3,7 @@ import {
   Copy,
   FileSpreadsheet,
   MinusCircle,
+  Pencil,
   PlusCircle,
   Printer,
   Wallet,
@@ -14,16 +15,22 @@ import { toast } from 'sonner';
 import {
   descargarExcelEstadoCuenta,
   imprimirEstadoCuenta,
+  useCorregirMovimientoEsMa,
   useEstadoCuenta,
   useRevisarMovimiento,
 } from '@/api/esma';
 import { useExistenciaMaquilero } from '@/api/wip';
 import type {
+  EsMaConceptoCorregible,
   EsMaConceptoRevisable,
   EsMaEstadoCuentaMovimiento,
   EsMaEstadoCuentaQuery,
   EsMaIncompletasBloque,
 } from '@/api/tipos';
+import {
+  CajonCorregirSinFactura,
+  type CuerpoCorreccion,
+} from '@/components/dominio/CajonCorregirSinFactura';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -111,6 +118,11 @@ export function EstadoCuentaPagina(): React.JSX.Element {
   };
   const estado = useEstadoCuenta(idNum, filtro);
   const revisar = useRevisarMovimiento();
+  const corregir = useCorregirMovimientoEsMa();
+  // ⭐ Fila 0.145 — el renglón que se está corrigiendo. Quién puede corregirlo NO lo decide esta
+  // pantalla: cada renglón viene con su `corregible` calculado en el servidor (bandera de la
+  // persona + sin factura + vivo + no ser un cargo de recibo).
+  const [movACorregir, setMovACorregir] = useState<EsMaEstadoCuentaMovimiento | null>(null);
 
   const movimientos = estado.data?.movimientos ?? [];
 
@@ -133,6 +145,24 @@ export function EstadoCuentaPagina(): React.JSX.Element {
       observaciones: m.referencia,
     };
     void navigate(RUTA_CAPTURA[m.concepto], { state: inicial });
+  }
+
+  /** Manda la corrección al concepto del renglón (el cargo nunca llega aquí: no es corregible). */
+  function guardarCorreccion(cuerpo: CuerpoCorreccion): void {
+    if (movACorregir === null || movACorregir.concepto === 'cargo') {
+      return;
+    }
+    const concepto: EsMaConceptoCorregible = movACorregir.concepto;
+    corregir.mutate(
+      { concepto, id: movACorregir.id, cuerpo },
+      {
+        onSuccess: () => {
+          toast.success('Movimiento corregido (queda el rastro del anterior).');
+          setMovACorregir(null);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   }
 
   function autorizar(m: EsMaEstadoCuentaMovimiento): void {
@@ -334,6 +364,17 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                               <BadgeCheck aria-hidden /> Autorizar
                             </Button>
                           ) : null}
+                          {m.corregible ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setMovACorregir(m)}
+                              data-testid="edc-corregir-movil"
+                            >
+                              <Pencil aria-hidden /> Corregir
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                     ))}
@@ -382,6 +423,17 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                                     <Copy aria-hidden /> Duplicar
                                   </Button>
                                 ) : null}
+                                {m.corregible ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setMovACorregir(m)}
+                                    data-testid="edc-corregir"
+                                  >
+                                    <Pencil aria-hidden /> Corregir
+                                  </Button>
+                                ) : null}
                                 {puedeRevisar && m.pendienteRevision && esRevisable(m.concepto) ? (
                                   <Button
                                     type="button"
@@ -409,6 +461,34 @@ export function EstadoCuentaPagina(): React.JSX.Element {
           {verWip ? <ExistenciasMaquileroSeccion idMaquilero={idNum} /> : null}
         </>
       )}
+
+      {/* ⭐ Fila 0.145 — corregir un movimiento SIN FACTURA: un gesto de edición que por dentro
+          anula el viejo y captura el bueno, en una transacción y con su rastro. */}
+      <CajonCorregirSinFactura
+        valores={
+          movACorregir === null
+            ? null
+            : {
+                // El importe GUARDADO, que el servidor manda ya en positivo — no `monto`, que en
+                // descuentos y pagos va negativo y se vacía si el renglón no aporta al saldo.
+                importeGuardado: movACorregir.importeGuardado,
+                fecha: movACorregir.fecha,
+                // El CRUDO, no `referencia`: ésta es texto para LEER («Abono» cuando no hay nota),
+                // y arrancar de ahí guardaría «Abono» dentro del movimiento.
+                observaciones: movACorregir.observacionesGuardadas,
+                importeCorregible: movACorregir.importeCorregible,
+              }
+        }
+        titulo="Corregir movimiento"
+        subtitulo={
+          movACorregir
+            ? `${ETIQUETA_CONCEPTO[movACorregir.concepto]} · ${moneda(movACorregir.monto)}`
+            : undefined
+        }
+        enviando={corregir.isPending}
+        alCerrar={() => setMovACorregir(null)}
+        alGuardar={guardarCorreccion}
+      />
     </div>
   );
 }

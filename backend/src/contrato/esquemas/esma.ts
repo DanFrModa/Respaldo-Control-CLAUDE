@@ -330,6 +330,21 @@ export const esquemaPagoSalida = z
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     estadoRevision: z.enum(ESTADOS_REVISION_ESMA).describe('Estado de revisión.'),
     aplicaciones: z.array(esquemaPagoAplicacionSalida).describe('Cargos cubiertos por el pago.'),
+    /**
+     * ⭐⭐ Fila 0.145 — cuándo se ANULÓ este pago, o `null` si está vivo.
+     *
+     * Antes de la 0.145 un pago **no se podía cancelar nunca**, así que este esquema no tenía cómo
+     * decirlo… y el RECIBO en PDF —el papel que se le entrega al maquilero— se seguía armando igual
+     * para un pago ya anulado. El campo existe para que el impreso pueda **estamparlo**, no sólo
+     * para que el API lo sepa: un recibo que no dice que está cancelado es un recibo que se puede
+     * cobrar dos veces.
+     *
+     * 🔑 El pago cancelado **se sigue devolviendo** (no se esconde, D3/A7): lo que cambia es que
+     * ahora viene marcado.
+     */
+    canceladoEn: z.iso.datetime().nullable().describe('Cuándo se anuló el pago, o null si vive.'),
+    /** Por qué se anuló (el motivo de la corrección), o `null`. */
+    motivoCancelacion: z.string().nullable().describe('Motivo de la anulación, o null.'),
     creadoEn: z.iso.datetime().describe('Cuándo se capturó (ISO).'),
   })
   .describe('Pago a un maquilero (con sus aplicaciones a cargos).');
@@ -676,6 +691,40 @@ export const esquemaEstadoCuentaMovimiento = z
       .string()
       .describe('Estado del renglón (propuesto/validado o capturado/revisado).'),
     pendienteRevision: z.boolean().describe('true si el renglón está pendiente de revisión.'),
+    /**
+     * ⭐ Fila 0.145 — ¿quien consulta puede CORREGIR este renglón? Lo decide el servidor (bandera de
+     * la persona + sin factura + vivo + es un movimiento plano, no un cargo de recibo). Ver la nota
+     * gemela en `esquemas/terceros.ts`.
+     */
+    corregible: z.boolean().describe('¿Quien consulta puede corregir este renglón?'),
+    /**
+     * ⭐ Fila 0.145 — las observaciones TAL COMO ESTÁN GUARDADAS. `referencia` es texto para LEER
+     * («Abono» cuando no hay nota, «Orden #12 · Costura» en un cargo); esto es el dato. El cajón de
+     * corrección arranca de aquí: si arrancara de `referencia`, guardar metería «Abono» dentro del
+     * movimiento como si alguien lo hubiera escrito.
+     */
+    observacionesGuardadas: z
+      .string()
+      .nullable()
+      .describe('Observaciones tal como están guardadas (null si no tiene).'),
+    /**
+     * ⭐⭐ Fila 0.145 — el IMPORTE guardado **en POSITIVO** (lo normaliza `importeGuardadoDe`) y sin la
+     * aritmética de la lectura: `monto` lleva signo y se vacía cuando el renglón no aporta al saldo,
+     * así que no sirve para arrancar la corrección.
+     *
+     * 🔴 En un renglón **CORREGIBLE**, `null` significa **sólo** que se ocultan importes. El CARGO
+     * viaja en `null` con permiso —su importe se deriva, no se captura— y por eso nunca es
+     * corregible. Ver la nota gemela, más larga, en `esquemas/terceros.ts`.
+     */
+    importeGuardado: z
+      .number()
+      .nullable()
+      .describe(
+        'Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ' +
+          'ocultan importes.',
+      ),
+    /** ⭐ Fila 0.145 — ¿la corrección puede cambiar el importe? `false` en un pago ya aplicado. */
+    importeCorregible: z.boolean().describe('¿La corrección puede cambiar el importe?'),
   })
   .describe('Renglón del estado de cuenta unificado.');
 

@@ -156590,6 +156590,281 @@
         }
       }
     },
+    "/api/esma/movimientos/{concepto}/{id}/corregir": {
+      "post": {
+        "summary": "Corregir un movimiento SIN FACTURA de un maquilero (anular + recapturar, D3)",
+        "tags": [
+          "esma"
+        ],
+        "description": "Reservado a la dirección por una bandera de la persona que no se otorga con ningún permiso ni desde ninguna pantalla. Un movimiento con factura se rechaza. Un PAGO ya aplicado a cargos se corrige en fecha y observaciones, no en importe.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "importe": {
+                    "description": "Nuevo importe POSITIVO. Omitir para dejarlo como está.",
+                    "type": "number",
+                    "minimum": 0.01
+                  },
+                  "fecha": {
+                    "description": "Nueva fecha del movimiento (YYYY-MM-DD). Omitir para dejarla como está.",
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "observaciones": {
+                    "description": "Nuevas observaciones, o null para dejarlas vacías. Omitir para no tocarlas.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "Por qué se corrige. Queda en la bitácora junto con lo que decía antes."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "additionalProperties": false,
+                "description": "Corrección (anular + recapturar) de un movimiento sin factura."
+              }
+            }
+          },
+          "description": "Corrección (anular + recapturar) de un movimiento sin factura."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "abono",
+                "descuento",
+                "pago"
+              ]
+            },
+            "in": "path",
+            "name": "concepto",
+            "required": true,
+            "description": "Concepto del movimiento a corregir (el CARGO no se corrige: nace de un recibo)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del movimiento dentro de su concepto."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Corrección de un movimiento sin factura de EsMa.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "concepto": {
+                      "type": "string",
+                      "enum": [
+                        "abono",
+                        "descuento",
+                        "pago"
+                      ],
+                      "description": "Concepto corregido (abono/descuento/pago)."
+                    },
+                    "idCorregido": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del movimiento que quedó anulado."
+                    },
+                    "idNuevo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del movimiento bueno que lo sustituye."
+                    }
+                  },
+                  "required": [
+                    "concepto",
+                    "idCorregido",
+                    "idNuevo"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Corrección de un movimiento sin factura de EsMa."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/esma/pagos": {
       "post": {
         "summary": "Capturar un pago a un maquilero (ligado a cargos; anti-doble-pago)",
@@ -156798,6 +157073,30 @@
                       },
                       "description": "Cargos cubiertos por el pago."
                     },
+                    "canceladoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se anuló el pago, o null si vive."
+                    },
+                    "motivoCancelacion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo de la anulación, o null."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -156816,6 +157115,8 @@
                     "observaciones",
                     "estadoRevision",
                     "aplicaciones",
+                    "canceladoEn",
+                    "motivoCancelacion",
                     "creadoEn"
                   ],
                   "additionalProperties": false,
@@ -157127,6 +157428,30 @@
                       },
                       "description": "Cargos cubiertos por el pago."
                     },
+                    "canceladoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se anuló el pago, o null si vive."
+                    },
+                    "motivoCancelacion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo de la anulación, o null."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -157145,6 +157470,8 @@
                     "observaciones",
                     "estadoRevision",
                     "aplicaciones",
+                    "canceladoEn",
+                    "motivoCancelacion",
                     "creadoEn"
                   ],
                   "additionalProperties": false,
@@ -157634,6 +157961,30 @@
                             },
                             "description": "Cargos cubiertos por el pago."
                           },
+                          "canceladoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se anuló el pago, o null si vive."
+                          },
+                          "motivoCancelacion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Motivo de la anulación, o null."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -157652,6 +158003,8 @@
                           "observaciones",
                           "estadoRevision",
                           "aplicaciones",
+                          "canceladoEn",
+                          "motivoCancelacion",
                           "creadoEn"
                         ],
                         "additionalProperties": false,
@@ -161072,6 +161425,36 @@
                           "pendienteRevision": {
                             "type": "boolean",
                             "description": "true si el renglón está pendiente de revisión."
+                          },
+                          "corregible": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta puede corregir este renglón?"
+                          },
+                          "observacionesGuardadas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Observaciones tal como están guardadas (null si no tiene)."
+                          },
+                          "importeGuardado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                          },
+                          "importeCorregible": {
+                            "type": "boolean",
+                            "description": "¿La corrección puede cambiar el importe?"
                           }
                         },
                         "required": [
@@ -161081,7 +161464,11 @@
                           "referencia",
                           "monto",
                           "estadoRevision",
-                          "pendienteRevision"
+                          "pendienteRevision",
+                          "corregible",
+                          "observacionesGuardadas",
+                          "importeGuardado",
+                          "importeCorregible"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón del estado de cuenta unificado."
@@ -161906,6 +162293,30 @@
                             },
                             "description": "Cargos cubiertos por el pago."
                           },
+                          "canceladoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se anuló el pago, o null si vive."
+                          },
+                          "motivoCancelacion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Motivo de la anulación, o null."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -161924,6 +162335,8 @@
                           "observaciones",
                           "estadoRevision",
                           "aplicaciones",
+                          "canceladoEn",
+                          "motivoCancelacion",
                           "creadoEn"
                         ],
                         "additionalProperties": false,
@@ -163069,6 +163482,49 @@
                       "type": "boolean",
                       "description": "¿Es un movimiento inverso de cancelación?"
                     },
+                    "idMovimientoCorregido": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                    },
+                    "corregible": {
+                      "type": "boolean",
+                      "description": "¿Quien consulta puede corregir este renglón?"
+                    },
+                    "observacionesGuardadas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                    },
+                    "importeGuardado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                    },
+                    "importeCorregible": {
+                      "type": "boolean",
+                      "description": "¿La corrección puede cambiar el importe?"
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -163108,6 +163564,11 @@
                     "observaciones",
                     "cancelado",
                     "esInverso",
+                    "idMovimientoCorregido",
+                    "corregible",
+                    "observacionesGuardadas",
+                    "importeGuardado",
+                    "importeCorregible",
                     "creadoEn",
                     "creadoPorId"
                   ],
@@ -163481,6 +163942,49 @@
                       "type": "boolean",
                       "description": "¿Es un movimiento inverso de cancelación?"
                     },
+                    "idMovimientoCorregido": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                    },
+                    "corregible": {
+                      "type": "boolean",
+                      "description": "¿Quien consulta puede corregir este renglón?"
+                    },
+                    "observacionesGuardadas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                    },
+                    "importeGuardado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                    },
+                    "importeCorregible": {
+                      "type": "boolean",
+                      "description": "¿La corrección puede cambiar el importe?"
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -163520,6 +164024,496 @@
                     "observaciones",
                     "cancelado",
                     "esInverso",
+                    "idMovimientoCorregido",
+                    "corregible",
+                    "observacionesGuardadas",
+                    "importeGuardado",
+                    "importeCorregible",
+                    "creadoEn",
+                    "creadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Renglón del estado de cuenta de un tercero."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terceros/movimientos/{id}/corregir": {
+      "post": {
+        "summary": "Corregir un movimiento SIN FACTURA (anula el viejo y captura el bueno, D3)",
+        "tags": [
+          "terceros"
+        ],
+        "description": "Reservado a la dirección por una bandera de la persona que no se otorga con ningún permiso ni desde ninguna pantalla. Sólo movimientos sin factura: uno con CFDI se rechaza.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "importe": {
+                    "description": "Nuevo importe POSITIVO. Omitir para dejarlo como está.",
+                    "type": "number",
+                    "minimum": 0.01
+                  },
+                  "fecha": {
+                    "description": "Nueva fecha del movimiento (YYYY-MM-DD). Omitir para dejarla como está.",
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "observaciones": {
+                    "description": "Nuevas observaciones, o null para dejarlas vacías. Omitir para no tocarlas.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "Por qué se corrige. Queda en la bitácora junto con lo que decía antes."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "additionalProperties": false,
+                "description": "Corrección (anular + recapturar) de un movimiento sin factura."
+              }
+            }
+          },
+          "description": "Corrección (anular + recapturar) de un movimiento sin factura."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del movimiento."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Renglón del estado de cuenta de un tercero.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fuente": {
+                      "type": "string",
+                      "enum": [
+                        "motor",
+                        "esma"
+                      ],
+                      "description": "Origen del renglón: motor nuevo o EsMa."
+                    },
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del renglón en su tabla de origen."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña (A9)."
+                    },
+                    "folio": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Folio A3 (solo motor; null en EsMa)."
+                    },
+                    "tipoTercero": {
+                      "type": "string",
+                      "enum": [
+                        "cliente",
+                        "proveedor"
+                      ],
+                      "description": "Tipo de tercero."
+                    },
+                    "idTercero": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del cliente o proveedor."
+                    },
+                    "tercero": {
+                      "type": "string",
+                      "description": "Nombre del tercero."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha del movimiento (YYYY-MM-DD)."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "description": "Origen/concepto del movimiento (etiqueta estable)."
+                    },
+                    "monto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe CON SIGNO (Σ = saldo); null si se ocultan importes."
+                    },
+                    "fechaVencimiento": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de vencimiento derivada (aging D15d) o null."
+                    },
+                    "esFiscal": {
+                      "type": "boolean",
+                      "description": "¿Movimiento fiscal (con CFDI)?"
+                    },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI o null."
+                    },
+                    "rfcTercero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC del tercero o null."
+                    },
+                    "idArchivoCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del Archivo R2 del CFDI o null."
+                    },
+                    "refTipo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Discriminador de la operación ligada o null."
+                    },
+                    "refId": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la operación ligada o null."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones o null."
+                    },
+                    "cancelado": {
+                      "type": "boolean",
+                      "description": "¿El movimiento fue cancelado (existe su inverso)?"
+                    },
+                    "esInverso": {
+                      "type": "boolean",
+                      "description": "¿Es un movimiento inverso de cancelación?"
+                    },
+                    "idMovimientoCorregido": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                    },
+                    "corregible": {
+                      "type": "boolean",
+                      "description": "¿Quien consulta puede corregir este renglón?"
+                    },
+                    "observacionesGuardadas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                    },
+                    "importeGuardado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                    },
+                    "importeCorregible": {
+                      "type": "boolean",
+                      "description": "¿La corrección puede cambiar el importe?"
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Cuándo se registró (ISO)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien lo registró o null."
+                    }
+                  },
+                  "required": [
+                    "fuente",
+                    "id",
+                    "idEmpresa",
+                    "folio",
+                    "tipoTercero",
+                    "idTercero",
+                    "tercero",
+                    "fecha",
+                    "origen",
+                    "monto",
+                    "fechaVencimiento",
+                    "esFiscal",
+                    "uuidCfdi",
+                    "rfcTercero",
+                    "idArchivoCfdi",
+                    "refTipo",
+                    "refId",
+                    "observaciones",
+                    "cancelado",
+                    "esInverso",
+                    "idMovimientoCorregido",
+                    "corregible",
+                    "observacionesGuardadas",
+                    "importeGuardado",
+                    "importeCorregible",
                     "creadoEn",
                     "creadoPorId"
                   ],
@@ -164422,6 +165416,49 @@
                             "type": "boolean",
                             "description": "¿Es un movimiento inverso de cancelación?"
                           },
+                          "idMovimientoCorregido": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                          },
+                          "corregible": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta puede corregir este renglón?"
+                          },
+                          "observacionesGuardadas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                          },
+                          "importeGuardado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                          },
+                          "importeCorregible": {
+                            "type": "boolean",
+                            "description": "¿La corrección puede cambiar el importe?"
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -164461,6 +165498,11 @@
                           "observaciones",
                           "cancelado",
                           "esInverso",
+                          "idMovimientoCorregido",
+                          "corregible",
+                          "observacionesGuardadas",
+                          "importeGuardado",
+                          "importeCorregible",
                           "creadoEn",
                           "creadoPorId"
                         ],
@@ -165774,6 +166816,49 @@
                             "type": "boolean",
                             "description": "¿Es un movimiento inverso de cancelación?"
                           },
+                          "idMovimientoCorregido": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                          },
+                          "corregible": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta puede corregir este renglón?"
+                          },
+                          "observacionesGuardadas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                          },
+                          "importeGuardado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                          },
+                          "importeCorregible": {
+                            "type": "boolean",
+                            "description": "¿La corrección puede cambiar el importe?"
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -165813,6 +166898,11 @@
                           "observaciones",
                           "cancelado",
                           "esInverso",
+                          "idMovimientoCorregido",
+                          "corregible",
+                          "observacionesGuardadas",
+                          "importeGuardado",
+                          "importeCorregible",
                           "creadoEn",
                           "creadoPorId"
                         ],
@@ -166535,6 +167625,49 @@
                       "type": "boolean",
                       "description": "¿Es un movimiento inverso de cancelación?"
                     },
+                    "idMovimientoCorregido": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                    },
+                    "corregible": {
+                      "type": "boolean",
+                      "description": "¿Quien consulta puede corregir este renglón?"
+                    },
+                    "observacionesGuardadas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                    },
+                    "importeGuardado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                    },
+                    "importeCorregible": {
+                      "type": "boolean",
+                      "description": "¿La corrección puede cambiar el importe?"
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -166574,6 +167707,11 @@
                     "observaciones",
                     "cancelado",
                     "esInverso",
+                    "idMovimientoCorregido",
+                    "corregible",
+                    "observacionesGuardadas",
+                    "importeGuardado",
+                    "importeCorregible",
                     "creadoEn",
                     "creadoPorId"
                   ],
@@ -166947,6 +168085,49 @@
                       "type": "boolean",
                       "description": "¿Es un movimiento inverso de cancelación?"
                     },
+                    "idMovimientoCorregido": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                    },
+                    "corregible": {
+                      "type": "boolean",
+                      "description": "¿Quien consulta puede corregir este renglón?"
+                    },
+                    "observacionesGuardadas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                    },
+                    "importeGuardado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                    },
+                    "importeCorregible": {
+                      "type": "boolean",
+                      "description": "¿La corrección puede cambiar el importe?"
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -166986,6 +168167,496 @@
                     "observaciones",
                     "cancelado",
                     "esInverso",
+                    "idMovimientoCorregido",
+                    "corregible",
+                    "observacionesGuardadas",
+                    "importeGuardado",
+                    "importeCorregible",
+                    "creadoEn",
+                    "creadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Renglón del estado de cuenta de un tercero."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxp/movimientos/{id}/corregir": {
+      "post": {
+        "summary": "Corregir un movimiento de CxP SIN FACTURA (anula el viejo y captura el bueno, D3)",
+        "tags": [
+          "cxp"
+        ],
+        "description": "Reservado a la dirección por una bandera de la persona que no se otorga con ningún permiso ni desde ninguna pantalla. Un renglón con CFDI se rechaza aunque sea del mismo proveedor: el segmento con/sin factura es del MOVIMIENTO, no del tercero.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "importe": {
+                    "description": "Nuevo importe POSITIVO. Omitir para dejarlo como está.",
+                    "type": "number",
+                    "minimum": 0.01
+                  },
+                  "fecha": {
+                    "description": "Nueva fecha del movimiento (YYYY-MM-DD). Omitir para dejarla como está.",
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "observaciones": {
+                    "description": "Nuevas observaciones, o null para dejarlas vacías. Omitir para no tocarlas.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "Por qué se corrige. Queda en la bitácora junto con lo que decía antes."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "additionalProperties": false,
+                "description": "Corrección (anular + recapturar) de un movimiento sin factura."
+              }
+            }
+          },
+          "description": "Corrección (anular + recapturar) de un movimiento sin factura."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del movimiento."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Renglón del estado de cuenta de un tercero.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fuente": {
+                      "type": "string",
+                      "enum": [
+                        "motor",
+                        "esma"
+                      ],
+                      "description": "Origen del renglón: motor nuevo o EsMa."
+                    },
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del renglón en su tabla de origen."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña (A9)."
+                    },
+                    "folio": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Folio A3 (solo motor; null en EsMa)."
+                    },
+                    "tipoTercero": {
+                      "type": "string",
+                      "enum": [
+                        "cliente",
+                        "proveedor"
+                      ],
+                      "description": "Tipo de tercero."
+                    },
+                    "idTercero": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del cliente o proveedor."
+                    },
+                    "tercero": {
+                      "type": "string",
+                      "description": "Nombre del tercero."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha del movimiento (YYYY-MM-DD)."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "description": "Origen/concepto del movimiento (etiqueta estable)."
+                    },
+                    "monto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe CON SIGNO (Σ = saldo); null si se ocultan importes."
+                    },
+                    "fechaVencimiento": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de vencimiento derivada (aging D15d) o null."
+                    },
+                    "esFiscal": {
+                      "type": "boolean",
+                      "description": "¿Movimiento fiscal (con CFDI)?"
+                    },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI o null."
+                    },
+                    "rfcTercero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC del tercero o null."
+                    },
+                    "idArchivoCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del Archivo R2 del CFDI o null."
+                    },
+                    "refTipo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Discriminador de la operación ligada o null."
+                    },
+                    "refId": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la operación ligada o null."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones o null."
+                    },
+                    "cancelado": {
+                      "type": "boolean",
+                      "description": "¿El movimiento fue cancelado (existe su inverso)?"
+                    },
+                    "esInverso": {
+                      "type": "boolean",
+                      "description": "¿Es un movimiento inverso de cancelación?"
+                    },
+                    "idMovimientoCorregido": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                    },
+                    "corregible": {
+                      "type": "boolean",
+                      "description": "¿Quien consulta puede corregir este renglón?"
+                    },
+                    "observacionesGuardadas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                    },
+                    "importeGuardado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                    },
+                    "importeCorregible": {
+                      "type": "boolean",
+                      "description": "¿La corrección puede cambiar el importe?"
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Cuándo se registró (ISO)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien lo registró o null."
+                    }
+                  },
+                  "required": [
+                    "fuente",
+                    "id",
+                    "idEmpresa",
+                    "folio",
+                    "tipoTercero",
+                    "idTercero",
+                    "tercero",
+                    "fecha",
+                    "origen",
+                    "monto",
+                    "fechaVencimiento",
+                    "esFiscal",
+                    "uuidCfdi",
+                    "rfcTercero",
+                    "idArchivoCfdi",
+                    "refTipo",
+                    "refId",
+                    "observaciones",
+                    "cancelado",
+                    "esInverso",
+                    "idMovimientoCorregido",
+                    "corregible",
+                    "observacionesGuardadas",
+                    "importeGuardado",
+                    "importeCorregible",
                     "creadoEn",
                     "creadoPorId"
                   ],
@@ -178763,6 +180434,49 @@
                           "type": "boolean",
                           "description": "¿Es un movimiento inverso de cancelación?"
                         },
+                        "idMovimientoCorregido": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                        },
+                        "corregible": {
+                          "type": "boolean",
+                          "description": "¿Quien consulta puede corregir este renglón?"
+                        },
+                        "observacionesGuardadas": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                        },
+                        "importeGuardado": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                        },
+                        "importeCorregible": {
+                          "type": "boolean",
+                          "description": "¿La corrección puede cambiar el importe?"
+                        },
                         "creadoEn": {
                           "type": "string",
                           "format": "date-time",
@@ -178802,6 +180516,11 @@
                         "observaciones",
                         "cancelado",
                         "esInverso",
+                        "idMovimientoCorregido",
+                        "corregible",
+                        "observacionesGuardadas",
+                        "importeGuardado",
+                        "importeCorregible",
                         "creadoEn",
                         "creadoPorId"
                       ],
@@ -179842,6 +181561,49 @@
                             "type": "boolean",
                             "description": "¿Es un movimiento inverso de cancelación?"
                           },
+                          "idMovimientoCorregido": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                          },
+                          "corregible": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta puede corregir este renglón?"
+                          },
+                          "observacionesGuardadas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                          },
+                          "importeGuardado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                          },
+                          "importeCorregible": {
+                            "type": "boolean",
+                            "description": "¿La corrección puede cambiar el importe?"
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -179881,6 +181643,11 @@
                           "observaciones",
                           "cancelado",
                           "esInverso",
+                          "idMovimientoCorregido",
+                          "corregible",
+                          "observacionesGuardadas",
+                          "importeGuardado",
+                          "importeCorregible",
                           "creadoEn",
                           "creadoPorId"
                         ],
@@ -180604,6 +182371,49 @@
                       "type": "boolean",
                       "description": "¿Es un movimiento inverso de cancelación?"
                     },
+                    "idMovimientoCorregido": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                    },
+                    "corregible": {
+                      "type": "boolean",
+                      "description": "¿Quien consulta puede corregir este renglón?"
+                    },
+                    "observacionesGuardadas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                    },
+                    "importeGuardado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                    },
+                    "importeCorregible": {
+                      "type": "boolean",
+                      "description": "¿La corrección puede cambiar el importe?"
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -180643,6 +182453,11 @@
                     "observaciones",
                     "cancelado",
                     "esInverso",
+                    "idMovimientoCorregido",
+                    "corregible",
+                    "observacionesGuardadas",
+                    "importeGuardado",
+                    "importeCorregible",
                     "creadoEn",
                     "creadoPorId"
                   ],
@@ -181016,6 +182831,49 @@
                       "type": "boolean",
                       "description": "¿Es un movimiento inverso de cancelación?"
                     },
+                    "idMovimientoCorregido": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                    },
+                    "corregible": {
+                      "type": "boolean",
+                      "description": "¿Quien consulta puede corregir este renglón?"
+                    },
+                    "observacionesGuardadas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                    },
+                    "importeGuardado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                    },
+                    "importeCorregible": {
+                      "type": "boolean",
+                      "description": "¿La corrección puede cambiar el importe?"
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -181055,6 +182913,11 @@
                     "observaciones",
                     "cancelado",
                     "esInverso",
+                    "idMovimientoCorregido",
+                    "corregible",
+                    "observacionesGuardadas",
+                    "importeGuardado",
+                    "importeCorregible",
                     "creadoEn",
                     "creadoPorId"
                   ],
@@ -181938,6 +183801,49 @@
                           "type": "boolean",
                           "description": "¿Es un movimiento inverso de cancelación?"
                         },
+                        "idMovimientoCorregido": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Movimiento al que este renglón sustituye (corrección), o null."
+                        },
+                        "corregible": {
+                          "type": "boolean",
+                          "description": "¿Quien consulta puede corregir este renglón?"
+                        },
+                        "observacionesGuardadas": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones tal como están guardadas (sin los adornos de la lectura)."
+                        },
+                        "importeGuardado": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes."
+                        },
+                        "importeCorregible": {
+                          "type": "boolean",
+                          "description": "¿La corrección puede cambiar el importe?"
+                        },
                         "creadoEn": {
                           "type": "string",
                           "format": "date-time",
@@ -181977,6 +183883,11 @@
                         "observaciones",
                         "cancelado",
                         "esInverso",
+                        "idMovimientoCorregido",
+                        "corregible",
+                        "observacionesGuardadas",
+                        "importeGuardado",
+                        "importeCorregible",
                         "creadoEn",
                         "creadoPorId"
                       ],

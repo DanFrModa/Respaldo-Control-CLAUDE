@@ -1,4 +1,4 @@
-import { Ban, Plus, Printer } from 'lucide-react';
+import { Ban, Pencil, Plus, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -6,10 +6,17 @@ import { toast } from 'sonner';
 import {
   imprimirEstadoCuentaCxp,
   useCancelarMovimientoCxp,
+  useCorregirMovimientoCxp,
   useEstadoCuentaProveedor,
   useRegistrarMovimientoCxp,
 } from '@/api/cxp';
+import { useCorregirMovimientoEsMa } from '@/api/esma';
+import type { EsMaConceptoCorregible } from '@/api/tipos';
 import type { CxpEstadoCuentaMovimiento, CxpEstadoCuentaQuery, CxpOrigen } from '@/api/tipos';
+import {
+  CajonCorregirSinFactura,
+  type CuerpoCorreccion,
+} from '@/components/dominio/CajonCorregirSinFactura';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
 import {
   TablaDensa,
@@ -40,6 +47,20 @@ import {
 /** ¿El renglón se puede cancelar? Solo los del MOTOR, no cancelados ni inversos (los EsMa no aquí). */
 function esCancelable(m: CxpEstadoCuentaMovimiento): boolean {
   return m.fuente === 'motor' && !m.cancelado && !m.esInverso;
+}
+
+/**
+ * ⭐ Fila 0.145 — el CONCEPTO de EsMa al que corresponde un renglón proyectado, o `null` si no es un
+ * movimiento plano de EsMa (un cargo de recibo no se corrige).
+ *
+ * El renglón NO trae un campo «concepto»: trae `origen`, y para EsMa la traducción es 1 a 1. Se
+ * escribe aquí, una vez, en vez de repetir la comparación en el manejador del botón.
+ */
+function conceptoEsMa(m: CxpEstadoCuentaMovimiento): EsMaConceptoCorregible | null {
+  if (m.fuente !== 'esma') {
+    return null;
+  }
+  return m.origen === 'abono' || m.origen === 'descuento' || m.origen === 'pago' ? m.origen : null;
 }
 
 /**
@@ -76,6 +97,10 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
 
   const [capturaAbierta, setCapturaAbierta] = useState(false);
   const [movACancelar, setMovACancelar] = useState<CxpEstadoCuentaMovimiento | null>(null);
+  // ⭐ Fila 0.145: el renglón que se está corrigiendo. Quién puede corregirlo NO lo decide esta
+  // pantalla: cada renglón viene del servidor con su `corregible` ya calculado (bandera de la
+  // persona + sin factura + vivo + …), así que el botón nunca se ofrece para que lo rechacen.
+  const [movACorregir, setMovACorregir] = useState<CxpEstadoCuentaMovimiento | null>(null);
 
   // Cambiar de proveedor, periodo o vista siempre vuelve a la página 1 (si no, se pediría una página
   // fuera de rango del proveedor nuevo → tabla vacía).
@@ -282,17 +307,30 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
                           </TablaDensaCelda>
                           {puedeAdministrar ? (
                             <TablaDensaCelda numerica>
-                              {esCancelable(m) ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => setMovACancelar(m)}
-                                  data-testid="cxp-edc-cancelar"
-                                >
-                                  <Ban aria-hidden /> Cancelar
-                                </Button>
-                              ) : null}
+                              <div className="flex justify-end gap-1">
+                                {m.corregible ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setMovACorregir(m)}
+                                    data-testid="cxp-edc-corregir"
+                                  >
+                                    <Pencil aria-hidden /> Corregir
+                                  </Button>
+                                ) : null}
+                                {esCancelable(m) ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setMovACancelar(m)}
+                                    data-testid="cxp-edc-cancelar"
+                                  >
+                                    <Ban aria-hidden /> Cancelar
+                                  </Button>
+                                ) : null}
+                              </div>
                             </TablaDensaCelda>
                           ) : null}
                         </TablaDensaFila>
@@ -343,6 +381,7 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
         />
       ) : null}
       <CajonCancelar movimiento={movACancelar} alCerrar={() => setMovACancelar(null)} />
+      <CajonCorregir movimiento={movACorregir} alCerrar={() => setMovACorregir(null)} />
     </div>
   );
 }
@@ -592,5 +631,72 @@ function CajonCancelar({
         </div>
       </form>
     </CajonDetalle>
+  );
+}
+
+/**
+ * ⭐ Cajón de CORRECCIÓN de un movimiento SIN FACTURA (fila 0.145). Un solo gesto para quien
+ * corrige; por dentro, el servidor anula el viejo y captura el bueno en una transacción.
+ *
+ * Este estado de cuenta mezcla las DOS fuentes del proveedor —el motor de CxP y la maquila (EsMa)—,
+ * así que el cajón manda cada renglón a SU endpoint. Es lo único que cambia entre los dos: el acto,
+ * las guardas y el formulario son los mismos.
+ */
+function CajonCorregir({
+  movimiento,
+  alCerrar,
+}: {
+  movimiento: CxpEstadoCuentaMovimiento | null;
+  alCerrar: () => void;
+}): React.JSX.Element {
+  const corregirMotor = useCorregirMovimientoCxp();
+  const corregirEsMa = useCorregirMovimientoEsMa();
+  const concepto = movimiento === null ? null : conceptoEsMa(movimiento);
+
+  function guardar(cuerpo: CuerpoCorreccion): void {
+    if (movimiento === null) {
+      return;
+    }
+    const alTerminar = {
+      onSuccess: () => {
+        toast.success('Movimiento corregido (queda el rastro del anterior).');
+        alCerrar();
+      },
+      onError: (error: Error) => toast.error(error.message),
+    };
+    if (concepto !== null) {
+      corregirEsMa.mutate({ concepto, id: movimiento.id, cuerpo }, alTerminar);
+      return;
+    }
+    corregirMotor.mutate({ idMovimiento: movimiento.id, cuerpo }, alTerminar);
+  }
+
+  return (
+    <CajonCorregirSinFactura
+      valores={
+        movimiento === null
+          ? null
+          : {
+              // El importe GUARDADO, no `monto`: éste va con signo y se vacía cuando el renglón
+              // aún no está revisado — que es justo el caso que más se corrige.
+              importeGuardado: movimiento.importeGuardado,
+              fecha: movimiento.fecha,
+              // El CRUDO, no el de la columna: para un renglón de EsMa sin revisar, `observaciones`
+              // trae pegada la nota «(pendiente de revisión)», y guardarla la metería en el
+              // movimiento como si alguien la hubiera escrito.
+              observaciones: movimiento.observacionesGuardadas,
+              importeCorregible: movimiento.importeCorregible,
+            }
+      }
+      titulo="Corregir movimiento"
+      subtitulo={
+        movimiento
+          ? `${etiquetaOrigen(movimiento.origen)} · ${moneda(movimiento.monto)}`
+          : undefined
+      }
+      enviando={corregirMotor.isPending || corregirEsMa.isPending}
+      alCerrar={alCerrar}
+      alGuardar={guardar}
+    />
   );
 }

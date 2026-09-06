@@ -60647,6 +60647,157 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/esma/movimientos/{concepto}/{id}/corregir': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Corregir un movimiento SIN FACTURA de un maquilero (anular + recapturar, D3)
+     * @description Reservado a la dirección por una bandera de la persona que no se otorga con ningún permiso ni desde ninguna pantalla. Un movimiento con factura se rechaza. Un PAGO ya aplicado a cargos se corrige en fecha y observaciones, no en importe.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Concepto del movimiento a corregir (el CARGO no se corrige: nace de un recibo). */
+          concepto: 'abono' | 'descuento' | 'pago';
+          /** @description Id del movimiento dentro de su concepto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Corrección (anular + recapturar) de un movimiento sin factura. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nuevo importe POSITIVO. Omitir para dejarlo como está. */
+            importe?: number;
+            /**
+             * Format: date
+             * @description Nueva fecha del movimiento (YYYY-MM-DD). Omitir para dejarla como está.
+             */
+            fecha?: string;
+            /** @description Nuevas observaciones, o null para dejarlas vacías. Omitir para no tocarlas. */
+            observaciones?: string | null;
+            /** @description Por qué se corrige. Queda en la bitácora junto con lo que decía antes. */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Corrección de un movimiento sin factura de EsMa. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * @description Concepto corregido (abono/descuento/pago).
+               * @enum {string}
+               */
+              concepto: 'abono' | 'descuento' | 'pago';
+              /** @description Id del movimiento que quedó anulado. */
+              idCorregido: number;
+              /** @description Id del movimiento bueno que lo sustituye. */
+              idNuevo: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/esma/pagos': {
     parameters: {
       query?: never;
@@ -60733,6 +60884,10 @@ export interface paths {
                 /** @description Importe aplicado (null si se ocultan importes). */
                 importe: number | null;
               }[];
+              /** @description Cuándo se anuló el pago, o null si vive. */
+              canceladoEn: string | null;
+              /** @description Motivo de la anulación, o null. */
+              motivoCancelacion: string | null;
               /**
                * Format: date-time
                * @description Cuándo se capturó (ISO).
@@ -60892,6 +61047,10 @@ export interface paths {
                 /** @description Importe aplicado (null si se ocultan importes). */
                 importe: number | null;
               }[];
+              /** @description Cuándo se anuló el pago, o null si vive. */
+              canceladoEn: string | null;
+              /** @description Motivo de la anulación, o null. */
+              motivoCancelacion: string | null;
               /**
                * Format: date-time
                * @description Cuándo se capturó (ISO).
@@ -61165,6 +61324,10 @@ export interface paths {
                   /** @description Importe aplicado (null si se ocultan importes). */
                   importe: number | null;
                 }[];
+                /** @description Cuándo se anuló el pago, o null si vive. */
+                canceladoEn: string | null;
+                /** @description Motivo de la anulación, o null. */
+                motivoCancelacion: string | null;
                 /**
                  * Format: date-time
                  * @description Cuándo se capturó (ISO).
@@ -62707,6 +62870,14 @@ export interface paths {
                 estadoRevision: string;
                 /** @description true si el renglón está pendiente de revisión. */
                 pendienteRevision: boolean;
+                /** @description ¿Quien consulta puede corregir este renglón? */
+                corregible: boolean;
+                /** @description Observaciones tal como están guardadas (null si no tiene). */
+                observacionesGuardadas: string | null;
+                /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+                importeGuardado: number | null;
+                /** @description ¿La corrección puede cambiar el importe? */
+                importeCorregible: boolean;
               }[];
               /** @description Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Van APARTE de los movimientos porque no son dinero: no suman ni restan al saldo. */
               incompletas: {
@@ -63002,6 +63173,10 @@ export interface paths {
                   /** @description Importe aplicado (null si se ocultan importes). */
                   importe: number | null;
                 }[];
+                /** @description Cuándo se anuló el pago, o null si vive. */
+                canceladoEn: string | null;
+                /** @description Motivo de la anulación, o null. */
+                motivoCancelacion: string | null;
                 /**
                  * Format: date-time
                  * @description Cuándo se capturó (ISO).
@@ -63517,6 +63692,16 @@ export interface paths {
               cancelado: boolean;
               /** @description ¿Es un movimiento inverso de cancelación? */
               esInverso: boolean;
+              /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+              idMovimientoCorregido: number | null;
+              /** @description ¿Quien consulta puede corregir este renglón? */
+              corregible: boolean;
+              /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+              observacionesGuardadas: string | null;
+              /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+              importeGuardado: number | null;
+              /** @description ¿La corrección puede cambiar el importe? */
+              importeCorregible: boolean;
               /**
                * Format: date-time
                * @description Cuándo se registró (ISO).
@@ -63698,6 +63883,219 @@ export interface paths {
               cancelado: boolean;
               /** @description ¿Es un movimiento inverso de cancelación? */
               esInverso: boolean;
+              /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+              idMovimientoCorregido: number | null;
+              /** @description ¿Quien consulta puede corregir este renglón? */
+              corregible: boolean;
+              /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+              observacionesGuardadas: string | null;
+              /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+              importeGuardado: number | null;
+              /** @description ¿La corrección puede cambiar el importe? */
+              importeCorregible: boolean;
+              /**
+               * Format: date-time
+               * @description Cuándo se registró (ISO).
+               */
+              creadoEn: string;
+              /** @description Id de quien lo registró o null. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/terceros/movimientos/{id}/corregir': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Corregir un movimiento SIN FACTURA (anula el viejo y captura el bueno, D3)
+     * @description Reservado a la dirección por una bandera de la persona que no se otorga con ningún permiso ni desde ninguna pantalla. Sólo movimientos sin factura: uno con CFDI se rechaza.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del movimiento. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Corrección (anular + recapturar) de un movimiento sin factura. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nuevo importe POSITIVO. Omitir para dejarlo como está. */
+            importe?: number;
+            /**
+             * Format: date
+             * @description Nueva fecha del movimiento (YYYY-MM-DD). Omitir para dejarla como está.
+             */
+            fecha?: string;
+            /** @description Nuevas observaciones, o null para dejarlas vacías. Omitir para no tocarlas. */
+            observaciones?: string | null;
+            /** @description Por qué se corrige. Queda en la bitácora junto con lo que decía antes. */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Renglón del estado de cuenta de un tercero. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * @description Origen del renglón: motor nuevo o EsMa.
+               * @enum {string}
+               */
+              fuente: 'motor' | 'esma';
+              /** @description Id del renglón en su tabla de origen. */
+              id: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Folio A3 (solo motor; null en EsMa). */
+              folio: number | null;
+              /**
+               * @description Tipo de tercero.
+               * @enum {string}
+               */
+              tipoTercero: 'cliente' | 'proveedor';
+              /** @description Id del cliente o proveedor. */
+              idTercero: number;
+              /** @description Nombre del tercero. */
+              tercero: string;
+              /** @description Fecha del movimiento (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Origen/concepto del movimiento (etiqueta estable). */
+              origen: string;
+              /** @description Importe CON SIGNO (Σ = saldo); null si se ocultan importes. */
+              monto: number | null;
+              /** @description Fecha de vencimiento derivada (aging D15d) o null. */
+              fechaVencimiento: string | null;
+              /** @description ¿Movimiento fiscal (con CFDI)? */
+              esFiscal: boolean;
+              /** @description UUID del CFDI o null. */
+              uuidCfdi: string | null;
+              /** @description RFC del tercero o null. */
+              rfcTercero: string | null;
+              /** @description Id del Archivo R2 del CFDI o null. */
+              idArchivoCfdi: string | null;
+              /** @description Discriminador de la operación ligada o null. */
+              refTipo: string | null;
+              /** @description Id de la operación ligada o null. */
+              refId: number | null;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description ¿El movimiento fue cancelado (existe su inverso)? */
+              cancelado: boolean;
+              /** @description ¿Es un movimiento inverso de cancelación? */
+              esInverso: boolean;
+              /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+              idMovimientoCorregido: number | null;
+              /** @description ¿Quien consulta puede corregir este renglón? */
+              corregible: boolean;
+              /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+              observacionesGuardadas: string | null;
+              /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+              importeGuardado: number | null;
+              /** @description ¿La corrección puede cambiar el importe? */
+              importeCorregible: boolean;
               /**
                * Format: date-time
                * @description Cuándo se registró (ISO).
@@ -64086,6 +64484,16 @@ export interface paths {
                 cancelado: boolean;
                 /** @description ¿Es un movimiento inverso de cancelación? */
                 esInverso: boolean;
+                /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+                idMovimientoCorregido: number | null;
+                /** @description ¿Quien consulta puede corregir este renglón? */
+                corregible: boolean;
+                /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+                observacionesGuardadas: string | null;
+                /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+                importeGuardado: number | null;
+                /** @description ¿La corrección puede cambiar el importe? */
+                importeCorregible: boolean;
                 /**
                  * Format: date-time
                  * @description Cuándo se registró (ISO).
@@ -64562,6 +64970,16 @@ export interface paths {
                 cancelado: boolean;
                 /** @description ¿Es un movimiento inverso de cancelación? */
                 esInverso: boolean;
+                /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+                idMovimientoCorregido: number | null;
+                /** @description ¿Quien consulta puede corregir este renglón? */
+                corregible: boolean;
+                /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+                observacionesGuardadas: string | null;
+                /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+                importeGuardado: number | null;
+                /** @description ¿La corrección puede cambiar el importe? */
+                importeCorregible: boolean;
                 /**
                  * Format: date-time
                  * @description Cuándo se registró (ISO).
@@ -64904,6 +65322,16 @@ export interface paths {
               cancelado: boolean;
               /** @description ¿Es un movimiento inverso de cancelación? */
               esInverso: boolean;
+              /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+              idMovimientoCorregido: number | null;
+              /** @description ¿Quien consulta puede corregir este renglón? */
+              corregible: boolean;
+              /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+              observacionesGuardadas: string | null;
+              /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+              importeGuardado: number | null;
+              /** @description ¿La corrección puede cambiar el importe? */
+              importeCorregible: boolean;
               /**
                * Format: date-time
                * @description Cuándo se registró (ISO).
@@ -65085,6 +65513,219 @@ export interface paths {
               cancelado: boolean;
               /** @description ¿Es un movimiento inverso de cancelación? */
               esInverso: boolean;
+              /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+              idMovimientoCorregido: number | null;
+              /** @description ¿Quien consulta puede corregir este renglón? */
+              corregible: boolean;
+              /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+              observacionesGuardadas: string | null;
+              /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+              importeGuardado: number | null;
+              /** @description ¿La corrección puede cambiar el importe? */
+              importeCorregible: boolean;
+              /**
+               * Format: date-time
+               * @description Cuándo se registró (ISO).
+               */
+              creadoEn: string;
+              /** @description Id de quien lo registró o null. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/movimientos/{id}/corregir': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Corregir un movimiento de CxP SIN FACTURA (anula el viejo y captura el bueno, D3)
+     * @description Reservado a la dirección por una bandera de la persona que no se otorga con ningún permiso ni desde ninguna pantalla. Un renglón con CFDI se rechaza aunque sea del mismo proveedor: el segmento con/sin factura es del MOVIMIENTO, no del tercero.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del movimiento. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Corrección (anular + recapturar) de un movimiento sin factura. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nuevo importe POSITIVO. Omitir para dejarlo como está. */
+            importe?: number;
+            /**
+             * Format: date
+             * @description Nueva fecha del movimiento (YYYY-MM-DD). Omitir para dejarla como está.
+             */
+            fecha?: string;
+            /** @description Nuevas observaciones, o null para dejarlas vacías. Omitir para no tocarlas. */
+            observaciones?: string | null;
+            /** @description Por qué se corrige. Queda en la bitácora junto con lo que decía antes. */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Renglón del estado de cuenta de un tercero. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * @description Origen del renglón: motor nuevo o EsMa.
+               * @enum {string}
+               */
+              fuente: 'motor' | 'esma';
+              /** @description Id del renglón en su tabla de origen. */
+              id: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Folio A3 (solo motor; null en EsMa). */
+              folio: number | null;
+              /**
+               * @description Tipo de tercero.
+               * @enum {string}
+               */
+              tipoTercero: 'cliente' | 'proveedor';
+              /** @description Id del cliente o proveedor. */
+              idTercero: number;
+              /** @description Nombre del tercero. */
+              tercero: string;
+              /** @description Fecha del movimiento (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Origen/concepto del movimiento (etiqueta estable). */
+              origen: string;
+              /** @description Importe CON SIGNO (Σ = saldo); null si se ocultan importes. */
+              monto: number | null;
+              /** @description Fecha de vencimiento derivada (aging D15d) o null. */
+              fechaVencimiento: string | null;
+              /** @description ¿Movimiento fiscal (con CFDI)? */
+              esFiscal: boolean;
+              /** @description UUID del CFDI o null. */
+              uuidCfdi: string | null;
+              /** @description RFC del tercero o null. */
+              rfcTercero: string | null;
+              /** @description Id del Archivo R2 del CFDI o null. */
+              idArchivoCfdi: string | null;
+              /** @description Discriminador de la operación ligada o null. */
+              refTipo: string | null;
+              /** @description Id de la operación ligada o null. */
+              refId: number | null;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description ¿El movimiento fue cancelado (existe su inverso)? */
+              cancelado: boolean;
+              /** @description ¿Es un movimiento inverso de cancelación? */
+              esInverso: boolean;
+              /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+              idMovimientoCorregido: number | null;
+              /** @description ¿Quien consulta puede corregir este renglón? */
+              corregible: boolean;
+              /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+              observacionesGuardadas: string | null;
+              /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+              importeGuardado: number | null;
+              /** @description ¿La corrección puede cambiar el importe? */
+              importeCorregible: boolean;
               /**
                * Format: date-time
                * @description Cuándo se registró (ISO).
@@ -69292,6 +69933,16 @@ export interface paths {
                 cancelado: boolean;
                 /** @description ¿Es un movimiento inverso de cancelación? */
                 esInverso: boolean;
+                /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+                idMovimientoCorregido: number | null;
+                /** @description ¿Quien consulta puede corregir este renglón? */
+                corregible: boolean;
+                /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+                observacionesGuardadas: string | null;
+                /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+                importeGuardado: number | null;
+                /** @description ¿La corrección puede cambiar el importe? */
+                importeCorregible: boolean;
                 /**
                  * Format: date-time
                  * @description Cuándo se registró (ISO).
@@ -69709,6 +70360,16 @@ export interface paths {
                 cancelado: boolean;
                 /** @description ¿Es un movimiento inverso de cancelación? */
                 esInverso: boolean;
+                /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+                idMovimientoCorregido: number | null;
+                /** @description ¿Quien consulta puede corregir este renglón? */
+                corregible: boolean;
+                /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+                observacionesGuardadas: string | null;
+                /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+                importeGuardado: number | null;
+                /** @description ¿La corrección puede cambiar el importe? */
+                importeCorregible: boolean;
                 /**
                  * Format: date-time
                  * @description Cuándo se registró (ISO).
@@ -70054,6 +70715,16 @@ export interface paths {
               cancelado: boolean;
               /** @description ¿Es un movimiento inverso de cancelación? */
               esInverso: boolean;
+              /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+              idMovimientoCorregido: number | null;
+              /** @description ¿Quien consulta puede corregir este renglón? */
+              corregible: boolean;
+              /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+              observacionesGuardadas: string | null;
+              /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+              importeGuardado: number | null;
+              /** @description ¿La corrección puede cambiar el importe? */
+              importeCorregible: boolean;
               /**
                * Format: date-time
                * @description Cuándo se registró (ISO).
@@ -70235,6 +70906,16 @@ export interface paths {
               cancelado: boolean;
               /** @description ¿Es un movimiento inverso de cancelación? */
               esInverso: boolean;
+              /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+              idMovimientoCorregido: number | null;
+              /** @description ¿Quien consulta puede corregir este renglón? */
+              corregible: boolean;
+              /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+              observacionesGuardadas: string | null;
+              /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+              importeGuardado: number | null;
+              /** @description ¿La corrección puede cambiar el importe? */
+              importeCorregible: boolean;
               /**
                * Format: date-time
                * @description Cuándo se registró (ISO).
@@ -70633,6 +71314,16 @@ export interface paths {
                 cancelado: boolean;
                 /** @description ¿Es un movimiento inverso de cancelación? */
                 esInverso: boolean;
+                /** @description Movimiento al que este renglón sustituye (corrección), o null. */
+                idMovimientoCorregido: number | null;
+                /** @description ¿Quien consulta puede corregir este renglón? */
+                corregible: boolean;
+                /** @description Observaciones tal como están guardadas (sin los adornos de la lectura). */
+                observacionesGuardadas: string | null;
+                /** @description Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ocultan importes. */
+                importeGuardado: number | null;
+                /** @description ¿La corrección puede cambiar el importe? */
+                importeCorregible: boolean;
                 /**
                  * Format: date-time
                  * @description Cuándo se registró (ISO).

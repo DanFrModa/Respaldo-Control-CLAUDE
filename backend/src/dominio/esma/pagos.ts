@@ -33,6 +33,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { resolverConFactura } from './facturacion.js';
+import { WHERE_VIVO_PAGO } from './formula-saldo.js';
 import { recalcularOrdenPagada } from './orden-pagada.js';
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
@@ -45,10 +46,142 @@ function aDateColumna(valor: string): Date {
  * (distinto del de recibos por orden) para que dos pagos al mismo maquilero se serialicen y no
  * excedan las prendas por pagar. Se libera al commit.
  */
-async function bloquearMaquilero(tx: Tx, idEmpresa: number, idMaquilero: number): Promise<void> {
+export async function bloquearMaquilero(
+  tx: Tx,
+  idEmpresa: number,
+  idMaquilero: number,
+): Promise<void> {
   const clave1 = ((idEmpresa * 1_000_003) ^ 0x51000000) | 0;
   const clave2 = idMaquilero | 0;
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
+}
+
+/**
+ * ⭐⭐ PRENDAS YA PAGADAS de un cargo — **la suma que manda** (D3), y la que la fila 0.145 tuvo que
+ * corregir.
+ *
+ * `EsMaCargo.cantidadPagada` es un CACHE (así lo dice su propio comentario en el schema); la verdad
+ * es esta suma de `PagoAplicacion`. Desde la 0.145 un pago se puede CANCELAR —lo hace la corrección
+ * de un movimiento sin factura—, y un pago cancelado no pagó nada: sus aplicaciones siguen ahí como
+ * rastro (D3: nada se borra) pero **dejan de consumir «prendas por pagar»**.
+ *
+ * 🔴 Sin este filtro, corregir un pago dejaba los cargos marcados como pagados con dinero que ya no
+ * existe: el saldo del maquilero bajaba (el pago cancelado deja de restar) pero sus cargos seguían
+ * «cubiertos», y la orden seguía marcada como pagada. Es el error que hace que un maquilero deje de
+ * cobrar lo que se le debe.
+ *
+ * Se llama SIEMPRE bajo el `pg_advisory_xact_lock` por maquilero (ver {@link bloquearMaquilero}).
+ */
+async function prendasPagadasVivas(tx: Tx, idCargo: number): Promise<number> {
+  const agg = await tx.pagoAplicacion.aggregate({
+    where: { idCargo, pago: WHERE_VIVO_PAGO },
+    _sum: { cantidad: true },
+  });
+  return agg._sum.cantidad?.toNumber() ?? 0;
+}
+
+/** Una aplicación pedida: cuántas prendas de qué cargo cubre el pago. */
+interface AplicacionSolicitada {
+  idCargo: number;
+  cantidad: number;
+}
+
+/** Lo que deja resuelto {@link aplicarACargos}: el detalle a persistir y sus efectos derivados. */
+interface AplicacionResuelta {
+  monto: number;
+  detalle: { idCargo: number; cantidad: number; importe: number }[];
+  ordenesAfectadas: Set<number>;
+}
+
+/**
+ * ⭐ EL NÚCLEO de aplicar un pago a cargos (decisión (g) de F6), extraído en la fila 0.145 para que
+ * la CAPTURA ({@link crearPagoMaquilero}) y la CORRECCIÓN (`esma/correccion.ts`) usen **el mismo
+ * camino**: mismas guardas, mismo tope de prendas por pagar, mismo cache. Corregir un pago aplicado
+ * lo re-aplica a los mismos cargos, y tiene que hacerlo con estas reglas, no con una copia.
+ *
+ * Valida cargo por cargo (existe, es de este maquilero y esta empresa, está validado, no es sin
+ * costo, tiene precio y cantidad reales) y topa la cantidad contra las prendas por pagar VIVAS
+ * ({@link prendasPagadasVivas}). Actualiza el cache `cantidadPagada` del cargo.
+ *
+ * ⚠️ El llamador YA tomó {@link bloquearMaquilero} y corre dentro de su transacción: esta función no
+ * bloquea ni abre transacción propia. No verifica permisos (los verifica quien la llama).
+ */
+async function aplicarACargos(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idEmpresa: number,
+  idMaquilero: number,
+  aplicaciones: readonly AplicacionSolicitada[],
+  /**
+   * ⭐ Fila 0.145 — qué se está haciendo, para que el mensaje hable de eso. Al CORREGIR un pago se
+   * re-aplican sus cargos, y si alguno se canceló entre medias el usuario recibía un error sobre
+   * *«no se puede pagar hasta validarlo»* cuando lo único que quería era mover una fecha. Falla
+   * cerrado en los dos casos; lo que cambia es que ahora dice la verdad de lo que pasó.
+   */
+  motivo: 'captura' | 'correccion' = 'captura',
+): Promise<AplicacionResuelta> {
+  const ordenesAfectadas = new Set<number>();
+  const detalle: { idCargo: number; cantidad: number; importe: number }[] = [];
+  let monto = 0;
+
+  for (const ap of aplicaciones) {
+    const cargo = await tx.esMaCargo.findFirst({
+      where: { id: ap.idCargo, idEmpresa, idMaquilero },
+      select: {
+        id: true,
+        estado: true,
+        sinCosto: true,
+        cantidadReal: true,
+        precioReal: true,
+        idOrden: true,
+      },
+    });
+    if (cargo === null) {
+      throw new ErrorNoEncontrado('EsMaCargo', ap.idCargo);
+    }
+    if (cargo.estado !== 'validado') {
+      throw new ErrorConflicto(
+        motivo === 'correccion'
+          ? `Este pago cubre el cargo ${ap.idCargo}, que ya NO está validado (lo cancelaron o lo ` +
+              'regresaron a revisión). Por eso no se puede corregir: al rehacerlo, ese cargo dejaría ' +
+              'de estar cubierto. Revisa primero el cargo.'
+          : `El cargo ${ap.idCargo} no está validado: no se puede pagar hasta validarlo.`,
+      );
+    }
+    if (cargo.sinCosto) {
+      throw new ErrorConflicto(
+        motivo === 'correccion'
+          ? `Este pago cubre el cargo ${ap.idCargo}, que ahora está marcado SIN COSTO. Por eso no ` +
+              'se puede corregir: al rehacerlo, ese cargo ya no se le pagaría al maquilero.'
+          : `El cargo ${ap.idCargo} es SIN COSTO: no se paga.`,
+      );
+    }
+    if (cargo.precioReal === null || cargo.cantidadReal === null) {
+      throw new ErrorConflicto(`El cargo ${ap.idCargo} no tiene precio/cantidad reales.`);
+    }
+
+    // Prendas por pagar = cantidadReal − Σ(aplicaciones VIVAS previas), por SUMA DIRECTA bajo lock (D3).
+    const yaPagado = await prendasPagadasVivas(tx, ap.idCargo);
+    const porPagar = cargo.cantidadReal.toNumber() - yaPagado;
+    if (ap.cantidad > porPagar) {
+      throw new ErrorConflicto(
+        `No se puede pagar ${ap.cantidad} pza(s) del cargo ${ap.idCargo}: solo quedan ${porPagar} por pagar.`,
+      );
+    }
+
+    const importe = ap.cantidad * cargo.precioReal.toNumber();
+    detalle.push({ idCargo: ap.idCargo, cantidad: ap.cantidad, importe });
+    monto += importe;
+
+    // Actualiza el cache de prendas pagadas del cargo (para derivar "pagado").
+    await tx.esMaCargo.update({
+      where: { id: ap.idCargo },
+      data: { cantidadPagada: yaPagado + ap.cantidad, ...datosModificacion(sesion) },
+    });
+    ordenesAfectadas.add(cargo.idOrden);
+  }
+
+  return { monto, detalle, ordenesAfectadas };
 }
 
 /** `include` para proyectar un pago con sus aplicaciones (orden + proceso legibles). */
@@ -93,6 +226,10 @@ function aPagoSalida(p: PagoConDetalle, puedeVerImportes: boolean): PagoSalida {
       cantidad: a.cantidad.toNumber(),
       importe: puedeVerImportes ? a.importe.toNumber() : null,
     })),
+    // Fila 0.145: un pago ANULADO se sigue devolviendo, pero MARCADO (D3/A7: no se esconde nada).
+    // El recibo en PDF lee esto para estamparlo — ver `impresos/impreso-recibo-pago.ts`.
+    canceladoEn: p.canceladoEn === null ? null : p.canceladoEn.toISOString(),
+    motivoCancelacion: p.motivoCancelacion,
     creadoEn: p.creadoEn.toISOString(),
   };
 }
@@ -133,65 +270,19 @@ export async function crearPagoMaquilero(
     // Serializa por maquilero: "prendas por pagar" consistente contra pagos concurrentes.
     await bloquearMaquilero(tx, sesion.idEmpresaActiva, datos.idMaquilero);
 
-    const ordenesAfectadas = new Set<number>();
-    const aplicacionesData: { idCargo: number; cantidad: number; importe: number }[] = [];
-    let monto = 0;
-
-    for (const ap of datos.aplicaciones) {
-      const cargo = await tx.esMaCargo.findFirst({
-        where: {
-          id: ap.idCargo,
-          idEmpresa: sesion.idEmpresaActiva,
-          idMaquilero: datos.idMaquilero,
-        },
-        select: {
-          id: true,
-          estado: true,
-          sinCosto: true,
-          cantidadReal: true,
-          precioReal: true,
-          idOrden: true,
-        },
-      });
-      if (cargo === null) {
-        throw new ErrorNoEncontrado('EsMaCargo', ap.idCargo);
-      }
-      if (cargo.estado !== 'validado') {
-        throw new ErrorConflicto(
-          `El cargo ${ap.idCargo} no está validado: no se puede pagar hasta validarlo.`,
-        );
-      }
-      if (cargo.sinCosto) {
-        throw new ErrorConflicto(`El cargo ${ap.idCargo} es SIN COSTO: no se paga.`);
-      }
-      if (cargo.precioReal === null || cargo.cantidadReal === null) {
-        throw new ErrorConflicto(`El cargo ${ap.idCargo} no tiene precio/cantidad reales.`);
-      }
-
-      // Prendas por pagar = cantidadReal − Σ(aplicaciones previas), por SUMA DIRECTA bajo lock (D3).
-      const agg = await tx.pagoAplicacion.aggregate({
-        where: { idCargo: ap.idCargo },
-        _sum: { cantidad: true },
-      });
-      const yaPagado = agg._sum.cantidad?.toNumber() ?? 0;
-      const porPagar = cargo.cantidadReal.toNumber() - yaPagado;
-      if (ap.cantidad > porPagar) {
-        throw new ErrorConflicto(
-          `No se puede pagar ${ap.cantidad} pza(s) del cargo ${ap.idCargo}: solo quedan ${porPagar} por pagar.`,
-        );
-      }
-
-      const importe = ap.cantidad * cargo.precioReal.toNumber();
-      aplicacionesData.push({ idCargo: ap.idCargo, cantidad: ap.cantidad, importe });
-      monto += importe;
-
-      // Actualiza el cache de prendas pagadas del cargo (para derivar "pagado").
-      await tx.esMaCargo.update({
-        where: { id: ap.idCargo },
-        data: { cantidadPagada: yaPagado + ap.cantidad, ...datosModificacion(sesion) },
-      });
-      ordenesAfectadas.add(cargo.idOrden);
-    }
+    // Las guardas, el tope de prendas por pagar y el cache viven en UN solo sitio
+    // ({@link aplicarACargos}), que es el mismo que usa la corrección de la fila 0.145.
+    const {
+      monto,
+      detalle: aplicacionesData,
+      ordenesAfectadas,
+    } = await aplicarACargos(
+      tx,
+      sesion,
+      sesion.idEmpresaActiva,
+      datos.idMaquilero,
+      datos.aplicaciones,
+    );
 
     const pago = await tx.pagoMaquilero.create({
       data: {
@@ -229,7 +320,15 @@ export async function crearPagoMaquilero(
   return obtenerPagoMaquilero(sesion, idPago, bd);
 }
 
-/** Obtiene un pago de la empresa activa (A9), o lanza `ErrorNoEncontrado`. Permiso `esma.ver-pagos`. */
+/**
+ * Obtiene un pago de la empresa activa (A9), o lanza `ErrorNoEncontrado`. Permiso `esma.ver-pagos`.
+ *
+ * ⚠️ **Devuelve TAMBIÉN los pagos ANULADOS, y a propósito** (fila 0.145): esconderlos rompería el
+ * rastro que esta fila existe para conservar (D3/A7) y dejaría un id que «desaparece». Lo que NO
+ * puede pasar es que se sirvan como si valieran: por eso la proyección trae `canceladoEn` y el
+ * RECIBO en PDF lo estampa en grande. Los LISTADOS sí filtran los vivos —ahí un anulado sólo sería
+ * ruido—; este obtener por id es el único que enseña la ficha completa.
+ */
 export async function obtenerPagoMaquilero(
   sesion: SesionUsuario,
   idPago: number,
@@ -256,7 +355,8 @@ export async function listarPagosMaquilero(
   verificarPermiso(sesion, 'esma.ver-pagos');
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const pagos = await clienteLectura(bd).pagoMaquilero.findMany({
-    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero },
+    // VIVOS (fila 0.145): el pago que sustituyó una corrección no se lista.
+    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero, ...WHERE_VIVO_PAGO },
     orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
     include: incluirPago,
   });
@@ -368,6 +468,185 @@ export async function crearPagoACuentaMaquilero(
       conFactura,
       aCuenta: true,
       ...datos.origenAuditoria,
+    },
+  });
+
+  return { id: pago.id };
+}
+
+// ── CORRECCIÓN de un pago SIN FACTURA (fila 0.145) ────────────────────────────────────────────────
+//
+// Las dos mitades del acto viven aquí porque aquí viven sus reglas (las aplicaciones a cargos y el
+// cache de prendas pagadas). Quien las orquesta —y quien exige la bandera de la persona— es
+// `esma/correccion.ts`: estas dos funciones NO verifican la bandera ni abren transacción propia.
+
+/** Un pago tal como lo necesita la corrección (lo lee `correccion.ts` bajo lock). */
+export interface PagoParaCorregir {
+  id: number;
+  idMaquilero: number;
+  monto: Prisma.Decimal;
+  conFactura: boolean | null;
+  observaciones: string | null;
+  estadoRevision: 'capturado' | 'revisado';
+  aplicaciones: { idCargo: number; cantidad: Prisma.Decimal }[];
+}
+
+/**
+ * ⭐⭐ CANCELA un pago (suave, D3) y **DESHACE SU APLICACIÓN A LOS CARGOS**. El caso difícil de la
+ * fila 0.145.
+ *
+ * Un pago no es un renglón suelto: consume «prendas por pagar» de cargos concretos y deja el estatus
+ * `Orden.pagada` derivado de eso. Cancelarlo cambiando sólo su renglón dejaría los cargos marcados
+ * como pagados con dinero que ya no existe — el maquilero dejaría de cobrar lo que se le debe.
+ *
+ * Qué hace, en la transacción del llamador (que YA tomó {@link bloquearMaquilero}):
+ *  1. marca el pago `canceladoEn` con un `updateMany` CONDICIONAL (`canceladoEn: null`) — la lectura
+ *     previa da el mensaje, la condición da la garantía (precedente F8-E3, `CLAUDE.md` §7.3);
+ *  2. recalcula el cache `cantidadPagada` de cada cargo que tocaba, con la suma VIVA
+ *     ({@link prendasPagadasVivas}) — que ya no cuenta las aplicaciones de este pago;
+ *  3. recalcula el estatus derivado `Orden.pagada` de cada orden afectada;
+ *  4. deja bitácora (A7).
+ *
+ * ⚠️ Las filas de `PagoAplicacion` NO se borran (D3: nada se edita ni se borra). Siguen colgando del
+ * pago cancelado como rastro de lo que se hizo; lo que cambia es que la suma que manda las excluye.
+ */
+export async function cancelarPagoMaquileroInterno(
+  tx: Tx,
+  sesion: SesionUsuario,
+  pago: PagoParaCorregir,
+  motivo: string,
+): Promise<void> {
+  const cancelados = await tx.pagoMaquilero.updateMany({
+    where: { id: pago.id, idEmpresa: sesion.idEmpresaActiva, ...WHERE_VIVO_PAGO },
+    data: {
+      canceladoEn: new Date(),
+      canceladoPorId: sesion.id,
+      motivoCancelacion: motivo,
+      ...datosModificacion(sesion),
+    },
+  });
+  if (cancelados.count === 0) {
+    throw new ErrorConflicto(
+      'Ese pago cambió mientras se corregía (alguien lo canceló en paralelo). Vuelve a consultarlo ' +
+        'antes de decidir.',
+    );
+  }
+
+  // Deshace la aplicación: el cache vuelve a ser la suma VIVA, que ya no cuenta este pago.
+  const ordenes = new Set<number>();
+  for (const ap of pago.aplicaciones) {
+    const vivas = await prendasPagadasVivas(tx, ap.idCargo);
+    const cargo = await tx.esMaCargo.update({
+      where: { id: ap.idCargo },
+      data: { cantidadPagada: vivas, ...datosModificacion(sesion) },
+      select: { idOrden: true },
+    });
+    ordenes.add(cargo.idOrden);
+  }
+  for (const idOrden of ordenes) {
+    await recalcularOrdenPagada(tx, sesion, idOrden);
+  }
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'PagoMaquilero',
+    idEntidad: pago.id,
+    accion: 'CANCELAR',
+    datos: {
+      motivo,
+      origen: 'correccion-sin-factura',
+      aplicacionesDeshechas: pago.aplicaciones.map((a) => ({
+        idCargo: a.idCargo,
+        cantidad: a.cantidad.toNumber(),
+      })),
+    },
+  });
+}
+
+/**
+ * Captura el pago BUENO que sustituye al corregido, dentro de la misma transacción.
+ *
+ * Reglas propias de este acto (las de negocio; las técnicas las pone {@link aplicarACargos}):
+ *  • si el pago corregido estaba APLICADO a cargos, el nuevo se aplica a **los mismos cargos con las
+ *    mismas cantidades** y su `monto` se DERIVA de ahí (nunca se acepta un importe suelto: el
+ *    modelo promete `monto = Σ aplicaciones.importe`);
+ *  • si era un pago A CUENTA (sin aplicaciones — el de la corrida semanal, fila 0.113), el importe
+ *    es libre;
+ *  • el `conFactura` se COPIA verbatim del corregido: corregir nunca cambia de segmento (y así un
+ *    movimiento migrado con la modalidad sin definir se puede corregir igual, REGLA 0-B);
+ *  • el `estadoRevision` se hereda: corregir un pago ya revisado no lo saca del saldo a escondidas.
+ *    Que heredar `revisado` exija `esma.revisar` lo verifica `correccion.ts`, como en
+ *    {@link crearPagoACuentaMaquilero}.
+ *
+ * 🔴 **EL RENGLÓN DE LA CORRIDA SEMANAL NO SE REPUNTA — y es DELIBERADO, no un cabo suelto.**
+ * Si el pago corregido nació de una corrida (fila 0.113), su `RenglonCorridaPago` sigue apuntando al
+ * pago VIEJO. **No lo "arregles"**: el renglón es el registro histórico de *lo que esa corrida emitió
+ * ese día*, y la corrección es un hecho POSTERIOR, ligado por `idPagoCorregido`. Repuntarlo sería
+ * reescribir el pasado — justo lo que esta fila existe para evitar. Además el monto que la relación
+ * reporta vive en su propia columna (`RenglonCorridaPago.monto`), así que no hay doble conteo con el
+ * libro; y su FK es `@unique`, de modo que tampoco *podría* apuntar a los dos.
+ */
+export async function recapturarPagoCorregido(
+  tx: Tx,
+  sesion: SesionUsuario,
+  corregido: PagoParaCorregir,
+  cambios: { monto: number; fecha: string; observaciones: string | null },
+): Promise<{ id: number }> {
+  // Nace con el estado de revisión HEREDADO. Si ese estado es `revisado`, escribirlo es un acto de
+  // VALIDACIÓN (fila 0.128), y la garantía vive DENTRO de la función que lo escribe —no en quien la
+  // llame— por la misma razón que en {@link crearPagoACuentaMaquilero}.
+  if (corregido.estadoRevision === 'revisado') {
+    verificarPermiso(sesion, 'esma.revisar');
+  }
+
+  const idEmpresa = sesion.idEmpresaActiva;
+  const aplicado = corregido.aplicaciones.length > 0;
+
+  const resuelto = aplicado
+    ? await aplicarACargos(
+        tx,
+        sesion,
+        idEmpresa,
+        corregido.idMaquilero,
+        corregido.aplicaciones.map((a) => ({
+          idCargo: a.idCargo,
+          cantidad: a.cantidad.toNumber(),
+        })),
+        'correccion',
+      )
+    : null;
+  const monto = resuelto === null ? cambios.monto : resuelto.monto;
+
+  const pago = await tx.pagoMaquilero.create({
+    data: {
+      idEmpresa,
+      idMaquilero: corregido.idMaquilero,
+      monto,
+      fecha: aDateColumna(cambios.fecha),
+      conFactura: corregido.conFactura,
+      estadoRevision: corregido.estadoRevision,
+      ...(cambios.observaciones === null ? {} : { observaciones: cambios.observaciones }),
+      ...(resuelto === null ? {} : { aplicaciones: { create: resuelto.detalle } }),
+      idPagoCorregido: corregido.id,
+      ...datosCreacion(sesion),
+    },
+  });
+
+  if (resuelto !== null) {
+    for (const idOrden of resuelto.ordenesAfectadas) {
+      await recalcularOrdenPagada(tx, sesion, idOrden);
+    }
+  }
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'PagoMaquilero',
+    idEntidad: pago.id,
+    accion: 'CREAR',
+    datos: {
+      idMaquilero: corregido.idMaquilero,
+      monto,
+      conFactura: corregido.conFactura,
+      correccionDe: corregido.id,
+      aplicado,
     },
   });
 
