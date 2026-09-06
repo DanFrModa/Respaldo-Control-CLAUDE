@@ -765,12 +765,24 @@ export interface ExistenciaTelaColorDeLote extends ExistenciaTelaColor {
  * `movimiento_det_tela` DIRECTO — NUNCA la vista `existencia_tela_color` (ADR-0010 §3). Comparte
  * {@link SUMAS_TELA_COLOR} con {@link existenciaTelaColorBloqueada}: misma aritmética, un solo sitio.
  *
- * 🔴 SIN LOCK, y a propósito: es una LECTURA de consulta (la columna «Sistema» de la pantalla de
- * conteo). Un `pg_advisory_xact_lock` exclusivo por color no le añade garantía ninguna —bajo Read
- * Committed la Σ ya ve un snapshot consistente, y el lock se soltaría al commit de la propia
- * lectura, o sea antes de que el usuario teclee nada— y en cambio sí cuesta: cargar un inventario
- * completo son cientos de renglones. La garantía contra "dos personas ajustando contra un saldo
- * viejo" no vive aquí: vive en que el conteo RECALCULA el delta bajo lock al aplicar.
+ * 🔴 **ESTA FUNCIÓN NO TOMA EL LOCK: lo toma —o no— quien la llama.** Tiene dos usos, y sólo por eso
+ * la responsabilidad vive fuera:
+ *
+ *  1. **Lectura de consulta, SIN lock** (la columna «Sistema» de la pantalla de conteo por color).
+ *     Un `pg_advisory_xact_lock` exclusivo por color no le añadiría garantía ninguna —bajo Read
+ *     Committed la Σ ya ve un snapshot consistente, y el lock se soltaría al commit de la propia
+ *     lectura, o sea antes de que el usuario teclee nada— y en cambio sí cuesta: cargar un
+ *     inventario completo son cientos de renglones. La garantía contra "dos personas ajustando
+ *     contra un saldo viejo" no vive aquí: vive en que el conteo RECALCULA el delta bajo lock al
+ *     aplicar.
+ *  2. **Lectura AUTORITATIVA bajo lock** (fila 0.099, `dominio/indicadores/ciclico/tela.ts`): el
+ *     adaptador del inventario cíclico toma `bloquearTelaColor` por CADA id —en orden ascendente,
+ *     el mismo que `partidas-telas.ts`— y sólo entonces llama aquí, una vez, para congelar el
+ *     teórico al abrir la hoja y para re-leer la existencia al cerrarla. Con todos los locks ya
+ *     tomados, esta Σ agrupada ES el valor bajo lock, y por eso el cierre puede decidir con ella.
+ *
+ * ⇒ Al añadir un llamador nuevo, la pregunta no es si esta función bloquea (no lo hace nunca), sino
+ * si ESE llamador necesita el lock y lo tomó antes.
  *
  * Los colores sin NINGÚN movimiento no salen del `GROUP BY`: el llamador los completa con 0.
  */

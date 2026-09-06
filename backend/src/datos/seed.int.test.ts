@@ -143,6 +143,113 @@ describe('seed de fundación', () => {
     expect(await prisma.almacen.count({ where: { tipo: 'PT' } })).toBe(3);
   });
 
+  /**
+   * Fila 0.099 — el gemelo de telas, y por la MISMA razón: el seed sembraba tres almacenes de
+   * producto terminado y uno de avíos, y **ni uno de tipo TELA**. Los de telas nacían SÓLO del ETL
+   * de Access, que es opcional ⇒ en una base sembrada sin ETL, el guard de tipo de la 0.137 dejaba
+   * a los flujos de tela sin un solo almacén válido, y el **inventario cíclico de telas** —la
+   * pantalla del ARRANQUE, con la que se carga el inventario el día uno— sin ninguno que ofrecer
+   * en el alta. Esta fila declara esa siembra PRECONDICIÓN de la pantalla, así que se prueba.
+   */
+  it('siembra UN almacén global de TELAS y no lo duplica al re-sembrar (fila 0.099)', async () => {
+    // `sembrar` ya corrió varias veces en los tests anteriores de este describe.
+    const telas = await prisma.almacen.findMany({ where: { tipo: 'TELA' } });
+    expect(telas).toHaveLength(1);
+    expect(telas[0]).toMatchObject({
+      nombre: 'Almacén de telas',
+      tipo: 'TELA',
+      idEmpresa: null,
+      activo: true,
+      esTransitoProceso: false,
+    });
+
+    // Otra corrida tampoco lo duplica (idempotencia explícita, no heredada de los tests de arriba).
+    await sembrar(prisma);
+    expect(await prisma.almacen.count({ where: { tipo: 'TELA' } })).toBe(1);
+    // Y no se llevó por delante a los vecinos: 3 de PT y 1 de avíos.
+    expect(await prisma.almacen.count({ where: { tipo: 'PT' } })).toBe(3);
+    expect(await prisma.almacen.count({ where: { tipo: 'AVIO' } })).toBe(1);
+  });
+
+  /**
+   * ⭐ Fila 0.099 (revisión) — **la llave de idempotencia es el TIPO, no el NOMBRE**
+   * (`DECISIONES.md` §Post-F9.202).
+   *
+   * El daño que esto impide es concreto: el catálogo **permite renombrar** un almacén y el historial
+   * de versiones se lo dice a Daniel con esas palabras; el `@@unique (idEmpresa, nombre)` **no
+   * atrapa los NULL** de los almacenes globales; y `SEED_ON_START=true` está **permanente** en
+   * `prueba`. Con la llave vieja —buscar por nombre— el primer despliegue después de un renombre
+   * habría creado un SEGUNDO almacén global del mismo tipo: dos «telas» en el desplegable y el
+   * inventario partido en dos, que es exactamente lo que la fila 0.137 vino a evitar.
+   */
+  it('⭐ renombrar el almacén global NO lo duplica al re-sembrar: la llave es el TIPO', async () => {
+    const antesTela = await prisma.almacen.findFirstOrThrow({
+      where: { tipo: 'TELA', idEmpresa: null },
+    });
+    const antesAvio = await prisma.almacen.findFirstOrThrow({
+      where: { tipo: 'AVIO', idEmpresa: null },
+    });
+
+    // Daniel lo renombra desde Administración › Almacenes (cosa permitida y anunciada).
+    await prisma.almacen.update({
+      where: { id: antesTela.id },
+      data: { nombre: 'Bodega de telas Naucalpan' },
+    });
+    await prisma.almacen.update({
+      where: { id: antesAvio.id },
+      data: { nombre: 'Bodega de avíos Naucalpan' },
+    });
+
+    await sembrar(prisma);
+
+    // Sigue habiendo UNO de cada tipo, y es EL MISMO de antes con su nombre nuevo intacto: el seed
+    // ni duplica ni le devuelve el nombre de fábrica a un almacén que alguien renombró a propósito.
+    const telas = await prisma.almacen.findMany({ where: { tipo: 'TELA' } });
+    const avios = await prisma.almacen.findMany({ where: { tipo: 'AVIO' } });
+    expect(telas).toHaveLength(1);
+    expect(avios).toHaveLength(1);
+    expect(telas[0]).toMatchObject({ id: antesTela.id, nombre: 'Bodega de telas Naucalpan' });
+    expect(avios[0]).toMatchObject({ id: antesAvio.id, nombre: 'Bodega de avíos Naucalpan' });
+  });
+
+  /**
+   * ⭐ Fila 0.099 (revisión, 2ª vuelta) — **la llave mira SÓLO los almacenes GLOBALES**, y esta
+   * prueba fija esa mitad: la cláusula `idEmpresa: null` de {@link sembrarAlmacenUnicoGlobal}.
+   *
+   * Sin ella —buscando por `{ tipo }` a secas— un almacén de TELA **de una empresa** contaría como
+   * "ya hay uno", y el seed dejaría de sembrar el GLOBAL. El global es el **piso del catálogo**: lo
+   * que garantiza que cualquier empresa tenga a dónde mover telas aunque nadie le haya dado de alta
+   * los suyos. Un almacén de empresa no puede hacer ese papel, porque para las demás empresas no
+   * existe (A9).
+   *
+   * El escenario es el único en el que la cláusula se nota: **hay uno de empresa y NO hay global**.
+   * Por eso se borra el global antes de re-sembrar — si se dejara puesto, el seed lo encontraría de
+   * todas formas y la prueba no distinguiría nada. La cláusula es del helper COMPARTIDO, así que
+   * probarla en telas la cubre también para avíos.
+   */
+  it('⭐ un almacén de EMPRESA no cuenta como el global: el seed lo siembra igual', async () => {
+    const empresa = await prisma.empresa.findFirstOrThrow({ select: { id: true } });
+    const global = await prisma.almacen.findFirstOrThrow({
+      where: { tipo: 'TELA', idEmpresa: null },
+      select: { id: true },
+    });
+    await prisma.almacen.delete({ where: { id: global.id } });
+    const deEmpresa = await prisma.almacen.create({
+      data: { nombre: 'Telas de FR Moda', tipo: 'TELA', idEmpresa: empresa.id },
+    });
+    expect(await prisma.almacen.count({ where: { tipo: 'TELA', idEmpresa: null } })).toBe(0);
+
+    await sembrar(prisma);
+
+    // El global vuelve a nacer, con su nombre de fábrica…
+    const globales = await prisma.almacen.findMany({ where: { tipo: 'TELA', idEmpresa: null } });
+    expect(globales).toHaveLength(1);
+    expect(globales[0]).toMatchObject({ nombre: 'Almacén de telas', activo: true });
+    // …y el de la empresa queda intacto: el seed no lo confundió con el suyo ni lo tocó.
+    const trasSeed = await prisma.almacen.findUniqueOrThrow({ where: { id: deEmpresa.id } });
+    expect(trasSeed).toMatchObject({ nombre: 'Telas de FR Moda', idEmpresa: empresa.id });
+  });
+
   it('siembra los 8 géneros base (F1-E4) de forma idempotente', async () => {
     const generos = await prisma.genero.findMany({ select: { nombre: true } });
     const nombres = generos.map((g) => g.nombre).sort();

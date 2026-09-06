@@ -148,6 +148,57 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   movimiento de los que ya están capturados.
 - **La versión NO siembra permisos nuevos ni catálogos**; sí lleva **cambios en la base** (las columnas
   del rastro y de la llave), que se aplican solos al desplegar.
+## 0.120 · 6-sep-2026 · **en prueba** — **Contar el almacén de telas y el de avíos con la misma hoja que ya se usaba para la ropa**
+
+### Qué se puede hacer ahora que antes no
+
+- **Levantar un conteo físico de telas o de avíos igual que se levantaba de producto terminado**: una hoja
+  con su folio, el saldo del sistema **congelado en el momento de abrirla**, la hoja para imprimir y
+  llevarse al anaquel, la captura, el resultado de qué cuadró y qué no, y el ajuste. Hasta hoy eso sólo
+  existía para la ropa; las telas y los avíos se corregían a mano, movimiento por movimiento.
+- **No hay que decirle al sistema qué se va a contar: lo sabe por el almacén.** Se elige el almacén y él
+  decide si la hoja es de ropa, de telas o de avíos, porque cada almacén guarda una sola clase de
+  mercancía.
+- **Se captura lo que se contó, nunca una resta**, y en telas y avíos **con el saldo del sistema a la
+  vista** —en la pantalla y también en la hoja impresa—. En producto terminado el conteo sigue siendo a
+  ciegas, como se decidió en su día.
+- **Se puede anotar mercancía que el sistema cree que no tiene.** Antes la hoja sólo traía lo que ya tenía
+  saldo, así que lo que apareciera en el anaquel y no estuviera en el sistema **no había dónde apuntarlo**.
+  Por lo mismo, ahora **se puede abrir una hoja de un almacén que el sistema cree vacío** y llenarla a
+  mano: es exactamente lo que hace falta el día que se cargue el inventario de telas por primera vez.
+- **Las telas que llevan dos componentes (la felpa con su cardigan) se cuentan con sus dos números**, y el
+  ajuste mueve cada uno por su lado: puede sobrar uno y faltar el otro en el mismo renglón.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **El sistema ahora AVISA cuando el almacén se movió mientras se contaba, y espera a que alguien
+  decida.** Ejemplo real: el sistema tenía 100, se contaron 95 y en medio entraron 20 piezas de verdad.
+  Antes se aplicaba la diferencia de −5 en silencio y quedaban **115** en el sistema mientras el anaquel
+  decía 95. Ahora el primer intento de ajustar **no escribe nada**: devuelve la lista de artículos que se
+  movieron, con lo que había congelado, lo que hay ahora, lo contado y **en cuánto va a quedar si se
+  aplica**. El segundo intento —ya viéndolo— aplica. **Avisa, no bloquea.**
+  🔴 **Y esto no era sólo de telas y avíos: le faltaba también a producto terminado**, desde que el conteo
+  cíclico existe. Se arregló en las tres.
+- **Ajustar un conteo de telas o de avíos pide, además del permiso de conteos, el de mover ese
+  inventario.** Quien podía hacer conteos de ropa y no tocar el almacén de telas **sigue sin poder
+  tocarlo**: el conteo escribe en el inventario, y esa llave no se regala.
+- **El ajuste que sale de un conteo cerrado ya no se puede deshacer desde las pantallas de inventarios.**
+  Si se deshiciera, la hoja seguiría diciendo «cerrada» mientras el inventario cuenta otra cosa. Si el
+  conteo estuvo mal, se corrige **con un movimiento manual nuevo**, que es como se corrige todo aquí: nada
+  se edita ni se borra.
+- **Si alguien cambia la ficha de una tela mientras hay una hoja de conteo abierta** (ponerle o quitarle el
+  segundo componente), **la hoja no cambia de forma**: sigue pidiendo los números que congeló al abrirse.
+  Antes eso podía pedir un número que el ajuste ignoraba, o dejar la hoja imposible de cerrar.
+
+### Qué sigue pendiente o roto
+
+- **El despliegue siembra un almacén nuevo: «Almacén de telas».** Hacía falta: el sistema no traía ninguno
+  de tipo tela salvo los que llegan de Access, así que una base recién instalada **no tenía almacén que
+  ofrecer** justo en la pantalla del arranque. Se puede renombrar desde Administración › Almacenes. Nada
+  más se siembra, y **nada de lo ya cargado se toca**.
+- **Los conteos que ya existían siguen siendo de producto terminado** y se ven igual que siempre.
+- La ubicación física dentro del almacén (pasillo, rack) **no entra todavía** en la hoja de conteo: va en
+  otra versión.
 
 ## 0.119 · 5-sep-2026 · **en prueba** — **Sacar material sin que vaya a ninguna orden — y que sólo la dirección pueda hacerlo**
 

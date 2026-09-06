@@ -96237,6 +96237,8 @@ export interface paths {
           /** @description abierto → contado → cerrado (ajuste aplicado); cancelado = abortado antes de cerrar. */
           estado?: 'abierto' | 'contado' | 'cerrado' | 'cancelado';
           idAlmacen?: number;
+          /** @description Qué se cuenta; se deriva del tipo del almacén, no se captura. */
+          dimension?: 'PT' | 'TELA' | 'AVIO';
         };
         header?: never;
         path?: never;
@@ -96257,6 +96259,11 @@ export interface paths {
                 idEmpresa: number;
                 idAlmacen: number;
                 almacen: string;
+                /**
+                 * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+                 * @enum {string}
+                 */
+                dimension: 'PT' | 'TELA' | 'AVIO';
                 /** Format: date */
                 fecha: string;
                 /**
@@ -96377,8 +96384,12 @@ export interface paths {
         content: {
           'application/json': {
             idAlmacen: number;
-            /** @description Modelos a revisar; vacío/ausente = todo el almacén. */
+            /** @description Solo almacenes de PT: modelos a revisar; vacío/ausente = todo el almacén. */
             idsModelo?: number[];
+            /** @description Solo almacenes de TELA: telas a revisar; vacío/ausente = todo el almacén. */
+            idsTela?: number[];
+            /** @description Solo almacenes de AVÍO: avíos a revisar; vacío/ausente = todo el almacén. */
+            idsAvio?: number[];
             observaciones?: string;
           };
         };
@@ -96396,6 +96407,11 @@ export interface paths {
               idEmpresa: number;
               idAlmacen: number;
               almacen: string;
+              /**
+               * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+               * @enum {string}
+               */
+              dimension: 'PT' | 'TELA' | 'AVIO';
               /** Format: date */
               fecha: string;
               /**
@@ -96535,6 +96551,11 @@ export interface paths {
               idEmpresa: number;
               idAlmacen: number;
               almacen: string;
+              /**
+               * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+               * @enum {string}
+               */
+              dimension: 'PT' | 'TELA' | 'AVIO';
               /** Format: date */
               fecha: string;
               /**
@@ -96664,7 +96685,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Vista de captura de conteo — CIEGA (sin teórico, doc 05 §Almacén / D6). */
+        /** @description Vista de captura de conteo (doc 05 §Almacén / D6). */
         200: {
           headers: {
             [name: string]: unknown;
@@ -96675,6 +96696,11 @@ export interface paths {
               folio: number;
               idAlmacen: number;
               almacen: string;
+              /**
+               * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+               * @enum {string}
+               */
+              dimension: 'PT' | 'TELA' | 'AVIO';
               /** Format: date */
               fecha: string;
               /**
@@ -96684,17 +96710,20 @@ export interface paths {
               estado: 'abierto' | 'contado' | 'cerrado' | 'cancelado';
               renglones: {
                 idDet: number;
-                idModelo: number;
-                modelo: string;
-                idColor: number;
-                color: string;
-                idTalla: number;
-                etiquetaTalla: string;
-                ordenTalla: number;
-                idOrden: number | null;
-                folioOrden: number | null;
+                /** @description El artículo: código del modelo, nombre de la tela o clave del avío. */
+                titulo: string;
+                /** @description Lo que lo distingue: color·talla·orden, el color de la tela, la descripción del avío. */
+                subtitulo: string | null;
+                /** @description Unidad de la cantidad (m, kg, pza…); null si no aplica. */
+                unidad: string | null;
+                /** @description Saldo del sistema al abrir la hoja. AUSENTE en PT (conteo ciego, D6). */
+                cantTeorica?: number;
                 /** @description Cantidad física capturada; null si no se ha contado. */
                 cantReal: number | null;
+                /** @description Nombre del segundo componente de la tela (D5); null si el artículo no lleva. */
+                nombreComplemento: string | null;
+                cantTeoricaComplemento?: number;
+                cantRealComplemento: number | null;
                 contado: boolean;
               }[];
             };
@@ -96799,12 +96828,14 @@ export interface paths {
             renglones: {
               idDet: number;
               cantReal: number;
+              /** @description Solo telas CON complemento (D5): lo contado del cardigan. */
+              cantRealComplemento?: number;
             }[];
           };
         };
       };
       responses: {
-        /** @description Vista de captura de conteo — CIEGA (sin teórico, doc 05 §Almacén / D6). */
+        /** @description Vista de captura de conteo (doc 05 §Almacén / D6). */
         200: {
           headers: {
             [name: string]: unknown;
@@ -96815,6 +96846,11 @@ export interface paths {
               folio: number;
               idAlmacen: number;
               almacen: string;
+              /**
+               * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+               * @enum {string}
+               */
+              dimension: 'PT' | 'TELA' | 'AVIO';
               /** Format: date */
               fecha: string;
               /**
@@ -96824,17 +96860,185 @@ export interface paths {
               estado: 'abierto' | 'contado' | 'cerrado' | 'cancelado';
               renglones: {
                 idDet: number;
-                idModelo: number;
-                modelo: string;
-                idColor: number;
-                color: string;
-                idTalla: number;
-                etiquetaTalla: string;
-                ordenTalla: number;
-                idOrden: number | null;
-                folioOrden: number | null;
+                /** @description El artículo: código del modelo, nombre de la tela o clave del avío. */
+                titulo: string;
+                /** @description Lo que lo distingue: color·talla·orden, el color de la tela, la descripción del avío. */
+                subtitulo: string | null;
+                /** @description Unidad de la cantidad (m, kg, pza…); null si no aplica. */
+                unidad: string | null;
+                /** @description Saldo del sistema al abrir la hoja. AUSENTE en PT (conteo ciego, D6). */
+                cantTeorica?: number;
                 /** @description Cantidad física capturada; null si no se ha contado. */
                 cantReal: number | null;
+                /** @description Nombre del segundo componente de la tela (D5); null si el artículo no lleva. */
+                nombreComplemento: string | null;
+                cantTeoricaComplemento?: number;
+                cantRealComplemento: number | null;
+                contado: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/indicadores/ciclicos/{id}/renglones': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Agregar a la hoja un artículo que el sistema cree que no tiene */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            idModelo?: number;
+            idColor?: number;
+            idTalla?: number;
+            /** @description PT: orden dueña de las prendas; ausente/null = bucket «sin orden». */
+            idOrden?: number | null;
+            idTelaColor?: number;
+            idAvio?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Vista de captura de conteo (doc 05 §Almacén / D6). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              folio: number;
+              idAlmacen: number;
+              almacen: string;
+              /**
+               * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+               * @enum {string}
+               */
+              dimension: 'PT' | 'TELA' | 'AVIO';
+              /** Format: date */
+              fecha: string;
+              /**
+               * @description abierto → contado → cerrado (ajuste aplicado); cancelado = abortado antes de cerrar.
+               * @enum {string}
+               */
+              estado: 'abierto' | 'contado' | 'cerrado' | 'cancelado';
+              renglones: {
+                idDet: number;
+                /** @description El artículo: código del modelo, nombre de la tela o clave del avío. */
+                titulo: string;
+                /** @description Lo que lo distingue: color·talla·orden, el color de la tela, la descripción del avío. */
+                subtitulo: string | null;
+                /** @description Unidad de la cantidad (m, kg, pza…); null si no aplica. */
+                unidad: string | null;
+                /** @description Saldo del sistema al abrir la hoja. AUSENTE en PT (conteo ciego, D6). */
+                cantTeorica?: number;
+                /** @description Cantidad física capturada; null si no se ha contado. */
+                cantReal: number | null;
+                /** @description Nombre del segundo componente de la tela (D5); null si el artículo no lleva. */
+                nombreComplemento: string | null;
+                cantTeoricaComplemento?: number;
+                cantRealComplemento: number | null;
                 contado: boolean;
               }[];
             };
@@ -96959,6 +97163,11 @@ export interface paths {
               idEmpresa: number;
               idAlmacen: number;
               almacen: string;
+              /**
+               * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+               * @enum {string}
+               */
+              dimension: 'PT' | 'TELA' | 'AVIO';
               /** Format: date */
               fecha: string;
               /**
@@ -96971,29 +97180,31 @@ export interface paths {
               motivoCancelacion: string | null;
               renglones: {
                 idDet: number;
-                idModelo: number;
-                modelo: string;
-                idColor: number;
-                color: string;
-                idTalla: number;
-                etiquetaTalla: string;
-                ordenTalla: number;
-                idOrden: number | null;
-                folioOrden: number | null;
+                titulo: string;
+                subtitulo: string | null;
+                unidad: string | null;
                 cantTeorica: number;
                 cantReal: number | null;
                 /** @description cantReal − cantTeorica; null si el renglón no se ha contado. */
                 exactitud: number | null;
-                idMovimientoAjuste: number | null;
-                folioMovimientoAjuste: number | null;
+                nombreComplemento: string | null;
+                cantTeoricaComplemento: number | null;
+                cantRealComplemento: number | null;
+                exactitudComplemento: number | null;
+                ajustes: {
+                  id: number;
+                  folio: number;
+                  /** @enum {string} */
+                  direccion: 'entrada' | 'salida';
+                }[];
               }[];
               totales: {
                 /** @description Artículos enumerados. */
                 total: number;
                 contados: number;
-                /** @description Renglones contados con exactitud 0. */
+                /** @description Renglones contados sin diferencia en NINGÚN componente. */
                 exactos: number;
-                /** @description Renglones contados con exactitud ≠ 0. */
+                /** @description Renglones contados con diferencia en algún componente. */
                 diferencias: number;
                 teorico: number;
                 /** @description Suma de cantReal (solo renglones contados). */
@@ -97101,7 +97312,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Generar el ajuste (movimientos de kardex, D3) */
+    /**
+     * Generar el ajuste (movimientos de kardex, D3)
+     * @description Si el almacén se movió entre el alta y el cierre, responde 200 con `aplicado: false` y el AVISO de qué artículos se movieron, SIN escribir nada (decisión 6: avisar y dejar decidir, no bloquear). Repetir con `confirmarMovimiento: true` aplica.
+     */
     post: {
       parameters: {
         query?: never;
@@ -97111,59 +97325,103 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description true = ya vi el aviso de que el almacén se movió y aun así quiero aplicar.
+             * @default false
+             */
+            confirmarMovimiento?: boolean;
+          };
+        };
+      };
       responses: {
-        /** @description Vista de exactitud + generación del ajuste (permiso de consulta). */
+        /** @description Ajuste del cíclico: aplicado, o detenido con el aviso de que el almacén se movió. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             'application/json': {
-              id: number;
-              folio: number;
-              idEmpresa: number;
-              idAlmacen: number;
-              almacen: string;
-              /** Format: date */
-              fecha: string;
-              /**
-               * @description abierto → contado → cerrado (ajuste aplicado); cancelado = abortado antes de cerrar.
-               * @enum {string}
-               */
-              estado: 'abierto' | 'contado' | 'cerrado' | 'cancelado';
-              observaciones: string | null;
-              canceladoEn: string | null;
-              motivoCancelacion: string | null;
-              renglones: {
-                idDet: number;
-                idModelo: number;
-                modelo: string;
-                idColor: number;
-                color: string;
-                idTalla: number;
-                etiquetaTalla: string;
-                ordenTalla: number;
-                idOrden: number | null;
-                folioOrden: number | null;
-                cantTeorica: number;
-                cantReal: number | null;
-                /** @description cantReal − cantTeorica; null si el renglón no se ha contado. */
-                exactitud: number | null;
-                idMovimientoAjuste: number | null;
-                folioMovimientoAjuste: number | null;
-              }[];
-              totales: {
-                /** @description Artículos enumerados. */
-                total: number;
-                contados: number;
-                /** @description Renglones contados con exactitud 0. */
-                exactos: number;
-                /** @description Renglones contados con exactitud ≠ 0. */
-                diferencias: number;
-                teorico: number;
-                /** @description Suma de cantReal (solo renglones contados). */
-                real: number;
+              /** @description false = NO se escribió nada: hay un aviso que confirmar antes de aplicar. */
+              aplicado: boolean;
+              aviso: {
+                articulos: {
+                  idDet: number;
+                  titulo: string;
+                  subtitulo: string | null;
+                  /**
+                   * @description Qué componente se movió (las telas tienen dos; PT y avíos, sólo «cuerpo»).
+                   * @enum {string}
+                   */
+                  componente: 'cuerpo' | 'complemento';
+                  /** @description Lo que el sistema tenía CONGELADO al abrir la hoja. */
+                  cantTeorica: number;
+                  /** @description Lo que el sistema tiene AHORA (Σ de movimientos, D3). */
+                  existenciaActual: number;
+                  /** @description Lo que se contó físicamente; null si no se contó. */
+                  cantReal: number | null;
+                  /** @description Lo que el ajuste va a mover en este componente (contado − teórico congelado). */
+                  ajuste: number;
+                  /** @description Existencia que quedará si se aplica: existenciaActual + ajuste. */
+                  existenciaResultante: number;
+                }[];
+              } | null;
+              /** @description Vista de exactitud + generación del ajuste (permiso de consulta). */
+              exactitud: {
+                id: number;
+                folio: number;
+                idEmpresa: number;
+                idAlmacen: number;
+                almacen: string;
+                /**
+                 * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+                 * @enum {string}
+                 */
+                dimension: 'PT' | 'TELA' | 'AVIO';
+                /** Format: date */
+                fecha: string;
+                /**
+                 * @description abierto → contado → cerrado (ajuste aplicado); cancelado = abortado antes de cerrar.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'contado' | 'cerrado' | 'cancelado';
+                observaciones: string | null;
+                canceladoEn: string | null;
+                motivoCancelacion: string | null;
+                renglones: {
+                  idDet: number;
+                  titulo: string;
+                  subtitulo: string | null;
+                  unidad: string | null;
+                  cantTeorica: number;
+                  cantReal: number | null;
+                  /** @description cantReal − cantTeorica; null si el renglón no se ha contado. */
+                  exactitud: number | null;
+                  nombreComplemento: string | null;
+                  cantTeoricaComplemento: number | null;
+                  cantRealComplemento: number | null;
+                  exactitudComplemento: number | null;
+                  ajustes: {
+                    id: number;
+                    folio: number;
+                    /** @enum {string} */
+                    direccion: 'entrada' | 'salida';
+                  }[];
+                }[];
+                totales: {
+                  /** @description Artículos enumerados. */
+                  total: number;
+                  contados: number;
+                  /** @description Renglones contados sin diferencia en NINGÚN componente. */
+                  exactos: number;
+                  /** @description Renglones contados con diferencia en algún componente. */
+                  diferencias: number;
+                  teorico: number;
+                  /** @description Suma de cantReal (solo renglones contados). */
+                  real: number;
+                };
               };
             };
           };
@@ -97295,6 +97553,11 @@ export interface paths {
               idEmpresa: number;
               idAlmacen: number;
               almacen: string;
+              /**
+               * @description Qué se cuenta; se deriva del tipo del almacén, no se captura.
+               * @enum {string}
+               */
+              dimension: 'PT' | 'TELA' | 'AVIO';
               /** Format: date */
               fecha: string;
               /**
@@ -97410,7 +97673,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Hoja de conteo en PDF (CIEGA — sin teórico, R9) */
+    /** Hoja de conteo en PDF (R9; ciega en PT — sin teórico, D6) */
     get: {
       parameters: {
         query?: never;

@@ -1443,40 +1443,48 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3f-bis. Almacén de AVÍOS (fila 0.137)
+// 3f-bis. Los almacenes ÚNICOS de AVÍOS (fila 0.137) y de TELAS (fila 0.099)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Nombre del ÚNICO almacén de AVÍOS que siembra el catálogo base. UNO, no tres: el sistema viejo
- * no tenía almacenes de avíos (`IPT_Almacenes` era de PT y `Almacenes` de telas, por eso el ETL
- * no crea ninguno de tipo AVIO), así que aquí no hay lista que copiar — hay un lugar donde poner
- * los avíos. Si mañana hacen falta más, se dan de alta desde el catálogo.
- */
+/** Nombre con el que NACE el almacén único de avíos (fila 0.137). Renombrable desde el catálogo. */
 const ALMACEN_AVIOS_BASE = 'Almacén de avíos';
+/** Nombre con el que NACE el almacén único de telas (fila 0.099). Renombrable desde el catálogo. */
+const ALMACEN_TELAS_BASE = 'Almacén de telas';
 
 /**
- * Siembra el almacén de AVÍOS base (fila 0.137).
+ * Siembra **UN** almacén GLOBAL del tipo dado, si el catálogo no tiene ya ninguno de ese tipo.
  *
- * ⚠️ POR QUÉ EXISTE ESTE SEED. Desde la fila 0.137 el dominio exige que el tipo del almacén case
- * con el del artículo que se mueve (`comun/almacenes.ts` → `exigirAlmacenDelTipo`). Los avíos se
- * mueven en CUATRO flujos —ajuste, traspaso, recepción de compra y notas de salida— y hasta hoy
- * **el catálogo no tenía ni un almacén de tipo AVIO**: ni el seed (que sembraba 3 de PT) ni el ETL
- * (`migracion/loaders/almacenes.ts`, que mapea a PT y TELA) creaban uno. Sin esta siembra, esos
- * cuatro flujos rechazarían SIEMPRE, contra cualquier almacén del catálogo.
+ * ⚠️ **POR QUÉ EXISTEN ESTOS DOS SEEDS.** Desde la fila 0.137 el dominio exige que el tipo del
+ * almacén case con el del artículo que se mueve (`comun/almacenes.ts` → `exigirAlmacenDelTipo`), y
+ * el catálogo base **no tenía ninguno** ni de AVIO ni de TELA: el seed sembraba tres de producto
+ * terminado y el ETL de Access mapea los almacenes viejos a PT y TELA — o sea que los avíos no
+ * tenían dónde caer nunca, y las telas sólo si alguien corría el ETL. Sin esta siembra, los flujos
+ * de avíos (ajuste, traspaso, recepción de compra, notas de salida) y el **inventario cíclico de
+ * telas** —la pantalla del ARRANQUE— rechazan contra cualquier almacén del catálogo, o directamente
+ * no tienen ninguno que ofrecer.
  *
- * Idempotente por `(nombre, tipo AVIO, global)`, con el mismo truco que {@link sembrarAlmacenesPt}:
- * el `@@unique` de almacenes es `(idEmpresa, nombre)` y Postgres trata los NULL como distintos, así
- * que un almacén GLOBAL no queda cubierto por el índice y hay que verificarlo a mano antes de crear.
+ * ⭐ **LA LLAVE DE IDEMPOTENCIA ES EL TIPO, NO EL NOMBRE** (decisión del lead en la revisión de la
+ * fila 0.099, `DECISIONES.md` §Post-F9.202). Antes se buscaba por `(nombre, tipo, global)`, y eso
+ * convertía un renombre en un duplicado silencioso: el catálogo **permite renombrar** un almacén (y
+ * el historial de versiones se lo dice a Daniel), el `@@unique (idEmpresa, nombre)` **no atrapa los
+ * NULL** de los globales, y `SEED_ON_START=true` está **permanente** en `prueba` ⇒ el siguiente
+ * arranque habría creado un SEGUNDO almacén global del mismo tipo, partiendo el inventario en dos
+ * — el daño exacto que la fila 0.137 vino a evitar. Preguntando por el TIPO, renombrar es inocuo.
+ *
+ * Lo que este seed NO hace: no toca el almacén que ya exista (ni su nombre, ni su estado), y no
+ * cuenta los de EMPRESA — un almacén global es el piso del catálogo, no un almacén de nadie.
  */
-async function sembrarAlmacenAvios(prisma: PrismaClient): Promise<void> {
+async function sembrarAlmacenUnicoGlobal(
+  prisma: PrismaClient,
+  tipo: 'AVIO' | 'TELA',
+  nombre: string,
+): Promise<void> {
   const existente = await prisma.almacen.findFirst({
-    where: { nombre: ALMACEN_AVIOS_BASE, tipo: 'AVIO', idEmpresa: null },
+    where: { tipo, idEmpresa: null },
     select: { id: true },
   });
   if (existente === null) {
-    await prisma.almacen.create({
-      data: { nombre: ALMACEN_AVIOS_BASE, tipo: 'AVIO', idEmpresa: null },
-    });
+    await prisma.almacen.create({ data: { nombre, tipo, idEmpresa: null } });
   }
 }
 
@@ -1775,7 +1783,11 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarAlmacenesPt(prisma);
   // Fila 0.137: el almacén de AVÍOS base. Sin él, el guard de tipo dejaría los cuatro flujos de
   // avíos sin un solo almacén válido que elegir (el viejo no tenía almacenes de avíos).
-  await sembrarAlmacenAvios(prisma);
+  await sembrarAlmacenUnicoGlobal(prisma, 'AVIO', ALMACEN_AVIOS_BASE);
+  // Fila 0.099: el almacén de TELAS base, por la misma razón — el seed no sembraba ninguno de tipo
+  // TELA (sólo el ETL los creaba) y el cíclico de telas, que es la pantalla del ARRANQUE, se
+  // quedaba sin almacén que elegir.
+  await sembrarAlmacenUnicoGlobal(prisma, 'TELA', ALMACEN_TELAS_BASE);
   // Fichas confiables (F7-E4): los 8 reactivos fijos del checklist del viejo (IP_InfConf), ahora
   // filas configurables (A6). Idempotente por clave.
   await sembrarReactivosFicha(prisma);

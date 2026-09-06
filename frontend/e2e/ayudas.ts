@@ -120,6 +120,43 @@ export async function elegirEnCombobox(
 }
 
 /**
+ * Elige una opción de un `<select>` nativo buscándola por el **PREFIJO** de su texto, no por su
+ * etiqueta completa.
+ *
+ * ⚠️ **Por qué existe** (cicatriz del 6-sep-2026, fila 0.099): varias pantallas le pegan
+ * información EXTRA al nombre del artículo dentro de la opción. El desplegable de almacén del
+ * inventario cíclico pasó a decir «Primeras · Producto terminado», porque ahí la dimensión de lo
+ * que se cuenta la manda el TIPO del almacén y el usuario tiene que verla. El `label` de
+ * `selectOption` es **coincidencia EXACTA**, así que el spec que pedía `label: 'Primeras'` se puso
+ * rojo en CI — un cambio de etiqueta legítimo tumbando una prueba que no medía la etiqueta.
+ *
+ * Este ayudante resuelve el `value` de la opción y selecciona por él: la prueba queda atada a la
+ * **identidad** del almacén, no a cómo se escriba hoy su renglón. **Si un `<select>` gana texto
+ * extra en sus opciones, su e2e se pasa a este ayudante** — misma regla que {@link elegirEnCombobox}
+ * para los desplegables que se volvieron combobox.
+ *
+ * `toHaveCount(1)` hace dos cosas: espera a que las opciones terminen de cargar (es aserción
+ * web-first, reintenta) y **exige que el prefijo no sea ambiguo** — con dos coincidencias falla
+ * diciéndolo, en vez de elegir una al azar. El `startsWith` remata: `hasText` busca subcadena, así
+ * que sin él una opción que llevara el prefijo EN MEDIO pasaría por buena.
+ *
+ * El timeout va explícito y por encima de los 10 s del `expect` global: esta suele ser la PRIMERA
+ * interacción con un diálogo recién abierto, y lo que se espera es el viaje al servidor por el
+ * catálogo. El `selectOption` al que sustituye no tenía ese techo —se comía el presupuesto entero
+ * del test—, así que sin esto el arreglo introduciría una ventana de espera más corta que la de
+ * antes: cambiar un rojo por un flaky no es arreglarlo.
+ */
+export async function elegirEnSelectPorPrefijo(select: Locator, prefijo: string): Promise<void> {
+  const opcion = select.locator('option').filter({ hasText: prefijo });
+  await expect(opcion, `opciones que contienen «${prefijo}»`).toHaveCount(1, { timeout: 20_000 });
+  const texto = ((await opcion.textContent()) ?? '').trim();
+  expect(texto.startsWith(prefijo), `«${texto}» debe empezar por «${prefijo}»`).toBe(true);
+  const valor = await opcion.getAttribute('value');
+  expect(valor, `la opción «${texto}» debe tener value`).not.toBeNull();
+  await select.selectOption(valor as string);
+}
+
+/**
  * Elige un CLIENTE en el combobox con búsqueda server-side (V1-E4 punto 7).
  *
  * Antes era un `<select>` alimentado de la primera página del catálogo (`porPagina: 100`, que

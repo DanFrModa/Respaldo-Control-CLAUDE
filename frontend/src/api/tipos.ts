@@ -1988,6 +1988,16 @@ export type ExactitudCiclico =
   paths['/api/indicadores/ciclicos/{id}/exactitud']['get']['responses']['200']['content']['application/json'];
 /** Un renglón de exactitud (teórico vs real). */
 export type ExactitudCiclicoRenglon = ExactitudCiclico['renglones'][number];
+/** Qué cuenta la hoja (se deriva del tipo del almacén — fila 0.099). */
+export type DimensionCiclico = InventarioCiclicoResumen['dimension'];
+/** Agregar a la hoja un artículo que el sistema cree que no tiene (`POST .../renglones`). */
+export type CiclicoRenglonAgregar =
+  paths['/api/indicadores/ciclicos/{id}/renglones']['post']['requestBody']['content']['application/json'];
+/** Resultado de pedir el ajuste: aplicado, o detenido con el aviso de que el almacén se movió. */
+export type AjusteCiclico =
+  paths['/api/indicadores/ciclicos/{id}/ajuste']['post']['responses']['200']['content']['application/json'];
+/** Un artículo que se movió entre el alta y el cierre de la hoja (decisión 6). */
+export type CiclicoArticuloMovido = NonNullable<AjusteCiclico['aviso']>['articulos'][number];
 
 // ── CxP: cuentas por pagar de proveedores (Módulo 14, F9-E2) ──────────────────
 
