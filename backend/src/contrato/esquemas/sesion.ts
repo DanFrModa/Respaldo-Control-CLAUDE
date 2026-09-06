@@ -30,6 +30,11 @@ export const esquemaSesionActual = z
     permisos: z
       .array(z.enum(CLAVES_PERMISO))
       .describe('Claves de permiso efectivas del usuario (unión de sus roles).'),
+    // ⚠️ Fila 0.145: la bandera `Usuario.puedeCorregirSinFactura` NO viaja aquí, a propósito. La
+    // interfaz no la necesita —y no debe re-derivar la regla—: cada renglón del estado de cuenta
+    // trae ya su `corregible`, calculado por el servidor con las CINCO condiciones (bandera, sin
+    // factura, vivo, no-inverso, y en EsMa no ser un cargo). Así nunca se pinta un botón que el
+    // servidor va a rechazar, ni al revés.
   })
   .describe('Usuario actualmente autenticado, su empresa activa y sus permisos.');
 

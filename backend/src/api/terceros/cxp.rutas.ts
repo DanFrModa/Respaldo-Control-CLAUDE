@@ -17,6 +17,7 @@ import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
+  esquemaCorreccionSinFactura,
   esquemaMovimientoCxpCrear,
   esquemaBandejaCxpQuery,
   esquemaBandejaCxpSalida,
@@ -33,6 +34,7 @@ import {
   estadoCuentaProveedorCxp,
   registrarMovimientoCxp,
   cancelarMovimientoCxp,
+  corregirMovimientoCxp,
 } from '../../dominio/terceros/cxp/cxp.js';
 import { impresoEstadoCuentaCxp } from '../../dominio/terceros/cxp/impresos/impreso-estado-cuenta-cxp.js';
 
@@ -179,6 +181,33 @@ export const rutasCxp: FastifyPluginCallbackZod = (app, _opciones, done) => {
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return cancelarMovimientoCxp(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ── Corrección de un movimiento SIN FACTURA (fila 0.145) ──────────────────────
+  //
+  // Un gesto («corregir»), dos hechos: se anula el viejo con su inverso y nace el bueno, ligados, en
+  // UNA transacción. `cxp.administrar` es el permiso del MÓDULO; la autorización de verdad es la
+  // bandera `Usuario.puedeCorregirSinFactura`, que NO es un permiso y la exige el dominio (A1).
+  app.route({
+    method: 'POST',
+    url: '/cxp/movimientos/:id/corregir',
+    preHandler: app.conPermiso('cxp.administrar'),
+    schema: {
+      tags: ['cxp'],
+      summary: 'Corregir un movimiento de CxP SIN FACTURA (anula el viejo y captura el bueno, D3)',
+      description:
+        'Reservado a la dirección por una bandera de la persona que no se otorga con ningún ' +
+        'permiso ni desde ninguna pantalla. Un renglón con CFDI se rechaza aunque sea del mismo ' +
+        'proveedor: el segmento con/sin factura es del MOVIMIENTO, no del tercero.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaCorreccionSinFactura,
+      response: { 200: esquemaMovimientoTerceroSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return corregirMovimientoCxp(sesion, request.params.id, request.body);
     },
   });
 

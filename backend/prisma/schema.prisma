@@ -260,12 +260,23 @@ model Usuario {
   image           String? @map("imagen")
 
   /// Borrado suave (plan §4: patrón conservado del sistema viejo): un usuario que se va se desactiva, jamás se borra.
-  activo           Boolean @default(true)
+  activo                  Boolean @default(true)
   /// Bloqueado por intentos fallidos (regla viejo sistema: 5 intentos, doc 00 §1.1).
-  bloqueado        Boolean @default(false)
-  intentosFallidos Int     @default(0) @map("intentos_fallidos")
+  bloqueado               Boolean @default(false)
+  intentosFallidos        Int     @default(0) @map("intentos_fallidos")
   /// Bandera de auditor de calidad (viejo: `Usuarios.EsAuditor`).
-  esAuditor        Boolean @default(false) @map("es_auditor")
+  esAuditor               Boolean @default(false) @map("es_auditor")
+  /// ⭐ CORREGIR movimientos SIN FACTURA (fila 0.145, DANIEL 6-sep-2026 — §Post-F9.203): *«Quiero
+  /// tener manera de modificar cualquier registro que se meta en cualquier estado de cuenta de los
+  /// proveedores sin factura. **Sólo yo. Nadie más ni con permiso. Sólo yo.**»*
+  ///
+  /// 🔴 NO ES UN PERMISO Y NO SE ASIGNA DESDE NINGUNA PANTALLA. Es una bandera de la PERSONA —el
+  /// mismo patrón que {@link esAuditor}—, y a diferencia de aquélla NO viaja en ningún esquema de
+  /// alta/edición de usuarios: no hay endpoint que la escriba. Se prende **sólo por base de datos**
+  /// (`UPDATE usuarios SET puede_corregir_sin_factura = TRUE WHERE username = '…'`). Por eso NO es
+  /// `roles.administrar` ni un `cxp.corregir` nuevo: un permiso se reparte, y Daniel dijo
+  /// explícitamente *«ni con permiso»*.
+  puedeCorregirSinFactura Boolean @default(false) @map("puede_corregir_sin_factura")
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -5142,13 +5153,32 @@ model AbonoMaquilero {
   observaciones  String?            @db.Text
   estadoRevision EstadoRevisionEsMa @default(capturado) @map("estado_revision")
 
+  /// ⭐ Fila 0.145 — CANCELACIÓN SUAVE (D3: nunca se edita ni se borra), gemela de la que el
+  /// descuento tiene desde la 0.109. La usa la CORRECCIÓN de un movimiento SIN FACTURA: el abono
+  /// viejo queda cancelado y nace uno nuevo que lo sustituye. Un abono cancelado NO cuenta al saldo
+  /// y NO cuenta como pendiente de revisión — y eso no se decide aquí: sale de la definición única
+  /// (`esma/formula-saldo.ts`), que lleva `canceladoEn: null` en los DOS criterios del concepto.
+  canceladoEn       DateTime? @map("cancelado_en")
+  /// Usuario que canceló (sin FK física — ADR-0005).
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  /// ⭐ Fila 0.145 — el abono al que ESTE sustituye (liga de la corrección). NULL en toda captura
+  /// normal. `@@unique`: un abono se corrige UNA vez (la siguiente corrección se hace sobre el
+  /// nuevo, encadenando). Restrict.
+  idAbonoCorregido Int?             @map("id_abono_corregido")
+  abonoCorregido   AbonoMaquilero?  @relation("AbonoCorreccion", fields: [idAbonoCorregido], references: [id], onDelete: Restrict)
+  corregidoPor     AbonoMaquilero[] @relation("AbonoCorreccion")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  @@unique([idAbonoCorregido])
   @@index([idEmpresa])
   @@index([idMaquilero])
+  @@index([canceladoEn])
   @@map("abono_maquilero")
 }
 
@@ -5189,11 +5219,18 @@ model DescuentoMaquilero {
   canceladoPorId    String?   @map("cancelado_por_id")
   motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
 
+  /// ⭐ Fila 0.145 — el descuento al que ESTE sustituye (liga de la corrección). Ver la nota gemela
+  /// de `AbonoMaquilero.idAbonoCorregido`. NULL en toda captura normal. Restrict.
+  idDescuentoCorregido Int?                 @map("id_descuento_corregido")
+  descuentoCorregido   DescuentoMaquilero?  @relation("DescuentoCorreccion", fields: [idDescuentoCorregido], references: [id], onDelete: Restrict)
+  corregidoPor         DescuentoMaquilero[] @relation("DescuentoCorreccion")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  @@unique([idDescuentoCorregido])
   @@index([idEmpresa])
   @@index([idMaquilero])
   @@index([canceladoEn])
@@ -5223,6 +5260,21 @@ model PagoMaquilero {
   /// Aplicaciones del pago a cargos concretos (decisión (g)). Cascade (el detalle vive con el pago).
   aplicaciones PagoAplicacion[]
 
+  /// ⭐ Fila 0.145 — CANCELACIÓN SUAVE (D3), gemela de la del abono y la del descuento. Un pago
+  /// cancelado no cuenta al saldo, no cuenta como pendiente de revisión **y sus `PagoAplicacion`
+  /// dejan de consumir «prendas por pagar»** del cargo: la suma que manda (`esma/pagos.ts`) filtra
+  /// por `pago.canceladoEn = null`. Las aplicaciones NO se borran (D3): siguen ahí como rastro.
+  canceladoEn       DateTime? @map("cancelado_en")
+  /// Usuario que canceló (sin FK física — ADR-0005).
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  /// ⭐ Fila 0.145 — el pago al que ESTE sustituye (liga de la corrección). NULL en toda captura
+  /// normal. Restrict.
+  idPagoCorregido Int?            @map("id_pago_corregido")
+  pagoCorregido   PagoMaquilero?  @relation("PagoCorreccion", fields: [idPagoCorregido], references: [id], onDelete: Restrict)
+  corregidoPor    PagoMaquilero[] @relation("PagoCorreccion")
+
   /// Renglón de la corrida semanal que lo originó (0.113), si nació de una. Restrict.
   ///
   /// ⚠️ Relación **1-a-1 opcional**, no una lista: la FK del renglón lleva `@@unique`, así que a un
@@ -5236,8 +5288,10 @@ model PagoMaquilero {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  @@unique([idPagoCorregido])
   @@index([idEmpresa])
   @@index([idMaquilero])
+  @@index([canceladoEn])
   @@map("pago_maquilero")
 }
 
@@ -5369,6 +5423,15 @@ model MovimientoTercero {
   movimientoOriginal  MovimientoTercero?  @relation("MovimientoTerceroInverso", fields: [idMovimientoInverso], references: [id], onDelete: Restrict)
   anuladoPor          MovimientoTercero[] @relation("MovimientoTerceroInverso")
 
+  /// ⭐ Fila 0.145 — CORRECCIÓN de un movimiento SIN FACTURA. El movimiento nuevo apunta aquí al que
+  /// SUSTITUYE (que queda `cancelado` con su inverso, en la MISMA transacción). No reemplaza a
+  /// `refTipo`/`refId` —que siguen apuntando a la operación real que originó el movimiento y se
+  /// COPIAN al corregido—: esta columna dice otra cosa, que este renglón es la versión buena de
+  /// aquél. Restrict.
+  idMovimientoCorregido Int?                @map("id_movimiento_corregido")
+  movimientoCorregido   MovimientoTercero?  @relation("MovimientoTerceroCorreccion", fields: [idMovimientoCorregido], references: [id], onDelete: Restrict)
+  corregidoPor          MovimientoTercero[] @relation("MovimientoTerceroCorreccion")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -5388,6 +5451,9 @@ model MovimientoTercero {
   /// así que este unique deja pasar las N filas normales (idMovimientoInverso NULL) pero impide dos
   /// inversos apuntando al mismo original — dos cancelaciones concurrentes no pueden duplicar el inverso.
   @@unique([idMovimientoInverso])
+  /// UNA SOLA corrección por movimiento corregido, por el mismo motivo y con la misma mecánica de
+  /// los NULL: dos correcciones concurrentes del mismo renglón no pueden ambas prosperar.
+  @@unique([idMovimientoCorregido])
   @@index([idEmpresa])
   @@index([tipoTercero])
   @@index([idCliente])

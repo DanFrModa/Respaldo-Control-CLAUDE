@@ -18,9 +18,11 @@
  * activa), D3 (saldo derivado). Los IMPORTES se ocultan (null) si falta `consultas.ver-importes`.
  */
 import {
+  esquemaCorreccionSinFactura,
   esquemaMovimientoTerceroCrear,
   esquemaMovimientoTerceroCancelar,
   esquemaEstadoCuentaTerceroQuery,
+  type DatosCorreccionSinFactura,
   type DatosMovimientoTerceroCrear,
   type DatosMovimientoTerceroCancelar,
   type EstadoCuentaTerceroQuery,
@@ -34,7 +36,12 @@ import type { z } from 'zod';
 
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
-import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import {
+  tienePermiso,
+  verificarCorrectorSinFactura,
+  verificarPermiso,
+  type SesionUsuario,
+} from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
@@ -44,6 +51,13 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import {
+  esCorregibleMotor,
+  importeGuardadoDe,
+  MENSAJE_TIENE_FACTURA,
+  MENSAJE_SIN_CAMBIOS,
+  resolverCambios,
+} from '../finanzas/correccion-comun.js';
 import { esOrigenCargo, signoDeOrigen } from './origen-tercero.js';
 import { resolverEsFiscalMotor } from './segmento-motor.js';
 import { exigirTercero, obtenerNombreTercero } from './terceros.js';
@@ -88,13 +102,22 @@ const incluirTercero = {
 
 type MovimientoConTercero = Prisma.MovimientoTerceroGetPayload<{ include: typeof incluirTercero }>;
 
+/** Lo que la proyección necesita saber de QUIEN pregunta (no del movimiento). */
+interface ContextoProyeccion {
+  puedeVerImportes: boolean;
+  /** Bandera de la persona (fila 0.145): decide el `corregible` de cada renglón. */
+  puedeCorregir: boolean;
+}
+
 /** Proyecta un movimiento del MOTOR (fuente "motor") a la forma del contrato; oculta el monto si aplica. */
 function aMovimientoSalida(
   m: MovimientoConTercero,
-  puedeVerImportes: boolean,
+  ctx: ContextoProyeccion,
 ): MovimientoTerceroSalida {
+  const { puedeVerImportes } = ctx;
   const nombre = m.cliente?.nombre ?? m.proveedor?.nombre ?? '';
   const idTercero = m.idCliente ?? m.idProveedor ?? 0;
+  const corregible = esCorregibleMotor(m, ctx.puedeCorregir);
   return {
     fuente: 'motor',
     id: m.id,
@@ -117,6 +140,15 @@ function aMovimientoSalida(
     observaciones: m.observaciones,
     cancelado: m.cancelado,
     esInverso: m.idMovimientoInverso !== null,
+    idMovimientoCorregido: m.idMovimientoCorregido,
+    // En el motor el texto que se lee y el que está guardado son el mismo (no hay adornos).
+    observacionesGuardadas: m.observaciones,
+    // POSITIVO siempre, y oculto sólo por permiso. La regla vive en `importeGuardadoDe`, compartida
+    // con EsMa: cuando estaba escrita a mano en cada sitio, el motor la cumplía y EsMa no.
+    importeGuardado: importeGuardadoDe(m.monto.toNumber(), puedeVerImportes),
+    corregible,
+    // Un movimiento del motor no está aplicado a nada: si se corrige, se corrige entero.
+    importeCorregible: corregible,
     creadoEn: m.creadoEn.toISOString(),
     creadoPorId: m.creadoPorId,
   };
@@ -180,6 +212,23 @@ export async function registrarMovimientoTerceroInterno(
   sesion: SesionUsuario,
   entrada: z.input<typeof esquemaMovimientoTerceroCrear>,
   bd?: ContextoBd,
+  /**
+   * Columnas que NO son parte del contrato del API y sólo puede poner el dominio. Van como parámetro
+   * aparte —y no como campos más de `entrada`— justamente para que ninguna ruta pueda mandarlas.
+   *
+   *  • `idMovimientoCorregido` (fila 0.145): el movimiento nuevo apunta al que sustituye.
+   *
+   *  • `observacionesConservadas` (fila 0.145): la nota que la corrección **ARRASTRA** tal cual,
+   *    porque el usuario no la tocó. Va por aquí y NO por `entrada` para que **no se vuelva a
+   *    validar**: `esquemaMovimientoTerceroCrear` limita las observaciones a 1000 caracteres, pero
+   *    el ETL de apertura las escribe **sin validar ninguna** (`terceros/migracion.ts`, un
+   *    `createManyAndReturn` que no pasa por Zod) desde una columna de texto libre del CSV
+   *    (`migracion/loaders/terceros-saldos.ts`). Reenviándola por `entrada`, corregir **sólo la
+   *    fecha** de un movimiento migrado con una nota larga devolvería **400 por un campo que el
+   *    usuario ni tocó** — el mismo defecto que el cajón tenía con el importe, ahora del lado del
+   *    servidor. Lo que el usuario PROPONE sí viaja por `entrada` y sí se valida: es entrada suya.
+   */
+  extras?: { idMovimientoCorregido?: number; observacionesConservadas?: string },
 ): Promise<MovimientoTerceroSalida> {
   const datos: DatosMovimientoTerceroCrear = validarEntrada(esquemaMovimientoTerceroCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
@@ -220,7 +269,15 @@ export async function registrarMovimientoTerceroInterno(
         ...(datos.idArchivoCfdi === undefined ? {} : { idArchivoCfdi: datos.idArchivoCfdi }),
         ...(datos.refTipo === undefined ? {} : { refTipo: datos.refTipo }),
         ...(datos.refId === undefined ? {} : { refId: datos.refId }),
+        // Las dos fuentes de la nota son EXCLUYENTES por construcción (ver `extras`): la propuesta
+        // por el usuario pasa por Zod; la arrastrada por una corrección, no.
         ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        ...(extras?.observacionesConservadas === undefined
+          ? {}
+          : { observaciones: extras.observacionesConservadas }),
+        ...(extras?.idMovimientoCorregido === undefined
+          ? {}
+          : { idMovimientoCorregido: extras.idMovimientoCorregido }),
         ...datosCreacion(sesion),
       },
       include: incluirTercero,
@@ -244,7 +301,10 @@ export async function registrarMovimientoTerceroInterno(
 
   // Se proyecta el creado directamente (no se re-consulta con `terceros.ver`: quien administra ya
   // registró; el retorno no debe exigir un permiso adicional).
-  return aMovimientoSalida(creado, puedeVerImportes);
+  return aMovimientoSalida(creado, {
+    puedeVerImportes,
+    puedeCorregir: sesion.puedeCorregirSinFactura,
+  });
 }
 
 // ── Cancelación (inverso auditado) ───────────────────────────────────────────────────────────────
@@ -361,7 +421,196 @@ export async function cancelarMovimientoTerceroInterno(
     return creado;
   }, bd);
 
-  return aMovimientoSalida(inverso, puedeVerImportes);
+  return aMovimientoSalida(inverso, {
+    puedeVerImportes,
+    puedeCorregir: sesion.puedeCorregirSinFactura,
+  });
+}
+
+// ── CORRECCIÓN de un movimiento SIN FACTURA (fila 0.145) ──────────────────────────────────────────
+
+/**
+ * ⭐⭐ CORRIGE un movimiento SIN FACTURA del libro: **anula el viejo y captura el bueno**, en UNA
+ * transacción (A2), ligados entre sí.
+ *
+ * DANIEL (6-sep-2026, §Post-F9.203): *«Quiero tener manera de modificar cualquier registro que se
+ * meta en cualquier estado de cuenta de los proveedores sin factura. **Sólo yo. Nadie más ni con
+ * permiso. Sólo yo.**»* Sobre la forma, tras plantearle el costo: *«Sí, está bien **con rastro**.»*
+ *
+ * ## Se COMPONE de lo que ya existía, no lo reimplementa
+ *
+ * La corrección es exactamente {@link cancelarMovimientoTerceroInterno} seguido de
+ * {@link registrarMovimientoTerceroInterno}, dentro de la misma transacción. Eso no es una
+ * comodidad: es lo que garantiza que la corrección herede el folio por secuencia atómica (A3), el
+ * signo por origen, el bloqueo por movimiento, el inverso auditado (D3) y la bitácora (A7) —sin una
+ * segunda copia de esas reglas que se pueda quedar atrás—.
+ *
+ * ## Qué cambia y qué NO
+ *
+ * Cambian el **importe**, la **fecha** y las **observaciones**. El tercero, el origen y el segmento
+ * se toman del movimiento corregido y no de la petición: cambiar de proveedor o de concepto no es
+ * corregir un renglón, es otro renglón (y para eso ya está cancelar + capturar).
+ *
+ * La `refTipo`/`refId` del original SÍ se copian: siguen apuntando a la operación real que originó
+ * el movimiento (una recepción, una corrida de pagos). La liga de la corrección vive en su propia
+ * columna, `idMovimientoCorregido`, para no pisar aquélla.
+ *
+ * ## Las guardas
+ *
+ *  • **la BANDERA de la persona** ({@link verificarCorrectorSinFactura}), que no es un permiso y no
+ *    se reparte con ningún rol;
+ *  • **`terceros.administrar`**, además: la bandera abre una puerta nueva, no exime de poder operar
+ *    la cuenta corriente. Falla CERRADO;
+ *  • **SIN FACTURA de verdad**: `esFiscal = false` y sin UUID ni archivo de CFDI colgando. Un
+ *    renglón con comprobante fiscal queda intocable **aunque sea del mismo proveedor** — el segmento
+ *    es del MOVIMIENTO, no del tercero (un proveedor `ambos` tiene de los dos);
+ *  • vivo y no siendo él mismo un inverso de cancelación (eso lo re-verifica el cancelador).
+ *
+ * ## 🔴 NO SE REVALIDA LO QUE NADIE PROPUSO — y por qué importa el día del ETL de apertura
+ *
+ * La nota del movimiento viaja por DOS caminos distintos según de quién sea:
+ *
+ *  • la que el usuario **PROPONE** va por `entrada` y la valida Zod (`.max(1000)`), como toda
+ *    captura suya;
+ *  • la que sólo se **ARRASTRA** —porque él no la tocó— va por `extras.observacionesConservadas`,
+ *    el canal del dominio, y **no se vuelve a validar**.
+ *
+ * ⚠️ **No es una sutileza: es un 400 esperando fecha.** El ETL de apertura de terceros escribe las
+ * observaciones **sin validar ninguna** ({@link insertarAperturasMigradas} inserta con
+ * `createManyAndReturn`, que no pasa por Zod) desde una columna de texto libre del CSV
+ * (`migracion/loaders/terceros-saldos.ts`). Reenviando siempre la nota por `entrada`, corregir
+ * **sólo la fecha** de un movimiento migrado con una nota de más de 1000 caracteres fallaba con
+ * *«Too big: expected string to have <=1000 characters»* — **por un campo que el usuario ni tocó**.
+ * Es la misma forma del defecto que el cajón tenía con el importe, del lado del servidor.
+ *
+ * 🔑 Y la otra mitad, que la prueba también pinza: **no revalidarla no puede significar perderla**.
+ * Si la nota arrastrada no se pasara por ningún camino, corregir la fecha borraría la nota en
+ * silencio — un defecto peor que el que se venía a arreglar.
+ */
+export async function corregirMovimientoTercero(
+  sesion: SesionUsuario,
+  id: number,
+  cuerpo: z.input<typeof esquemaCorreccionSinFactura>,
+  bd?: ContextoBd,
+): Promise<MovimientoTerceroSalida> {
+  verificarCorrectorSinFactura(sesion);
+  verificarPermiso(sesion, 'terceros.administrar');
+  const datos: DatosCorreccionSinFactura = validarEntrada(esquemaCorreccionSinFactura, cuerpo);
+  const idEmpresa = sesion.idEmpresaActiva;
+
+  return enTransaccion(async (tx) => {
+    const original = await tx.movimientoTercero.findFirst({
+      where: { id, idEmpresa },
+      select: {
+        id: true,
+        tipoTercero: true,
+        idCliente: true,
+        idProveedor: true,
+        fecha: true,
+        origen: true,
+        monto: true,
+        esFiscal: true,
+        uuidCfdi: true,
+        idArchivoCfdi: true,
+        refTipo: true,
+        refId: true,
+        observaciones: true,
+        cancelado: true,
+        idMovimientoInverso: true,
+      },
+    });
+    if (original === null) {
+      throw new ErrorNoEncontrado('MovimientoTercero', id);
+    }
+    // La BANDERA ya se verificó arriba (y lanzó 403 si faltaba), así que aquí se pasa `true`: lo que
+    // queda por comprobar son las condiciones del RENGLÓN. Es la MISMA función que decide el
+    // `corregible` de cada fila del estado de cuenta, para que la pantalla y el servidor no puedan
+    // contestar distinto.
+    if (!esCorregibleMotor(original, true)) {
+      // El mensaje distingue los dos motivos, porque el remedio de cada uno es distinto.
+      throw new ErrorConflicto(
+        original.esFiscal || original.uuidCfdi !== null || original.idArchivoCfdi !== null
+          ? MENSAJE_TIENE_FACTURA
+          : 'Ese movimiento ya está cancelado, o es el inverso de una cancelación: no se corrige.',
+      );
+    }
+
+    // El `monto` guardado lleva el SIGNO del origen; el importe que se corrige es POSITIVO (igual
+    // que en el alta). Se compara en positivo y el signo lo vuelve a poner el motor.
+    const antes = {
+      monto: Math.abs(original.monto.toNumber()),
+      fecha: original.fecha.toISOString().slice(0, 10),
+      observaciones: original.observaciones,
+    };
+    const cambios = resolverCambios(antes, datos);
+    if (!cambios.hayCambio) {
+      throw new ErrorValidacion(MENSAJE_SIN_CAMBIOS);
+    }
+    // ¿La nota es ENTRADA del usuario, o sólo se arrastra? De eso depende si se valida o no.
+    const propusoObservaciones = datos.observaciones !== undefined;
+
+    await cancelarMovimientoTerceroInterno(sesion, id, { motivo: datos.motivo }, { tx });
+
+    const idTercero = original.idCliente ?? original.idProveedor;
+    if (idTercero === null) {
+      // Imposible por el CHECK de exclusividad, pero el tipo lo admite: mejor un error claro que un
+      // `!` que mienta.
+      throw new ErrorConflicto('El movimiento no apunta a ningún tercero.');
+    }
+    const nuevo = await registrarMovimientoTerceroInterno(
+      sesion,
+      {
+        tipoTercero: original.tipoTercero,
+        idTercero,
+        fecha: cambios.fecha,
+        origen: original.origen,
+        importe: cambios.monto,
+        // Explícito: el corregido conserva el segmento del corregido (que es SIN factura, por la
+        // guarda de arriba). No se deja derivar de la modalidad del proveedor, para que corregir
+        // nunca pueda mover un renglón de segmento sin que nadie lo pida.
+        esFiscal: false,
+        ...(original.refTipo === null ? {} : { refTipo: original.refTipo }),
+        ...(original.refId === null ? {} : { refId: original.refId }),
+        // 🔴 LA NOTA SÓLO PASA POR EL CONTRATO SI EL USUARIO LA PROPUSO. Si sólo se arrastra, viaja
+        // por `extras` —el canal del dominio— y NO se vuelve a validar: ver el TSDoc de
+        // `registrarMovimientoTerceroInterno`. Reenviarla siempre por aquí hacía que corregir la
+        // fecha de un movimiento MIGRADO con una nota de más de 1000 caracteres fallara con 400 por
+        // un campo que nadie tocó. Es el mismo principio que el cajón aplica al importe: **no se
+        // revalida lo que nadie propuso.**
+        ...(propusoObservaciones && cambios.observaciones !== null
+          ? { observaciones: cambios.observaciones }
+          : {}),
+      },
+      { tx },
+      {
+        idMovimientoCorregido: original.id,
+        ...(!propusoObservaciones && cambios.observaciones !== null
+          ? { observacionesConservadas: cambios.observaciones }
+          : {}),
+      },
+    );
+
+    // A7 «con rastro»: qué decía ANTES, qué dice ahora, quién y por qué. Va sobre el movimiento
+    // CORREGIDO (el viejo), que es el que alguien va a ir a buscar cuando pregunte qué pasó.
+    await registrarBitacora(tx, sesion, {
+      entidad: 'MovimientoTercero',
+      idEntidad: original.id,
+      accion: 'MODIFICAR',
+      datos: {
+        operacion: 'corregir-sin-factura',
+        motivo: datos.motivo,
+        idNuevo: nuevo.id,
+        antes,
+        despues: {
+          monto: cambios.monto,
+          fecha: cambios.fecha,
+          observaciones: cambios.observaciones,
+        },
+      },
+    });
+
+    return nuevo;
+  }, bd);
 }
 
 // ── Saldo derivado ──────────────────────────────────────────────────────────────────────────────────
@@ -489,7 +738,9 @@ export async function estadoDeCuentaTercero(
     where,
     include: incluirTercero,
   });
-  const movimientosMotor = filasMotor.map((m) => aMovimientoSalida(m, puedeVerImportes));
+  const movimientosMotor = filasMotor.map((m) =>
+    aMovimientoSalida(m, { puedeVerImportes, puedeCorregir: sesion.puedeCorregirSinFactura }),
+  );
 
   // Convivencia EsMa (solo proveedor y solo si NO se filtra por un origen concreto del motor).
   const movimientosEsMa =
@@ -500,6 +751,9 @@ export async function estadoDeCuentaTercero(
           // EsMa marca el segmento en su propia columna `conFactura`; el proyector la traduce.
           segmento,
           puedeVerImportes,
+          // Fila 0.145: la bandera de la persona viaja hasta el proyector para que cada renglón
+          // EsMa diga si ESTA persona lo puede corregir (el cargo, nunca).
+          puedeCorregir: sesion.puedeCorregirSinFactura,
         })
       : [];
 

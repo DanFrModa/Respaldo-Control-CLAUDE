@@ -10,6 +10,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
+  CorreccionSinFactura,
   CxpBandeja,
   CxpBandejaQuery,
   CxpEstadoCuenta,
@@ -135,6 +136,47 @@ export function useCancelarMovimientoCxp(): UseMutationResult<
   return useMutation({
     mutationFn: ({ idMovimiento, cuerpo }: ArgsCancelarMovimientoCxp) =>
       cancelarMovimiento(idMovimiento, cuerpo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_CXP }),
+  });
+}
+
+// ── Corrección de un movimiento SIN FACTURA (fila 0.145) ─────────────────────
+
+async function corregirMovimiento(
+  idMovimiento: number,
+  cuerpo: CorreccionSinFactura,
+): Promise<CxpMovimientoSalida> {
+  const { data, error } = await api.POST('/api/cxp/movimientos/{id}/corregir', {
+    params: { path: { id: idMovimiento } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/** Argumentos de la corrección de un movimiento de CxP. */
+export interface ArgsCorregirMovimientoCxp {
+  idMovimiento: number;
+  cuerpo: CorreccionSinFactura;
+}
+
+/**
+ * ⭐ Corrige un movimiento SIN FACTURA (fila 0.145): por dentro anula el viejo y captura el bueno,
+ * en una transacción. Devuelve el movimiento BUENO. Invalida la bandeja + el estado de cuenta,
+ * porque los dos cambian (el saldo y el renglón).
+ *
+ * Quién puede: sólo quien tenga la bandera `Usuario.puedeCorregirSinFactura`, que no es un permiso
+ * y no se reparte con ningún rol. La pantalla no lo adivina: cada renglón viene con su `corregible`.
+ */
+export function useCorregirMovimientoCxp(): UseMutationResult<
+  CxpMovimientoSalida,
+  ErrorDeApi,
+  ArgsCorregirMovimientoCxp
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idMovimiento, cuerpo }: ArgsCorregirMovimientoCxp) =>
+      corregirMovimiento(idMovimiento, cuerpo),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_CXP }),
   });
 }

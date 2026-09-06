@@ -24,12 +24,15 @@ import type { PrismaClient } from '../../datos/index.js';
 import {
   aporteCargoAlSaldo,
   cuentaAlSaldoPlano,
+  WHERE_VIVO_ABONO,
   WHERE_VIVO_DESCUENTO,
+  WHERE_VIVO_PAGO,
   whereSegmentoFactura,
   type SegmentoFactura,
   type WhereSegmentoFactura,
 } from '../esma/formula-saldo.js';
 import { etiquetaProcesoDelCargo } from '../esma/etiqueta-cargo.js';
+import { esSinFactura, importeGuardadoDe } from '../finanzas/correccion-comun.js';
 import { calcularSaldoMaquilero, type SaldoMaquileroCalculado } from '../esma/saldos.js';
 import { saldosEsMaPorMaquilero, type AporteEsMaLote } from '../esma/saldos-todos.js';
 
@@ -135,6 +138,13 @@ export interface OpcionesProyeccionEsMa {
   segmento: 'todos' | 'con' | 'sin';
   /** Si false, los `monto` viajan en null (se ocultan importes). */
   puedeVerImportes: boolean;
+  /**
+   * ⭐ Fila 0.145 — la BANDERA de quien pregunta (`Usuario.puedeCorregirSinFactura`). Decide el
+   * `corregible` de cada renglón proyectado: sin ella, todos viajan en `false` y la pantalla no
+   * pinta el botón. Es la MISMA regla que el servidor exige al corregir, para que nunca se ofrezca
+   * un botón que después se rechaza.
+   */
+  puedeCorregir: boolean;
 }
 
 /**
@@ -155,7 +165,7 @@ export async function proyectarMovimientosEsMa(
   nombre: string,
   opciones: OpcionesProyeccionEsMa,
 ): Promise<MovimientoTerceroSalida[]> {
-  const { desde, hasta, segmento, puedeVerImportes } = opciones;
+  const { desde, hasta, segmento, puedeVerImportes, puedeCorregir } = opciones;
   const factura = facturaWhere(segmento);
   const oculto = (v: number): number | null => (puedeVerImportes ? redondear2(v) : null);
   /** Texto del renglón, avisando cuando está capturado y todavía no cuenta al saldo. */
@@ -189,7 +199,14 @@ export async function proyectarMovimientosEsMa(
       },
     }),
     cliente.abonoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero: idProveedor, ...factura, ...rangoFecha(desde, hasta) },
+      // VIVOS (fila 0.145): un abono sustituido por una corrección no es movimiento.
+      where: {
+        idEmpresa,
+        idMaquilero: idProveedor,
+        ...WHERE_VIVO_ABONO,
+        ...factura,
+        ...rangoFecha(desde, hasta),
+      },
       select: {
         id: true,
         monto: true,
@@ -219,10 +236,20 @@ export async function proyectarMovimientosEsMa(
         estadoRevision: true,
         creadoEn: true,
         creadoPorId: true,
+        // Fila 0.145: el descuento que PROPUSO un cierre de orden no se corrige suelto (su dueño es
+        // el cierre, que puede deshacerse). Se trae para poder decirlo en el renglón.
+        idCierreMaquila: true,
       },
     }),
     cliente.pagoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero: idProveedor, ...factura, ...rangoFecha(desde, hasta) },
+      // VIVOS (fila 0.145): ver la nota del abono.
+      where: {
+        idEmpresa,
+        idMaquilero: idProveedor,
+        ...WHERE_VIVO_PAGO,
+        ...factura,
+        ...rangoFecha(desde, hasta),
+      },
       select: {
         id: true,
         monto: true,
@@ -232,6 +259,9 @@ export async function proyectarMovimientosEsMa(
         estadoRevision: true,
         creadoEn: true,
         creadoPorId: true,
+        // Fila 0.145: un pago APLICADO a cargos no cambia de importe (sale de las prendas por el
+        // precio del cargo). El conteo basta para decirlo, sin traerse el detalle.
+        _count: { select: { aplicaciones: true } },
       },
     }),
   ]);
@@ -253,6 +283,13 @@ export async function proyectarMovimientosEsMa(
     refId: id,
     cancelado: false,
     esInverso: false,
+    idMovimientoCorregido: null,
+    // Fila 0.145: por defecto NADA de EsMa es corregible; cada concepto lo levanta si aplica, y con
+    // él el texto CRUDO de sus observaciones (el de `observaciones` lleva adornos de lectura).
+    observacionesGuardadas: null,
+    importeGuardado: null,
+    corregible: false,
+    importeCorregible: false,
   });
 
   const filas: MovimientoTerceroSalida[] = [];
@@ -282,8 +319,18 @@ export async function proyectarMovimientosEsMa(
   for (const a of abonos) {
     // Signo + (abono EsMa = cargo extra al maquilero, convención F6). Sin revisar: no aporta.
     const cuentaA = cuentaAlSaldoPlano(a.estadoRevision);
+    // Fila 0.145: un abono vivo y sin factura se corrige entero (importe incluido).
+    const corrigeA = puedeCorregir && esSinFactura(a.conFactura);
     filas.push({
       ...base(a.id, a.conFactura),
+      corregible: corrigeA,
+      importeCorregible: corrigeA,
+      observacionesGuardadas: a.observaciones,
+      // ⭐ El importe GUARDADO. Lo normaliza `importeGuardadoDe` (positivo + oculto sólo por
+      // permiso): la regla NO se escribe aquí, porque cuando estaba en cada sitio el motor la
+      // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
+      // —que es, por definición, el caso de lo capturado por error—.
+      importeGuardado: importeGuardadoDe(a.monto.toNumber(), puedeVerImportes),
       origen: 'abono',
       monto: cuentaA ? oculto(a.monto.toNumber()) : null,
       observaciones: conNota(a.observaciones, cuentaA),
@@ -296,8 +343,19 @@ export async function proyectarMovimientosEsMa(
   for (const d of descuentos) {
     // Signo − (descuento resta). Sin revisar: no aporta.
     const cuentaD = cuentaAlSaldoPlano(d.estadoRevision);
+    // Fila 0.145: el descuento que nació del CIERRE de una orden es del cierre (su liga es única y
+    // el sustituto no podría heredarla): se arregla deshaciendo el cierre, no corrigiendo aquí.
+    const corrigeD = puedeCorregir && esSinFactura(d.conFactura) && d.idCierreMaquila === null;
     filas.push({
       ...base(d.id, d.conFactura),
+      corregible: corrigeD,
+      importeCorregible: corrigeD,
+      observacionesGuardadas: d.observaciones,
+      // ⭐ El importe GUARDADO. Lo normaliza `importeGuardadoDe` (positivo + oculto sólo por
+      // permiso): la regla NO se escribe aquí, porque cuando estaba en cada sitio el motor la
+      // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
+      // —que es, por definición, el caso de lo capturado por error—.
+      importeGuardado: importeGuardadoDe(d.monto.toNumber(), puedeVerImportes),
       origen: 'descuento',
       monto: cuentaD ? oculto(-d.monto.toNumber()) : null,
       observaciones: conNota(d.observaciones, cuentaD),
@@ -310,8 +368,18 @@ export async function proyectarMovimientosEsMa(
   for (const p of pagos) {
     // Signo − (pago resta). Sin revisar: no aporta.
     const cuentaP = cuentaAlSaldoPlano(p.estadoRevision);
+    // Fila 0.145: el pago se corrige; su IMPORTE, sólo si no está aplicado a cargos.
+    const corrigeP = puedeCorregir && esSinFactura(p.conFactura);
     filas.push({
       ...base(p.id, p.conFactura),
+      corregible: corrigeP,
+      importeCorregible: corrigeP && p._count.aplicaciones === 0,
+      observacionesGuardadas: p.observaciones,
+      // ⭐ El importe GUARDADO. Lo normaliza `importeGuardadoDe` (positivo + oculto sólo por
+      // permiso): la regla NO se escribe aquí, porque cuando estaba en cada sitio el motor la
+      // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
+      // —que es, por definición, el caso de lo capturado por error—.
+      importeGuardado: importeGuardadoDe(p.monto.toNumber(), puedeVerImportes),
       origen: 'pago',
       monto: cuentaP ? oculto(-p.monto.toNumber()) : null,
       observaciones: conNota(p.observaciones, cuentaP),
