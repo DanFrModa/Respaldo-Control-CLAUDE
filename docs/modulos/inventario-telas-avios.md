@@ -62,7 +62,8 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
     crea partida»*) y la **cancelación de una salida sin lote** en
     `inventarios/partidas-telas.int.test.ts` (hasta entonces era un corolario razonado del caso que
     sí estaba medido: cancelar una ENTRADA, que sí lleva partida); la **propagación** ya estaba en ese mismo
-    archivo, y **la tela vieja** en `inventarios/previa-salida-tela-orden.int.test.ts` (*«la tela que ningún lote explica viaja SIN lote»*). 🔴 **NO es una puerta el «sobrante» de un conteo por color**, aunque esta doc
+    archivo (*«la tela que ningún lote explica viaja SIN lote»*), y **la tela vieja** en
+    `inventarios/previa-salida-tela-orden.int.test.ts` (*«la tela vieja, traspasada ANTES de la 0.142»*). 🔴 **NO es una puerta el «sobrante» de un conteo por color**, aunque esta doc
     lo dijo: sobrante = *contado < sistema* = **salida**, y una salida baja la existencia; el
     faltante, que sí es entrada, **crea partida**.
   - **La hoja del traspaso sale desglosada por lote** (número del proveedor + folio de partida; «—»

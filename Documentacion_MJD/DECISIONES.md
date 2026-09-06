@@ -12209,12 +12209,15 @@ tela sin nombre** cuando no está seguro? La **(ii)** se le repreguntó sin jerg
 el default elige *arriesgarse a nombrar* en vez de *callar*.
 
 
-#### (Post-F9.203) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default, ⏳ **PENDIENTES DE RATIFICACIÓN DE DANIEL**
+#### (Post-F9.203) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default. ✅ **P2 RATIFICADA por Daniel** (§Post-F9.205·1, con una adición) · ⏳ **P1, P3 y P4 siguen pendientes**
 
 **Lo que SÍ decidió Daniel ya está escrito y no se repite aquí:** es el punto **1 de §Post-F9.201** —
 *«el traspaso conserva el lote de origen (y su reparto, si la pata mueve varios); aditivo y sin backfill»*.
-Lo que sigue son **cuatro decisiones que la construcción obligó a tomar y que Daniel NO ha contestado**: van
-con su default aplicado, y se le presentan para confirmar o ajustar. **Ninguna cambia lo que él pidió**;
+Lo que sigue son **cuatro decisiones que la construcción obligó a tomar**, con su default aplicado.
+⚠️ **ESTADO AL 6-sep por la tarde (§Post-F9.205):** **P2 YA LA CONTESTÓ** — *«está bien que decida el
+sistema»*, **y añadió** que se pueda **elegir otro lote a mano** cuando el cortador escoja uno concreto
+(eso NO entra aquí: va en **fila 0.146**, encima de esta). **P1, P3 y P4 siguen sin contestar** y son las
+únicas que hay que volver a ponerle delante — **repreguntar P2 sería preguntarle dos veces lo mismo**. **Ninguna cambia lo que él pidió**;
 todas son cómo se cumple.
 
 **(P1) La cuenta de lotes del aviso de tono pasa a NETO (entradas − salidas), no a acumulado de entradas.**
@@ -12228,8 +12231,12 @@ misma clase de número — un neto de hoy contra un neto de hoy —, que es just
 especial, se neutraliza sola en la Σ (su inverso copia el `idPartida`).
 
 **(P2) El reparto es FIFO por folio de partida, AUTOMÁTICO y sin pantalla nueva.** *Default tomado: FIFO.*
-⚠️ **Ojo: leer antes el recuadro rojo del final de esta sección** — el FIFO sobre un saldo por lote inflado
-podía nombrar un lote ya consumido; se acotó, pero P2 no se puede ratificar sin ver eso.
+⚠️ **Ojo: leer el recuadro rojo del final de esta sección** — el FIFO sobre un saldo por lote inflado
+podía nombrar un lote ya consumido; se acotó, y su límite quedó declarado. ✅ **P2 la ratificó Daniel el
+6-sep por la tarde** (§Post-F9.205·1) **antes** de que ese recuadro se reescribiera con su redacción
+honesta; **lo que sigue sin contestar de este mismo asunto son las dos preguntas del recuadro, (i) y
+(ii)** — y la **(ii)** es la que de verdad importa, porque es donde el default elige *arriesgarse a
+nombrar* en vez de *callar*.
 La captura del traspaso **no cambia** (color + cantidad, como siempre) y el sistema decide de qué lotes sale,
 del folio más viejo al más nuevo. **Por qué no se le pide al usuario que escoja:** sería una pantalla nueva
 en el flujo más rutinario del almacén (mandarle tela al cortador), para una decisión que en el 90 % de los
