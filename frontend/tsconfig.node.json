@@ -35,9 +35,14 @@
          que fabrica el e2e cumpla el patron REAL que el backend publica en el contrato;
        - `src/selector-proveedor-unico.test.ts` recorre los .tsx de `src/` para exigir que ningun
          `<SelectNativo>` se alimente del catalogo de proveedores (el defecto que Daniel reporto
-         cuatro veces: un `<select>` nativo solo busca por prefijo). */
+         cuatro veces: un `<select>` nativo solo busca por prefijo);
+       - `src/documentos.test.ts` ejecuta `herramientas/verificar-documentos.mjs` (fila 0.142) con
+         `node:child_process` para que el CRUCE MECANICO de los documentos (el contador de filas de
+         HOJA-DE-RUTA.md contra su linea de resumen, y el numero de version en sus cuatro sitios) lo
+         corra el CI y no dependa de que alguien se acuerde. */
   "include": [
     "vite.config.ts",
+    "src/documentos.test.ts",
     "src/version.test.ts",
     "src/limite-cuerpo-api.test.ts",
     "src/cabeceras-seguridad-nginx.test.ts",

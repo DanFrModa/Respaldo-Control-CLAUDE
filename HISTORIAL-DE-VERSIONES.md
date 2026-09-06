@@ -71,6 +71,69 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.122 · 6-sep-2026 · **en prueba** — **La tela que se manda a otro almacén ya se lleva su lote: el cortador por fin sabe de qué tono es lo que tiene**
+
+### Qué se puede hacer ahora que antes no
+
+- **Saber de qué lote es la tela que hay en el almacén del cortador.** Cuando se manda tela de una bodega
+  a otra, la tela **se lleva consigo el lote del que salió**. Hasta hoy no: llegaba «anónima», y como al
+  cortador la tela le llega casi siempre así, el sistema **nunca** sabía de qué lote era nada de lo que
+  tenía en el anaquel.
+- **Por eso el aviso de riesgo de tono por fin sirve donde hace falta.** Al surtir tela para una orden, la
+  pantalla ahora puede decir *«ojo, aquí hay dos lotes de este color»* **y enseñarlos con su número**, que
+  es justo lo que se pidió: poder escoger el rollo a conciencia en vez de sólo enterarse de que el riesgo
+  existe. Antes, en ese almacén, esa lista **nunca aparecía**.
+- **La nota que acompaña la tela sale desglosada por lote.** Si un envío sale de dos lotes, la hoja trae
+  un renglón por lote, con **el número que el proveedor escribió en el rollo** y el folio del sistema. Quien
+  recibe puede casar el bulto contra el papel; antes leía «300 kg de marino» y nada más.
+- **En el kardex de telas los movimientos de traspaso ya salen con su lote**, así que se puede seguir un
+  lote de bodega en bodega.
+
+### Qué cambió y puede sorprender
+
+- **No hay pantalla nueva ni un campo más que llenar.** Se sigue capturando igual —color y cantidad— y el
+  sistema decide de qué lotes sale, **empezando por el más viejo**. Es lo que el almacén ya hace con la
+  tela.
+- ⭐ **Un envío de un solo color puede salir partido en varios renglones**, uno por lote, tanto en el
+  kardex como en la nota impresa. No es un error: es de dónde salió cada kilo.
+- **La lista de lotes de un almacén ahora enseña lo que QUEDA, no lo que entró alguna vez.** Un lote que ya
+  se mandó completo a otra bodega **desaparece de la lista del que lo mandó**. Antes seguía apareciendo
+  para siempre, así que una bodega vacía podía seguir avisando «aquí hay dos lotes, escoge».
+- **La tela con dos componentes (la felpa con su cardigan) reparte cada uno por su lado.** Un lote puede
+  aportar sólo el cuerpo y otro sólo el cardigan; cada uno se nombra por separado.
+- **Deshacer un envío sigue siendo mandar la tela de vuelta**, no «cancelarlo»: eso no cambió, y ahora
+  importa más, porque el viaje de vuelta también reparte lotes.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **La tela que se traspasó ANTES de esta versión se queda sin lote, y su línea gris sigue saliendo.**
+  Es **lo esperado, no una carencia**: esta versión cambia lo que se escribe de aquí en adelante y **no
+  toca ni un movimiento ya registrado**. Esa tela seguirá diciendo *«no se sabe de qué lote es»* hasta que
+  se consuma, y está bien que lo diga: es la verdad.
+- **La misma línea gris sale para otras dos cosas que tampoco tienen lote**: la tela que entra por un
+  **ajuste de conteo cíclico** —esa hoja no trae factura ni número de lote, así que no hay lote que
+  ponerle— y la que **vuelve al almacén al cancelar una salida** que tampoco lo llevaba.
+- **Al sacar tela para una orden se sigue sin decir de qué lote sale** (eso no cambió y no estaba en esta
+  versión). Tiene una consecuencia que conviene conocer: en un almacén que consume, **la lista de lotes
+  puede enseñar uno que producción ya se llevó**. El aviso peca de decir de más, nunca de callar.
+- 🔴 **Y de ahí sale el punto más delicado de esta versión, que hay que conocer antes de fiarse del nombre
+  del lote en la nota.** Como al surtir una orden no se apunta de qué lote salió, el sistema puede creer
+  que todavía tiene un lote que en realidad ya se acabó. Si justo entonces se manda tela al cortador,
+  **podría escribirle el nombre del lote equivocado** — y eso sería peor que la versión anterior, donde al
+  menos decía honestamente «no sé de cuál es». **Se le puso un freno:** antes de repartir, el sistema
+  compara lo que los lotes dicen tener contra lo que de verdad hay en el anaquel y descarta lo que ya no
+  puede estar, empezando por lo más viejo. **Lo que el freno cambia es QUÉ lote se escribe, no cuánta
+  tela se manda**: en el ejemplo de arriba, en vez del lote que ya se acabó escribe el que de verdad
+  está en el anaquel. Lo que no alcance a explicarse se manda **sin lote**. 🔻 **Lo que el freno NO
+  arregla, dicho sin adornos:** (a) si en la bodega hay varios lotes y se consumió sólo una parte, el
+  sistema **supone** que lo consumido era lo más viejo, y si no lo era el nombre puede ser el del lote de
+  al lado; (b) si además ha entrado tela **sin lote**, los dos desajustes se tapan entre sí y **puede
+  seguir nombrando un lote que ya se acabó**. **Daniel tiene que ver esto** antes de dar por buenas dos de
+  las cuatro decisiones de abajo — es su papel el que va con el bulto.
+- **Cuatro decisiones de esta versión las tomó el equipo con un criterio propuesto y siguen esperando el
+  visto bueno de Daniel**: que la lista enseñe el saldo vivo, que el reparto sea automático del lote más
+  viejo al más nuevo, que la salida a orden no se toque, y que la nota lleve el desglose.
+
 ## 0.120 · 6-sep-2026 · **en prueba** — **Contar el almacén de telas y el de avíos con la misma hoja que ya se usaba para la ropa**
 
 ### Qué se puede hacer ahora que antes no

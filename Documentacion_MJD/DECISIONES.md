@@ -12136,6 +12136,117 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.203) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default, ⏳ **PENDIENTES DE RATIFICACIÓN DE DANIEL**
+
+**Lo que SÍ decidió Daniel ya está escrito y no se repite aquí:** es el punto **1 de §Post-F9.201** —
+*«el traspaso conserva el lote de origen (y su reparto, si la pata mueve varios); aditivo y sin backfill»*.
+Lo que sigue son **cuatro decisiones que la construcción obligó a tomar y que Daniel NO ha contestado**: van
+con su default aplicado, y se le presentan para confirmar o ajustar. **Ninguna cambia lo que él pidió**;
+todas son cómo se cumple.
+
+**(P1) La cuenta de lotes del aviso de tono pasa a NETO (entradas − salidas), no a acumulado de entradas.**
+*Default tomado: sí.* **Por qué, y es la mitad no obvia de la fila:** al hacer que el traspaso nombre el
+lote, la **salida** del origen también lo nombra. Si el aviso siguiera sumando **sólo entradas** —como hacía
+desde la 0.101— un lote traspasado entero seguiría contando en la bodega **para siempre**, y la fila habría
+cambiado *«callar»* por *«avisar de más»*: la bodega vacía gritaría «hay dos lotes, escoge» sin tener nada
+en el anaquel. Con el neto, los dos lados de la comparación (`existencia` contra `Σ saldos`) son por fin la
+misma clase de número — un neto de hoy contra un neto de hoy —, que es justo el segundo defecto que la fila
+0.142 venía a curar. **Efecto lateral que se aprovechó:** una partida cancelada ya no necesita filtro
+especial, se neutraliza sola en la Σ (su inverso copia el `idPartida`).
+
+**(P2) El reparto es FIFO por folio de partida, AUTOMÁTICO y sin pantalla nueva.** *Default tomado: FIFO.*
+⚠️ **Ojo: leer antes el recuadro rojo del final de esta sección** — el FIFO sobre un saldo por lote inflado
+podía nombrar un lote ya consumido; se acotó, pero P2 no se puede ratificar sin ver eso.
+La captura del traspaso **no cambia** (color + cantidad, como siempre) y el sistema decide de qué lotes sale,
+del folio más viejo al más nuevo. **Por qué no se le pide al usuario que escoja:** sería una pantalla nueva
+en el flujo más rutinario del almacén (mandarle tela al cortador), para una decisión que en el 90 % de los
+casos no tiene alternativa —hay un solo lote— y que ya se toma físicamente al cargar el bulto. FIFO es
+además lo que el almacén hace en la realidad con la tela: sale primero la que lleva más tiempo. 🔻 **Lo que
+cuesta:** si alguien mueve a propósito el rollo NUEVO y deja el viejo, el papel dirá el viejo. Se cambia en
+una función (`repartirPorPartidaFifo`) el día que Daniel lo pida.
+
+**(P3) La salida a orden SIGUE sin nombrar lote — no se tocó.** *Default tomado: no tocarla.*
+⚠️ **Y es la RAÍZ del defecto del recuadro rojo del final**: por eso P3 dejó de ser una decisión inocua. Es la decisión
+de Daniel de §Post-F9.9 (*el consumo empareja por color*) y cambiarla es otra fila, con su propia pantalla y
+su propia conversación. ⚠️ **Pero tiene una consecuencia que hay que decir en voz alta, y quedó escrita en el
+código y en el doc del módulo: el saldo por lote NUNCA cuadra del todo en un almacén que consume.** Como la
+salida a orden no descuenta el lote, su saldo se queda **por encima** de lo que de verdad hay ⇒ el aviso de
+tono **puede listar un lote que la producción ya se llevó**. Es el precio explícito de no pedirle al almacén
+que escoja partida en cada salida, y está **medido** en la integración para que nadie lo descubra de golpe.
+
+**(P4) La hoja del traspaso lleva DESGLOSE por lote.** *Default tomado: sí.* Una columna «Lote» con el
+número del **proveedor** primero —que es lo que viene escrito en el rollo y lo que quien recibe puede casar a
+la vista— y el **folio de la partida** entre paréntesis; «—» cuando el sistema no lo sabe. Sin esto, el
+reparto existiría sólo dentro de la base y el papel seguiría diciendo «300 kg de marino» sin decir de cuál
+tono. Un color puede ocupar **varias filas** en la hoja (una por lote), que es exactamente como el kardex lo
+guardó.
+
+**Y una advertencia para quien lea el número del aviso:** los lotes de la tela **traspasada antes de esta
+fila** siguen sin nombre y **no se van a reparar** (REGLA 0-B). Esa tela sigue saliendo por la línea neutra
+*«no se sabe de qué partidas es»* hasta que se consuma. **No es un defecto: es lo acordado.**
+
+---
+
+### 🔴🔴 DANIEL: ESTO HAY QUE LEERLO **ANTES** DE RATIFICAR P2 Y P3 — el sistema puede escribir el número de lote equivocado
+
+Lo encontró el reviewer de esta fila **midiéndolo contra la base**, y cambia lo que P2 y P3 significan en la
+práctica. **No es una posibilidad teórica: es el flujo normal de la bodega.**
+
+**Qué puede pasar, en el lenguaje del almacén.** La bodega hace dos cosas con la misma tela: **surte
+órdenes** y **manda tela al cortador**. Cuando surte una orden, el sistema **no apunta de qué lote salió**
+(eso es P3, y es una decisión vieja de Daniel: el consumo empareja por color, no por lote). Entonces:
+
+1. Entran **500 kg del lote A**.
+2. Se surten **500 kg a una orden** ⇒ **físicamente ya no queda nada del lote A**, pero el sistema sigue
+   creyendo que sí, porque nadie le dijo de cuál lote salió.
+3. Entran **300 kg del lote B** — es **lo único que hay** en la bodega.
+4. Se le mandan esos 300 al cortador.
+
+**Sin arreglo, el sistema le pone el nombre del lote A**, porque reparte del más viejo al más nuevo y cree
+que el A sigue ahí. El cortador recibe la nota con **un lote que no es**, la pantalla le dice **«sin riesgo
+de tono»**, y nadie revisa nada.
+
+🔑 **Y eso sería PEOR que antes de esta versión.** Antes, el cortador leía *«no sé de qué lote es esta
+tela»* — que era **verdad**, y le hacía ir a mirar el rollo. Cambiar un «no sé» honesto por **una
+afirmación falsa dicha con total confianza** es exactamente lo que este proyecto no hace.
+
+**Qué se construyó (la mitigación).** Antes de repartir, el sistema **compara lo que los lotes dicen tener
+contra lo que de verdad hay en el anaquel**, y le quita la diferencia a los lotes más viejos. En el ejemplo,
+el lote A queda en cero y el reparto acierta con el B. ⭐ **Lo que el freno cambia —y es lo que
+importa para decidir— es QUÉ LOTE SE ESCRIBE, no cuánta tela se manda:** en el ejemplo de arriba, en vez
+del lote que ya se había acabado escribe **el que de verdad está en el anaquel**. Eso está **medido** con
+ese mismo escenario de cuatro pasos. Lo que no alcance a explicarse se manda **sin lote**, que es la verdad.
+
+⚠️ *(Corrección de una versión anterior de este recuadro, que decía «garantiza que nunca se nombra más tela
+de la que hay». Eso ya lo hacía el sistema desde antes —no deja sacar más de lo que hay—, así que como
+argumento a favor del freno **no valía nada** y hacía parecer que el freno apenas sirve. Sirve, y sirve
+justo donde duele: en el nombre que va escrito en el papel.)*
+
+**Qué NO arregla — y esto hay que leerlo, porque una primera versión de este texto prometió de más y una
+prueba lo desmintió.** La raíz es P3, y el freno la acota sin curarla, en **dos** situaciones:
+- **(a) Varios lotes y consumo parcial.** El sistema no sabe de cuál se consumió, así que quita del más
+  viejo **por hipótesis**. Si la hipótesis falla, el nombre puede ser el del **lote de al lado**.
+- **(b) Si además ha entrado tela SIN lote** (un ajuste de conteo cíclico, una salida cancelada, un
+  traspaso viejo), los dos desajustes **se tapan entre sí** y el freno se queda corto: **puede seguir
+  nombrando un lote que ya se acabó**. Medido: 500 consumidos sin apuntar + 200 entrados sin lote ⇒ el
+  freno sólo ve 300 de diferencia y le deja al lote fantasma 200 kg que no son suyos.
+
+⏳ **Las dos preguntas para Daniel, y el default del lead:**
+- **(i)** ¿Está bien que el sistema **suponga** que lo que se consumió sin apuntar salió de lo más viejo?
+  *Default: sí* — es lo que el almacén hace de hecho, y es la misma regla del reparto.
+- **(ii)** ¿O prefiere que, cuando la bodega tenga varios lotes y no cuadren, el traspaso mande la tela
+  **SIN nombre de lote** en vez de arriesgar el equivocado? *Default: no* — nombrar acotado da al cortador
+  algo con qué trabajar en el caso normal (un solo lote, que es la mayoría), y el caso ambiguo ya sale
+  avisado por la pantalla de tono. **Pero es SU decisión**, porque es su papel el que va con el bulto.
+
+🔑 **La salida definitiva es apuntar el lote también al surtir la orden** (revertir P3). Eso es otra fila, y
+otra conversación: obligaría a escoger lote en cada salida, que es justo lo que Daniel no quiso en
+§Post-F9.9.
+
+- **Aplica en:** fila 0.142. **Fecha:** 2026-09-06.
+
+---
+
 #### (Post-F9.202) — EL CONTEO CÍCLICO DE LAS TRES DIMENSIONES (fila 0.099, 6-sep-2026): un hallazgo que cambió el alcance y dos decisiones tomadas solas, con default
 
 Las **cuatro decisiones del dueño** que esta fila ejecuta ya están escritas y **no se repiten aquí**: son los puntos **4, 5 y 6** de §Post-F9.193 (se captura *lo contado* con el saldo a la vista; el cíclico se extiende a telas y avíos; si el almacén se movió, **avisar y dejar decidir, no bloquear**) más la adenda de la misma sección (**se puede anotar mercancía con existencia cero**). Lo que sigue es lo que apareció **al construirla**.

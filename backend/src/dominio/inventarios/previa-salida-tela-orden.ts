@@ -61,80 +61,114 @@
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * ## ⚠️⚠️ EL RIESGO DE TONO TIENE **TRES** ESTADOS, NO DOS — Y EL TERCERO ES «NO SE SABE»
  *
- * La partida es la unidad de **ENTRADA** del inventario por color. **Las salidas NO llevan partida**
- * —el consumo empareja por color, decisión de Daniel §Post-F9.9— así que el sistema **no puede
- * saber de qué partida salió cada metro**, y por tanto tampoco cuál queda en el anaquel. Eso no es
- * un hueco de esta fila: es exactamente **la razón por la que el riesgo de tono existe**.
+ * La partida es la unidad de **ENTRADA** del inventario por color. **Las salidas a orden no llevan
+ * partida** —el consumo empareja por color, decisión de Daniel §Post-F9.9— así que el sistema **no
+ * puede saber de qué partida salió cada metro**. Eso no es un hueco de esta fila: es exactamente
+ * **la razón por la que el riesgo de tono existe**.
  *
- * 🔴 **Y hay tela que entra a un almacén SIN partida ninguna: la que llega por TRASPASO.** Las patas
- * del traspaso van con `idPartida = NULL` (`partidas-telas.ts`, `traspasarTelaColor`) porque no son
- * entradas de compra. ⇒ contar partidas y callar cuando no hay ninguna **hacía desaparecer el aviso
- * justo donde más falta**: la pantalla arranca en el almacén DEL CORTADOR, y a ese almacén la tela
- * llega casi siempre traspasada desde la bodega. Medido: 800 kg físicos en «Corte», cero partidas
- * visibles, aviso mudo — con N tonos posibles enfrente de quien escoge el rollo.
+ * ⭐⭐ **LO QUE CAMBIÓ CON LA FILA 0.142 (Daniel §Post-F9.201 punto 1): EL TRASPASO YA NOMBRA EL
+ * LOTE.** Hasta la 0.141 las dos patas del traspaso se escribían con `idPartida = NULL`, y eso
+ * dejaba este aviso **ciego justo donde hace falta**: la pantalla arranca en el almacén DEL
+ * CORTADOR, y a ese almacén la tela llega casi siempre traspasada desde la bodega. Medido entonces:
+ * 800 kg físicos en «Corte», cero partidas visibles, aviso mudo — con N tonos posibles enfrente de
+ * quien escoge el rollo. Hoy el traspaso reparte **FIFO por folio** sobre el saldo por lote del
+ * origen (`partidas-telas.ts`, `repartirPorPartidaFifo`) y la pata de entrada nombra el lote en el
+ * destino ⇒ **las dos mitades de lo que Daniel pidió** (*«sólo cuando hay más de una partida»* y
+ * *«con la lista a la vista»*) se entregan **en el almacén donde se escoge el rollo**.
  *
- * ⭐ Por eso el veredicto es un **estado de tres valores** ({@link EstadoTono}), y el criterio que
- * los ordena es uno solo: **la ignorancia NO se presenta como tranquilidad.**
+ * ⭐ El veredicto sigue siendo un **estado de tres valores** ({@link EstadoTono}), porque queda tela
+ * que nadie puede nombrar (ver abajo), y el criterio que los ordena no cambió: **la ignorancia NO se
+ * presenta como tranquilidad.**
  *
  * | estado | cuándo | qué hace |
  * |---|---|---|
- * | `varias-partidas` | hay **más de una** partida conocida del color en ese almacén | avisa **y las lista** |
- * | `origen-desconocido` | hay **más existencia que la que las partidas conocidas explican** (`existencia > Σ entrado`) — típicamente porque llegó por traspaso | lo **dice**, en línea NEUTRA (no alarma) |
- * | `sin-riesgo` | una sola partida que explica toda la existencia, o no hay tela ahí | **calla** |
+ * | `varias-partidas` | hay **más de un lote VIVO** del color en ese almacén | avisa **y los lista** |
+ * | `origen-desconocido` | hay **más existencia que la que los lotes vivos explican** (`existencia > Σ saldo`) | lo **dice**, en línea NEUTRA (no alarma) |
+ * | `sin-riesgo` | un solo lote que explica toda la existencia, o no hay tela ahí | **calla** |
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
- * ## 🔻🔻 EL LÍMITE REAL DE `origen-desconocido`: FALLA SISTEMÁTICAMENTE EN LOS DOS SENTIDOS
+ * ## ⭐ POR QUÉ AHORA LOS DOS LADOS SE PUEDEN COMPARAR (y antes no)
  *
- * Hay que saberlo antes de confiar en este estado. La comparación es `existencia > Σ entrado`, y los
- * dos lados **no son la misma clase de número**: `Σ entrado` es un **acumulado histórico que nunca
- * baja** —a la partida nadie le descuenta las salidas, porque las salidas no la nombran— mientras
- * que `existencia` es un **neto de hoy**. Comparar *«lo que entró alguna vez»* contra *«lo que hay
- * ahora»* sólo se sostiene mientras el almacén no haya consumido nada. De ahí, dos fallos:
+ * La comparación es `existencia > Σ saldo de los lotes vivos`. Hasta la 0.141 el lado derecho era
+ * un **acumulado histórico que nunca bajaba** —a la partida nadie le descontaba las salidas— contra
+ * un **neto de hoy** a la izquierda, y de ahí salían **dos fallos sistemáticos**, los dos medidos:
  *
- *  1. **ENCENDIDO PERMANENTE donde nunca hubo partidas.** A un almacén alimentado SÓLO por traspaso
- *     —**el del cortador, que es el caso normal**— la tela entra con `idPartida = NULL`, así que
- *     `Σ entrado = 0` siempre y `existencia > 0` dispara el estado en **TODAS** las capturas. Sólo
- *     calla con el anaquel vacío, o sea justo cuando la pantalla no sirve para nada. **Es lo
- *     esperado hoy**, no un defecto de esta función.
- *  2. **APAGADO CASI PERMANENTE donde ya se consumió algo.** Con historia de consumo,
- *     `existencia < Σ entrado` casi por definición. Medido: 500 con partida en Corte, se consumen
- *     enteros, llegan 300 **por traspaso** ⇒ `300 > 500` es falso ⇒ **se calla** con tela de origen
- *     desconocido en el anaquel. ⇒ el caso mixto (una partida conocida + tela traspasada) se detecta
- *     **sólo mientras el almacén no haya consumido nada**, y no siempre, como decía esta cabecera
- *     hasta la tercera revisión de la fila.
+ *  1. **ENCENDIDO PERMANENTE donde nunca hubo partidas** (el almacén del cortador): `Σ = 0` siempre
+ *     ⇒ el estado salía en TODAS las capturas mientras quedara tela.
+ *  2. **APAGADO donde ya se consumió algo**: 500 con lote consumidos + 300 llegados por traspaso
+ *     daban `300 > 500` = falso ⇒ **callaba** con tela de origen desconocido en el anaquel.
  *
- * ⚠️⚠️ **QUÉ SE PUEDE Y QUÉ NO — y hay que leerlo fallo por fallo, porque NO son el mismo caso.**
- * (Esta acotación existe porque la versión anterior de este párrafo decía «no se puede» a secas y
- * un lector la ataba a los dos fallos; quien escriba la fila de la cura merece el mapa completo.)
+ * 🔑 **La fila 0.142 los cierra a los dos con un solo cambio**, y no por casualidad: al hacer que el
+ * traspaso nombre el lote, el fallo 1 desaparece (ya hay lotes que listar) y al pasar la Σ a **neto
+ * vivo** (`entradas − salidas` que nombran el lote — decisión P1 del lead) los dos lados quedan en
+ * la misma clase de número. Se descartó la alternativa que se había dejado escrita aquí —comparar
+ * *acumulado contra acumulado*— porque era **PEGAJOSA**: en cuanto entrara una sola vez tela sin
+ * lote, el estado se quedaría encendido **para siempre**, aunque esa tela se hubiera consumido
+ * entera. Eso cambia el significado de *«ahora mismo no puedo nombrar lo que hay»* a *«alguna vez
+ * pasó por aquí tela que no supe nombrar»*, y lo primero es lo que necesita quien surte.
  *
- *  • **Homogeneizar ESTOS DOS LADOS CONCRETOS** —`existencia`, neto de hoy, contra `Σ entrado`,
- *    acumulado— **no se puede** sin que la partida viaje en el traspaso: hoy `traspasarTelaColor` la
- *    deja en NULL a propósito (las patas del traspaso no son entradas de compra).
- *  • **El fallo 1** (encendido permanente del cortador) **sólo lo cura eso**: mientras la tela entre
- *    sin partida, no hay nada aquí dentro que pueda nombrarla. Punto.
- *  • **El fallo 2 SÍ tiene una alternativa local, computable hoy y sobre esta misma tabla**:
- *    comparar **acumulado contra acumulado** — todo lo que ENTRÓ al almacén contra lo que entró
- *    **con** partida. En el caso que hoy se pierde (500 con partida ya consumidos + 300 traspasados)
- *    daría `800 > 500` ⇒ **lo vería**, y en una bodega alimentada sólo por compras no dispararía.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * ## 🔻 QUÉ SIGUE SIN CUADRAR, Y HAY QUE SABERLO ANTES DE CONFIAR EN EL NÚMERO
  *
- * 🔑 **Y no se toma, a propósito: es PEGAJOSA.** En cuanto entrara una sola vez tela sin partida, el
- * estado se quedaría encendido **para siempre** —aunque esa tela se hubiera consumido entera y la
- * hubiera sustituido tela con partida conocida—. Eso cambia el significado del estado de *«ahora
- * mismo no puedo nombrar lo que hay en el anaquel»* a *«en algún momento pasó por aquí tela que no
- * supe nombrar»*, y **lo primero es lo que necesita quien surte**. Es una DECISIÓN, no una
- * imposibilidad: quien retome esto tiene las dos formulaciones y el costo de cada una.
+ *  • ⭐ **NINGUNA SALIDA NOMBRA LOTE, SALVO LA PATA DEL TRASPASO.** La prosa de esta fila decía «las
+ *    salidas **a orden**» como si fuera la única, y no lo es — el mapa completo, que es justo el que
+ *    hace falta para entender el defecto de abajo: la **salida a orden** (`registrarSalidaTela
+ *    ColorAOrden`), la **salida SIN orden** (fila 0.104), la **pata de sobrante del conteo**, el
+ *    **ajuste de salida** y el **ajuste de salida del cíclico**. Todas descuentan existencia sin
+ *    descontarle nada a ningún lote (decisión P3 / §Post-F9.9: el consumo empareja por color).
+ *  • ⇒ en un almacén que CONSUME, el saldo por lote queda **por encima** de lo que de verdad hay:
+ *    `varias-partidas` puede listar un lote que la producción ya se llevó, y `sinNombrar` puede
+ *    quedarse corto. **El saldo por lote nunca cuadra del todo en un almacén que consume**, y ése es
+ *    el precio explícito de no pedirle al almacén que escoja partida en cada salida.
+ *  • 🔴🔴 **Y ese mismo saldo inflado tuvo una consecuencia GRAVE en el traspaso, que hay que conocer
+ *    al leer este aviso.** Si el reparto del traspaso se hiciera contra el saldo inflado, mandaría al
+ *    cortador —y a la hoja impresa— el nombre de un lote **ya consumido**, y este aviso diría
+ *    `sin-riesgo` sobre una mentira. Se acotó en origen (`partidas-telas.ts`,
+ *    `repartirPorPartidaFifo` topa el reparto contra la existencia real), pero **el tope acota y no
+ *    cura**: lo que aporta es que el lote escogido sea **uno que la existencia pueda respaldar**
+ *    cuando el desajuste viene sólo de consumo no apuntado — cambia CUÁL lote se nombra, no cuánta
+ *    tela. Con varios lotes vivos y consumo parcial —o si además entró tela sin lote, que tapa el
+ *    desajuste— el nombre puede seguir siendo el equivocado. La raíz es P3. Aquí
+ *    el error va en la dirección inofensiva —se lista de más, nunca de menos— y por eso este módulo
+ *    **no** aplica ese tope: esconder un lote sería callar un aviso que sí hacía falta.
+ *  • **La tela vieja se queda sin nombre.** REGLA 0-B: la 0.142 es **aditiva y sin backfill** — los
+ *    traspasos ya registrados siguen con `idPartida = NULL`, así que su tela sigue saliendo por la
+ *    línea neutra hasta que se consuma. **No es un defecto: es lo acordado.**
+ *  • ⭐ **EL MAPA COMPLETO DE LO QUE ENTRA SIN LOTE — medido, puerta por puerta**, porque la ronda de
+ *    corrección de la 0.142 encontró que este párrafo nombraba una fuente FALSA y se callaba la real:
+ *      1. **El ajuste de ENTRADA del conteo CÍCLICO de telas** (`indicadores/ciclico/tela.ts`) —
+ *         **ésta es la puerta viva de verdad**. Su propio TSDoc lo dice: *«el ajuste de ENTRADA no
+ *         crea partida… va sin partida, igual que las salidas»*, porque una hoja de conteo cíclico no
+ *         tiene ni factura ni lote del proveedor que poner en una partida.
+ *      2. **La CANCELACIÓN de una salida que no llevaba lote** (una salida a orden, una salida sin
+ *         orden, la pata de sobrante de un conteo): el inverso copia el `idPartida` del original, y
+ *         si el original iba en NULL el inverso también ⇒ entra tela sin nombre.
+ *      3. **Los traspasos ANTERIORES a la fila 0.142**, que se escribieron con `idPartida = NULL` y
+ *         **no se reparan** (REGLA 0-B).
+ *      4. ⭐ **UN TRASPASO DE HOY, cuando el origen tiene tela que él tampoco puede nombrar.** El
+ *         reparto FIFO nombra lo que puede y **el remanente viaja con `idPartida = NULL`** — o sea,
+ *         la tela sin nombre **se propaga de almacén en almacén**, que es justo lo que hay que
+ *         esperar: el traspaso no inventa lotes. Desde la ronda de corrección hay una segunda vía
+ *         para lo mismo: **el remanente que deja el TOPE** cuando recorta lotes que la existencia no
+ *         respalda (`repartirPorPartidaFifo`). *(Esta cuarta puerta faltaba cuando este mapa se
+ *         declaraba «completo»; la cazó el reviewer en la 3ª vuelta.)*
+ *    🔴 **Lo que NO es una fuente, aunque se dijo en ONCE sitios: el «sobrante» de un conteo por
+ *    color.** En el vocabulario de este módulo sobrante = *contado < sistema* = **SALIDA**, y una
+ *    salida BAJA la existencia ⇒ nunca deja tela sin nombre en el anaquel; y el caso contrario —el
+ *    faltante— entra por una ENTRADA que **sí crea partida** (`registrarConteoTelaColor`). Era falso
+ *    en las dos lecturas.
  *
  * 🔑 **POR ESO ESTE ESTADO NO SE PINTA COMO ALARMA.** La pantalla lo enseña como una **línea
- * neutra** —*«aquí no llevamos partidas, míralo tú»*— y reserva el ámbar para `varias-partidas`
- * —*«ojo, hay varios lotes, escoge»*—. La primera acompaña; la segunda interrumpe. Si el estado que
- * sale siempre gritara, le devolveríamos a Daniel el problema que esta fila vino a resolver
- * (*«un aviso que sale siempre no lo lee nadie»*) con otro texto, y de paso quemaríamos el canal de
- * alarma para cuando de verdad hay de dónde escoger.
+ * neutra** —*«esta tela no la puedo nombrar, míralo tú»*— y reserva el ámbar para `varias-partidas`
+ * —*«ojo, hay varios lotes, escoge»*—. La primera acompaña; la segunda interrumpe. Pintar de ámbar
+ * el que puede salir seguido le devolvería a Daniel el problema que esto vino a resolver (*«un aviso
+ * que sale siempre no lo lee nadie»*) con otro texto, y quemaría el canal de alarma para cuando de
+ * verdad hay de dónde escoger.
  *
- * 🔻 **Y el límite de `varias-partidas`:** una partida ya consumida por completo sigue contando
- * —nadie le descontó nada—, así que ese aviso **puede sobrar**; y con **una sola** partida que
- * explique toda la existencia calla, aunque ese único rollo tuviera vetas: eso el sistema no lo
- * puede saber.
+ * 🔻 **Y el límite de `varias-partidas`:** un lote que se consumió **por una salida a orden** sigue
+ * contando (nadie le descontó nada — ver arriba), así que ese aviso **puede sobrar**; y con **un
+ * solo** lote que explique toda la existencia calla, aunque ese único rollo tuviera vetas: eso el
+ * sistema no lo puede saber.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * ## 🖥️ SIRVE A LAS DOS PANTALLAS QUE SACAN TELA A UNA ORDEN
@@ -157,6 +191,10 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { existenciasTelaColorPorColor } from '../../comun/kardex.js';
 import { clienteLectura, type ClienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+// El redondeo a los decimales de la columna y la Σ del saldo por lote viven en el módulo de
+// partidas (fila 0.142): AQUÍ se importan para que la aritmética del aviso y la del traspaso sean
+// literalmente la misma, y no dos copias que un día divergen.
+import { aCantidadTela as aCantidad, saldosPorPartidaTela } from './partidas-telas.js';
 import {
   esquemaPreviaSalidaTelaColorCrear,
   type PreviaSalidaTelaColorSalida,
@@ -261,11 +299,16 @@ export function evaluarSobreSalidaDeTela(
  * tabla de la cabecera resume — y el que cambia el aviso de *«sale siempre»* a *«sale cuando hay
  * algo que decir, y dice cuál de las dos cosas es»*.
  *
- *  • `varias-partidas` — más de una partida conocida ⇒ avisa **y las lista**, para poder escoger.
- *  • `origen-desconocido` — hay MÁS existencia que la que las partidas conocidas explican ⇒ avisa
- *    diciendo la verdad: que no se sabe de qué partidas es esa tela (llegó por traspaso, que no
- *    lleva partida). **Callar aquí era presentar la ignorancia como tranquilidad.**
- *  • `sin-riesgo` — una sola partida que explica toda la existencia, o nada de ese color ahí.
+ *  • `varias-partidas` — más de un lote VIVO ⇒ avisa **y los lista**, para poder escoger.
+ *  • `origen-desconocido` — hay MÁS existencia que la que los lotes vivos explican ⇒ avisa diciendo
+ *    la verdad: que no se sabe de qué lotes es esa tela. **Callar aquí era presentar la ignorancia
+ *    como tranquilidad.**
+ *  • `sin-riesgo` — un solo lote que explica toda la existencia, o nada de ese color ahí.
+ *
+ * ⭐ **La aritmética no cambió con la fila 0.142; cambió LA CLASE DE NÚMERO que recibe.** Antes
+ * `partidas[].saldo` era un acumulado histórico de entradas y `existencia` un neto de hoy: restar
+ * uno del otro comparaba peras con manzanas. Ahora los dos son netos de hoy, así que `sinNombrar`
+ * significa de verdad *«esto es lo que hay en el anaquel y no puedo nombrar»*.
  */
 export function evaluarRiesgoDeTono(
   lineas: readonly LineaCapturada[],
@@ -283,14 +326,14 @@ export function evaluarRiesgoDeTono(
     vistos.add(l.idTelaColor);
     const partidas = partidasPorColor.get(l.idTelaColor) ?? [];
     const existencia = aCantidad(existenciaPorColor.get(l.idTelaColor) ?? 0);
-    // Lo que las partidas conocidas EXPLICAN. Los dos números se redondean a los 4 decimales de la
-    // columna antes de compararse: sin eso, el ruido binario inventaría "tela de origen
-    // desconocido" por una millonésima.
-    const entradoConocido = aCantidad(partidas.reduce((suma, p) => suma + p.entrado, 0));
+    // Lo que los lotes vivos EXPLICAN. Los dos números se redondean a los 4 decimales de la columna
+    // antes de compararse: sin eso, el ruido binario inventaría "tela de origen desconocido" por
+    // una millonésima.
+    const saldoConocido = aCantidad(partidas.reduce((suma, p) => suma + p.saldo, 0));
     // Cuánto de lo que hay HOY no explica ninguna partida conocida. Se calcula UNA vez: es a la vez
     // lo que enciende `origen-desconocido` y el número que la pantalla enseña. Si viviera dos veces
     // (aquí una comparación, allá una resta) podrían decir cosas distintas del mismo hecho.
-    const sinNombrar = aCantidad(Math.max(0, existencia - entradoConocido));
+    const sinNombrar = aCantidad(Math.max(0, existencia - saldoConocido));
     renglones.push({
       idTelaColor: l.idTelaColor,
       telaColor: l.telaColor,
@@ -308,20 +351,12 @@ export function evaluarRiesgoDeTono(
             ? 'origen-desconocido'
             : 'sin-riesgo',
       existencia,
-      entradoConocido,
+      saldoConocido,
       sinNombrar,
       partidas: [...partidas],
     });
   }
   return renglones;
-}
-
-/**
- * DECIMALES de una cantidad de inventario: los mismos que guarda la columna (`Decimal(14,4)`).
- * Sumar/restar en `number` arrastra ruido binario y ese ruido acabaría impreso en el aviso.
- */
-function aCantidad(valor: number): number {
-  return Number(valor.toFixed(4));
 }
 
 // ── Lectura (la previa completa que consume la pantalla) ─────────────────────────────────────────
@@ -405,8 +440,10 @@ export async function previaSalidaTelaColorAOrden(
   const partidas = await partidasVivasPorColor(cliente, idEmpresa, datos.idAlmacen, idsColor);
   // ⭐ La EXISTENCIA de cada color en ese almacén, por la Σ compartida del motor de kardex
   // (`existenciasTelaColorPorColor`, misma aritmética que el conteo — nunca la vista, ADR-0010 §3).
-  // Es lo que permite distinguir «no hay nada que escoger» de «no se sabe qué hay»: sin ella, la
-  // tela que llegó por traspaso —sin partida— dejaba el aviso mudo con N tonos enfrente.
+  // Es lo que permite distinguir «no hay nada que escoger» de «no se sabe qué hay»: la tela que
+  // entró sin lote (el ajuste de ENTRADA del conteo cíclico, la cancelación de una salida que no
+  // llevaba lote, y los traspasos anteriores a la 0.142) sólo se ve restándole a esta existencia el
+  // saldo de los lotes vivos. Ver el mapa completo en la cabecera.
   const existencias = await existenciasTelaColorPorColor(
     cliente,
     idEmpresa,
@@ -487,18 +524,27 @@ async function yaSalidoDeLaOrden(
 }
 
 /**
- * **LAS PARTIDAS CONOCIDAS DE CADA COLOR EN EL ALMACÉN DEL QUE SE SACA**, con lo que entró de cada
- * una. Conocida = tiene una entrada VIVA a ese almacén.
+ * ⭐⭐ **LOS LOTES QUE QUEDAN HOY DE CADA COLOR EN EL ALMACÉN DEL QUE SE SACA**, con **el saldo vivo**
+ * de cada uno (fila 0.142, decisión P1 del lead). Vivo = queda algo: `Σ entradas − Σ salidas` que
+ * nombran esa partida en ESE almacén, descartando el neto ≤ 0.
  *
- * ⚠️ Sólo las ENTRADAS llevan `idPartida` (las salidas **y las patas de traspaso** van con NULL):
- * por eso esto mide *«cuántas partidas entraron aquí»*, no *«cuántas quedan»* ni *«cuánta tela hay»*
- * — la tela traspasada no aparece en esta lista, y ése es justo el hueco que el tercer estado
- * (`origen-desconocido`) tapa comparando contra la existencia real. Ver la tabla de la cabecera.
+ * 🔴 **Hasta la 0.141 esto sumaba SÓLO ENTRADAS**, o sea un **acumulado histórico que nunca baja**,
+ * y se comparaba contra la existencia, que es un **neto de hoy**. Dos clases de número distintas
+ * ⇒ el aviso fallaba en los dos sentidos, y el fallo malo estaba **medido**: 500 con lote ya
+ * consumidos + 300 llegados por traspaso daban `300 > 500` = falso ⇒ **callaba** con tela de origen
+ * desconocido en el anaquel. Ahora los dos lados son netos y son comparables.
  *
- * 🔴 **Una entrada CANCELADA no deja partida viva**, y hacen falta las DOS condiciones para eso:
- * `anuladoPor: { none: {} }` saca a la entrada original, y `direccion = entrada` saca a su inverso
- * —que es una SALIDA con el mismo `idPartida` copiado (`cancelarMovimientoMaterial`)—. Quitar
- * cualquiera de las dos resucita la partida cancelada; las dos están medidas en la integración.
+ * 🔴 **La Σ NO filtra las canceladas, y eso es lo correcto ahora que resta**: el inverso copia el
+ * `idPartida` del original (`cancelarMovimientoMaterial`), así que el par se neutraliza solo. El
+ * viejo `anuladoPor: { none: {} }` sacaba al original y dejaba al inverso ⇒ **restaría dos veces**.
+ * Una entrada cancelada deja el lote en 0 y por tanto **fuera de la lista**, igual que antes — pero
+ * por aritmética, no por un filtro. Medido en la integración.
+ *
+ * 🔻 **Lo que este saldo NO cuadra, y hay que saberlo:** las **salidas a orden no nombran lote**
+ * (decisión P3 — es otra fila), así que en un almacén que consume el saldo por lote se queda **por
+ * encima** de lo que de verdad hay. Consecuencia práctica: `varias-partidas` puede listar un lote
+ * que la producción ya se llevó, y `sinNombrar` puede quedarse corto. Lo que SÍ desapareció con la
+ * 0.142 es la ceguera del traspaso, que era el caso normal del almacén del cortador.
  */
 async function partidasVivasPorColor(
   cliente: ClienteLectura,
@@ -509,34 +555,26 @@ async function partidasVivasPorColor(
   const porColor = new Map<number, PreviaSalidaPartida[]>();
   if (idsColor.length === 0) return porColor;
 
-  const entradas = await cliente.movimientoDetTela.groupBy({
-    by: ['idPartida'],
-    where: {
-      idPartida: { not: null },
-      idTelaColor: { in: [...idsColor] },
-      movimiento: {
-        idEmpresa,
-        idAlmacen,
-        tipoMov: { direccion: DireccionMovimiento.entrada },
-        anuladoPor: { none: {} },
-      },
-    },
-    _sum: { cantidad: true, cantidadComplemento: true },
-  });
-  /** Σ por partida de lo que entró a ESTE almacén (cuerpo + complemento: una entrada de puro
-   *  cardigan también pone un rollo con su tono en el anaquel). */
-  const entradoPorPartida = new Map<number, number>();
-  for (const e of entradas) {
-    if (e.idPartida === null) continue;
-    entradoPorPartida.set(
-      e.idPartida,
-      Number(e._sum.cantidad ?? 0) + Number(e._sum.cantidadComplemento ?? 0),
-    );
-  }
-  if (entradoPorPartida.size === 0) return porColor;
+  // La MISMA Σ por lote que reparte el traspaso (`saldosPorPartidaTela`), ya ordenada por folio.
+  // Cuerpo + complemento juntos: una partida de puro cardigan también pone un rollo con su tono en
+  // el anaquel, y por eso cuenta para el riesgo de tono.
+  const saldos = await saldosPorPartidaTela(cliente, idEmpresa, idAlmacen, idsColor);
+  // 🔴 VIVO se decide POR COMPONENTE, no por la suma. Un lote con cuerpo +100 y complemento −100
+  // (alcanzable con un inverso de corrección) neta 0, y con el filtro sobre la suma **desaparecía de
+  // la lista** aunque 100 kg de cuerpo sí fueran suyos — justo el aviso que hay que dar. Por la
+  // misma razón cada componente se acota a 0 antes de sumar: un componente en negativo no puede
+  // borrar tela del otro que sí está en el anaquel.
+  const vivas = saldos
+    .map((s) => ({
+      idPartida: s.idPartida,
+      saldo: aCantidad(Math.max(0, s.cuerpo) + Math.max(0, s.complemento)),
+      vivo: s.cuerpo > 0 || s.complemento > 0,
+    }))
+    .filter((s) => s.vivo);
+  if (vivas.length === 0) return porColor;
 
   const partidas = await cliente.partidaTela.findMany({
-    where: { idEmpresa, id: { in: [...entradoPorPartida.keys()] } },
+    where: { idEmpresa, id: { in: vivas.map((v) => v.idPartida) } },
     select: {
       id: true,
       folio: true,
@@ -545,15 +583,14 @@ async function partidasVivasPorColor(
       factura: true,
       fecha: true,
     },
-    orderBy: { folio: 'asc' },
   });
-  for (const p of partidas) {
-    // Sin filtro por cantidad, y es deliberado: el `where` de arriba ya deja SÓLO entradas vivas
-    // (la cancelada la saca `anuladoPor`, su inverso la dirección), y ninguna entrada nace con las
-    // DOS cantidades en cero (`alMenosUnaCantidad` del contrato). El `if (entrado <= 1e-6)` que
-    // había aquí era inalcanzable —se mutó y ninguna prueba se puso roja—, así que se fue en vez de
-    // quedarse como rama que nadie vigila.
-    const entrado = entradoPorPartida.get(p.id) ?? 0;
+  const porId = new Map(partidas.map((p) => [p.id, p]));
+  // Se recorre `vivas` (no `partidas`) para conservar el ORDEN POR FOLIO que trae la Σ: dos
+  // corridas iguales listan los lotes igual. Una partida de otra empresa no aparece en `porId` y
+  // simplemente no se lista (A9: no se dice nada de ella).
+  for (const v of vivas) {
+    const p = porId.get(v.idPartida);
+    if (p === undefined) continue;
     const lista = porColor.get(p.idTelaColor) ?? [];
     lista.push({
       id: p.id,
@@ -561,7 +598,7 @@ async function partidasVivasPorColor(
       loteProveedor: p.loteProveedor,
       factura: p.factura,
       fecha: p.fecha === null ? null : p.fecha.toISOString().slice(0, 10),
-      entrado: aCantidad(entrado),
+      saldo: v.saldo,
     });
     porColor.set(p.idTelaColor, lista);
   }

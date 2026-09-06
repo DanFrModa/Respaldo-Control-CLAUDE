@@ -53,14 +53,13 @@ function yaSalido(...pares: [number, number][]): Map<number, number> {
   return new Map(pares);
 }
 
-/** Una partida conocida del color en el almacén (100 unidades entradas, salvo que se diga otra). */
-function partida(
-  id: number,
-  folio: number,
-  lote: string | null,
-  entrado = 100,
-): PreviaSalidaPartida {
-  return { id, folio, loteProveedor: lote, factura: null, fecha: null, entrado };
+/**
+ * Un lote VIVO del color en el almacén, con su SALDO (100, salvo que se diga otro). Desde la fila
+ * 0.142 el número es un **neto de hoy** (entradas − salidas que nombran el lote), no el acumulado
+ * de entradas: por eso el campo se llama `saldo` y no `entrado`.
+ */
+function partida(id: number, folio: number, lote: string | null, saldo = 100): PreviaSalidaPartida {
+  return { id, folio, loteProveedor: lote, factura: null, fecha: null, saldo };
 }
 
 /** Existencia (cuerpo + complemento) de cada color EN ESE ALMACÉN. */
@@ -221,10 +220,12 @@ describe('aviso (b) — riesgo de tono: TRES estados, no dos', () => {
     expect(color?.partidas.map((p) => p.loteProveedor)).toEqual(['L-A', 'L-B']);
   });
 
-  // ⭐⭐ EL TERCER ESTADO — el hueco que el revisor midió: la tela que llega por TRASPASO entra SIN
-  // partida, así que contar partidas dejaba el aviso mudo en el almacén del cortador (que es
-  // adonde llega traspasada) con N tonos enfrente de quien escoge el rollo.
-  it('HAY TELA pero NINGUNA partida conocida (llegó traspasada) = ORIGEN DESCONOCIDO: avisa', () => {
+  // ⭐⭐ EL TERCER ESTADO. Desde la fila 0.142 el traspaso SÍ nombra el lote, así que este caso ya no
+  // es «el almacén del cortador»: es la tela que NADIE puede nombrar — la traspasada antes de la
+  // 0.142 (REGLA 0-B: no se repara hacia atrás), la que entra por el ajuste de ENTRADA del conteo
+  // CÍCLICO (que no crea partida a propósito) y la devuelta al cancelar una salida que tampoco
+  // llevaba lote. Sigue habiendo tela sin nombre, y el aviso sigue diciéndolo.
+  it('HAY TELA pero NINGÚN lote vivo que la explique = ORIGEN DESCONOCIDO: avisa', () => {
     const [color] = evaluarRiesgoDeTono(
       [linea(11, 'Marino', FELPA, 100)],
       new Map(),
@@ -232,14 +233,13 @@ describe('aviso (b) — riesgo de tono: TRES estados, no dos', () => {
     );
     expect(color?.estadoTono).toBe('origen-desconocido');
     expect(color?.existencia).toBe(800);
-    expect(color?.entradoConocido).toBe(0);
+    expect(color?.saldoConocido).toBe(0);
     expect(color?.sinNombrar).toBe(800);
     expect(color?.partidas).toEqual([]);
   });
 
-  // El caso MIXTO, que la regla de "cero partidas" seguiría callando por la misma razón: una
-  // partida conocida de 500 y 300 más que llegaron traspasados.
-  it('UNA partida conocida que NO explica toda la existencia también avisa', () => {
+  // El caso MIXTO: un lote vivo de 500 y 300 más que ninguno explica.
+  it('UN lote vivo que NO explica toda la existencia también avisa', () => {
     const [color] = evaluarRiesgoDeTono(
       [linea(11, 'Marino', FELPA, 100)],
       new Map([[11, [partida(1, 501, 'L-A', 500)]]]),
@@ -247,7 +247,7 @@ describe('aviso (b) — riesgo de tono: TRES estados, no dos', () => {
     );
     expect(color?.estadoTono).toBe('origen-desconocido');
     expect(color?.existencia).toBe(800);
-    expect(color?.entradoConocido).toBe(500);
+    expect(color?.saldoConocido).toBe(500);
     expect(color?.sinNombrar).toBe(300);
   });
 
@@ -258,10 +258,10 @@ describe('aviso (b) — riesgo de tono: TRES estados, no dos', () => {
     const [color] = evaluarRiesgoDeTono(
       [linea(11, 'Marino', FELPA, 100)],
       new Map([[11, [partida(1, 501, 'L-A', 500), partida(2, 502, 'L-B', 300)]]]),
-      existencias([11, 1000]), // 800 de las dos partidas + 200 que llegaron traspasados
+      existencias([11, 1000]), // 800 de los dos lotes + 200 que nada explica (ver el mapa de la cabecera)
     );
     expect(color?.estadoTono).toBe('varias-partidas');
-    expect(color?.entradoConocido).toBe(800);
+    expect(color?.saldoConocido).toBe(800);
     expect(color?.sinNombrar).toBe(200);
     // La lista sigue viajando: es lo que hace accionable a la alarma.
     expect(color?.partidas).toHaveLength(2);
@@ -277,7 +277,7 @@ describe('aviso (b) — riesgo de tono: TRES estados, no dos', () => {
     expect(color?.sinNombrar).toBe(0);
   });
 
-  it('una partida ya consumida (existencia por debajo de lo entrado) NO dispara nada', () => {
+  it('un saldo por lote MAYOR que la existencia (salidas a orden que no lo descuentan) NO dispara nada', () => {
     const [color] = evaluarRiesgoDeTono(
       [linea(11, 'Marino', FELPA, 100)],
       new Map([[11, [partida(1, 501, 'L-A', 500)]]]),
@@ -299,13 +299,13 @@ describe('aviso (b) — riesgo de tono: TRES estados, no dos', () => {
   });
 
   it('el ruido decimal no inventa tela de origen desconocido', () => {
-    // 400.1 + 200.3 entradas conocidas contra 600.4 de existencia: en binario la Σ da 600.4000…04.
+    // 400.1 + 200.3 de saldo conocido contra 600.4 de existencia: en binario la Σ da 600.4000…04.
     const [color] = evaluarRiesgoDeTono(
       [linea(11, 'Marino', FELPA, 10)],
       new Map([[11, [partida(1, 501, 'L-A', 400.1), partida(2, 502, 'L-B', 200.3)]]]),
       existencias([11, 600.4]),
     );
-    expect(color?.entradoConocido).toBe(600.4);
+    expect(color?.saldoConocido).toBe(600.4);
     // (con DOS partidas el estado ya es `varias-partidas`; lo que se mide aquí es la aritmética)
     expect(color?.existencia).toBe(600.4);
   });

@@ -36,7 +36,7 @@ type RespuestaPrevia = {
     tela: string;
     estadoTono: 'sin-riesgo' | 'varias-partidas' | 'origen-desconocido';
     existencia: number;
-    entradoConocido: number;
+    saldoConocido: number;
     sinNombrar: number;
     partidas: {
       id: number;
@@ -44,7 +44,7 @@ type RespuestaPrevia = {
       loteProveedor: string | null;
       factura: string | null;
       fecha: string | null;
-      entrado: number;
+      saldo: number;
     }[];
   }[];
   haySobreSalida: boolean;
@@ -81,16 +81,16 @@ function partida(
   id: number,
   folio: number,
   lote: string | null,
-  entrado = 100,
+  saldo = 100,
 ): RespuestaPrevia['colores'][number]['partidas'][number] {
-  return { id, folio, loteProveedor: lote, factura: null, fecha: null, entrado };
+  return { id, folio, loteProveedor: lote, factura: null, fecha: null, saldo };
 }
 
 /** El renglón (b) de un color: el ESTADO lo decide el SERVIDOR, así que aquí se dicta. */
 function color(
   estadoTono: RespuestaPrevia['colores'][number]['estadoTono'],
   partidas: RespuestaPrevia['colores'][number]['partidas'],
-  existencia = partidas.reduce((suma, p) => suma + p.entrado, 0),
+  existencia = partidas.reduce((suma, p) => suma + p.saldo, 0),
   identidad: { idTelaColor: number; telaColor: string } = {
     idTelaColor: 11,
     telaColor: 'Marino',
@@ -102,8 +102,8 @@ function color(
     tela: 'Felpa Suiza',
     estadoTono,
     existencia,
-    entradoConocido: partidas.reduce((suma, p) => suma + p.entrado, 0),
-    sinNombrar: Math.max(0, existencia - partidas.reduce((suma, p) => suma + p.entrado, 0)),
+    saldoConocido: partidas.reduce((suma, p) => suma + p.saldo, 0),
+    sinNombrar: Math.max(0, existencia - partidas.reduce((suma, p) => suma + p.saldo, 0)),
     partidas,
   };
 }
@@ -284,11 +284,14 @@ describe('SalidaTelaColorOrdenPagina (A2 — salida por color)', () => {
     expect(screen.getByTestId('salida-color-guardar')).toBeEnabled();
   });
 
-  // ⭐⭐ EL TERCER ESTADO: tela que ninguna partida explica (llegó traspasada al almacén del
-  // cortador). El aviso tiene que DECIR que no se sabe, no callar — callar sería presentar la
-  // ignorancia como tranquilidad, justo enfrente de quien está escogiendo el rollo.
+  // ⭐⭐ EL TERCER ESTADO: tela que ningún lote explica. El aviso tiene que DECIR que no se sabe, no
+  // callar — callar sería presentar la ignorancia como tranquilidad, justo enfrente de quien está
+  // escogiendo el rollo. ⚠️ Desde la fila 0.142 esa tela **ya no viene de un traspaso** (ésos nombran
+  // el lote): viene del ajuste de entrada del conteo cíclico, de una salida cancelada, o de un
+  // traspaso anterior a esa fila. Esta prueba dicta el estado directamente —lo decide el SERVIDOR—,
+  // así que no monta ninguno de esos caminos: mide lo único que le toca, que es cómo se pinta.
   // ⭐⭐ LA LISTA NO ES TODO LO QUE HAY, y la pantalla tiene que decirlo. Con dos lotes conocidos y
-  // 200 más llegados por traspaso, enseñar sólo «#501 · #502» haría creer que ésos son el anaquel
+  // 200 kg más que nada explica, enseñar sólo «#501 · #502» haría creer que ésos son el anaquel
   // entero — presentar como completo lo que no lo es.
   it('con varias partidas Y tela sin nombrar, la lista lo DICE (no se presenta como completa)', () => {
     respuestaPrevia = previa({
@@ -324,9 +327,10 @@ describe('SalidaTelaColorOrdenPagina (A2 — salida por color)', () => {
     );
   });
 
-  // ⭐⭐ Y NO COMO ALARMA. En el almacén del cortador este estado sale en TODAS las capturas (la
-  // partida no viaja en el traspaso), así que pintarlo en ámbar devolvería el «aviso que sale
-  // siempre» que esta fila vino a matar — y quemaría la alarma de arriba.
+  // ⭐⭐ Y NO COMO ALARMA. Antes de la fila 0.142 este estado salía en TODAS las capturas del almacén
+  // del cortador porque el lote no viajaba en el traspaso; hoy ya no es así, pero el criterio no
+  // cambia: es el estado que puede salir seguido, y pintarlo en ámbar devolvería el «aviso que sale
+  // siempre» que la 0.101 vino a matar — y quemaría la alarma de arriba, que es la accionable.
   it('ORIGEN DESCONOCIDO se dice en LÍNEA NEUTRA, no en el bloque de alarma', () => {
     respuestaPrevia = previa({
       colores: [color('origen-desconocido', [], 800)],

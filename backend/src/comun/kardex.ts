@@ -704,12 +704,20 @@ export interface ExistenciaTelaColor {
 /**
  * Las DOS Σ con signo de un tela-color (cuerpo y complemento), en UNA sola definición.
  *
- * ⚠️ Existe para que el lector BAJO LOCK ({@link existenciaTelaColorBloqueada}) y el lector POR
- * LOTES ({@link existenciasTelaColorPorColor}) no sean dos copias de la misma aritmética: si
- * mañana cambia el tratamiento de una dirección, cambia AQUÍ y los dos caminos se mueven juntos.
- * Es exactamente la trampa de "la rama gemela" — dos cosas simétricas donde se arregla una sola.
+ * ⚠️ Existe para que NINGÚN lector de esta aritmética sea una copia: si mañana cambia el tratamiento
+ * de una dirección, cambia AQUÍ y todos los caminos se mueven juntos. Es exactamente la trampa de
+ * "la rama gemela" — dos cosas simétricas donde se arregla una sola.
+ *
+ * **Quién la usa hoy — la lista se mantiene, porque es la que hace verificable la promesa:**
+ *  1. {@link existenciaTelaColorBloqueada} — el lector BAJO LOCK (valida no-negativo, D3).
+ *  2. {@link existenciasTelaColorPorColor} — el lector POR LOTES (consulta y cíclico).
+ *  3. `dominio/inventarios/partidas-telas.ts` → `saldosPorPartidaTela` — la MISMA Σ agrupada por
+ *     PARTIDA (fila 0.142: el saldo vivo de cada lote). Por eso se EXPORTA: se copió a mano en esa
+ *     fila y el reviewer lo cazó — quedaban tres copias y este comentario, que promete lo contrario,
+ *     se había vuelto falso. La guía *«no toques `kardex.ts`»* era para no meterse en el motor; la
+ *     INVARIANTE es no duplicar la aritmética, y manda la invariante.
  */
-const SUMAS_TELA_COLOR = Prisma.sql`
+export const SUMAS_TELA_COLOR = Prisma.sql`
       COALESCE(SUM(
         d."cantidad" * CASE t."direccion"
           WHEN 'entrada' THEN 1

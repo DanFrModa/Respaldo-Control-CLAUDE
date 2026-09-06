@@ -4,6 +4,8 @@
  * respuestas fijas. Cubren lo que hace de esta hoja un documento y no una ocurrencia:
  *  • se arma con el folio QUE YA EXISTE (el de la pata de salida) — nunca uno nuevo;
  *  • dice origen, destino y el CORTADOR del almacén destino, y ambos componentes por renglón;
+ *  • ⭐ **desglosa POR LOTE** (fila 0.142): un renglón por partida, con el número del proveedor y el
+ *    folio, y «—» para la tela vieja que no tiene partida;
  *  • se puede pedir desde CUALQUIERA de las dos patas (así se reimprime desde el historial);
  *  • un traspaso CANCELADO no se imprime (su papel no vuelve a salir con un bulto);
  *  • un movimiento que no es traspaso no tiene hoja;
@@ -17,13 +19,20 @@ import type { ContextoBd } from '../../../comun/transaccion.js';
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
 import {
   armarDatosImpresoTraspasoTela,
+  etiquetaLoteImpreso,
   generarPdfTraspasoTela,
   type DatosImpresoTraspasoTela,
 } from './impreso-traspaso-tela.js';
 
 const sesionVer = () => sesionDePrueba({ permisos: ['inventario-telas.ver'] });
 
-/** Detalle de tela de la pata de SALIDA (una tela con cuerpo + complemento). */
+/**
+ * Detalle de tela de la pata de SALIDA. ⭐ Desde la fila 0.142 el traspaso reparte lo que se mueve
+ * entre los lotes del origen, así que **un mismo color ocupa VARIOS renglones** —uno por partida— y
+ * la hoja los desglosa. Aquí van los tres casos que la hoja tiene que saber pintar: un lote con
+ * número del proveedor, un lote SIN número (sólo folio de partida) y la tela vieja SIN partida
+ * ninguna (traspasada antes de la 0.142 — REGLA 0-B).
+ */
 const DETALLE = [
   {
     idTela: 7,
@@ -32,6 +41,25 @@ const DETALLE = [
     tela: { nombre: 'Felpa 100% algodón', nombreCuerpo: 'Felpa', nombreComplemento: 'Cardigan' },
     telaColor: { nombre: 'Marino', pantone: '19-4024' },
     lote: null,
+    partida: { folio: 45n, loteProveedor: 'L-2211' },
+  },
+  {
+    idTela: 7,
+    cantidad: 30,
+    cantidadComplemento: 0,
+    tela: { nombre: 'Felpa 100% algodón', nombreCuerpo: 'Felpa', nombreComplemento: 'Cardigan' },
+    telaColor: { nombre: 'Marino', pantone: '19-4024' },
+    lote: null,
+    partida: { folio: 46n, loteProveedor: null },
+  },
+  {
+    idTela: 7,
+    cantidad: 10,
+    cantidadComplemento: 0,
+    tela: { nombre: 'Felpa 100% algodón', nombreCuerpo: 'Felpa', nombreComplemento: 'Cardigan' },
+    telaColor: { nombre: 'Marino', pantone: '19-4024' },
+    lote: null,
+    partida: null,
   },
 ];
 
@@ -96,6 +124,8 @@ describe('armarDatosImpresoTraspasoTela (V1-E3b, §Post-F9.38)', () => {
     expect(datos.almacenDestino).toBe('Taller Pérez');
     expect(datos.tercero).toBe('Cortes Pérez');
     expect(datos.fecha).toBe('2026-08-12');
+    // ⭐ Fila 0.142 — UN RENGLÓN POR LOTE, con el folio de la partida y el número del proveedor:
+    // es lo que hace que quien recibe pueda casar el rollo físico con la nota.
     expect(datos.renglones).toEqual([
       {
         tela: 'Felpa 100% algodón',
@@ -105,10 +135,46 @@ describe('armarDatosImpresoTraspasoTela (V1-E3b, §Post-F9.38)', () => {
         cantidadCuerpo: 120.5,
         nombreComplemento: 'Cardigan',
         cantidadComplemento: 12,
+        partidaFolio: 45,
+        loteProveedor: 'L-2211',
+      },
+      {
+        tela: 'Felpa 100% algodón',
+        colorOLote: 'Marino',
+        pantone: '19-4024',
+        nombreCuerpo: 'Felpa',
+        cantidadCuerpo: 30,
+        nombreComplemento: 'Cardigan',
+        cantidadComplemento: 0,
+        partidaFolio: 46,
+        loteProveedor: null,
+      },
+      {
+        tela: 'Felpa 100% algodón',
+        colorOLote: 'Marino',
+        pantone: '19-4024',
+        nombreCuerpo: 'Felpa',
+        cantidadCuerpo: 10,
+        nombreComplemento: 'Cardigan',
+        cantidadComplemento: 0,
+        partidaFolio: null,
+        loteProveedor: null,
       },
     ]);
-    expect(datos.totalCuerpo).toBe(120.5);
+    expect(datos.totalCuerpo).toBe(160.5);
     expect(datos.totalComplemento).toBe(12);
+  });
+
+  // ⭐ Cómo se NOMBRA el lote en el papel (fila 0.142). El número del PROVEEDOR va primero porque es
+  // lo que viene escrito en el rollo; el folio de la partida, entre paréntesis, es lo que el sistema
+  // sabe buscar. Sin partida sale «—»: inventar un lote sería peor que callar.
+  it('nombra el lote con el número del proveedor y el folio, y «—» cuando no hay partida', () => {
+    expect(etiquetaLoteImpreso(45, 'L-2211')).toBe('L-2211 (#45)');
+    expect(etiquetaLoteImpreso(46, null)).toBe('#46');
+    expect(etiquetaLoteImpreso(46, '   ')).toBe('#46');
+    expect(etiquetaLoteImpreso(null, null)).toBe('—');
+    // Y la tela vieja no hereda el lote del renglón de al lado por no tener partida propia.
+    expect(etiquetaLoteImpreso(null, 'L-2211')).toBe('—');
   });
 
   it('se puede pedir desde la pata de ENTRADA y sale la MISMA hoja (reimpresión desde el historial)', async () => {
@@ -205,6 +271,8 @@ describe('generarPdfTraspasoTela (V1-E3b)', () => {
           cantidadCuerpo: 100,
           nombreComplemento: null,
           cantidadComplemento: null,
+          partidaFolio: 45,
+          loteProveedor: 'L-2211',
         },
       ],
       totalCuerpo: 100,

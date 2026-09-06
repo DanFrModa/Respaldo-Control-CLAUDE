@@ -49139,7 +49139,7 @@ export interface paths {
                 /** @description Nombre del color de la tela. */
                 telaColor: string;
                 pantone: string | null;
-                /** @description Partida de la entrada o null (salidas). */
+                /** @description Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en la tela traspasada antes de esa fila. */
                 idPartida: number | null;
                 /** @description Folio de la partida o null. */
                 partidaFolio: number | null;
@@ -49487,7 +49487,7 @@ export interface paths {
                   /** @description Nombre del color de la tela. */
                   telaColor: string;
                   pantone: string | null;
-                  /** @description Partida de la entrada o null (salidas). */
+                  /** @description Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en la tela traspasada antes de esa fila. */
                   idPartida: number | null;
                   /** @description Folio de la partida o null. */
                   partidaFolio: number | null;
@@ -49542,7 +49542,7 @@ export interface paths {
                   /** @description Nombre del color de la tela. */
                   telaColor: string;
                   pantone: string | null;
-                  /** @description Partida de la entrada o null (salidas). */
+                  /** @description Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en la tela traspasada antes de esa fila. */
                   idPartida: number | null;
                   /** @description Folio de la partida o null. */
                   partidaFolio: number | null;
@@ -49729,7 +49729,7 @@ export interface paths {
                 /** @description Nombre del color de la tela. */
                 telaColor: string;
                 pantone: string | null;
-                /** @description Partida de la entrada o null (salidas). */
+                /** @description Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en la tela traspasada antes de esa fila. */
                 idPartida: number | null;
                 /** @description Folio de la partida o null. */
                 partidaFolio: number | null;
@@ -49928,17 +49928,17 @@ export interface paths {
                 idTela: number;
                 tela: string;
                 /**
-                 * @description VEREDICTO del dominio: `varias-partidas` = más de una partida conocida (avisa y las lista); `origen-desconocido` = hay más existencia que la que las partidas conocidas explican, típicamente tela llegada por traspaso (avisa diciendo que NO se sabe); `sin-riesgo` = calla.
+                 * @description VEREDICTO del dominio: `varias-partidas` = más de un lote VIVO (avisa y los lista); `origen-desconocido` = hay más existencia que la que los lotes vivos explican, o sea tela que el sistema no puede nombrar (avisa diciendo que NO se sabe); `sin-riesgo` = calla.
                  * @enum {string}
                  */
                 estadoTono: 'sin-riesgo' | 'varias-partidas' | 'origen-desconocido';
                 /** @description Existencia del color EN ESE ALMACÉN (cuerpo + complemento, Σ de movimientos). */
                 existencia: number;
-                /** @description Σ de lo que ENTRÓ con partida conocida a ese almacén (acumulado histórico: nadie le descuenta las salidas, así que puede ser MAYOR que la existencia de hoy). */
-                entradoConocido: number;
-                /** @description Cuánta de la existencia de hoy NO explica ninguna partida conocida = max(0, existencia − entradoConocido). > 0 es lo que enciende `origen-desconocido`, y es el número que la pantalla enseña cuando hay partidas listadas pero la lista no lo cubre todo. */
+                /** @description Σ del saldo VIVO de los lotes de ese color en ese almacén. Es un neto de hoy, comparable con la existencia (fila 0.142). Puede quedar POR ENCIMA de lo real en un almacén que consume: las salidas a orden no nombran lote, así que no lo descuentan. */
+                saldoConocido: number;
+                /** @description Cuánta de la existencia de hoy NO explica ningún lote vivo = max(0, existencia − saldoConocido). > 0 es lo que enciende `origen-desconocido`, y es el número que la pantalla enseña cuando hay lotes listados pero la lista no lo cubre todo. */
                 sinNombrar: number;
-                /** @description Las partidas conocidas del color en ese almacén (para escoger a conciencia). */
+                /** @description Los lotes vivos del color en ese almacén (para escoger a conciencia). */
                 partidas: {
                   id: number;
                   /** @description Folio de la partida (A3). */
@@ -49949,8 +49949,8 @@ export interface paths {
                   factura: string | null;
                   /** @description Fecha de la entrada (YYYY-MM-DD) o null. */
                   fecha: string | null;
-                  /** @description Cuánto ENTRÓ de esta partida a este almacén (cuerpo + complemento). */
-                  entrado: number;
+                  /** @description Lo que QUEDA de esta partida en este almacén (cuerpo + complemento): Σ entradas − Σ salidas que la nombran. Es un NETO de hoy, no un acumulado de entradas (fila 0.142). Sólo se listan las partidas con saldo > 0. */
+                  saldo: number;
                 }[];
               }[];
               /** @description ¿Alguna tela se pasa de lo que la orden pide? */
@@ -50121,7 +50121,7 @@ export interface paths {
                 /** @description Nombre del color de la tela. */
                 telaColor: string;
                 pantone: string | null;
-                /** @description Partida de la entrada o null (salidas). */
+                /** @description Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en la tela traspasada antes de esa fila. */
                 idPartida: number | null;
                 /** @description Folio de la partida o null. */
                 partidaFolio: number | null;
@@ -50308,7 +50308,7 @@ export interface paths {
                   /** @description Nombre del color de la tela. */
                   telaColor: string;
                   pantone: string | null;
-                  /** @description Partida de la entrada o null (salidas). */
+                  /** @description Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en la tela traspasada antes de esa fila. */
                   idPartida: number | null;
                   /** @description Folio de la partida o null. */
                   partidaFolio: number | null;
@@ -50363,7 +50363,7 @@ export interface paths {
                   /** @description Nombre del color de la tela. */
                   telaColor: string;
                   pantone: string | null;
-                  /** @description Partida de la entrada o null (salidas). */
+                  /** @description Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en la tela traspasada antes de esa fila. */
                   idPartida: number | null;
                   /** @description Folio de la partida o null. */
                   partidaFolio: number | null;
@@ -50543,7 +50543,7 @@ export interface paths {
                 /** @description Nombre del color de la tela. */
                 telaColor: string;
                 pantone: string | null;
-                /** @description Partida de la entrada o null (salidas). */
+                /** @description Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en la tela traspasada antes de esa fila. */
                 idPartida: number | null;
                 /** @description Folio de la partida o null. */
                 partidaFolio: number | null;

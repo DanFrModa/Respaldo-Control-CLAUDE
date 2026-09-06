@@ -8,7 +8,10 @@
  *      complemento RECHAZA cantidad de complemento;
  *  (c) la salida valida no-negativo de AMBOS componentes bajo lock (D3, suma directa);
  *  (d) la salida a orden empareja por color (sin partida) y conserva la traza origenId;
- *  (e) traspaso atómico (dos patas) con ambas cantidades y validación del origen;
+ *  (e) traspaso atómico (dos patas) con ambas cantidades y validación del origen, y ⭐ **el LOTE
+ *      viajando en las dos patas** (fila 0.142): reparto FIFO por folio sobre el saldo real del
+ *      origen, cuerpo y complemento por separado, remanente sin lote, y la prohibición de cancelar
+ *      una sola pata;
  *  (f) cancelación = movimiento INVERSO que copia las dimensiones nuevas (el saldo por color se
  *      neutraliza) y no se re-cancela;
  *  (g) existencias agrupadas TELA PADRE → colores → almacenes (vista existencia_tela_color);
@@ -390,6 +393,185 @@ describe('traspaso por color (dos patas atómicas, A2)', () => {
         },
         bd(),
       ),
+    ).rejects.toThrow(ErrorConflicto);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ FILA 0.142 — EL LOTE VIAJA EN EL TRASPASO (Daniel §Post-F9.201 punto 1)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// La REGLA del reparto (FIFO por folio, cuerpo y complemento por separado, remanente sin lote) se
+// mide pura en `partidas-telas.test.ts`. Lo que SÓLO se puede medir contra Postgres, y es lo que
+// estas pruebas fijan:
+//  • que la partida llegue de verdad a los renglones de kardex de LAS DOS patas (el motor pasa el
+//    mismo arreglo a las dos: si eso cambiara, el destino se quedaría sin lote y nadie lo vería);
+//  • que el reparto salga del SALDO REAL del origen, leído después del lock (Σ de movimientos);
+//  • que la tela sin lote del origen siga viajando sin lote, sin romper el traspaso.
+
+/** Los renglones de kardex de un movimiento, con el folio de su partida (o null). */
+async function renglonesConLote(idMovimiento: number) {
+  const detalles = await cliente.movimientoDetTela.findMany({
+    where: { idMovimiento },
+    select: { cantidad: true, cantidadComplemento: true, partida: { select: { folio: true } } },
+    orderBy: { id: 'asc' },
+  });
+  return detalles.map((d) => ({
+    folioPartida: d.partida === null ? null : Number(d.partida.folio),
+    cuerpo: Number(d.cantidad),
+    complemento: d.cantidadComplemento === null ? null : Number(d.cantidadComplemento),
+  }));
+}
+
+describe('el traspaso NOMBRA el lote en las dos patas (fila 0.142)', () => {
+  it('⭐ reparte FIFO por folio y escribe la MISMA partida en la salida y en la entrada', async () => {
+    const p1 = await entrarColor(colorMarino.id, 500, 0, { loteProveedor: 'L-A' });
+    const p2 = await entrarColor(colorMarino.id, 300, 0, { loteProveedor: 'L-B' });
+    const folioP1 = p1.renglones[0]!.partidaFolio!;
+    const folioP2 = p2.renglones[0]!.partidaFolio!;
+
+    const traspaso = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 700 }],
+      },
+      bd(),
+    );
+
+    const esperado = [
+      { folioPartida: folioP1, cuerpo: 500, complemento: 0 },
+      { folioPartida: folioP2, cuerpo: 200, complemento: 0 },
+    ];
+    // 🔴 LAS DOS patas, y por separado: es lo único que demuestra que el lote llega al DESTINO, que
+    // es donde alguien va a escoger el rollo.
+    expect(await renglonesConLote(traspaso.salida.id)).toEqual(esperado);
+    expect(await renglonesConLote(traspaso.entrada.id)).toEqual(esperado);
+  });
+
+  it('⭐ el CUERPO y el COMPLEMENTO se nombran por separado (partida de sólo cardigan)', async () => {
+    // El lote viejo tiene sólo cuerpo; el nuevo, sólo cardigan. Un reparto que arrastrara el
+    // complemento detrás del cuerpo escribiría un renglón imposible.
+    const soloCuerpo = await entrarColor(colorMarino.id, 400, 0, { loteProveedor: 'L-CUERPO' });
+    const soloCardigan = await entrarColor(colorMarino.id, 0, 200, {
+      loteProveedor: 'L-CARDIGAN',
+    });
+    const traspaso = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 400, cantidadComplemento: 150 }],
+      },
+      bd(),
+    );
+    expect(await renglonesConLote(traspaso.entrada.id)).toEqual([
+      { folioPartida: soloCuerpo.renglones[0]!.partidaFolio, cuerpo: 400, complemento: 0 },
+      { folioPartida: soloCardigan.renglones[0]!.partidaFolio, cuerpo: 0, complemento: 150 },
+    ]);
+  });
+
+  it('⭐ un SEGUNDO traspaso ya no puede repartir el lote que el primero se llevó', async () => {
+    // El saldo por lote sale de la Σ de movimientos (D3): la pata de salida del primer traspaso YA
+    // descontó `L-A`. Si el reparto sumara sólo entradas, este segundo traspaso volvería a nombrar
+    // `L-A` — el mismo rollo saldría dos veces de la bodega, en el papel.
+    const pa = await entrarColor(colorMarino.id, 500, 0, { loteProveedor: 'L-A' });
+    const pb = await entrarColor(colorMarino.id, 500, 0, { loteProveedor: 'L-B' });
+    await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 500 }],
+      },
+      bd(),
+    );
+    const segundo = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-07',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 500 }],
+      },
+      bd(),
+    );
+    expect(await renglonesConLote(segundo.salida.id)).toEqual([
+      { folioPartida: pb.renglones[0]!.partidaFolio, cuerpo: 500, complemento: 0 },
+    ]);
+    // …y el primero se había llevado el otro, no éste.
+    expect(pa.renglones[0]!.partidaFolio).not.toBe(pb.renglones[0]!.partidaFolio);
+  });
+
+  it('la tela que ningún lote explica viaja SIN lote, junto a la que sí (REGLA 0-B)', async () => {
+    // Así se ve un almacén real hoy: parte de su tela entró antes de la 0.142 (sin partida) y parte
+    // con su partida. El traspaso mueve las dos y no inventa un lote para la primera.
+    const conLote = await entrarColor(colorMarino.id, 200, 0, { loteProveedor: 'L-A' });
+    const tipoTransferenciaEntrada = await cliente.tipoMovimientoInventario.findFirstOrThrow({
+      where: { codigo: 'transferencia-entrada' },
+    });
+    await cliente.movimiento.create({
+      data: {
+        folio: 987654n,
+        idEmpresa: empresa.id,
+        idTipoMov: tipoTransferenciaEntrada.id,
+        idAlmacen: almA.id,
+        fecha: new Date('2026-07-01T00:00:00.000Z'),
+        origenTipo: 'traspaso',
+        detallesTela: {
+          create: [
+            {
+              idTela: telaFelpa.id,
+              idTelaColor: colorMarino.id,
+              idPartida: null,
+              cantidad: 300,
+              cantidadComplemento: 0,
+            },
+          ],
+        },
+      },
+    });
+
+    const traspaso = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 500 }],
+      },
+      bd(),
+    );
+    expect(await renglonesConLote(traspaso.entrada.id)).toEqual([
+      { folioPartida: conLote.renglones[0]!.partidaFolio, cuerpo: 200, complemento: 0 },
+      { folioPartida: null, cuerpo: 300, complemento: 0 },
+    ]);
+  });
+
+  it('🔴 una sola pata del traspaso NO se cancela: la marcha atrás es OTRO traspaso', async () => {
+    // El motor lo prohíbe (`cancelarMovimientoMaterial`) porque descuadraría los dos almacenes. Con
+    // el lote viajando importa el doble: cancelar sólo la entrada dejaría el lote descontado del
+    // origen y sin aparecer en ningún lado.
+    await entrarColor(colorMarino.id, 500, 0, { loteProveedor: 'L-A' });
+    const traspaso = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 500 }],
+      },
+      bd(),
+    );
+    await expect(
+      cancelarMovimientoTelaColor(sesion(), traspaso.salida.id, { motivo: 'Me equivoqué' }, bd()),
+    ).rejects.toThrow(ErrorConflicto);
+    await expect(
+      cancelarMovimientoTelaColor(sesion(), traspaso.entrada.id, { motivo: 'Me equivoqué' }, bd()),
     ).rejects.toThrow(ErrorConflicto);
   });
 });

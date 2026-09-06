@@ -41,8 +41,11 @@ function leerIdDeepLink(state: unknown, clave: string): number | null {
  * un estado de TRES valores, que aquí se pintan **con dos pesos distintos a propósito**:
  * `varias-partidas` → **alarma ámbar con la lista** de partidas (hay de dónde escoger: interrumpe);
  * `origen-desconocido` → **línea neutra** que dice que el sistema no sabe de qué partidas es esa
- * tela —lo normal cuando llegó traspasada, y en el almacén del cortador es SIEMPRE— (acompaña, no
- * interrumpe); `sin-riesgo` → nada. Los tres estados y sus límites, en
+ * tela (acompaña, no interrumpe); `sin-riesgo` → nada. ⭐ **Desde la fila 0.142 el TRASPASO nombra el
+ * lote**, así que en el almacén del cortador —donde arranca esta pantalla— ya hay lista que enseñar;
+ * la línea neutra queda para la tela que nadie puede nombrar: la **traspasada antes de esa fila**, la
+ * que entra por el **ajuste de entrada del conteo cíclico** (que no crea partida a propósito) y la
+ * que vuelve al **cancelar una salida** que tampoco llevaba lote. Los tres estados y sus límites, en
  * `dominio/inventarios/previa-salida-tela-orden.ts`.
  * En la misma fila entró el aviso de **SOBRE-SALIDA** (Daniel §Post-F9.193 dec. 8): si lo que se
  * saca —contando lo que YA salió antes— pasa de lo que la orden pide, se dice. **Los dos avisos
@@ -337,9 +340,10 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                               )
                               .join(' · ')}
                             {/* 🔴 LA LISTA NO SIEMPRE ES TODO LO QUE HAY. Si además entró tela sin
-                                partida (traspaso), enseñar sólo los lotes conocidos haría creer que
-                                esos son el anaquel entero. No se presenta como completo lo que no lo
-                                es. `sinNombrar` lo calcula el dominio; aquí no se resta nada. */}
+                                lote (conteo cíclico, salida cancelada, traspasos anteriores a la
+                                0.142), enseñar sólo los lotes conocidos haría creer que esos son el
+                                anaquel entero. No se presenta como completo lo que no lo es.
+                                `sinNombrar` lo calcula el dominio; aquí no se resta nada. */}
                             {c.sinNombrar > 0
                               ? `, y hay ${c.sinNombrar.toLocaleString('es-MX')} más cuyo origen no se puede nombrar`
                               : ''}
@@ -351,12 +355,13 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                 ) : null}
 
                 {/* ⭐⭐ AVISO (b2) — ORIGEN DESCONOCIDO: la LÍNEA NEUTRA, y el tono sobrio es la
-                    decisión, no un descuido. En un almacén alimentado por traspaso —el del cortador,
-                    que es el caso normal— este estado sale en TODAS las capturas mientras quede
-                    tela: la partida no viaja en el traspaso (arreglarlo es fila aparte). Pintarlo en
-                    ámbar sería devolverle a Daniel el «aviso que sale siempre» con otro texto, y
-                    quemar la alarma de arriba para cuando SÍ hay de dónde escoger. Acompaña, no
-                    interrumpe. */}
+                    decisión, no un descuido. Desde la fila 0.142 el traspaso SÍ nombra el lote, así
+                    que este estado ya NO es el caso normal del almacén del cortador: queda para la
+                    tela que nadie puede nombrar —la traspasada ANTES de esa fila (REGLA 0-B: no se
+                    repara), la del ajuste de entrada del conteo cíclico y la devuelta al cancelar
+                    una salida que tampoco llevaba lote—. Sigue en
+                    gris: pintarlo en ámbar quemaría la alarma de arriba, que es la que trae la lista
+                    de entre las que escoger. Acompaña, no interrumpe. */}
                 {coloresSinPartidas.length > 0 ? (
                   <div
                     className="space-y-0.5 text-xs text-muted-foreground"
@@ -364,8 +369,9 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                     data-testid="salida-color-tono-sin-partidas"
                   >
                     <p>
-                      El sistema <strong>no sabe de qué partidas</strong> es esta tela: llegó sin
-                      partida (normalmente traspasada de otra bodega), así que puede haber varios
+                      El sistema <strong>no sabe de qué partidas</strong> es esta tela: entró sin
+                      lote (traspasada antes de que el traspaso llevara el lote, ajustada por un
+                      conteo cíclico o devuelta de una salida cancelada), así que puede haber varios
                       tonos. Verifícalo físicamente antes de cortar.
                     </p>
                     <ul className="list-disc space-y-0.5 pl-4">
@@ -378,7 +384,7 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                             {c.tela} · {c.telaColor}
                           </strong>{' '}
                           — hay {c.existencia.toLocaleString('es-MX')} en este almacén y sólo se
-                          puede nombrar el origen de {c.entradoConocido.toLocaleString('es-MX')}.
+                          puede nombrar el origen de {c.saldoConocido.toLocaleString('es-MX')}.
                         </li>
                       ))}
                     </ul>

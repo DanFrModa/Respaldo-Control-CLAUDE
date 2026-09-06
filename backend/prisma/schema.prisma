@@ -1807,7 +1807,11 @@ model TelaColor {
 /// (resuelve la dualidad vieja `Lote.idColor` vs `TelaColor` anotada en HOJA-DE-RUTA §4): el
 /// color de la partida ES el color-hijo de la tela, no el catálogo de prenda. El CONSUMO empareja
 /// por TELA+COLOR (las salidas NO obligan a escoger partida — `MovimientoDetTela.idPartida` va
-/// NULL en salidas); la partida queda como traza de entrada y para búsquedas. La EXISTENCIA NO
+/// NULL en las salidas a orden). ⭐ EXCEPCIÓN desde la fila 0.142 (Daniel §Post-F9.201 punto 1): el
+/// TRASPASO entre almacenes SÍ nombra la partida en sus DOS patas, repartida FIFO por folio sobre
+/// el saldo por lote del origen — nadie la escoge, la calcula el dominio (`repartirPorPartidaFifo`),
+/// para que el almacén del cortador sepa de qué lotes es su tela. La partida queda como traza y
+/// para búsquedas. La EXISTENCIA NO
 /// vive aquí (D3): es Σ de `MovimientoDetTela` por tela×color×almacén. Auditoría A7. El
 /// inventario viejo por `Lote` NO se toca (queda como legado consultable).
 model PartidaTela {
@@ -1829,7 +1833,9 @@ model PartidaTela {
   fecha         DateTime? @db.Date
   observaciones String?   @db.Text
 
-  /// Renglones de kardex de ENTRADA que trajeron esta partida (en salidas idPartida va NULL).
+  /// Renglones de kardex que NOMBRAN esta partida: las ENTRADAS que la trajeron y, desde la fila
+  /// 0.142, las DOS patas de los traspasos que la movieron (la salida del origen la descuenta).
+  /// Sigue en NULL en las salidas a orden (el consumo empareja por color).
   movimientosDetTela MovimientoDetTela[]
   /// Renglón del documento de ENTRADA de tela (B1) que creó esta partida al confirmarse. Inversa.
   entradaTelaLineas  EntradaTelaLinea[]
@@ -4931,14 +4937,17 @@ model MovimientoDetTela {
   // ── INVENTARIO NUEVO por COLOR (etapa A2 — Daniel §Post-F9.9/§Post-F9.11). Columnas ADITIVAS:
   // las filas viejas (flujo por Lote) quedan con las 3 en NULL; las filas NUEVAS llevan SIEMPRE
   // `idTelaColor` (la dimensión de existencia pasa a tela×color×almacén, vista
-  // `existencia_tela_color`). `idPartida` SOLO en entradas (el consumo empareja por color, no por
-  // partida: en salidas va NULL). `cantidad` = CUERPO (puede ser 0 si la entrada es solo
-  // complemento); `cantidadComplemento` NULL cuando la tela no lleva complemento. ──
+  // `existencia_tela_color`). `idPartida` en las ENTRADAS y —desde la fila 0.142— en LAS DOS PATAS
+  // DEL TRASPASO (repartido FIFO por folio en el dominio); en las salidas a orden va NULL, porque el
+  // consumo empareja por color y no por partida. `cantidad` = CUERPO (puede ser 0 si la entrada es
+  // solo complemento); `cantidadComplemento` NULL cuando la tela no lleva complemento. ──
 
   /// Color de tela (hijo de la tela) del renglón NUEVO. NULL = fila del flujo viejo por Lote. Restrict.
   idTelaColor Int?         @map("id_tela_color")
   telaColor   TelaColor?   @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
-  /// Partida de la ENTRADA (traza; NULL en salidas — el consumo empareja por tela+color). Restrict.
+  /// Partida que nombra este renglón: la de la ENTRADA que la trajo o, desde la fila 0.142, la que
+  /// el traspaso repartió (va en sus DOS patas). NULL en las salidas a orden y en la tela movida
+  /// antes de esa fila —que no se repara, REGLA 0-B—. Restrict.
   idPartida   Int?         @map("id_partida")
   partida     PartidaTela? @relation(fields: [idPartida], references: [id], onDelete: Restrict)
 
