@@ -2502,6 +2502,17 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
 
+ - 🟡 **ABIERTO POR LA 0.142 — `herramientas/` NO LO ALCANZA ESLINT.** El CI corre todo con
+   `working-directory: backend|frontend`, así que `herramientas/verificar-documentos.mjs` (el script
+   que cruza el contador del tablero, los cuatro sitios de la versión y el orden del historial)
+   **queda fuera de ESLint**. ✅ **Lo que SÍ está cerrado, que era lo que bloqueaba:** el script **se
+   ejecuta** en cada corrida —lo lanza `frontend/src/documentos.test.ts`, verificado poniéndolo en
+   rojo al desincronizar el contador— y **se formatea** (`format:check` del frontend lo alcanza vía
+   `../herramientas/*.mjs`, comprobado desformateándolo). **Razón de diseño para dejarlo:** montarle
+   una configuración de ESLint propia a un script de Node suelto cuesta más de lo que aporta cuando
+   ya está ejecutado y formateado. Está dicho en la cabecera del propio archivo (`:18-21`), que es
+   donde lo va a leer quien lo toque. **Se anota aquí porque la regla de la casa pide que una
+   decisión de "no arreglar" viva también en §4, no sólo junto a la cosa.**
 - 🟡 **ABIERTO POR LA 0.100 — LA FLECHA DEL PIE DE LA HOJA DE TRASPASO DE TELA SALE COMO UN
   APÓSTROFO.** Medido al construir la hoja gemela de producto terminado: el carácter `→` **no está
   en WinAnsi** y `@react-pdf` lo imprime como `'`. La hoja de **PT** nació ya sin el defecto (su pie

@@ -12136,6 +12136,79 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.205) — LA TANDA DE RESPUESTAS DEL 6-sep-2026 (tarde): once decisiones, y una que CORRIGE al lead
+
+**Contexto.** El lead le puso a Daniel las preguntas abiertas de tres bloques con su default. Contestó
+casi todas. Se registran **con sus palabras**, no parafraseadas.
+
+**1. ⭐ EL LOTE SE PUEDE ELEGIR A MANO (cambia el alcance).** *«Está bien que decida el sistema **pero
+que haya posibilidad de seleccionar otro si es que el cortador decide un lote específico**.»*
+⇒ El **FIFO automático se queda** tal cual. La **selección manual va en FILA APARTE**, encima: la 0.142
+lleva tres rondas y sólo cubre el reparto automático; añadirle pantalla reabriría el ciclo y retrasaría
+lo que ya sirve. Decisión de alcance del lead, comunicada.
+
+**2. `0.143` · existencias de PT:** *«Está bien paginar»* ⇒ default (b) confirmado.
+
+**3. ⭐ `0.140` · IMPRESO POR LOTE — DE 10 EN 10.** *«Casi nunca imprimo tantas de golpe. Si es problema
+la memoria, **pon de 10 en 10 máximo** y listo.»* ⇒ el tope duro pasa de **100 a 10** órdenes por PDF.
+⚠️ **El tope de peso por imagen SIGUE haciendo falta**, medido: 10 × 7 × 12 MB ≈ **840 MB**. La decisión
+reduce el riesgo 10×, **no lo elimina**. Se construyen las dos cosas.
+
+**4. Corrida de pagos ejecutada:** *«Si. Está bien el default»* ⇒ **no** hay botón que revierta la
+corrida completa; se corrige movimiento por movimiento. Y **sí** se arregla que un **borrador vacío** se
+pueda borrar (hoy se queda en la lista para siempre).
+
+**5. ⭐ ESMA NO SE FUSIONA — y la razón la dio él.** *«Lo que pasa con EsMa de Access es que **es un
+estado de cuenta especializado para maquileros porque desde ahí reviso entradas y defino el renglón que
+abona a su estado de cuenta**. Si lo quieres fusionar con cuentas por pagar, **esa funcionalidad es sólo
+del maquilero, no de otros proveedores**. No sé cómo lo harías»* → y al oír la propuesta: *«Ok. Lo que
+comentas de EsMa»*.
+🔑 **EsMa NO es "otra vista del mismo saldo": es su MESA DE TRABAJO del maquilero.** Tiene una función
+que CxP no tiene y que no aplica a un proveedor de telas. ⇒ **Las dos pantallas se quedan**, con papeles
+distintos: **EsMa = donde se DECIDE** (revisar lo recibido, definir qué se abona, descuentos);
+**CxP = el libro único del dinero**. Lo que se arregla son las **tres contradicciones medidas**:
+(a) **no cuentan a la misma gente** —un maquilero dado de baja con saldo vivo sale en CxP y no en
+EsMa, así que sumar una columna y la otra da distinto—; (b) desde CxP se **ven** los renglones de
+maquila pero **no se pueden tocar** (la 0.145 abre esa puerta); (c) **ninguna pantalla dice que la otra
+existe**. Y se **quita del menú la etiqueta de «interina»** que EsMa arrastra desde antes de F9.
+⚠️ **Esto DESMIENTE el enunciado de la fila 0.135**, que trataba la convivencia como duplicidad a
+eliminar. No lo es: **es división del trabajo**, y fusionarlas le quitaría la pantalla donde opera.
+
+**6. 🔴 LOS PLAZOS DEL MAQUILERO — DANIEL CORRIGE AL LEAD, y el dato cambia el diseño.**
+*«Los maquileros cobran normalmente en **una o dos semanas máximo**. **No hay plazos de 30 días.** El
+que estás viendo (bordados computarizados) **es un proveedor de etiqueta**. O sea: los maquileros cobran
+en el **99 % de las veces esa misma semana o la siguiente**. No más.»*
+🔴 **Lo que el lead afirmó y era FALSO:** que «los 8 y 30 días del archivo son los días de crédito de dos
+**maquileros**». BORDADOS COMPUTARIZADOS **no es maquilero**. El dato se leyó del Excel **sin cruzarlo
+con quien conoce a los terceros** — la cicatriz de siempre.
+⭐ **Consecuencia de diseño para la fila 0.121 y para el aging:** la antigüedad de un **maquilero** NO se
+mide con la escala del **proveedor**. Proveedor: 30/60/90 (Daniel usa **150/200/250**). Maquilero: **la
+semana en curso o la siguiente** ⇒ **un maquilero a 30 días no es "vencido normal": es una ANOMALÍA que
+debe saltar a la vista.** Meterlos en cubetas de 30/60/90 haría que **todo maquilero atrasado se vea "al
+corriente"**, que es justo el defecto que la 0.121 viene a curar. ⇒ **Los tramos de maquila van en
+SEMANAS y son propios.** Default propuesto **7 / 14 / 21+**, a confirmar al construir la fila.
+
+**7. Cancelar un pago/abono de maquilero:** *«Ok»* — y añadió: *«**Aunque me gustaría poder editarlo yo
+cuando sea sin factura. Mismo criterio que los estados de cuenta de proveedores que no tienen
+facturas**»*. ⇒ **Es exactamente la fila 0.145**, ya construida: corrige **por movimiento**, no por
+proveedor, y deja intocable el renglón con CFDI detrás aunque sea del mismo tercero.
+
+**8. Constancia de situación fiscal:** *«Si»* ⇒ obligatoria **también para clientes**, como bloqueo suave.
+
+**9. CFDI en volumen:** *«De acuerdo con default»* ⇒ arrastrar varios XML a la misma pantalla, con
+resumen de importados / duplicados / sin proveedor.
+
+**10. Los XML de apertura:** *«Si son con facturas, voy a subir **todos los XML que estén vivos**»* ⇒
+ratifica §Post-F9.201·5 y **los aporta él**.
+
+**11. Las muestras de la carga de apertura:** *«Mañana subo una prueba»* ⇒ **desbloquea la fila 0.131**.
+
+⏳ **SIGUEN ABIERTAS de §Post-F9.203:** P1, P3, P4 y las dos del recuadro — **(i)** ¿el sistema supone
+que lo consumido sin apuntar salió de lo más viejo? y **(ii)** ¿nombrar un lote acotado o **mandar la
+tela sin nombre** cuando no está seguro? La **(ii)** se le repreguntó sin jerga por ser la única donde
+el default elige *arriesgarse a nombrar* en vez de *callar*.
+
+
 #### (Post-F9.203) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default, ⏳ **PENDIENTES DE RATIFICACIÓN DE DANIEL**
 
 **Lo que SÍ decidió Daniel ya está escrito y no se repite aquí:** es el punto **1 de §Post-F9.201** —

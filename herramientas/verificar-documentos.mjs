@@ -29,8 +29,9 @@
  *     `HOJA-DE-RUTA.md`, la línea «versión en `prueba`» del mismo archivo, la primera entrada de
  *     `HISTORIAL-DE-VERSIONES.md` y la constante `VERSION` de `frontend/src/version.ts`.
  *  3. **Que las entradas del historial vayan en orden estrictamente descendente** — la misma regla
- *     que `frontend/src/version.test.ts` exige, comprobada también aquí para que un cambio de docs
- *     no tenga que esperar al suite del frontend para enterarse.
+ *     que `frontend/src/version.test.ts` exige, comprobada también aquí para poder correr la
+ *     verificación A MANO sobre los documentos, sin montar el suite entero. En el CI la ejecuta
+ *     `frontend/src/documentos.test.ts` (ver arriba): ahí no se salta.
  *
  * 📌 **Nació de una afirmación falsa, y conviene que se sepa:** en la fila 0.142 el coder dijo haber
  * dejado esta herramienta cuando lo que tenía era un script efímero fuera del repositorio. El
