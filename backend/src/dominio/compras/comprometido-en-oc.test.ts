@@ -157,3 +157,87 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
     expect(granaPrimero.reduce((s, r) => s + r.enOc, 0)).toBe(100);
   });
 });
+
+describe('⭐⭐ 0.158 — LAS CUBETAS HUÉRFANAS (el avío que se marca «sin color» con OC ya hecha)', () => {
+  /**
+   * ⭐⭐ **EL CASO DE DANIEL, EN LA FUNCIÓN PURA.** Un avío se compró por color (tres OC: Rojo 30,
+   * Azul 50, Negro 20) y DESPUÉS alguien marca «se compra sin tomar en cuenta el color» (fila
+   * 0.158). Desde ese momento la explosión emite **UN renglón sin color** y las tres cubetas se
+   * quedan **sin dueño**.
+   *
+   * 🔴 **Antes de esta corrección se caían al piso**: el renglón sin color sólo miraba la cubeta
+   * `null`, veía 0, y la explosión volvía a ofrecer las 100 piezas que ya estaban en una OC viva —
+   * o sea §Post-F9.85 (*"no se vuelve a comprar lo ya comprado"*) resucitado por otra puerta. Si el
+   * comprador generaba la OC, **se compraba dos veces**. El valor que pone ROJA la primera línea de
+   * abajo es exactamente ese: `0`.
+   */
+  it('⭐ el renglón sin color absorbe las cubetas de color que NADIE reclama', () => {
+    const reparto = repartirComprometidoPorColor(
+      [{ idColor: null, cantidadAComprar: 100 }],
+      comprometido({ 7: 30, 9: 50, 15: 20 }),
+    );
+    expect(reparto.map((r) => r.enOc)).toEqual([100]);
+    // ⚠️ NO son ambiguas: la OC sí dice su color; el que no pregunta por color es el renglón, y
+    // como pide TODO el material de la orden, esas líneas le corresponden enteras.
+    expect(reparto[0]!.desdeAcervoSinColor).toBe(0);
+  });
+
+  it('⭐ suma las huérfanas Y el acervo sin color, sin contar dos veces', () => {
+    const reparto = repartirComprometidoPorColor(
+      [{ idColor: null, cantidadAComprar: 400 }],
+      comprometido({ 7: 30, sin: 300 }),
+    );
+    // 🔴 Valores que la ponen roja: `300` (sólo el acervo, la conducta vieja) o `30` (sólo las
+    // huérfanas). La invariante es que no se pierda NADA: 30 + 300.
+    expect(reparto.map((r) => r.enOc)).toEqual([330]);
+  });
+
+  it('⭐ las cubetas que SÍ tienen renglón se quedan con su dueño (no se las roba el sin color)', () => {
+    const reparto = repartirComprometidoPorColor(
+      [
+        { idColor: 7, cantidadAComprar: 30 },
+        { idColor: null, cantidadAComprar: 70 },
+      ],
+      comprometido({ 7: 30, 9: 50, 15: 20 }),
+    );
+    // Rojo (7) tiene renglón propio y conserva sus 30. Sólo Azul (9) y Negro (15) están huérfanas.
+    // 🔴 El valor que la pone roja: `[0, 100]` — el sin color barriendo con todo, que dejaría al
+    // renglón de Rojo pidiendo otra vez lo que ya está comprado.
+    expect(reparto.map((r) => r.enOc)).toEqual([30, 70]);
+  });
+
+  it('🔑 con un renglón sin color en la mesa, la Σ repartida es TODO lo comprometido', () => {
+    // La invariante en una línea: nada de lo que ya está en una OC viva se queda sin contar. Es lo
+    // que `comprometidoDe` hacía antes de que existieran los colores.
+    const cubetas = comprometido({ 7: 30, 9: 50, 15: 20, sin: 12.5 });
+    const reparto = repartirComprometidoPorColor(
+      [
+        { idColor: 9, cantidadAComprar: 50 },
+        { idColor: null, cantidadAComprar: 62.5 },
+      ],
+      cubetas,
+    );
+    expect(reparto.reduce((s, r) => s + r.enOc, 0)).toBe(cubetas.enOc);
+  });
+
+  /**
+   * 🔴 **LA OTRA MITAD, LA QUE IMPIDE ARREGLAR DE MÁS.** Sin un renglón sin color, una cubeta
+   * huérfana **NO se reparte**: darle a Azul lo que una OC pidió para Rojo sería inventar un hecho,
+   * que es justo la suposición-escrita-como-dato que §Post-F9.86 prohíbe. El acervo `null` sí se
+   * reparte, porque ahí la OC no dice nada; una línea que SÍ dice "Rojo" no se le atribuye a otro.
+   *
+   * Sin esta prueba, «que el huérfano se lo lleve alguien» pasaría igual de verde.
+   */
+  it('⭐ SIN renglón sin color, la huérfana NO se le atribuye a otro color', () => {
+    const reparto = repartirComprometidoPorColor(
+      [
+        { idColor: 7, cantidadAComprar: 30 },
+        { idColor: 9, cantidadAComprar: 50 },
+      ],
+      comprometido({ 7: 30, 9: 50, 15: 20 }),
+    );
+    // Negro (15) está huérfano y se queda sin repartir: cada quien con lo suyo, 20 sin dueño.
+    expect(reparto.map((r) => r.enOc)).toEqual([30, 50]);
+    expect(reparto.map((r) => r.desdeAcervoSinColor)).toEqual([0, 0]);
+  });
+});

@@ -70,6 +70,7 @@ export const esquemaAvioFormulario = z
       mensajeMin: 'La cantidad preestablecida no puede ser negativa',
     }).describe('Cantidad preestablecida (requerida si es favorito).'),
     esGenerico: z.boolean(),
+    seCompraSinColor: z.boolean(),
     precioReferencia: numeroOpcional({
       min: 0,
       mensajeNoNumero: 'El precio de referencia debe ser un número',

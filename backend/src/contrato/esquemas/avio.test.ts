@@ -20,6 +20,10 @@ describe('esquemaAvioCrear', () => {
     // favorito/esGenerico aplican su default.
     expect(datos.favorito).toBe(false);
     expect(datos.esGenerico).toBe(false);
+    // ⭐⭐ 0.158: y la marca nueva también. 🔴 Si el default fuera `true`, TODO avío dado de alta
+    // dejaría de partirse por color — lo contrario de lo que la etapa quiere (§Post-F9.126 sigue
+    // siendo la regla; esto es la EXCEPCIÓN que se pide a mano).
+    expect(datos.seCompraSinColor).toBe(false);
   });
 
   it('unidad y presentación son OPCIONALES en el contrato (ADR-0009; el form las exige)', () => {

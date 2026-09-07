@@ -354,6 +354,13 @@ export interface FilaParaNeteo {
  *  2. **El acervo SIN color** (`porColor[null]`) va al renglón sin color si lo hay —son la misma
  *     pregunta sin responder— y, si no lo hay, se reparte entre los renglones con color **en el
  *     orden en que vienen**, cada uno hasta lo que necesita, y **el último absorbe el remanente**.
+ *  3. ⭐⭐ **fila 0.158 — las cubetas CON color que NINGÚN renglón reclama van también al renglón
+ *     sin color.** Antes se caían al piso: nadie las contaba.
+ *
+ * 🔑 **De ahí sale la invariante que la regla 3 restaura:** cuando hay un renglón sin color en la
+ * mesa, **nada de lo comprometido de ese material se queda sin repartir** — `Σ(enOc) =
+ * comprometido.enOc`. Es lo que hacía `comprometidoDe` antes de que existieran los colores, y lo
+ * que impide que la explosión ofrezca comprar algo que ya está en una OC viva.
  *
  * ⚠️ **Por qué el último absorbe (y no se tira):** con UN solo renglón sin color —el caso de toda
  * orden anterior a esta etapa— esa regla devuelve el acervo COMPLETO, que es exactamente lo que
@@ -381,19 +388,50 @@ export function repartirComprometidoPorColor(
     enOc: f.idColor === null ? 0 : (comprometido.porColor.get(f.idColor)?.enOc ?? 0),
     desdeAcervoSinColor: 0,
   }));
-  let acervo = comprometido.porColor.get(null)?.enOc ?? 0;
-  if (acervo <= 0) return propio;
+  const acervoSinColor = comprometido.porColor.get(null)?.enOc ?? 0;
 
   // El renglón SIN color se lleva el acervo entero: los dos son "esta tela, sin decir de qué color".
   // ⚠️ Aquí NO hay ambigüedad que marcar: la fila pregunta lo mismo que el acervo responde.
   const indiceSinColor = filas.findIndex((f) => f.idColor === null);
   if (indiceSinColor >= 0) {
+    /**
+     * ⭐⭐ **fila 0.158 — LAS CUBETAS HUÉRFANAS.** Son las que SÍ dicen un color, pero un color que
+     * ningún renglón de esta explosión reclama. Nacen en cuanto alguien marca «se compra sin tomar
+     * en cuenta el color» en un avío cuya OP **ya tenía OC por color**: la explosión pasa a emitir
+     * UN renglón sin color y las tres cubetas (Rojo, Azul, Negro) se quedan sin dueño.
+     *
+     * 🔴 **Sin esto se compra dos veces.** Medido por el camino real: la re-explosión decía
+     * `enOc: 0 / pendiente: 100` con las 100 piezas ya pedidas en una OC viva, y la segunda
+     * generación volvía a ofrecerlas. Es §Post-F9.85 resucitado por otra puerta.
+     *
+     * ⚠️ **Y NO se marcan como ambiguas** (`desdeAcervoSinColor` sigue en 0): ese campo dice *"la
+     * OC no decía de qué color era, así que atribuírselo a ESTE color lo eligió el sistema"*. Aquí
+     * la OC sí dice su color; el que no pregunta por color es el renglón, y como pide **todo el
+     * material de esa orden**, contarle esas líneas no es una elección: le corresponden enteras.
+     */
+    const conRenglon = new Set<number>();
+    for (const f of filas) {
+      if (f.idColor !== null) conRenglon.add(f.idColor);
+    }
+    let huerfano = 0;
+    for (const [idColor, cubeta] of comprometido.porColor) {
+      if (idColor !== null && !conRenglon.has(idColor)) huerfano += cubeta.enOc;
+    }
+
     const fila = propio[indiceSinColor] as RepartoNeteo;
-    fila.enOc = redondearCantidadCompra(fila.enOc + acervo);
+    fila.enOc = redondearCantidadCompra(fila.enOc + acervoSinColor + huerfano);
     return propio;
   }
 
   // Sin renglón sin color: se reparte por necesidad y el ÚLTIMO absorbe lo que sobre.
+  //
+  // ⚠️ **Aquí las huérfanas NO se reparten, y es a propósito.** Sin un renglón sin color, darle a
+  // Azul lo que una OC pidió para Rojo sería inventar un hecho —la clase de suposición escrita como
+  // dato que §Post-F9.86 prohíbe—. El acervo sin color sí se reparte porque ahí la OC no dice nada;
+  // una línea que SÍ dice "Rojo" no se le atribuye a otro color.
+  let acervo = acervoSinColor;
+  if (acervo <= 0) return propio;
+
   for (let i = 0; i < filas.length; i += 1) {
     const esUltimo = i === filas.length - 1;
     const fila = propio[i] as RepartoNeteo;

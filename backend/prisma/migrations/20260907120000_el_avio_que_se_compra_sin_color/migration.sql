@@ -1,0 +1,27 @@
+-- 0.158 · EL AVÍO QUE SE COMPRA SIN TOMAR EN CUENTA EL COLOR.
+--
+-- DANIEL (7-sep-2026), mirando la Explosión de materiales con datos reales: «hay ciertos avíos que
+-- NO se compran por color. Debería de sumar todos. Como la etiqueta de lavado. En este caso me los
+-- pone por separado, yo creo que porque es otro color. ¿Cómo le puedo hacer para definirle que
+-- algunas cosas se compran juntas sin tomar en cuenta el color?»
+--
+-- Desde V1-E8c (§Post-F9.126) la explosión parte CADA avío en un renglón por color de la prenda,
+-- SIEMPRE y sin excepción posible. Para los cierres y los botones eso es exactamente lo que Daniel
+-- pidió; para la etiqueta de lavado es ruido: la etiqueta es la misma en las tres órdenes y en los
+-- cuatro colores, y verla dos veces (11,771 pz y 1,387 pz) obliga a sumar a mano lo que se le va a
+-- pedir al proveedor.
+--
+-- Esta columna es LA PREGUNTA que faltaba: **¿la identidad de compra de este avío incluye el
+-- color?** Marcada, la explosión colapsa el avío en UN renglón por orden —piezas y desglose por
+-- talla de TODA la orden, sin color— y ese renglón se suma con el de otras OP, porque la clave de
+-- agrupación (material|color|proveedor) ya trata el "sin color" como un valor más.
+--
+-- ⚠️ NO es `es_generico` y no hay que confundirlos: aquél contesta «¿contra stock o contra la
+-- orden?» (netea contra el kardex y cambia la valuación); ésta contesta «¿el color forma parte de
+-- lo que pido?». Son ejes independientes.
+--
+-- ADITIVA y con DEFAULT false: ninguna fila existente se reescribe ni cambia de conducta (REGLA
+-- 0-B). El avío que hoy se parte por color se sigue partiendo hasta que alguien lo marque.
+
+-- AlterTable
+ALTER TABLE "avios" ADD COLUMN     "se_compra_sin_color" BOOLEAN NOT NULL DEFAULT false;
