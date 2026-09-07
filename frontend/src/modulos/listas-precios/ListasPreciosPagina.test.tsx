@@ -146,6 +146,12 @@ const LISTA = {
       // que `listaConTarget` pueda encenderlo. Por defecto NO lo dio ("si es que nos lo dio").
       precioTarget: null as number | null,
       tieneTarget: false,
+      // ⭐⭐ FILA 0.153: el precio que quedó en la NEGOCIACIÓN. Anotados (mismo truco que el
+      // target) para que `listaConPrecioNegociado` pueda encenderlos. Por defecto, este renglón
+      // nunca se negoció.
+      precioNegociado: null as number | null,
+      tienePrecioNegociado: false,
+      precioNegociadoEn: null as string | null,
       // ⭐ V1-E8x (§Post-F9.151): el estado del MODELO. `as` para que las variantes puedan moverlo
       // (si no, TypeScript infiere el literal y `listaConEstado` no compila).
       estado: 'abierto' as ListaLinea['estado'],
@@ -858,5 +864,94 @@ describe('⭐⭐ V1-E8y — la mesa abierta (§Post-F9.152)', () => {
   it('sin pendientes abiertos no se pinta el chip (no hay nada que recordar)', async () => {
     await abrirDetalle();
     expect(screen.queryByTestId('chip-pendientes')).not.toBeInTheDocument();
+  });
+});
+
+// ── ⭐⭐ FILA 0.153 — EL PRECIO QUE QUEDÓ EN LA NEGOCIACIÓN, EN LA MISMA FILA ────────────────────
+//
+// Daniel: *«Después de haber cerrado la negociación de un modelo, debería de cambiar el precio que
+// se ve afuera… o estaría bien poner los dos, mejor. Está muy confuso cuál es el precio. **Dice
+// precio aprobado, pero dentro de la negociación quedó otro.** Debe de haber congruencia.»*
+//
+// Se prueba A NIVEL DE RENDER porque el defecto vivía exactamente ahí: el número existía (en el
+// diálogo de negociación) y la fila de afuera no lo enseñaba. Y se prueba **junto al aprobado**,
+// porque «poner los dos» es lo que se pidió: una prueba que sólo mire el negociado dejaría pasar
+// que alguien SUSTITUYERA uno por el otro.
+
+describe('⭐⭐ Fila 0.153 — el precio negociado se ve AL LADO del aprobado', () => {
+  beforeEach(() => {
+    useListaPreciosMock.mockReset();
+    useListasPreciosMock.mockReset();
+  });
+
+  /** El mismo detalle, con el renglón firmado en `aprobado` y pactado en `negociado`. */
+  function listaConPrecioNegociado(
+    aprobado: number | null,
+    negociado: number | null,
+  ): typeof LISTA {
+    return {
+      ...LISTA,
+      lineas: LISTA.lineas.map((ln) => ({
+        ...ln,
+        precioAprobado: aprobado,
+        aprobado: aprobado !== null,
+        precioNegociado: negociado,
+        tienePrecioNegociado: negociado !== null,
+        precioNegociadoEn: negociado === null ? null : '2026-09-01T10:00:00.000Z',
+      })),
+    };
+  }
+
+  /**
+   * ⭐⭐ **LA PRUEBA DE LA QUEJA.** Firmado 137, pactado 95: los DOS números en la misma fila, cada
+   * uno en su celda. Antes de esta fila, la pantalla enseñaba 137 y el 95 había que ir a buscarlo
+   * abriendo la negociación.
+   */
+  it('⭐ enseña LOS DOS: el aprobado (137) y el negociado (95), cada uno en su celda', async () => {
+    await abrirDetalle(PERM, listaConPrecioNegociado(137, 95));
+
+    expect(screen.getByTestId('precio-aprobado')).toHaveTextContent('$137.00');
+    expect(screen.getByTestId('precio-negociado')).toHaveTextContent('$95.00');
+    // 🔴 Y no se pisan: el negociado NO reemplazó al aprobado (eso borraría la firma del dueño).
+    expect(screen.getByTestId('precio-aprobado')).not.toHaveTextContent('95');
+  });
+
+  /**
+   * 🔴 Es DINERO: sin `consultas.ver-importes` se dice que lo HAY, nunca cuánto — el mismo reparto
+   * que el target del cliente. El servidor ya manda `precioNegociado: null` con
+   * `tienePrecioNegociado: true`; esto exige que la pantalla no invente el número.
+   */
+  it('🔴 sin `consultas.ver-importes` dice que HAY precio negociado, pero NO cuánto', async () => {
+    await abrirDetalle(['listas.ver', 'listas.administrar'] as ClavePermiso[], {
+      ...listaConPrecioNegociado(137, 95),
+      lineas: listaConPrecioNegociado(137, 95).lineas.map((ln) => ({
+        ...ln,
+        precioNegociado: null,
+        precioAprobado: null,
+      })),
+    });
+
+    const celda = screen.getByTestId('precio-negociado');
+    expect(celda).toHaveTextContent('Negociado');
+    expect(celda).not.toHaveTextContent('95');
+  });
+
+  it('sin negociación NO se inventa nada: se ve el hueco', async () => {
+    await abrirDetalle(PERM, listaConPrecioNegociado(137, null));
+
+    expect(screen.queryByTestId('precio-negociado')).not.toBeInTheDocument();
+    // Y el aprobado sigue en su sitio: la columna nueva no se comió a la vieja.
+    expect(screen.getByTestId('precio-aprobado')).toHaveTextContent('$137.00');
+  });
+
+  /**
+   * El caso que Daniel vive: **pactado y todavía sin re-firmar**. La fila lo dice sin rodeos —
+   * aprobado en blanco, negociado con su número—, que es justo la congruencia que pedía.
+   */
+  it('⭐ pactado pero SIN aprobar: el negociado se ve y el aprobado sale vacío', async () => {
+    await abrirDetalle(PERM, listaConPrecioNegociado(null, 95));
+
+    expect(screen.getByTestId('precio-negociado')).toHaveTextContent('$95.00');
+    expect(screen.queryByTestId('precio-aprobado')).not.toBeInTheDocument();
   });
 });

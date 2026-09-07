@@ -71,6 +71,38 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.126 · 7-sep-2026 · **en prueba** — **El precio que se negoció ya se ve desde fuera, al lado del aprobado**
+
+### Qué se puede hacer ahora que antes no
+
+- **Ver en la lista de precios, de un vistazo, los DOS precios**: el **aprobado** por la dirección y el
+  **negociado** —el último que quedó registrado en la negociación—, en columnas contiguas. Era la queja
+  de Daniel: *«dice precio aprobado, pero dentro de la negociación quedó otro. Debe de haber
+  congruencia»*, y su propia propuesta: *«o estaría bien poner los dos, mejor»*.
+- **Saber si un renglón se negoció sin necesidad de abrirlo**: si no hubo negociación, la columna queda
+  vacía.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **No cambia NINGÚN precio ni quién decide.** Es sólo una columna que se muestra. El **precio
+  aprobado sigue siendo el que manda**: es el que sale en el PDF, en el Excel, en la cotización al
+  cliente y **el que viaja a la orden de producción**. Negociar **no aprueba** — eso lo sigue haciendo
+  la dirección, a propósito.
+- ⚠️ **Los dos números pueden no coincidir, y eso es información, no un error.** Que difieran significa
+  exactamente lo que Daniel quería ver: se negoció algo distinto de lo aprobado, y falta re-aprobar.
+- ⚠️ **La columna dice «el último precio registrado en la negociación», no «el pactado»**, y la
+  diferencia importa: **mover los factores del cliente también deja su precio recalculado en ese
+  historial**, así que puede cambiar sin que nadie haya pactado nada. Es lo mismo que se ve dentro del
+  diálogo — que es de lo que se trataba—, pero conviene saberlo. *(Ver la pregunta abierta abajo.)*
+- Quien no tenga permiso de ver importes ve la columna **sin el número**, igual que con los demás precios.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Una pregunta para Daniel, con su default:** ¿el «precio negociado» debe ser **el último de todo el
+  historial** (como está hoy, incluidos los recálculos por factores) o **sólo el de un acuerdo**?
+  *Default: como está.* Distinguirlos obligaría a añadir una columna nueva a la tabla de eventos, porque
+  hoy **no hay forma de saber de qué tipo es cada uno**.
+
 ## 0.124 · 7-sep-2026 · **en prueba** — **Cancelar un pedido ya no apaga las órdenes que YA se están produciendo**
 
 ### Qué se puede hacer ahora que antes no

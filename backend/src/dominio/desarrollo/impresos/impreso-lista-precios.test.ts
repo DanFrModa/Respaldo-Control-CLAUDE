@@ -61,6 +61,13 @@ function listaEjemplo(): ListaPreciosDetalle {
         aprobado: true,
         aprobadoPorId: 'u1',
         aprobadoEn: '2026-07-06T00:00:00.000Z',
+        // ⭐⭐ FILA 0.153 — el precio que dejó la NEGOCIACIÓN, **distinto del aprobado a
+        // propósito** (95 ≠ 137). Es el mismo truco que el target de arriba: con los dos números
+        // iguales, cambiar el papel de `precioAprobado` a `precioNegociado` pasaría desapercibido.
+        // Con 95 aquí, cualquier impreso que lea el negociado se pone rojo en las pruebas de abajo.
+        precioNegociado: 95,
+        tienePrecioNegociado: true,
+        precioNegociadoEn: '2026-07-07T00:00:00.000Z',
         avisoCostoViejo: null,
         // ⭐ V1-E8x: los dos renglones de la lista base van VIGENTES (`abierto`). El caso dropeado
         // tiene sus propias pruebas más abajo.
@@ -88,6 +95,11 @@ function listaEjemplo(): ListaPreciosDetalle {
         aprobado: true,
         aprobadoPorId: 'u1',
         aprobadoEn: '2026-07-06T00:00:00.000Z',
+        // ⭐⭐ FILA 0.153 — también negociado y también distinto (210 ≠ 155): los DOS renglones
+        // vigilan el papel, no sólo uno.
+        precioNegociado: 210,
+        tienePrecioNegociado: true,
+        precioNegociadoEn: '2026-07-07T00:00:00.000Z',
         avisoCostoViejo: null,
         estado: 'abierto' as const,
         nombreEstado: 'Abierto',
@@ -207,6 +219,48 @@ describe('excelListaPrecios (Excel)', () => {
     // Y la fila del renglón CON target trae su precio aprobado (137), no el target (130).
     expect(valoresDe(2)).toEqual(['MOD-A', 'Jogger', 'CA-001', 137, 'Aprobado']);
     expect(valoresDe(2)).not.toContain(130);
+  });
+});
+
+// ── ⭐⭐ FILA 0.153 — AGUAS ABAJO NO CAMBIÓ NADA ────────────────────────────────────────────────
+
+/**
+ * ⭐⭐ **EL PRECIO NEGOCIADO SE VE, PERO NO MANDA.** La fila 0.153 saca a la luz el precio que quedó
+ * en la negociación (`precioNegociado`) para que la pantalla de afuera diga lo mismo que el diálogo
+ * de adentro — y **ahí se acaba su alcance**. El papel que sale para el cliente sigue llevando el
+ * precio que el DUEÑO firmó (`precioAprobado ?? precioCalculado`), porque negociar y aprobar son dos
+ * actos de dos personas con dos permisos distintos.
+ *
+ * Estas pruebas son la mitad que garantiza que el cambio es de SÓLO LECTURA: los dos renglones del
+ * fixture traen un precio negociado (95 y 210) que NO coincide con su aprobado (137 y 155), así que
+ * si alguien cambiara el impreso para leer el negociado, se pondrían rojas señalando el número exacto.
+ */
+describe('⭐⭐ Fila 0.153 — el precio NEGOCIADO no manda en el papel', () => {
+  it('🔴 el PDF sigue llevando el APROBADO (137/155), ni rastro del negociado (95/210)', async () => {
+    const datos = await armarDatosImpresoListaPrecios(sesion, 1, undefined, {
+      obtenerLista: fakeObtener,
+    });
+    expect(datos.renglones.map((r) => r.precio)).toEqual([137, 155]);
+    expect(datos.renglones.map((r) => r.precio)).not.toContain(95);
+    expect(datos.renglones.map((r) => r.precio)).not.toContain(210);
+  });
+
+  it('🔴 el EXCEL igual: la columna Precio trae 137 y 155, no 95 ni 210', async () => {
+    const { buffer } = await excelListaPrecios(sesion, 1, undefined, {
+      obtenerLista: fakeObtener,
+    });
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(buffer as unknown as ArrayBuffer);
+    const hoja = libro.worksheets[0]!;
+    const valoresDe = (fila: number): unknown[] => (hoja.getRow(fila).values as unknown[]).slice(1);
+
+    // Las cinco columnas de siempre: la de negociado NO se agregó al papel del cliente.
+    expect(valoresDe(1)).toEqual(['Modelo', 'Descripción', 'Nº cliente', 'Precio', 'Estado']);
+    expect(hoja.columnCount).toBe(5);
+    expect(valoresDe(2)).toEqual(['MOD-A', 'Jogger', 'CA-001', 137, 'Aprobado']);
+    expect(valoresDe(2)).not.toContain(95);
+    expect(valoresDe(3)).not.toContain(210);
+    expect(Number(hoja.getCell('D3').value)).toBe(155);
   });
 });
 
