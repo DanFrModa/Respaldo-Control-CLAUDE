@@ -1141,8 +1141,8 @@ describe('simularMesa — el negociador en vivo (§Post-F9.138)', () => {
    * ⭐ §Post-F9.150 — el TARGET del cliente **aparece en la mesa** y **NO bloquea nada**. Daniel:
    * *«aveces los clientes nos dan sus target prices…. y es importante saberlo a la hora de la
    * negociacion»*. Se prueba el ciclo entero: sin target → null; con target → el veredicto; por
-   * debajo → `cumpleTarget: false` **y la mesa sigue calculando todo lo demás igual** (informa, no
-   * bloquea); y borrarlo lo devuelve a null.
+   * ARRIBA del target (nos pasamos) → `cumpleTarget: false` **y la mesa sigue calculando todo lo
+   * demás igual** (informa, no bloquea); por DEBAJO → `true`; y borrarlo lo devuelve a null.
    */
   it('⭐ el TARGET del cliente sale en la mesa, INFORMA y no bloquea (§Post-F9.150)', async () => {
     const idDesarrollo = await desarrolloConPrecosto('MOD-TARGET');
@@ -1168,22 +1168,26 @@ describe('simularMesa — el negociador en vivo (§Post-F9.138)', () => {
       bd(),
     );
     expect(conTarget.precioTarget).toBe(95);
-    expect(conTarget.cumpleTarget).toBe(true); // 106 ≥ 95
+    // 106 > 95: NOS PASAMOS del precio que el cliente quiere pagar ⇒ no llega.
+    expect(conTarget.cumpleTarget).toBe(false);
 
-    // 🔴 INFORMA, NO BLOQUEA: por debajo del target la mesa contesta igual de completa, y aprobar
-    // el precio por debajo se PERMITE (no hay candado en ningún lado).
+    // 🔴 INFORMA, NO BLOQUEA: pasarse del target no le quita nada a la mesa —contesta igual de
+    // completa— y aprobar ESE precio se PERMITE (no hay candado en ningún lado).
+    expect(conTarget.margenBrutoPct).not.toBeNull();
+    const aprobada = await ajustarPrecioLinea(sesion(), idLinea, { precio: 106 }, bd());
+    expect(aprobada.lineas[0]?.precioAprobado).toBe(106);
+    expect(aprobada.lineas[0]?.precioTarget).toBe(95);
+    expect(aprobada.lineas[0]?.tieneTarget).toBe(true);
+
+    // Y cotizando POR DEBAJO del target sí se llega: 90 es menos de lo que el cliente pedía pagar.
     const debajo = await simularMesa(
       sesion(),
       idLinea,
       { renglones: RECETA, precioObjetivo: 90 },
       bd(),
     );
-    expect(debajo.cumpleTarget).toBe(false);
+    expect(debajo.cumpleTarget).toBe(true);
     expect(debajo.margenBrutoPct).not.toBeNull();
-    const aprobada = await ajustarPrecioLinea(sesion(), idLinea, { precio: 90 }, bd());
-    expect(aprobada.lineas[0]?.precioAprobado).toBe(90);
-    expect(aprobada.lineas[0]?.precioTarget).toBe(95);
-    expect(aprobada.lineas[0]?.tieneTarget).toBe(true);
 
     // Y se puede BORRAR (*"si es que nos lo dio"*: un número capturado por error no atrapa a nadie).
     const sin = await fijarPrecioTargetLinea(sesion(), idLinea, { precioTarget: null }, bd());
@@ -1260,12 +1264,43 @@ describe('simularMesa — el negociador en vivo (§Post-F9.138)', () => {
       bd(),
     );
     expect(mesa.precioTarget).toBe(95);
-    expect(mesa.cumpleTarget).toBe(true); // 100 ≥ 95 — aritmética limpia, sin factores de por medio
+    // El veredicto SE VE (no es null, que es lo que esta prueba vigila); vale `false` porque 100 se
+    // pasa de los 95 que pedía el cliente. Aritmética limpia, sin factores de por medio.
+    expect(mesa.cumpleTarget).toBe(false);
     expect(mesa.precioSugerido).toBeNull();
     expect(mesa.margenBrutoPct).toBeNull();
     expect(mesa.margenObjetivoPct).toBeNull();
     expect(mesa.cumpleObjetivo).toBeNull();
     expect(mesa.precioNeto).toBeNull();
+  });
+
+  /**
+   * 🔴🔴 **LA DIRECCIÓN DEL SEMÁFORO, CLAVADA CON EL EJEMPLO LITERAL DE DANIEL** (6-sep-2026), que
+   * es quien cachó que estaba invertida:
+   *
+   * > *«En la negociación hay un precio target y abajo hay una leyenda de "llega y no llega"…..
+   * > **Esta al revés.** Si el cliente pide 200 y le doy 190, claro que llega. Y si se pasa,
+   * > entonces no llega.»*
+   *
+   * El target es el precio que el CLIENTE quiere PAGAR, así que cotizar por DEBAJO lo CUMPLE. Nació
+   * con `>=` y pintaba «no llega» en ROJO justo cuando sí se le llegaba —y «llega» en verde estando
+   * caros—, o sea invertido en los DOS sentidos. Esta prueba existe para que no se vuelva a voltear.
+   */
+  it('🔴 el veredicto del target: 190 LLEGA a un target de 200, 210 no, y 200 clavado SÍ llega', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-TARGETDIR');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await fijarPrecioTargetLinea(sesion(), idLinea, { precioTarget: 200 }, bd());
+    const conPrecio = async (precioObjetivo: number) =>
+      simularMesa(sesion(), idLinea, { renglones: RECETA, precioObjetivo }, bd());
+
+    // *«Si el cliente pide 200 y le doy 190, claro que llega»*.
+    expect((await conPrecio(190)).cumpleTarget).toBe(true);
+    // *«Y si se pasa, entonces no llega»*.
+    expect((await conPrecio(210)).cumpleTarget).toBe(false);
+    // ⚠️ **LA IGUALDAD CUMPLE**: cotizarle exactamente su target es dárselo. Sin esta línea, un `<`
+    // en vez de `<=` pasaría todas las demás pruebas sin que nadie se enterara.
+    expect((await conPrecio(200)).cumpleTarget).toBe(true);
   });
 
   it('una mesa VACÍA se rechaza (un costo de 0 no es una negociación)', async () => {

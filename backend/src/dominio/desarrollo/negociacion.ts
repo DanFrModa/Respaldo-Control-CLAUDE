@@ -738,7 +738,15 @@ export async function simularMesa(
     // margen, descuentos, regalías ni costo de ventas. Lo que sí los delataría —compararlo contra
     // `precioSugerido`— sigue tapado, porque el sugerido ya sale null sin `listas.aprobar`.
     precioTarget,
-    cumpleTarget: precioTarget === null ? null : datos.precioObjetivo >= precioTarget,
+    // 🔴 **LA DIRECCIÓN ES `<=`, Y NO ES CAPRICHO.** El target es el precio que el CLIENTE quiere
+    // PAGAR (`schema.prisma` › `ListaPreciosLinea.precioTarget`: *"TARGET PRICE del CLIENTE: el
+    // precio objetivo que ÉL nos da"*), y `precioObjetivo` es NUESTRO precio de venta. Cotizar por
+    // DEBAJO del target lo CUMPLE; pasarse es lo que NO llega. La igualdad cumple: cotizarle
+    // exactamente su target es dárselo.
+    // ⚠️ Nació al revés (`>=`) y el semáforo pintaba «no llega» en ROJO justo cuando sí se llegaba.
+    // Daniel, 6-sep-2026: *«Esta al revés. Si el cliente pide 200 y le doy 190, claro que llega. Y
+    // si se pasa, entonces no llega.»* La dirección la clava una prueba con ese mismo ejemplo.
+    cumpleTarget: precioTarget === null ? null : datos.precioObjetivo <= precioTarget,
   };
 }
 
