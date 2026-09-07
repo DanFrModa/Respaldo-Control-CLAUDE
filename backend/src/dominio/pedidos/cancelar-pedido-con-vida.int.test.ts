@@ -34,6 +34,8 @@ import type {
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { completarProceso } from '../ruta-critica/cumplimiento.js';
+import { generarRutaOrden } from '../ruta-critica/rutaOrden.js';
 import { cerrarOrden } from '../produccion/cierre-orden.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 import { cancelarPedido, crearPedido } from './pedidos.js';
@@ -224,8 +226,17 @@ async function sembrarEsMa(idOrden: number, estado: 'propuesto' | 'cancelado'): 
   });
 }
 
-/** Nota de salida de material con un renglón de esta orden (el camino del kardex de AVÍOS). */
-async function sembrarNotaSalida(idOrden: number, cancelada = false): Promise<void> {
+/**
+ * Nota de salida de material con un renglón de esta orden (el camino del kardex de AVÍOS).
+ *
+ * ⚠️ El estado importa, y mucho: `confirmadaEn` es *«cuándo se confirmó (se descontaron los
+ * avíos)»*. Una nota en BORRADOR no ha sacado NADA del almacén — y el rechazo de la 0.150 fue
+ * justamente que este sembrador nunca ponía `confirmadaEn` y la prueba pasaba igual: no medía nada.
+ */
+async function sembrarNotaSalida(
+  idOrden: number,
+  estado: 'confirmada' | 'borrador' | 'cancelada' = 'confirmada',
+): Promise<void> {
   await cliente.notaSalida.create({
     data: {
       numNota: BigInt(idOrden),
@@ -233,7 +244,9 @@ async function sembrarNotaSalida(idOrden: number, cancelada = false): Promise<vo
       idMaquilero: proveedor.id,
       idAlmacen: almacenTela.id,
       fechaElaboracion: new Date('2026-09-01'),
-      ...(cancelada
+      estatus: estado,
+      ...(estado === 'borrador' ? {} : { confirmadaEn: new Date('2026-09-01') }),
+      ...(estado === 'cancelada'
         ? { canceladaEn: new Date('2026-09-02'), motivoCancelacion: 'se deshizo' }
         : {}),
       lineas: { create: [{ idOrden, idTela: tela.id, cantidad: 10 }] },
@@ -545,7 +558,18 @@ describe('⭐⭐ 0.150 — lo DESHECHO y lo DERIVADO no bloquean', () => {
   });
 
   it('una nota de salida CANCELADA no cuenta', async () => {
-    await esperaQueLaCancele((id) => sembrarNotaSalida(id, true));
+    await esperaQueLaCancele((id) => sembrarNotaSalida(id, 'cancelada'));
+  });
+
+  /**
+   * ⭐ RECHAZO de la 0.150 — defecto 2. `confirmadaEn` es *«cuándo se descontaron los avíos»*: una
+   * nota nunca confirmada no sacó un solo avío del almacén. Es EL MISMO caso que el borrador de OC
+   * que Daniel resolvió el mismo día (*«no cuenta como comprado»*), y la primera versión lo
+   * contradecía sola: su comentario decía *«el descuento nace al confirmar»* y el código no lo
+   * miraba.
+   */
+  it('⭐ una nota de salida en BORRADOR no cuenta (no ha salido un solo avío)', async () => {
+    await esperaQueLaCancele((id) => sembrarNotaSalida(id, 'borrador'));
   });
 
   it('un cargo EsMa CANCELADO no cuenta', async () => {
@@ -641,5 +665,190 @@ describe('⭐⭐ 0.150 — el caso mixto: se cancela la limpia y la producida se
     expect(resultado.foliosOrdenesCanceladas).toEqual([]);
     expect(resultado.ordenesConservadas.map((o) => o.folio)).toEqual(ordenes.map((o) => o.folio));
     for (const op of ordenes) expect(await estadoDe(op.id)).not.toBe('cancelada');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 4) ⭐⭐ LA TRAMPA 3, CONTRA EL GENERADOR REAL — programar la RC NO es haber producido
+//
+// Este bloque nació del RECHAZO de la 0.150. La primera versión sembraba `RutaOrden` con Prisma
+// directo, así que nunca vio lo que hace `generarRutaOrden`: AUTO-COMPLETAR todo proceso de
+// `duracionDias === 0` con `fechaReal`, `estado='completado'` y `origenCaptura='evento'`. Efecto
+// medido: **programar la ruta crítica —en la planeación, antes de comprar y de cortar— conservaba
+// la OP**, con un `porque` que decía «ya tiene procesos capturados» sobre una orden que nadie había
+// tocado. Rompía la frase de Daniel en su caso de uso exacto.
+//
+// Por eso estas pruebas GENERAN la ruta de verdad y CAPTURAN de verdad: es la única forma de que la
+// guarda quede atada al comportamiento del generador y no a lo que un sembrador crea de él.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+describe('⭐⭐ 0.150 — la RUTA CRÍTICA generada de verdad (rechazo, defecto 1)', () => {
+  const PERM_RC: ClavePermiso[] = [...PERM, 'rc.programar', 'rc.capturar', 'roles.administrar'];
+  const sesionRc = (): SesionUsuario =>
+    sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_RC });
+
+  /** Ids del catálogo de programación que `generarRutaOrden` exige. */
+  let idArticuloRC: number;
+  let idTipoTela: number;
+  let idAplicacion: number;
+  /** Los dos procesos de la plantilla: uno de 0 días (auto-completado) y uno normal. */
+  let idProcesoCero: number;
+  let idProcesoNormal: number;
+
+  beforeEach(async () => {
+    await cliente.configuracionEmpresa.create({
+      data: { idEmpresa: empresa.id, colchonCostura: 2 },
+    });
+    await cliente.factorCantidad.createMany({
+      data: [{ deCant: 1, aCant: 5000, factor: 1.0 }],
+    });
+    const familia = await cliente.familiaArticulo.create({ data: { nombre: 'Playeras' } });
+    const articulo = await cliente.articuloRC.create({
+      data: { nombre: 'SENCILLO 1/6', idFamiliaArticulo: familia.id },
+    });
+    idArticuloRC = articulo.id;
+    const dTela = await cliente.duracionPorTipoTela.create({
+      data: { nombre: 'Nacional', dias: 10, factorTela: 1 },
+    });
+    idTipoTela = dTela.id;
+    const dAplic = await cliente.duracionPorAplicacion.create({
+      data: { nombre: 'Sin Aplicacion', clave: 'A0', dias: 0 },
+    });
+    idAplicacion = dAplic.id;
+
+    // ⚠️ `tiempoEstandar: 0` + `tipoDuracion: 'fija'` = duración 0 = el caso que auto-completa.
+    const cero = await cliente.procesoDef.create({
+      data: { codigo: 'revision-op', nombre: 'REVISION OP', tipoDuracion: 'fija' },
+    });
+    idProcesoCero = cero.id;
+    const normal = await cliente.procesoDef.create({
+      data: { codigo: 'corte-rc', nombre: 'CORTE', tipoDuracion: 'fija', ultimoProceso: true },
+    });
+    idProcesoNormal = normal.id;
+
+    const plantilla = await cliente.plantillaRuta.create({
+      data: { nombre: 'Plantilla playeras', idArticuloRC: articulo.id },
+    });
+    const rCero = await cliente.plantillaRutaProceso.create({
+      data: { idPlantillaRuta: plantilla.id, idProcesoDef: cero.id, tiempoEstandar: 0, orden: 0 },
+    });
+    const rNormal = await cliente.plantillaRutaProceso.create({
+      data: { idPlantillaRuta: plantilla.id, idProcesoDef: normal.id, tiempoEstandar: 3, orden: 1 },
+    });
+    await cliente.plantillaRutaDep.create({
+      data: { idPlantillaRutaProceso: rNormal.id, idAntecesor: rCero.id },
+    });
+  });
+
+  /** PROGRAMA la ruta de la orden por el camino real (nada de sembrar `RutaOrden` a mano). */
+  async function programarRuta(idOrden: number): Promise<void> {
+    await generarRutaOrden(
+      sesionRc(),
+      {
+        idOrden,
+        idArticuloRC,
+        fechaEntregaRC: new Date('2026-12-01T00:00:00Z'),
+        idTipoTela,
+        idAplicacion,
+        fechaInicioRC: new Date('2026-09-01T00:00:00Z'),
+      },
+      bd(),
+    );
+  }
+
+  /** El renglón de ruta de un proceso de esta orden. */
+  async function renglonDeRuta(idOrden: number, idProcesoDef: number) {
+    return cliente.rutaOrden.findFirstOrThrow({ where: { idOrden, idProcesoDef } });
+  }
+
+  it('🔴 SÓLO programar la RC deja la OP cancelable (el defecto que rechazó la fila)', async () => {
+    const { idPedido, ordenes } = await pedidoConOps();
+    const op = ordenes[0] as { id: number; folio: number };
+
+    await programarRuta(op.id);
+
+    // Se MIDE la trampa antes de juzgarla: el proceso de 0 días nació COMPLETADO, con fecha real,
+    // sin que nadie capturara nada — y `capturadoPorId` en null es lo que lo delata.
+    const cero = await renglonDeRuta(op.id, idProcesoCero);
+    expect(cero.duracionDias).toBe(0);
+    expect(cero.fechaReal).not.toBeNull();
+    expect(cero.estado).toBe('completado');
+    expect(cero.origenCaptura).toBe('evento');
+    expect(cero.capturadoPorId).toBeNull();
+    // Y el proceso normal, en cambio, sigue pendiente: nadie ha hecho nada.
+    const normal = await renglonDeRuta(op.id, idProcesoNormal);
+    expect(normal.fechaReal).toBeNull();
+
+    const resultado = await cancelarEnCascada(idPedido);
+
+    // Nada comprado, nada producido ⇒ se cancela en cascada. Es la frase literal de Daniel.
+    expect(resultado.ordenesConservadas).toEqual([]);
+    expect(resultado.aviso).toBeNull();
+    expect(resultado.foliosOrdenesCanceladas).toEqual([op.folio]);
+    expect(await estadoDe(op.id)).toBe('cancelada');
+  });
+
+  it('⭐ pero si una PERSONA captura ese mismo proceso de 0 días, la OP se conserva', async () => {
+    // La rama gemela, y la razón de que el criterio sea la TERNA y no `duracionDias: { not: 0 }`:
+    // `completarProceso` no mira la duración ni el estado, así que capturar a mano un proceso de 0
+    // días es posible — y es un acto humano que la guarda NO puede tirar a la basura.
+    const { idPedido, ordenes } = await pedidoConOps();
+    const op = ordenes[0] as { id: number; folio: number };
+    await programarRuta(op.id);
+    const cero = await renglonDeRuta(op.id, idProcesoCero);
+
+    await completarProceso(sesionRc(), cero.id, new Date('2026-09-05T00:00:00Z'), bd());
+
+    // El sello cambió: ya NO es el del generador (lo firma una persona).
+    const tras = await renglonDeRuta(op.id, idProcesoCero);
+    expect(tras.duracionDias).toBe(0);
+    expect(tras.origenCaptura).toBe('manual');
+    expect(tras.capturadoPorId).not.toBeNull();
+
+    const resultado = await cancelarEnCascada(idPedido);
+
+    expect(resultado.ordenesConservadas).toHaveLength(1);
+    expect(resultado.ordenesConservadas[0]?.porque).toMatch(/ruta crítica/);
+    expect(await estadoDe(op.id)).not.toBe('cancelada');
+  });
+
+  /**
+   * ⭐ BLINDAJE de SQL, no de negocio. El criterio se escribe en POSITIVO (`OR` de «no es el sello
+   * del generador») y no como `NOT {terna}` porque, medido sobre el SQL que emite Prisma,
+   * `NOT (a AND b AND c)` con `origen_captura` NULL vale NULL y **tira la fila del conteo** — o
+   * sea: la guarda dejaría de ver esa captura y cancelaría la OP, el lado caro del error.
+   *
+   * ⚠️ Se dice lo que es: HOY ningún camino del dominio deja `fechaReal` con `origenCaptura` NULL
+   * (generador y auto-avance ponen `'evento'`; captura manual, checklist y ETL dejan `'manual'` o
+   * `capturadoPorId`), así que el estado se fabrica a mano a propósito. Lo que esta prueba clava
+   * no es un caso de uso: es que la FORMA del filtro no dependa de eso.
+   */
+  it('⭐ una fechaReal SIN sello de origen cuenta (el `NOT` de tres patas la perdía)', async () => {
+    const { idPedido, ordenes } = await pedidoConOps();
+    const op = ordenes[0] as { id: number; folio: number };
+    await programarRuta(op.id);
+    const cero = await renglonDeRuta(op.id, idProcesoCero);
+    await cliente.rutaOrden.update({ where: { id: cero.id }, data: { origenCaptura: null } });
+
+    const resultado = await cancelarEnCascada(idPedido);
+
+    expect(resultado.ordenesConservadas).toHaveLength(1);
+    expect(await estadoDe(op.id)).not.toBe('cancelada');
+  });
+
+  it('⭐ y capturar un proceso NORMAL (duración > 0) también la conserva', async () => {
+    const { idPedido, ordenes } = await pedidoConOps();
+    const op = ordenes[0] as { id: number; folio: number };
+    await programarRuta(op.id);
+    const normal = await renglonDeRuta(op.id, idProcesoNormal);
+    expect(normal.duracionDias).toBeGreaterThan(0);
+
+    await completarProceso(sesionRc(), normal.id, new Date('2026-09-05T00:00:00Z'), bd());
+
+    const resultado = await cancelarEnCascada(idPedido);
+
+    expect(resultado.ordenesConservadas).toHaveLength(1);
+    expect(resultado.ordenesConservadas[0]?.porque).toMatch(/ruta crítica/);
+    expect(await estadoDe(op.id)).not.toBe('cancelada');
   });
 });

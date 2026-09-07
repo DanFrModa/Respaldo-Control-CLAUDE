@@ -58,11 +58,22 @@ de pedidos reales con su seguimiento. Los importes se ocultan según permiso.
   llegó a ofrecer una salida que no existía en el código—.
   - El criterio de *«esta orden tiene vida»* es **único** y vive en
     `backend/src/dominio/produccion/actividad-orden.ts` (`senalesDeActividadOrden`): cierre, receta
-    liberada/reabierta, etapas vivas, cierres de maquila, cargos EsMa, notas de salida, compras
-    **comprometidas** (⭐ el BORRADOR de OC **no** cuenta — Daniel: *«no cuenta como comprado»*),
-    kardex de PT / TELA / AVÍOS, ruta crítica capturada, hitos, auditorías, costo y EDR. **No**
-    cuentan los derivados regenerables (snapshot del MRP, ruta sólo generada, receta congelada) ni
-    nada cancelado/deshecho/anulado.
+    liberada/reabierta, etapas vivas, cierres de maquila, cargos EsMa, notas de salida
+    **confirmadas**, compras **comprometidas**, kardex de PT / TELA / AVÍOS, ruta crítica
+    **realmente capturada**, hitos, auditorías, costo y EDR.
+  - **Lo que NO cuenta** — la vara es *«nada comprado ni producido»*: los derivados regenerables
+    (snapshot del MRP, ruta sólo generada, receta congelada), todo lo cancelado/deshecho/anulado, y
+    los actos que no comprometen material ni mueven piezas (comentarios, adjuntos, referencias,
+    fichas de verificación, eventos de precio, «dado por cubierto», liga al desarrollo). ⭐ Los dos
+    **borradores** se comportan igual y por la misma razón: la **OC en borrador** (Daniel: *«no
+    cuenta como comprado»*) y la **nota de salida en borrador** (nunca se confirmó ⇒ no salió un
+    solo avío del almacén).
+  - ⚠️ **Programar la ruta crítica NO conserva la OP.** El generador auto-completa los procesos de
+    duración 0 en el momento de generar la ruta (les escribe `fechaReal` sin que nadie capture
+    nada), así que se descarta ese sello suyo y sólo ése: si una persona captura ese mismo proceso
+    —o si lo mueve el auto-avance de un proceso normal— la OP **sí** se conserva. Sin esto, planear
+    la RC —que pasa *antes* de comprar y de cortar— bloqueaba la cascada en el caso exacto que
+    Daniel describió.
   - **Cancelar UNA orden a mano (`ordenes.cancelar`) sigue sin esa guarda**, a propósito: es un acto
     consciente con motivo obligatorio, y es la salida que el propio aviso ofrece.
 

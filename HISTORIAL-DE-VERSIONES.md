@@ -101,6 +101,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   orden vuelve a poder cancelarse. Parece obvio y no lo era: cancelar un movimiento de almacén escribe
   el movimiento contrario **con el mismo número de orden**, así que contar «cuántos movimientos tiene»
   nunca daba cero. Sin cuidar eso, la orden habría quedado bloqueada para siempre.
+- ⭐ **Y tampoco cuenta lo que el sistema se marcó a sí mismo.** Al programar la ruta crítica, los
+  procesos que duran cero días **nacen ya completados** — los completa el sistema, no una persona. Se
+  ven exactamente igual que un proceso capturado, así que **sólo programar la ruta bastaba para que la
+  orden se negara a cancelarse**, diciendo *«ya tiene procesos capturados»* cuando nadie había
+  capturado nada. Y eso pega justo donde duele: la ruta se programa **en la planeación, antes de
+  cortar**. Ahora se distingue lo que puso el sistema de lo que puso alguien.
+- ⭐ **Una nota de salida en BORRADOR no cuenta.** Si está sin confirmar, no ha salido un solo avío del
+  almacén — mismo criterio que el borrador de orden de compra.
 - **Cancelar UNA orden suelta, desde Órdenes, sigue sin pedir nada.** Es a propósito: ahí es un acto
   consciente sobre una sola orden, con motivo obligatorio, y es justo la salida que el aviso del
   pedido te ofrece. Ponerle un candado dejaría sin forma de parar una orden que sí hay que parar.
