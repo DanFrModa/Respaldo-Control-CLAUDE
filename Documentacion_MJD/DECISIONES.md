@@ -12136,6 +12136,65 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.211) — ⭐⭐ BORRAR DE VERDAD LOS ERRORES DEL DÍA, FOLIOS INCLUIDOS (7-sep-2026): Daniel cierra el punto que quedaba abierto
+
+**Contestó la pregunta que se le dejó puesta** (descarte acotado vs. sólo liberar el número) **y pidió más
+de lo que se le ofrecía.** Textual:
+
+> *«Para las ordenes que acabo de hacer y me equivoque, me gustaria poder **borrar por completo.
+> Absolutamente todo. No quisiera ni perder folios de OP….. me gusta tener todos los folios ocupados y sin
+> que se salte ninguno.** Hay errores que me gustaria **solo yo** poder eliminar. Y normalmente son errores
+> míos que no vale la pena dejarlos vivir en nada. Ejemplo, subí la OC equivocada al importar, o subí una
+> que ya había dado de alta…. o cualquier otro error de esa índole. **No hay ninguna necesidad de
+> perjudicar el sistema.**
+>
+> **Otro tema es cuando ya hay trabajo hecho…. ahí sí estoy de acuerdo en dejar rastro.»*
+
+🔑 **La frontera la puso él, y es limpia: TRABAJO HECHO vs. ERROR DE CAPTURA.** No es «borrar» contra
+«cancelar» por gusto: es que un pedido de hace diez minutos sin nada colgando **no es un hecho del
+negocio**, y un pedido con tela surtida sí. **D3 no se relaja**: sigue gobernando todo lo que tiene
+trabajo detrás. Lo que se reconoce es que **un fantasma no tiene historia que preservar**.
+
+**DECIDIDO:**
+1. **Borrado FÍSICO y completo** (no cancelación) cuando se cumplen TODAS las condiciones de «sin vida».
+2. **Los folios se devuelven** — de pedido y de OP. Él lo pidió por su nombre: *«me gusta tener todos los
+   folios ocupados y sin que se salte ninguno»*.
+3. **Sólo él.** Permiso propio, no un botón para todos.
+4. **Con trabajo hecho: se cancela y se deja rastro.** Ahí no se discute.
+
+**CÓMO SE DEVUELVE EL FOLIO — medido, y con su límite dicho.** `siguienteFolio` (`comun/secuencias.ts:62-67`)
+es `INSERT … ON CONFLICT DO UPDATE SET valor = valor + 1` sobre una fila `(id_empresa, clave, valor)`.
+⇒ se puede retroceder con un **UPDATE condicionado**: `SET valor = valor - 1 WHERE … AND valor = <el folio
+que se descarta>`. Es atómico (bloquea la misma fila que `siguienteFolio`) y **se comporta solo**:
+- si el descartado es **el último emitido** → el contador retrocede y **no queda hueco**. Es el caso normal
+  de Daniel: se equivocó y lo deshace en el momento.
+- si **alguien tomó un folio después** → el `WHERE` no casa, no pasa nada y **el hueco queda**. No se puede
+  cerrar sin renumerar a otro, y renumerar folios ajenos sería mucho peor que un hueco.
+⚠️ **Esto hay que decírselo con esas palabras**: la promesa es «sin huecos **cuando lo deshaces en el
+momento**», no «sin huecos nunca».
+
+**EL NÚMERO DE 5 DÍGITOS es más fácil:** no hay contador que retroceder. `consecutivosUsados`
+(`nomenclatura.ts:231-259`) lo calcula **leyendo los modelos existentes**, así que borrar el modelo hijo
+libera el número solo.
+
+**⚠️ DOS COSAS QUE EL BORRADO TAMBIÉN TIENE QUE DESHACER, y que no son obvias** (se miden antes de
+construir, no se asumen):
+1. 🔴 **La liga aprendida.** `aprenderLiga` (`pedidos/importacion-pdf.ts:469`) hace **upsert** en
+   `ClienteModeloLiga` dentro de la misma transacción del confirm. Si Daniel importó con el modelo
+   EQUIVOCADO y descarta, **la liga equivocada sobrevive y le vuelve a sugerir lo mismo la próxima vez** —
+   que es exactamente el escenario de su punto 17. Hay que medir si el upsert **creó** o **actualizó** para
+   saber qué se deshace.
+2. **El PDF en R2.** El adjunto sube a Cloudflare R2, y hay **deuda conocida**: `comun/archivos.ts` no tiene
+   `DeleteObject`, así que borrar el registro deja el objeto huérfano (backlog de `HOJA-DE-RUTA.md` §4).
+   Un borrado que se llama «absolutamente todo» es **el sitio donde esa deuda por fin importa**.
+
+**ABIERTO — una sola cosa, con default:** ¿sobrevive **un renglón de bitácora** del descarte? El lead
+recomienda **sí**, y la razón NO es vigilarlo: es que **cuando el folio NO se puede devolver** (el caso de
+arriba), ese renglón es lo único que contesta *«¿por qué falta el 1043?»*. Vive en un log que él nunca
+mira y no ensucia ninguna pantalla. **Su decisión.**
+
+---
+
 #### (Post-F9.210) — ⭐⭐ LA TANDA DEL 7-sep-2026: Daniel contesta once de los diecisiete hallazgos, y deja UNA abierta que es la más grande
 
 Contestó por lista, sobre el resumen que le entregó el lead. **Van sus palabras textuales** y, debajo,

@@ -423,6 +423,9 @@ describe('MesaNegociacion — el renglón en vivo', () => {
       expect(screen.getByTestId('mesa-badge-target')).toHaveAttribute('data-cumple-target', 'true');
     });
     const insigniaLlega = screen.getByTestId('mesa-badge-target');
+    // ⚠️ ANCLADA, y aquí es donde de verdad importa: «llega» es SUBCADENA de «no llega», así que
+    // relajar esto a `toHaveTextContent('llega')` deja la prueba en VERDE aunque el letrero mienta
+    // en este estado. Medido: es lo ÚNICO que sostiene esta mitad del guardián.
     expect(insigniaLlega).toHaveTextContent(/^llega$/);
     expect(insigniaLlega).toHaveAttribute('data-variant', 'default');
   });
