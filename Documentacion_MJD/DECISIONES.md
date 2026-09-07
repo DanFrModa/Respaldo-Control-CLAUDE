@@ -12352,9 +12352,28 @@ dárselo. Arreglo quirúrgico de una comparación.
   `cumpleObjetivo`) es **otra comparación y es correcta** — lo confirmó el propio Daniel al reportar.
 
 ⚠️ **Las pruebas DEFENDÍAN el defecto** (`negociacion.int.test.ts` :1171 / :1181 / :1263, escritas con la
-lógica vieja) y se voltearon. Se añadieron dos que antes no existían: **el caso de la igualdad** —sin él,
-un futuro `<` en vez de `<=` pasaría todas— y una que **clava la dirección con el ejemplo literal de
-Daniel** (200/190/210), para que esto no se pueda volver a invertir en silencio.
+lógica vieja) y se voltearon **releyendo el precio de cada caso, no el booleano** — señal de que se releyó:
+el `ajustarPrecioLinea` que prueba *«aprobar un precio que NO cumple se permite»* se movió de 90 a **106**,
+porque con la corrección el precio que no cumple es el otro. Se añadieron dos que no existían: **el caso de
+la igualdad** —sin él, un futuro `<` en vez de `<=` pasaría todas— y una que **clava la dirección con el
+ejemplo literal de Daniel** (200/190/210). **Medido con mutación:** reponer `>=` deja **3 rojas**; poner `<`
+estricto deja **1**, y es justo la de la igualdad.
+
+🔴 **PERO EL REVIEWER ENCONTRÓ QUE ESO NO BASTABA, Y ES LA LECCIÓN QUE HAY QUE GUARDAR.** La primera ronda
+se **RECHAZÓ**: las pruebas del frontend aseguraban **sólo `data-cumple-target`** —un pasa-manos del
+booleano del servidor— y **no las palabras ni el color**. Lo demostró mutando `MesaNegociacion.tsx`:
+invertir el texto (`:389`) → **17/17 en VERDE**; invertir el `variant` (`:385`) → **17/17 en VERDE**.
+⇒ **el defecto exacto que este arreglo corrige habría vuelto a pasar todas las compuertas.**
+
+📌 **La regla que se lleva de aquí:** *un guardián puesto en el dato que viaja no vigila lo que el usuario
+lee.* Daniel no vio un booleano: vio la palabra «no llega» en rojo. La prueba tiene que aseverar **eso**.
+Por eso la segunda ronda añade la aserción del **letrero en sus dos estados** y del **color**, comprobadas
+—también con mutación— dejando la prueba en rojo al invertir cada una.
+
+⚠️ **Y una corrección de prosa del propio lead, que el reviewer cazó:** este apartado afirmaba que las
+pruebas se añadieron *«para que esto no se pueda volver a invertir en silencio»*. Con la primera ronda eso
+era **cierto para la aritmética del backend y FALSO para el letrero y el color**. Es la cicatriz de siempre
+—prosa que asegura más de lo medido— y aquí queda anotada en vez de callada.
 
 **SIN migración, SIN permisos nuevos, SIN semilla.**
 

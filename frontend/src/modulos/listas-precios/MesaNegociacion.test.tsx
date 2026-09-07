@@ -395,21 +395,36 @@ describe('MesaNegociacion — el renglón en vivo', () => {
     await waitFor(() => {
       expect(screen.getByTestId('mesa-target')).toHaveTextContent('$100.00');
     });
-    // El precio nace en 106 y el cliente quería pagar 100: NOS PASAMOS ⇒ «no llega».
-    expect(screen.getByTestId('mesa-badge-target')).toHaveAttribute('data-cumple-target', 'false');
+    // El precio nace en 106 y el cliente quería pagar 100: NOS PASAMOS ⇒ «no llega», en ROJO.
+    //
+    // ⚠️⚠️ **SE ASEVERA LO QUE DANIEL VE —la palabra y el color—, no sólo `data-cumple-target`**, que
+    // es un pasa-manos del booleano del servidor. Medido: con el guardián puesto sólo en el atributo,
+    // invertir el letrero (`cumpleTarget ? 'no llega' : 'llega'`) o el color (`variant`) dejaba las
+    // 17 pruebas en VERDE — o sea, el defecto exacto que este arreglo vino a corregir volvía a pasar
+    // entero. El booleano puede estar bien y el letrero al revés: son dos cosas distintas.
+    //
+    // 🔴 El texto va con regex ANCLADA a propósito: «llega» es SUBCADENA de «no llega», así que un
+    // `toHaveTextContent('llega')` pelón pasa con los dos estados y no cazaría nada.
+    const insigniaPasados = screen.getByTestId('mesa-badge-target');
+    expect(insigniaPasados).toHaveAttribute('data-cumple-target', 'false');
+    expect(insigniaPasados).toHaveTextContent(/^no llega$/);
+    expect(insigniaPasados).toHaveAttribute('data-variant', 'destructive');
 
     // …y aun así NO bloquea: el margen sigue a la vista y todo queda operable.
     expect(screen.getByTestId('mesa-margen')).not.toHaveTextContent('—');
     expect(screen.getByTestId('celda-precio')).toBeEnabled();
     expect(screen.getByTestId('abrir-guardar-mesa')).toBeEnabled();
 
-    // Se baja el precio por DEBAJO del target: ahora SÍ le llegamos.
+    // Se baja el precio por DEBAJO del target: ahora SÍ le llegamos ⇒ «llega», y en VERDE.
     const precio = screen.getByTestId('celda-precio');
     await usuario.clear(precio);
     await usuario.type(precio, '95');
     await waitFor(() => {
       expect(screen.getByTestId('mesa-badge-target')).toHaveAttribute('data-cumple-target', 'true');
     });
+    const insigniaLlega = screen.getByTestId('mesa-badge-target');
+    expect(insigniaLlega).toHaveTextContent(/^llega$/);
+    expect(insigniaLlega).toHaveAttribute('data-variant', 'default');
   });
 
   it('sin target del cliente NO se inventa ningún veredicto', async () => {
