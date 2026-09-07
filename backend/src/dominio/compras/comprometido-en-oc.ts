@@ -354,13 +354,33 @@ export interface FilaParaNeteo {
  *  2. **El acervo SIN color** (`porColor[null]`) va al renglón sin color si lo hay —son la misma
  *     pregunta sin responder— y, si no lo hay, se reparte entre los renglones con color **en el
  *     orden en que vienen**, cada uno hasta lo que necesita, y **el último absorbe el remanente**.
- *  3. ⭐⭐ **fila 0.158 — las cubetas CON color que NINGÚN renglón reclama van también al renglón
- *     sin color.** Antes se caían al piso: nadie las contaba.
+ *  3. ⭐⭐ **fila 0.158 — las cubetas CON color que NINGÚN renglón reclama van al renglón sin color,
+ *     pero SÓLO si ese renglón es el ÚNICO del material** (ningún hermano lleva color). Antes se
+ *     caían al piso y la explosión volvía a ofrecer lo ya comprado.
  *
- * 🔑 **De ahí sale la invariante que la regla 3 restaura:** cuando hay un renglón sin color en la
- * mesa, **nada de lo comprometido de ese material se queda sin repartir** — `Σ(enOc) =
- * comprometido.enOc`. Es lo que hacía `comprometidoDe` antes de que existieran los colores, y lo
- * que impide que la explosión ofrezca comprar algo que ya está en una OC viva.
+ * 🔴 **Y POR QUÉ ESE "SÓLO SI" NO ES OPCIONAL** (hallazgo del reviewer, 7-sep-2026). La tentación
+ * es decir *"el renglón sin color pide TODO el material de la orden, así que le tocan todas las
+ * líneas"*. **Eso es cierto en un avío colapsado y FALSO en una tela.** En un avío marcado
+ * `seCompraSinColor` hay un solo renglón por orden (`ModeloAvio` tiene `@@id([idModelo, idAvio])`,
+ * así que el avío entra una vez al BOM y {@link gruposDeCompraDelAvio} devuelve un único grupo).
+ * En una tela NO: los colores de prenda **sin amarre de color de tela** caen todos en el grupo
+ * `'sin'` **junto a** los que sí lo tienen, así que una misma tela emite a la vez renglones con
+ * color **y** uno sin color — y ese renglón sin color es **una PARTE de la orden, no toda**. Es el
+ * estado normal mientras el comprador no captura los tonos.
+ *
+ * ⚠️ **Medido:** con una tela mixta y una cubeta huérfana (que se fabrica cambiando un amarre de
+ * color con la OC en `borrador` — permitido, porque `borrador` no está en
+ * {@link ESTATUS_OC_COMPROMETIDA} pero **sí** en {@link ESTATUS_OC_QUE_CUBREN}), absorber sin la
+ * guarda acreditaba al renglón sin color 100 m que la OC había pedido de OTRO tono: su faltante
+ * real se iba a cero y **ese material no se compraba nunca**. Cambiar una sobre-compra visible por
+ * una **sub-compra silenciosa que para la producción** es peor negocio, y además es exactamente lo
+ * que la regla 2 prohíbe tres líneas más abajo: no se le atribuye a un renglón lo que la OC pidió
+ * para otro color.
+ *
+ * 🔑 **La invariante, ACOTADA a donde vale:** cuando el renglón sin color es el **único** del
+ * material, `Σ(enOc) = comprometido.enOc` — nada de lo ya comprometido se queda sin contar, que es
+ * lo que hacía `comprometidoDe` antes de que existieran los colores. Con hermanos de color en la
+ * mesa **no vale, y no debe valer**: lo huérfano se queda sin repartir a propósito.
  *
  * ⚠️ **Por qué el último absorbe (y no se tira):** con UN solo renglón sin color —el caso de toda
  * orden anterior a esta etapa— esa regla devuelve el acervo COMPLETO, que es exactamente lo que
@@ -404,18 +424,28 @@ export function repartirComprometidoPorColor(
      * `enOc: 0 / pendiente: 100` con las 100 piezas ya pedidas en una OC viva, y la segunda
      * generación volvía a ofrecerlas. Es §Post-F9.85 resucitado por otra puerta.
      *
+     * 🔴 **PERO SÓLO CUANDO NADIE MÁS LLEVA COLOR** (`conRenglon.size === 0`). Con hermanos de
+     * color en la mesa —el caso normal de una tela a la que le faltan tonos por capturar— el
+     * renglón sin color es **una PARTE de la orden, no toda**, y acreditarle una línea que la OC
+     * pidió de otro tono le baja el faltante a cero: **ese material ya no se compra nunca**. Ver el
+     * porqué completo, con la medición, en el doc de esta función.
+     *
      * ⚠️ **Y NO se marcan como ambiguas** (`desdeAcervoSinColor` sigue en 0): ese campo dice *"la
      * OC no decía de qué color era, así que atribuírselo a ESTE color lo eligió el sistema"*. Aquí
-     * la OC sí dice su color; el que no pregunta por color es el renglón, y como pide **todo el
-     * material de esa orden**, contarle esas líneas no es una elección: le corresponden enteras.
+     * la OC sí dice su color, y con la guarda de arriba el renglón que las recibe es el ÚNICO del
+     * material: le corresponden enteras, sin elección que confesar. Marcarlas en vez de acotar la
+     * absorción NO sirve —el número seguiría neteando y el material seguiría sin comprarse—; sólo
+     * avisaría del daño.
      */
     const conRenglon = new Set<number>();
     for (const f of filas) {
       if (f.idColor !== null) conRenglon.add(f.idColor);
     }
     let huerfano = 0;
-    for (const [idColor, cubeta] of comprometido.porColor) {
-      if (idColor !== null && !conRenglon.has(idColor)) huerfano += cubeta.enOc;
+    if (conRenglon.size === 0) {
+      for (const [idColor, cubeta] of comprometido.porColor) {
+        if (idColor !== null) huerfano += cubeta.enOc;
+      }
     }
 
     const fila = propio[indiceSinColor] as RepartoNeteo;

@@ -192,29 +192,77 @@ describe('⭐⭐ 0.158 — LAS CUBETAS HUÉRFANAS (el avío que se marca «sin c
     expect(reparto.map((r) => r.enOc)).toEqual([330]);
   });
 
-  it('⭐ las cubetas que SÍ tienen renglón se quedan con su dueño (no se las roba el sin color)', () => {
+  /**
+   * 🔴 **EL CASO MIXTO: CON HERMANOS DE COLOR, EL SIN COLOR NO ABSORBE NADA.** Aquí el renglón sin
+   * color es **una PARTE del material**, no todo, así que acreditarle una línea que la OC pidió de
+   * otro tono le baja el faltante y ese material deja de comprarse.
+   *
+   * ⚠️ Los números están elegidos para que **no cuadren**: lo huérfano suma 80 y el renglón sin
+   * color necesita 70. Con la versión anterior de esta prueba (huérfanas = 70, justo lo que el
+   * renglón pedía) la absorción pasaba **por casualidad** y el defecto se escondía — fue el propio
+   * reviewer quien lo cazó.
+   */
+  it('⭐ MIXTO: con hermanos CON color en la mesa, el sin color NO absorbe lo huérfano', () => {
     const reparto = repartirComprometidoPorColor(
       [
         { idColor: 7, cantidadAComprar: 30 },
         { idColor: null, cantidadAComprar: 70 },
       ],
-      comprometido({ 7: 30, 9: 50, 15: 20 }),
+      comprometido({ 7: 30, 9: 55, 15: 25 }),
     );
-    // Rojo (7) tiene renglón propio y conserva sus 30. Sólo Azul (9) y Negro (15) están huérfanas.
-    // 🔴 El valor que la pone roja: `[0, 100]` — el sin color barriendo con todo, que dejaría al
-    // renglón de Rojo pidiendo otra vez lo que ya está comprado.
-    expect(reparto.map((r) => r.enOc)).toEqual([30, 70]);
+    // Rojo (7) conserva sus 30. Azul (9) y Negro (15) están huérfanas y se quedan SIN repartir.
+    // 🔴 El valor que la pone roja: `[30, 80]` — el sin color acreditándose tonos ajenos y
+    // quedándose en pendiente 0 con sus 70 sin comprar.
+    expect(reparto.map((r) => r.enOc)).toEqual([30, 0]);
+    expect(reparto.map((r) => r.desdeAcervoSinColor)).toEqual([0, 0]);
   });
 
-  it('🔑 con un renglón sin color en la mesa, la Σ repartida es TODO lo comprometido', () => {
-    // La invariante en una línea: nada de lo que ya está en una OC viva se queda sin contar. Es lo
-    // que `comprometidoDe` hacía antes de que existieran los colores.
-    const cubetas = comprometido({ 7: 30, 9: 50, 15: 20, sin: 12.5 });
+  /**
+   * ⭐⭐ **LA PRUEBA QUE FALTABA Y QUE HABRÍA CAZADO LA REGRESIÓN** (reviewer, 7-sep-2026). Es una
+   * TELA, que es donde la premisa *"el renglón sin color pide todo el material"* se cae: los
+   * colores de prenda **sin amarre de tono** caen en el grupo `'sin'` **junto a** los que sí lo
+   * tienen (`mrp.ts`, armado de `grupos`), así que la misma tela emite renglones con color y uno
+   * sin color a la vez. Es el estado normal mientras el comprador no captura los tonos.
+   *
+   * 🚪 **Y la cubeta huérfana tiene una puerta abierta que la fabrica:** cambiar el amarre de color
+   * sólo se bloquea con `ESTATUS_OC_COMPROMETIDA`, que **no** incluye `borrador` (*"mientras la OC
+   * sea un BORRADOR el color se mueve libre"*), pero `borrador` **sí** cuenta en
+   * `ESTATUS_OC_QUE_CUBREN`, que es lo que alimenta este neteo. Un borrador + un cambio de tono y
+   * la cubeta se queda sin dueño.
+   *
+   * 🔴 **El daño que fija esta prueba:** con la absorción sin acotar, los 80 m de la fila sin color
+   * quedaban acreditados con 100 m que la OC pidió como **Vino** → `pendiente: 0` → **esos 80 m no
+   * se compran nunca**. Una sub-compra silenciosa que para la producción, a cambio de evitar una
+   * sobre-compra visible: mal negocio.
+   */
+  it('⭐⭐ TELA MIXTA: la cubeta de un tono que ya nadie usa NO le tapa el faltante al sin color', () => {
+    const GRIS = 3;
+    const MARINO = 4;
+    const VINO = 9; // el tono que la OC borrador pidió y que ya ningún renglón reclama
     const reparto = repartirComprometidoPorColor(
       [
-        { idColor: 9, cantidadAComprar: 50 },
-        { idColor: null, cantidadAComprar: 62.5 },
+        { idColor: GRIS, cantidadAComprar: 60 },
+        { idColor: MARINO, cantidadAComprar: 90 },
+        { idColor: null, cantidadAComprar: 80 }, // el color de prenda que aún no tiene amarre
       ],
+      comprometido({ [VINO]: 100, [MARINO]: 100 }),
+    );
+    // Marino cobra lo suyo; Gris no tiene nada comprado; y el sin color **sigue debiendo sus 80**.
+    // 🔴 El valor que la pone roja: un `100` en la tercera posición — los 80 m que se dejarían de
+    // comprar, pagados con una línea de Vino.
+    expect(reparto.map((r) => r.enOc)).toEqual([0, 100, 0]);
+  });
+
+  /**
+   * 🔑 **LA INVARIANTE, ACOTADA A DONDE VALE.** Sólo cuando el renglón sin color es el **ÚNICO** del
+   * material puede decirse que nada de lo comprometido se queda sin contar — ahí sí pide toda la
+   * orden. Enunciarla para cualquier mesa con un renglón sin color (como estaba antes) es lo que
+   * justificaba absorber en el caso mixto y metía la regresión de telas.
+   */
+  it('🔑 con el sin color como ÚNICO renglón, la Σ repartida es TODO lo comprometido', () => {
+    const cubetas = comprometido({ 7: 30, 9: 50, 15: 20, sin: 12.5 });
+    const reparto = repartirComprometidoPorColor(
+      [{ idColor: null, cantidadAComprar: 112.5 }],
       cubetas,
     );
     expect(reparto.reduce((s, r) => s + r.enOc, 0)).toBe(cubetas.enOc);
