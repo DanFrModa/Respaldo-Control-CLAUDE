@@ -12136,6 +12136,153 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.213) — ⭐⭐ EL COLOR EN LA EXPLOSIÓN: avíos que no van por color, y la misma tela en dos colores (Daniel, 7-sep-2026)
+
+Salió mirando la pantalla de **Explosión de materiales** con datos suyos. Son **dos problemas
+distintos** que la pantalla junta, y al medirlos aparecieron **tres defectos apilados** en el primero.
+
+---
+
+### A · «Hay avíos que NO se compran por color»
+
+> *«hay ciertos avíos que **no se compran por color**. Debería de sumar todos. Como la **etiqueta de
+> lavado**. En este caso me los pone por separado, yo creo que porque es otro color. **¿Cómo le puedo
+> hacer para definirle que algunas cosas se compran juntas sin tomar en cuenta el color?**»*
+
+Su pantalla, bajo «Etiquetas Industrial»: `E01 — Etiqueta de lavado` **dos veces** — 11,771 pz con
+color «Blanco Hueso Pantone 14-0002 Tcx Pumice Stone» (órdenes 5565/5566) y 1,387 pz con «Blanco
+Hueso» (orden 5567).
+
+**MEDIDO — son TRES defectos, no uno:**
+1. **La explosión parte por color SIEMPRE, sin excepción posible.** El avío se abre en un renglón por
+   cada color de la matriz de la OP (`compras/mrp.ts:1359-1376`) y `claveAgrupada` (`mrp.ts:1557-1577`)
+   lleva **un segmento de color incondicional**. **No existe ninguna bandera** que diga «este avío no
+   va por color» (leído `Avio` entero, `schema.prisma:2146-2229`).
+   ⚠️ **`esGenerico` NO sirve y hay que decirlo**: es **otro eje** —*«¿me lo compro contra stock o
+   contra la orden?»* (`schema.prisma:2167`)— y su único efecto es netear contra el kardex
+   (`mrp.ts:1358, 1386-1392`). El array `porColor` se construye **antes y sin mirarlo**, así que un
+   genérico con 3 colores **sale igual en 3 renglones**. Marcar la etiqueta como genérica no la
+   juntaría, y encima le cambiaría la valuación del costo.
+2. 🔴 **Los dos «Blanco Hueso» son dos colores distintos que HOY NO SE PUEDEN FUSIONAR.**
+   `Color.nombre` es `@unique` (`schema.prisma:1152`) ⇒ necesariamente son dos filas. La fusión existe
+   (`Color.idFusionadoEn`, `catalogos/colores.ts:507` `colorCanonico`) pero **`fusionarColores` se
+   NIEGA** si el color origen ya se usó fuera de las telas (`colores.ts:400-403`), y **la primera
+   referencia bloqueante de la lista es justo ésta**: `OrdenLinea.idColor`
+   (`colores-fusion-referencias.ts:54-59`). Los suyos están los dos en órdenes ⇒ **atascado con el
+   duplicado para siempre**.
+3. 🔴 **Y aunque se fusionaran, el MRP los seguiría partiendo:** `colorCanonico` **no aparece en
+   ningún archivo de `dominio/compras/`**; `colorDelRenglon` devuelve el **id crudo**
+   (`comprometido-en-oc.ts:123-129`) y `claveAgrupada` lo mete tal cual.
+
+✅ **La buena noticia, medida eslabón por eslabón: el camino de «SIN COLOR» YA EXISTE y aguanta.**
+`RequerimientoOrden.idColorPrenda` es nullable **sin unique que incluya color** · `claveAgrupada`
+tiene rama `'sin'` explícita · en el neteo el renglón sin color es **el caso privilegiado** (*«se
+lleva el acervo entero… aquí NO hay ambigüedad que marcar»*, `comprometido-en-oc.ts:388-393`) ·
+`CompraLinea` nunca **exige** color · **la recepción ni se entera** (el cruce por color es exclusivo
+de telas) · y **el kardex de avíos NO TIENE COLOR EN ABSOLUTO** (`MovimientoDetAvio` es avío × lote ×
+almacén; el propio esquema lo dice en `:5766-5767`).
+⇒ **El arreglo es UN solo sitio**: la construcción de `porColor` (`mrp.ts:1360-1374`). Sin migración
+de datos, sin tocar `claveAgrupada`. REGLA 0-B: el snapshot se regenera solo y el diff ya contempla
+el paso de «con color» a «sin color» (`mrp.ts:1954`).
+
+---
+
+### B · «La misma TELA en dos colores dentro de la misma prenda»
+
+> *«a veces hay modelos que llevan **dos colores en la misma prenda**. Ejemplo: **mangas de otro
+> color**… es la misma tela, pero las mangas van de otro color. En la receta pongo que lleva 200
+> gramos. Pero la realidad es que lleva **150 de un color y 50 de otro**. ¿Cómo lo manejamos en la
+> explosión? ¿Cómo puedo definir eso (aunque sea de forma manual)?»*
+
+⭐⭐ **Y LA DECISIÓN DE DISEÑO LA PUSO ÉL, sin que se la preguntaran** — es la frase que gobierna la
+solución:
+
+> *«el concepto de **dividirlo desde la receta es lo ideal**. Porque **la gente de desarrollo son los
+> que realmente tienen esa información**… sí debe de venir desde allá.»*
+
+⇒ **El reparto NACE EN LA RECETA, no en la explosión ni en la compra.** Desarrollo lo dice **una vez
+por modelo** y todo lo de aguas abajo lo hereda; la explosión deja de tener que adivinarlo orden por
+orden. Es la misma lógica que ya gobierna el resto del sistema (la receta manda, la orden la congela).
+
+🔑 **Y ACOTÓ EL ALCANCE ÉL MISMO, en el mensaje siguiente — esto es lo que hay que construir:**
+
+> *«**no sé si con su color, pero sí con el consumo por partes** cuando el modelo lleva más de un
+> color»*
+
+⚠️ **La receta lleva LAS PARTES Y SU CONSUMO, NO EL COLOR.** Y la distinción no es un detalle: es la
+que mantiene la receta como ficha técnica del modelo y deja el color donde ya vive.
+- **En la RECETA (Desarrollo, una vez por modelo):** *«esta tela: 0.150 cuerpo + 0.050 mangas»*. Es
+  información **técnica y estable** — la misma para todos los colores en que se venda el modelo.
+- **En la ORDEN (comercial, por pedido):** *«para la prenda azul, el cuerpo va azul y las mangas van
+  blancas»*. Es información **variable**: el mismo modelo con dos combinaciones distintas en dos
+  pedidos no cambia de receta.
+
+📌 **Encaja con lo que ya existe, y por eso es el diseño barato.** Hoy `OrdenTelaColor`
+(`schema.prisma:4014-4038`) traduce **color de prenda → color de tela** con
+`@@unique([idOrdenTela, idColor])`. Con partes, esa traducción pasa a ser **(color de prenda, parte) →
+color de tela**: una columna más en la llave, **no una tabla nueva ni un concepto nuevo**. Y el cerrojo
+`@@unique([idOrden, idTela])` **se puede dejar intacto**, porque el reparto vive DENTRO del renglón de
+la tela (sus partes), no en renglones repetidos de la misma tela.
+
+⇒ Si el consumo por partes existe pero nadie asigna colores distintos, **el comportamiento de hoy no
+cambia**: la suma de las partes es el consumo total y todo sale del mismo color. La función nueva sólo
+aplica a lo que se capture con partes — REGLA 0-B, sin retrocompatibilidad que inventar.
+
+⏳ **Queda por decidir con Daniel (no se supone):** si las partes son **catálogo** (cuerpo, mangas,
+cuello, puños…) o **texto libre por modelo**. Default propuesto: **catálogo chico y editable**, porque
+la parte se va a querer ver en el impreso de la orden y en la nota de corte, y el texto libre hace que
+«mangas» y «Mangas» sean dos cosas.
+
+**MEDIDO — el techo de hoy es estructural, no un campo que falte:**
+- **El color viene de la MATRIZ DE LA ORDEN, no de la receta**: `piezasPorColorOrden`
+  (`mrp.ts:499-514`) lee `OrdenLinea.idColor`, y `OrdenTelaColor` traduce color de prenda → color de
+  tela **en la orden** (`schema.prisma:4014-4038`). La cantidad es `consumo × piezas del color`
+  (`mrp.ts:1265`). La receta aporta **una** cifra y **cero** información de color.
+- **Ni `ModeloTela` (`schema.prisma:2808-2838`) ni `OrdenTela` (`:3910-3989`) tienen `idColor`**, ni
+  campo de parte/posición. (`posicion` existe, pero en `OrdenArte`, que es el bordado.)
+- 🔴 **Y el cerrojo que mata la solución obvia:** `@@unique([idOrden, idTela])` (`schema.prisma:3982`)
+  ⇒ **la misma tela NO se puede meter dos veces** en la receta de una orden, ni a mano. El dominio lo
+  rechaza con letras: *«ya está en la receta de esta orden: edítalo en su renglón en vez de volver a
+  agregarlo»* (`receta-orden.ts:531-545`).
+
+**El camino MANUAL que sí existe hoy** (medido paso a paso): en la revisión previa teclear 15 en vez
+de 20 → contestar **«sigue pendiente»** (NO «cubierto») → generar la OC → **agregar a mano** un
+segundo renglón de la misma tela por los 5 kg, ligado a la misma OP (`EditorLineasOc.tsx:66`, sin
+restricción de unicidad en la OC). El neteo funciona y el renglón no reaparece.
+🔴 **PERO tiene un agujero que hay que decirle:** ese renglón añadido a mano **nace SIN COLOR y no hay
+control para ponérselo** (`EditorLineasOc.tsx:300-325`: *«aquí no se ELIGE… aquí se VE, y se puede
+quitar»*) ⇒ en la recepción el cruce de color **sólo se hace si el renglón lo tiene**
+(`recepciones.ts:1079-1090`), así que esos 5 kg **se pueden recibir de cualquier tono** y quien recibe
+vuelve a inventar la correspondencia — justo el mal que V1-E3u cerró.
+**En una frase: hoy se puede COMPRAR el caso, pero no DEFINIRLO.**
+
+---
+
+### C · ✅ EL REDONDEO YA FUNCIONA, y el sistema lo tenía previsto
+
+De su Excel se reconstruyó el método: matriz **piezas por color × orden** → consumo por tela (Felpa
+España `0.135`, Cardigan 2x1 `0.045`) → kg (1,320 × 0.135 = **178.2**, cuadra al decimal) → suma por
+color **por proveedor** → **cantidad REDONDEADA** (178.2 → **180**; 365.6 → **370**).
+
+**Ese último paso YA SE PUEDE HACER HOY**: `cantidadTotal` en la revisión previa es
+`z.number().positive()` **sin tope respecto de lo propuesto** (`contrato/esquemas/mrp.ts:559-568`).
+Y el esquema **anticipó este caso textualmente** (`schema.prisma:200-202`): *«así que **redondear al
+rollo o al mínimo del proveedor** no cría alarmas de mentira, pero comprar un rollo entero de más sí
+llega a quien autoriza»*. Sus redondeos son **+1.0 %** y **+1.2 %**, muy por debajo del **10 %**
+(`ConfiguracionEmpresa.pctDesvioCompra`) que marca la OC para autorización.
+⚠️ **`menor-al-minimo` NO es un mínimo de proveedor** — es el mínimo **guardable** de la columna
+(0.01, `mrp.ts:2500-2501`). **No existe ningún campo de mínimo ni de múltiplo de compra** en el
+esquema (comprobado). Automatizar el redondeo **sí** sería trabajo nuevo.
+
+---
+
+### ORDEN APROBADO POR DANIEL (*«Sí, está bien»*)
+**0.158** la marca «no va por color» · **0.159** la fusión de colores (que se pueda y que el MRP la
+respete) · **0.160** el color en la línea de compra añadida a mano · **0.161** ⭐ **la parte de la
+prenda en la receta** — la de fondo, y la que él mismo situó en Desarrollo.
+
+---
+
 #### (Post-F9.212) — ⭐⭐ SE DESCARTA EL BORRADO FÍSICO (7-sep-2026): se previene el error en vez de limpiarlo
 
 ⚠️ **Esta decisión REVOCA la de §Post-F9.211.** Daniel pidió allí el borrado completo con folios
