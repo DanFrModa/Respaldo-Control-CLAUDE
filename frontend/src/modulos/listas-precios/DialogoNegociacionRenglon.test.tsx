@@ -74,6 +74,11 @@ function linea(): ListaLinea {
     aprobado: false,
     aprobadoPorId: null,
     aprobadoEn: null,
+    // ⭐⭐ Fila 0.153: el renglón todavía no tiene precio pactado (el diálogo es justo donde se
+    // pacta). El campo lo pinta la LISTA de afuera, no este diálogo.
+    precioNegociado: null,
+    tienePrecioNegociado: false,
+    precioNegociadoEn: null,
     // ⭐ V1-E8x: el segundo eje del renglón (aquí, uno vivo).
     estado: 'abierto' as const,
     nombreEstado: 'Abierto',

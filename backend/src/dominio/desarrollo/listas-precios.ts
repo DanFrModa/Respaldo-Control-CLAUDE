@@ -151,17 +151,78 @@ const incluirLista = {
       // ⭐ V1-E8y (§Post-F9.152): los PENDIENTES del modelo viajan con el renglón. La mesa los
       // enseña fila por fila; pedirlos aparte serían N llamadas para pintar una lista de 20.
       pendientes: { orderBy: { id: 'asc' } },
+      // ⭐⭐ FILA 0.153 — **el precio que quedó en la negociación**, para que la lista de afuera
+      // diga lo mismo que el diálogo de adentro (Daniel: *«dice precio aprobado, pero dentro de la
+      // negociación quedó otro»*). Se pide el ÚLTIMO evento QUE TRAE PRECIO —no el último a
+      // secas—: los cambios de estado del renglón (`cambiarEstadoRenglon`) escriben el evento con
+      // los dos precios en null a propósito, y cerrar un modelo no puede borrar de la vista el
+      // precio con el que se cerró. El filtro + `take: 1` van en SQL: son 20 renglones por lista y
+      // traerse el historial entero para quedarse con uno sería pagarlo N veces.
+      eventos: {
+        where: { precioNuevo: { not: null } },
+        orderBy: { id: 'desc' },
+        take: 1,
+        select: { id: true, precioNuevo: true, registradoEn: true },
+      },
     },
   },
 } satisfies Prisma.ListaPreciosInclude;
 
 type ListaConDetalle = Prisma.ListaPreciosGetPayload<{ include: typeof incluirLista }>;
 
+/**
+ * ⭐⭐ **EL CRITERIO** de la fila 0.153: de los eventos de negociación de un renglón, ¿cuál es «el
+ * precio que quedó»? **El del ÚLTIMO evento que registró un precio** (el de `id` mayor: los ids son
+ * autoincrementales, así que el orden de id ES el orden en que pasaron las cosas).
+ *
+ * 🔴 **Por qué el último y no «el del acuerdo»**, que era la otra opción sobre la mesa: `NegociacionEvento`
+ * **no tiene columna de tipo**, y las cinco cosas que escriben un precio ahí no se distinguen por sus
+ * columnas —una ronda con precio pactado, un acuerdo, el cierre de la mesa y la invalidación
+ * automática por mover los factores dejan todas la misma forma—. Cualquier intento de «quedarme sólo
+ * con los acuerdos» tendría que adivinar leyendo la prosa del comentario, que es exactamente el tipo
+ * de regla que se rompe en silencio el día que alguien reescribe un mensaje.
+ *
+ * Y hay una razón mejor que la técnica: **lo que Daniel pidió es CONGRUENCIA con el diálogo**. La
+ * última fila del historial que se ve al abrir la negociación es, precisamente, el último evento con
+ * precio. Si de afuera enseñáramos «el último acuerdo» y de adentro se leyera otro número más abajo,
+ * habríamos mudado su queja de sitio en vez de resolverla. El número de afuera es el mismo de la
+ * última fila de adentro, siempre, venga de donde venga — y el porqué de ese número lo cuenta el
+ * comentario del evento, que se lee en el diálogo.
+ *
+ * Devuelve `null` cuando el renglón no tiene NINGÚN evento con precio (nunca se negoció, o sólo se
+ * movió de estado). En ese caso la pantalla no inventa nada: pinta el hueco.
+ *
+ * Es PURA a propósito (recibe los eventos, no el cliente de Prisma): así el criterio se prueba sin
+ * base de datos y vive en UN solo sitio.
+ */
+export function ultimoPrecioDeNegociacion(
+  eventos: readonly { id: number; precioNuevo: Prisma.Decimal | null; registradoEn: Date }[],
+): { precio: number; registradoEn: Date } | null {
+  let elegido: { id: number; precioNuevo: Prisma.Decimal; registradoEn: Date } | null = null;
+  for (const evento of eventos) {
+    if (evento.precioNuevo === null) {
+      continue;
+    }
+    if (elegido === null || evento.id > elegido.id) {
+      elegido = {
+        id: evento.id,
+        precioNuevo: evento.precioNuevo,
+        registradoEn: evento.registradoEn,
+      };
+    }
+  }
+  return elegido === null
+    ? null
+    : { precio: num(elegido.precioNuevo), registradoEn: elegido.registradoEn };
+}
+
 /** Proyecta un renglón a la salida del contrato (importes en null sin `consultas.ver-importes`). */
 function aLineaSalida(
   linea: ListaConDetalle['lineas'][number],
   verImportes: boolean,
 ): ListaPreciosLineaSalida {
+  // ⭐⭐ Fila 0.153 — el precio que quedó en la negociación (ver `ultimoPrecioDeNegociacion`).
+  const negociado = ultimoPrecioDeNegociacion(linea.eventos);
   return {
     id: linea.id,
     idDesarrollo: linea.idDesarrollo,
@@ -181,6 +242,16 @@ function aLineaSalida(
     aprobado: linea.precioAprobado !== null,
     aprobadoPorId: linea.aprobadoPorId,
     aprobadoEn: linea.aprobadoEn === null ? null : linea.aprobadoEn.toISOString(),
+    // ⭐⭐ FILA 0.153 — **los DOS precios, uno al lado del otro** (Daniel: *«o estaría bien poner
+    // los dos, mejor»*). El importe va tras la reja como todos los demás; el HECHO de que exista un
+    // precio negociado y CUÁNDO se registró, no —igual que `tieneTarget` y `aprobadoEn`—, porque
+    // saber cuál de los dos números es el más nuevo es lo que deshace la confusión que reportó.
+    //
+    // 🔴 Esto NO escribe `precioAprobado` ni lo sustituye: aprobar sigue siendo un acto aparte, del
+    // dueño y con `listas.aprobar`. Es sólo que ahora el precio pactado se ve SIN abrir el diálogo.
+    precioNegociado: verImportes && negociado !== null ? negociado.precio : null,
+    tienePrecioNegociado: negociado !== null,
+    precioNegociadoEn: negociado === null ? null : negociado.registradoEn.toISOString(),
     // ⭐ V1-E8x (§Post-F9.151): el SEGUNDO eje del renglón. No es un importe (no lo tapa
     // `consultas.ver-importes`): saber que un modelo se dropeó es un hecho del negocio, y quien no
     // ve precios igual necesita saber que ese modelo ya no va en el papel.

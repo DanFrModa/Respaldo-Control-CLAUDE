@@ -270,6 +270,49 @@ export const esquemaListaPreciosLineaSalida = z
     aprobadoPorId: z.string().nullable().describe('Quién aprobó el precio, o null.'),
     aprobadoEn: z.iso.datetime().nullable().describe('Cuándo se aprobó (ISO 8601), o null.'),
     /**
+     * ⭐⭐ **EL PRECIO QUE QUEDÓ EN LA NEGOCIACIÓN** (fila 0.153) — Daniel, textual:
+     *
+     * > *«Después de haber cerrado la negociación de un modelo, debería de cambiar el precio que se
+     * > ve afuera. Ese fue el precio que quedó, ya deja de ser con el que venía (o estaría bien
+     * > poner los dos, mejor). Está muy confuso cuál es el precio. **Dice precio aprobado, pero
+     * > dentro de la negociación quedó otro.** Debe de haber congruencia.»*
+     *
+     * Es el `precioNuevo` del ÚLTIMO `NegociacionEvento` del renglón que registró un precio. Hasta
+     * ahora ese número **sólo se veía abriendo el diálogo de la negociación**: la lista de afuera
+     * enseñaba `precioCalculado` y `precioAprobado` y nada más, así que la pantalla podía decir
+     * «aprobado 137» mientras la última fila del historial decía «95». Poniendo los dos, la de
+     * afuera dice lo mismo que la de adentro.
+     *
+     * 🔴 **NO sustituye a `precioAprobado` ni lo escribe.** Aprobar es un acto APARTE, de otra
+     * persona y con otro permiso (`listas.aprobar`): el negociador pacta, el dueño firma. Este
+     * campo es SÓLO LECTURA —una proyección del historial— y **nada aguas abajo lo lee**: el PDF,
+     * el Excel, la cotización y el precio que viaja a la orden siguen usando
+     * `precioAprobado ?? precioCalculado`.
+     *
+     * 🔴 Es un importe ⇒ sale `null` sin `consultas.ver-importes`. Para saber que HAY un precio
+     * negociado sin ver cuánto está `tienePrecioNegociado` (mismo reparto que
+     * `precioTarget`/`tieneTarget`).
+     */
+    precioNegociado: z
+      .number()
+      .nullable()
+      .describe(
+        'Último precio registrado en la negociación del renglón (o null si nunca se negoció un ' +
+          'precio / sin importes). NO es el aprobado y nada aguas abajo lo lee.',
+      ),
+    tienePrecioNegociado: z
+      .boolean()
+      .describe('¿El historial de negociación trae algún precio? (independiente de ver importes).'),
+    /**
+     * Cuándo se registró ese precio. **No es un importe** (no lo tapa la reja), y es lo que vuelve
+     * comparables los dos números: puesto al lado de `aprobadoEn` dice CUÁL de los dos es el más
+     * reciente, que es justo la pregunta que Daniel no podía contestar.
+     */
+    precioNegociadoEn: z.iso
+      .datetime()
+      .nullable()
+      .describe('Cuándo se registró el último precio de la negociación (ISO 8601), o null.'),
+    /**
      * ⭐⭐ V1-E8x (§Post-F9.151) — EL SEGUNDO EJE DEL RENGLÓN: en qué punto va **este modelo**
      * dentro de la lista. Convive con `aprobado` (la firma del dueño sobre el precio), **no lo
      * sustituye**: un modelo `cerrado` puede seguir sin firmar, y un `dropeado` conserva la firma

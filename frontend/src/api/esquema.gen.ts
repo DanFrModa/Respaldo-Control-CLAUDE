@@ -106567,6 +106567,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -106802,6 +106808,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -107159,6 +107171,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -107393,6 +107411,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -107629,6 +107653,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -107877,6 +107907,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -108121,6 +108157,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -108367,6 +108409,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -109108,6 +109156,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -109356,6 +109410,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -109603,6 +109663,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -109999,6 +110065,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -110240,6 +110312,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}
@@ -110491,6 +110569,12 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee. */
+                precioNegociado: number | null;
+                /** @description ¿El historial de negociación trae algún precio? (independiente de ver importes). */
+                tienePrecioNegociado: boolean;
+                /** @description Cuándo se registró el último precio de la negociación (ISO 8601), o null. */
+                precioNegociadoEn: string | null;
                 /**
                  * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
                  * @enum {string}

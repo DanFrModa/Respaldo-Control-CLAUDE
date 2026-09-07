@@ -263435,6 +263435,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -263583,6 +263611,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -264088,6 +264119,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -264236,6 +264295,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -264957,6 +265019,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -265105,6 +265195,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -265610,6 +265703,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -265758,6 +265879,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -266263,6 +266387,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -266411,6 +266563,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -266936,6 +267091,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -267084,6 +267267,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -267629,6 +267815,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -267777,6 +267991,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -268315,6 +268532,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -268463,6 +268708,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -270144,6 +270392,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -270292,6 +270568,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -270824,6 +271103,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -270972,6 +271279,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -271502,6 +271812,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -271650,6 +271988,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -272506,6 +272847,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -272654,6 +273023,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -273186,6 +273558,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -273334,6 +273734,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",
@@ -273877,6 +274280,34 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "precioNegociado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último precio registrado en la negociación del renglón (o null si nunca se negoció un precio / sin importes). NO es el aprobado y nada aguas abajo lo lee."
+                          },
+                          "tienePrecioNegociado": {
+                            "type": "boolean",
+                            "description": "¿El historial de negociación trae algún precio? (independiente de ver importes)."
+                          },
+                          "precioNegociadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se registró el último precio de la negociación (ISO 8601), o null."
+                          },
                           "estado": {
                             "type": "string",
                             "enum": [
@@ -274025,6 +274456,9 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "precioNegociado",
+                          "tienePrecioNegociado",
+                          "precioNegociadoEn",
                           "estado",
                           "nombreEstado",
                           "estadoPorId",

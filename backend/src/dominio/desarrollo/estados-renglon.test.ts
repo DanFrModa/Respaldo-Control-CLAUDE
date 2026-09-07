@@ -178,6 +178,10 @@ function filaLineaConJoins(estado: EstadoFake): Record<string, unknown> {
     // prueba no habla de ellos, pero la proyección los lee y sin la clave reventaría — que es lo
     // que tiene que pasar si algún día alguien quita el `include`.
     pendientes: [],
+    // ⭐⭐ FILA 0.153: el renglón trae también el ÚLTIMO evento de negociación CON PRECIO (el
+    // `include` lo filtra y se queda con uno). Vacío aquí = "este renglón nunca se negoció". La
+    // proyección lo lee, así que la clave tiene que estar — igual que en producción.
+    eventos: [],
   };
 }
 

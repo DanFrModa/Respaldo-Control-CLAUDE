@@ -50,6 +50,9 @@ import {
   simularMesa,
   simularNegociacion,
 } from './negociacion.js';
+// ⭐⭐ Fila 0.153: los DOS papeles que salen de la lista, para exigir que sigan leyendo el APROBADO.
+import { armarDatosImpresoListaPrecios } from './impresos/impreso-lista-precios.js';
+import { armarDatosExcelListaPrecios } from './impresos/excel-lista-precios.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -1684,5 +1687,257 @@ describe('⭐ la FOTO del modelo llega a la mesa (V1-E8w)', () => {
 
     const conFoto = await desgloseCostoLinea(sesion(), idLinea, bd(), archivos);
     expect(conFoto.urlFotoModelo).toBe('https://r2.falso/modelos/1/frente.jpg');
+  });
+});
+
+// ── ⭐⭐ FILA 0.153 — EL PRECIO QUE QUEDÓ EN LA NEGOCIACIÓN, VISIBLE DESDE AFUERA ─────────────────
+
+/**
+ * ⭐⭐ **«DICE PRECIO APROBADO, PERO DENTRO DE LA NEGOCIACIÓN QUEDÓ OTRO».** Daniel, textual:
+ *
+ * > *«Después de haber cerrado la negociación de un modelo, debería de cambiar el precio que se ve
+ * > afuera. Ese fue el precio que quedó, ya deja de ser con el que venía (o estaría bien poner los
+ * > dos, mejor). Está muy confuso cuál es el precio. Dice precio aprobado, pero dentro de la
+ * > negociación quedó otro. Debe de haber congruencia.»*
+ *
+ * Hasta esta fila, el precio pactado vivía **sólo** dentro del diálogo de negociación: la lista de
+ * afuera enseñaba el calculado y el aprobado y nada más. Se hace lo que Daniel propuso —**poner los
+ * dos**— y **NADA MÁS que eso**: es una proyección de SÓLO LECTURA.
+ *
+ * 🔴 **Lo que estas pruebas blindan, y es la mitad que importa:** el `precioAprobado` NO se toca, y
+ * nada aguas abajo (el PDF, el Excel, la cotización, el precio que viaja a la orden) lee el
+ * negociado. La separación **negociador / aprobador** es deliberada (`negociacion.ts`: *"el costo
+ * cambió → el precio se re-aprueba después con `listas.aprobar`; separa negociador de aprobador"*),
+ * y enseñar un número no puede borrarla.
+ */
+describe('⭐⭐ FILA 0.153 — el precio pactado se ve desde AFUERA (sin abrir la negociación)', () => {
+  it('⭐ un acuerdo con precio sale en el renglón, y el APROBADO sigue intacto', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-VIS');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd()); // firma del dueño en 106
+
+    const conAcuerdo = await registrarAcuerdo(
+      sesion(),
+      idLinea,
+      { acuerdo: 'Cerramos en 95 con el cliente', precioAcordado: 95 },
+      bd(),
+    );
+
+    const renglon = conAcuerdo.lineas[0]!;
+    // El precio que quedó en la mesa, AFUERA.
+    expect(renglon.precioNegociado).toBe(95);
+    expect(renglon.tienePrecioNegociado).toBe(true);
+    expect(renglon.precioNegociadoEn).not.toBeNull();
+    // 🔴🔴 Y LA FIRMA DEL DUEÑO NO SE MOVIÓ: aprobar sigue siendo un acto aparte.
+    expect(renglon.precioAprobado).toBe(106);
+    expect(renglon.aprobado).toBe(true);
+    expect(renglon.precioCalculado).toBe(106);
+
+    // Ni en la base: la columna del renglón sigue con la firma vieja (nadie la escribió).
+    const enBase = await cliente.listaPreciosLinea.findUniqueOrThrow({ where: { id: idLinea } });
+    expect(enBase.precioAprobado?.toNumber()).toBe(106);
+    expect(enBase.aprobadoPorId).not.toBeNull();
+
+    // Y una re-lectura limpia (otra consulta, no el objeto que devolvió la mutación) dice lo mismo.
+    const releida = await obtenerLista(sesion(), lista.id, bd());
+    expect(releida.lineas[0]!.precioNegociado).toBe(95);
+    expect(releida.lineas[0]!.precioAprobado).toBe(106);
+  });
+
+  it('⭐ con VARIOS precios en el hilo gana el ÚLTIMO (lo mismo que enseña el diálogo)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-VAR');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    await registrarAcuerdo(
+      sesion(),
+      idLinea,
+      { acuerdo: 'Primera oferta', precioAcordado: 120 },
+      bd(),
+    );
+    await registrarAcuerdo(
+      sesion(),
+      idLinea,
+      { acuerdo: 'Contraoferta', precioAcordado: 101 },
+      bd(),
+    );
+    const tercero = await registrarAcuerdo(
+      sesion(),
+      idLinea,
+      { acuerdo: 'Cerramos', precioAcordado: 95 },
+      bd(),
+    );
+
+    expect(tercero.lineas[0]!.precioNegociado).toBe(95);
+    // 🔴 CONGRUENCIA: es EXACTAMENTE el último renglón del historial que enseña el diálogo.
+    const eventos = await listarEventosDeLinea(sesion(), idLinea, bd());
+    expect(eventos).toHaveLength(3);
+    expect(eventos.at(-1)!.precioNuevo).toBe(95);
+    expect(tercero.lineas[0]!.precioNegociado).toBe(eventos.at(-1)!.precioNuevo);
+  });
+
+  it('⭐ el precio con el que se CERRÓ LA MESA también sale (es el mismo hilo)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESA');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    const renglones: RenglonMesa[] = [
+      {
+        conceptoCodigo: 'tela',
+        conceptoNombre: 'Tela',
+        etiqueta: 'Felpa',
+        consumo: 1.5,
+        precioUnit: 20,
+      },
+      {
+        conceptoCodigo: 'maquila',
+        conceptoNombre: 'Maquila',
+        etiqueta: 'Costura',
+        consumo: null,
+        precioUnit: 10,
+      },
+    ];
+    const conMesa = await guardarMesa(
+      sesion(),
+      idLinea,
+      { acuerdo: 'Así se vendió', precioObjetivo: 88, renglones },
+      bd(),
+    );
+    expect(conMesa.lineas[0]!.precioNegociado).toBe(88);
+    expect(conMesa.lineas[0]!.precioAprobado).toBeNull(); // la mesa NO firma
+  });
+
+  it('🔴 cerrar el modelo DESPUÉS de pactar no borra el precio de la vista', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-CIER');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    await registrarAcuerdo(sesion(), idLinea, { acuerdo: 'Cerramos', precioAcordado: 95 }, bd());
+    // El cambio de estado escribe un evento SIN precios (a propósito). Si el criterio mirara «el
+    // último evento» a secas, aquí se perdería el 95 — que es el precio con el que se cerró.
+    const cerrado = await cambiarEstadoRenglon(sesion(), idLinea, { estado: 'cerrado' }, bd());
+
+    expect(cerrado.lineas[0]!.estado).toBe('cerrado');
+    expect(cerrado.lineas[0]!.precioNegociado).toBe(95);
+    expect(cerrado.lineas[0]!.tienePrecioNegociado).toBe(true);
+  });
+
+  it('un renglón SIN negociación va en null, y no dice que haya nada', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-SIN');
+    const lista = await crearListaCon(idDesarrollo);
+
+    expect(lista.lineas[0]!.precioNegociado).toBeNull();
+    expect(lista.lineas[0]!.tienePrecioNegociado).toBe(false);
+    expect(lista.lineas[0]!.precioNegociadoEn).toBeNull();
+  });
+
+  it('un ACUERDO sin precio (sólo nota) no inventa un precio negociado', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-NOTA');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    const conNota = await registrarAcuerdo(sesion(), idLinea, { acuerdo: 'Pidió muestra' }, bd());
+    expect(conNota.lineas[0]!.precioNegociado).toBeNull();
+    expect(conNota.lineas[0]!.tienePrecioNegociado).toBe(false);
+  });
+
+  /**
+   * 🔴🔴 **LA REJA.** `precioNegociado` es DINERO, así que sale en `null` sin
+   * `consultas.ver-importes`, igual que el costo, el calculado, el aprobado y el target. Lo que sí
+   * se ve sin la reja es que HAY un precio negociado (`tienePrecioNegociado`) y cuándo se registró
+   * — el mismo reparto que `precioTarget`/`tieneTarget` y que `precioAprobado`/`aprobado`.
+   *
+   * Sin esta prueba, publicar un importe nuevo SIN reja pasaría en verde.
+   */
+  it('🔴 sin `consultas.ver-importes` el precio negociado sale NULL (pero se sabe que lo hay)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-REJA');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd());
+    await registrarAcuerdo(sesion(), idLinea, { acuerdo: 'Cerramos', precioAcordado: 95 }, bd());
+
+    const sinImportes = await obtenerLista(sesion(['listas.ver']), lista.id, bd());
+    const renglon = sinImportes.lineas[0]!;
+    expect(renglon.precioNegociado).toBeNull();
+    expect(renglon.precioAprobado).toBeNull(); // los demás importes también, como siempre
+    expect(renglon.precioCalculado).toBeNull();
+    // Pero el HECHO y la FECHA no son importes: se ven.
+    expect(renglon.tienePrecioNegociado).toBe(true);
+    expect(renglon.precioNegociadoEn).not.toBeNull();
+
+    // Y con la reja puesta, el número aparece.
+    const conImportes = await obtenerLista(sesion(), lista.id, bd());
+    expect(conImportes.lineas[0]!.precioNegociado).toBe(95);
+  });
+
+  /**
+   * ⚠️⚠️ **EL CASO INCÓMODO, MEDIDO Y DECIDIDO A PROPÓSITO.** No sólo la mesa escribe un precio en
+   * el hilo: mover los FACTORES de la lista (`editarFactoresLista`, V1-E8b) tumba las aprobaciones
+   * y deja su propio `NegociacionEvento` con `precioNuevo` = el precio **recalculado**. Ese número
+   * NO lo pactó nadie: lo propuso la fórmula.
+   *
+   * 🔴 **Y aun así cuenta, deliberadamente.** Dos razones, en este orden:
+   *  1. **Congruencia, que es lo que se pidió.** El diálogo de negociación enseña ese evento como
+   *     última fila de su historial. Si afuera enseñáramos «el último acuerdo» (95) y adentro la
+   *     última fila dijera otra cosa (125), habríamos **mudado de sitio la queja de Daniel** en vez
+   *     de resolverla. El número de afuera es el mismo de la última fila de adentro, siempre.
+   *  2. **No hay forma honesta de distinguirlos.** `NegociacionEvento` **no tiene columna de tipo**,
+   *     y un acuerdo y esta invalidación dejan EXACTAMENTE la misma forma (sin precostos, con
+   *     `precioAnterior` y `precioNuevo`). Separarlos exigiría adivinar leyendo la prosa del
+   *     comentario — una regla que se rompe en silencio el día que alguien reescribe el mensaje.
+   *
+   * El PORQUÉ de ese número lo cuenta el propio evento, que se lee entero en el diálogo (y su texto
+   * dice, con todas sus letras, que la aprobación se invalidó automáticamente).
+   */
+  it('⚠️ mover los FACTORES deja su precio recalculado en el hilo, y ése pasa a ser el visible', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-FACT');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd()); // firma en 106
+    await registrarAcuerdo(sesion(), idLinea, { acuerdo: 'Cerramos', precioAcordado: 95 }, bd());
+
+    // Se mueven los factores → la firma se cae y se escribe un evento con el precio recalculado.
+    const conFactores = await editarFactoresLista(
+      sesion(),
+      lista.id,
+      { margenPct: 60, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 },
+      bd(),
+    );
+
+    const renglon = conFactores.lineas[0]!;
+    expect(renglon.precioAprobado).toBeNull(); // la firma se cayó (V1-E8b(d))
+    // El visible pasa a ser el recalculado, porque es la última fila del historial…
+    expect(renglon.precioNegociado).toBe(renglon.precioCalculado);
+    // …y eso es EXACTAMENTE lo que enseña el diálogo: congruencia, que es lo que se pidió.
+    const eventos = await listarEventosDeLinea(sesion(), idLinea, bd());
+    expect(eventos.at(-1)!.precioNuevo).toBe(renglon.precioNegociado);
+    expect(eventos.at(-1)!.acuerdo).toContain('INVALIDÓ la aprobación');
+    // Y el 95 no se perdió: sigue en el hilo, un renglón más arriba.
+    expect(eventos.at(-2)!.precioNuevo).toBe(95);
+  });
+
+  /**
+   * ⭐⭐ **AGUAS ABAJO NO CAMBIÓ NADA.** Los dos papeles que salen de la lista se arman contra la
+   * MISMA proyección que acaba de estrenar el campo, y siguen imprimiendo el precio que el DUEÑO
+   * firmó. El acuerdo deja 95 en el hilo y la firma sigue en 106: si alguno de los dos empezara a
+   * leer el negociado, aquí saldría 95.
+   */
+  it('🔴 AGUAS ABAJO: el PDF y el Excel siguen llevando el APROBADO (106), no el negociado (95)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-PAPEL');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd());
+    await registrarAcuerdo(sesion(), idLinea, { acuerdo: 'Cerramos', precioAcordado: 95 }, bd());
+
+    const pdf = await armarDatosImpresoListaPrecios(sesion(), lista.id, bd());
+    expect(pdf.renglones).toHaveLength(1);
+    expect(pdf.renglones[0]!.precio).toBe(106);
+
+    const excel = await armarDatosExcelListaPrecios(sesion(), lista.id, bd());
+    expect(excel.lineas[0]!.precioAprobado).toBe(106);
+    expect(excel.lineas[0]!.precioNegociado).toBe(95); // viaja en la proyección…
+    // …pero el que se imprime es el aprobado: ni el PDF ni el Excel lo miran.
+    expect(pdf.renglones[0]!.precio).not.toBe(95);
   });
 });

@@ -100,6 +100,21 @@ const QUERY_ESTADOS = {
 } as const;
 
 /** Tono del chip por código de estado (proto `ESTADO_LISTA`); desconocidos en neutro. */
+/**
+ * 🔴 **CUÁNTAS COLUMNAS TIENE LA TABLA DE RENGLONES**, en UN solo sitio.
+ *
+ * Las dos filas que la cruzan enteras —la banda de «Costo viejo» y el cajón de detalle— llevan un
+ * `colSpan`, y `TablaDensaCelda` lo reenvía tal cual al `<td>`. Cuando la fila 0.153 agregó la
+ * columna del precio de la negociación (de 7 a 8), esos dos `colSpan` se quedaron en 7 y **las dos
+ * filas se pintaban una columna cortas**: un defecto que las 2326 pruebas del frontend no vieron
+ * porque todas comprueban el CONTENIDO de las celdas y ninguna el ANCHO de la tabla.
+ *
+ * Por eso el número vive aquí y no repetido en cada `<td>`, y por eso
+ * `ListasPreciosPagina.test.tsx` compara los `<th>` del encabezado contra el `colSpan` REAL en vez
+ * de contra un número escrito a mano: quien agregue la novena columna y no toque esto, se pone rojo.
+ */
+const COLUMNAS_TABLA_RENGLONES = 8;
+
 const TONO_ESTADO_LISTA: Record<string, TonoEstado> = {
   abierta: 'ok',
   autorizada: 'info',
@@ -826,6 +841,18 @@ function PaginaLista({
                 <TablaDensaHead numerica>Target cliente</TablaDensaHead>
                 <TablaDensaHead numerica>Precio calculado</TablaDensaHead>
                 <TablaDensaHead numerica>Precio aprobado</TablaDensaHead>
+                {/* ⭐⭐ FILA 0.153 — **el precio que quedó en la negociación, PEGADO al aprobado**
+                    (Daniel: *«o estaría bien poner los dos, mejor… dice precio aprobado, pero
+                    dentro de la negociación quedó otro»*). Van adjuntas a propósito: la confusión
+                    que reportó era no poder comparar dos números que vivían en pantallas distintas.
+                    NO sustituye al aprobado —firmar sigue siendo un acto aparte, del dueño—; lo
+                    acompaña. */}
+                <TablaDensaHead
+                  numerica
+                  title="Último precio registrado en la negociación de este modelo (la última fila de su historial). No es la firma del dueño: aprobar es un acto aparte. Y no siempre lo pactó alguien: mover los factores de la lista también deja aquí el precio recalculado."
+                >
+                  Último precio de la negociación
+                </TablaDensaHead>
                 {/* ⭐ V1-E8x: la columna se NOMBRA («del modelo») porque arriba, en el encabezado
                     del detalle, vive el chip de la LISTA con nombres que se repiten. */}
                 <TablaDensaHead>Estado del modelo</TablaDensaHead>
@@ -1076,6 +1103,28 @@ function FilaRenglon({
             <span className="text-faint">—</span>
           )}
         </TablaDensaCelda>
+        {/* ⭐⭐ FILA 0.153 — el precio que dejó la negociación. Sin negociación **no se inventa
+            nada**: el hueco también dice algo ("a este modelo nadie le ha puesto precio en la
+            mesa"). Sin `consultas.ver-importes` se ve QUE lo hay pero no CUÁNTO, igual que el
+            target del cliente. La fecha va en el `title` porque es lo que resuelve la duda de
+            Daniel cuando los dos números difieren: cuál de los dos es el más reciente. */}
+        <TablaDensaCelda numerica>
+          {linea.tienePrecioNegociado ? (
+            <span
+              className="num"
+              data-testid="precio-negociado"
+              title={
+                linea.precioNegociadoEn === null
+                  ? undefined
+                  : `Registrado en la negociación el ${formatearFecha(linea.precioNegociadoEn)}`
+              }
+            >
+              {verImportes ? formatearMoneda(linea.precioNegociado) : 'Negociado'}
+            </span>
+          ) : (
+            <span className="text-faint">—</span>
+          )}
+        </TablaDensaCelda>
         <TablaDensaCelda>
           <div className="flex flex-wrap items-center gap-1">
             {/* ⭐⭐ V1-E8x: PRIMERO el estado del modelo (el eje nuevo, el que Daniel pidió para
@@ -1203,7 +1252,7 @@ function FilaRenglon({
           del precosto, y qué hacer. Un semáforo mudo no avisa de nada. */}
       {linea.avisoCostoViejo === null ? null : (
         <TablaDensaFila data-testid="aviso-costo-viejo">
-          <TablaDensaCelda colSpan={7} className="bg-warn-soft">
+          <TablaDensaCelda colSpan={COLUMNAS_TABLA_RENGLONES} className="bg-warn-soft">
             <div className="flex items-start gap-2 text-[11.5px]">
               <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
               <span>
@@ -1215,7 +1264,7 @@ function FilaRenglon({
       )}
       {expandido ? (
         <TablaDensaFila data-testid="desglose-renglon">
-          <TablaDensaCelda colSpan={7} className="bg-muted/30">
+          <TablaDensaCelda colSpan={COLUMNAS_TABLA_RENGLONES} className="bg-muted/30">
             <DesgloseCosto idLinea={linea.id} verImportes={verImportes} />
             {/* ⭐ V1-E8y (§Post-F9.152) — LA LIBRETA de este modelo, en el mismo cajón que su
                 desglose: en la cita se abre el renglón, se mira el costo y se anota lo que falta. */}
