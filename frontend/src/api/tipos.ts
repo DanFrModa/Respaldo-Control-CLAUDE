@@ -415,6 +415,13 @@ export type PedidoRealCrear =
 /** Cuerpo de cancelar un pedido (V1-E4 punto 5: opcionalmente arrastra sus OPs). */
 export type PedidoCancelarCuerpo =
   paths['/api/pedidos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/**
+ * Resultado de cancelar un pedido (0.150): el pedido + el DESENLACE de cada OP. La cascada ya no
+ * es total —las OP que ya tienen movimientos se conservan— y esta respuesta es lo que impide que
+ * eso pase en silencio.
+ */
+export type PedidoCancelarResultado =
+  paths['/api/pedidos/{id}/cancelar']['post']['responses']['200']['content']['application/json'];
 /** Cuerpo de cancelar un pedido real (V1-E4 punto 6: motivo obligatorio). */
 export type PedidoRealCancelarCuerpo =
   paths['/api/pedidos-reales/{idReal}/cancelar']['post']['requestBody']['content']['application/json'];

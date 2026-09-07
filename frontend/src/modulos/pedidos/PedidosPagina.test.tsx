@@ -2,6 +2,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toast } from 'sonner';
+
 import type { Pedido, PedidosPagina as TipoPagina } from '@/api/tipos';
 import { ErrorDeApi } from '@/api/errores';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -47,6 +49,12 @@ vi.mock('@/api/pedidos', () => ({
 vi.mock('@/api/clientes', () => ({
   useClientes: () => ({ data: { datos: [{ id: 3, nombre: 'Liverpool' }] }, isPending: false }),
 }));
+// ⭐ 0.150: los toasts se espían para poder EXIGIR que el aviso de las OPs conservadas se muestre
+// tal como lo redactó el backend (y como advertencia, no como felicitación).
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('@/api/modelos', () => ({
   useModelos: () => ({
     data: { datos: [{ id: 1060, codigo: 'A-100', descripcion: null }] },
@@ -143,6 +151,10 @@ describe('<PedidosPagina>', () => {
     usePedidos.mockReset();
     cancelarMutate.mockReset();
     actualizarMutate.mockReset();
+    // 0.150: los toasts se espían por prueba (si no, un `success` de otra ensucia la aserción).
+    vi.mocked(toast.success).mockReset();
+    vi.mocked(toast.warning).mockReset();
+    vi.mocked(toast.error).mockReset();
     ultimaQuery = undefined;
   });
 
@@ -268,6 +280,65 @@ describe('<PedidosPagina>', () => {
         { id: 7, cuerpo: { cancelarOrdenes: true, motivo: 'El cliente canceló' } },
         expect.anything(),
       );
+    });
+
+    /**
+     * ⭐⭐ 0.150 — DANIEL: *«no quiero que se borren las OP en ese caso»*. La cascada conserva las
+     * OP con movimientos, así que el usuario marca «cancelar también sus OPs» y algunas sobreviven.
+     * Si eso no se dice, es exactamente la mentira que V1-E4 vino a matar en esta pantalla.
+     */
+    it('cuando quedan OPs vivas muestra el aviso DEL BACKEND, y como advertencia', async () => {
+      const usuario = userEvent.setup();
+      usePedidos.mockReturnValue(consultaConDatos([pedido(7, 107, 'Liverpool')]));
+      renderConProveedores(<PedidosPagina />, {
+        sesion: estadoSesionDePrueba([...PERM_TODOS, 'ordenes.cancelar']),
+      });
+
+      await usuario.click(screen.getByTestId('desactivar-pedido'));
+      await usuario.click(await screen.findByTestId('cancelar-tambien-ordenes'));
+      await usuario.type(screen.getByTestId('cancelar-pedido-motivo'), 'El cliente canceló');
+      await usuario.click(screen.getByTestId('confirmar-cancelar-pedido'));
+
+      const opciones = cancelarMutate.mock.calls[0]?.[1] as {
+        onSuccess: (r: unknown) => void;
+      };
+      const aviso = 'Se canceló el pedido 107, pero 1 orden(es) siguen VIVAS: 3401 (ya tiene…).';
+      opciones.onSuccess({
+        pedido: pedido(7, 107, 'Liverpool'),
+        foliosOrdenesCanceladas: [],
+        ordenesConservadas: [{ id: 1, folio: 3401, porque: 'ya tiene producción capturada' }],
+        aviso,
+      });
+
+      // TAL CUAL: la pantalla no re-redacta el hecho (A1), y no lo disfraza de éxito.
+      expect(toast.warning).toHaveBeenCalledWith(aviso, expect.anything());
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('sin OPs conservadas sigue siendo un éxito normal', async () => {
+      const usuario = userEvent.setup();
+      usePedidos.mockReturnValue(consultaConDatos([pedido(7, 107, 'Liverpool')]));
+      renderConProveedores(<PedidosPagina />, {
+        sesion: estadoSesionDePrueba([...PERM_TODOS, 'ordenes.cancelar']),
+      });
+
+      await usuario.click(screen.getByTestId('desactivar-pedido'));
+      await usuario.click(await screen.findByTestId('cancelar-tambien-ordenes'));
+      await usuario.type(screen.getByTestId('cancelar-pedido-motivo'), 'El cliente canceló');
+      await usuario.click(screen.getByTestId('confirmar-cancelar-pedido'));
+
+      const opciones = cancelarMutate.mock.calls[0]?.[1] as {
+        onSuccess: (r: unknown) => void;
+      };
+      opciones.onSuccess({
+        pedido: pedido(7, 107, 'Liverpool'),
+        foliosOrdenesCanceladas: [3401],
+        ordenesConservadas: [],
+        aviso: null,
+      });
+
+      expect(toast.success).toHaveBeenCalled();
+      expect(toast.warning).not.toHaveBeenCalled();
     });
 
     it('marcada SIN motivo no deja confirmar (toda OP cancelada lleva su porqué)', async () => {
