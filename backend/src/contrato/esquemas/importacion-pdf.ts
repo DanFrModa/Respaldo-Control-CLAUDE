@@ -288,7 +288,10 @@ export type OcYaImportada = z.infer<typeof esquemaOcYaImportada>;
  *  • `nacido`   — el color de esta OC todavía no tiene modelo de producción: va a nacer uno, con su
  *                 nº de 5 dígitos. **Es el ÚNICO caso en que el número se puede teclear.**
  *  • `reusado`  — ese color ya tiene modelo (u otro PDF de esta misma tanda lo hace nacer antes):
- *                 la OP usa el suyo y un número capturado NO se aplicaría.
+ *                 la OP usa el suyo y un número capturado NO se aplicaría. ⚠️ Si ese modelo está
+ *                 DESCONTINUADO, el confirm **rechaza la importación entera** (§Post-F9.119): el
+ *                 renglón llega igual como `reusado`, pero con `numeroProduccionModelo` en null y
+ *                 el motivo en `avisosNumeroProduccion` — no hay reuso que prometer.
  *  • `heredado` — el modelo ligado ya es de producción (el histórico del Access): la OP lo lleva tal
  *                 cual y nada nace.
  */
@@ -404,8 +407,9 @@ export const esquemaRenglonPdfPreview = z
         'Nº de producción del modelo con el que la OP va a quedar cuando NO nace uno nuevo: el del ' +
           'modelo que ya existe para ese color (`reusado`) o el del modelo de producción ya ligado ' +
           '(`heredado`). También trae el número que va a estrenar OTRO PDF de esta misma tanda ' +
-          'cuando dos OC comparten modelo y color. Null si no aplica o si el modelo histórico no ' +
-          'tiene número.',
+          'cuando dos OC comparten modelo y color. Null si no aplica, si el modelo histórico no ' +
+          'tiene número, o si el modelo de ese color está DESCONTINUADO (ahí no hay reuso que ' +
+          'prometer: el confirm rechaza la importación; el motivo va en `avisosNumeroProduccion`).',
       ),
     avisosNumeroProduccion: z
       .array(z.string())

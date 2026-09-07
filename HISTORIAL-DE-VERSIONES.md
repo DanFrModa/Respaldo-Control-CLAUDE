@@ -95,7 +95,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   *«elegiste este modelo después de analizar… si lo dejas vacío, lo asigna el sistema»*. Y **si cambias
   la liga, el número precargado se borra** en vez de quedarse el del modelo anterior.
 - **Un aviso que MENTÍA quedó retirado.** En una OP nacida del PDF, la cadena de trazabilidad decía
-  *«modelo anterior al módulo de Desarrollo»*, que era falso. Estaba en **cuatro** pantallas.
+  *«modelo anterior al módulo de Desarrollo»*, que era falso. Estaba en **cuatro sitios de tres pantallas**.
 
 ### Qué sigue pendiente o roto
 

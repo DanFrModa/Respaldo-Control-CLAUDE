@@ -1258,6 +1258,68 @@ describe('⭐ nº de producción confirmado por el usuario (fila 0.151)', () => 
     expect(await cliente.orden.count()).toBe(0);
     expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(0);
   });
+
+  /**
+   * ⭐⭐ LA PREVIA Y EL CONFIRM, MEDIDOS EN LA MISMA PRUEBA.
+   *
+   * Con el hijo del color DESCONTINUADO, `obtenerODerivarModeloDeProduccion` lanza conflicto
+   * (§Post-F9.119) y A2 revierte la tanda ENTERA. Mientras la previa no miraba `activo` anunciaba
+   * *«la OP se va a hacer con él»*: prometía un reuso que el confirm rechaza. Las dos mitades van
+   * juntas a propósito — una prueba que sólo mirara la previa dejaría volver el desacuerdo.
+   */
+  it('⭐ modelo del color DESCONTINUADO: la previa avisa el rechazo y el confirm lo cumple', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-5');
+
+    // 1ª OC: nace el modelo de "Blanco"… y después alguien lo descontinúa.
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+    await cliente.modelo.updateMany({
+      where: { idModeloDesarrollo: idModelo },
+      data: { activo: false },
+    });
+
+    // La PREVIA de la 2ª OC no promete ningún reuso: avisa que se va a rechazar.
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf2()] },
+      bd(),
+    );
+    expect(previa.renglones[0]).toMatchObject({
+      modeloDeProduccion: 'reusado',
+      numeroProduccionModelo: null,
+    });
+    expect(previa.renglones[0]?.avisosNumeroProduccion[0]).toContain('DESCONTINUADO');
+    expect(previa.renglones[0]?.avisosNumeroProduccion[0]).toContain('se va a rechazar');
+    expect(previa.renglones[0]?.avisosNumeroProduccion[0]).not.toContain(
+      'la OP se va a hacer con él',
+    );
+
+    // Y el CONFIRM hace exactamente eso.
+    await expect(
+      confirmarImportacionPdf(
+        sesion(),
+        {
+          idCliente: idClienteNegocio,
+          archivos: [archivoPdf2()],
+          ligas: [{ modeloCliente: '3138277', idModelo }],
+        },
+        bd(),
+        archivosFalsos(),
+      ),
+    ).rejects.toThrow(/descontinuado/i);
+
+    // A2: la 2ª importación no dejó ni pedido ni OP nuevos (sólo viven los de la 1ª).
+    expect(await cliente.pedido.count()).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+  });
 });
 
 // ── ⭐ Fila 0.151 — LA OP ENSEÑA DE QUÉ DESARROLLO NACIÓ ───────────────────────────────

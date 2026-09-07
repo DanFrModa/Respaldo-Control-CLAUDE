@@ -59995,7 +59995,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nº de producción del modelo con el que la OP va a quedar cuando NO nace uno nuevo: el del modelo que ya existe para ese color (`reusado`) o el del modelo de producción ya ligado (`heredado`). También trae el número que va a estrenar OTRO PDF de esta misma tanda cuando dos OC comparten modelo y color. Null si no aplica o si el modelo histórico no tiene número."
+                            "description": "Nº de producción del modelo con el que la OP va a quedar cuando NO nace uno nuevo: el del modelo que ya existe para ese color (`reusado`) o el del modelo de producción ya ligado (`heredado`). También trae el número que va a estrenar OTRO PDF de esta misma tanda cuando dos OC comparten modelo y color. Null si no aplica, si el modelo histórico no tiene número, o si el modelo de ese color está DESCONTINUADO (ahí no hay reuso que prometer: el confirm rechaza la importación; el motivo va en `avisosNumeroProduccion`)."
                           },
                           "avisosNumeroProduccion": {
                             "type": "array",

@@ -12136,6 +12136,65 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.217) — ⭐ EL NÚMERO DE PRODUCCIÓN LO PONE DANIEL AL IMPORTAR (7-sep-2026, fila 0.151 / v0.127)
+
+**Daniel, probando el flujo real:** *«me generó el pedido y la OP **sin preguntar el número de modelo
+interno**…. **Quedamos que ese lo ponía yo, con una sugerencia previa.** …**No me gustó que todo sea
+completamente automático antes de poder verificar.**»* Y su punto 17: *«**en la OP no veo el modelo de
+desarrollo**»*.
+
+🔑 **Era un hueco de CABLEADO, no de diseño.** `salidaAProduccion` **ya aceptaba** el número —su propio
+`describe` decía *«el sistema lo precarga y el usuario lo puede cambiar»*— y el importador **nunca se lo
+pasaba**. La mitad del linaje ya estaba registrada en **§Post-F9.209**; esta sección cierra la otra mitad.
+
+**DECIDIDO:**
+1. **El número se teclea al importar**, con la sugerencia precargada, igual que en «Generar OP».
+2. **La sugerencia es INFORMATIVA, no una reserva.** `proponerNumeroProduccion` exige `tx` y toma un
+   advisory lock ⇒ entre verla y confirmar, otro puede tomarla. **La pantalla no promete exclusividad.**
+3. **La casilla se apaga fuera de `nacido`.** En `reusado`/`heredado`, `nomenclatura.ts` **descarta** el
+   número capturado; ofrecerlo ahí prometería algo falso.
+4. **La OP enseña su LINAJE** (`idModeloDesarrollo` + código), que es un **hecho**.
+
+⚠️ **Y lo que NO se hace, con su razón medida — para que nadie lo reabra creyendo que se olvidó:**
+- **No hay propuesta en vivo para un modelo elegido a mano.** La única forma correcta es que el servidor
+  renumere **la TANDA** (cuatro colores del mismo modelo necesitan cuatro números). **Medido por el
+  reviewer:** `consultarPropuestaProduccion` llama a `proponerNumeroProduccion` **sin `reservados`** y
+  sólo depende del *modelo*, no del color ⇒ **las cuatro filas recibirían el MISMO número**, que es el
+  defecto que `numero-produccion-pdf.ts` vino a cerrar.
+- **No se liga el expediente de Desarrollo solo.** `Desarrollo` es `@@unique([idProyecto, idModelo])`
+  (`schema.prisma:8535`) ⇒ **un modelo puede tener N expedientes, uno por proyecto**: ligarlo
+  automáticamente sería **adivinar el proyecto**. Por eso se contesta con el linaje.
+
+🔴 **Y el agujero que apareció al retomar la fila, que era EL CASO DE ESTRENO.** El servidor numera **una
+sola vez, al analizar, con la liga APRENDIDA** — pero **la primera vez de cada modelo del cliente se liga
+A MANO en la vista previa** (lo dice el propio importador). ⇒ ese renglón **no ofrecía casilla** y la OP
+nacía con el número del sistema: **la queja de Daniel sin cubrir, justo cuando nace el modelo**.
+⇒ **La numeración CADUCA** por dos caminos: el renglón cambió de modelo, **o** su desenlace es `reusado`
+y **alguna** liga de la tanda cambió. Es una **sobre-aproximación deliberada** —la pantalla no puede saber
+si ese `reusado` viene de la tanda o de la base—, y el lado seguro es barato: ofrece una casilla opcional
+con su explicación. El otro lado **repite la queja**.
+
+🔴 **Dos promesas falsas más, cazadas por el reviewer y medidas contra Postgres real:**
+- **La previa anunciaba un reuso que el confirm RECHAZA.** Buscaba el hijo del color **sin mirar
+  `activo`**, y `obtenerODerivarModeloDeProduccion` lanza si está **descontinuado** (§Post-F9.119) ⇒ la
+  previa decía *«la OP se va a hacer con él»* y el confirm reventaba, **con A2 revirtiendo la importación
+  entera**. Es la invariante que el propio módulo declara: *«la vista previa y el confirm tienen que decir
+  lo MISMO»*. ⇒ ahora **no anuncia número**, avisa de que está descontinuado y **da el mismo remedio con
+  las mismas palabras** que el error del confirm. 📌 Se conserva el desenlace `reusado` **sin añadir un
+  cuarto valor**, porque ese enum lo comparten la previa **y** lo que de verdad pasó, donde un `bloqueado`
+  no puede existir.
+- **El pie de la casilla prometía el desenlace `nacido`** (*«si lo dejas vacío, lo asigna el sistema»*),
+  pero el combo trae `origen: 'todos'` ⇒ **ligar a un modelo de producción del Access es camino normal**, y
+  ahí nada se asigna. Ahora el pie **enumera los dos desenlaces**.
+
+📌 **Muere un aviso que MENTÍA:** *«modelo anterior al módulo de Desarrollo»* en una OP nacida del PDF —
+estaba en **cuatro sitios de tres pantallas**, hoy en cero, y también se corrigió en las **specs del
+rediseño**, que lo describían como conducta vigente y **mandan sobre la implementación**.
+⏳ **Queda una, a criterio de Daniel:** la frase sigue en `docs/rediseno/prototipo.html` (un `toast` del
+demo). **Es su mockup**, no una spec en prosa, y editarlo es otro tipo de acto.
+
+---
+
 #### (Post-F9.215) — ✅ EL BORRADOR DE ORDEN DE COMPRA **NO** CUENTA COMO COMPRADO (Daniel, 7-sep-2026)
 
 **Decisión pedida por el lead al construir la guarda de cancelación (fila 0.150) y contestada por Daniel

@@ -9,6 +9,9 @@
  *      impide que la vista previa precargue cuatro veces el mismo número y reviente al confirmar;
  *  (c) dos OC del mismo modelo y el MISMO color: la segunda sale `reusado`, no estrena número;
  *  (d) un color que YA tiene modelo de producción sale `reusado` con el número de ese modelo;
+ *  (d2) ⭐ y si ese modelo está DESCONTINUADO no se promete reuso ninguno: se avisa que el confirm
+ *      va a rechazar la importación (§Post-F9.119), porque la previa y el confirm tienen que decir
+ *      lo MISMO;
  *  (e) un modelo que ya es de producción sale `heredado`;
  *  (f) un modelo al que le faltan los dígitos de la nomenclatura NO tumba la vista previa: sale sin
  *      propuesta y con el motivo en `avisos`.
@@ -181,6 +184,44 @@ describe('resolverNumerosDeProduccion (vista previa del importador por PDF)', ()
       numeroProduccionModelo: 71_007,
     });
     expect(uno?.avisos[0]).toContain('71007');
+    expect(uno?.avisos[0]).toContain('la OP se va a hacer con él');
+  });
+
+  /**
+   * ⭐⭐ LA PROMESA QUE EL CONFIRM NO PUEDE CUMPLIR.
+   *
+   * `obtenerODerivarModeloDeProduccion` lanza `ErrorConflicto` cuando el hijo de ese color está
+   * DESCONTINUADO (§Post-F9.119), y con A2 eso **revierte la importación entera**. Mientras este
+   * `findFirst` no miraba `activo`, la previa anunciaba *«la OP se va a hacer con él»* de un modelo
+   * con el que la OP no se puede hacer: la previa y el confirm decían cosas distintas, que es justo
+   * lo que el encabezado de este módulo promete que no pasa.
+   */
+  it('⭐ (d2) si ese modelo está DESCONTINUADO no se promete reuso: se avisa el rechazo', async () => {
+    const idModelo = await crearDesarrollo('CYA-26-71-001');
+    const idColor = await crearColor('Blanco');
+    await cliente.modelo.create({
+      data: {
+        codigo: '71007',
+        origen: 'produccion',
+        numeroProduccion: 71_007,
+        idModeloDesarrollo: idModelo,
+        idColor,
+        activo: false,
+      },
+    });
+
+    const [uno] = await resolver([{ idModelo, idColor, claveColor: 'blanco' }]);
+
+    expect(uno).toMatchObject({
+      modeloDeProduccion: 'reusado',
+      numeroProduccionPropuesto: null,
+      // 🔴 NADA de número: la OP no va a quedar con él porque no va a haber OP.
+      numeroProduccionModelo: null,
+    });
+    expect(uno?.avisos[0]).toContain('DESCONTINUADO');
+    expect(uno?.avisos[0]).toContain('se va a rechazar');
+    // Y NO la frase que prometía lo contrario.
+    expect(uno?.avisos[0]).not.toContain('la OP se va a hacer con él');
   });
 
   it('(e) un modelo que ya es de PRODUCCIÓN sale HEREDADO (rama legado del Access)', async () => {

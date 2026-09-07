@@ -40,6 +40,16 @@
  * Sólo `nacido` puede llevar número. En `reusado` y `heredado` el modelo ya tiene el suyo y
  * `obtenerODerivarModeloDeProduccion` **ignora** el capturado (avisa, no bloquea): ofrecer el campo
  * ahí sería prometer algo que la capa de abajo descarta.
+ *
+ * ## 🔴 Y un `reusado` cuyo modelo está DESCONTINUADO no es un reuso: es un rechazo
+ *
+ * `obtenerODerivarModeloDeProduccion` lanza `ErrorConflicto` si el hijo de ese color está apagado
+ * (§Post-F9.119), y con A2 eso **tumba la importación completa**. Ese caso sale con el desenlace
+ * `reusado` —es el modelo con el que la OP *querría* hacerse, y como no nace nada tampoco hay
+ * número que teclear— pero **sin número** y con el aviso diciendo que la importación se va a
+ * rechazar y cómo arreglarlo. No hay un cuarto valor en el enum a propósito: `modeloDeProduccion`
+ * lo comparten la previa y la respuesta del alta (`OrdenPdfImportada`), donde un "bloqueado" no
+ * puede ocurrir nunca.
  */
 import type { DesenlaceModeloPdf } from '../../contrato/index.js';
 
@@ -157,22 +167,41 @@ export async function resolverNumerosDeProduccion(
 
     // ¿Ese color ya tiene modelo de producción? Se reusa (mismo criterio y mismo `orderBy` que
     // `obtenerODerivarModeloDeProduccion`: si hubiera dos, gana el primero que nació).
+    //
+    // 🔴 **`activo` NO ES DECORACIÓN: SIN ÉL LA PREVIA PROMETE UN REUSO QUE EL CONFIRM RECHAZA.**
+    // `obtenerODerivarModeloDeProduccion` lanza `ErrorConflicto` cuando el hijo de ese color está
+    // DESCONTINUADO (§Post-F9.119: reactivarlo es un acto a mano, nunca un efecto lateral de generar
+    // una OP), y como el confirm corre en UNA transacción (A2), ese conflicto **revierte la tanda
+    // entera**. Sin mirar `activo`, la vista previa anunciaba *«la OP se va a hacer con él»* de un
+    // modelo con el que la OP no se puede hacer — justo lo contrario de la invariante que este
+    // módulo declara en su encabezado (*la previa y el confirm tienen que decir lo MISMO*), y el
+    // mismo cuidado que `ligaSugerida` sí tiene al filtrar los modelos inactivos.
     const existente =
       renglon.idColor === null
         ? null
         : await bd.modelo.findFirst({
             where: { idModeloDesarrollo: modelo.id, idColor: renglon.idColor },
             orderBy: { id: 'asc' },
-            select: { codigo: true, numeroProduccion: true },
+            select: { codigo: true, numeroProduccion: true, activo: true },
           });
     if (existente !== null) {
       salida.push({
         modeloDeProduccion: 'reusado',
         numeroProduccionPropuesto: null,
-        numeroProduccionModelo: existente.numeroProduccion,
+        // ⚠️ Con el hijo descontinuado NO se anuncia ningún número: la OP no va a quedar con él
+        // (no va a haber OP). Enseñar `#71007` aquí sería la mitad visible de la promesa falsa.
+        numeroProduccionModelo: existente.activo ? existente.numeroProduccion : null,
         avisos: [
-          `Este color ya tiene el modelo de producción ${existente.codigo}: la OP se va a hacer ` +
-            `con él y no nace ninguno nuevo.`,
+          existente.activo
+            ? `Este color ya tiene el modelo de producción ${existente.codigo}: la OP se va a ` +
+              `hacer con él y no nace ninguno nuevo.`
+            : // El mismo remedio, con las mismas palabras, que el error del confirm
+              // (`obtenerODerivarModeloDeProduccion`): quien lea el aviso ya sabe qué hacer.
+              `El modelo de producción ${existente.codigo} de ese color está DESCONTINUADO, así ` +
+              `que esta OC no se va a poder importar: la importación entera se va a rechazar. ` +
+              `Reactívalo desde su ficha si vas a producirlo otra vez — no se le puede dar la ` +
+              `vuelta haciendo nacer otro, porque el número es del modelo y ese color ya tiene ` +
+              `el suyo.`,
         ],
       });
       continue;
