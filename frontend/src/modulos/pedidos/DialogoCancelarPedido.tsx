@@ -31,6 +31,14 @@ import { useSesion } from '@/sesion/useSesion';
  *  • marcándola (+ motivo, obligatorio para cancelar cualquier orden) se cancelan también sus OPs,
  *    en la MISMA transacción.
  *
+ * ⭐⭐ 0.150 — y la cascada NO es total. DANIEL: *«¿Qué pasa si me cancelan un pedido, pero la OC ya
+ * está producida? **No quiero que se borren las OP en ese caso.**»* Las OP que ya tienen
+ * movimientos se CONSERVAN, y el backend devuelve el aviso YA REDACTADO nombrándolas por folio con
+ * su porqué. Aquí se muestra tal cual (`toast.warning`, no `success`): que el usuario haya marcado
+ * «cancelar también sus OPs» y algunas sobrevivan sin decírselo sería exactamente la mentira que
+ * V1-E4 vino a matar en esta pantalla. El texto NO se redacta aquí (A1): dos sitios que escriben el
+ * mismo hecho acaban diciéndolo distinto.
+ *
  * La casilla solo se ofrece con `ordenes.cancelar` — el mismo permiso que cancelar una OP a mano.
  * El backend re-decide de todos modos (A1): esto es cortesía de UI, no la barrera.
  */
@@ -74,12 +82,18 @@ export function DialogoCancelarPedido({
         },
       },
       {
-        onSuccess: () => {
-          toast.success(
-            tambienOrdenes
-              ? `Pedido ${String(pedido.folio)} cancelado junto con sus órdenes de producción.`
-              : `Pedido ${String(pedido.folio)} cancelado.`,
-          );
+        onSuccess: (resultado) => {
+          if (resultado.aviso === null) {
+            toast.success(
+              tambienOrdenes
+                ? `Pedido ${String(pedido.folio)} cancelado junto con sus órdenes de producción.`
+                : `Pedido ${String(pedido.folio)} cancelado.`,
+            );
+          } else {
+            // El aviso viene HECHO del backend: nombra las OPs conservadas, dice qué pasa si no se
+            // hace nada y ofrece la salida. Se muestra entero y sin prisa (no es una felicitación).
+            toast.warning(resultado.aviso, { duration: 15000 });
+          }
           alCambiarAbierto(false);
           alCancelado?.();
         },
@@ -110,7 +124,7 @@ export function DialogoCancelarPedido({
               <b>Cancelar el pedido NO detiene sus órdenes de producción.</b> Si ya tiene OPs vivas,
               seguirían cortándose:{' '}
               {puedeCancelarOrdenes
-                ? 'márcalas abajo para cancelarlas también, o cancélalas una por una desde Órdenes.'
+                ? 'márcalas abajo para cancelar las que todavía no tienen movimientos (las que ya se están produciendo se conservan, y te decimos cuáles), o cancélalas una por una desde Órdenes.'
                 : 'hay que cancelarlas una por una desde Órdenes.'}
             </span>
           </p>
@@ -125,7 +139,10 @@ export function DialogoCancelarPedido({
                 data-testid="cancelar-tambien-ordenes"
               />
               <span>
-                Cancelar <b>también sus órdenes de producción</b>
+                Cancelar <b>también sus órdenes de producción</b>{' '}
+                <span className="text-muted-foreground">
+                  (sólo las que no tengan producción, compras ni material surtido)
+                </span>
               </span>
             </label>
           ) : null}
