@@ -12174,7 +12174,10 @@ y **alguna** liga de la tanda cambió. Es una **sobre-aproximación deliberada**
 si ese `reusado` viene de la tanda o de la base—, y el lado seguro es barato: ofrece una casilla opcional
 con su explicación. El otro lado **repite la queja**.
 
-🔴 **Dos promesas falsas más, cazadas por el reviewer.** ⚠️ **La primera se midió contra Postgres real; la segunda NO** — se estableció leyendo el contrato del combo (`origen: 'todos'`) y el filtro de `listarModelos`, más pruebas en jsdom. *(La distinción la pidió el propio reviewer: decir «las dos» era afirmar más de lo medido, que es la falta que más ha caído en esta sesión.)*
+🔴 **Dos promesas falsas más, cazadas por el reviewer.** ⚠️ **La primera se midió contra Postgres
+real; la segunda NO** — se estableció leyendo el contrato del combo (`origen: 'todos'`) y el filtro
+de `listarModelos`, más pruebas en jsdom. *(La distinción la pidió el propio reviewer: decir «las
+dos» era afirmar más de lo medido, que es la falta que más ha caído en esta sesión.)*
 - **La previa anunciaba un reuso que el confirm RECHAZA.** Buscaba el hijo del color **sin mirar
   `activo`**, y `obtenerODerivarModeloDeProduccion` lanza si está **descontinuado** (§Post-F9.119) ⇒ la
   previa decía *«la OP se va a hacer con él»* y el confirm reventaba, **con A2 revirtiendo la importación
@@ -12192,6 +12195,60 @@ estaba en **cuatro sitios de tres pantallas**, hoy en cero, y también se corrig
 rediseño**, que lo describían como conducta vigente y **mandan sobre la implementación**.
 ⏳ **Queda una, a criterio de Daniel:** la frase sigue en `docs/rediseno/prototipo.html` (un `toast` del
 demo). **Es su mockup**, no una spec en prosa, y editarlo es otro tipo de acto.
+#### (Post-F9.216) — ⭐ QUÉ ES «EL PRECIO NEGOCIADO» QUE SE VE DESDE FUERA (7-sep-2026, fila 0.153 / v0.126)
+
+**Daniel:** *«dice precio aprobado, **pero dentro de la negociación quedó otro**. Debe de haber
+congruencia»*, y su propia salida: *«**o estaría bien poner los dos, mejor**»*.
+
+**DECIDIDO — y es SÓLO LECTURA.** Se añade el precio de la negociación **al lado** del aprobado, sin
+tocar ninguna ruta de escritura, ningún permiso ni el reparto de responsabilidades.
+
+⚠️ **La separación negociador/aprobador NO se toca, y es deliberada** (`negociacion.ts:8-12`):
+**negociar no aprueba**. El **aprobado sigue siendo el que manda** en el PDF, el Excel, la cotización al
+cliente y —lo que más pesa— **el precio que viaja a la ORDEN de producción**. Escribir `precioAprobado`
+al cerrar la mesa habría borrado ese reparto, y **no es lo que Daniel pidió**.
+
+### El criterio: «el último evento con precio», y por qué incluye uno que nadie pactó
+
+`NegociacionEvento` **no tiene columna de tipo** (`schema.prisma:8907-8935`), y el evento que escribe
+**`editarFactoresLista`** (`listas-precios.ts:1127`) es **estructuralmente idéntico** a un
+`registrarAcuerdo` con precio (`negociacion.ts:292`): precostos `null`, `costoEstimado` `null`, ambos
+precios no nulos. **Verificado por el reviewer comparando los cinco escritores.** ⇒ separarlos exigiría
+**adivinar leyendo la prosa de un comentario**, que es de las cosas que se rompen en silencio.
+
+Se eligió **incluirlo**, por dos razones:
+1. Lo que se pidió es **congruencia con el diálogo**, y ese evento **es** la última fila del historial.
+   Enseñar «el último acuerdo» afuera mientras adentro se lee otro número más abajo **mudaría la queja
+   de sitio** en vez de resolverla.
+2. Se hace **visible**, no se esconde: queda fijado con prueba propia.
+
+🔴 **Y el rótulo se corrigió por eso mismo.** La columna se llamaba «Precio negociado», y el reviewer
+midió el caso real: **en cuanto el dueño mueve los factores, CADA renglón aprobado recibe un evento con
+`precioNuevo = precioCalculado`**, y la pantalla queda con dos columnas contiguas repitiendo el mismo
+número — la que dice «negociado» exhibiendo la fórmula. **Es la misma especie de confusión que originó
+la fila.** La aclaración honesta existía… en el `title`, **invisible en táctil**. ⇒ el encabezado pasa a
+decir lo que el `title` ya decía bien: **«Último precio de la negociación»**.
+📌 Es la cicatriz de `CLAUDE.md` §8 aplicada: *el aviso que importa es el que está pegado a la cosa, no
+el que vive en el documento correcto*.
+
+### ⏳ PREGUNTA ABIERTA PARA DANIEL (default: como está)
+
+**¿El «precio negociado» debe ser el último de TODO el historial —como está hoy— o SÓLO el de un
+acuerdo?** Distinguirlos obliga a **añadir una columna de tipo** a la tabla de eventos y tocar sus cinco
+rutas de escritura, o sea **migración**.
+📌 **Y la pregunta que sólo él puede contestar** (regla §7.5, la clasificación depende de la frecuencia
+real del negocio): **¿cada cuánto mueve los factores de una lista YA aprobada?** Si es frecuente, la
+columna pasará buena parte del tiempo repitiendo el precio calculado, y esta pregunta deja de ser
+teórica.
+
+### 📌 Corrige una medición del lead, y deja un cabo anotado
+
+Se había dicho que `NegociacionEvento.precioNuevo` se leía en **dos** sitios, **ambos dentro del diálogo
+de negociación**. Son **TRES**, y el tercero está **fuera**: `SeccionDesarrolloOrden.tsx:191-193`, en la
+pantalla de la **ORDEN**, vía `liga-orden.ts:465`. (Confirmado por el coder y por el reviewer.)
+⚠️ **No cambia el diseño entregado, pero deja un cabo:** en esa pantalla **persiste la incongruencia
+original** —el precio sugerido sale del **aprobado** mientras los acuerdos de abajo muestran otro—, así
+que **la queja de Daniel puede reaparecer ahí**. Fuera del alcance de esta fila.
 
 ---
 

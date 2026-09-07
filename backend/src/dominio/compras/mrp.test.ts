@@ -15,6 +15,7 @@ import {
   calcularEstatusMaterial,
   claveAgrupada,
   estadoGenerico,
+  gruposDeCompraDelAvio,
   estatusMaterialesOrden,
   explosionarOrden,
   generarOCDesdeExplosion,
@@ -1590,5 +1591,166 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
     const p = await plan(ID_COLOR, { idColor: ID_COLOR, restoCubierto: true });
     expect(p.proveedores[0]?.renglones[0]?.restoCubierto).toBe(true);
     expect(p.proveedores[0]?.renglones[0]?.cantidadFaltante).toBe(60);
+  });
+});
+
+describe('⭐⭐ 0.158 — el avío que se compra SIN tomar en cuenta el color (gruposDeCompraDelAvio)', () => {
+  /**
+   * DANIEL (7-sep-2026), mirando la Explosión con datos reales: *«hay ciertos avíos que NO se
+   * compran por color. Debería de sumar todos. Como la etiqueta de lavado… ¿cómo le puedo hacer
+   * para definirle que algunas cosas se compran juntas sin tomar en cuenta el color?»*.
+   *
+   * La regla es de dos filos y las dos mitades se prueban aquí: **marcado ⇒ un solo renglón sin
+   * color**, y **SIN marcar ⇒ sigue partiéndose color por color** (V1-E8c, §Post-F9.126). Sin la
+   * segunda, colapsar para todo el mundo pasaría igual de verde — y los cierres de Daniel, que SÍ
+   * se compran por color, volverían a salir fundidos en un renglón.
+   */
+
+  /** Tallas de un color: `[idTalla, piezas, etiqueta]`. */
+  type Renglon = [number, number, string];
+
+  /** Arma el mapa color → {piezas, porTalla} tal como lo entrega `piezasPorColorYTallaOrden`. */
+  function matriz(
+    filas: { idColor: number; nombre: string; tallas: Renglon[] }[],
+  ): Map<
+    number,
+    { nombre: string; piezas: number; porTalla: Map<number, { piezas: number; etiqueta: string }> }
+  > {
+    return new Map(
+      filas.map((f) => [
+        f.idColor,
+        {
+          nombre: f.nombre,
+          piezas: f.tallas.reduce((s, [, piezas]) => s + piezas, 0),
+          porTalla: new Map(
+            f.tallas.map(([idTalla, piezas, etiqueta]) => [idTalla, { piezas, etiqueta }]),
+          ),
+        },
+      ]),
+    );
+  }
+
+  /** El total de la orden (Σ de todos los colores), que es lo que recibe el grupo colapsado. */
+  function totalDe(m: ReturnType<typeof matriz>): {
+    piezas: number;
+    porTalla: Map<number, { piezas: number; etiqueta: string }>;
+  } {
+    const porTalla = new Map<number, { piezas: number; etiqueta: string }>();
+    let piezas = 0;
+    for (const g of m.values()) {
+      piezas += g.piezas;
+      for (const [idTalla, t] of g.porTalla) {
+        const previa = porTalla.get(idTalla);
+        if (previa === undefined) porTalla.set(idTalla, { ...t });
+        else previa.piezas += t.piezas;
+      }
+    }
+    return { piezas, porTalla };
+  }
+
+  /** La OP del ejemplo: 3 colores × (CH, M). Rojo 30, Azul 50, Negro 20 → 100 piezas. */
+  const TRES_COLORES = matriz([
+    {
+      idColor: 9,
+      nombre: 'Rojo',
+      tallas: [
+        [1, 10, 'CH'],
+        [2, 20, 'M'],
+      ],
+    },
+    {
+      idColor: 12,
+      nombre: 'Azul',
+      tallas: [
+        [1, 20, 'CH'],
+        [2, 30, 'M'],
+      ],
+    },
+    {
+      idColor: 15,
+      nombre: 'Negro',
+      tallas: [
+        [1, 5, 'CH'],
+        [2, 15, 'M'],
+      ],
+    },
+  ]);
+
+  it('⭐ MARCADO: tres colores caen en UN SOLO renglón, sin color y con la suma de las piezas', () => {
+    const grupos = gruposDeCompraDelAvio(true, TRES_COLORES, totalDe(TRES_COLORES));
+
+    // 🔴 EL VALOR QUE LA PONE ROJA: `3` — la etiqueta de lavado partida por color, que es
+    // exactamente lo que Daniel vio en pantalla (11,771 pz con un color y 1,387 con otro).
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0]?.idColor).toBeNull();
+    expect(grupos[0]?.nombre).toBeNull();
+    expect(grupos[0]?.piezas).toBe(100); // 30 + 50 + 20
+  });
+
+  it('⭐ SIN MARCAR: los mismos tres colores siguen saliendo en TRES renglones', () => {
+    // 🔴 La otra mitad de la regla. Sin esta prueba, colapsar para TODO avío pasaría igual de verde
+    // y los cierres de §Post-F9.126 volverían a fundirse en un renglón.
+    const grupos = gruposDeCompraDelAvio(false, TRES_COLORES, totalDe(TRES_COLORES));
+
+    expect(grupos).toHaveLength(3);
+    expect(grupos.map((g) => g.idColor)).toEqual([9, 12, 15]);
+    expect(grupos.map((g) => g.nombre)).toEqual(['Rojo', 'Azul', 'Negro']);
+    expect(grupos.map((g) => g.piezas)).toEqual([30, 50, 20]);
+  });
+
+  it('⭐ el DESGLOSE POR TALLA del renglón colapsado es el de TODA la orden, no el de un color', () => {
+    // Es la mitad que se cuela: se puede colapsar el renglón y dejarle el `porTalla` del PRIMER
+    // color. La cantidad de arriba diría 100 y la tablita de abajo sumaría 30 — el papel
+    // contradiciéndose a sí mismo, justo lo que V1-E8c vino a impedir.
+    const grupos = gruposDeCompraDelAvio(true, TRES_COLORES, totalDe(TRES_COLORES));
+    const porTalla = grupos[0]?.porTalla;
+
+    expect(porTalla?.get(1)).toEqual({ piezas: 35, etiqueta: 'CH' }); // 10 + 20 + 5
+    expect(porTalla?.get(2)).toEqual({ piezas: 65, etiqueta: 'M' }); // 20 + 30 + 15
+
+    // 🔑 La invariante: Σ del desglose = piezas del renglón. Con el `porTalla` de un solo color
+    // (30) esto se cae.
+    const suma = [...(porTalla ?? [])].reduce((s, [, t]) => s + t.piezas, 0);
+    expect(suma).toBe(grupos[0]?.piezas);
+  });
+
+  it('⭐ DOS OP de colores DISTINTOS con el avío marcado caen en la MISMA clave (se suman)', () => {
+    // Es el caso literal de Daniel: sus órdenes 5565/5566/5567, cada una de su color, con la misma
+    // etiqueta de lavado y el mismo proveedor. Al colapsar, las dos quedan sin color, y la clave de
+    // agrupación —que ya trataba el "sin" como un valor más— las junta en un solo renglón.
+    const op1 = matriz([{ idColor: 9, nombre: 'Rojo', tallas: [[1, 10, 'CH']] }]);
+    const op2 = matriz([{ idColor: 12, nombre: 'Azul', tallas: [[1, 40, 'CH']] }]);
+
+    const [g1] = gruposDeCompraDelAvio(true, op1, totalDe(op1));
+    const [g2] = gruposDeCompraDelAvio(true, op2, totalDe(op2));
+
+    const clave = (g: typeof g1) =>
+      claveAgrupada({
+        idTela: null,
+        idAvio: 77,
+        idTelaColor: null,
+        idColorPrenda: g?.idColor ?? null,
+        idProveedorSugerido: 5,
+      });
+
+    expect(clave(g1)).toBe(clave(g2));
+
+    // 🔴 Y sin la marca NO se juntan (la mitad que impide colapsar de más): dos claves distintas.
+    const [s1] = gruposDeCompraDelAvio(false, op1, totalDe(op1));
+    const [s2] = gruposDeCompraDelAvio(false, op2, totalDe(op2));
+    expect(clave(s1)).not.toBe(clave(s2));
+  });
+
+  it('sin matriz de colores hay UN renglón sin color, esté marcado o no (no-regresión)', () => {
+    // La OP sin matriz ya salía así desde F4: la marca no cambia nada aquí.
+    const vacia = matriz([]);
+    const toda = { piezas: 40, porTalla: new Map([[1, { piezas: 40, etiqueta: 'U' }]]) };
+
+    for (const marcado of [true, false]) {
+      const grupos = gruposDeCompraDelAvio(marcado, vacia, toda);
+      expect(grupos).toHaveLength(1);
+      expect(grupos[0]?.idColor).toBeNull();
+      expect(grupos[0]?.piezas).toBe(40);
+    }
   });
 });

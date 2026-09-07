@@ -78,6 +78,7 @@ function aAvioSalida(avio: AvioConProveedores): z.infer<typeof esquemaAvioSalida
     favorito: avio.favorito,
     cantFav: avio.cantFav === null ? null : Number(avio.cantFav),
     esGenerico: avio.esGenerico,
+    seCompraSinColor: avio.seCompraSinColor,
     precioReferencia: avio.precioReferencia === null ? null : Number(avio.precioReferencia),
     proveedores: avio.proveedores.map(aProveedorSalida),
     activo: avio.activo,

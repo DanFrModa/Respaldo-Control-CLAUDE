@@ -270,6 +270,17 @@ export function AviosPagina(): React.JSX.Element {
                               <ChipEstado tono={avio.esGenerico ? 'info' : 'neutro'}>
                                 {avio.esGenerico ? 'Genérico · stock' : 'Por orden'}
                               </ChipEstado>
+                              {/* ⭐⭐ fila 0.158: el mismo chip que en la tabla — la tarjeta del
+                                  móvil enseña lo mismo que el escritorio, o el dato existe sólo
+                                  para quien abre la pantalla grande. */}
+                              {avio.seCompraSinColor ? (
+                                <ChipEstado
+                                  tono="info"
+                                  title="La explosión lo junta en un solo renglón, sin partirlo por color"
+                                >
+                                  Sin color
+                                </ChipEstado>
+                              ) : null}
                             </div>
                             <div className="num text-xs text-faint">{avio.clave}</div>
                           </div>
@@ -459,6 +470,16 @@ function RenglonAvio({
                 >
                   {avio.esGenerico ? 'Genérico · stock' : 'Por orden'}
                 </ChipEstado>
+                {/* ⭐⭐ fila 0.158: sólo se enseña cuando está MARCADO. No marcado es lo normal (un
+                    renglón por color) y un chip en cada avío del catálogo sería ruido. */}
+                {avio.seCompraSinColor ? (
+                  <ChipEstado
+                    tono="info"
+                    title="La explosión lo junta en un solo renglón, sin partirlo por color"
+                  >
+                    Sin color
+                  </ChipEstado>
+                ) : null}
               </div>
               <div className="num text-xs text-faint">{avio.clave}</div>
             </div>

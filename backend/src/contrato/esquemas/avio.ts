@@ -18,7 +18,8 @@ import { z } from 'zod';
  * Reglas de negocio que SÍ van en el contrato (las repite el dominio, A1):
  *  • `clave` única global (clave de negocio).
  *  • favorito ⇒ `cantFav` obligatoria (>0): se valida con un `.refine()` (alta y edición).
- *  • `esGenerico` (R4) y `precioReferencia` (fallback) son opcionales.
+ *  • `esGenerico` (R4), `seCompraSinColor` (fila 0.158) y `precioReferencia` (fallback) son
+ *    opcionales (banderas con default `false` en el alta).
  */
 
 // ── Proveedores inline (N:N con datos propios por renglón, R1) ────────────────
@@ -137,6 +138,14 @@ export const esquemaAvioCrear = z
       .optional(),
     /** Avío genérico de stock (R4 / Make-to-Order). */
     esGenerico: z.boolean({ error: '¿Genérico? debe ser verdadero o falso' }).default(false),
+    /**
+     * ⭐⭐ fila 0.158 — ¿se compra SIN tomar en cuenta el color? (la etiqueta de lavado). Marcado, la
+     * explosión emite UN solo renglón por orden en vez de uno por color. NO es `esGenerico`: aquél
+     * contesta "¿contra stock o contra la orden?", éste "¿el color forma parte de lo que pido?".
+     */
+    seCompraSinColor: z
+      .boolean({ error: '¿Se compra sin color? debe ser verdadero o falso' })
+      .default(false),
     /** Precio de referencia (fallback de precio sin proveedor mapeable — ADR-0009). */
     precioReferencia: z
       .number({ error: 'El precio de referencia debe ser un número' })
@@ -191,6 +200,10 @@ const baseAvioEditar = z
       .optional()
       .nullable(),
     esGenerico: z.boolean({ error: '¿Genérico? debe ser verdadero o falso' }).optional(),
+    /** ⭐⭐ fila 0.158 — bandera: omitir = no tocar (no es nullable). */
+    seCompraSinColor: z
+      .boolean({ error: '¿Se compra sin color? debe ser verdadero o falso' })
+      .optional(),
     precioReferencia: z
       .number({ error: 'El precio de referencia debe ser un número' })
       .nonnegative({ error: 'El precio de referencia no puede ser negativo' })
@@ -265,6 +278,12 @@ export const esquemaAvioSalida = z
     favorito: z.boolean().describe('¿Avío de uso frecuente?'),
     cantFav: z.number().nullable().describe('Cantidad preestablecida si es favorito, o null.'),
     esGenerico: z.boolean().describe('¿Avío genérico de stock (R4)?'),
+    seCompraSinColor: z
+      .boolean()
+      .describe(
+        '⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un ' +
+          'solo renglón por orden (sin color) en vez de uno por color de la matriz.',
+      ),
     precioReferencia: z.number().nullable().describe('Precio de referencia (fallback), o null.'),
     proveedores: z
       .array(esquemaAvioProveedorSalida)

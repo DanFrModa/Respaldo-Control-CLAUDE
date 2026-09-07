@@ -48,6 +48,11 @@ function renglon(
     // ⭐ V1-E8w (§Post-F9.150): el target del cliente NO participa en la cotización. Va ≠ null a
     // propósito, para que la prueba muerda si algún día se colara al documento.
     precioTarget: 95,
+    // ⭐⭐ Fila 0.153: el precio que quedó en la NEGOCIACIÓN tampoco participa en la cotización.
+    // Va ≠ null y ≠ del aprobado, por la misma razón que el target: para que muerda si se colara.
+    precioNegociado: 88,
+    tienePrecioNegociado: true,
+    precioNegociadoEn: '2026-09-01T10:00:00.000Z',
     tieneTarget: true,
     aprobado: precioAprobado !== null,
     aprobadoPorId: precioAprobado === null ? null : 'u1',

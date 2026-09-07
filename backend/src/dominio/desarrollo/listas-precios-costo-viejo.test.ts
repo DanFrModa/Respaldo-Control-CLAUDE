@@ -65,6 +65,10 @@ function filaLinea(caso: CasoRenglon): Record<string, unknown> {
     // ⭐ V1-E8y: el renglón trae sus PENDIENTES (vacíos aquí: esta prueba habla del aviso de costo
     // viejo). La proyección los lee, así que la clave tiene que estar — igual que en producción.
     pendientes: [],
+    // ⭐⭐ FILA 0.153: el renglón trae también el ÚLTIMO evento de negociación CON PRECIO (el
+    // `include` lo filtra y se queda con uno). Vacío aquí = "este renglón nunca se negoció". La
+    // proyección lo lee, así que la clave tiene que estar — igual que en producción.
+    eventos: [],
   };
 }
 
