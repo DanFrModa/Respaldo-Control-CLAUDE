@@ -12853,6 +12853,8 @@ export interface paths {
                 cantFav: number | null;
                 /** @description ¿Avío genérico de stock (R4)? */
                 esGenerico: boolean;
+                /** @description ⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz. */
+                seCompraSinColor: boolean;
                 /** @description Precio de referencia (fallback), o null. */
                 precioReferencia: number | null;
                 /** @description Proveedores del avío con su precio y condiciones (R1). */
@@ -12999,6 +13001,8 @@ export interface paths {
             cantFav?: number;
             /** @default false */
             esGenerico?: boolean;
+            /** @default false */
+            seCompraSinColor?: boolean;
             precioReferencia?: number;
             proveedores?: {
               idProveedor: number;
@@ -13033,6 +13037,8 @@ export interface paths {
               cantFav: number | null;
               /** @description ¿Avío genérico de stock (R4)? */
               esGenerico: boolean;
+              /** @description ⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz. */
+              seCompraSinColor: boolean;
               /** @description Precio de referencia (fallback), o null. */
               precioReferencia: number | null;
               /** @description Proveedores del avío con su precio y condiciones (R1). */
@@ -13198,6 +13204,8 @@ export interface paths {
               cantFav: number | null;
               /** @description ¿Avío genérico de stock (R4)? */
               esGenerico: boolean;
+              /** @description ⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz. */
+              seCompraSinColor: boolean;
               /** @description Precio de referencia (fallback), o null. */
               precioReferencia: number | null;
               /** @description Proveedores del avío con su precio y condiciones (R1). */
@@ -13352,6 +13360,8 @@ export interface paths {
               cantFav: number | null;
               /** @description ¿Avío genérico de stock (R4)? */
               esGenerico: boolean;
+              /** @description ⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz. */
+              seCompraSinColor: boolean;
               /** @description Precio de referencia (fallback), o null. */
               precioReferencia: number | null;
               /** @description Proveedores del avío con su precio y condiciones (R1). */
@@ -13491,6 +13501,7 @@ export interface paths {
             favorito?: boolean;
             cantFav?: number | null;
             esGenerico?: boolean;
+            seCompraSinColor?: boolean;
             precioReferencia?: number | null;
             proveedores?: {
               idProveedor: number;
@@ -13526,6 +13537,8 @@ export interface paths {
               cantFav: number | null;
               /** @description ¿Avío genérico de stock (R4)? */
               esGenerico: boolean;
+              /** @description ⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz. */
+              seCompraSinColor: boolean;
               /** @description Precio de referencia (fallback), o null. */
               precioReferencia: number | null;
               /** @description Proveedores del avío con su precio y condiciones (R1). */

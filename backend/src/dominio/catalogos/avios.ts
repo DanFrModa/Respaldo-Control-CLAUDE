@@ -330,6 +330,7 @@ function datosOpcionalesCrear(
   if (datos.favorito !== undefined) data.favorito = datos.favorito;
   if (datos.cantFav !== undefined) data.cantFav = datos.cantFav;
   if (datos.esGenerico !== undefined) data.esGenerico = datos.esGenerico;
+  if (datos.seCompraSinColor !== undefined) data.seCompraSinColor = datos.seCompraSinColor;
   if (datos.precioReferencia !== undefined) data.precioReferencia = datos.precioReferencia;
   return data;
 }
@@ -341,7 +342,8 @@ const CAMPOS_TEXTO_EDITABLES = ['unidad', 'presentacion'] as const;
  * Aplica los campos que VENGAN en la edición al `update` y registra qué cambió (para la
  * bitácora). Semántica del PATCH parcial (M1): campo OMITIDO (`undefined`) → no se toca;
  * texto/decimal en `null` (o texto vacío) → se BORRA (a `null`); con valor → se guarda si
- * difiere del actual. `favorito`/`esGenerico` (banderas): omitir = no tocar. Devuelve el
+ * difiere del actual. `favorito`/`esGenerico`/`seCompraSinColor` (banderas): omitir = no
+ * tocar. Devuelve el
  * detalle de cambios para la bitácora.
  */
 function aplicarEditar(
@@ -373,6 +375,12 @@ function aplicarEditar(
   if (datos.esGenerico !== undefined && datos.esGenerico !== actual.esGenerico) {
     cambios.esGenerico = datos.esGenerico;
     detalle.esGenerico = { de: actual.esGenerico, a: datos.esGenerico };
+  }
+  // ⭐⭐ fila 0.158: la bandera que decide si la explosión parte el avío por color. Va a la bitácora
+  // como cualquier otra, porque cambiarla cambia CÓMO se compra el avío de aquí en adelante.
+  if (datos.seCompraSinColor !== undefined && datos.seCompraSinColor !== actual.seCompraSinColor) {
+    cambios.seCompraSinColor = datos.seCompraSinColor;
+    detalle.seCompraSinColor = { de: actual.seCompraSinColor, a: datos.seCompraSinColor };
   }
 
   // Decimales (cantFav/precioReferencia): comparar por valor numérico. Omitir = no tocar;

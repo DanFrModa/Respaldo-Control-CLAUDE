@@ -12325,6 +12325,46 @@ el paso de «con color» a «sin color» (`mrp.ts:1954`).
 
 ---
 
+### A-bis · ⭐ A QUIÉN LE CUENTAN LAS CUBETAS HUÉRFANAS (7-sep-2026) — decisión de diseño nacida al construir la 0.158
+
+Al colapsar el avío apareció un defecto **que habría costado dinero**: marcar un avío cuyas OP **ya
+tenían OC por color** hacía que la explosión **volviera a ofrecer todo lo ya comprado** (`enOc: 0 /
+pendiente: 100`, medido con sonda por el camino real) ⇒ **se compraba dos veces**. Causa: en
+`repartirComprometidoPorColor` (`compras/comprometido-en-oc.ts`) el renglón **sin color** se llevaba
+sólo la cubeta `porColor[null]`, y **las cubetas CON color que ningún renglón reclama se caían al
+piso**.
+
+**DECIDIDO — la regla tiene DOS mitades, y las dos importan:**
+1. ✅ **El renglón sin color absorbe las cubetas huérfanas SÓLO SI es el ÚNICO renglón de ese
+   material.** Entonces sí pide todo el material de la orden y contarle esas líneas no es una elección.
+2. ⛔ **Si hay hermanos CON color en la mesa, NO las absorbe.** Ahí el renglón sin color es **una PARTE
+   de la orden**, y darle lo que una OC pidió para otro tono **sería inventar un hecho** (§Post-F9.86).
+
+🔴 **La segunda mitad nació de una regresión REAL, no de una precaución.** La primera versión absorbía
+siempre, y el reviewer midió el daño en **TELAS**: en `mrp.ts` los colores **sin amarre de tono** caen
+en la llave `'sin'` **junto a** los que sí lo tienen, así que una misma tela emite a la vez renglones
+con color y uno sin color. Con la absorción abierta, **80 m de negro no se compraban nunca**,
+acreditados con 100 que la OC pidió como **vino**. ⚠️ **Y el intercambio era el malo:** cambiaba una
+**sobre-compra visible y recuperable** por una **sub-compra silenciosa que para la producción**.
+
+📌 **La puerta que lo hace alcanzable, y por eso no es teórico:** el amarre de color se cambia
+libremente mientras la OC sea **borrador** (`color-de-la-tela.ts`, porque `borrador` **no** está en
+`ESTATUS_OC_COMPROMETIDA`) **pero el borrador SÍ cuenta para el neteo** (`ESTATUS_OC_QUE_CUBREN`). Un
+borrador más un cambio de tono fabrica la cubeta huérfana.
+
+⚠️ **Se descartó el atajo de absorber y marcar con `desdeAcervoSinColor`:** el número seguiría neteando
+y el material seguiría sin comprarse — sólo se avisaría del daño.
+
+🔑 **Y la lección de método, que es de las que se repiten:** el defecto no estaba en la aritmética,
+estaba **en una frase del comentario** —*«como pide todo el material de esa orden»*— que era cierta
+para un avío y falsa para una tela. Se corrigió el código **y la frase**, más la invariante, que estaba
+enunciada para cualquier mesa cuando sólo vale con el sin-color como **único** renglón. **Enunciarla de
+más era justo lo que autorizaba absorber en el caso mixto.**
+⚠️ **Las 3 344 pruebas de integración en verde no lo desmentían:** ninguna combinaba *tela mixta* **con**
+*cubeta huérfana*. Ese hueco tiene ahora su prueba.
+
+---
+
 ### B · «La misma TELA en dos colores dentro de la misma prenda»
 
 > *«a veces hay modelos que llevan **dos colores en la misma prenda**. Ejemplo: **mangas de otro

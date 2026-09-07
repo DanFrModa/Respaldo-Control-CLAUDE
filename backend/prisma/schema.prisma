@@ -2166,6 +2166,17 @@ model Avio {
   cantFav          Decimal? @map("cant_fav") @db.Decimal(12, 2)
   /// Avío genérico de stock (R4 / Make-to-Order): no se compra por orden, se tiene en almacén.
   esGenerico       Boolean  @default(false) @map("es_generico")
+  /// ⭐⭐ **fila 0.158 — ¿su IDENTIDAD DE COMPRA incluye el color?** DANIEL (7-sep-2026), mirando la
+  /// explosión con datos reales: *«hay ciertos avíos que no se compran por color. Debería de sumar
+  /// todos. Como la etiqueta de lavado… ¿cómo le puedo hacer para definirle que algunas cosas se
+  /// compran juntas sin tomar en cuenta el color?»*. Marcado ⇒ la explosión emite **UN solo renglón
+  /// por orden** con las piezas y el desglose por talla de TODA la orden, sin color — y ese renglón
+  /// se suma con el de otras OP (misma clave de agrupación: material|sin|proveedor).
+  ///
+  /// ⚠️ **NO es `esGenerico`, y no hay que confundirlos**: aquél contesta *"¿contra stock o contra la
+  /// orden?"* (netea contra el kardex); éste contesta *"¿el color forma parte de lo que pido?"*. Son
+  /// ejes independientes: un avío puede ser genérico y por color, o por orden y sin color.
+  seCompraSinColor Boolean  @default(false) @map("se_compra_sin_color")
   /// Precio de referencia (fallback de precio sin proveedor mapeable — ADR-0009).
   precioReferencia Decimal? @map("precio_referencia") @db.Decimal(12, 2)
   /// ⚰️ COLUMNA MUERTA — SIN ESCRITOR Y SIN LECTOR (V1-E8a, §Post-F9.97, decisión de Daniel del
