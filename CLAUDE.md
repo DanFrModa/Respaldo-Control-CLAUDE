@@ -311,6 +311,27 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
    - **A cada agente se le pasa SOLO su pedazo.** El lead extrae de `docs/hoja-de-ruta/F#-etapas.md` el alcance de ESA etapa/sub-pieza y se lo da en el prompt. Los agentes NO cargan el plan completo ni las 7 fichas de etapa ni `Documentacion_MJD/` entera — solo lo que su tarea necesita.
    - **NUNCA leer archivos generados completos.** `backend/openapi.json` y `frontend/openapi.json` (~100k tokens c/u) y `frontend/src/api/esquema.gen.ts` (~74k) son GENERADOS: se **regeneran con su comando**, no se leen ni se vuelcan al chat enteros. Si hay que mirar algo puntual, `Grep` del fragmento — jamás `Read` del archivo completo. Lo mismo con cualquier dump grande (logs de tests, CSV de `Respaldo CLAUDE/`, lockfiles): mirar el pedazo, no todo.
    - **Sesiones acotadas.** Cerrar y arrancar chat nuevo al terminar una etapa sale más barato que arrastrar una conversación larguísima (cada turno reprocesa todo).
+5. **🔴 CADA FILA NUEVA NACE DICIENDO SI ENTRA EN V1 O NO (regla de Daniel, 7-sep-2026).** Textual:
+
+   > *«Desde que te ponga las cosas y generen una línea, **definamos (con recomendación tuya y aprobación mía) si entra o no en V1**.»*
+   >
+   > *«Ha de haber muchas cosas que no son indispensables y **están gastando tiempo**.»*
+
+   **Cómo se aplica, sin excepción:** en el mismo mensaje en que se le dice a Daniel que algo se
+   convirtió en fila, va **la recomendación del lead** —`bloquea el arranque` · `duele pero se aguanta`
+   · `puede esperar a después de arrancar`— **con su razón en una línea**, y él confirma o corrige. La
+   respuesta se anota **en la propia fila**, no sólo en el chat.
+
+   **El criterio, para que la recomendación no sea un gusto personal:**
+   - **Bloquea** = sin eso no se puede operar el día a día, **o** el sistema da información equivocada
+     que lleva a decisiones equivocadas (dinero, compras, precios), **o** lo exige la ley/el contador.
+   - **Duele pero se aguanta** = hay rodeo manual conocido. Se hace si sobra tiempo antes de arrancar.
+   - **Puede esperar** = comodidad, estética, o un caso raro.
+
+   ⚠️ **Y lo que NO puede decidir el lead solo:** cuando la clasificación depende de **con qué
+   frecuencia pasa en el negocio** (¿cuántos modelos llevan dos colores? ¿cada cuánto se venden
+   segundas?), **eso se pregunta, no se supone** — es justo el tipo de dato que sólo Daniel tiene.
+
 5. **HISTORIAL DE VERSIONES (regla de Daniel, 19-ago-2026):** **cada vez que se actualiza `prueba` se
    sube la versión** y se agrega su entrada en **`HISTORIAL-DE-VERSIONES.md`** (raíz). Numeración
    **`0.xxx`** correlativa **mientras nada esté en producción** (el cero lo dice a simple vista); al
