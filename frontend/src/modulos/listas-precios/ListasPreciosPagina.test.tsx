@@ -30,6 +30,12 @@ const estadoRenglonMutate = vi.fn();
 const targetMutate = vi.fn();
 const eliminarMutate = vi.fn();
 const useListaPreciosMock = vi.fn();
+/**
+ * El desglose del cajón. Por defecto conserva la forma que tenía este doble (nadie lo expandía en
+ * esta suite), y la prueba del ANCHO lo pone «cargando» para abrir el cajón sin fabricar un
+ * desglose entero: lo que ahí se mide es el `colSpan` del `<td>`, no lo que va dentro.
+ */
+const desgloseMock = vi.fn(() => ({ data: undefined, isPending: false, isError: false }));
 const useListasPreciosMock = vi.fn();
 
 vi.mock('@/api/listas-precios', () => ({
@@ -39,7 +45,7 @@ vi.mock('@/api/listas-precios', () => ({
   useAjustarPrecioLinea: () => ({ mutate: vi.fn(), isPending: false }),
   useQuitarLineaLista: () => ({ mutate: quitarMutate, isPending: false }),
   useEliminarLista: () => ({ mutate: eliminarMutate, isPending: false }),
-  useDesgloseCostoLinea: () => ({ data: undefined, isPending: false, isError: false }),
+  useDesgloseCostoLinea: () => desgloseMock() as unknown,
   // V1-E8f: la consulta devuelve candidatos Y descartados; el doble copia esa forma (un doble con
   // la forma vieja probaría la suposición, no el sistema).
   useCandidatosLista: () => ({
@@ -953,5 +959,74 @@ describe('⭐⭐ Fila 0.153 — el precio negociado se ve AL LADO del aprobado',
 
     expect(screen.getByTestId('precio-negociado')).toHaveTextContent('$95.00');
     expect(screen.queryByTestId('precio-aprobado')).not.toBeInTheDocument();
+  });
+});
+
+// ── 🔴 EL ANCHO DE LA TABLA — la prueba que faltaba ────────────────────────────────────────────
+//
+// ⚠️ **Cómo nació.** La fila 0.153 agregó la columna «Último precio de la negociación» y la tabla
+// pasó de 7 a 8 columnas, pero las dos filas que la cruzan enteras —la banda de «Costo viejo» y el
+// cajón de detalle— se quedaron en `colSpan={7}`, así que se pintaban **una columna cortas**.
+// **Las 2326 pruebas del frontend pasaron con el defecto dentro**: todas comprueban el CONTENIDO de
+// una celda y ninguna el ANCHO de la tabla.
+//
+// 🔴 Por eso esta prueba NO compara contra un número escrito a mano —eso sería repetir el mismo
+// error en otro archivo— sino **los `<th>` del encabezado contra el `colSpan` REAL del `<td>`**.
+// Quien agregue la novena columna y no toque `COLUMNAS_TABLA_RENGLONES` se pone rojo aquí.
+
+describe('🔴 el ancho de la tabla: las filas que la cruzan abarcan TODAS las columnas', () => {
+  beforeEach(() => {
+    useListaPreciosMock.mockReset();
+    useListasPreciosMock.mockReset();
+    desgloseMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+  });
+
+  /** Columnas reales del encabezado (la única fuente de verdad del ancho). */
+  function columnasDelEncabezado(): number {
+    const encabezado = document.querySelector('thead tr');
+    if (encabezado === null) {
+      throw new Error('La tabla de renglones no tiene encabezado: no hay ancho que comparar.');
+    }
+    return encabezado.querySelectorAll('th').length;
+  }
+
+  /** El `colSpan` REAL que quedó en el `<td>` (no el que dice el JSX). */
+  function colSpanDe(testId: string): number {
+    const celda = screen.getByTestId(testId).querySelector('td');
+    if (!(celda instanceof HTMLTableCellElement)) {
+      throw new Error(`La fila «${testId}» no trae una celda que medir.`);
+    }
+    return celda.colSpan;
+  }
+
+  it('🔴 la banda de «Costo viejo» cruza la tabla ENTERA', async () => {
+    await abrirDetalleConAviso('Le cambiaron la receta el 1-sep.');
+
+    expect(await screen.findByTestId('aviso-costo-viejo')).toBeInTheDocument();
+    expect(colSpanDe('aviso-costo-viejo')).toBe(columnasDelEncabezado());
+  });
+
+  it('🔴 el cajón de detalle (desglose + pendientes) cruza la tabla ENTERA', async () => {
+    // El desglose se queda «cargando»: el cajón se pinta igual y es su ANCHO lo que se mide.
+    desgloseMock.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    await abrirDetalle();
+
+    await userEvent.click(screen.getByTestId('alternar-desglose'));
+    expect(await screen.findByTestId('desglose-renglon')).toBeInTheDocument();
+    expect(colSpanDe('desglose-renglon')).toBe(columnasDelEncabezado());
+  });
+
+  /**
+   * Y el control que le da sentido a las dos de arriba: si el encabezado tuviera una sola columna,
+   * comparar contra él no probaría nada. La tabla trae las ocho de hoy —modelo, costo, target,
+   * calculado, aprobado, último de la negociación, estado y la de acciones—.
+   */
+  it('el encabezado trae las columnas que se esperan (control de la comparación)', async () => {
+    await abrirDetalle();
+
+    expect(columnasDelEncabezado()).toBe(8);
+    const titulos = [...document.querySelectorAll('thead th')].map((th) => th.textContent);
+    expect(titulos).toContain('Último precio de la negociación');
+    expect(titulos).toContain('Precio aprobado');
   });
 });
