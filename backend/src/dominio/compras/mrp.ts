@@ -401,6 +401,10 @@ const seleccionOrdenExplosion = {
           descripcion: true,
           unidad: true,
           esGenerico: true,
+          // ⭐⭐ fila 0.158 — ¿este avío se compra SIN tomar en cuenta el color? Es la bandera del
+          // catálogo que decide si la explosión lo parte por color o lo colapsa en un solo renglón
+          // (`gruposDeCompraDelAvio`). Sin ella en el `select`, la regla no tendría con qué decidir.
+          seCompraSinColor: true,
           precioReferencia: true,
           // ⭐⭐ §Post-F9.105 — ¿el avío se compra POR MEDIDA? Es el ÚNICO hecho del que sale esa
           // respuesta (el mismo que usan el BOM, la receta y el precosto: ≥1 medida ACTIVA). Sin
@@ -550,6 +554,63 @@ function piezasPorColorYTallaOrden(
     mapa.set(linea.idColor, grupo);
   }
   return mapa;
+}
+
+/**
+ * Un grupo de compra de un avío: las piezas (y su desglose por talla) que van juntas en UN renglón
+ * de la explosión, con el color al que pertenecen — o `null` cuando el renglón NO lleva color.
+ */
+export interface GrupoDeCompraAvio {
+  idColor: number | null;
+  nombre: string | null;
+  piezas: number;
+  porTalla: Map<number, { piezas: number; etiqueta: string }>;
+}
+
+/**
+ * ⭐⭐ **fila 0.158 — EN CUÁNTOS RENGLONES SE PARTE UN AVÍO.** DANIEL (7-sep-2026), mirando la
+ * explosión con datos reales: *«hay ciertos avíos que NO se compran por color. Debería de sumar
+ * todos. Como la etiqueta de lavado… ¿cómo le puedo hacer para definirle que algunas cosas se
+ * compran juntas sin tomar en cuenta el color?»*.
+ *
+ * Hasta hoy la respuesta era una sola y sin excepción posible: **uno por color de la matriz** (V1-E8c,
+ * §Post-F9.126). Para los cierres y los botones eso es lo correcto —cada color es una compra
+ * distinta—, pero la etiqueta de lavado es LA MISMA en los cuatro colores, y verla partida obliga a
+ * sumar a mano lo que se le va a pedir al proveedor.
+ *
+ * La bandera del catálogo (`Avio.seCompraSinColor`) es la que decide, y sólo hay dos respuestas:
+ *  • **marcado** → UN grupo, `idColor: null`, con las piezas y el desglose por talla de **TODA la
+ *    orden**. Es exactamente lo que ya hacía la orden SIN matriz de colores, así que el renglón
+ *    resultante recorre el mismo camino ya probado: `claveAgrupada` lo agrupa con el `'sin'` que ya
+ *    existía —y por eso dos OP de colores distintos se SUMAN en un solo renglón—, el neteo contra
+ *    la OC trata el renglón sin color como el caso privilegiado, y la recepción de avíos nunca miró
+ *    el color.
+ *  • **sin marcar** → un grupo por color, como desde V1-E8c.
+ *
+ * ⚠️ **La Σ no cambia en ninguno de los dos casos**: Σ(piezas por color) = piezas de la orden. Lo
+ * que cambia es en cuántos renglones se pide, no cuánto.
+ *
+ * 🔴 Se saca a función PURA y exportada para poder ponerla roja sin Postgres: es LA regla del caso
+ * de Daniel, y una regla que sólo se puede probar con base es una regla que en la práctica nadie
+ * muta.
+ */
+export function gruposDeCompraDelAvio(
+  seCompraSinColor: boolean,
+  gruposColor: Map<
+    number,
+    { nombre: string; piezas: number; porTalla: Map<number, { piezas: number; etiqueta: string }> }
+  >,
+  toda: { piezas: number; porTalla: Map<number, { piezas: number; etiqueta: string }> },
+): GrupoDeCompraAvio[] {
+  if (seCompraSinColor || gruposColor.size === 0) {
+    return [{ idColor: null, nombre: null, piezas: toda.piezas, porTalla: toda.porTalla }];
+  }
+  return [...gruposColor].map(([idColor, g]) => ({
+    idColor,
+    nombre: g.nombre,
+    piezas: g.piezas,
+    porTalla: g.porTalla,
+  }));
 }
 
 /**
@@ -1357,21 +1418,15 @@ async function calcularRequerimientos(
      */
     let disponible = esGenerico ? await existenciaGenerico(ma.idAvio) : 0;
 
-    /** Los colores por los que se parte este avío; sin matriz, un solo renglón sin color. */
-    const porColor: {
-      idColor: number | null;
-      nombre: string | null;
-      piezas: number;
-      porTalla: Map<number, { piezas: number; etiqueta: string }>;
-    }[] =
-      gruposColor.size === 0
-        ? [{ idColor: null, nombre: null, piezas: totalPiezas, porTalla: piezasPorTalla }]
-        : [...gruposColor].map(([idColor, g]) => ({
-            idColor,
-            nombre: g.nombre,
-            piezas: g.piezas,
-            porTalla: g.porTalla,
-          }));
+    /**
+     * Los renglones en los que se parte este avío: uno por color de la matriz, o **UNO SOLO sin
+     * color** si el avío se compra sin tomar en cuenta el color (fila 0.158) o la orden no tiene
+     * matriz. La regla vive en `gruposDeCompraDelAvio` (pura y probada aparte).
+     */
+    const porColor = gruposDeCompraDelAvio(ma.avio.seCompraSinColor, gruposColor, {
+      piezas: totalPiezas,
+      porTalla: piezasPorTalla,
+    });
 
     for (const grupo of porColor) {
       const {

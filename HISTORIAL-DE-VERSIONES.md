@@ -71,6 +71,37 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.125 · 7-sep-2026 · **en prueba** — **La etiqueta de lavado ya se pide de una sola vez, no una por color**
+
+### Qué se puede hacer ahora que antes no
+
+- **Marcar un avío como «no se compra por color»**, en su ficha del catálogo. Desde ese momento la
+  explosión **lo suma todo junto**: un solo renglón con las piezas de toda la orden, y sumado entre
+  órdenes distintas. Es lo que pidió Daniel viendo su pantalla: la misma *Etiqueta de lavado* le salía
+  **dos veces** —11,771 piezas por un lado y 1,387 por otro— sólo porque las prendas eran de colores
+  distintos, y tenía que sumar a mano lo que le iba a pedir al proveedor.
+- **Sirve para todo lo que no cambia con el color de la prenda**: etiquetas de lavado, de marca, de
+  composición, bolsas, ganchos, cintas de empaque.
+
+### Qué cambió y puede sorprender
+
+- **Hay que marcarlo avío por avío**, en el catálogo. Nada cambia solo: el que no se marque **se sigue
+  partiendo por color**, que para cierres, botones o cintas es exactamente lo correcto.
+- ⚠️ **No confundirlo con «genérico»**, que es otra casilla y otra pregunta. *Genérico* responde
+  *«¿me lo compro contra almacén o contra la orden?»* y cambia cómo se costea. Ésta responde
+  *«¿el color forma parte de lo que le pido al proveedor?»*. Son independientes.
+- **El desglose por talla del renglón junto es el de toda la orden**, no el de un color. Para una
+  etiqueta de lavado es justo lo que se quiere.
+
+### Qué sigue pendiente o roto
+
+- **Se arregló también un defecto que este cambio destapaba, y que habría costado dinero.** Al marcar
+  un avío cuyas órdenes **ya tenían orden de compra**, la explosión **volvía a ofrecer todo lo ya
+  comprado** —decía «faltan 100» cuando ya estaban las 100 pedidas— y quien no lo notara **compraba dos
+  veces**. Pasaba porque lo comprado bajo cada color no se lo atribuía nadie al renglón junto. Ya no.
+- 🔶 **Queda la mitad gemela, y hay que saberlo:** las marcas de **«con esto queda cubierto»** hechas
+  bajo un color **no las ve** el renglón junto, así que ese faltante se puede volver a perseguir. Es la
+  fila 0.162; no se arregló aquí porque toca qué significa «dar por cubierto», que es decisión de Daniel.
 ## 0.124 · 7-sep-2026 · **en prueba** — **Cancelar un pedido ya no apaga las órdenes que YA se están produciendo**
 
 ### Qué se puede hacer ahora que antes no

@@ -29951,6 +29951,10 @@
                             "type": "boolean",
                             "description": "¿Avío genérico de stock (R4)?"
                           },
+                          "seCompraSinColor": {
+                            "type": "boolean",
+                            "description": "⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz."
+                          },
                           "precioReferencia": {
                             "anyOf": [
                               {
@@ -30064,6 +30068,7 @@
                           "favorito",
                           "cantFav",
                           "esGenerico",
+                          "seCompraSinColor",
                           "precioReferencia",
                           "proveedores",
                           "activo",
@@ -30304,6 +30309,10 @@
                     "default": false,
                     "type": "boolean"
                   },
+                  "seCompraSinColor": {
+                    "default": false,
+                    "type": "boolean"
+                  },
                   "precioReferencia": {
                     "type": "number",
                     "minimum": 0
@@ -30413,6 +30422,10 @@
                     "esGenerico": {
                       "type": "boolean",
                       "description": "¿Avío genérico de stock (R4)?"
+                    },
+                    "seCompraSinColor": {
+                      "type": "boolean",
+                      "description": "⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz."
                     },
                     "precioReferencia": {
                       "anyOf": [
@@ -30527,6 +30540,7 @@
                     "favorito",
                     "cantFav",
                     "esGenerico",
+                    "seCompraSinColor",
                     "precioReferencia",
                     "proveedores",
                     "activo",
@@ -30776,6 +30790,10 @@
                       "type": "boolean",
                       "description": "¿Avío genérico de stock (R4)?"
                     },
+                    "seCompraSinColor": {
+                      "type": "boolean",
+                      "description": "⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz."
+                    },
                     "precioReferencia": {
                       "anyOf": [
                         {
@@ -30889,6 +30907,7 @@
                     "favorito",
                     "cantFav",
                     "esGenerico",
+                    "seCompraSinColor",
                     "precioReferencia",
                     "proveedores",
                     "activo",
@@ -31111,6 +31130,9 @@
                   "esGenerico": {
                     "type": "boolean"
                   },
+                  "seCompraSinColor": {
+                    "type": "boolean"
+                  },
                   "precioReferencia": {
                     "anyOf": [
                       {
@@ -31240,6 +31262,10 @@
                       "type": "boolean",
                       "description": "¿Avío genérico de stock (R4)?"
                     },
+                    "seCompraSinColor": {
+                      "type": "boolean",
+                      "description": "⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz."
+                    },
                     "precioReferencia": {
                       "anyOf": [
                         {
@@ -31353,6 +31379,7 @@
                     "favorito",
                     "cantFav",
                     "esGenerico",
+                    "seCompraSinColor",
                     "precioReferencia",
                     "proveedores",
                     "activo",
@@ -31600,6 +31627,10 @@
                       "type": "boolean",
                       "description": "¿Avío genérico de stock (R4)?"
                     },
+                    "seCompraSinColor": {
+                      "type": "boolean",
+                      "description": "⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un solo renglón por orden (sin color) en vez de uno por color de la matriz."
+                    },
                     "precioReferencia": {
                       "anyOf": [
                         {
@@ -31713,6 +31744,7 @@
                     "favorito",
                     "cantFav",
                     "esGenerico",
+                    "seCompraSinColor",
                     "precioReferencia",
                     "proveedores",
                     "activo",
