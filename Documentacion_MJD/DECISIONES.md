@@ -12136,6 +12136,39 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.215) — ✅ EL BORRADOR DE ORDEN DE COMPRA **NO** CUENTA COMO COMPRADO (Daniel, 7-sep-2026)
+
+**Decisión pedida por el lead al construir la guarda de cancelación (fila 0.150) y contestada por Daniel
+en una línea:**
+
+> *«no cuenta como comprado»*
+
+**El contexto de la pregunta.** Daniel había dicho *«si no hay nada **comprado** ni producido y borra el
+pedido está bien cancelar en cascada»*, y «comprado» tiene **dos definiciones distintas** en el código,
+que `compras/comprometido-en-oc.ts` mantiene **a propósito separadas** (su TSDoc `:71-78` avisa de que
+copiar una en la otra *«habría dejado el defecto vivo»*):
+
+| Lista | Incluye borrador | Contesta |
+|---|---|---|
+| `ESTATUS_OC_QUE_CUBREN` (`:57`) | **SÍ** | *«¿hace falta volver a comprar esto?»* |
+| `ESTATUS_OC_COMPROMETIDA` (`:84`) | **NO** | *«¿ya me comprometí con el proveedor?»* |
+
+⇒ **La guarda usa `ESTATUS_OC_COMPROMETIDA`.** Un borrador **no compromete a nadie** frente al
+proveedor, así que **no impide cancelar** el pedido ni conserva la orden.
+
+📌 **Alcance:** esta decisión gobierna **la cancelación**. NO cambia el neteo de la explosión, que sigue
+contando el borrador para no duplicar la compra — son dos preguntas distintas y siguen con criterios
+distintos, que es justo lo que el archivo defiende.
+
+⚠️ **Y esta sección existe porque FALTABA.** La cita de Daniel estaba en el código, en
+`HISTORIAL-DE-VERSIONES.md` y en `docs/modulos/pedidos.md`, pero **en ninguna parte de `DECISIONES.md`**
+—que es donde `CLAUDE.md` §7 paso 2 obliga a registrarla—. Lo cazó el reviewer de la 0.150, no el
+verificador de documentos (que sólo cruza números de versión y el contador de filas). **Es la cicatriz
+del §8 otra vez: un dato repetido en varios sitios necesita un cruce, y aquí el sitio que faltaba era
+justo el maestro.**
+
+---
+
 #### (Post-F9.214) — 🔴 EL CÁRDIGAN SÍ VA COMO COMPLEMENTO (7-sep-2026): Daniel corrige una clasificación mal hecha del lead
 
 **Cómo se torció, porque la lección vale más que la corrección.** Al clasificar las filas pendientes se
@@ -12504,7 +12537,7 @@ con actividad**, nombrándolas; el pedido se cancela y esas OP siguen vivas.
 23 personas y *«yo sé cuándo fue sólo un error»* no se puede delegar — pero **la capacidad sí hay que
 dársela**, porque perderla sería que v2 fuera PEOR que Access en algo que usa.
 Condiciones, **todas**: cero movimientos de kardex · **ninguna OC que lo mencione, ni en borrador**
-(medido: los borradores ya cuentan como comprometido, `comprometido-en-oc.ts:56-63`) · ninguna receta
+(⚠️ **CORREGIDO 7-sep**: aquí se citó `comprometido-en-oc.ts:56-63` para decir que «los borradores ya cuentan como comprometido». **La cita era la lista EQUIVOCADA** —esas líneas son `ESTATUS_OC_QUE_CUBREN`, la que contesta *«¿hace falta volver a comprar?»* y **sí** incluye el borrador—. La lista de compromiso es `ESTATUS_OC_COMPROMETIDA` (`:84`) y **excluye** el borrador. Y Daniel decidió ese mismo día que **el borrador NO cuenta como comprado** — ver §Post-F9.215) · ninguna receta
 liberada. Si se cumplen, **no hay nada que auditar**: desaparecen pedido, renglones, OP, matrices **y
 los modelos de producción nacidos de él** —que es lo que devuelve los números de 5 dígitos—, y
 **sobrevive UN renglón de bitácora** con qué se descartó y por qué. *No queda el fantasma, pero queda
