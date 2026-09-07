@@ -63,7 +63,9 @@ function servidorFalso(cuerpo: MesaCuerpo): SimulacionMesa {
       subtotal: Math.round(g.subtotal * 100) / 100,
     })),
     precioTarget: targetDelCliente,
-    cumpleTarget: targetDelCliente === null ? null : cuerpo.precioObjetivo >= targetDelCliente,
+    // El target es el precio que el CLIENTE quiere PAGAR: cotizar por DEBAJO lo cumple (`<=`, con la
+    // igualdad dentro). Espejo exacto de `simularMesa` en el backend — si aquél cambia, esto cambia.
+    cumpleTarget: targetDelCliente === null ? null : cuerpo.precioObjetivo <= targetDelCliente,
   };
 }
 
@@ -377,8 +379,12 @@ describe('MesaNegociacion — el renglón en vivo', () => {
 
   /**
    * ⭐ §Post-F9.150 — **EL TARGET DEL CLIENTE, EN LA MESA.** *«y me debe de aparecer en la
-   * negociacion»*. INFORMA, NO BLOQUEA: por debajo del target dice «no llega» y **no deshabilita ni
+   * negociacion»*. INFORMA, NO BLOQUEA: pasarse del target dice «no llega» y **no deshabilita ni
    * esconde nada** — el margen, el precio sugerido y los costos siguen ahí, exactamente igual.
+   *
+   * 🔴 La DIRECCIÓN va en la aserción a propósito (Daniel, 6-sep-2026: *«Si el cliente pide 200 y le
+   * doy 190, claro que llega. Y si se pasa, entonces no llega»*): el precio nace en 106 contra un
+   * target de 100 —nos pasamos, «no llega»— y al bajarlo a 95 pasa a «llega».
    */
   it('⭐ el TARGET del cliente aparece con su veredicto, e informa sin bloquear', async () => {
     const usuario = userEvent.setup();
@@ -389,21 +395,21 @@ describe('MesaNegociacion — el renglón en vivo', () => {
     await waitFor(() => {
       expect(screen.getByTestId('mesa-target')).toHaveTextContent('$100.00');
     });
-    expect(screen.getByTestId('mesa-badge-target')).toHaveAttribute('data-cumple-target', 'true');
+    // El precio nace en 106 y el cliente quería pagar 100: NOS PASAMOS ⇒ «no llega».
+    expect(screen.getByTestId('mesa-badge-target')).toHaveAttribute('data-cumple-target', 'false');
 
-    // Se baja el precio por DEBAJO del target: avisa, y todo lo demás sigue funcionando.
+    // …y aun así NO bloquea: el margen sigue a la vista y todo queda operable.
+    expect(screen.getByTestId('mesa-margen')).not.toHaveTextContent('—');
+    expect(screen.getByTestId('celda-precio')).toBeEnabled();
+    expect(screen.getByTestId('abrir-guardar-mesa')).toBeEnabled();
+
+    // Se baja el precio por DEBAJO del target: ahora SÍ le llegamos.
     const precio = screen.getByTestId('celda-precio');
     await usuario.clear(precio);
     await usuario.type(precio, '95');
     await waitFor(() => {
-      expect(screen.getByTestId('mesa-badge-target')).toHaveAttribute(
-        'data-cumple-target',
-        'false',
-      );
+      expect(screen.getByTestId('mesa-badge-target')).toHaveAttribute('data-cumple-target', 'true');
     });
-    expect(screen.getByTestId('mesa-margen')).not.toHaveTextContent('—');
-    expect(screen.getByTestId('celda-precio')).toBeEnabled();
-    expect(screen.getByTestId('abrir-guardar-mesa')).toBeEnabled();
   });
 
   it('sin target del cliente NO se inventa ningún veredicto', async () => {

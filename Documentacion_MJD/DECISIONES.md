@@ -12136,6 +12136,261 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.210) — ⭐⭐ LA TANDA DEL 7-sep-2026: Daniel contesta once de los diecisiete hallazgos, y deja UNA abierta que es la más grande
+
+Contestó por lista, sobre el resumen que le entregó el lead. **Van sus palabras textuales** y, debajo,
+qué queda decidido. Lo que NO contestó se marca ⏳ y **no frena nada** (REGLA 0).
+
+---
+
+##### ✅ (14) el semáforo del target — **RATIFICADO**
+> *«1. OK»*
+
+Sale en la versión **0.123**. Ver §Post-F9.208.
+
+---
+
+##### ⏳🔴 (16) BORRAR vs CANCELAR — **ABIERTA, y es la decisión más grande de la tanda**
+> *«Que pasa si me cancelan un pedido, pero la OC ya esta producida? **No quiero que se borren las OP
+> en ese caso.** Pero si no hay nada comprado ni producido y borra el pedido esta bien cancelar en
+> cascada. **No quiero gastar modelos de produccion si me equivoque en dar de alta un pedido.** No sé
+> qué tan común es que me equivoque, pero seguramente me va a pasar en algún momento. **Hoy en access
+> todo eso lo controlo. Sé cuándo puedo borrar porque sólo fue un error y ni caso tiene dejar huella, y
+> sé cuándo hay que cancelar y dejar huella de lo que se hizo.** ¿Qué recomiendas?»*
+
+🔴 **PRIMERO, UN DEFECTO QUE SU PREGUNTA DESTAPÓ.** Las guardas de `cancelarPedido` en cascada
+(`dominio/pedidos/pedidos.ts:759`) son **sólo dos**: que ya esté cancelada, y que la orden esté
+**cerrada** (`exigirOrdenAbierta`, `cierre-orden.ts:102`). **NO hay ninguna guarda por producción,
+corte, WIP, compras ni recibos.** ⇒ **hoy, marcando la casilla de cascada, se cancela una OP aunque ya
+esté producida** — exactamente lo que él dice que no quiere. Eso no es diseño, es un hueco.
+
+**RECOMENDACIÓN DEL LEAD — dos cosas separadas, y sólo una es «borrar»:**
+
+**A · La guarda (no se discute, es el defecto de arriba).** La cascada debe **negarse a tocar las OP
+con actividad**, nombrándolas; el pedido se cancela y esas OP siguen vivas.
+
+**B · «DESCARTAR»: un borrado ACOTADO, con condiciones que verifica la MÁQUINA, no la memoria.**
+Ésa es la mejora sobre Access: allí **él** decide de memoria porque es el único que opera; en v2 son
+23 personas y *«yo sé cuándo fue sólo un error»* no se puede delegar — pero **la capacidad sí hay que
+dársela**, porque perderla sería que v2 fuera PEOR que Access en algo que usa.
+Condiciones, **todas**: cero movimientos de kardex · **ninguna OC que lo mencione, ni en borrador**
+(medido: los borradores ya cuentan como comprometido, `comprometido-en-oc.ts:56-63`) · ninguna receta
+liberada. Si se cumplen, **no hay nada que auditar**: desaparecen pedido, renglones, OP, matrices **y
+los modelos de producción nacidos de él** —que es lo que devuelve los números de 5 dígitos—, y
+**sobrevive UN renglón de bitácora** con qué se descartó y por qué. *No queda el fantasma, pero queda
+quién lo borró.* Con **permiso propio**, no un botón para todos.
+
+**Por qué el número de 5 dígitos y no los folios:** los folios de pedido/OP también se queman
+(`comun/secuencias.ts:51`, A3) pero **un hueco en la numeración no cuesta nada**. El de producción sí:
+son **999 por concepto×género**, lo consume el **Modelo** hijo (no la orden), y **ni descontinuarlo lo
+libera** — `consecutivosUsados` (`nomenclatura.ts:231-259`) lee `modelos` **sin filtrar por `activo`**.
+**Liberar el número sólo puede pasar en el descarte, JAMÁS al cancelar:** una OP cancelada después de
+producir conserva su número porque hay papeles con él; bajo las condiciones del descarte no los hay.
+
+📌 **NO es una reparación de datos viejos** (no lo mate nadie citando la REGLA 0-B): es capacidad
+nueva mirando hacia adelante, para lo que se capture de aquí en adelante. Él mismo lo dijo:
+*«seguramente me va a pasar en algún momento»*.
+
+⏳ **Falta que elija:** el descarte acotado (B), o sólo la mitad barata —liberar el número y seguir
+cancelando—, que deja la basura en pantalla.
+
+---
+
+##### ✅ (8) copiar modelo desde otro — **CERRADO SIN TRABAJO**
+> *«8 - ok»* — ya existe («Copiar receta de…»). Nada que hacer.
+
+##### ✅ (1) el comprador — **VA EN EL PROYECTO**
+> *«solo que ese catalogo debe de tener la opcion de seleccionar al comprador cuando se hace un
+> precosteo. **Normalmente un proyecto va dirigido a un solo comprador**»*
+
+⇒ FK **opcional** `idClienteContacto` en `Proyecto` + selector en su diálogo. El catálogo
+`ClienteContacto` ya existe completo (alta/baja y cambio de departamento incluidos, §Post-F9.152).
+
+##### ✅ (13) los avíos en la negociación — **UN SOLO RENGLÓN CON EL TOTAL**
+> *«si, solo quitarlos de la pantalla de negociacion y solo dejar **un solo registro de avios con el
+> total** de lo que esta en la ventana emergente»*
+
+⇒ Se filtra el desglose en `MesaNegociacion.tsx:313` y se deja el subtotal, que **ya lo calcula el
+servidor** (`desgloseCostoLinea`). El popup **ya existe**. Frontend puro.
+
+##### ✅ (7) avíos favoritos — **SE QUEDA COMO ESTÁ. CERO TRABAJO**
+> *«7 - ok de acuerdo, **dejalo asi como esta**»*
+
+Aceptó el argumento de §Post-F9.90 (su propia instrucción anterior + la regla de los ocho clics).
+**Registrado para que nadie lo vuelva a abrir.**
+
+##### ✅⭐ (12) el material sin catálogo — **VIVE EN LA MESA, NUNCA EN LA RECETA**
+> *«Si, pero eso en todo caso **debe de estar en la ventana de negociacion y no puede ser parte de la
+> receta**…. al final en desarrollo deben de poder cambiar la receta **después** de la negociación. El
+> problema que quede por ahí vivo en la OP lo que meto sin catálogo, es que **se duplican las cosas**.»*
+
+✅ **BUENA NOTICIA MEDIDA: lo que teme YA NO PASA.** Nada lleva un renglón de precosto ni de la mesa a
+la receta de la orden — `receta-orden.ts:302` copia **del BOM del MODELO**, y las únicas menciones de
+«precosto» en ese archivo son de **criterio compartido** (cómo promediar medidas, la bandera
+`ajustado`), nunca un camino de datos. **El material suelto muere en Desarrollo.**
+
+**DECISIÓN, con el matiz que la hace construible:** el texto libre se conserva **sólo en la mesa de
+negociación** (que es donde vive el caso de la jareta estimada, §Post-F9.139 — así **no se rompe** esa
+decisión suya anterior). El **precosteo deja de ser un tercer sitio** para teclear material: para
+**tela y avío** se exige el **catálogo**. ⚠️ **Los conceptos de COSTO** (corte, maquila, empaque y los
+que se inventen) **siguen libres**: ahí el texto libre *es* el punto, y prohibirlo sería malinterpretar.
+
+##### ✅ (3) consumo en corte/maquila/empaque — **SÓLO PRECIO**
+> *«Solo debe de llevar el precio. **no la cantidad**»*
+
+⇒ Era **especificación, no queja**. Se quita la casilla de Consumo que hoy se pinta sin condición al
+editar esos tres renglones (`DialogoPrecosto.tsx:552-560`). La columna sigue siendo nullable para todos.
+
+##### ✅ (9) la fecha de la lista — **SE QUEDA, ROTULADA «FECHA DE CITA»**
+> *«Ok, dejala… **solo ponle fecha de cita**»*
+
+⇒ Camino (a) de §Post-F9.—: **es la fecha de la junta**, no la de captura. Se etiqueta así, junto a
+`lugar`. Deja de parecer redundante con `creadoEn`. ⚠️ **Arrastra a `Cotizacion`**, que tiene la misma
+forma (`cotizaciones.ts:433`).
+
+##### ✅ (2) el género y el año — **EN EL PROYECTO, Y EL MODELO LO HEREDA**
+> *«**en el proyecto** y cada modelo hereda esa información (**con opción a cambiarla**)»*
+
+⇒ Campos en `Proyecto` (ni el `ClienteDepartamento` ni la `Temporada` los tienen hoy), y
+`crearDesarrolloConModeloNuevo` los **precarga** en vez de exigirlos en blanco. 🔑 **Vale más que la
+comodidad:** un modelo sin género/tipo **no se puede numerar**, y el error salta hasta «Generar OP»,
+**después de teclear la matriz completa** (`nomenclatura.ts:222`).
+
+##### ✅ (6) el cárdigan — **NÚMERO PROPIO**, y confirma lo medido
+> *«**Numero propio**, pero hoy **no se ve el campo de la segunda tela** para meter la info. Sólo se ve
+> el campo de la tela principal»*
+
+⇒ Confirma de primera mano el hueco de §—: `ModeloTela` tiene **un solo** `consumoPorPrenda`. Por eso
+`mrp.ts:3628-3631` deja el complemento **PENDIENTE** en cada OC automática y alguien lo teclea a mano,
+orden por orden. El consumo del complemento va como **número propio**, no como proporción del cuerpo.
+
+##### ✅ (11c) la descripción ampliada — **EN EL MODELO**
+> *«si, esta bien… **del modelo**»* ⇒ se escribe una vez y sale en todas sus cotizaciones.
+
+##### ✅ (0.149) el botón «pasar a producción» — **RATIFICADO**
+> *«De acuerdo con lo que dices del boton en el caso del modelo 54002 que tocamos»*
+
+---
+
+#### (Post-F9.209) — ⭐ EL BOTÓN QUE SE OFRECE Y NO PUEDE FUNCIONAR: «pasar a producción» sobre un modelo que ya tiene hijos (fila 0.149, 7-sep-2026)
+
+**Nació de una pregunta de Daniel, y la pregunta era mejor que su respuesta.** Textual:
+
+> *«me generó una OP y le puso por default el modelo de producción **54002**. Si me voy a ese modelo de
+> desarrollo, hay un botón que dice "pasar a producción", y me pide que le ponga un modelo de producción
+> y me ofrece poner el **54003**. ¿Qué pasa si lo pongo???»*
+
+✅ **La respuesta medida: NO PASA NADA MALO — se lo rechaza.** La **GUARDA A** de
+`promoverAProduccionNucleo` (`backend/src/dominio/modelos/nomenclatura.ts:775-787`) impide transformar un
+padre que ya tiene hijos, **y los nombra en el mensaje**:
+
+> *El modelo "…" ya tiene modelos de producción nacidos de él por color (54002): su número no es suyo, es
+> el de cada color. Pasarlo a producción le daría un número MÁS a la misma prenda. Si falta un color, sale
+> solo al generar la OP de ese color.*
+
+🔴 **Pero la incongruencia que él percibe es REAL, y son TRES sitios que no miran si hay hijos:**
+1. **El botón se pinta** con sólo `origen === 'desarrollo'` (`frontend/src/modulos/modelos/ModelosPagina.tsx:906`).
+2. **La propuesta le ofrece el 54003 a ciegas:** `consultarPropuestaProduccion`
+   (`nomenclatura.ts:1391-1408`) sólo comprueba `yaEnProduccion`; **no sabe que hay hijos**. Le sugiere un
+   número que el camino de escritura va a rechazar.
+3. **El aviso ámbar del diálogo** (`DialogoPasarAProduccion.tsx:165-173`) explica bien el peligro *general*
+   —*«Esto le da UN número a todo el modelo, no uno por color… No hay vuelta atrás»*— pero **no dice lo
+   único que aplica a su caso**: que a él ya no le va a dejar.
+
+⚠️ **Y el peligro ERA real antes de la primera OP.** Pulsado entonces **sí** funcionaba, y **no tiene
+vuelta atrás**: el modelo se queda con **UN número para todos sus colores** y **sus OP dejan de hacer
+nacer modelos por color para siempre**. Que hoy lo bloquee es la red de seguridad haciendo su trabajo;
+que se lo ofrezca es el defecto.
+
+🔑 **Los dos botones hacen lo OPUESTO, y el código ya lo decía en una línea** (`nomenclatura.ts:900-906`):
+> *«promover **transforma la fila** del desarrollo (un `update`: le cambia el código, le pone el número y
+> lo muda de catálogo); derivar **crea una fila NUEVA** y deja el desarrollo intacto y en su catálogo, que
+> es lo único que permite que de un mismo desarrollo salgan cuatro.»*
+
+📌 **Va junto con el punto 17 de sus hallazgos** (*«En la OP no veo el modelo de desarrollo…»*): es la misma
+carencia en la otra dirección. El linaje **existe en la base** (`Modelo.idModeloDesarrollo`) y **ninguna
+pantalla lo enseña** — ni del padre hacia los hijos ni del hijo hacia el padre. `esquemas/orden.ts:487-489`
+**ni siquiera lo transporta** al frontend.
+
+⭐ **Y el propio código había dejado la pregunta escrita, sin contestar** (`nomenclatura.ts:735-737`):
+*«La pregunta —¿se retira el botón del catálogo?— va planteada ahí.»* **El recorrido de Daniel la
+contestó: sí, cuando ya hay hijos.**
+
+---
+
+#### (Post-F9.208) — ⭐ EL SEMÁFORO DEL PRECIO TARGET ESTABA INVERTIDO (fila 0.148 → versión 0.123, 6/7-sep-2026)
+
+**Lo encontró Daniel probando la mesa de negociación.** Textual:
+
+> *«En la negociación hay un precio target y abajo hay una leyenda de "llega y no llega"….. no se a que se
+> refiere. **Esta al revés.** Si el cliente pide 200 y le doy 190, claro que llega. Y si se pasa, entonces
+> no llega. **La misma etiqueta en precio sugerido si esta bien.**»*
+
+🔴 **Era un DEFECTO, no una mejora — y el propio esquema lo delataba.** `ListaPreciosLinea.precioTarget`
+está documentado (`backend/prisma/schema.prisma:8818`, de §Post-F9.150) como **«TARGET PRICE del CLIENTE:
+el precio objetivo que ÉL nos da»** — o sea, **el precio que el cliente quiere PAGAR**. Cotizar por DEBAJO
+lo cumple. Pero `simularMesa` (`dominio/desarrollo/negociacion.ts:741`) calculaba:
+
+```ts
+cumpleTarget: datos.precioObjetivo >= precioTarget   // ❌ al revés
+```
+
+con `precioObjetivo` = **nuestro** precio de venta. **Consecuencia, con su propio ejemplo:**
+- target $200, cotizando **$190** → `190 >= 200` = `false` → **«no llega» en ROJO**, justo cuando sí se llega.
+- target $200, cotizando **$210** → `true` → **«llega» en VERDE**, estando caros.
+
+⇒ **El semáforo estaba al revés en los DOS sentidos**, no sólo la palabra: pintaba de verde el precio que
+no le sirve al cliente.
+
+**DECISIÓN — la dirección correcta es `<=`, y la IGUALDAD CUMPLE:** cotizarle exactamente su target es
+dárselo. Arreglo quirúrgico de una comparación.
+
+**Lo que NO se tocó, y por qué:**
+- **Los colores.** Con el booleano corregido, `default` (verde) / `destructive` (rojo) ya quedan bien;
+  cambiarlos lo habría vuelto a invertir.
+- **La otra etiqueta.** El `Cumple`/`Debajo` sobre el **margen** (`MesaNegociacion.tsx:467`, desde
+  `cumpleObjetivo`) es **otra comparación y es correcta** — lo confirmó el propio Daniel al reportar.
+
+⚠️ **Las pruebas DEFENDÍAN el defecto** (`negociacion.int.test.ts` :1171 / :1181 / :1263, escritas con la
+lógica vieja) y se voltearon. Se añadieron dos que antes no existían: **el caso de la igualdad** —sin él,
+un futuro `<` en vez de `<=` pasaría todas— y una que **clava la dirección con el ejemplo literal de
+Daniel** (200/190/210), para que esto no se pueda volver a invertir en silencio.
+
+**SIN migración, SIN permisos nuevos, SIN semilla.**
+
+---
+
+#### (Post-F9.207) — SEGUIR AÑADIENDO PDF A UN PEDIDO YA HECHO (fila 0.147, 7-sep-2026)
+
+**Pedido por Daniel mientras probaba el flujo real**, y **su razón es de diseño, no comodidad**:
+
+> *«es importante poder meter mas PDF al pedido ya hecho. Y prefiero siempre hacer una OP de la misma
+> manera **para tener toda la info completa de la OC del cliente**. […] Pero si ponlo como un punto a
+> corregir…. que se pueda seguir añadiendo mas PDF **aunque ya esten hechas algunas OP**.»*
+
+⚠️ **Corrige al lead.** Se le había propuesto el rodeo de *capturar el segundo modelo a mano* en el pedido
+bueno. **NO es equivalente:** se pierden los **SKUs**, los **packs**, la **referencia** y el **pantone** que
+el importador extrae del PDF. El rodeo le habría costado información.
+
+🔴 **MEDIDO: hoy es imposible.** `confirmarImportacionPdf` (`dominio/pedidos/importacion-pdf.ts:810`) hace
+`tx.pedido.create` (`:987`) — **el importador sólo sabe CREAR, nunca AÑADIR** — y el contrato
+(`esquemas/importacion-pdf.ts:400-425`) **ni siquiera acepta un pedido de destino**. Cada PDF nace en su
+propio pedido y la explosión no los junta.
+
+**El matiz que decide el tamaño es suyo: «aunque ya estén hechas algunas OP».** Permitir añadir a un pedido
+abierto es una cosa; permitirlo cuando ya parió órdenes obliga a decidir qué pasa con lo que ya nació —y eso
+**no está medido**: falta ver en `compras/mrp.ts` si la explosión junta renglones nuevos con OP vivas del
+mismo pedido.
+
+🔑 **Es la otra cara del punto 16 de sus hallazgos** (el importador crea el pedido y la OP de golpe, sin
+dejar verificar ni deshacer): **un flujo que sólo sabe crear** — ni añade, ni deja mirar antes, ni corregir
+después. **Se miden juntos.**
+
+📌 **Rodeo que él mismo usó para no frenarse:** meter la OP nueva desde su propio PDF y juntarlas en la
+explosión con «agregar una OP de otro pedido».
+
+---
+
 #### (Post-F9.206) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default. ✅ **P2 RATIFICADA por Daniel** (§Post-F9.205·1, con una adición) · ⏳ **P1, P3 y P4 siguen pendientes**
 
 **Lo que SÍ decidió Daniel ya está escrito y no se repite aquí:** es el punto **1 de §Post-F9.201** —

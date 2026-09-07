@@ -71,6 +71,38 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.123 · 7-sep-2026 · **en prueba** — **El semáforo del precio target estaba al revés: pintaba de verde el precio que NO le sirve al cliente**
+
+### Qué se puede hacer ahora que antes no
+
+- **Fiarse del semáforo del target en la mesa de negociación.** Cuando el cliente da su precio objetivo
+  —lo que él quiere pagar—, la mesa pone al lado una etiqueta que dice **«llega»** o **«no llega»**.
+  Estaba **invertida**: si el cliente pedía $200 y se le cotizaba **$190**, la pantalla marcaba
+  **«no llega» en rojo** — justo cuando sí se le llega. Y cotizando **$210** marcaba **«llega» en verde**,
+  estando caros. Ahora dice lo que pasa de verdad, en los dos sentidos.
+- **Cotizar exactamente el target cuenta como llegarle.** Darle al cliente su número al centavo es
+  cumplirlo, y así se pinta.
+
+### Qué cambió y puede sorprender
+
+- **Los renglones que ayer se veían verdes hoy se pueden ver rojos, y al revés.** No cambió ningún precio
+  ni ningún margen: **sólo se corrigió el letrero**. Si un modelo que parecía «llega» ahora dice
+  «no llega», es que siempre estuvo caro para ese cliente y el sistema lo estaba tapando.
+- **La otra etiqueta de la mesa NO se tocó.** La que dice **«Cumple» / «Debajo»** habla del **margen**
+  contra el objetivo interno, es otra cuenta y **estaba bien** — lo confirmó Daniel al reportar el fallo.
+- **El target sigue informando, no bloqueando.** Quedar por encima del target del cliente no impide
+  aprobar, cotizar ni imprimir; sólo se ve.
+
+### Qué sigue pendiente o roto
+
+- **Se encontró probando, y salieron 17 puntos más** en el mismo recorrido (del desarrollo del modelo
+  hasta las órdenes de compra). Éste es el único que era un **defecto**; el resto son huecos y remates,
+  ya medidos y en fila.
+- ⚠️ **El botón «Pasar a producción» sigue ofreciéndose cuando no debe.** Si un modelo de desarrollo ya
+  tiene modelos de producción nacidos por color, ese botón **no puede funcionar** —y el sistema lo
+  rechaza bien—, pero la pantalla **lo sigue pintando y hasta sugiere un número** que va a rechazar.
+  No hay riesgo para los datos; sí confusión. Queda en fila junto con enseñar el linaje del modelo.
+
 ## 0.122 · 6-sep-2026 · **en prueba** — **La tela que se manda a otro almacén ya se lleva su lote: el cortador por fin sabe de qué tono es lo que tiene**
 
 ### Qué se puede hacer ahora que antes no
