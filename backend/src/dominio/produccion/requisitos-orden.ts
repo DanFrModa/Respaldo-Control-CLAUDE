@@ -185,12 +185,24 @@ export function cambiosEstadoPorRequisitos(
 }
 
 /**
- * ¿La orden YA TIENE ACTIVIDAD DE PRODUCCIÓN? (≥1 `EtapaMovimiento` viva: corte o envío a maquila).
- * Es el cinturón de seguridad del des-completar: una orden que ya se está produciendo NO puede
- * degradarse a `capturada` por un cambio de catálogo — degradarla la sacaría de los tableros y
- * confundiría al piso. Los movimientos CANCELADOS no cuentan (esa actividad se deshizo).
+ * ¿La orden YA TIENE ACTIVIDAD DE PRODUCCIÓN? (≥1 `EtapaMovimiento` viva: corte, envío a maquila,
+ * recibo, entrega o empaque). Es el cinturón de seguridad del des-completar: una orden que ya se
+ * está produciendo NO puede degradarse a `capturada` por un cambio de catálogo — degradarla la
+ * sacaría de los tableros y confundiría al piso. Los movimientos CANCELADOS no cuentan (esa
+ * actividad se deshizo).
+ *
+ * ⭐ **EXPORTADA en la fila 0.150, y por una razón concreta:** esta misma pregunta estaba escrita
+ * A MANO en tres sitios más (la guarda de re-empaque de packs en `ordenes.ts` y las dos guardas de
+ * cancelación de `etapas.ts`, éstas acotadas por tipo). La fila que necesitaba una CUARTA copia
+ * —la guarda de cancelar el pedido, `actividad-orden.ts`— pagó la deuda en vez de agrandarla:
+ * `ordenes.ts` ya la llama, y `actividad-orden.ts` la REUSA como una de sus señales en lugar de
+ * duplicar el `count`.
+ *
+ * ⚠️ Contesta *«¿puedo degradar el semáforo?»*, que **no** es *«¿esta orden tiene vida?»*: sólo mira
+ * `EtapaMovimiento` y no ve compras, tela surtida, notas, cierres, EsMa, costo ni EDR. Para eso
+ * está {@link senalesDeActividadOrden} (`actividad-orden.ts`), que es más amplia y la incluye.
  */
-async function tieneActividadProduccion(tx: Tx, idOrden: number): Promise<boolean> {
+export async function tieneActividadProduccion(tx: Tx, idOrden: number): Promise<boolean> {
   const vivos = await tx.etapaMovimiento.count({ where: { idOrden, canceladoEn: null } });
   return vivos > 0;
 }

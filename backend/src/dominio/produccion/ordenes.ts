@@ -152,7 +152,11 @@ import {
   packsPorColor,
 } from './packs.js';
 import { copiarRecetaDelModelo } from './receta-orden.js';
-import { recalcularEstadoOrden, requisitosOrden } from './requisitos-orden.js';
+import {
+  recalcularEstadoOrden,
+  requisitosOrden,
+  tieneActividadProduccion,
+} from './requisitos-orden.js';
 
 /** Clave de la secuencia de folios de órdenes (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN = 'orden';
@@ -569,8 +573,9 @@ async function sincronizarMatriz(
   );
   const reempacados = coloresReempacados(packsAntes, packsDespues);
   if (reempacados.length > 0) {
-    const vivas = await tx.etapaMovimiento.count({ where: { idOrden, canceladoEn: null } });
-    if (vivas > 0) {
+    // ⭐ 0.150: la MISMA pregunta que protege el des-completar, y la que la guarda de cancelar
+    // el pedido reusa como señal. Era el segundo de tres `count` idénticos escritos a mano.
+    if (await tieneActividadProduccion(tx, idOrden)) {
       throw new ErrorConflicto(
         'Esta orden ya tiene producción capturada (corte o entrega a maquila), y esas piezas se ' +
           'guardaron con el pack que tenía la matriz: ya no se le pueden cambiar los packs a un ' +
@@ -1220,6 +1225,22 @@ export async function copiarDetalleOrden(
  * Cancela una orden (cancelación SUAVE): `estado='cancelada'` + `motivoCancelada` (OBLIGATORIO) +
  * bitácora `CANCELAR`. La orden sigue consultable; no se borra. Cancelar dos veces es conflicto.
  * Permiso propio: `ordenes.cancelar`.
+ *
+ * ⭐⭐ **0.150 — POR QUÉ AQUÍ *NO* SE APLICA la guarda de «esta orden ya tiene vida»**
+ * ({@link senalesDeActividadOrden}), que sí frena la cascada de `cancelarPedido`. No es un
+ * descuido: es la diferencia entre un BARRIDO y un ACTO.
+ *  • La cascada del pedido cancela órdenes que el usuario **no eligió una por una** —pidió parar el
+ *    pedido, no matar la OP que el piso está cosiendo—, así que ahí la guarda protege de un daño
+ *    que nadie decidió. Es lo que pidió DANIEL: *«no quiero que se borren las OP en ese caso»*.
+ *  • Esta puerta es lo contrario: alguien ABRIÓ esa orden, tiene `ordenes.cancelar` y escribió un
+ *    motivo obligatorio que queda en bitácora. Es una decisión consciente sobre UNA orden.
+ *
+ * 🔑 Y hay una razón dura, no sólo de criterio: **el mensaje de la cascada manda justo aquí.** Al
+ * conservar una OP con vida, el aviso dice *«cancélalas una por una desde Órdenes»*. Si esta puerta
+ * también bloqueara, ese aviso nombraría una salida que no existe — exactamente el defecto que la
+ * 0.150 vino a cerrar en el mensaje de la orden CERRADA (*«o cancela el pedido sin arrastrar las
+ * OPs»*, una puerta imaginaria). Una guarda aquí dejaría al usuario sin ninguna forma de parar una
+ * OP que de verdad hay que parar.
  */
 export async function cancelarOrden(
   sesion: SesionUsuario,

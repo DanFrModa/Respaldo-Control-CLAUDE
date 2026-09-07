@@ -48,6 +48,23 @@ de pedidos reales con su seguimiento. Los importes se ocultan según permiso.
 - **A3 folio por secuencia:** `"pedido"` por empresa; sustituye `AumentarNumPed` (Max()+1).
 - **A7 auditoría:** `creadoPorId`/`modificadoPorId` + `Bitacora` en la misma tx.
 - **Cancelación suave:** `pedCancelado` — el pedido nunca se borra, sigue consultable.
+- **⭐⭐ Cancelar el pedido NO se lleva las OP que ya tienen vida (0.150).** DANIEL: *«¿Qué pasa si me
+  cancelan un pedido, pero la OC ya está producida? **No quiero que se borren las OP en ese caso.**
+  Pero si no hay nada comprado ni producido y borra el pedido está bien cancelar en cascada.»* La
+  casilla *«cancelar también sus órdenes»* cancela **sólo las OP sin movimientos**; las demás se
+  **conservan y se nombran** (la respuesta trae `ordenesConservadas` + un `aviso` ya redactado, y la
+  bitácora del pedido guarda el par simétrico `ordenesCanceladas` / `ordenesConservadas`). El pedido
+  se cancela igual: **nunca queda atrapado** —que era el callejón de la orden CERRADA, cuyo mensaje
+  llegó a ofrecer una salida que no existía en el código—.
+  - El criterio de *«esta orden tiene vida»* es **único** y vive en
+    `backend/src/dominio/produccion/actividad-orden.ts` (`senalesDeActividadOrden`): cierre, receta
+    liberada/reabierta, etapas vivas, cierres de maquila, cargos EsMa, notas de salida, compras
+    **comprometidas** (⭐ el BORRADOR de OC **no** cuenta — Daniel: *«no cuenta como comprado»*),
+    kardex de PT / TELA / AVÍOS, ruta crítica capturada, hitos, auditorías, costo y EDR. **No**
+    cuentan los derivados regenerables (snapshot del MRP, ruta sólo generada, receta congelada) ni
+    nada cancelado/deshecho/anulado.
+  - **Cancelar UNA orden a mano (`ordenes.cancelar`) sigue sin esa guarda**, a propósito: es un acto
+    consciente con motivo obligatorio, y es la salida que el propio aviso ofrece.
 
 ## Migración de datos reales (F2-E5)
 
