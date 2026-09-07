@@ -26,6 +26,8 @@ import {
 } from '../../contrato/esquemas/pedido.js';
 import type {
   DatosPedidoLineaEntrada,
+  OrdenConservadaSalida,
+  PedidoCancelarSalida,
   PedidoLineaSalida,
   PedidoSalida,
 } from '../../contrato/esquemas/pedido.js';
@@ -52,6 +54,9 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA (`dominio/produccion/cierre-orden.ts`).
 import { exigirOrdenAbierta } from '../produccion/cierre-orden.js';
+// ⭐⭐ 0.150: el criterio ÚNICO de «esta orden ya tiene vida» + el lock que lo hace confiable (A2).
+import { senalesDeActividadOrden, textoSenalesActividad } from '../produccion/actividad-orden.js';
+import { bloquearEtapasDeOrden } from '../produccion/recibos.js';
 
 import {
   filtroOrdenesVivasDeLineas,
@@ -740,19 +745,38 @@ export async function copiarPedido(
 
 /**
  * ⭐ V1-E4 (punto 5) — Cancela un pedido (cancelación SUAVE, doc 02 §4.2) DICIENDO LA VERDAD.
+ * ⭐⭐ Fila 0.150 — y SIN llevarse por delante las OPs que ya se están produciendo.
  *
- * El defecto: la pantalla prometía que el pedido "deja de producirse", pero cancelar solo ponía
- * `pedCancelado = true`. Sus OPs seguían VIVAS —en el centro de órdenes, en el tablero de WIP, en
- * la ruta crítica y en el MRP— y se seguían cortando. La mentira no truena en ningún lado: el
- * usuario cree que paró la producción y la producción sigue.
+ * El defecto original (V1-E4): la pantalla prometía que el pedido "deja de producirse", pero
+ * cancelar solo ponía `pedCancelado = true`. Sus OPs seguían VIVAS —en el centro de órdenes, en el
+ * tablero de WIP, en la ruta crítica y en el MRP— y se seguían cortando.
  *
- * Las dos salidas honestas, y ninguna otra:
+ * El defecto de la 0.150, en palabras de DANIEL probando el flujo real: *«¿Qué pasa si me cancelan
+ * un pedido, pero la OC ya está producida? **No quiero que se borren las OP en ese caso.** Pero si
+ * no hay nada comprado ni producido y borra el pedido está bien cancelar en cascada.»* Y el sistema
+ * hacía justo lo contrario: la cascada sólo se frenaba ante una orden CERRADA, así que marcando la
+ * casilla se cancelaba una OP **aunque ya estuviera cortada, enviada, comprada y auditada**.
+ *
+ * Las salidas honestas, y ninguna otra:
  *  • el pedido NO tiene OPs vivas → se cancela, como siempre;
  *  • sí las tiene y NO se pidió cancelarlas → `ErrorConflicto` que las NOMBRA por su FOLIO, para
  *    que el usuario vaya a verlas y decida;
- *  • sí las tiene y se pidió `cancelarOrdenes` → se cancelan TODAS en la MISMA transacción (A2),
- *    con su motivo y su bitácora una por una (nunca un conteo, D3). Eso exige `ordenes.cancelar`:
- *    el mismo permiso que cancelar una OP a mano, porque es exactamente lo que está pasando.
+ *  • sí las tiene y se pidió `cancelarOrdenes` → **se separan en dos grupos** con el criterio único
+ *    de {@link senalesDeActividadOrden}: las LIMPIAS se cancelan en la MISMA transacción (A2), con
+ *    su motivo y su bitácora una por una (nunca un conteo, D3); las que YA TIENEN VIDA se
+ *    **conservan y se NOMBRAN** en la respuesta, con el porqué. Eso exige `ordenes.cancelar`: el
+ *    mismo permiso que cancelar una OP a mano, porque es exactamente lo que está pasando.
+ *
+ * 🔑 **NO se rechaza todo.** Rechazar dejaría al usuario sin ninguna manera de cancelar el pedido
+ * —que es lo que de verdad quiere— y es justo el callejón en el que caía la orden CERRADA hasta
+ * esta fila: sin cascada la rechazaba el aviso de OPs vivas, y con cascada la rechazaba el freno
+ * del cierre, cuyo mensaje ofrecía además *«o cancela el pedido sin arrastrar las OPs»* — **una
+ * puerta que no existía en el código**. Ahora la orden cerrada es simplemente una más de las que se
+ * conservan, y ese mensaje desapareció con su puerta imaginaria.
+ *
+ * ⚠️ **A2 — el bloqueo:** antes de mirar la actividad de una orden se toma su
+ * `bloquearEtapasDeOrden` (el MISMO advisory lock que usan el envío y el recibo), para que un corte
+ * capturado entre la comprobación y el `update` no se pierda.
  *
  * Cancelar dos veces sigue siendo `ErrorConflicto`.
  */
@@ -762,7 +786,7 @@ export async function cancelarPedido(
   cuerpo: z.input<typeof esquemaPedidoCancelarCuerpo> = {},
   bd?: ContextoBd,
   archivos: ServicioArchivos = servicioArchivos(),
-): Promise<PedidoSalida> {
+): Promise<PedidoCancelarSalida> {
   verificarPermiso(sesion, 'pedidos.administrar');
   const datos = validarEntrada(esquemaPedidoCancelarCuerpo, cuerpo);
   const motivo = datos.motivo === undefined || datos.motivo === '' ? null : datos.motivo;
@@ -778,7 +802,7 @@ export async function cancelarPedido(
     }
   }
 
-  await enTransaccion(async (tx) => {
+  const desenlace = await enTransaccion(async (tx) => {
     const actual = await exigirPedido(tx, id, sesion.idEmpresaActiva);
     if (actual.pedCancelado) {
       throw new ErrorConflicto(`El pedido ${Number(actual.folio)} ya está cancelado.`);
@@ -791,49 +815,52 @@ export async function cancelarPedido(
         estado: { not: 'cancelada' },
         pedidoLinea: { idPedido: id },
       },
-      // ⭐ 0.061: `cerradaEn` es lo que decide si la orden admite escritura. Sin traerla, este
-      // barrido pisaba órdenes CERRADAS (ver abajo).
-      select: { id: true, folio: true, estado: true, cerradaEn: true },
+      // ⭐ 0.061: `cerradaEn` es lo que decide si la orden admite escritura.
+      // ⭐ 0.150: las otras dos fechas son SEÑALES de actividad que ya viajan en esta misma fila —
+      // preguntarlas aquí sale gratis y le ahorra una consulta por orden a la guarda.
+      select: {
+        id: true,
+        folio: true,
+        estado: true,
+        cerradaEn: true,
+        recetaLiberadaEn: true,
+        recetaAbiertaEn: true,
+      },
       orderBy: { folio: 'asc' },
     });
+
+    const canceladas: number[] = [];
+    const conservadas: OrdenConservadaSalida[] = [];
 
     if (ordenesVivas.length > 0) {
       if (datos.cancelarOrdenes !== true || motivo === null) {
         const folios = ordenesVivas.map((o) => String(Number(o.folio))).join(', ');
         throw new ErrorConflicto(
-          `El pedido ${Number(actual.folio)} tiene ${String(ordenesVivas.length)} orden(es) de producción VIVA(S) (${folios}): cancelarlo NO las detiene, se seguirían cortando. Cancélalas también (marca la opción y captura el motivo) o cancélalas una por una desde Órdenes.`,
-        );
-      }
-
-      // ⭐⭐ 0.061 — LA PUERTA 17, Y LA ÚNICA QUE ESCRIBÍA EN CASCADA (§Post-F9.154(c)).
-      //
-      // Este barrido cancela las OPs del pedido escribiendo `tx.orden.update` DIRECTO, sin pasar
-      // por `cancelarOrden`. Y su filtro es «no cancelada», así que una orden CERRADA entraba: se
-      // quedaba con `estado='cancelada'` y `cerradaEn` PUESTA a la vez —dos finales para la misma
-      // orden—, con el costo congelado todavía en vigor (`divisorCongelado` mira `cerradaEn`, no el
-      // estado). Y peor: la ficha esconde «Reabrir» cuando el estado es `cancelada`, así que la
-      // orden quedaba atrapada desde la pantalla; reabrirla por API le borraba la cancelación,
-      // porque el estado se vuelve a derivar de los requisitos. Es el mismo agujero que
-      // `realinearEstadoOrdenes` ya tenía tapado (`notIn: ['cancelada','cerrada']`), destapado en
-      // el otro extremo del sistema.
-      //
-      // 🔑 SE RECHAZA NOMBRÁNDOLAS, que es lo que hace el resto del sistema con una orden cerrada
-      // (no se la salta en silencio): quien cancela el pedido tiene que decidir a conciencia sobre
-      // una orden que YA terminó su vida administrativa y cuyo costo está cerrado. Reabrirla es un
-      // acto con permiso y bitácora, y tiene que seguir siéndolo también por este camino.
-      const cerradas = ordenesVivas.filter((o) => o.cerradaEn !== null);
-      if (cerradas.length > 0) {
-        const foliosCerrados = cerradas.map((o) => String(Number(o.folio))).join(', ');
-        throw new ErrorConflicto(
-          `El pedido ${Number(actual.folio)} tiene ${String(cerradas.length)} orden(es) CERRADA(S) (${foliosCerrados}): su costo quedó congelado y no se pueden cancelar en cascada. Reábrelas primero (permiso "ordenes.cerrar" — queda auditado) o cancela el pedido sin arrastrar las OPs.`,
+          `El pedido ${Number(actual.folio)} tiene ${String(ordenesVivas.length)} orden(es) de producción VIVA(S) (${folios}): cancelarlo NO las detiene, se seguirían cortando. Marca la opción y captura el motivo para cancelar en cascada las que todavía no tienen movimientos (las que ya se están produciendo se conservan, y te digo cuáles), o cancélalas una por una desde Órdenes.`,
         );
       }
 
       const motivoOrden = `Pedido ${Number(actual.folio)} cancelado: ${motivo}`;
       for (const orden of ordenesVivas) {
-        // Cinturón: la comprobación de arriba da el mensaje bueno (las nombra TODAS de una vez);
-        // ésta es la guarda ÚNICA del sistema, y sigue aquí para que un cambio futuro en la
-        // consulta no vuelva a abrir el agujero en silencio.
+        // ⚠️ A2: el MISMO advisory lock del envío/recibo, tomado ANTES de mirar la actividad. Sin
+        // él, un corte capturado entre el conteo y el `update` se perdería en silencio.
+        await bloquearEtapasDeOrden(tx, sesion.idEmpresaActiva, orden.id);
+
+        // ⭐⭐ 0.150 — EL CRITERIO ÚNICO. Si la orden tiene vida, NO se toca: se conserva y se
+        // nombra. Daniel: *"no quiero que se borren las OP en ese caso"*.
+        const senales = await senalesDeActividadOrden(tx, orden);
+        if (senales.length > 0) {
+          conservadas.push({
+            id: orden.id,
+            folio: Number(orden.folio),
+            porque: textoSenalesActividad(senales),
+          });
+          continue;
+        }
+
+        // Cinturón: la orden CERRADA ya salió por `senales` (`cerrada` es una de ellas); esta
+        // guarda —la ÚNICA del sistema para el estado cerrado— sigue aquí para que un cambio futuro
+        // en el criterio no vuelva a abrir el agujero en silencio.
         exigirOrdenAbierta(orden, 'puede cancelar en cascada al cancelar su pedido');
         await tx.orden.update({
           where: { id: orden.id },
@@ -843,6 +870,7 @@ export async function cancelarPedido(
             ...datosModificacion(sesion),
           },
         });
+        canceladas.push(Number(orden.folio));
         // Bitácora POR ORDEN (A7/D3): cada OP cancelada deja su propio rastro, igual que si se
         // hubiera cancelado a mano. Un solo renglón "se cancelaron N" no serviría para auditar.
         await registrarBitacora(tx, sesion, {
@@ -870,12 +898,45 @@ export async function cancelarPedido(
       datos: {
         folio: Number(actual.folio),
         ...(motivo === null ? {} : { motivo }),
-        ordenesCanceladas: ordenesVivas.map((o) => Number(o.folio)),
+        ordenesCanceladas: canceladas,
+        // ⭐ 0.150 — el par SIMÉTRICO: sin él, la bitácora diría "se canceló el pedido y estas dos
+        // OPs" y callaría que otras tres siguen vivas. Auditar es saber qué NO pasó, también.
+        ordenesConservadas: conservadas.map((o) => ({ folio: o.folio, porque: o.porque })),
       },
     });
+
+    return { canceladas, conservadas };
   }, bd);
 
-  return obtenerPedido(sesion, id, bd, archivos);
+  const pedido = await obtenerPedido(sesion, id, bd, archivos);
+  return {
+    pedido,
+    foliosOrdenesCanceladas: desenlace.canceladas,
+    ordenesConservadas: desenlace.conservadas,
+    aviso: avisoOrdenesConservadas(pedido.folio, desenlace.conservadas),
+  };
+}
+
+/**
+ * El AVISO de las OPs que sobrevivieron a la cascada, ya redactado (o `null` si no sobrevivió
+ * ninguna). Sigue el estilo del 409 que rechaza el pedido con OPs vivas: **las nombra por folio**,
+ * dice **qué pasa si no se hace nada** y **ofrece las salidas**.
+ *
+ * Vive en el DOMINIO —y no en la pantalla— por A1 y por la razón de siempre: dos sitios que
+ * redactan el mismo hecho acaban diciéndolo distinto. Lo consume el toast del diálogo tal cual.
+ */
+function avisoOrdenesConservadas(
+  folioPedido: number,
+  conservadas: readonly OrdenConservadaSalida[],
+): string | null {
+  if (conservadas.length === 0) return null;
+  const detalle = conservadas.map((o) => `${String(o.folio)} (${o.porque})`).join('; ');
+  return (
+    `Se canceló el pedido ${String(folioPedido)}, pero ${String(conservadas.length)} orden(es) de ` +
+    `producción siguen VIVAS porque ya tienen movimientos: ${detalle}. Cancelar el pedido NO las ` +
+    'detiene: se seguirían produciendo. Si de verdad hay que pararlas, cancélalas una por una ' +
+    'desde Órdenes (queda auditado); si ya se produjeron, déjalas terminar.'
+  );
 }
 
 /** Obtiene un pedido (con cliente, renglones y fotos de modelo) o lanza `ErrorNoEncontrado`. */

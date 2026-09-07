@@ -102,6 +102,53 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - 🔶 **Queda la mitad gemela, y hay que saberlo:** las marcas de **«con esto queda cubierto»** hechas
   bajo un color **no las ve** el renglón junto, así que ese faltante se puede volver a perseguir. Es la
   fila 0.162; no se arregló aquí porque toca qué significa «dar por cubierto», que es decisión de Daniel.
+## 0.124 · 7-sep-2026 · **en prueba** — **Cancelar un pedido ya no apaga las órdenes que YA se están produciendo**
+
+### Qué se puede hacer ahora que antes no
+
+- **Cancelar un pedido sin miedo a llevarte por delante lo que ya se trabajó.** Antes, marcando la
+  casilla de «cancelar también sus órdenes», el sistema las cancelaba **todas** — aunque una ya
+  estuviera cortada, enviada a maquila, con tela surtida o con material comprado. Ahora las que tienen
+  trabajo hecho **se quedan vivas**, y el sistema **te dice cuáles y por qué**: *«la orden 5566 se
+  conserva: ya tiene corte capturado y material comprado»*.
+- **Se acabó un atasco que no tenía salida.** Un pedido con una orden ya **cerrada** no se podía
+  cancelar por ningún camino: si no marcabas la casilla te decía que había órdenes vivas, y si la
+  marcabas te decía que una estaba cerrada. Encima el mensaje te ofrecía *«o cancela el pedido sin
+  arrastrar las OPs»*, **una salida que no existía**. Ahora ese pedido se cancela y su orden cerrada
+  simplemente se conserva.
+
+### Qué cambió y puede sorprender
+
+- **Marcar la casilla ya no significa «cancela todas».** Significa «cancela las que se puedan». El
+  aviso al terminar dice cuántas se cancelaron y cuáles se conservaron, con su motivo.
+- **Qué cuenta como «ya tiene trabajo»** — quince cosas, y basta una: la orden está cerrada · su
+  receta está liberada o abierta para corregir · hay corte, envío, recibo, entrega o empaque · hay
+  cierre de maquila · hay cargos al maquilero · hay notas de salida de material · hay **compras
+  comprometidas** · hay movimientos de almacén de **producto terminado, tela o avíos** · hay ruta
+  crítica con fechas capturadas · hay hitos, auditorías de calidad, costo congelado o facturación.
+- ⭐ **Un borrador de orden de compra NO cuenta** — decisión de Daniel: *«no cuenta como comprado»*.
+  Un borrador no compromete a nadie con el proveedor, así que no impide cancelar.
+- ⭐ **Una actividad que se canceló tampoco cuenta.** Si cortaste y luego cancelaste ese corte, la
+  orden vuelve a poder cancelarse. Parece obvio y no lo era: cancelar un movimiento de almacén escribe
+  el movimiento contrario **con el mismo número de orden**, así que contar «cuántos movimientos tiene»
+  nunca daba cero. Sin cuidar eso, la orden habría quedado bloqueada para siempre.
+- ⭐ **Y tampoco cuenta lo que el sistema se marcó a sí mismo.** Al programar la ruta crítica, los
+  procesos que duran cero días **nacen ya completados** — los completa el sistema, no una persona. Se
+  ven exactamente igual que un proceso capturado, así que **sólo programar la ruta bastaba para que la
+  orden se negara a cancelarse**, diciendo *«ya tiene procesos capturados»* cuando nadie había
+  capturado nada. Y eso pega justo donde duele: la ruta se programa **en la planeación, antes de
+  cortar**. Ahora se distingue lo que puso el sistema de lo que puso alguien.
+- ⭐ **Una nota de salida en BORRADOR no cuenta.** Si está sin confirmar, no ha salido un solo avío del
+  almacén — mismo criterio que el borrador de orden de compra.
+- **Cancelar UNA orden suelta, desde Órdenes, sigue sin pedir nada.** Es a propósito: ahí es un acto
+  consciente sobre una sola orden, con motivo obligatorio, y es justo la salida que el aviso del
+  pedido te ofrece. Ponerle un candado dejaría sin forma de parar una orden que sí hay que parar.
+
+### Qué sigue pendiente o roto
+
+- **El aviso de «no marcaste la casilla» no separa cuáles tienen trabajo.** Te nombra todas las
+  órdenes vivas y te avisa de que las que ya se producen se conservarán, pero no te dice de antemano
+  cuáles son. Se sabe al cancelar.
 
 ## 0.123 · 7-sep-2026 · **en prueba** — **El semáforo del precio target estaba al revés: pintaba de verde el precio que NO le sirve al cliente**
 

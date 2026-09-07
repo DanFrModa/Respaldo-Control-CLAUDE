@@ -21614,7 +21614,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Cancelar un pedido (cancelación suave; opcionalmente también sus OPs) */
+    /** Cancelar un pedido (cancelación suave; opcionalmente también sus OPs sin movimientos) */
     post: {
       parameters: {
         query?: never;
@@ -21636,90 +21636,106 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Pedido interno (encabezado + renglones). */
+        /** @description Resultado de cancelar un pedido (con el desenlace de cada OP). */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             'application/json': {
-              /** @description Id interno del pedido. */
-              id: number;
-              /** @description Folio consecutivo por empresa. */
-              folio: number;
-              /** @description Empresa dueña del pedido y del folio. */
-              idEmpresa: number;
-              /** @description Cliente del pedido. */
-              idCliente: number;
-              /** @description Nombre del cliente (para la UI). */
-              cliente: string;
-              /** @description Fecha del pedido (YYYY-MM-DD), o null. */
-              fechaPedido: string | null;
-              /** @description Ventana de entrega — desde, o null. */
-              fechaDe: string | null;
-              /** @description Ventana de entrega — hasta, o null. */
-              fechaHasta: string | null;
-              /** @description Fecha de tela, o null. */
-              fechaTela: string | null;
-              /** @description Fecha de elaboración, o null. */
-              fechaElaboracion: string | null;
-              /** @description Marca de entregado a tienda. */
-              entregadoTienda: boolean;
-              /** @description Marcado para no producir. */
-              noProducir: boolean;
-              /** @description Cancelación suave: el pedido sigue consultable. */
-              pedCancelado: boolean;
-              /** @description OC original del cliente (R3, B3 — captura viva del pedido), o null. */
-              ocCliente: string | null;
-              /** @description Snapshot migrado de SOLO LECTURA: orden de compra ligada en el viejo (sin FK hasta F4). */
-              idOrdCompraV1: number | null;
-              /** @description Suma de las cantidades pedidas de los renglones. */
-              totalPiezas: number;
-              /** @description Suma de los importes (Σ cantidad × precio), o null si no puede ver importes. */
-              totalImporte: number | null;
-              /** @description Renglones del pedido. */
-              lineas: {
-                /** @description Id del renglón. */
+              /** @description El pedido ya cancelado. */
+              pedido: {
+                /** @description Id interno del pedido. */
                 id: number;
-                /** @description Id del modelo pedido. */
-                idModelo: number;
-                /** @description Código del modelo (para la UI). */
-                codigoModelo: string;
-                /** @description Descripción del modelo, o null. */
-                descripcionModelo: string | null;
-                /** @description URL prefirmada de la foto principal del modelo, o null. */
-                urlFotoModelo: string | null;
-                /** @description Cantidad pedida. */
-                cantidadPedida: number;
-                /** @description Precio por prenda, o null si la sesión no puede ver importes. */
-                precio: number | null;
-                /** @description Importe del renglón (cantidad × precio), o null si no puede ver importes. */
-                importe: number | null;
-                /** @description Snapshot migrado de SOLO LECTURA: cantidad ya entregada en el viejo (no saldo vivo). */
-                entregadoParcialV1: number | null;
-                /** @description Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo). */
-                cantFaltanteV1: number | null;
-                /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
-                idDesarrollo: number | null;
-                /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
-                numeroProduccion: number | null;
-                /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
-                numerosProduccion: number[];
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /** @description Empresa dueña del pedido y del folio. */
+                idEmpresa: number;
+                /** @description Cliente del pedido. */
+                idCliente: number;
+                /** @description Nombre del cliente (para la UI). */
+                cliente: string;
+                /** @description Fecha del pedido (YYYY-MM-DD), o null. */
+                fechaPedido: string | null;
+                /** @description Ventana de entrega — desde, o null. */
+                fechaDe: string | null;
+                /** @description Ventana de entrega — hasta, o null. */
+                fechaHasta: string | null;
+                /** @description Fecha de tela, o null. */
+                fechaTela: string | null;
+                /** @description Fecha de elaboración, o null. */
+                fechaElaboracion: string | null;
+                /** @description Marca de entregado a tienda. */
+                entregadoTienda: boolean;
+                /** @description Marcado para no producir. */
+                noProducir: boolean;
+                /** @description Cancelación suave: el pedido sigue consultable. */
+                pedCancelado: boolean;
+                /** @description OC original del cliente (R3, B3 — captura viva del pedido), o null. */
+                ocCliente: string | null;
+                /** @description Snapshot migrado de SOLO LECTURA: orden de compra ligada en el viejo (sin FK hasta F4). */
+                idOrdCompraV1: number | null;
+                /** @description Suma de las cantidades pedidas de los renglones. */
+                totalPiezas: number;
+                /** @description Suma de los importes (Σ cantidad × precio), o null si no puede ver importes. */
+                totalImporte: number | null;
+                /** @description Renglones del pedido. */
+                lineas: {
+                  /** @description Id del renglón. */
+                  id: number;
+                  /** @description Id del modelo pedido. */
+                  idModelo: number;
+                  /** @description Código del modelo (para la UI). */
+                  codigoModelo: string;
+                  /** @description Descripción del modelo, o null. */
+                  descripcionModelo: string | null;
+                  /** @description URL prefirmada de la foto principal del modelo, o null. */
+                  urlFotoModelo: string | null;
+                  /** @description Cantidad pedida. */
+                  cantidadPedida: number;
+                  /** @description Precio por prenda, o null si la sesión no puede ver importes. */
+                  precio: number | null;
+                  /** @description Importe del renglón (cantidad × precio), o null si no puede ver importes. */
+                  importe: number | null;
+                  /** @description Snapshot migrado de SOLO LECTURA: cantidad ya entregada en el viejo (no saldo vivo). */
+                  entregadoParcialV1: number | null;
+                  /** @description Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo). */
+                  cantFaltanteV1: number | null;
+                  /** @description Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2). */
+                  idDesarrollo: number | null;
+                  /** @description Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`). */
+                  numeroProduccion: number | null;
+                  /** @description ⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`). */
+                  numerosProduccion: number[];
+                }[];
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              };
+              /** @description Folios de las OPs que SÍ se cancelaron en cascada. */
+              foliosOrdenesCanceladas: number[];
+              /** @description OPs que siguen VIVAS porque ya tienen movimientos, con su razón. */
+              ordenesConservadas: {
+                /** @description Id de la orden que sigue viva. */
+                id: number;
+                /** @description Folio de la orden (con el que el usuario la busca). */
+                folio: number;
+                /** @description Por qué se conservó, en lenguaje de negocio ("ya tiene producción capturada…"). */
+                porque: string;
               }[];
-              /**
-               * Format: date-time
-               * @description Fecha de alta (ISO 8601).
-               */
-              creadoEn: string;
-              /** @description Id del usuario que lo creó. */
-              creadoPorId: string | null;
-              /**
-               * Format: date-time
-               * @description Fecha de la última modificación (ISO 8601).
-               */
-              modificadoEn: string;
-              /** @description Id del último usuario que lo modificó. */
-              modificadoPorId: string | null;
+              /** @description Aviso listo para mostrar cuando quedaron OPs vivas, o null si no quedó ninguna. */
+              aviso: string | null;
             };
           };
         };

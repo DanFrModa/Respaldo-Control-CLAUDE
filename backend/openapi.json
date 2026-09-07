@@ -51877,7 +51877,7 @@
     },
     "/api/pedidos/{id}/cancelar": {
       "post": {
-        "summary": "Cancelar un pedido (cancelación suave; opcionalmente también sus OPs)",
+        "summary": "Cancelar un pedido (cancelación suave; opcionalmente también sus OPs sin movimientos)",
         "tags": [
           "pedidos"
         ],
@@ -51922,159 +51922,386 @@
         ],
         "responses": {
           "200": {
-            "description": "Pedido interno (encabezado + renglones).",
+            "description": "Resultado de cancelar un pedido (con el desenlace de cada OP).",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Id interno del pedido."
-                    },
-                    "folio": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Folio consecutivo por empresa."
-                    },
-                    "idEmpresa": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Empresa dueña del pedido y del folio."
-                    },
-                    "idCliente": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Cliente del pedido."
-                    },
-                    "cliente": {
-                      "type": "string",
-                      "description": "Nombre del cliente (para la UI)."
-                    },
-                    "fechaPedido": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Fecha del pedido (YYYY-MM-DD), o null."
-                    },
-                    "fechaDe": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Ventana de entrega — desde, o null."
-                    },
-                    "fechaHasta": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Ventana de entrega — hasta, o null."
-                    },
-                    "fechaTela": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Fecha de tela, o null."
-                    },
-                    "fechaElaboracion": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Fecha de elaboración, o null."
-                    },
-                    "entregadoTienda": {
-                      "type": "boolean",
-                      "description": "Marca de entregado a tienda."
-                    },
-                    "noProducir": {
-                      "type": "boolean",
-                      "description": "Marcado para no producir."
-                    },
-                    "pedCancelado": {
-                      "type": "boolean",
-                      "description": "Cancelación suave: el pedido sigue consultable."
-                    },
-                    "ocCliente": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "OC original del cliente (R3, B3 — captura viva del pedido), o null."
-                    },
-                    "idOrdCompraV1": {
-                      "anyOf": [
-                        {
+                    "pedido": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
                           "type": "integer",
                           "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
+                          "maximum": 9007199254740991,
+                          "description": "Id interno del pedido."
                         },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Snapshot migrado de SOLO LECTURA: orden de compra ligada en el viejo (sin FK hasta F4)."
-                    },
-                    "totalPiezas": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Suma de las cantidades pedidas de los renglones."
-                    },
-                    "totalImporte": {
-                      "anyOf": [
-                        {
-                          "type": "number"
+                        "folio": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Folio consecutivo por empresa."
                         },
-                        {
-                          "type": "null"
+                        "idEmpresa": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Empresa dueña del pedido y del folio."
+                        },
+                        "idCliente": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cliente del pedido."
+                        },
+                        "cliente": {
+                          "type": "string",
+                          "description": "Nombre del cliente (para la UI)."
+                        },
+                        "fechaPedido": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha del pedido (YYYY-MM-DD), o null."
+                        },
+                        "fechaDe": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Ventana de entrega — desde, o null."
+                        },
+                        "fechaHasta": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Ventana de entrega — hasta, o null."
+                        },
+                        "fechaTela": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha de tela, o null."
+                        },
+                        "fechaElaboracion": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha de elaboración, o null."
+                        },
+                        "entregadoTienda": {
+                          "type": "boolean",
+                          "description": "Marca de entregado a tienda."
+                        },
+                        "noProducir": {
+                          "type": "boolean",
+                          "description": "Marcado para no producir."
+                        },
+                        "pedCancelado": {
+                          "type": "boolean",
+                          "description": "Cancelación suave: el pedido sigue consultable."
+                        },
+                        "ocCliente": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "OC original del cliente (R3, B3 — captura viva del pedido), o null."
+                        },
+                        "idOrdCompraV1": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Snapshot migrado de SOLO LECTURA: orden de compra ligada en el viejo (sin FK hasta F4)."
+                        },
+                        "totalPiezas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Suma de las cantidades pedidas de los renglones."
+                        },
+                        "totalImporte": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Suma de los importes (Σ cantidad × precio), o null si no puede ver importes."
+                        },
+                        "lineas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del renglón."
+                              },
+                              "idModelo": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del modelo pedido."
+                              },
+                              "codigoModelo": {
+                                "type": "string",
+                                "description": "Código del modelo (para la UI)."
+                              },
+                              "descripcionModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Descripción del modelo, o null."
+                              },
+                              "urlFotoModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "URL prefirmada de la foto principal del modelo, o null."
+                              },
+                              "cantidadPedida": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Cantidad pedida."
+                              },
+                              "precio": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Precio por prenda, o null si la sesión no puede ver importes."
+                              },
+                              "importe": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Importe del renglón (cantidad × precio), o null si no puede ver importes."
+                              },
+                              "entregadoParcialV1": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Snapshot migrado de SOLO LECTURA: cantidad ya entregada en el viejo (no saldo vivo)."
+                              },
+                              "cantFaltanteV1": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo)."
+                              },
+                              "idDesarrollo": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2)."
+                              },
+                              "numeroProduccion": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`)."
+                              },
+                              "numerosProduccion": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "description": "⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`)."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "idModelo",
+                              "codigoModelo",
+                              "descripcionModelo",
+                              "urlFotoModelo",
+                              "cantidadPedida",
+                              "precio",
+                              "importe",
+                              "entregadoParcialV1",
+                              "cantFaltanteV1",
+                              "idDesarrollo",
+                              "numeroProduccion",
+                              "numerosProduccion"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Renglón de un pedido interno."
+                          },
+                          "description": "Renglones del pedido."
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "Fecha de alta (ISO 8601)."
+                        },
+                        "creadoPorId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del usuario que lo creó."
+                        },
+                        "modificadoEn": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "Fecha de la última modificación (ISO 8601)."
+                        },
+                        "modificadoPorId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del último usuario que lo modificó."
                         }
+                      },
+                      "required": [
+                        "id",
+                        "folio",
+                        "idEmpresa",
+                        "idCliente",
+                        "cliente",
+                        "fechaPedido",
+                        "fechaDe",
+                        "fechaHasta",
+                        "fechaTela",
+                        "fechaElaboracion",
+                        "entregadoTienda",
+                        "noProducir",
+                        "pedCancelado",
+                        "ocCliente",
+                        "idOrdCompraV1",
+                        "totalPiezas",
+                        "totalImporte",
+                        "lineas",
+                        "creadoEn",
+                        "creadoPorId",
+                        "modificadoEn",
+                        "modificadoPorId"
                       ],
-                      "description": "Suma de los importes (Σ cantidad × precio), o null si no puede ver importes."
+                      "additionalProperties": false,
+                      "description": "El pedido ya cancelado."
                     },
-                    "lineas": {
+                    "foliosOrdenesCanceladas": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "description": "Folios de las OPs que SÍ se cancelaron en cascada."
+                    },
+                    "ordenesConservadas": {
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -52083,157 +52310,30 @@
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Id del renglón."
+                            "description": "Id de la orden que sigue viva."
                           },
-                          "idModelo": {
+                          "folio": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Id del modelo pedido."
+                            "description": "Folio de la orden (con el que el usuario la busca)."
                           },
-                          "codigoModelo": {
+                          "porque": {
                             "type": "string",
-                            "description": "Código del modelo (para la UI)."
-                          },
-                          "descripcionModelo": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Descripción del modelo, o null."
-                          },
-                          "urlFotoModelo": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "URL prefirmada de la foto principal del modelo, o null."
-                          },
-                          "cantidadPedida": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Cantidad pedida."
-                          },
-                          "precio": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Precio por prenda, o null si la sesión no puede ver importes."
-                          },
-                          "importe": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Importe del renglón (cantidad × precio), o null si no puede ver importes."
-                          },
-                          "entregadoParcialV1": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Snapshot migrado de SOLO LECTURA: cantidad ya entregada en el viejo (no saldo vivo)."
-                          },
-                          "cantFaltanteV1": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo)."
-                          },
-                          "idDesarrollo": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2)."
-                          },
-                          "numeroProduccion": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`)."
-                          },
-                          "numerosProduccion": {
-                            "type": "array",
-                            "items": {
-                              "type": "integer",
-                              "minimum": -9007199254740991,
-                              "maximum": 9007199254740991
-                            },
-                            "description": "⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`)."
+                            "description": "Por qué se conservó, en lenguaje de negocio (\"ya tiene producción capturada…\")."
                           }
                         },
                         "required": [
                           "id",
-                          "idModelo",
-                          "codigoModelo",
-                          "descripcionModelo",
-                          "urlFotoModelo",
-                          "cantidadPedida",
-                          "precio",
-                          "importe",
-                          "entregadoParcialV1",
-                          "cantFaltanteV1",
-                          "idDesarrollo",
-                          "numeroProduccion",
-                          "numerosProduccion"
+                          "folio",
+                          "porque"
                         ],
                         "additionalProperties": false,
-                        "description": "Renglón de un pedido interno."
+                        "description": "OP que NO se canceló al cancelar su pedido, y su razón."
                       },
-                      "description": "Renglones del pedido."
+                      "description": "OPs que siguen VIVAS porque ya tienen movimientos, con su razón."
                     },
-                    "creadoEn": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                      "description": "Fecha de alta (ISO 8601)."
-                    },
-                    "creadoPorId": {
+                    "aviso": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -52242,52 +52342,17 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Id del usuario que lo creó."
-                    },
-                    "modificadoEn": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                      "description": "Fecha de la última modificación (ISO 8601)."
-                    },
-                    "modificadoPorId": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Id del último usuario que lo modificó."
+                      "description": "Aviso listo para mostrar cuando quedaron OPs vivas, o null si no quedó ninguna."
                     }
                   },
                   "required": [
-                    "id",
-                    "folio",
-                    "idEmpresa",
-                    "idCliente",
-                    "cliente",
-                    "fechaPedido",
-                    "fechaDe",
-                    "fechaHasta",
-                    "fechaTela",
-                    "fechaElaboracion",
-                    "entregadoTienda",
-                    "noProducir",
-                    "pedCancelado",
-                    "ocCliente",
-                    "idOrdCompraV1",
-                    "totalPiezas",
-                    "totalImporte",
-                    "lineas",
-                    "creadoEn",
-                    "creadoPorId",
-                    "modificadoEn",
-                    "modificadoPorId"
+                    "pedido",
+                    "foliosOrdenesCanceladas",
+                    "ordenesConservadas",
+                    "aviso"
                   ],
                   "additionalProperties": false,
-                  "description": "Pedido interno (encabezado + renglones)."
+                  "description": "Resultado de cancelar un pedido (con el desenlace de cada OP)."
                 }
               }
             }

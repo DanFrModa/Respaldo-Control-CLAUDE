@@ -29,6 +29,7 @@ import {
   esquemaErrorApi,
   esquemaListarPedidos,
   esquemaPedidoCancelarCuerpo,
+  esquemaPedidoCancelarSalida,
   esquemaPedidoCopiarCuerpo,
   esquemaPedidoCrear,
   esquemaPedidoPatchCuerpo,
@@ -198,17 +199,21 @@ export const rutasPedidos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   // siempre para un pedido sin OPs vivas; con `cancelarOrdenes` + `motivo` se cancelan también sus
   // OPs (V1-E4 punto 5 — el permiso extra `ordenes.cancelar` lo exige el DOMINIO, no esta ruta,
   // porque solo aplica en esa rama).
+  // ⭐⭐ 0.150: la respuesta ya NO es el pedido a secas, sino el DESENLACE de cada OP — cuáles se
+  // cancelaron, cuáles siguen vivas y por qué. La cascada dejó de arrastrar las que ya se están
+  // produciendo (Daniel), y eso no puede pasar en silencio.
   app.route({
     method: 'POST',
     url: '/pedidos/:id/cancelar',
     preHandler: app.conPermiso('pedidos.administrar'),
     schema: {
       tags: ['pedidos'],
-      summary: 'Cancelar un pedido (cancelación suave; opcionalmente también sus OPs)',
+      summary:
+        'Cancelar un pedido (cancelación suave; opcionalmente también sus OPs sin movimientos)',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       body: esquemaPedidoCancelarCuerpo.optional(),
-      response: { 200: esquemaPedidoSalida, ...respuestasError },
+      response: { 200: esquemaPedidoCancelarSalida, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
