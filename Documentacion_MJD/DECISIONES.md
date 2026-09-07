@@ -12228,10 +12228,35 @@ la tela (sus partes), no en renglones repetidos de la misma tela.
 cambia**: la suma de las partes es el consumo total y todo sale del mismo color. La función nueva sólo
 aplica a lo que se capture con partes — REGLA 0-B, sin retrocompatibilidad que inventar.
 
-⏳ **Queda por decidir con Daniel (no se supone):** si las partes son **catálogo** (cuerpo, mangas,
-cuello, puños…) o **texto libre por modelo**. Default propuesto: **catálogo chico y editable**, porque
-la parte se va a querer ver en el impreso de la orden y en la nota de corte, y el texto libre hace que
-«mangas» y «Mangas» sean dos cosas.
+✅ **RESUELTO POR DANIEL, y CORRIGE al lead.** Se le propuso un **catálogo** de partes; contestó:
+
+> *«Preferiría **nombrarlo como "combinación 1", "combinación 2"**, etc., porque poner un catálogo de
+> partes podría ser **muy extenso** y va a pasar lo mismo. A veces puede ser una **franja lateral**, a
+> veces una **pretina**, mangas, capucha, **parte interna de la capucha**, etc. Chance es más fácil
+> manejarlo como combinación. O simplemente **con un texto abierto**. **No importa que a veces diga
+> manga y a veces Mangas. Al final NUNCA vas a agrupar esos dos conceptos. Son cosas que viven en esa
+> orden y no afecta a nada más.**»*
+
+⇒ **DECIDIDO: combinaciones numeradas con etiqueta de TEXTO LIBRE. NO hay catálogo de partes.**
+
+🔑 **Y el argumento del lead era una MALA ANALOGÍA — conviene dejarlo escrito para que nadie lo
+repita.** Se justificó el catálogo diciendo que «mangas»/«Mangas» sería el mismo problema que los dos
+«Blanco Hueso» (§Post-F9.213·A). **No lo es, y la diferencia es exactamente la que Daniel nombró:**
+- **Por COLOR el sistema AGRUPA** — es la clave de compra de toda la explosión (`claveAgrupada`,
+  `mrp.ts:1557-1577`). Dos entradas para el mismo color real **parten un renglón de compra en dos**:
+  daño real y medible.
+- **Por PARTE no se agrupa NUNCA.** La combinación no suma entre modelos, no alimenta ningún reporte,
+  no es clave de nada. Es una **etiqueta local** a ese renglón de receta.
+
+**Un catálogo existe para hacer cosas comparables.** Si nada se compara, el catálogo sólo añade una
+puerta que alguien tiene que abrir —dar de alta «parte interna de la capucha»— **antes** de que
+Desarrollo pueda capturar un modelo. Es fricción pura, y en un negocio donde la lista es abierta por
+naturaleza (franja lateral, pretina, capucha, forro de capucha…) esa puerta se convierte en un freno.
+
+**Forma concreta:** cada combinación de un renglón de tela es una fila con **id propio**, su
+**etiqueta libre** (default «Combinación 1», «Combinación 2»… editable a «manga», «pretina», lo que
+sea) y su **consumo**. ⚠️ **La orden referencia la combinación POR SU ID, jamás por el texto** — así la
+etiqueta se puede reescribir sin romper nada, que es justo lo que la vuelve segura siendo libre.
 
 **MEDIDO — el techo de hoy es estructural, no un campo que falte:**
 - **El color viene de la MATRIZ DE LA ORDEN, no de la receta**: `piezasPorColorOrden`
