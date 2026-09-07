@@ -12136,6 +12136,57 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.212) — ⭐⭐ SE DESCARTA EL BORRADO FÍSICO (7-sep-2026): se previene el error en vez de limpiarlo
+
+⚠️ **Esta decisión REVOCA la de §Post-F9.211.** Daniel pidió allí el borrado completo con folios
+devueltos; después preguntó *«¿qué piensas? ¿cuál es tu recomendación real? No quiero tampoco poner en
+riesgo nada de lo que ya está hecho y tampoco hacer que se tenga que programar mucho sólo para poder
+borrar. **Si no se puede, no es tan relevante**… Puedo ser muy flexible con esto. **No es algo que me quite
+el sueño.**»* — y con lo medido encima, **aceptó no construirlo**: *«ok, adelante con la guarda y lo de
+prevenir el error»*.
+
+🔑 **LO QUE CAMBIÓ LA DECISIÓN FUERON TRES MEDICIONES: cancelar YA resuelve todo lo que le estorbaba.**
+
+| Lo que temía | Qué pasa hoy al cancelar | Dónde se midió |
+|---|---|---|
+| basura en las pantallas | **no la ve**: lo cancelado se esconde por defecto | `pedidos.ts:920` (`incluirCancelados ? {} : { pedCancelado: false }`) · `ordenes.ts:1451` (`estado: { not: 'cancelada' }`) |
+| no poder resubir esa OC | **sí puede**: el detector de duplicados **ignora lo cancelado** | `oc-duplicada.ts:135` (`estado: { not: 'cancelada' }`) y `:59` (*«pedido **no cancelado** con esa referencia»*) |
+| que se siga produciendo | **se detiene**: la cascada apaga las OP | `pedidos.ts:833-859` |
+
+⇒ El borrado sólo añadiría **devolver el número de 5 dígitos** y **no saltarse un folio**.
+
+⚠️ **Y UNA CORRECCIÓN DEL LEAD A SÍ MISMO, que es la que movió la aguja.** En §Post-F9.— se dijo que el
+número quemado era *«el único daño permanente real»* y que dejar teclear el número era *«la mitigación más
+barata del único daño permanente»*. **Como afirmación de permanencia era cierta; como medida de IMPORTANCIA
+estaba inflada.** Son **999 por concepto×género**: a cinco errores por año, veinte años gastan el **1 %** de
+una serie. No es un recurso escaso — es un número redondo que suena grave. Y un folio saltado no cuesta nada
+operativamente. **Prosa que pesaba más de lo que medía: la misma cicatriz de siempre, esta vez en la
+priorización y no en un hecho.**
+
+🔴 **EL COSTO QUE SE EVITA no es escribirlo, es MANTENERLO.** Una `Orden` cuelga de **~16 relaciones**
+(inventario cíclico, fichas de verificación, EsMa, hitos, auditorías, costo, EDR, RC, notas de salida,
+compras, kardex…): **cada tabla nueva que se relacione con una orden, para siempre, tendría que acordarse
+de entrar en ese borrado**. El día que alguien lo olvide: o revienta al borrar, o deja huérfanos. Es un
+impuesto permanente sobre todo el desarrollo futuro. Y el terreno tiene trampas ya medidas: al kardex de
+una orden se llega por **tres caminos** distintos (PT por columna, tela por `origenTipo/origenId` de texto,
+avíos por `NotaSalidaLinea`), y `cancelarMovimientoPt` **copia `idOrden` al movimiento inverso**
+(`comun/kardex.ts:535`), así que contar movimientos **nunca da cero**.
+
+**QUÉ SE CONSTRUYE EN SU LUGAR — prevenir, no limpiar:**
+1. ✅ **LA GUARDA (sigue en pie, y es un DEFECTO, no una mejora).** Hoy `cancelarPedido` tiene **sólo dos**
+   guardas y **con la cascada marcada cancela una OP AUNQUE YA ESTÉ PRODUCIDA**. Desenlace **(b)**: se
+   cancela el pedido y las OP sin actividad, y **las que sí tienen se quedan vivas y NOMBRADAS**.
+2. ✅ **El número de producción se teclea AL IMPORTAR**, con la sugerencia delante — la máquina ya lo
+   acepta (`esquemas/salida-produccion.ts:60`), el importador sólo no se lo pasa. **Razón corregida: no
+   vale por ahorrar un número, vale porque EVITA el error en vez de limpiarlo.**
+3. ✅ **La OP enseña de qué modelo de desarrollo nació** (su punto 17). Es lo que le habría evitado
+   *«me puso el mismo modelo para las ordenes y no me di cuenta»*.
+
+📌 **NO es una puerta cerrada.** Si operando resulta que los huecos o los números quemados sí molestan, se
+retoma **con datos reales de cuántas veces pasó** — decisión informada, no precaución.
+
+---
+
 #### (Post-F9.211) — ⭐⭐ BORRAR DE VERDAD LOS ERRORES DEL DÍA, FOLIOS INCLUIDOS (7-sep-2026): Daniel cierra el punto que quedaba abierto
 
 **Contestó la pregunta que se le dejó puesta** (descarte acotado vs. sólo liberar el número) **y pidió más
