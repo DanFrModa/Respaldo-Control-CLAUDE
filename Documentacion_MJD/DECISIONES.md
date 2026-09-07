@@ -12174,7 +12174,7 @@ y **alguna** liga de la tanda cambió. Es una **sobre-aproximación deliberada**
 si ese `reusado` viene de la tanda o de la base—, y el lado seguro es barato: ofrece una casilla opcional
 con su explicación. El otro lado **repite la queja**.
 
-🔴 **Dos promesas falsas más, cazadas por el reviewer y medidas contra Postgres real:**
+🔴 **Dos promesas falsas más, cazadas por el reviewer.** ⚠️ **La primera se midió contra Postgres real; la segunda NO** — se estableció leyendo el contrato del combo (`origen: 'todos'`) y el filtro de `listarModelos`, más pruebas en jsdom. *(La distinción la pidió el propio reviewer: decir «las dos» era afirmar más de lo medido, que es la falta que más ha caído en esta sesión.)*
 - **La previa anunciaba un reuso que el confirm RECHAZA.** Buscaba el hijo del color **sin mirar
   `activo`**, y `obtenerODerivarModeloDeProduccion` lanza si está **descontinuado** (§Post-F9.119) ⇒ la
   previa decía *«la OP se va a hacer con él»* y el confirm reventaba, **con A2 revirtiendo la importación

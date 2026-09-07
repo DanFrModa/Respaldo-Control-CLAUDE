@@ -91,9 +91,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   al generar»* y no «reservado».
 - ⭐ **Y el caso que más te va a tocar: cuando eliges el modelo A MANO.** La primera vez de cada modelo
   del cliente **lo eliges tú** en la vista previa — y el sistema ya había calculado los números **antes**,
-  con la liga que tenía aprendida. Ahora ese renglón te ofrece la casilla **vacía**, diciéndote por qué:
-  *«elegiste este modelo después de analizar… si lo dejas vacío, lo asigna el sistema»*. Y **si cambias
-  la liga, el número precargado se borra** en vez de quedarse el del modelo anterior.
+  con la liga que tenía aprendida. Ahora ese renglón te ofrece la casilla **vacía**, diciéndote por qué,
+  y **el pie enumera los dos desenlaces posibles** en vez de prometer uno solo: *si de esa OC **nace** un
+  modelo nuevo* se usa el que escribas —o el que asigne el sistema si lo dejas vacío—; *si ese color **ya
+  tiene** modelo, o el que elegiste ya es de producción*, la OP usa el número de ÉSE y lo que teclees **no
+  se aplica**. Y **si cambias la liga, el número precargado deja de valer** en vez de quedarse el del
+  modelo anterior.
 - **Un aviso que MENTÍA quedó retirado.** En una OP nacida del PDF, la cadena de trazabilidad decía
   *«modelo anterior al módulo de Desarrollo»*, que era falso. Estaba en **cuatro sitios de tres pantallas**.
 

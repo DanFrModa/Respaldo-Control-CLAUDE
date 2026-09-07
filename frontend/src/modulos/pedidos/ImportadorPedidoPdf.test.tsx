@@ -284,8 +284,9 @@ const PREVIEW_TANDA: AnalizarPdf = {
  *
  * ⚠️ `archivos` NO es decoración: el confirm arma su cuerpo a partir de los ARCHIVOS cargados
  * (`archivosABase64(archivos)`), no de los renglones del preview mockeado. Una prueba de tanda que
- * cargue un solo PDF nunca podrá ver qué se manda del segundo renglón — `archivos[1]` sale
- * `undefined` y la aserción pasaría por el motivo equivocado.
+ * cargue un solo PDF nunca podrá ver qué se manda del segundo renglón: `archivos[1]` sale
+ * `undefined`, el cuerpo llega con un solo elemento y la aserción sobre el segundo revienta. No es un
+ * falso verde — es que el caso de tanda no se puede medir sin cargar los dos PDFs.
  */
 async function irAVistaPrevia(
   preview: AnalizarPdf = PREVIEW,
