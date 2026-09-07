@@ -31,6 +31,7 @@ import type { PrismaClient } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearColor, fusionarColores } from '../catalogos/colores.js';
+import { obtenerOrden } from '../produccion/ordenes.js';
 import { analizarImportacionPdf, confirmarImportacionPdf } from './importacion-pdf.js';
 
 const PDF_BASE64 = readFileSync(
@@ -1090,6 +1091,229 @@ describe('idempotencia de catálogos', () => {
     expect(renglon.colorNuevo).toBe(true);
     expect(renglon.colorFusionadoEn).toBeNull();
     expect(renglon.advertencias.some((a) => a.tipo === 'color-fusionado')).toBe(false);
+  });
+});
+
+// ── ⭐⭐ Fila 0.151 — EL Nº DE PRODUCCIÓN LO PONE EL USUARIO ────────────────────────────
+
+/**
+ * DANIEL, después de importar un PDF: *«me generó el pedido y la OP **sin preguntar el número de
+ * modelo interno**… **quedamos que ese lo ponía yo, con una sugerencia previa**… No me gustó que
+ * todo sea completamente automático antes de poder verificar»*.
+ *
+ * `salidaAProduccion` ya aceptaba `numeroProduccion` (§Post-F9.46) y el panel manual «Generar OP»
+ * ya lo usaba; lo que faltaba era que el importador por PDF **lo mandara**. Aquí se demuestra que
+ * viaja, que sigue funcionando sin él, y —lo que de verdad importa— **dónde NO se aplica**.
+ */
+describe('⭐ nº de producción confirmado por el usuario (fila 0.151)', () => {
+  it('con el número TECLEADO, la OP nace con ESE número (no con el propuesto)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-1');
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        // La serie 71 está vacía: el sistema propondría 71001. El usuario pide el 71042.
+        archivos: [{ ...archivoPdf(), numeroProduccion: 71_042 }],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    expect(res.ordenes[0]?.numeroProduccion).toBe(71_042);
+    expect(res.ordenes[0]?.modeloDeProduccion).toBe('nacido');
+    expect(res.ordenes[0]?.avisosNumeroProduccion).toEqual([]);
+
+    const hijo = await cliente.modelo.findFirstOrThrow({ where: { idModeloDesarrollo: idModelo } });
+    expect(hijo.numeroProduccion).toBe(71_042);
+    expect(hijo.codigo).toBe('71042');
+    // Y la OP quedó sellada con ÉL.
+    const orden = await cliente.orden.findUniqueOrThrow({
+      where: { id: res.ordenes[0]!.idOrden },
+      select: { idModelo: true },
+    });
+    expect(orden.idModelo).toBe(hijo.id);
+  });
+
+  it('SIN teclearlo, la OP sigue naciendo con el propuesto (la conducta de antes, intacta)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-2');
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    expect(res.ordenes[0]?.numeroProduccion).toBe(71_001);
+    expect(res.ordenes[0]?.modeloDeProduccion).toBe('nacido');
+  });
+
+  it('la VISTA PREVIA llega con el número PROPUESTO y el desenlace `nacido`', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-PREV');
+    // La liga se APRENDE con una importación previa de OTRA OC del cliente… así que aquí se siembra
+    // a mano (la previa sólo propone números para lo que ya sabe ligar).
+    await cliente.clienteModeloLiga.create({
+      data: { idCliente: idClienteNegocio, modeloCliente: '3138277', idModelo },
+    });
+
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    expect(previa.renglones[0]).toMatchObject({
+      modeloDeProduccion: 'nacido',
+      numeroProduccionPropuesto: 71_001,
+      numeroProduccionModelo: null,
+      avisosNumeroProduccion: [],
+    });
+  });
+
+  /**
+   * ⭐⭐ EL CASO QUE HABRÍA PASADO EN VERDE SIN ESTA PRUEBA.
+   *
+   * Si el color ya tiene modelo de producción, `obtenerODerivarModeloDeProduccion` **descarta** el
+   * número capturado y avisa. Ofrecer el campo ahí sería prometer algo que la capa de abajo tira:
+   * por eso la vista previa dice `reusado` y **no propone número**, y por eso el confirm devuelve
+   * el aviso en vez de callárselo. Las dos mitades se prueban juntas — la que apaga el campo y la
+   * que explica lo que pasó.
+   */
+  it('⭐ desenlace REUSADO: el número tecleado se IGNORA (con aviso) y la previa no ofrece campo', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-3');
+
+    // 1ª OC: nace el modelo de "Blanco" con el 71001.
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    // La VISTA PREVIA de la 2ª OC (otro papel, MISMO modelo y MISMO color) ya no ofrece número.
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf2()] },
+      bd(),
+    );
+    expect(previa.renglones[0]).toMatchObject({
+      modeloDeProduccion: 'reusado',
+      numeroProduccionPropuesto: null,
+      numeroProduccionModelo: 71_001,
+    });
+    expect(previa.renglones[0]?.avisosNumeroProduccion[0]).toContain('71001');
+
+    // Y si alguien lo manda de todas formas (carrera entre la previa y el confirm), NO se aplica:
+    // la OP se hace con el modelo que ya existía, y el confirm lo DICE.
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [{ ...archivoPdf2(), numeroProduccion: 71_099 }],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    expect(res.ordenes[0]?.modeloDeProduccion).toBe('reusado');
+    expect(res.ordenes[0]?.numeroProduccion).toBe(71_001);
+    expect(res.ordenes[0]?.avisosNumeroProduccion.join(' ')).toContain('71099');
+    // No nació un segundo modelo: el número es del MODELO, no de la orden.
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(1);
+    expect(await cliente.modelo.count({ where: { numeroProduccion: 71_099 } })).toBe(0);
+  });
+
+  it('un número REPETIDO bloquea toda la importación, y dice quién lo tiene', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-4');
+    await cliente.modelo.create({
+      data: { codigo: '71042', origen: 'produccion', numeroProduccion: 71_042 },
+    });
+
+    await expect(
+      confirmarImportacionPdf(
+        sesion(),
+        {
+          idCliente: idClienteNegocio,
+          archivos: [{ ...archivoPdf(), numeroProduccion: 71_042 }],
+          ligas: [{ modeloCliente: '3138277', idModelo }],
+        },
+        bd(),
+        archivosFalsos(),
+      ),
+    ).rejects.toThrow(/71042 ya está ocupado por el modelo "71042"/);
+
+    // A2: no quedó NADA (ni pedido, ni OP, ni modelo hijo).
+    expect(await cliente.pedido.count()).toBe(0);
+    expect(await cliente.orden.count()).toBe(0);
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(0);
+  });
+});
+
+// ── ⭐ Fila 0.151 — LA OP ENSEÑA DE QUÉ DESARROLLO NACIÓ ───────────────────────────────
+
+/**
+ * DANIEL: *«¿qué pasa si me equivoqué con el modelo de desarrollo al que lo relacioné?… **en la OP
+ * no veo el modelo de desarrollo**»*. El dato existía en la base desde V1-E3 (`Modelo
+ * .idModeloDesarrollo`) y sólo salía en la respuesta del alta, ese instante y nunca más: el
+ * contrato de la ORDEN no lo transportaba.
+ */
+describe('⭐ el linaje del modelo viaja en la orden (fila 0.151)', () => {
+  it('una OP nacida del PDF dice de qué modelo de DESARROLLO salió', async () => {
+    const idModelo = await crearModelo('DEV-CYA-LINAJE');
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const orden = await obtenerOrden(sesion(), res.ordenes[0]!.idOrden, bd());
+    // La OP lleva el HIJO (el modelo de producción de su color)…
+    expect(orden.codigoModelo).toBe('71001');
+    // …y ahora dice de quién es hijo, que es lo que Daniel no podía ver.
+    expect(orden.idModeloDesarrollo).toBe(idModelo);
+    expect(orden.codigoModeloDesarrollo).toBe('DEV-CYA-LINAJE');
+  });
+
+  it('una OP SIN linaje lo trae en null (nada que inventar en la pantalla)', async () => {
+    // Modelo del catálogo de PRODUCCIÓN (la rama legado: los migrados del Access). Su OP no nace de
+    // ningún desarrollo, y el contrato tiene que poder decirlo sin ambigüedad.
+    const legado = await cliente.modelo.create({
+      data: { codigo: '51783', origen: 'produccion', numeroProduccion: 51_783 },
+      select: { id: true },
+    });
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo: legado.id }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const orden = await obtenerOrden(sesion(), res.ordenes[0]!.idOrden, bd());
+    expect(orden.codigoModelo).toBe('51783');
+    expect(orden.idModeloDesarrollo).toBeNull();
+    expect(orden.codigoModeloDesarrollo).toBeNull();
   });
 });
 

@@ -146,6 +146,9 @@ function orden(
     idModelo: 10,
     codigoModelo: 'A-100',
     descripcionModelo: 'Playera',
+    // Fila 0.151 — linaje V1-E3: esta orden de ejemplo NO nació de un desarrollo.
+    idModeloDesarrollo: null,
+    codigoModeloDesarrollo: null,
     idCliente: opciones.idCliente ?? 3,
     cliente: 'Liverpool',
     idMaquilero: null,

@@ -487,6 +487,22 @@ export const esquemaOrdenSalida = z
     idModelo: z.number().int().describe('Modelo a producir.'),
     codigoModelo: z.string().describe('Código del modelo (para la UI).'),
     descripcionModelo: z.string().nullable().describe('Descripción del modelo, o null.'),
+    // ── ⭐⭐ LINAJE del modelo de la OP (fila 0.151, V1-E3 §Post-F9.172(b)) ──
+    idModeloDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la ' +
+          'receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no ' +
+          'nació de un desarrollo (el histórico del Access, o cualquier modelo de producción ' +
+          'elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía ' +
+          'en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más.',
+      ),
+    codigoModeloDesarrollo: z
+      .string()
+      .nullable()
+      .describe('Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null.'),
     idCliente: z.number().int().describe('Cliente de la orden.'),
     cliente: z.string().describe('Nombre del cliente (para la UI).'),
     idMaquilero: z.number().int().nullable().describe('Maquilero asignado (Proveedor), o null.'),

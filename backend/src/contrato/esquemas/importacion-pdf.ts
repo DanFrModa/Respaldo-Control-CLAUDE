@@ -90,6 +90,18 @@ export const esquemaRenglonMatrizPdf = z
 export type RenglonMatrizPdf = z.infer<typeof esquemaRenglonMatrizPdf>;
 
 /**
+ * Nº de producción de 5 dígitos tal como VIAJA por el importador de PDF (fila 0.151). Es la MISMA
+ * forma que pide `esquemaSalidaProduccionCuerpo.numeroProduccion` —el panel manual «Generar OP»—
+ * porque acaba en la MISMA puerta (`salidaAProduccion` → `derivarModeloDeProduccion`): dos formas
+ * distintas para el mismo dato es como se empiezan a aceptar números que la otra puerta rechaza.
+ */
+const esquemaNumeroProduccionPdf = z
+  .number({ error: 'El número de producción debe ser un número' })
+  .int({ error: 'El número de producción debe ser entero' })
+  .min(10_000, { error: 'El número de producción debe tener 5 dígitos' })
+  .max(99_999, { error: 'El número de producción debe tener 5 dígitos' });
+
+/**
  * Un PDF al CONFIRMAR: el PDF + (opcional) la matriz EDITADA en la vista previa y el pantone. Si `matriz`
  * viene, la OP se fabrica con ESOS renglones-pack (Daniel: el sistema propone el sobre-pedido por packs,
  * el usuario decide celda por celda y renglón por renglón); si se omite, se usa la propuesta calculada.
@@ -111,6 +123,16 @@ export const esquemaArchivoPdfConfirmar = esquemaArchivoPdf
       .max(60)
       .optional()
       .describe('Código PANTONE del color de la OP (editado/prefilleado); vacío = sin pantone.'),
+    numeroProduccion: esquemaNumeroProduccionPdf
+      .optional()
+      .describe(
+        'Nº de producción CONFIRMADO por el usuario para el modelo que va a NACER de ESTA OC ' +
+          '(fila 0.151, §Post-F9.46: el sistema lo precarga en la vista previa y el usuario lo ' +
+          'puede cambiar). Omitir = aceptar el que proponga el sistema al confirmar. ⚠️ Se IGNORA ' +
+          '—con aviso, sin bloquear— cuando el desenlace NO es `nacido`: si ese color ya tenía ' +
+          'modelo de producción (se reusa el suyo) o si el modelo ligado ya era de producción (la ' +
+          'OP lo hereda). El número es del MODELO, no de la orden.',
+      ),
   })
   .describe('Un PDF con su ajuste manual opcional al confirmar.');
 
@@ -258,6 +280,25 @@ export const esquemaOcYaImportada = z
 /** Forma de la OP duplicada. */
 export type OcYaImportada = z.infer<typeof esquemaOcYaImportada>;
 
+/**
+ * Qué le va a pasar al MODELO DE PRODUCCIÓN de la OP que nazca de un PDF (fila 0.151). Son los
+ * MISMOS tres desenlaces que devuelve `salidaAProduccion.modeloDeProduccion`, y a propósito: la
+ * vista previa tiene que anunciar exactamente lo que el confirm va a hacer.
+ *
+ *  • `nacido`   — el color de esta OC todavía no tiene modelo de producción: va a nacer uno, con su
+ *                 nº de 5 dígitos. **Es el ÚNICO caso en que el número se puede teclear.**
+ *  • `reusado`  — ese color ya tiene modelo (u otro PDF de esta misma tanda lo hace nacer antes):
+ *                 la OP usa el suyo y un número capturado NO se aplicaría.
+ *  • `heredado` — el modelo ligado ya es de producción (el histórico del Access): la OP lo lleva tal
+ *                 cual y nada nace.
+ */
+export const esquemaDesenlaceModeloPdf = z
+  .enum(['nacido', 'reusado', 'heredado'])
+  .describe('Qué le pasa al modelo de producción de la OP de este PDF.');
+
+/** Forma del desenlace del modelo de un PDF. */
+export type DesenlaceModeloPdf = z.infer<typeof esquemaDesenlaceModeloPdf>;
+
 /** Un renglón de la vista previa = un PDF parseado, con su liga sugerida y sus advertencias. */
 export const esquemaRenglonPdfPreview = z
   .object({
@@ -335,6 +376,43 @@ export const esquemaRenglonPdfPreview = z
     advertencias: z
       .array(esquemaAdvertenciaPdf)
       .describe('Advertencias de validación (no bloquean).'),
+    // ── ⭐ Nº de producción del modelo de ESTA OC (fila 0.151) ──
+    modeloDeProduccion: esquemaDesenlaceModeloPdf
+      .nullable()
+      .describe(
+        'Qué le va a pasar al MODELO de la OP de este PDF si se confirma con la liga que hoy trae ' +
+          'el renglón, o null si todavía no hay ninguna liga (no hay modelo del que hablar). ' +
+          'SOLO en `nacido` tiene sentido teclear un número.',
+      ),
+    numeroProduccionPropuesto: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº de 5 dígitos que el sistema PROPONE para el modelo que nacería de esta OC, con el que ' +
+          'la pantalla precarga el campo. Null si el desenlace no es `nacido` o si la serie está ' +
+          'llena. ⚠️ Es INFORMATIVO: se calcula sin el candado del par y sin escribir nada, así ' +
+          'que entre esta consulta y el confirm otro puede tomarlo. Quien decide de verdad es el ' +
+          'confirm, que vuelve a proponer bajo candado y BLOQUEA si el número capturado ya está ' +
+          'ocupado. La pantalla NO debe prometer que el número queda apartado.',
+      ),
+    numeroProduccionModelo: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº de producción del modelo con el que la OP va a quedar cuando NO nace uno nuevo: el del ' +
+          'modelo que ya existe para ese color (`reusado`) o el del modelo de producción ya ligado ' +
+          '(`heredado`). También trae el número que va a estrenar OTRO PDF de esta misma tanda ' +
+          'cuando dos OC comparten modelo y color. Null si no aplica o si el modelo histórico no ' +
+          'tiene número.',
+      ),
+    avisosNumeroProduccion: z
+      .array(z.string())
+      .describe(
+        'Avisos de la numeración de ESTE PDF (serie cerca del tope, color que ya tiene modelo, ' +
+          'modelo sin dígitos para numerar…). NUNCA bloquean.',
+      ),
     yaImportado: esquemaOcYaImportada
       .nullable()
       .describe(
@@ -445,6 +523,18 @@ export const esquemaOrdenPdfImportada = z
     nombreArchivo: z.string().describe('Nombre del PDF de origen (adjunto a esta OP).'),
     totalPiezas: z.number().int().describe('Piezas de la OP (Σ de la matriz).'),
     adjuntado: z.boolean().describe('true si el PDF se adjuntó a la OP.'),
+    modeloDeProduccion: esquemaDesenlaceModeloPdf.describe(
+      'Qué pasó DE VERDAD con el modelo de la OP (fila 0.151). Puede no coincidir con lo que ' +
+        'anunció la vista previa: entre analizar y confirmar el color pudo estrenar modelo por ' +
+        'otra puerta, y entonces un `nacido` anunciado sale `reusado`.',
+    ),
+    avisosNumeroProduccion: z
+      .array(z.string())
+      .describe(
+        'Avisos de la numeración de ESTA OP (dígitos que no cuadran, serie cerca del tope, número ' +
+          'capturado que NO se usó porque el color ya tenía modelo). NUNCA bloquean, pero hay que ' +
+          'enseñarlos: son la única señal de que un número tecleado no se aplicó.',
+      ),
   })
   .describe('Una OP creada por la importación de un PDF.');
 

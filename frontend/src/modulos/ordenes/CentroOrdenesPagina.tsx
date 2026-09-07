@@ -1169,10 +1169,96 @@ export function MatrizResumen({ orden }: { orden: Orden }): React.JSX.Element {
 }
 
 /**
+ * ⭐⭐ **EL NODO «DESARROLLO» DE UNA OP, SIN MENTIR** (fila 0.151).
+ *
+ * DANIEL, textual: *«¿qué pasa si me equivoqué con el modelo de desarrollo al que lo relacioné?…
+ * **En la OP no veo el modelo de desarrollo**»*.
+ *
+ * 🔴 **Lo que había, y por qué era falso.** El nodo sólo se encendía con la LIGA del expediente
+ * (`DesarrolloOrden`), y si no la había ponía `—` con el tooltip *«modelo anterior al módulo de
+ * Desarrollo (sin liga)»*. Toda OP nacida del importador de OC por PDF cae ahí —`crearOrdenDesdePdf`
+ * crea el renglón SIN `idDesarrollo`, así que `salidaAProduccion` no liga nada—, y sin embargo su
+ * modelo **sí nació de un desarrollo**, que es exactamente lo que el tooltip negaba. El usuario leía
+ * "este modelo es viejo" de una OP importada hace un minuto.
+ *
+ * 🔑 **La cura es distinguir DOS cosas que no son la misma**, y por eso el nodo tiene tres estados:
+ *  1. **Ligada al expediente** (`yaLigada`) — hay `DesarrolloOrden`: proyecto, precosto y lista. Es
+ *     el nodo fuerte de siempre.
+ *  2. **Con LINAJE pero sin expediente** (`orden.idModeloDesarrollo !== null`) — el modelo de la OP
+ *     nació de un desarrollo (V1-E3: un modelo por color), aunque nadie ligó el expediente. El nodo
+ *     enseña el **nº de desarrollo** y navega a su ficha; el tooltip dice la verdad completa: de
+ *     dónde salió y que la liga del expediente falta.
+ *  3. **Ni lo uno ni lo otro** — recién ahí se apaga, y con un texto que sólo afirma lo que se puede
+ *     comprobar (el modelo no nació de un desarrollo y la OP no está ligada), no la edad del modelo.
+ *
+ * ⚠️ Y la NAVEGACIÓN va al PADRE, no al modelo de la orden: desde V1-E3 la OP lleva el hijo de
+ * producción, y `/desarrollo` sólo encuentra modelos de desarrollo — abrirla con el id del hijo
+ * llegaba a una ficha vacía.
+ */
+function nodoDesarrollo({
+  orden,
+  yaLigada,
+  expediente,
+  puedeVerDesarrollo,
+  navigate,
+}: {
+  orden: Orden;
+  yaLigada: boolean;
+  expediente: { data?: { codigoModelo?: string } | undefined };
+  puedeVerDesarrollo: boolean;
+  navigate: ReturnType<typeof useNavigate>;
+}): NodoTraza {
+  // El modelo de desarrollo al que hay que ir: el PADRE del linaje si lo hay; si no, el de la orden
+  // (caso legado, donde la orden lleva directamente el modelo que el desarrollo apunta).
+  const idDestino = orden.idModeloDesarrollo ?? orden.idModelo;
+  const irADesarrollo = {
+    onNavegar: () => void navigate('/desarrollo', { state: { idModelo: idDestino } }),
+  };
+
+  if (yaLigada) {
+    return {
+      clave: 'desarrollo',
+      etiqueta: 'Desarrollo',
+      valor: `#${expediente.data?.codigoModelo ?? orden.codigoModeloDesarrollo ?? orden.codigoModelo}`,
+      activo: true,
+      // §Post-F9.68: el nodo NAVEGA solo si el usuario puede abrir el destino; sin
+      // el permiso queda como dato (no como enlace roto) y NO se dice por qué —
+      // antes el tooltip anunciaba «Requiere permiso de Desarrollo».
+      ...(puedeVerDesarrollo ? irADesarrollo : {}),
+    };
+  }
+
+  if (orden.codigoModeloDesarrollo !== null) {
+    return {
+      clave: 'desarrollo',
+      etiqueta: 'Desarrollo',
+      valor: `#${orden.codigoModeloDesarrollo}`,
+      activo: true,
+      titulo:
+        `El modelo ${orden.codigoModelo} de esta OP nació del desarrollo ` +
+        `${orden.codigoModeloDesarrollo} (de ahí sale su receta). La OP todavía NO está ligada a un ` +
+        `expediente de Desarrollo, así que no trae proyecto ni lista de precios.`,
+      ...(puedeVerDesarrollo ? irADesarrollo : {}),
+    };
+  }
+
+  return {
+    clave: 'desarrollo',
+    etiqueta: 'Desarrollo',
+    valor: '—',
+    activo: false,
+    titulo:
+      `El modelo ${orden.codigoModelo} de esta OP no nació de un desarrollo y la OP no está ligada ` +
+      `a ningún expediente de Desarrollo.`,
+  };
+}
+
+/**
  * Cadena de trazabilidad COMPACTA del panel (R3, §4.1): `OC cliente → Desarrollo → Lista →
  * Pedido → OP`. El nodo de desarrollo/lista se resuelve con el expediente F8-E6 (mismas claves de
  * cache que `SeccionDesarrolloOrden`: cero peticiones extra); sin `desarrollo.ver` quedan
- * apagados. Los históricos sin ficha avisan "modelo anterior al módulo de Desarrollo".
+ * apagados. El nodo de Desarrollo lo arma {@link nodoDesarrollo} (fila 0.151): liga del
+ * expediente, o —si no la hay— el LINAJE del modelo de la OP; sólo sin ninguno de los dos se apaga.
  */
 function CadenaTrazaOrden({
   orden,
@@ -1202,23 +1288,7 @@ function CadenaTrazaOrden({
           },
         ]
       : []),
-    {
-      clave: 'desarrollo',
-      etiqueta: 'Desarrollo',
-      valor: yaLigada ? `#${expediente.data?.codigoModelo ?? orden.codigoModelo}` : '—',
-      activo: yaLigada,
-      // §Post-F9.68: el nodo NAVEGA solo si el usuario puede abrir el destino; sin
-      // el permiso queda como dato (no como enlace roto) y NO se dice por qué —
-      // antes el tooltip anunciaba «Requiere permiso de Desarrollo».
-      ...(yaLigada
-        ? puedeVerDesarrollo
-          ? {
-              onNavegar: () =>
-                void navigate('/desarrollo', { state: { idModelo: orden.idModelo } }),
-            }
-          : {}
-        : { titulo: 'modelo anterior al módulo de Desarrollo (sin liga)' }),
-    },
+    nodoDesarrollo({ orden, yaLigada, expediente, puedeVerDesarrollo, navigate }),
     {
       clave: 'lista',
       etiqueta: 'Lista de precios',

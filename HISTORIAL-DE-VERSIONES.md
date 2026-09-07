@@ -71,6 +71,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.127 · 7-sep-2026 · **en prueba** — **El número de producción lo pones tú al importar, y la OP dice de qué desarrollo nació**
+
+### Qué se puede hacer ahora que antes no
+
+- **Teclear el número de producción al importar el PDF**, con la sugerencia del sistema ya puesta —
+  igual que en «Generar OP». Era la queja de Daniel: *«me generó el pedido y la OP **sin preguntar el
+  número de modelo interno**… **quedamos que ese lo ponía yo, con una sugerencia previa**»*.
+- **Ver en la orden de qué modelo de desarrollo nació.** Antes ese dato existía en la base pero **no
+  llegaba a ninguna pantalla**: *«en la OP no veo el modelo de desarrollo»*.
+
+### Qué cambió y puede sorprender
+
+- **La casilla sólo aparece cuando de verdad va a nacer un modelo.** Si ese color **ya tiene** modelo de
+  producción, el sistema **reusa el suyo** y no te pregunta nada — teclear un número ahí no serviría de
+  nada, porque el sistema lo descarta.
+- ⚠️ **La sugerencia es orientativa, no una reserva.** Se calcula al analizar el PDF, sin apartar el
+  número: entre que lo ves y confirmas, otra persona podría tomarlo. Por eso el pie dice *«se confirma
+  al generar»* y no «reservado».
+- ⭐ **Y el caso que más te va a tocar: cuando eliges el modelo A MANO.** La primera vez de cada modelo
+  del cliente **lo eliges tú** en la vista previa — y el sistema ya había calculado los números **antes**,
+  con la liga que tenía aprendida. Ahora ese renglón te ofrece la casilla **vacía**, diciéndote por qué:
+  *«elegiste este modelo después de analizar… si lo dejas vacío, lo asigna el sistema»*. Y **si cambias
+  la liga, el número precargado se borra** en vez de quedarse el del modelo anterior.
+- **Un aviso que MENTÍA quedó retirado.** En una OP nacida del PDF, la cadena de trazabilidad decía
+  *«modelo anterior al módulo de Desarrollo»*, que era falso. Estaba en **cuatro** pantallas.
+
+### Qué sigue pendiente o roto
+
+- **Cuando eliges el modelo a mano, el sistema no te sugiere número** (la casilla va vacía). Hacerlo bien
+  exige que el servidor **renumere la tanda entera** —cuatro colores del mismo modelo necesitan cuatro
+  números—, y pedirlo fila por fila reintroduciría el defecto de que **las cuatro reciban el mismo**.
+  Queda recomendado como trabajo aparte.
+- **La liga del expediente de Desarrollo NO se hace sola**, y es a propósito: un mismo modelo puede tener
+  **un expediente por proyecto**, así que elegirlo automáticamente sería adivinar. Lo que sí se muestra es
+  el **linaje**, que es un hecho.
+
 ## 0.124 · 7-sep-2026 · **en prueba** — **Cancelar un pedido ya no apaga las órdenes que YA se están produciendo**
 
 ### Qué se puede hacer ahora que antes no

@@ -35,7 +35,7 @@ import { AdjuntosPedido } from './AdjuntosPedido';
 import { ConstructorPedido } from './ConstructorPedido';
 import { ImportadorPedido } from './ImportadorPedido';
 import { ImportadorPedidoPdf } from './ImportadorPedidoPdf';
-import { numerosDeProduccion } from './numeros-produccion';
+import { notaSinExpedienteDesarrollo, numerosDeProduccion } from './numeros-produccion';
 import { PanelGenerarOP } from './PanelGenerarOP';
 
 /**
@@ -565,7 +565,9 @@ export function PedidosMesPagina(): React.JSX.Element {
                                 ) : (
                                   <span
                                     className="num font-medium"
-                                    title="modelo anterior al módulo de Desarrollo"
+                                    /* Fila 0.151: sólo lo comprobable (en qué catálogo vive el
+                                       modelo), nunca su edad. Ver `notaSinExpedienteDesarrollo`. */
+                                    title={notaSinExpedienteDesarrollo(renglon) ?? undefined}
                                   >
                                     {renglon.codigoModelo}
                                   </span>
@@ -921,7 +923,7 @@ function DetalleRenglon({
                 void navigate('/desarrollo', { state: { idModelo: renglon.idModelo } }),
             }
           : {}
-        : { titulo: 'modelo anterior al módulo de Desarrollo' }),
+        : { titulo: notaSinExpedienteDesarrollo(renglon) ?? '' }),
     },
     {
       clave: 'lista',

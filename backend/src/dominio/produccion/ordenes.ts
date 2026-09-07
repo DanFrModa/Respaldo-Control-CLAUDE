@@ -198,6 +198,9 @@ type OrdenConDetalle = Orden & {
     descripcion: string | null;
     /** Casilla "lleva arte": el único insumo de la regla que sigue viviendo en el MODELO. */
     llevaArte: boolean;
+    /** ⭐ Linaje V1-E3: de qué modelo de DESARROLLO nació el de la OP (fila 0.151), o null. */
+    idModeloDesarrollo: number | null;
+    modeloDesarrollo: { codigo: string } | null;
   };
   /** Artes VIVOS de la RECETA de esta orden (insumo de la regla, V1-E3d). */
   _count: { recetaArtes: number };
@@ -227,6 +230,12 @@ const incluirDetalle = {
       // Único insumo de la regla que sigue en el MODELO (V1-E3d): la casilla "lleva arte". Los
       // otros dos son de la ORDEN (receta liberada + artes de la receta) y viajan abajo.
       llevaArte: true,
+      // ⭐⭐ Fila 0.151 — EL LINAJE VIAJA EN LA ORDEN. DANIEL: *«en la OP no veo el modelo de
+      // desarrollo»*. La columna existía desde V1-E3 y sólo salía en la respuesta del alta; sin
+      // esto, una OP nacida por color no puede decir de qué desarrollo salió, y la cadena de
+      // trazabilidad del Centro apagaba su nodo «Desarrollo» con un tooltip FALSO.
+      idModeloDesarrollo: true,
+      modeloDesarrollo: { select: { codigo: true } },
     },
   },
   // Conteo del arte VIVO de la receta de ESTA orden, sin traer la receta entera.
@@ -710,6 +719,8 @@ function aOrdenSalida(
     idModelo: orden.idModelo,
     codigoModelo: orden.modelo.codigo,
     descripcionModelo: orden.modelo.descripcion,
+    idModeloDesarrollo: orden.modelo.idModeloDesarrollo,
+    codigoModeloDesarrollo: orden.modelo.modeloDesarrollo?.codigo ?? null,
     idCliente: orden.idCliente,
     cliente: orden.cliente.nombre,
     idMaquilero: orden.idMaquilero,
