@@ -361,8 +361,12 @@ export interface FilaParaNeteo {
  * 🔴 **Y POR QUÉ ESE "SÓLO SI" NO ES OPCIONAL** (hallazgo del reviewer, 7-sep-2026). La tentación
  * es decir *"el renglón sin color pide TODO el material de la orden, así que le tocan todas las
  * líneas"*. **Eso es cierto en un avío colapsado y FALSO en una tela.** En un avío marcado
- * `seCompraSinColor` hay un solo renglón por orden (`ModeloAvio` tiene `@@id([idModelo, idAvio])`,
- * así que el avío entra una vez al BOM y {@link gruposDeCompraDelAvio} devuelve un único grupo).
+ * `seCompraSinColor` hay un solo renglón por orden: **`OrdenAvio` tiene `@@unique([idOrden,
+ * idAvio])`**, así que el avío entra una vez a la **receta congelada de la orden** —que es lo que
+ * la explosión recorre (`Orden.recetaAvios`)— y {@link gruposDeCompraDelAvio} devuelve un único
+ * grupo. (`ModeloAvio.@@id([idModelo, idAvio])` lo refuerza aguas arriba, en el BOM del modelo,
+ * pero la garantía es la de la receta: `OrdenAvio` se escribe aparte al congelarla y sin su propio
+ * cerrojo admitiría duplicados.)
  * En una tela NO: los colores de prenda **sin amarre de color de tela** caen todos en el grupo
  * `'sin'` **junto a** los que sí lo tienen, así que una misma tela emite a la vez renglones con
  * color **y** uno sin color — y ese renglón sin color es **una PARTE de la orden, no toda**. Es el
