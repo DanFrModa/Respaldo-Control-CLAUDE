@@ -12136,6 +12136,54 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.214) — 🔴 EL CÁRDIGAN SÍ VA COMO COMPLEMENTO (7-sep-2026): Daniel corrige una clasificación mal hecha del lead
+
+**Cómo se torció, porque la lección vale más que la corrección.** Al clasificar las filas pendientes se
+le preguntó a Daniel por la frecuencia del cárdigan. Contestó:
+
+> *«La mayoría lleva cárdigan. Pero **a veces el cárdigan está dado como una tela independiente**, porque
+> es un cárdigan especial. **Hoy es más común meter felpa por un lado y cárdigan como otra tela** por
+> otro.»*
+
+🔴 **El lead concluyó de ahí que ésa era la forma BUENA**, bajó la fila 0.156 a post-V1 y llegó a
+proponer *«si la práctica normal es tela separada, ¿vale la pena conservar el complemento?»*.
+
+**Daniel lo corrigió de inmediato:**
+
+> *«**Sí es importante meterlo como complemento**, porque **hay proveedores que así lo manejan** y **para
+> el control de la tela siempre es mejor ponerla como un complemento de su tela**.»*
+
+⇒ **Lo hacen separado PORQUE LA RECETA NO SABE LLEVAR EL COMPLEMENTO, no porque sea mejor.** Un rodeo
+no es una preferencia.
+
+⭐ **Y la evidencia le da la razón, y estaba a la vista del lead todo el tiempo** — `CLAUDE.md` §5, de
+la ingeniería inversa del sistema viejo, validada por Daniel hace meses:
+
+> *«Telas: doble componente `ExTela1`/`ExTela2` (ej. felpa + cardigan, **mismo lote**).»*
+
+🔑 **El cárdigan comparte LOTE con su felpa.** Darlo de alta como tela independiente **rompe ese vínculo
+en silencio** — y eso pega justo donde se acaba de trabajar: la fila **0.142** (v0.122) hizo que el lote
+**viaje** en los traspasos, y el aviso de riesgo de tono depende de poder nombrar el lote. Dos telas
+separadas no pueden decir «éstas dos vinieron del mismo rollo».
+
+**DECIDIDO: 0.156 sube a 🔴 BLOQUEA V1.** El consumo del complemento va como **número propio** (no
+proporción del cuerpo, ya decidido en §Post-F9.210). Lleva **migración** ⇒ es **más barata ahora que
+después de arrancar** (REGLA 0-B: mientras la versión empiece por `0.`, los datos son desechables).
+
+---
+
+📌 **LA LECCIÓN, que es el motivo de escribir esta sección aparte:**
+**un RODEO no es una PREFERENCIA.** Cuando alguien describe cómo hace hoy las cosas, eso NO dice que sea
+como quiere hacerlas: puede ser lo único que el sistema le deja. **La pregunta que faltó es de una línea:
+*«¿lo haces así porque es mejor, o porque el sistema no te deja hacerlo de otra forma?»***
+⚠️ Y es exactamente el modo de fallo que el propio lead había advertido dos mensajes antes —*«el riesgo
+es que empiece a marcar cosas como post-V1 para que el camino se vea más corto»*—, sólo que aquí no fue
+comodidad sino **una inferencia mal hecha sobre una frase de Daniel**. Que la advertencia existiera no lo
+impidió; lo impidió que Daniel leyera la clasificación. **Por eso la regla §7.5 exige su aprobación y no
+sólo su información.**
+
+---
+
 #### (Post-F9.213) — ⭐⭐ EL COLOR EN LA EXPLOSIÓN: avíos que no van por color, y la misma tela en dos colores (Daniel, 7-sep-2026)
 
 Salió mirando la pantalla de **Explosión de materiales** con datos suyos. Son **dos problemas
