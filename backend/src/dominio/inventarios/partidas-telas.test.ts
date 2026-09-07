@@ -4,14 +4,19 @@ import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/er
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
+  aCantidadTela,
   calcularDeltasConteo,
   idsDeColorPedidos,
   registrarConteoTelaColor,
+  repartirPorPartidaFifo,
   saldosTelaColorParaConteo,
   type ColorConTela,
+  type LineaColorBase,
   type LineaConteoBase,
   type SaldoConteo,
+  type SaldoPartidaTela,
 } from './partidas-telas.js';
+import type { ExistenciaTelaColor } from '../../comun/kardex.js';
 
 /**
  * Unit del CONTEO FÍSICO de tela por COLOR (fila 0.098) — SIN Postgres. La pantalla «Ajuste de
@@ -573,5 +578,356 @@ describe('la lista de colores del querystring se trocea en el dominio', () => {
     expect(() => idsDeColorPedidos(muchos)).toThrow(ErrorValidacion);
     const justos = Array.from({ length: 500 }, (_, i) => String(i + 1)).join(',');
     expect(idsDeColorPedidos(justos)).toHaveLength(500);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ FILA 0.142 — EL REPARTO FIFO DEL TRASPASO ENTRE LOS LOTES DEL ORIGEN
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// `repartirPorPartidaFifo` es PURA: aquí se fija la REGLA (de qué lotes sale la tela que se mueve),
+// y en `partidas-telas.int.test.ts` se fija que esa regla llegue de verdad a las dos patas del
+// kardex bajo el lock del origen. Lo que estas pruebas vigilan, y que antes no vigilaba nadie:
+//  • que sea FIFO por FOLIO de partida y no por id ni por el orden en que la base los devuelva;
+//  • que CUERPO y COMPLEMENTO se repartan por SEPARADO (son dos existencias independientes, y hay
+//    partidas de sólo cardigan) y luego se junten POR PARTIDA en un renglón;
+//  • que lo que ningún lote explique salga con `null` y sin reventar (REGLA 0-B: la tela vieja no
+//    tiene lote y no se le inventa uno);
+//  • que un lote agotado (o en negativo) no se ofrezca.
+
+/** Un saldo por lote del almacén de origen. */
+function saldoLote(
+  idPartida: number,
+  folio: number,
+  idTelaColor: number,
+  cuerpo: number,
+  complemento = 0,
+): SaldoPartidaTela {
+  return { idPartida, idTelaColor, folio, cuerpo, complemento };
+}
+
+/** Un renglón capturado en la pantalla de traspaso. */
+function capturado(
+  idTelaColor: number,
+  cantidad: number,
+  cantidadComplemento?: number,
+): LineaColorBase {
+  return cantidadComplemento === undefined
+    ? { idTelaColor, cantidad }
+    : { idTelaColor, cantidad, cantidadComplemento };
+}
+
+/**
+ * La existencia REAL por color cuando NO hay déficit: exactamente lo que los lotes dicen tener. Es
+ * el tercer argumento del reparto, y estas pruebas lo pasan así para decir *«este caso no va del
+ * tope»*. El tope tiene sus propias pruebas más abajo, con la existencia por debajo de la Σ.
+ */
+function sinDeficit(saldos: readonly SaldoPartidaTela[]): Map<number, ExistenciaTelaColor> {
+  const m = new Map<number, ExistenciaTelaColor>();
+  for (const s of saldos) {
+    const acum = m.get(s.idTelaColor) ?? { cuerpo: 0, complemento: 0 };
+    m.set(s.idTelaColor, {
+      cuerpo: acum.cuerpo + Math.max(0, s.cuerpo),
+      complemento: acum.complemento + Math.max(0, s.complemento),
+    });
+  }
+  return m;
+}
+
+/** La existencia REAL por color, dictada a mano (para los casos del TOPE). */
+function existenciasReales(
+  ...filas: [number, number, number?][]
+): Map<number, ExistenciaTelaColor> {
+  return new Map(filas.map(([id, cuerpo, comp]) => [id, { cuerpo, complemento: comp ?? 0 }]));
+}
+
+/** Lo repartido, en la forma en la que es fácil de leer: [partida, cuerpo, complemento]. */
+function comoTerna(
+  r: ReturnType<typeof repartirPorPartidaFifo>,
+): [number | null, number, number | undefined][] {
+  return r.lineas.map((l, i) => [
+    r.idPartidaPorLinea[i] ?? null,
+    l.cantidad,
+    l.cantidadComplemento,
+  ]);
+}
+
+describe('reparto FIFO del traspaso (fila 0.142)', () => {
+  it('un solo lote que alcanza: un renglón, con SU partida', () => {
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 300)],
+      [saldoLote(1, 501, 11, 800)],
+      sinDeficit([saldoLote(1, 501, 11, 800)]),
+    );
+    expect(comoTerna(r)).toEqual([[1, 300, 0]]);
+  });
+
+  it('⭐ va del folio MÁS VIEJO al más nuevo, aunque los saldos lleguen AL REVÉS', () => {
+    // Se pasan DESORDENADOS a propósito: si la función se fiara del orden en que llegan (o del id),
+    // este caso saldría al revés y nadie lo notaría — los dos renglones existirían igual y las
+    // cantidades sumarían lo mismo. La partida 9 tiene el folio 502 y el id más alto: si mandara el
+    // id o el orden del arreglo, se llevaría los primeros 500.
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 700)],
+      [saldoLote(9, 502, 11, 500), saldoLote(1, 501, 11, 300)],
+      sinDeficit([saldoLote(9, 502, 11, 500), saldoLote(1, 501, 11, 300)]),
+    );
+    expect(comoTerna(r)).toEqual([
+      [1, 300, 0],
+      [9, 400, 0],
+    ]);
+  });
+
+  it('lo que ningún lote alcanza a explicar viaja SIN lote, y no truena', () => {
+    // El caso normal de la tela vieja: entró por un traspaso anterior a la 0.142, así que no tiene
+    // partida y nadie se la va a inventar (REGLA 0-B).
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 500)],
+      [saldoLote(1, 501, 11, 200)],
+      // La existencia es MAYOR que lo que los lotes explican: 500 en el anaquel y sólo 200 con
+      // nombre. El tope no quita nada (no hay déficit) y los 300 restantes viajan sin lote.
+      existenciasReales([11, 500]),
+    );
+    expect(comoTerna(r)).toEqual([
+      [1, 200, 0],
+      [null, 300, 0],
+    ]);
+  });
+
+  it('sin NINGÚN lote en el origen, todo viaja sin lote (un solo renglón)', () => {
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 500, 40)],
+      [],
+      existenciasReales([11, 500, 40]),
+    );
+    expect(comoTerna(r)).toEqual([[null, 500, 40]]);
+  });
+
+  it('⭐⭐ CUERPO y COMPLEMENTO se reparten POR SEPARADO y se juntan por partida', () => {
+    // Dos existencias independientes: el lote viejo tiene cuerpo y nada de cardigan; el nuevo, al
+    // revés. Repartir sólo el cuerpo (o arrastrar el cardigan con él) daría un reparto imposible.
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 500, 60)],
+      [saldoLote(1, 501, 11, 400, 0), saldoLote(2, 502, 11, 300, 100)],
+      sinDeficit([saldoLote(1, 501, 11, 400, 0), saldoLote(2, 502, 11, 300, 100)]),
+    );
+    expect(comoTerna(r)).toEqual([
+      [1, 400, 0],
+      [2, 100, 60],
+    ]);
+  });
+
+  it('⭐ una partida de SÓLO complemento nombra el cardigan aunque no aporte cuerpo', () => {
+    // Comprar cardigan suelto es un caso REAL (§Post-F9.11 punto 2): esa partida tiene cuerpo 0.
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 0, 120)],
+      [saldoLote(1, 501, 11, 0, 200)],
+      sinDeficit([saldoLote(1, 501, 11, 0, 200)]),
+    );
+    expect(comoTerna(r)).toEqual([[1, 0, 120]]);
+  });
+
+  it('un lote AGOTADO (o en negativo) no se ofrece: se salta al siguiente', () => {
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 250)],
+      [saldoLote(1, 501, 11, 0), saldoLote(2, 502, 11, -30), saldoLote(3, 503, 11, 400)],
+      sinDeficit([
+        saldoLote(1, 501, 11, 0),
+        saldoLote(2, 502, 11, -30),
+        saldoLote(3, 503, 11, 400),
+      ]),
+    );
+    expect(comoTerna(r)).toEqual([[3, 250, 0]]);
+  });
+
+  it('🔴 un lote con CUERPO en negativo y complemento vivo NO reparte una cantidad negativa', () => {
+    // El caso feo: un inverso de corrección dejó el cuerpo de ese lote en −30 mientras su cardigan
+    // sigue vivo. Sin acotar el saldo a 0, `min(resta, −30)` daría un renglón de kardex con
+    // cantidad NEGATIVA — que el motor sí acepta en la validación por color (el signo lo pone la
+    // dirección) y que descuadraría el saldo por lote en el destino.
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 100, 40)],
+      [saldoLote(1, 501, 11, -30, 200)],
+      // 100 kg de cuerpo en el anaquel que ningún lote explica (el suyo está en negativo).
+      existenciasReales([11, 100, 200]),
+    );
+    expect(comoTerna(r)).toEqual([
+      [1, 0, 40],
+      [null, 100, 0],
+    ]);
+  });
+
+  it('cada COLOR se reparte contra SUS lotes (los de otro color no lo tocan)', () => {
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 100), capturado(21, 50)],
+      [saldoLote(1, 501, 11, 400), saldoLote(2, 502, 21, 30)],
+      sinDeficit([saldoLote(1, 501, 11, 400), saldoLote(2, 502, 21, 30)]),
+    );
+    expect(comoTerna(r)).toEqual([
+      [1, 100, 0],
+      [2, 30, 0],
+      [null, 20, 0],
+    ]);
+  });
+
+  it('el ruido decimal no inventa un renglón de una millonésima', () => {
+    // 0.1 + 0.2 = 0.30000000000000004 en binario: sin redondear a los 4 decimales de la columna,
+    // el remanente quedaría en 4.4e-17 y saldría un renglón fantasma SIN lote.
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 0.3)],
+      [saldoLote(1, 501, 11, 0.1), saldoLote(2, 502, 11, 0.2)],
+      sinDeficit([saldoLote(1, 501, 11, 0.1), saldoLote(2, 502, 11, 0.2)]),
+    );
+    expect(comoTerna(r)).toEqual([
+      [1, 0.1, 0],
+      [2, 0.2, 0],
+    ]);
+  });
+
+  it('⭐ el remanente redondeado evita el RENGLÓN FANTASMA sin lote', () => {
+    // 1.0 − 0.7 da 0.30000000000000004 en binario; al restarle el segundo lote (0.3) queda
+    // 5.5e-17 > 0 y, sin redondear el remanente, saldría un TERCER renglón sin lote con cantidad
+    // «cero» — un renglón de kardex que no representa nada y que además saldría impreso en la hoja
+    // del traspaso con el lote en «—».
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 1)],
+      [saldoLote(1, 501, 11, 0.7), saldoLote(2, 502, 11, 0.3)],
+      sinDeficit([saldoLote(1, 501, 11, 0.7), saldoLote(2, 502, 11, 0.3)]),
+    );
+    expect(comoTerna(r)).toEqual([
+      [1, 0.7, 0],
+      [2, 0.3, 0],
+    ]);
+  });
+
+  it('lo repartido SUMA exactamente lo capturado (no se pierde ni se inventa tela)', () => {
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 1234.5678, 90.1234)],
+      [saldoLote(1, 501, 11, 1000, 50), saldoLote(2, 502, 11, 100, 10)],
+      sinDeficit([saldoLote(1, 501, 11, 1000, 50), saldoLote(2, 502, 11, 100, 10)]),
+    );
+    const sumaCuerpo = aCantidadTela(r.lineas.reduce((t, l) => t + l.cantidad, 0));
+    const sumaComp = aCantidadTela(r.lineas.reduce((t, l) => t + (l.cantidadComplemento ?? 0), 0));
+    expect(sumaCuerpo).toBe(1234.5678);
+    expect(sumaComp).toBe(90.1234);
+    // …y el arreglo de partidas va PARALELO a las líneas, que es de lo que depende `aLineasMotor`.
+    expect(r.idPartidaPorLinea).toHaveLength(r.lineas.length);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 EL TOPE CONTRA LA EXISTENCIA REAL — el hallazgo GRAVE de la ronda de corrección
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  //
+  // El saldo por lote viene INFLADO porque las salidas a orden no nombran lote (P3). Sin tope, el
+  // FIFO se lleva el folio más viejo AUNQUE YA ESTÉ CONSUMIDO, y el destino —y la hoja impresa—
+  // reciben el nombre de un lote que no es. Eso es PEOR que el estado anterior a esta fila: cambia
+  // un «no sé» honesto por una afirmación falsa dicha con confianza.
+
+  it('🔴 NO nombra un lote que la existencia real ya no respalda (el escenario del reviewer)', () => {
+    // Los cuatro pasos, medidos contra la base por el reviewer y reproducidos aquí en puro:
+    //  1. entran 500 de L-VIEJO   2. salen 500 a una orden (no nombra lote)
+    //  3. entran 300 de L-NUEVO   4. se traspasan esos 300
+    // Σ saldos = 800 (L-VIEJO sigue diciendo 500), pero en el anaquel sólo hay 300, y son L-NUEVO.
+    const saldos = [saldoLote(1, 501, 11, 500), saldoLote(2, 502, 11, 300)];
+    const r = repartirPorPartidaFifo([capturado(11, 300)], saldos, existenciasReales([11, 300]));
+    // Sin el tope esto decía [[1, 300, 0]] — L-VIEJO, que ya no existe.
+    expect(comoTerna(r)).toEqual([[2, 300, 0]]);
+  });
+
+  it('🔴 el déficit se quita del más VIEJO al más nuevo (misma hipótesis FIFO del reparto)', () => {
+    // Σ saldos = 900, existencia = 400 ⇒ déficit 500: se lo come L-VIEJO entero (300) y 200 del
+    // segundo. Quedan 100 del segundo y 300 del tercero.
+    const saldos = [
+      saldoLote(1, 501, 11, 300),
+      saldoLote(2, 502, 11, 300),
+      saldoLote(3, 503, 11, 300),
+    ];
+    const r = repartirPorPartidaFifo([capturado(11, 400)], saldos, existenciasReales([11, 400]));
+    expect(comoTerna(r)).toEqual([
+      [2, 100, 0],
+      [3, 300, 0],
+    ]);
+  });
+
+  it('🔴 el déficit se calcula POR COMPONENTE (el cardigan no arrastra al cuerpo)', () => {
+    // El cuerpo está inflado (Σ 800 contra 300 reales) y el complemento no (Σ 200 contra 200).
+    // Un déficit calculado sobre la suma de los dos componentes castigaría al cardigan sin motivo.
+    const saldos = [saldoLote(1, 501, 11, 500, 100), saldoLote(2, 502, 11, 300, 100)];
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 300, 200)],
+      saldos,
+      existenciasReales([11, 300, 200]),
+    );
+    expect(comoTerna(r)).toEqual([
+      [1, 0, 100],
+      [2, 300, 100],
+    ]);
+  });
+
+  // ⚠️⚠️ AQUÍ VIVÍA UNA PRUEBA VACUA, y se cuenta para que no vuelva. Decía «INVARIANTE: nunca se
+  // nombra más tela de la que los lotes pueden explicar» y **pasaba con el tope BORRADO**, porque esa
+  // propiedad no la da el tope: la da `validarNoNegativoTelaColor` (rechaza la captura si pasa de la
+  // existencia) más el hecho de que el reparto nunca reparte más de lo capturado. El único estado en
+  // que el tope la sostendría —dos renglones del mismo color en una captura— lo prohíbe
+  // `resolverColores`. La cazó el reviewer y la reprodujo el coder: 4 rojas al borrar el tope, y
+  // ésta verde. Su sustituta fija la propiedad REAL, que es de identidad y no de cantidad.
+
+  it('⭐ el tope cambia CUÁL lote se nombra, NO cuánta tela se nombra', () => {
+    // Mismo capturado y misma existencia; lo único que cambia entre tener tope y no tenerlo es el
+    // lote elegido. Se afirman las DOS mitades a la vez:
+    //  · la cantidad total repartida es EXACTAMENTE la capturada (el tope no se come nada), y
+    //  · el lote es el que la existencia respalda, no el más viejo que ya se consumió.
+    // Con el tope borrado la segunda mitad se pone roja; sin la primera, un tope demasiado goloso
+    // pasaría inadvertido mandando tela sin nombre.
+    const saldos = [saldoLote(1, 501, 11, 500), saldoLote(2, 502, 11, 300)];
+    const r = repartirPorPartidaFifo([capturado(11, 300)], saldos, existenciasReales([11, 300]));
+
+    expect(aCantidadTela(r.lineas.reduce((t, l) => t + l.cantidad, 0))).toBe(300);
+    expect(r.idPartidaPorLinea).toEqual([2]);
+    // Y nada viaja sin lote: la existencia entera está respaldada por el lote nuevo.
+    expect(r.idPartidaPorLinea.filter((id) => id === null)).toEqual([]);
+  });
+
+  it('sin déficit el tope NO quita nada (no castiga al almacén que sí cuadra)', () => {
+    // El caso normal de una bodega alimentada sólo por compras: la existencia es exactamente lo que
+    // los lotes explican. Un tope demasiado goloso mandaría tela sin nombre aquí.
+    const saldos = [saldoLote(1, 501, 11, 500), saldoLote(2, 502, 11, 300)];
+    const r = repartirPorPartidaFifo([capturado(11, 700)], saldos, existenciasReales([11, 800]));
+    expect(comoTerna(r)).toEqual([
+      [1, 500, 0],
+      [2, 200, 0],
+    ]);
+  });
+
+  it('con MÁS existencia que lotes (tela sin nombre en el origen) el tope no inventa nada', () => {
+    // 800 en el anaquel, sólo 300 con nombre: los 500 restantes viajan sin lote, como debe ser.
+    const saldos = [saldoLote(1, 501, 11, 300)];
+    const r = repartirPorPartidaFifo([capturado(11, 800)], saldos, existenciasReales([11, 800]));
+    expect(comoTerna(r)).toEqual([
+      [1, 300, 0],
+      [null, 500, 0],
+    ]);
+  });
+
+  it('un color SIN existencia declarada se trata como anaquel vacío: nada se nombra', () => {
+    // Defensa: si el mapa no trae el color (no debería pasar — lo llena la validación bajo lock),
+    // el tope asume 0 y nada se nombra. Prefiere callar antes que nombrar a ciegas.
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 100)],
+      [saldoLote(1, 501, 11, 400)],
+      existenciasReales([99, 400]),
+    );
+    expect(comoTerna(r)).toEqual([[null, 100, 0]]);
+  });
+
+  it('un renglón capturado en 0/0 NO desaparece: sale sin lote para que lo rechace el motor', () => {
+    // El contrato ya lo rechaza antes (`alMenosUnaCantidad`), pero si esta función lo tragara en
+    // silencio un movimiento podría acabar con menos renglones de los capturados.
+    const r = repartirPorPartidaFifo(
+      [capturado(11, 0, 0)],
+      [saldoLote(1, 501, 11, 400)],
+      sinDeficit([saldoLote(1, 501, 11, 400)]),
+    );
+    expect(comoTerna(r)).toEqual([[null, 0, 0]]);
   });
 });

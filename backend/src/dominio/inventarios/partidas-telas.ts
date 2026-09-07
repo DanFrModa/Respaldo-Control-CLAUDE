@@ -11,6 +11,11 @@
  *  • La PARTIDA es la unidad de ENTRADA (folio propio consecutivo POR EMPRESA — A3, secuencia
  *    `partida-tela` — + número de lote del proveedor, texto opcional buscable). El CONSUMO
  *    empareja por TELA+COLOR: las salidas NO piden partida (`idPartida` va NULL).
+ *  • ⭐ **EXCEPCIÓN, y es la única (fila 0.142):** el TRASPASO entre almacenes SÍ nombra el lote en
+ *    sus dos patas — se reparte FIFO por folio sobre el saldo por lote del origen, sin pantalla
+ *    nueva ({@link repartirPorPartidaFifo}). No es «pedir partida en la salida»: nadie la escoge,
+ *    la calcula el sistema. Sin eso, el almacén del cortador —alimentado sólo por traspasos— nunca
+ *    sabría de qué lotes es su tela, y el aviso de riesgo de tono era ciego justo ahí.
  *  • El inventario ARRANCA DESDE CERO (conteo físico): la puerta es el ajuste de entrada, que
  *    CREA la(s) partida(s) en la MISMA transacción (A2).
  *  • D3 — existencia = Σ de movimientos. Las validaciones de no-negativo (de AMBOS componentes)
@@ -59,6 +64,8 @@ import {
   existenciasTelaColorPorColor,
   registrarMovimientoTela as registrarMovimientoTelaMotor,
   registrarTraspasoTela as registrarTraspasoTelaMotor,
+  SUMAS_TELA_COLOR,
+  type ExistenciaTelaColor,
   type LineaMovimientoTela,
 } from '../../comun/kardex.js';
 import { ORIGEN } from '../../comun/origenes.js';
@@ -67,6 +74,7 @@ import { verificarPermiso, tienePermiso, type SesionUsuario } from '../../comun/
 import {
   clienteLectura,
   enTransaccion,
+  type ClienteLectura,
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
@@ -192,6 +200,309 @@ export function aLineasMotor(
   });
 }
 
+/**
+ * DECIMALES de una cantidad de inventario de tela: los mismos que guarda la columna
+ * (`Decimal(14,4)`). Sumar y restar en `number` arrastra ruido binario, y ese ruido acabaría
+ * escribiendo renglones de kardex de una millonésima o inventando «tela que no se puede nombrar»
+ * que no existe. Vive AQUÍ y lo importa `previa-salida-tela-orden.ts`: si mañana cambia la escala
+ * de la columna, cambia en UN sitio y los dos caminos se mueven juntos.
+ */
+export function aCantidadTela(valor: number): number {
+  return Number(valor.toFixed(4));
+}
+
+/**
+ * ⭐ **EL SALDO VIVO DE UNA PARTIDA EN UN ALMACÉN** (fila 0.142): lo que ENTRÓ nombrando esa
+ * partida MENOS lo que SALIÓ nombrándola, por cada componente. No es «lo que entró alguna vez».
+ */
+export interface SaldoPartidaTela {
+  idPartida: number;
+  idTelaColor: number;
+  /** Folio de la partida (A3): el criterio FIFO del reparto y el orden en que se lista. */
+  folio: number;
+  /** Saldo del CUERPO (Σ con signo de los renglones que nombran esta partida en ese almacén). */
+  cuerpo: number;
+  /** Saldo del COMPLEMENTO (cardigan) — existencia INDEPENDIENTE del cuerpo (motor de kardex). */
+  complemento: number;
+}
+
+/**
+ * ⭐⭐ **CUÁNTO QUEDA DE CADA PARTIDA EN UN ALMACÉN** — Σ de `movimiento_det_tela` DIRECTO, con el
+ * signo de la dirección, agrupada por partida (D3: nunca una columna de saldo, nunca la vista).
+ * Es la pieza que la fila 0.142 necesitaba en DOS sitios y por eso vive en uno solo:
+ *
+ *  1. **El reparto FIFO del traspaso** ({@link repartirPorPartidaFifo}): de qué lotes es la tela
+ *     que se está moviendo, para que la pata de entrada la nombre en el almacén destino.
+ *  2. **El aviso de riesgo de tono** (`previa-salida-tela-orden.ts`): qué lotes hay HOY en el
+ *     anaquel — un NETO, comparable con la existencia, que también es un neto de hoy.
+ *
+ * 🔴 **NO filtra las canceladas, y es a propósito.** `cancelarMovimientoMaterial` copia `idPartida`
+ * al inverso, así que el par original+inverso **se neutraliza solo** en esta Σ. Poner aquí el
+ * `anuladoPor: { none: {} }` que usaba la versión de acumulado sería peor que inútil: dejaría fuera
+ * al original (que sí está anulado) y dentro al inverso (que no lo está) ⇒ **restaría dos veces**.
+ * Es la MISMA regla con la que el motor calcula la existencia, y por eso los dos números se pueden
+ * comparar.
+ *
+ * ⚠️ **NO TOMA EL LOCK: lo toma —o no— quien la llama**, igual que `existenciasTelaColorPorColor`.
+ * El traspaso la llama DESPUÉS de `validarNoNegativoTelaColor` (que ya bloqueó cada color del
+ * origen); la previa la llama sin lock, porque es una lectura de consulta.
+ *
+ * Devuelve TODAS las partidas que tocaron ese almacén (incluidas las de saldo 0 o negativo): quién
+ * llama decide qué hacer con ellas — y las dos decisiones están escritas donde se toman.
+ */
+export async function saldosPorPartidaTela(
+  cliente: ClienteLectura,
+  idEmpresa: number,
+  idAlmacen: number,
+  idsTelaColor: readonly number[],
+): Promise<SaldoPartidaTela[]> {
+  const ids = [...new Set(idsTelaColor)];
+  if (ids.length === 0) return [];
+  const filas = await cliente.$queryRaw<
+    {
+      idPartida: number;
+      idTelaColor: number;
+      folio: bigint;
+      cuerpo: Prisma.Decimal | null;
+      complemento: Prisma.Decimal | null;
+    }[]
+  >(Prisma.sql`
+    SELECT
+      d."id_partida"    AS "idPartida",
+      d."id_tela_color" AS "idTelaColor",
+      p."folio"         AS "folio",
+${SUMAS_TELA_COLOR}
+    FROM "movimiento_det_tela" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    JOIN "partidas_tela" p ON p."id" = d."id_partida"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_partida" IS NOT NULL
+      AND d."id_tela_color" IN (${Prisma.join(ids)})
+    GROUP BY d."id_partida", d."id_tela_color", p."folio"
+    ORDER BY p."folio" ASC, d."id_partida" ASC
+  `);
+  return filas.map((f) => ({
+    idPartida: f.idPartida,
+    idTelaColor: f.idTelaColor,
+    folio: Number(f.folio),
+    cuerpo: aCantidadTela(Number(f.cuerpo ?? 0)),
+    complemento: aCantidadTela(Number(f.complemento ?? 0)),
+  }));
+}
+
+/** Cómo queda repartida una captura de traspaso entre las partidas del almacén de ORIGEN. */
+export interface RepartoPorPartida {
+  /** Renglones EXPANDIDOS: uno por partida que aporta, más uno sin partida si algo no se nombra. */
+  lineas: LineaColorBase[];
+  /** La partida de cada renglón, POR ÍNDICE (paralelo a `lineas`); `null` = no se pudo nombrar. */
+  idPartidaPorLinea: (number | null)[];
+}
+
+/**
+ * ⭐⭐ **EL REPARTO FIFO DE UN TRASPASO ENTRE LAS PARTIDAS DEL ORIGEN** (fila 0.142, Daniel
+ * §Post-F9.201 punto 1: *«el traspaso conserva el lote de origen —y su reparto, si la pata mueve
+ * varios»*). Función PURA: no toca base ni sesión, así que la regla se puede medir sin Postgres.
+ *
+ * Se captura como siempre —color y cantidad, sin pantalla nueva (decisión P2 del lead)— y el
+ * sistema decide de qué lotes sale, **del folio más viejo al más nuevo**. Cada partida que aporta
+ * se lleva SU renglón, y el renglón viaja igual a las DOS patas (el motor pasa el mismo arreglo a
+ * la salida del origen y a la entrada del destino) ⇒ el destino sabe de qué lote es su tela.
+ *
+ * 🔴 **CUERPO Y COMPLEMENTO SE REPARTEN POR SEPARADO, y no es un detalle**: son dos existencias
+ * INDEPENDIENTES en el motor de kardex, y hay partidas de SÓLO complemento (comprar cardigan
+ * suelto — §Post-F9.11 punto 2). Repartir sólo el cuerpo dejaría el cardigan sin nombre, o peor,
+ * le inventaría un reparto imposible. Por eso las dos vueltas son independientes y luego se juntan
+ * **por partida**: un renglón lleva lo que ESA partida aporta de cada componente (0 incluido).
+ *
+ * ⚠️ **Lo que ninguna partida alcanza a explicar viaja SIN lote (`null`), sin error.** Pasa siempre
+ * que el origen tenga tela que nadie nombró: la que llegó por traspaso ANTES de esta fila (REGLA
+ * 0-B: no se repara hacia atrás), la que entra por el **ajuste de ENTRADA del conteo cíclico** (que
+ * no crea partida a propósito), la que devolvió la cancelación de una salida que tampoco llevaba
+ * lote y —desde el tope de abajo— **la que el propio reparto se niega a nombrar** porque la
+ * existencia no la respalda. Callar y mover la tela es lo correcto: el traspaso NO es el sitio
+ * donde se inventan lotes. 🔁 Y como este reparto lo consume `traspasarTelaColor`, que pasa el MISMO
+ * arreglo de renglones a las DOS patas, **la tela sin nombre se PROPAGA** al destino igual de
+ * anónima, que es la verdad. El mapa completo de las cuatro puertas por las que entra tela sin lote
+ * vive en la cabecera de `previa-salida-tela-orden.ts`.
+ *
+ * ⚠️ **Un renglón capturado en 0/0 sobrevive** (sale como renglón sin partida) para que lo rechace
+ * `validarLineasTela` del motor con su mensaje, en vez de desaparecer del movimiento en silencio.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * 🔴🔴 **EL TOPE CONTRA LA EXISTENCIA REAL — sin esto, el traspaso NOMBRA EL LOTE EQUIVOCADO.**
+ * (Ronda de corrección de la fila 0.142; el reviewer lo midió contra la base y salió tal cual.)
+ *
+ * El saldo por lote viene **INFLADO** y no es un defecto de la Σ: las **salidas a orden no nombran
+ * lote** (decisión P3, §Post-F9.9), así que consumen existencia **sin descontarle nada a ningún
+ * lote**. El escenario, en cuatro pasos:
+ *
+ *   1. entran 500 kg de `L-VIEJO` a la bodega;
+ *   2. **salen 500 kg a una orden** — físicamente ya no queda nada de `L-VIEJO`, pero su saldo por
+ *      lote sigue diciendo 500;
+ *   3. entran 300 kg de `L-NUEVO`, que es **lo único que hay** (existencia = 300, Σ saldos = 800);
+ *   4. se traspasan esos 300 al cortador.
+ *
+ * Sin tope, el FIFO reparte contra 800 y se lleva **el folio más viejo — el que ya se consumió** ⇒ el
+ * destino recibe `L-VIEJO`, el aviso de tono dice **`sin-riesgo`** y **la hoja impresa lleva el
+ * nombre de un lote que no es**. 🔑 **Eso es peor que el estado anterior a esta fila**: antes el
+ * cortador leía *«no sé de qué lote es»* —que era VERDAD y mandaba a revisar el rollo— y ahora leería
+ * una afirmación falsa con confianza total. Es justo lo contrario de lo que dice
+ * `impreso-traspaso-tela.ts` (*«decir un lote que no se sabe sería peor que callar»*).
+ *
+ * ⭐ **El tope:** antes de repartir, a los lotes se les quita el **déficit** `Σ saldos − existencia`
+ * **empezando por los folios más viejos** — o sea, se asume que lo que se consumió sin nombre salió
+ * de lo más viejo, la MISMA hipótesis FIFO con la que se reparte (coherente con P2). En el ejemplo
+ * `L-VIEJO` queda en 0, `L-NUEVO` en 300, y el reparto acierta.
+ *
+ * ⭐ **LO QUE EL TOPE SÍ APORTA — y es sobre la IDENTIDAD del lote, no sobre la cantidad:** que el
+ * lote escogido sea **uno que la existencia pueda respaldar**, cuando el desajuste viene sólo de
+ * consumo no apuntado — que es el caso normal de la bodega. Eso es lo que convierte `L-VIEJO` en
+ * `L-NUEVO` en el ejemplo de arriba, y está medido (la prueba *«NO nombra un lote que la existencia
+ * real ya no respalda»* y los cuatro pasos en integración).
+ *
+ * ⚠️ **Lo que el tope NO aporta, aunque una versión anterior de este bloque lo presumía «medido»:**
+ * que *«no se nombre más tela de la que hay»*. **Esa propiedad ya la daba
+ * {@link validarNoNegativoTelaColor}**, que rechaza la captura si pasa de la existencia, y el reparto
+ * nunca reparte más de lo capturado ⇒ `Σ nombrado ≤ existencia` es cierto **con tope y sin él**. El
+ * único estado donde el tope la sostendría —dos renglones del MISMO color en una captura— lo prohíbe
+ * `resolverColores`. Era una promesa **vacua**, y su prueba pasaba con el tope borrado: la cazó el
+ * reviewer y **se sustituyó por otra que sí muerde**.
+ *
+ * 🔑 **Dicho en una línea: el tope no cambia CUÁNTA tela se nombra — cambia CUÁL lote se nombra.**
+ * Lo que no alcance viaja sin lote, que es la verdad.
+ *
+ * 🔻🔻 **LO QUE **NO** GARANTIZA, y se escribe aquí porque la primera versión de este bloque prometió
+ * de más y una prueba lo desmintió** (`previa-salida-tela-orden.int.test.ts`, la que se llama
+ * `🔻 LÍMITE:`). Decía también *«nunca se nombra un lote que ya no tiene nada»*, y **es FALSO cuando
+ * además ha entrado tela SIN lote**:
+ *
+ *  • El desajuste `Σ saldos − existencia` **mezcla dos causas de signo contrario que la Σ no puede
+ *    separar**: el **consumo no nombrado** (el lote reclama de MÁS ⇒ habría que restarle) y la
+ *    **entrada sin lote** (reclama de MENOS ⇒ NO habría que restarle). Se cancelan entre sí.
+ *  • Medido: 500 de un lote consumidos por una salida a orden (sobre-reclamo real = 500) **+ 200
+ *    entrados sin lote** ⇒ el tope sólo ve **300** de desajuste y le deja al fantasma **200 kg que no
+ *    son suyos**. El escenario del reviewer —sin tela sin lote de por medio— **sí** queda curado,
+ *    porque ahí el déficit coincide exactamente con lo que el fantasma reclamaba.
+ *  • Y aunque no hubiera tela sin lote: con **varios lotes vivos y consumo parcial** el tope quita
+ *    del más viejo **por hipótesis**, así que el nombre puede acabar siendo el del lote de al lado.
+ *
+ * 🔑 **La raíz de las tres cosas es la misma: P3.** Mientras la salida a orden no nombre lote, el
+ * sistema no sabe de CUÁL salió lo consumido. Está declarado para Daniel en `DECISIONES.md`
+ * §Post-F9.206 (recuadro final), porque afecta a lo que él tiene que ratificar.
+ *
+ * ⚠️ **Y por qué este mismo tope NO se aplica al aviso de riesgo de tono** (`previa-salida-tela-
+ * orden.ts`), aunque el saldo inflado también le afecte: ahí el error seguro va en la dirección
+ * INOFENSIVA. Listar de más un lote que producción ya se llevó hace que alguien mire el anaquel de
+ * sobra; **esconderlo** haría callar un aviso cuando sí hay dos tonos. En el papel del traspaso es al
+ * revés: sobra-nombrar **es** la mentira. Misma cifra, dos usos, dos criterios — y por eso el tope
+ * vive aquí y no en la Σ compartida.
+ */
+export function repartirPorPartidaFifo(
+  lineas: readonly LineaColorBase[],
+  saldos: readonly SaldoPartidaTela[],
+  /** Existencia REAL por color, leída bajo el MISMO lock (D3). Es el techo del reparto. */
+  existenciaPorColor: ReadonlyMap<number, ExistenciaTelaColor>,
+): RepartoPorPartida {
+  // Lo disponible por color, en orden FIFO de folio y con el restante MUTABLE: si dos renglones
+  // pidieran el mismo color (hoy `resolverColores` lo prohíbe en la captura, pero nada obliga a que
+  // siga siendo así) el segundo no volvería a repartir lo que el primero ya se llevó.
+  const disponibles = new Map<
+    number,
+    { idPartida: number; cuerpo: number; complemento: number }[]
+  >();
+  // 🔴 El FIFO se ordena AQUÍ, no se hereda del orden en que lleguen los saldos. `saldosPorPartidaTela`
+  // ya los devuelve por folio, pero si esta función dependiera de eso la regla viviría en un `ORDER
+  // BY` que ninguna prueba pura puede vigilar — y el día que alguien cambie la consulta, el reparto
+  // cambiaría de lote sin que nada se ponga rojo. Desempate por `idPartida` para que sea determinista.
+  const porFolio = [...saldos].sort((a, b) => a.folio - b.folio || a.idPartida - b.idPartida);
+  for (const s of porFolio) {
+    const lista = disponibles.get(s.idTelaColor) ?? [];
+    // Un saldo NEGATIVO (sólo puede venir de un inverso de corrección) se ofrece como 0: nombrar
+    // esa partida diría que hay tela suya en el anaquel cuando no queda. No lleva guarda propia a
+    // propósito — con el saldo en 0 el `continue` de más abajo la salta igual, y una guarda que
+    // ninguna prueba puede poner en rojo es exactamente la rama que nadie vigila.
+    lista.push({
+      idPartida: s.idPartida,
+      cuerpo: Math.max(0, s.cuerpo),
+      complemento: Math.max(0, s.complemento),
+    });
+    disponibles.set(s.idTelaColor, lista);
+  }
+
+  // 🔴 EL TOPE CONTRA LA EXISTENCIA REAL (ver la cabecera): se le quita a los lotes, del más VIEJO
+  // al más nuevo, todo lo que digan tener de más que lo que hay en el anaquel. Por COMPONENTE,
+  // porque cuerpo y complemento son dos existencias independientes y su déficit no tiene por qué
+  // coincidir.
+  for (const [idTelaColor, lista] of disponibles) {
+    const existencia = existenciaPorColor.get(idTelaColor);
+    const topeCuerpo = Math.max(0, existencia?.cuerpo ?? 0);
+    const topeComplemento = Math.max(0, existencia?.complemento ?? 0);
+    let deficitCuerpo = aCantidadTela(
+      Math.max(0, lista.reduce((t, d) => t + d.cuerpo, 0) - topeCuerpo),
+    );
+    let deficitComplemento = aCantidadTela(
+      Math.max(0, lista.reduce((t, d) => t + d.complemento, 0) - topeComplemento),
+    );
+    for (const disp of lista) {
+      if (deficitCuerpo <= 0 && deficitComplemento <= 0) break;
+      const quitaCuerpo = aCantidadTela(Math.min(deficitCuerpo, disp.cuerpo));
+      const quitaComplemento = aCantidadTela(Math.min(deficitComplemento, disp.complemento));
+      disp.cuerpo = aCantidadTela(disp.cuerpo - quitaCuerpo);
+      disp.complemento = aCantidadTela(disp.complemento - quitaComplemento);
+      deficitCuerpo = aCantidadTela(deficitCuerpo - quitaCuerpo);
+      deficitComplemento = aCantidadTela(deficitComplemento - quitaComplemento);
+    }
+  }
+
+  const expandidas: LineaColorBase[] = [];
+  const idPartidaPorLinea: (number | null)[] = [];
+
+  for (const l of lineas) {
+    const lista = disponibles.get(l.idTelaColor) ?? [];
+    /** Lo asignado a cada partida. Un `Map` conserva el orden de inserción = el orden FIFO. */
+    const asignado = new Map<number, { cuerpo: number; complemento: number }>();
+    let restaCuerpo = aCantidadTela(l.cantidad);
+    let restaComplemento = aCantidadTela(l.cantidadComplemento ?? 0);
+
+    for (const disp of lista) {
+      if (restaCuerpo <= 0 && restaComplemento <= 0) break;
+      const tomaCuerpo = aCantidadTela(Math.min(Math.max(0, restaCuerpo), disp.cuerpo));
+      const tomaComplemento = aCantidadTela(
+        Math.min(Math.max(0, restaComplemento), disp.complemento),
+      );
+      if (tomaCuerpo <= 0 && tomaComplemento <= 0) continue;
+      asignado.set(disp.idPartida, { cuerpo: tomaCuerpo, complemento: tomaComplemento });
+      disp.cuerpo = aCantidadTela(disp.cuerpo - tomaCuerpo);
+      disp.complemento = aCantidadTela(disp.complemento - tomaComplemento);
+      restaCuerpo = aCantidadTela(restaCuerpo - tomaCuerpo);
+      restaComplemento = aCantidadTela(restaComplemento - tomaComplemento);
+    }
+
+    for (const [idPartida, cant] of asignado) {
+      expandidas.push({
+        idTelaColor: l.idTelaColor,
+        cantidad: cant.cuerpo,
+        cantidadComplemento: cant.complemento,
+      });
+      idPartidaPorLinea.push(idPartida);
+    }
+    // El remanente que ninguna partida explicó (y el renglón capturado en 0/0, para que lo juzgue
+    // el motor) viaja al final, sin lote.
+    if (restaCuerpo > 0 || restaComplemento > 0 || asignado.size === 0) {
+      expandidas.push({
+        idTelaColor: l.idTelaColor,
+        cantidad: Math.max(0, restaCuerpo),
+        cantidadComplemento: Math.max(0, restaComplemento),
+      });
+      idPartidaPorLinea.push(null);
+    }
+  }
+
+  return { lineas: expandidas, idPartidaPorLinea };
+}
+
 /** Datos de la PARTIDA que se crea al dar una entrada de tela por color. */
 export interface DatosPartidaTela {
   idEmpresa: number;
@@ -249,6 +560,17 @@ export async function crearPartidaTela(
  * componentes en negativo (D3). Advisory lock por color (`bloquearTelaColor`) + suma DIRECTA de
  * `MovimientoDetTela` (`existenciaTelaColorBloqueada`) — NUNCA la vista (ADR-0010 §3). Locks en
  * orden DETERMINISTA (por idTelaColor) para evitar deadlocks entre operaciones cruzadas.
+ *
+ * ⭐ **DEVUELVE la existencia que leyó, por color** (fila 0.142, ronda de corrección). No es un
+ * detalle de implementación: es **el único sitio del flujo donde la existencia se lee bajo el lock**,
+ * y el reparto por lote del traspaso la necesita como techo ({@link repartirPorPartidaFifo}).
+ * Leerla otra vez fuera de aquí sería una **segunda Σ** que podría ver otro estado. Los llamadores
+ * que sólo validan pueden ignorar el valor devuelto, y eso es lo que hacen los otros tres.
+ *
+ * ⚠️ **Y ojo con lo que esta función ya garantiza, porque se confunde:** al rechazar toda captura que
+ * pase de la existencia, **ella sola** hace cierto que *«no se reparte más tela de la que hay»*. Eso
+ * NO es mérito del tope del reparto — presumirlo como tal fue un error que costó una vuelta de
+ * revisión (ver la cabecera de `repartirPorPartidaFifo`).
  */
 async function validarNoNegativoTelaColor(
   tx: Tx,
@@ -256,7 +578,11 @@ async function validarNoNegativoTelaColor(
   idAlmacen: number,
   lineas: readonly LineaColorBase[],
   colores: Map<number, ColorConTela>,
-): Promise<void> {
+): Promise<Map<number, ExistenciaTelaColor>> {
+  /** La existencia que se leyó BAJO LOCK, por color. Se devuelve en vez de tirarse: el traspaso la
+   *  necesita para acotar el reparto por lote (fila 0.142, ronda de corrección) y leerla otra vez
+   *  fuera de aquí sería una segunda Σ que podría ver otro estado. */
+  const existencias = new Map<number, ExistenciaTelaColor>();
   const ordenadas = [...lineas].sort((a, b) => a.idTelaColor - b.idTelaColor);
   for (const l of ordenadas) {
     const color = colores.get(l.idTelaColor);
@@ -265,6 +591,7 @@ async function validarNoNegativoTelaColor(
     }
     await bloquearTelaColor(tx, idEmpresa, idAlmacen, l.idTelaColor);
     const existencia = await existenciaTelaColorBloqueada(tx, idEmpresa, idAlmacen, l.idTelaColor);
+    existencias.set(l.idTelaColor, existencia);
     if (existencia.cuerpo - l.cantidad < 0) {
       throw new ErrorConflicto(
         `No hay existencia suficiente de "${color.nombreTela} · ${color.nombreColor}": se intenta ` +
@@ -281,6 +608,7 @@ async function validarNoNegativoTelaColor(
       );
     }
   }
+  return existencias;
 }
 
 // ── Proyección a la salida ───────────────────────────────────────────────────────────────────────
@@ -1018,8 +1346,11 @@ export async function registrarSalidaTelaColorAOrden(
  *  • **Traza** — `origenTipo = salida-sin-orden` y SIN `origenId` (no hay entidad detrás). Eso es
  *    lo que después obliga a tener la misma llave para CANCELARLA.
  *
- * Sin partida (`idPartida` NULL, como toda salida: el consumo empareja por tela+color) y con
- * motivo OBLIGATORIO, que va a las observaciones del movimiento (A7).
+ * Sin partida (`idPartida` NULL: el consumo empareja por tela+color) y con motivo OBLIGATORIO, que
+ * va a las observaciones del movimiento (A7). ⚠️ **Ya NO vale decir «como toda salida»**: desde la
+ * fila 0.142 la **pata de salida del traspaso SÍ nombra el lote** (se reparte FIFO). Las que siguen
+ * sin nombrarlo son ésta, la salida a orden, la pata de sobrante del conteo, el ajuste de salida y
+ * el ajuste de salida del cíclico.
  */
 export async function registrarSalidaTelaColorSinOrden(
   sesion: SesionUsuario,
@@ -1061,8 +1392,32 @@ export async function registrarSalidaTelaColorSinOrden(
  * Registra un TRASPASO de tela POR COLOR entre dos almacenes de la empresa activa: DOS patas
  * atómicas (salida del origen + entrada al destino) en UNA transacción (A2, patrón
  * `registrarTraspasoTela`), con AMBAS cantidades juntas. Valida que el ORIGEN aguante los dos
- * componentes (D3, bajo lock). Sin partida (las patas del traspaso no son entradas de compra).
- * Permiso `inventario-telas.mover`.
+ * componentes (D3, bajo lock). Permiso `inventario-telas.mover`.
+ *
+ * ⭐⭐ **EL LOTE VIAJA EN EL TRASPASO** (fila 0.142 — Daniel §Post-F9.201 punto 1). Hasta la 0.141
+ * las dos patas se escribían con `idPartida = NULL` («no son entradas de compra»), y eso dejaba
+ * ciego el aviso de riesgo de tono **justo donde hace falta**: al almacén DEL CORTADOR —donde
+ * arranca la pantalla de salida de tela— la tela llega casi siempre traspasada, así que el sistema
+ * nunca sabía de qué lotes era lo que había en el anaquel. Ahora el reparto se calcula **FIFO por
+ * folio de partida** ({@link repartirPorPartidaFifo}) sobre el saldo por lote del ORIGEN, y el
+ * renglón expandido viaja igual a las dos patas: la salida descuenta del lote y la entrada lo
+ * nombra en el destino.
+ *
+ * 🔴 **EL REPARTO SE CALCULA DENTRO DE LA TRANSACCIÓN Y DESPUÉS DEL LOCK**, nunca antes:
+ * {@link validarNoNegativoTelaColor} toma `pg_advisory_xact_lock` por empresa+almacén+color en
+ * orden determinista. Calcularlo fuera del lock haría que dos traspasos simultáneos repartieran el
+ * mismo lote dos veces **en silencio**, y el saldo por lote se iría a negativo sin que nada lo
+ * validara (la validación de no-negativo es por COLOR, no por lote).
+ *
+ * ⚠️ **Lo que ninguna partida explique viaja SIN lote**, sin error: la tela que entró antes de esta
+ * fila se queda sin nombre (REGLA 0-B — aditivo, sin backfill) y sigue saliendo por la línea neutra
+ * del aviso de tono.
+ *
+ * 🔴 **Y el reparto va ACOTADO A LA EXISTENCIA REAL del origen** (la que la validación de no-negativo
+ * acaba de leer bajo lock, y que por eso devuelve). Sin ese tope el traspaso puede nombrar un lote
+ * **que ya se consumió** —porque las salidas a orden no lo descuentan— y mandar al cortador, y al
+ * papel, un nombre falso. El porqué completo y lo que el tope NO cura, en
+ * {@link repartirPorPartidaFifo}.
  */
 export async function traspasarTelaColor(
   sesion: SesionUsuario,
@@ -1087,7 +1442,26 @@ export async function traspasarTelaColor(
     await exigirAlmacenDelTipo(tx, datos.idAlmacenOrigen, 'TELA', idEmpresa);
     await exigirAlmacenDelTipo(tx, datos.idAlmacenDestino, 'TELA', idEmpresa);
     const colores = await resolverColores(tx, datos.lineas);
-    await validarNoNegativoTelaColor(tx, idEmpresa, datos.idAlmacenOrigen, datos.lineas, colores);
+    // La existencia que devuelve viene leída BAJO EL LOCK que ella misma toma: es la que acota el
+    // reparto (ronda de corrección de la 0.142). Volver a leerla aparte sería una segunda Σ.
+    const existencias = await validarNoNegativoTelaColor(
+      tx,
+      idEmpresa,
+      datos.idAlmacenOrigen,
+      datos.lineas,
+      colores,
+    );
+
+    // ⭐ Fila 0.142 — de qué lotes sale la tela que se mueve. VA AQUÍ, después del lock que acaba de
+    // tomar la validación de no-negativo (ver la cabecera): el saldo por lote se lee y se reparte
+    // con los colores del origen ya bloqueados, así que dos traspasos no se pisan el mismo lote.
+    const saldosOrigen = await saldosPorPartidaTela(
+      tx,
+      idEmpresa,
+      datos.idAlmacenOrigen,
+      datos.lineas.map((l) => l.idTelaColor),
+    );
+    const reparto = repartirPorPartidaFifo(datos.lineas, saldosOrigen, existencias);
 
     const { salida, entrada: entradaMov } = await registrarTraspasoTelaMotor(
       sesion,
@@ -1098,7 +1472,12 @@ export async function traspasarTelaColor(
         idAlmacenOrigen: datos.idAlmacenOrigen,
         idAlmacenDestino: datos.idAlmacenDestino,
         fecha: aDateColumna(datos.fecha),
-        lineas: aLineasMotor(datos.lineas, colores),
+        // Renglones EXPANDIDOS (uno por lote) con su partida POR ÍNDICE. El motor pasa el MISMO
+        // arreglo a las dos patas, así que el lote entra al destino sin tocar `kardex.ts`.
+        // ⚠️ Efecto visible: la bitácora (A7) cuenta los renglones EXPANDIDOS, no los capturados —
+        // un traspaso de un color que salga de dos lotes queda registrado con 2. Es lo honesto:
+        // son los renglones que de verdad se escribieron en el kardex.
+        lineas: aLineasMotor(reparto.lineas, colores, reparto.idPartidaPorLinea),
         ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
       },
       { tx },

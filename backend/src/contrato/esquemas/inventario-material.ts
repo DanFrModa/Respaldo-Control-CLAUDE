@@ -534,7 +534,15 @@ const esquemaMovTelaColorRenglonSalida = z.object({
   idTelaColor: z.number().int(),
   telaColor: z.string().describe('Nombre del color de la tela.'),
   pantone: z.string().nullable(),
-  idPartida: z.number().int().nullable().describe('Partida de la entrada o null (salidas).'),
+  idPartida: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      'Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS ' +
+        'DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en ' +
+        'la tela traspasada antes de esa fila.',
+    ),
   partidaFolio: z.number().int().nullable().describe('Folio de la partida o null.'),
   loteProveedor: z.string().nullable().describe('Lote del proveedor de la partida o null.'),
   cantidad: z.number().describe('Cantidad de CUERPO (≥ 0; el signo lo da la dirección).'),
@@ -1049,9 +1057,13 @@ const esquemaPreviaSalidaPartida = z.object({
   loteProveedor: z.string().nullable().describe('Lote del proveedor o null.'),
   factura: z.string().nullable().describe('Factura/remisión que la amparó o null.'),
   fecha: z.string().nullable().describe('Fecha de la entrada (YYYY-MM-DD) o null.'),
-  entrado: z
+  saldo: z
     .number()
-    .describe('Cuánto ENTRÓ de esta partida a este almacén (cuerpo + complemento).'),
+    .describe(
+      'Lo que QUEDA de esta partida en este almacén (cuerpo + complemento): Σ entradas − Σ ' +
+        'salidas que la nombran. Es un NETO de hoy, no un acumulado de entradas (fila 0.142). ' +
+        'Sólo se listan las partidas con saldo > 0.',
+    ),
 });
 
 /** Una partida de la lista del aviso de tono. */
@@ -1059,9 +1071,15 @@ export type PreviaSalidaPartida = z.infer<typeof esquemaPreviaSalidaPartida>;
 
 /**
  * ⭐ AVISO (b) — RIESGO DE TONO, por TELA+COLOR. El veredicto tiene **TRES** valores, no dos: el
- * tercero existe porque la tela que llega por TRASPASO entra **sin partida**, y contar partidas
- * hacía que el aviso se callara justo en el almacén del cortador —donde alguien está escogiendo el
- * rollo—. La ignorancia no se presenta como tranquilidad.
+ * tercero existe porque queda tela que el sistema no puede nombrar. Desde la 0.142 el traspaso SÍ
+ * nombra el lote, así que el almacén del cortador —donde alguien está escogiendo el rollo— ya tiene
+ * lista que enseñar; pero **no toda la tela llega con nombre**, y las puertas por las que entra sin
+ * él son CUATRO, no tres: los traspasos ANTERIORES a la 0.142, el ajuste de ENTRADA del conteo
+ * cíclico, la cancelación de una salida que tampoco llevaba lote, y **un traspaso de hoy cuyo origen
+ * tampoco pueda nombrarla** —incluido el remanente que deja el tope del reparto—. El mapa completo,
+ * con el porqué de cada una, vive en `dominio/inventarios/previa-salida-tela-orden.ts`; aquí se
+ * enumeran para que quien lea el contrato no crea que el tercer estado es sólo cosa del pasado.
+ * La ignorancia no se presenta como tranquilidad.
  */
 const esquemaPreviaSalidaColorRenglon = z.object({
   idTelaColor: z.number().int(),
@@ -1071,29 +1089,30 @@ const esquemaPreviaSalidaColorRenglon = z.object({
   estadoTono: z
     .enum(['sin-riesgo', 'varias-partidas', 'origen-desconocido'])
     .describe(
-      'VEREDICTO del dominio: `varias-partidas` = más de una partida conocida (avisa y las lista); ' +
-        '`origen-desconocido` = hay más existencia que la que las partidas conocidas explican, ' +
-        'típicamente tela llegada por traspaso (avisa diciendo que NO se sabe); `sin-riesgo` = calla.',
+      'VEREDICTO del dominio: `varias-partidas` = más de un lote VIVO (avisa y los lista); ' +
+        '`origen-desconocido` = hay más existencia que la que los lotes vivos explican, o sea tela ' +
+        'que el sistema no puede nombrar (avisa diciendo que NO se sabe); `sin-riesgo` = calla.',
     ),
   existencia: z
     .number()
     .describe('Existencia del color EN ESE ALMACÉN (cuerpo + complemento, Σ de movimientos).'),
-  entradoConocido: z
+  saldoConocido: z
     .number()
     .describe(
-      'Σ de lo que ENTRÓ con partida conocida a ese almacén (acumulado histórico: nadie le ' +
-        'descuenta las salidas, así que puede ser MAYOR que la existencia de hoy).',
+      'Σ del saldo VIVO de los lotes de ese color en ese almacén. Es un neto de hoy, comparable ' +
+        'con la existencia (fila 0.142). Puede quedar POR ENCIMA de lo real en un almacén que ' +
+        'consume: las salidas a orden no nombran lote, así que no lo descuentan.',
     ),
   sinNombrar: z
     .number()
     .describe(
-      'Cuánta de la existencia de hoy NO explica ninguna partida conocida = max(0, existencia − ' +
-        'entradoConocido). > 0 es lo que enciende `origen-desconocido`, y es el número que la ' +
-        'pantalla enseña cuando hay partidas listadas pero la lista no lo cubre todo.',
+      'Cuánta de la existencia de hoy NO explica ningún lote vivo = max(0, existencia − ' +
+        'saldoConocido). > 0 es lo que enciende `origen-desconocido`, y es el número que la ' +
+        'pantalla enseña cuando hay lotes listados pero la lista no lo cubre todo.',
     ),
   partidas: z
     .array(esquemaPreviaSalidaPartida)
-    .describe('Las partidas conocidas del color en ese almacén (para escoger a conciencia).'),
+    .describe('Los lotes vivos del color en ese almacén (para escoger a conciencia).'),
 });
 
 /** Un renglón del aviso de riesgo de tono (por color). */

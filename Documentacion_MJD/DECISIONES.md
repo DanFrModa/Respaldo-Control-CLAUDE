@@ -12136,6 +12136,246 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.206) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default. ✅ **P2 RATIFICADA por Daniel** (§Post-F9.205·1, con una adición) · ⏳ **P1, P3 y P4 siguen pendientes**
+
+**Lo que SÍ decidió Daniel ya está escrito y no se repite aquí:** es el punto **1 de §Post-F9.201** —
+*«el traspaso conserva el lote de origen (y su reparto, si la pata mueve varios); aditivo y sin backfill»*.
+Lo que sigue son **cuatro decisiones que la construcción obligó a tomar**, con su default aplicado.
+⚠️ **ESTADO AL 6-sep por la tarde (§Post-F9.205):** **P2 YA LA CONTESTÓ** — *«está bien que decida el
+sistema»*, **y añadió** que se pueda **elegir otro lote a mano** cuando el cortador escoja uno concreto
+(eso NO entra aquí: va en **fila 0.146**, encima de esta). **P1, P3 y P4 siguen sin contestar** y son las
+únicas que hay que volver a ponerle delante — **repreguntar P2 sería preguntarle dos veces lo mismo**. **Ninguna cambia lo que él pidió**;
+todas son cómo se cumple.
+
+**(P1) La cuenta de lotes del aviso de tono pasa a NETO (entradas − salidas), no a acumulado de entradas.**
+*Default tomado: sí.* **Por qué, y es la mitad no obvia de la fila:** al hacer que el traspaso nombre el
+lote, la **salida** del origen también lo nombra. Si el aviso siguiera sumando **sólo entradas** —como hacía
+desde la 0.101— un lote traspasado entero seguiría contando en la bodega **para siempre**, y la fila habría
+cambiado *«callar»* por *«avisar de más»*: la bodega vacía gritaría «hay dos lotes, escoge» sin tener nada
+en el anaquel. Con el neto, los dos lados de la comparación (`existencia` contra `Σ saldos`) son por fin la
+misma clase de número — un neto de hoy contra un neto de hoy —, que es justo el segundo defecto que la fila
+0.142 venía a curar. **Efecto lateral que se aprovechó:** una partida cancelada ya no necesita filtro
+especial, se neutraliza sola en la Σ (su inverso copia el `idPartida`).
+
+**(P2) El reparto es FIFO por folio de partida, AUTOMÁTICO y sin pantalla nueva.** *Default tomado: FIFO.*
+⚠️ **Ojo: leer el recuadro rojo del final de esta sección** — el FIFO sobre un saldo por lote inflado
+podía nombrar un lote ya consumido; se acotó, y su límite quedó declarado. ✅ **P2 la ratificó Daniel el
+6-sep por la tarde** (§Post-F9.205·1) **antes** de que ese recuadro se reescribiera con su redacción
+honesta; **lo que sigue sin contestar de este mismo asunto son las dos preguntas del recuadro, (i) y
+(ii)** — y la **(ii)** es la que de verdad importa, porque es donde el default elige *arriesgarse a
+nombrar* en vez de *callar*.
+La captura del traspaso **no cambia** (color + cantidad, como siempre) y el sistema decide de qué lotes sale,
+del folio más viejo al más nuevo. **Por qué no se le pide al usuario que escoja:** sería una pantalla nueva
+en el flujo más rutinario del almacén (mandarle tela al cortador), para una decisión que en el 90 % de los
+casos no tiene alternativa —hay un solo lote— y que ya se toma físicamente al cargar el bulto. FIFO es
+además lo que el almacén hace en la realidad con la tela: sale primero la que lleva más tiempo. 🔻 **Lo que
+cuesta:** si alguien mueve a propósito el rollo NUEVO y deja el viejo, el papel dirá el viejo. Se cambia en
+una función (`repartirPorPartidaFifo`) el día que Daniel lo pida.
+
+**(P3) La salida a orden SIGUE sin nombrar lote — no se tocó.** *Default tomado: no tocarla.*
+⚠️ **Y es la RAÍZ del defecto del recuadro rojo del final**: por eso P3 dejó de ser una decisión inocua. Es la decisión
+de Daniel de §Post-F9.9 (*el consumo empareja por color*) y cambiarla es otra fila, con su propia pantalla y
+su propia conversación. ⚠️ **Pero tiene una consecuencia que hay que decir en voz alta, y quedó escrita en el
+código y en el doc del módulo: el saldo por lote NUNCA cuadra del todo en un almacén que consume.** Como la
+salida a orden no descuenta el lote, su saldo se queda **por encima** de lo que de verdad hay ⇒ el aviso de
+tono **puede listar un lote que la producción ya se llevó**. Es el precio explícito de no pedirle al almacén
+que escoja partida en cada salida, y está **medido** en la integración para que nadie lo descubra de golpe.
+
+**(P4) La hoja del traspaso lleva DESGLOSE por lote.** *Default tomado: sí.* Una columna «Lote» con el
+número del **proveedor** primero —que es lo que viene escrito en el rollo y lo que quien recibe puede casar a
+la vista— y el **folio de la partida** entre paréntesis; «—» cuando el sistema no lo sabe. Sin esto, el
+reparto existiría sólo dentro de la base y el papel seguiría diciendo «300 kg de marino» sin decir de cuál
+tono. Un color puede ocupar **varias filas** en la hoja (una por lote), que es exactamente como el kardex lo
+guardó.
+
+**Y una advertencia para quien lea el número del aviso:** los lotes de la tela **traspasada antes de esta
+fila** siguen sin nombre y **no se van a reparar** (REGLA 0-B). Esa tela sigue saliendo por la línea neutra
+*«no se sabe de qué partidas es»* hasta que se consuma. **No es un defecto: es lo acordado.**
+
+---
+
+### 🔴🔴 DANIEL: ESTO HAY QUE LEERLO **ANTES** DE RATIFICAR P2 Y P3 — el sistema puede escribir el número de lote equivocado
+
+Lo encontró el reviewer de esta fila **midiéndolo contra la base**, y cambia lo que P2 y P3 significan en la
+práctica. **No es una posibilidad teórica: es el flujo normal de la bodega.**
+
+**Qué puede pasar, en el lenguaje del almacén.** La bodega hace dos cosas con la misma tela: **surte
+órdenes** y **manda tela al cortador**. Cuando surte una orden, el sistema **no apunta de qué lote salió**
+(eso es P3, y es una decisión vieja de Daniel: el consumo empareja por color, no por lote). Entonces:
+
+1. Entran **500 kg del lote A**.
+2. Se surten **500 kg a una orden** ⇒ **físicamente ya no queda nada del lote A**, pero el sistema sigue
+   creyendo que sí, porque nadie le dijo de cuál lote salió.
+3. Entran **300 kg del lote B** — es **lo único que hay** en la bodega.
+4. Se le mandan esos 300 al cortador.
+
+**Sin arreglo, el sistema le pone el nombre del lote A**, porque reparte del más viejo al más nuevo y cree
+que el A sigue ahí. El cortador recibe la nota con **un lote que no es**, la pantalla le dice **«sin riesgo
+de tono»**, y nadie revisa nada.
+
+🔑 **Y eso sería PEOR que antes de esta versión.** Antes, el cortador leía *«no sé de qué lote es esta
+tela»* — que era **verdad**, y le hacía ir a mirar el rollo. Cambiar un «no sé» honesto por **una
+afirmación falsa dicha con total confianza** es exactamente lo que este proyecto no hace.
+
+**Qué se construyó (la mitigación).** Antes de repartir, el sistema **compara lo que los lotes dicen tener
+contra lo que de verdad hay en el anaquel**, y le quita la diferencia a los lotes más viejos. En el ejemplo,
+el lote A queda en cero y el reparto acierta con el B. ⭐ **Lo que el freno cambia —y es lo que
+importa para decidir— es QUÉ LOTE SE ESCRIBE, no cuánta tela se manda:** en el ejemplo de arriba, en vez
+del lote que ya se había acabado escribe **el que de verdad está en el anaquel**. Eso está **medido** con
+ese mismo escenario de cuatro pasos. Lo que no alcance a explicarse se manda **sin lote**, que es la verdad.
+
+⚠️ *(Corrección de una versión anterior de este recuadro, que decía «garantiza que nunca se nombra más tela
+de la que hay». Eso ya lo hacía el sistema desde antes —no deja sacar más de lo que hay—, así que como
+argumento a favor del freno **no valía nada** y hacía parecer que el freno apenas sirve. Sirve, y sirve
+justo donde duele: en el nombre que va escrito en el papel.)*
+
+**Qué NO arregla — y esto hay que leerlo, porque una primera versión de este texto prometió de más y una
+prueba lo desmintió.** La raíz es P3, y el freno la acota sin curarla, en **dos** situaciones:
+- **(a) Varios lotes y consumo parcial.** El sistema no sabe de cuál se consumió, así que quita del más
+  viejo **por hipótesis**. Si la hipótesis falla, el nombre puede ser el del **lote de al lado**.
+- **(b) Si además ha entrado tela SIN lote** (un ajuste de conteo cíclico, una salida cancelada, un
+  traspaso viejo), los dos desajustes **se tapan entre sí** y el freno se queda corto: **puede seguir
+  nombrando un lote que ya se acabó**. Medido: 500 consumidos sin apuntar + 200 entrados sin lote ⇒ el
+  freno sólo ve 300 de diferencia y le deja al lote fantasma 200 kg que no son suyos.
+
+⏳ **Las dos preguntas para Daniel, y el default del lead:**
+- **(i)** ¿Está bien que el sistema **suponga** que lo que se consumió sin apuntar salió de lo más viejo?
+  *Default: sí* — es lo que el almacén hace de hecho, y es la misma regla del reparto.
+- **(ii)** ¿O prefiere que, cuando la bodega tenga varios lotes y no cuadren, el traspaso mande la tela
+  **SIN nombre de lote** en vez de arriesgar el equivocado? *Default: no* — nombrar acotado da al cortador
+  algo con qué trabajar en el caso normal (un solo lote, que es la mayoría), y el caso ambiguo ya sale
+  avisado por la pantalla de tono. **Pero es SU decisión**, porque es su papel el que va con el bulto.
+
+🔑 **La salida definitiva es apuntar el lote también al surtir la orden** (revertir P3). Eso es otra fila, y
+otra conversación: obligaría a escoger lote en cada salida, que es justo lo que Daniel no quiso en
+§Post-F9.9.
+
+- **Aplica en:** fila 0.142. **Fecha:** 2026-09-06.
+
+---
+
+#### (Post-F9.205) — LA TANDA DE RESPUESTAS DEL 6-sep-2026 (tarde): once decisiones, y una que CORRIGE al lead
+
+**Contexto.** El lead le puso a Daniel las preguntas abiertas de tres bloques con su default. Contestó
+casi todas. Se registran **con sus palabras**, no parafraseadas.
+
+**1. ⭐ EL LOTE SE PUEDE ELEGIR A MANO (cambia el alcance).** *«Está bien que decida el sistema **pero
+que haya posibilidad de seleccionar otro si es que el cortador decide un lote específico**.»*
+⇒ El **FIFO automático se queda** tal cual. La **selección manual va en FILA APARTE**, encima: la 0.142
+lleva tres rondas y sólo cubre el reparto automático; añadirle pantalla reabriría el ciclo y retrasaría
+lo que ya sirve. Decisión de alcance del lead, comunicada.
+
+**2. `0.143` · existencias de PT:** *«Está bien paginar»* ⇒ default (b) confirmado.
+
+**3. ⭐ `0.140` · IMPRESO POR LOTE — DE 10 EN 10.** *«Casi nunca imprimo tantas de golpe. Si es problema
+la memoria, **pon de 10 en 10 máximo** y listo.»* ⇒ el tope duro pasa de **100 a 10** órdenes por PDF.
+⚠️ **El tope de peso por imagen SIGUE haciendo falta**, medido: 10 × 7 × 12 MB ≈ **840 MB**. La decisión
+reduce el riesgo 10×, **no lo elimina**. Se construyen las dos cosas.
+
+**4. Corrida de pagos ejecutada:** *«Si. Está bien el default»* ⇒ **no** hay botón que revierta la
+corrida completa; se corrige movimiento por movimiento. Y **sí** se arregla que un **borrador vacío** se
+pueda borrar (hoy se queda en la lista para siempre).
+
+**5. ⭐ ESMA NO SE FUSIONA — y la razón la dio él.** *«Lo que pasa con EsMa de Access es que **es un
+estado de cuenta especializado para maquileros porque desde ahí reviso entradas y defino el renglón que
+abona a su estado de cuenta**. Si lo quieres fusionar con cuentas por pagar, **esa funcionalidad es sólo
+del maquilero, no de otros proveedores**. No sé cómo lo harías»* → y al oír la propuesta: *«Ok. Lo que
+comentas de EsMa»*.
+🔑 **EsMa NO es "otra vista del mismo saldo": es su MESA DE TRABAJO del maquilero.** Tiene una función
+que CxP no tiene y que no aplica a un proveedor de telas. ⇒ **Las dos pantallas se quedan**, con papeles
+distintos: **EsMa = donde se DECIDE** (revisar lo recibido, definir qué se abona, descuentos);
+**CxP = el libro único del dinero**. Lo que se arregla son las **tres contradicciones medidas**:
+(a) **no cuentan a la misma gente** —un maquilero dado de baja con saldo vivo sale en CxP y no en
+EsMa, así que sumar una columna y la otra da distinto—; (b) desde CxP se **ven** los renglones de
+maquila pero **no se pueden tocar** (la 0.145 abre esa puerta); (c) **ninguna pantalla dice que la otra
+existe**. Y se **quita del menú la etiqueta de «interina»** que EsMa arrastra desde antes de F9.
+⚠️ **Esto DESMIENTE el enunciado de la fila 0.135**, que trataba la convivencia como duplicidad a
+eliminar. No lo es: **es división del trabajo**, y fusionarlas le quitaría la pantalla donde opera.
+
+**6. 🔴 LOS PLAZOS DEL MAQUILERO — DANIEL CORRIGE AL LEAD, y el dato cambia el diseño.**
+*«Los maquileros cobran normalmente en **una o dos semanas máximo**. **No hay plazos de 30 días.** El
+que estás viendo (bordados computarizados) **es un proveedor de etiqueta**. O sea: los maquileros cobran
+en el **99 % de las veces esa misma semana o la siguiente**. No más.»*
+🔴 **Lo que el lead afirmó y era FALSO:** que «los 8 y 30 días del archivo son los días de crédito de dos
+**maquileros**». BORDADOS COMPUTARIZADOS **no es maquilero**. El dato se leyó del Excel **sin cruzarlo
+con quien conoce a los terceros** — la cicatriz de siempre.
+⭐ **Consecuencia de diseño para la fila 0.121 y para el aging:** la antigüedad de un **maquilero** NO se
+mide con la escala del **proveedor**. Proveedor: 30/60/90 (Daniel usa **150/200/250**). Maquilero: **la
+semana en curso o la siguiente** ⇒ **un maquilero a 30 días no es "vencido normal": es una ANOMALÍA que
+debe saltar a la vista.** Meterlos en cubetas de 30/60/90 haría que **todo maquilero atrasado se vea "al
+corriente"**, que es justo el defecto que la 0.121 viene a curar. ⇒ **Los tramos de maquila van en
+SEMANAS y son propios.** Default propuesto **7 / 14 / 21+**, a confirmar al construir la fila.
+
+**7. Cancelar un pago/abono de maquilero:** *«Ok»* — y añadió: *«**Aunque me gustaría poder editarlo yo
+cuando sea sin factura. Mismo criterio que los estados de cuenta de proveedores que no tienen
+facturas**»*. ⇒ **Es exactamente la fila 0.145**, ya construida: corrige **por movimiento**, no por
+proveedor, y deja intocable el renglón con CFDI detrás aunque sea del mismo tercero.
+
+**8. Constancia de situación fiscal:** *«Si»* ⇒ obligatoria **también para clientes**, como bloqueo suave.
+
+**9. CFDI en volumen:** *«De acuerdo con default»* ⇒ arrastrar varios XML a la misma pantalla, con
+resumen de importados / duplicados / sin proveedor.
+
+**10. Los XML de apertura:** *«Si son con facturas, voy a subir **todos los XML que estén vivos**»* ⇒
+ratifica §Post-F9.201·5 y **los aporta él**.
+
+**11. Las muestras de la carga de apertura:** *«Mañana subo una prueba»* ⇒ **desbloquea la fila 0.131**.
+
+⏳ **SIGUEN ABIERTAS de §Post-F9.206:** P1, P3, P4 y las dos del recuadro — **(i)** ¿el sistema supone
+que lo consumido sin apuntar salió de lo más viejo? y **(ii)** ¿nombrar un lote acotado o **mandar la
+tela sin nombre** cuando no está seguro? La **(ii)** se le repreguntó sin jerga por ser la única donde
+el default elige *arriesgarse a nombrar* en vez de *callar*.
+
+
+#### (Post-F9.204) — LA REPARACIÓN COMO TERCER SERVICIO SOBRE LA ORDEN (fila 0.144, 6-sep-2026): las cuatro las decidió Daniel
+
+**Cómo nació.** Daniel, por su cuenta: *«a veces hay que hacer reparaciones a un modelo… funciona
+similar a lo que es empaque o el corte. Es sólo una cantidad a un precio que se le paga y **se le debe
+de cargar al costo**. Me parece que el desarrollo que hiciste con lo del corte y empaque ya está
+variable para poder meter un servicio más, ¿no?»*
+
+**Lo que se midió antes de contestarle — su instinto acierta en una mitad, y hay una sorpresa en la otra:**
+- ✅ **El PAGO sí está preparado.** `crearCargoDeServicio` (`dominio/produccion/etapas.ts:596`) recibe el
+  servicio **por parámetro**; el CHECK de la migración de la 0.114 es
+  `(id_tipo_proceso IS NULL) <> (servicio IS NULL)` y **no nombra valores**, así que un tercer servicio
+  no lo rompe; y la etiqueta vive en un `Record<ServicioOrden,string>` **exhaustivo**
+  (`dominio/esma/etiqueta-cargo.ts:21`), de modo que al ampliar el enum **el compilador obliga** a
+  nombrarla. ⚠️ **Pero NO es un catálogo de pantalla:** es el enum de BD `ServicioOrden { corte, empaque }`
+  (`schema.prisma:4336`) ⇒ meter la reparación es **migración + los puntos que marque el compilador**.
+  Es código, no captura. Se le dijo así.
+- 🔴 **EL COSTO NO EXISTE — ni para la reparación, NI para corte y empaque.** `costo-orden.ts:162-165`
+  calcula `procesos = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes`, y **ningún
+  archivo de `dominio/costos/` ni de `dominio/edr/` lee `EsMaCargo`** (verificado enumerando sus
+  lectores: sólo terceros/esma/produccion). ⇒ **hoy se paga el corte y ese dinero NO llega al costo de
+  la prenda** salvo que alguien lo teclee en «procesos». **Es la pieza que falta, y falta para los tres.**
+
+**LAS CUATRO DECISIONES DE DANIEL:**
+1. **Se paga POR PIEZA reparada**, con su cantidad y su precio — como corte y empaque. *(Suyo: «es sólo
+   una cantidad a un precio».)*
+2. ⭐ **La registra CUALQUIER proveedor que ya tenga un rol de maquila** (`ROLES_MAQUILA_ESMA`:
+   costura, estampado, bordado, lavado, aplicación, corte, empaque). **SIN rol nuevo y SIN casilla que
+   marcar.** Lo levantó él: *«el reparador puede ser un proveedor de empaque o de maquila… no sé cómo
+   vamos a manejar eso. Tú recomiéndame»*, y aceptó la recomendación. **Las razones, en su orden:**
+   (a) un rol nuevo obligaría a **repetir el paseo manual de la 0.114** —marcar «Empaque» taller por
+   taller—, y por lo que él describe habría que marcárselo a casi todos; (b) **es la verdad del negocio**:
+   el reparador *es* su maquilero, y un rol aparte modelaría una frontera que en su taller no existe;
+   (c) al estar todos en `ROLES_MAQUILA_ESMA`, **el reparador cae solo** en el rubro maquila de la
+   corrida semanal y en su estado de cuenta, sin enseñarle nada nuevo a finanzas.
+   ⚙️ **Lo que exige técnicamente:** `exigirTerceroConRol` (`etapas.ts:705`, `:826`) pide **UN** rol
+   exacto ⇒ hace falta una **variante que acepte una LISTA**.
+   ⛔ **Descartado abrirlo a cualquier proveedor:** dejaría registrar una reparación a nombre del que
+   vende tela. 📌 Y si algún día el selector largo estorba, **la casilla se puede añadir después sin
+   romper nada**: lo guardado apunta al proveedor, no al rol.
+3. **Avisa, NO bloquea** contra lo recibido — como el empaque. Reparar dos veces la misma pieza es real.
+4. ⭐ **El costo recoge lo REAL pagado** (cargos de corte + empaque + reparación) en vez de teclearse.
+   ⚠️ Esto **toca el motor de costeo**, que es el que produce las cifras que ya se están viendo ⇒
+   **considerar partirla en dos entregas**: (a) la reparación se paga; (b) el costo recoge los tres.
+   Decidir con el diff delante.
+
+⛔ **Lo que NO se hace:** convertir la reparación en un `TipoProceso` — la metería al flujo envío→recibo
+que Daniel dijo que estos servicios **no** son (§Post-F9.195). `idTipoProceso = NULL` sigue siendo la
+marca de «servicio sobre la orden».
+
 #### (Post-F9.203) ⭐⭐ CORREGIR UN MOVIMIENTO SIN FACTURA — «sólo yo, ni con permiso» (fila 0.145, 6-sep-2026)
 
 **Lo que pidió Daniel, textual (6-sep-2026):**
