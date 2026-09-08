@@ -19,7 +19,7 @@ describe('CadenaTrazabilidad', () => {
       etiqueta: 'Lista de precios',
       valor: '—',
       activo: false,
-      titulo: 'modelo anterior al módulo de Desarrollo',
+      titulo: 'esta orden no tiene renglón de lista de precios',
     },
     { clave: 'pedido', etiqueta: 'Pedido interno', valor: '1502-F', activo: true },
     { clave: 'op', etiqueta: 'OP · producción', valor: '#5500 · mod. 7', activo: true },
@@ -44,6 +44,6 @@ describe('CadenaTrazabilidad', () => {
     render(<CadenaTrazabilidad nodos={nodos} />);
     const lista = screen.getByTestId('traza-lista');
     expect(lista).toBeDisabled();
-    expect(lista).toHaveAttribute('title', 'modelo anterior al módulo de Desarrollo');
+    expect(lista).toHaveAttribute('title', 'esta orden no tiene renglón de lista de precios');
   });
 });
