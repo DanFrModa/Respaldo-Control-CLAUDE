@@ -265,9 +265,14 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await page.goto('/pedidos/administrar');
     // ⚠️ Esta recarga completa es FLAKY CRÓNICO desde antes de esta rama: falla en las 3 corridas de
     // `prueba` del 18-ago y se salva con el reintento. Se afirma primero la URL para que, cuando
-    // falle, el mensaje DIGA dónde acabó la página en vez del inútil "element(s) not found" — si
-    // aterrizó en /login, la causa es la sesión (ver HOJA-DE-RUTA.md §4: `retry: false` trata un
-    // parpadeo de red como "no hay sesión"), no el encabezado.
+    // falle, el mensaje DIGA dónde acabó la página en vez del inútil "element(s) not found".
+    //
+    // 🔴 8-sep-2026: y lo dijo. Al caer en el CI del PR #330 la página se había quedado en
+    // `/produccion/ordenes` —la pantalla anterior, 62 sondeos con el mismo valor—, NO en `/login`.
+    // ⇒ la sospecha que este comentario traía antes (que la causa era la sesión, `retry: false` de
+    // `ProveedorSesion.tsx`) **queda descartada para este caso**. La causa real está SIN MEDIR: se
+    // descartó de paso que la devolviera una redirección de `App.tsx`, y queda por comprobar una
+    // carrera entre el `keyboard.press('Escape')` de arriba y este `goto`. Fila **0.169**.
     await expect(page).toHaveURL(/\/pedidos\/administrar$/, { timeout: 30_000 });
     // `exact`: el matcher por nombre es substring y el panel de detalle trae un <h3>"Pedidos
     // reales"</h3> que aparece al auto-seleccionar un pedido (async) → sin exact, doble match flaky.
