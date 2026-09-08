@@ -10,7 +10,9 @@
  * Cubre:
  *  (a) un CARGO DE MAQUILA de un proveedor con plazo trae días vencidos (antes: null, sin edad);
  *  (b) el plazo del proveedor MUEVE la respuesta (8 días de crédito ⇒ 8 días menos de atraso);
- *  (c) el pago de EsMa se come lo más viejo primero (misma convención que las cubetas);
+ *  (c) los créditos se comen lo más viejo primero (misma convención que las cubetas), y se mide
+ *      CADA UNA de las fuentes: pago de EsMa, descuento de EsMa y crédito del MOTOR — las tres, más
+ *      las tres de cargo (motor · cargo EsMa · abono EsMa), son las CINCO ramas del agregado;
  *  (d) el proveedor pagado por completo no tiene días (null, no 0);
  *  (e) el estado de cuenta ya enseña la FECHA DE VENCIMIENTO derivada en el renglón de EsMa, y el
  *      abono de EsMa —que allí SUMA— también la trae, mientras que pago y descuento siguen sin ella;
@@ -214,6 +216,36 @@ describe('los pagos se aplican de más viejo a más nuevo (convención de las cu
         conFactura: false,
       },
     });
+    // Se fue el de 50 días (42 de atraso); queda el de 20 (12 de atraso).
+    expect((await diasVencidosPorProveedor(cliente, empresa.id)).get(maquilero.id)).toBe(12);
+  });
+
+  it('⭐ y el CRÉDITO DEL MOTOR salda igual — la quinta fuente del agregado', async () => {
+    // Gemela de las dos de arriba, con la ÚLTIMA fuente que quedaba sin medir: el movimiento
+    // negativo del motor (`origen: 'pago'`), no un pago de EsMa. Existe porque neutralizar esa rama
+    // con `AND FALSE` dejaba las 17 pruebas en verde. ⚠️ La consecuencia es la misma que la del
+    // descuento: **un proveedor de CxP ya pagado arrastraría días vencidos para siempre** en la
+    // pantalla con la que Daniel decide a quién le paga.
+    //
+    // Y de paso fija algo que ninguna otra prueba dice: el crédito del motor **netea contra cargos
+    // de EsMa**. Las dos fuentes se miran juntas — es la misma cuenta del mismo proveedor (D15a).
+    await cargoMaquila({ hace: 50, importe: 1000, folio: 1n });
+    await cargoMaquila({ hace: 20, importe: 1000, folio: 2n });
+    expect((await diasVencidosPorProveedor(cliente, empresa.id)).get(maquilero.id)).toBe(42);
+
+    await registrarMovimientoTercero(
+      sesion(),
+      {
+        tipoTercero: 'proveedor',
+        idTercero: maquilero.id,
+        fecha: haceDias(1).toISOString().slice(0, 10),
+        origen: 'pago',
+        importe: 1000,
+        // El proveedor es `ambos`: el motor exige decir de qué lado va (no lo elige en silencio).
+        esFiscal: false,
+      },
+      bd(),
+    );
     // Se fue el de 50 días (42 de atraso); queda el de 20 (12 de atraso).
     expect((await diasVencidosPorProveedor(cliente, empresa.id)).get(maquilero.id)).toBe(12);
   });
