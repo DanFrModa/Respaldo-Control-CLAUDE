@@ -1,20 +1,22 @@
 /**
- * Tests UNIT de la guarda que impide fusionar un color YA EN USO (§Post-F9.129).
+ * Tests UNIT de la CLASIFICACIÓN de lo que cuelga de un color (fila 0.159, §Post-F9.222).
  *
  * ⭐ La prueba que de verdad importa es la PRIMERA: lee `prisma/schema.prisma` y exige que la lista
- * del dominio cubra **todas** las relaciones entrantes de `model Color` menos `telas`. Se enumeraron
- * estas referencias tres veces y las tres se enumeraron mal; esta prueba convierte el cuarto olvido
- * en un rojo de CI en vez de un hueco silencioso.
+ * del dominio cubra **todas** las relaciones entrantes de `model Color` menos `absorbidos`. Se
+ * enumeraron estas referencias tres veces y las tres se enumeraron mal; esta prueba convierte el
+ * cuarto olvido en un rojo de CI en vez de un hueco silencioso.
+ *
+ * ⚠️ Y ahora vigila una cosa más que antes: que cada relación diga **qué se hace con ella**. Antes
+ * bastaba con nombrarla (todas bloqueaban igual); desde que la fusión repunta unas y deja otras con
+ * rastro, una relación nueva mal clasificada no bloquea nada — se lleva o se deja un dato en
+ * silencio. Por eso `repuntar` y `trato` se verifican como pareja obligatoria.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  REFERENCIAS_QUE_BLOQUEAN_FUSION,
-  mensajeFusionBloqueada,
-} from './colores-fusion-referencias.js';
+import { REFERENCIAS_DE_COLOR } from './colores-fusion-referencias.js';
 
 /** Nombres de las relaciones declaradas dentro de `model Color` en el esquema de Prisma. */
 function relacionesDeModeloColor(): string[] {
@@ -32,16 +34,18 @@ function relacionesDeModeloColor(): string[] {
 }
 
 /**
- * Las relaciones entrantes de `Color` que a propósito NO bloquean la fusión:
- *  • `telas` (`TelaColor`) — la única que la fusión SÍ sabe reasignar al destino.
- *  • `absorbidos` (V1-E8s, §Post-F9.143) — no es un USO del color: es la contabilidad de la propia
- *    fusión (los colores que ÉSTE se llevó). Bloquear por ella impediría encadenar «A→B» y luego
- *    «B→C», que es legítimo y que `colorCanonico` sabe recorrer.
+ * La ÚNICA relación entrante de `Color` que a propósito no se clasifica: `absorbidos` (V1-E8s,
+ * §Post-F9.143). No es un USO del color: es la contabilidad de la propia fusión (los colores que
+ * ÉSTE se llevó). Repuntarla aplanaría la cadena reescribiendo un hecho histórico.
+ *
+ * ⚠️ Vive AQUÍ y no en el dominio a propósito: ampliar la excepción obliga a **editar la prueba**,
+ * un acto visible en el diff. Si viviera junto a la lista, saltarse la red sería agregar una palabra
+ * en el mismo archivo que el desarrollador ya está editando.
  */
-const NO_BLOQUEAN = ['telas', 'absorbidos'];
+const SIN_CLASIFICAR = ['absorbidos'];
 
-describe('REFERENCIAS_QUE_BLOQUEAN_FUSION', () => {
-  it('cubre TODAS las relaciones entrantes de `model Color` menos las que a propósito no bloquean', () => {
+describe('REFERENCIAS_DE_COLOR', () => {
+  it('clasifica TODAS las relaciones entrantes de `model Color` menos la reflexiva de la fusión', () => {
     const enElEsquema = relacionesDeModeloColor();
     // Red de seguridad de la propia prueba: si el regex dejara de casar, esto lo delata. Y si un día
     // se quitara la relación reflexiva de la fusión, la exclusión dejaría de ser vacía sin avisar.
@@ -50,47 +54,63 @@ describe('REFERENCIAS_QUE_BLOQUEAN_FUSION', () => {
     expect(enElEsquema).toContain('ordenLineas');
     expect(enElEsquema.length).toBeGreaterThan(5);
 
-    const debenBloquear = enElEsquema.filter((r) => !NO_BLOQUEAN.includes(r)).sort();
-    const cubiertas = REFERENCIAS_QUE_BLOQUEAN_FUSION.map((r) => r.relacion).sort();
+    const debenEstar = enElEsquema.filter((r) => !SIN_CLASIFICAR.includes(r)).sort();
+    const cubiertas = REFERENCIAS_DE_COLOR.map((r) => r.relacion).sort();
 
-    expect(cubiertas).toEqual(debenBloquear);
+    expect(cubiertas).toEqual(debenEstar);
   });
 
-  it('no repite relaciones ni incluye las que la fusión sí sabe manejar', () => {
-    const nombres = REFERENCIAS_QUE_BLOQUEAN_FUSION.map((r) => r.relacion);
+  it('no repite relaciones ni clasifica la reflexiva de la fusión', () => {
+    const nombres = REFERENCIAS_DE_COLOR.map((r) => r.relacion);
     expect(new Set(nombres).size).toBe(nombres.length);
-    for (const excluida of NO_BLOQUEAN) {
+    for (const excluida of SIN_CLASIFICAR) {
       expect(nombres).not.toContain(excluida);
     }
   });
 
-  it('cada referencia trae una etiqueta legible para el mensaje', () => {
-    for (const r of REFERENCIAS_QUE_BLOQUEAN_FUSION) {
+  it('cada referencia trae una etiqueta legible', () => {
+    for (const r of REFERENCIAS_DE_COLOR) {
       expect(r.etiqueta.trim().length).toBeGreaterThan(3);
     }
   });
-});
 
-describe('mensajeFusionBloqueada', () => {
-  it('nombra el color, cada uso con su cuenta, y el camino de salida', () => {
-    const mensaje = mensajeFusionBloqueada('Negro A', [
-      { etiqueta: 'órdenes de producción', cuenta: 3 },
-      { etiqueta: 'movimientos de inventario de producto terminado', cuenta: 12 },
-    ]);
-
-    expect(mensaje).toContain('"Negro A"');
-    expect(mensaje).toContain('3 órdenes de producción');
-    expect(mensaje).toContain('12 movimientos de inventario de producto terminado');
-    // El camino de salida: por qué no se puede y a dónde ir.
-    expect(mensaje).toContain('color apagado');
-    expect(mensaje).toContain('§Post-F9.129');
+  it('`trato` y `repuntar` van SIEMPRE en pareja: repuntar sin función es un dato que se queda atrás', () => {
+    for (const r of REFERENCIAS_DE_COLOR) {
+      if (r.trato === 'repuntar') {
+        expect(r.repuntar, `"${r.relacion}" dice repuntar pero no sabe cómo`).toBeTypeOf(
+          'function',
+        );
+      } else {
+        expect(r.repuntar, `"${r.relacion}" se queda con rastro pero trae repunte`).toBeUndefined();
+      }
+    }
   });
 
-  it('con un solo uso no deja una lista colgando de comas', () => {
-    const mensaje = mensajeFusionBloqueada('Blanco B', [
-      { etiqueta: 'lotes de tela (legado)', cuenta: 1 },
-    ]);
-    expect(mensaje).toContain('(1 lotes de tela (legado))');
-    expect(mensaje).not.toContain(', ,');
+  it('las CUATRO que se repuntan son las de catálogo y amarres derivados, y ninguna más', () => {
+    // Se fija la lista a propósito: agregar aquí una tabla de DOCUMENTOS (una línea de OC, la matriz
+    // de la orden, un movimiento de kardex) significaría reescribir un hecho asentado, y eso tiene
+    // que costar editar esta prueba y explicarlo.
+    const repuntadas = REFERENCIAS_DE_COLOR.filter((r) => r.trato === 'repuntar').map(
+      (r) => r.relacion,
+    );
+    expect(repuntadas.sort()).toEqual(
+      ['modelosPorColor', 'ordenTelaColores', 'telaProveedorColores', 'telas'].sort(),
+    );
+  });
+
+  it('la matriz de la orden y los movimientos asentados se quedan con RASTRO (D3/D7)', () => {
+    const porRelacion = new Map(REFERENCIAS_DE_COLOR.map((r) => [r.relacion, r]));
+    for (const relacion of [
+      'ordenLineas',
+      'etapasMovimientoDet',
+      'movimientosDetPt',
+      'cierresMaquilaDet',
+      'ordenCompraLineasTalla',
+      'ordenCompraLineasAvio',
+      'inventarioCiclicoDet',
+      'lotes',
+    ]) {
+      expect(porRelacion.get(relacion)?.trato, relacion).toBe('rastro');
+    }
   });
 });

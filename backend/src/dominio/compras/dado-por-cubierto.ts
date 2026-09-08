@@ -84,6 +84,7 @@ import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import {
+  canonizarColorPrenda,
   claveMaterialColor,
   comprometidoEnOc,
   pendienteDeComprar,
@@ -121,7 +122,7 @@ export async function dadoPorCubierto(
   if (idsOrden.length === 0) return resultado;
 
   const cliente = clienteLectura(bd);
-  const filas = await cliente.requerimientoCubierto.findMany({
+  const crudas = await cliente.requerimientoCubierto.findMany({
     // D3: los actos deshechos («volver a pedirlo») siguen ahí para auditarlos, pero dejan de contar.
     where: { idOrden: { in: [...idsOrden] }, canceladoEn: null },
     select: {
@@ -133,6 +134,12 @@ export async function dadoPorCubierto(
       cantidad: true,
     },
   });
+
+  // ⭐⭐ fila 0.159 — en ESPACIO CANÓNICO, como el otro sumando del mismo criterio
+  // (`comprometidoEnOc`). Un *«con esto queda cubierto»* decidido ANTES de fusionar dos colores
+  // duplicados sigue contando después: la decisión de la persona no se pierde por una limpieza de
+  // catálogo, y no hace falta reescribir la fila que la guarda (D3).
+  const filas = await canonizarColorPrenda(crudas, bd);
 
   for (const f of filas) {
     const porClave = resultado.get(f.idOrden) ?? new Map<string, number>();

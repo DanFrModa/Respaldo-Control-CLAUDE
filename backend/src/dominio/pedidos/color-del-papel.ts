@@ -15,8 +15,9 @@
  *
  * **Vive aquí, y no dentro del importador**, por lo mismo que `oc-duplicada.ts`: la vista previa y el
  * confirm tienen que decir lo MISMO. Por eso este módulo no reimplementa la caminata de la fusión —
- * llama a `colorCanonico`, exactamente la misma función que usa el confirm. Un segundo recorrido
- * "equivalente" es justo como nacen las ramas gemelas que se arreglan a medias.
+ * la delega en `colores-canonicos.ts`, que es de donde el confirm saca la suya (`colorCanonico` y
+ * `resolverColoresCanonicos` comparten la caminata, fila 0.159). Un segundo recorrido "equivalente"
+ * es justo como nacen las ramas gemelas que se arreglan a medias.
  *
  * ⚠️ **LO QUE ESTE MÓDULO NO AVISA, a propósito:** un color apagado A MANO (sin fusión) también
  * cambia al confirmar —se REACTIVA— pero eso no desvía nada: mismo id, mismo nombre, mismo precio.
@@ -25,7 +26,8 @@
  */
 import type { AdvertenciaPdf } from '../../contrato/index.js';
 import type { Tx } from '../../comun/transaccion.js';
-import { colorCanonico, normalizarNombreColor } from '../catalogos/colores.js';
+import { normalizarNombreColor } from '../catalogos/colores.js';
+import { resolverColoresCanonicos } from '../catalogos/colores-canonicos.js';
 
 /** Clave de comparación de un nombre de color (normalización ligera del dominio + minúsculas). */
 export function claveColor(nombre: string): string {
@@ -47,11 +49,11 @@ export type ResolucionColorPapel =
  * Se hace en DOS pasos porque el canónico casi nunca se llama igual que el color del papel (ese es
  * el punto de una fusión), así que no puede salir de la misma consulta por nombre:
  *  1. una consulta por el LOTE de nombres (insensible a mayúsculas, como el confirm);
- *  2. por cada uno encontrado, `colorCanonico` sigue el rastro de la fusión.
+ *  2. `resolverColoresCanonicos` sigue el rastro de la fusión de TODOS ellos, también por lotes
+ *     (⭐ fila 0.159 — antes era una consulta por color dentro del bucle).
  *
- * El paso 2 es una consulta corta por color (una cadena real tiene 1 o 2 eslabones) y una vista
- * previa trae un puñado de PDFs; se prefiere eso a re-deducir aquí la regla de parada de la
- * caminata, que es lo que dejaría a la previa y al confirm diciendo cosas distintas.
+ * El paso 2 se delega y no se re-deduce aquí: reescribir la regla de parada de la caminata es lo
+ * que dejaría a la previa y al confirm diciendo cosas distintas.
  *
  * **El desempate se copia del confirm**: si el catálogo trae dos variantes de mayúsculas del mismo
  * nombre ("Blanco" y "BLANCO"), `resolverOCrearColor` se queda con la de id MENOR (`orderBy: id
@@ -82,6 +84,8 @@ export async function resolverColoresDelPapel(
     }
   }
 
+  const canonicos = await resolverColoresCanonicos(bd, idPorClave.values());
+
   const resolucion = new Map<string, ResolucionColorPapel>();
   for (const nombre of normalizados) {
     const clave = claveColor(nombre);
@@ -90,10 +94,10 @@ export async function resolverColoresDelPapel(
       resolucion.set(clave, { estado: 'nuevo' });
       continue;
     }
-    const canonico = await colorCanonico(bd, id);
+    const canonico = canonicos.get(id);
     resolucion.set(
       clave,
-      canonico.id === id
+      canonico === undefined || canonico.id === id
         ? { estado: 'existe', id }
         : { estado: 'fusionado', id, canonico: { id: canonico.id, nombre: canonico.nombre } },
     );

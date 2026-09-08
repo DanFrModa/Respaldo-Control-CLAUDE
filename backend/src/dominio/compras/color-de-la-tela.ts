@@ -50,6 +50,11 @@ import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 import { numOrNull } from '../costos/decimales.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222) — la matriz se lee por el color CANÓNICO. Ver `cargarOrden`.
+import {
+  canonizarLineasDeColor,
+  resolverColoresCanonicos,
+} from '../catalogos/colores-canonicos.js';
 import { algunaRecibida, ESTATUS_OC_COMPROMETIDA } from './comprometido-en-oc.js';
 import { proponerColorDeTela, type ColorDeTelaCandidato } from './casar-color-de-tela.js';
 
@@ -102,7 +107,17 @@ const seleccionOrden = {
 /** La orden cargada con lo que el desglose por color necesita. */
 type OrdenParaColores = Prisma.OrdenGetPayload<{ select: typeof seleccionOrden }>;
 
-/** Carga la orden de la empresa activa (A9: la ajena responde 404 y no se dice nada más de ella). */
+/**
+ * Carga la orden de la empresa activa (A9: la ajena responde 404 y no se dice nada más de ella).
+ *
+ * ⭐⭐ **fila 0.159 (§Post-F9.222) — LA MATRIZ ENTRA EN ESPACIO CANÓNICO**, igual que en la explosión
+ * (`mrp.ts`, `cargarOrden`) y por la misma razón: la fusión de colores duplicados **no reescribe la
+ * matriz** (D7), así que una orden puede tener dos renglones que son el mismo color real. Sin
+ * resolver el rastro, esta pantalla pediría capturar el color de tela **dos veces para el mismo
+ * color**, y el paso 1 de `casar-color-de-tela.ts` —*«la tela ya tiene ese color amarrado»*, que
+ * compara `TelaColor.idColor` contra el de la matriz— **no casaría nunca**: la fusión SÍ repunta
+ * `TelaColor` al canónico, así que quedaría comparando el id viejo contra el nuevo.
+ */
 async function cargarOrden(tx: Tx, idOrden: number, idEmpresa: number): Promise<OrdenParaColores> {
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
@@ -111,7 +126,11 @@ async function cargarOrden(tx: Tx, idOrden: number, idEmpresa: number): Promise<
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
-  return orden;
+  const canonicos = await resolverColoresCanonicos(
+    tx,
+    orden.lineas.map((l) => l.idColor),
+  );
+  return { ...orden, lineas: canonizarLineasDeColor(orden.lineas, canonicos) };
 }
 
 // ── ⭐ V1-E4c — HASTA CUÁNDO SE PUEDE CAMBIAR EL COLOR (§Post-F9.79, misma regla) ───────────────
@@ -255,12 +274,33 @@ function proyectarColores(
   orden: OrdenParaColores,
   compradosEnFirme: Map<string, CompraDelColor>,
 ): ColoresDeTelaSalida {
-  const coloresDeLaOrden = orden.lineas.map((l) => ({
-    idColor: l.idColor,
-    nombre: l.color.nombre,
-    pantone: l.pantone,
-    piezas: l.tallas.reduce((s, t) => s + t.cantidad, 0),
-  }));
+  // ⭐⭐ fila 0.159 — UN RENGLÓN POR COLOR REAL. `cargarOrden` ya puso la matriz en espacio
+  // canónico, así que dos renglones que eran colores duplicados llegan aquí con el MISMO `idColor`:
+  // se pliegan en uno sumando sus piezas. Sin plegarlos, la pantalla pediría capturar dos veces el
+  // color de tela del mismo color y —peor— `coloresDeLaOrden.length` diría 2, lo que apagaría la
+  // regla `unico-color` de la propuesta (que sólo actúa cuando la orden es de UN color).
+  // El PANTONE se queda con el primero que lo traiga: es el que la OP capturó para ese color, y dos
+  // renglones del mismo color canónico no pueden estar diciendo dos tonos distintos.
+  const porColor = new Map<
+    number,
+    { idColor: number; nombre: string; pantone: string | null; piezas: number }
+  >();
+  for (const l of orden.lineas) {
+    const piezas = l.tallas.reduce((s, t) => s + t.cantidad, 0);
+    const previo = porColor.get(l.idColor);
+    if (previo === undefined) {
+      porColor.set(l.idColor, {
+        idColor: l.idColor,
+        nombre: l.color.nombre,
+        pantone: l.pantone,
+        piezas,
+      });
+    } else {
+      previo.piezas += piezas;
+      previo.pantone ??= l.pantone;
+    }
+  }
+  const coloresDeLaOrden = [...porColor.values()];
 
   const telas: TelaConColores[] = orden.recetaTelas.map((mt) => {
     const opciones: ColorDeTelaCandidato[] = mt.tela.colores.map((c) => ({

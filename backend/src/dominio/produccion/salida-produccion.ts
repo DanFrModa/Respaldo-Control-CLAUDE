@@ -70,6 +70,7 @@ import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion
 import { validarEntrada } from '../../comun/validacion.js';
 import { ligarOrdenNucleo } from '../desarrollo/liga-orden.js';
 import { obtenerODerivarModeloDeProduccion } from '../modelos/nomenclatura.js';
+import { colorCanonico } from '../catalogos/colores-canonicos.js';
 
 import { crearOrden, obtenerOrden, sincronizarReferencias, validarReferencias } from './ordenes.js';
 
@@ -324,14 +325,16 @@ async function resolverModeloDeLaOp(
   const idColor = colorDeIdentidad(datos.lineas);
   let color: { nombre: string } | null = null;
   if (idColor !== null) {
-    color = await tx.color.findUnique({ where: { id: idColor }, select: { nombre: true } });
-    if (color === null) {
-      // 🔴 Ver el encabezado: sin esto el id inventado viaja hasta el `create` del hijo y sale como
-      // un 500 por violación de FK. El color de la matriz lo VUELVE a validar `sincronizarMatriz`
-      // (también su estado activo); esto no lo sustituye, sólo llega antes porque desde V1-E3 el
-      // modelo nace primero.
-      throw new ErrorNoEncontrado('Color', idColor);
-    }
+    // 🔴 Ver el encabezado: sin esto el id inventado viaja hasta el `create` del hijo y sale como
+    // un 500 por violación de FK (`colorCanonico` lanza `ErrorNoEncontrado`). El color de la matriz
+    // lo VUELVE a validar `sincronizarMatriz`; esto no lo sustituye, sólo llega antes porque desde
+    // V1-E3 el modelo nace primero.
+    //
+    // ⭐⭐ fila 0.159 — y se lee el **CANÓNICO**, no el color crudo: el modelo que va a nacer lleva
+    // la llave del canónico (`obtenerODerivarModeloDeProduccion`), así que su descripción tiene que
+    // decir ESE nombre. Si no, un modelo del color «Blanco Hueso» se llamaría «Blanco Hueso Pantone
+    // 14-0002 Tcx Pumice Stone» por haberse capturado la OP antes de la fusión.
+    color = await colorCanonico(tx, idColor);
   }
   const descripcion =
     color === null ? undefined : [modelo.descripcion, color.nombre].filter(Boolean).join(' · ');

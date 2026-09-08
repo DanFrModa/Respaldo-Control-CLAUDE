@@ -26,6 +26,9 @@ import type {
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222): la explosión resuelve el color por el CANÓNICO tras una fusión.
+import { fusionarColores } from '../catalogos/colores.js';
+import { darPorCubierto } from './dado-por-cubierto.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -4453,5 +4456,172 @@ describe('⭐⭐ 0.158 — el avío que se compra SIN tomar en cuenta el color (
     expect(omitidos.length).toBeGreaterThan(0);
     expect(omitidos.every((o) => o.motivo === 'ya-en-oc')).toBe(true);
     expect(omitidos.reduce((s, o) => s + o.cantidadEnOc, 0)).toBeCloseTo(100);
+  });
+});
+
+/**
+ * ⭐⭐ **fila 0.159 (§Post-F9.222) — DOS COLORES DUPLICADOS FUSIONADOS: EL MRP DEJA DE PARTIRLOS.**
+ *
+ * El caso REAL de Daniel: su catálogo tenía «Blanco Hueso Pantone 14-0002 Tcx Pumice Stone» y
+ * «Blanco Hueso» —el mismo color— y las dos variantes metidas en las mismas OP. Al fusionarlos, la
+ * fusión **no reescribe la matriz** (es lo que el cliente pidió, D7), así que la orden sigue
+ * teniendo dos renglones… y el MRP los seguía explotando por separado: dos renglones de compra del
+ * mismo botón, en el mismo color, que el proveedor no puede distinguir.
+ *
+ * Lo que se fija aquí es que la explosión resuelva el rastro de la fusión (`cargarOrden`) y que el
+ * NETEO siga cuadrando después (`comprometidoEnOc`), que es lo que impide comprar dos veces.
+ */
+describe('⭐⭐ fila 0.159 — colores duplicados fusionados en la explosión', () => {
+  let colorDuplicado: Color;
+  let idOrdenDosColores: number;
+
+  /** Orden con la MISMA prenda en dos colores que resultan ser el mismo: 30 + 20 = 50 piezas. */
+  async function ordenConLosDosColores(folio: bigint): Promise<number> {
+    const orden = await cliente.orden.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idColor: colorRojo.id,
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 10 },
+                  { idTalla: tallaM.id, cantidad: 20 },
+                ],
+              },
+            },
+            {
+              idColor: colorDuplicado.id,
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 5 },
+                  { idTalla: tallaM.id, cantidad: 15 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
+  /** Los renglones de BOTÓN de la explosión (el material que se parte por color). */
+  async function renglonesDeBoton(id: number) {
+    const ex = await explosionarOrden(sesion(), id, bd());
+    return ex.grupos
+      .flatMap((g) => g.renglones)
+      .filter((r) => r.idAvio === avioBoton.id)
+      .sort((a, b) => (a.colorPrenda ?? '').localeCompare(b.colorPrenda ?? '', 'es'));
+  }
+
+  beforeEach(async () => {
+    colorDuplicado = await cliente.color.create({ data: { nombre: 'Rojo Pantone 18-1662 TCX' } });
+    idOrdenDosColores = await ordenConLosDosColores(900n);
+  });
+
+  it('ANTES de fusionar los parte en dos renglones (el defecto, medido)', async () => {
+    const botones = await renglonesDeBoton(idOrdenDosColores);
+    expect(botones).toHaveLength(2);
+    // 6 botones por prenda: 30 × 6 = 180 y 20 × 6 = 120.
+    expect(botones.map((r) => r.cantidadAComprar)).toEqual([180, 120]);
+  });
+
+  it('DESPUÉS de fusionar sale UN solo renglón, con la suma de los dos', async () => {
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: colorRojo.id, origenes: [colorDuplicado.id] },
+      bd(),
+    );
+
+    const botones = await renglonesDeBoton(idOrdenDosColores);
+    expect(botones).toHaveLength(1);
+    expect(botones[0]?.cantidadAComprar).toBe(300); // 50 piezas × 6
+    expect(botones[0]?.idColorPrenda).toBe(colorRojo.id);
+    expect(botones[0]?.colorPrenda).toBe('Rojo');
+
+    // 🔴 Y la matriz de la ORDEN sigue diciendo lo que el cliente pidió: no se reescribió nada.
+    const lineas = await cliente.ordenLinea.findMany({ where: { idOrden: idOrdenDosColores } });
+    expect(new Set(lineas.map((l) => l.idColor))).toEqual(
+      new Set([colorRojo.id, colorDuplicado.id]),
+    );
+  });
+
+  it('el SNAPSHOT persistido queda en el color canónico (es lo que después netea)', async () => {
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: colorRojo.id, origenes: [colorDuplicado.id] },
+      bd(),
+    );
+    await explosionarOrden(sesion(), idOrdenDosColores, bd());
+
+    const guardados = await cliente.requerimientoOrden.findMany({
+      where: { idOrden: idOrdenDosColores, idAvio: avioBoton.id },
+    });
+    expect(guardados).toHaveLength(1);
+    expect(guardados[0]?.idColorPrenda).toBe(colorRojo.id);
+  });
+
+  it('🔴 lo DADO POR CUBIERTO antes de la fusión sigue contando', async () => {
+    // Alguien decide que el color duplicado ya está cubierto ANTES de limpiar el catálogo: esa
+    // decisión es de una persona (§Post-F9.99) y no se puede perder por una fusión.
+    const antes = await renglonesDeBoton(idOrdenDosColores);
+    const delDuplicado = antes.find((r) => r.idColorPrenda === colorDuplicado.id);
+    await darPorCubierto(
+      sesion(),
+      { idsRequerimiento: delDuplicado?.idsRequerimiento ?? [], cubierto: true },
+      bd(),
+    );
+
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: colorRojo.id, origenes: [colorDuplicado.id] },
+      bd(),
+    );
+
+    const despues = await renglonesDeBoton(idOrdenDosColores);
+    expect(despues).toHaveLength(1);
+    expect(despues[0]?.cantidadCubierta).toBe(120);
+    expect(despues[0]?.cantidadPendiente).toBe(180); // 300 − 120 cubiertos
+  });
+
+  it('🔴 lo COMPRADO antes de la fusión sigue neteando: no se vuelve a pedir', async () => {
+    // 1) Se compra el color duplicado ANTES de fusionar (la OC queda con el id absorbido).
+    const antes = await renglonesDeBoton(idOrdenDosColores);
+    const delDuplicado = antes.find((r) => r.idColorPrenda === colorDuplicado.id);
+    expect(delDuplicado?.cantidadAComprar).toBe(120);
+    await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrdenDosColores],
+        idsRequerimiento: delDuplicado?.idsRequerimiento ?? [],
+        fechaEntrega: '2026-09-01',
+      },
+      bd(),
+    );
+
+    // 2) Se limpia el catálogo.
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: colorRojo.id, origenes: [colorDuplicado.id] },
+      bd(),
+    );
+
+    // 3) La explosión de hoy pide UN renglón de 300… menos los 120 que ya viajan en la OC.
+    //    Sin resolver el color por el canónico, la OC (color absorbido) no casaría con el
+    //    requerimiento (color canónico) y el sistema propondría comprar los 300 otra vez.
+    const despues = await renglonesDeBoton(idOrdenDosColores);
+    expect(despues).toHaveLength(1);
+    expect(despues[0]?.cantidadAComprar).toBe(300);
+    expect(despues[0]?.cantidadEnOc).toBe(120);
+    expect(despues[0]?.cantidadPendiente).toBe(180);
   });
 });

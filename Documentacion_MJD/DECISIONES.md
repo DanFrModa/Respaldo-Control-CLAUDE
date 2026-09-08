@@ -12136,6 +12136,111 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.222) — ⭐⭐ LOS COLORES DUPLICADOS SE PUEDEN FUSIONAR AUNQUE YA ESTÉN EN ÓRDENES (fila 0.159 / v0.130, 8-sep-2026)
+
+**De dónde nace.** De la pantalla de Daniel: dos renglones de etiqueta que decían
+*«Blanco Hueso Pantone 14-0002 Tcx Pumice Stone»* y *«Blanco Hueso»*. `Color.nombre` es único global,
+así que **son necesariamente dos filas distintas para el mismo color real**, y las dos están metidas en
+las OP 5565/5566/5567. Él la subió a 🔴 BLOQUEA V1 con una razón de calendario: **empeora sola** — cada
+día que pasa más órdenes usan los duplicados y más difícil es limpiarlo.
+
+**Los dos defectos, medidos antes de tocar nada.**
+1. **La fusión SE NEGABA** si el color origen se usaba fuera de las telas (§Post-F9.129), y la primera
+   referencia de esa lista era `OrdenLinea` ⇒ un color que hubiera entrado a UNA orden **ya no se podía
+   unificar nunca**.
+2. **Y aunque se pudiera, el MRP los seguía partiendo:** dos renglones de la matriz que son el mismo
+   color real explotaban por separado ⇒ dos renglones de compra del mismo material y el mismo color.
+
+---
+
+### (a) ⚖️ LA DECISIÓN DE FONDO: **se repunta lo que es CATÁLOGO; lo que es DOCUMENTO no se toca**
+
+La negativa de §Post-F9.129 protegía algo real y **no se levanta a la ligera**. Mover `OrdenLinea`
+reescribiría **lo que el cliente pidió** (D7), y dejaría el corte, el kardex de PT y las líneas de OC
+apuntando a otro lado — incoherentes entre sí, que era exactamente el daño que aquella decisión
+describía. Peor aún: una misma orden puede tener **los dos duplicados en su matriz**, así que repuntar
+chocaría con `@@unique([idOrden, idColor, pack])` y obligaría a **sumar dos renglones del pedido en uno**.
+
+Así que la fusión **dejó de bloquear y pasó a clasificar**. Las catorce relaciones entrantes de `Color`
+quedan repartidas en dos tratos, y la lista se verifica **contra el esquema de Prisma** en una prueba
+(la enumeraron mal tres veces; ahora un olvido es un rojo de CI):
+
+| Se **REPUNTAN** al canónico (catálogo y amarres derivados) | Se quedan **CON RASTRO** (documentos y movimientos asentados) |
+|---|---|
+| `TelaColor.idColor` — la liga legada de un color de tela al catálogo de prenda | `OrdenLinea` — la matriz de la orden (D7) |
+| `TelaProveedorColor.idColor` — el precio que un proveedor cobra por ese color | `EtapaMovimientoDet` — corte, envío, recibo, entrega (D3) |
+| `Modelo.idColor` — de qué color nació un modelo de producción | `MovimientoDetPt` — kardex de producto terminado (D3) |
+| `OrdenTelaColor.idColor` — de qué color de tela se compra ese color en esa orden | `CierreMaquilaOrdenDet` — faltantes saldados con un maquilero (dinero) |
+| | `OrdenCompraLinea` / `OrdenCompraLineaTalla` — lo que se le mandó al proveedor |
+| | `RequerimientoOrden` / `RequerimientoCubierto` — el snapshot y la decisión de una persona |
+| | `Lote`, `InventarioCiclicoDet` — lotes de tela y conteos |
+
+**Por qué `Modelo.idColor` SÍ se repunta, y no es un detalle:** es la mitad de la llave
+`modelos_linaje_color_unico`, la que contesta *«¿este color ya tiene modelo?»* (§Post-F9.172(b), Daniel:
+*«se reúsa cuando sea el mismo modelo»*). Si se quedara colgando del absorbido, **la siguiente OC del
+color canónico estrenaría OTRO número de 5 dígitos para la misma prenda**, quemando un número de una
+serie que sólo tiene 999 por par. Es el daño más silencioso de toda la lista.
+
+**Colisiones: gana el color que se conserva, y lo descartado queda en la bitácora.** Las cuatro tablas
+repuntadas llevan una llave única que incluye el color, así que puede haber fila en los dos lados. Gana
+el canónico —es la identidad que sobrevive, y sus datos son parte de esa identidad—, pero se **rellena**
+lo que él tuviera en nulo y el duplicado sí traiga, y lo que se descarta se escribe en la bitácora con
+sus valores, para que la decisión sea auditable y rehacible a mano. **Nada bloquea**: bloquear
+devolvería a Daniel al problema que esta fila vino a resolver.
+⚠️ Único caso con forma propia: si el mismo desarrollo ya tiene un modelo del color canónico, el modelo
+del duplicado **se deja quieto** (conserva su número y su historia) y se anota — unificar dos modelos de
+producción es otra operación.
+
+---
+
+### (b) 🔑 LA OTRA MITAD, SIN LA CUAL ESTO SERÍA UN DAÑO: **la orden sigue siendo editable**
+
+`sincronizarMatriz` exigía que TODO color de la matriz estuviera activo, y la fusión apaga el absorbido
+⇒ sin tocar eso, fusionar habría dejado **ineditables** las órdenes que usaban el color. Ahora la regla
+es: **un color que la orden YA TIENE se acepta aunque esté apagado**; capturar uno nuevo con un color
+apagado se sigue rechazando, y si lo apagó una fusión el mensaje **dice a cuál ir**.
+
+---
+
+### (c) ⭐ TODO LO QUE **COMPARA** COLORES ENTRE DOCUMENTOS RESUELVE POR EL CANÓNICO
+
+Que los documentos no se reescriban tiene un precio: conviven el id absorbido (en lo ya asentado) y el
+canónico (en lo nuevo) nombrando el mismo color. Quien los compare en crudo vería dos colores donde hay
+uno. Los sitios que resuelven, y por qué **son ésos y no todos**:
+
+| Dónde | Qué se arregla |
+|---|---|
+| `compras/mrp.ts` → `cargarOrden` | La matriz entra en espacio canónico ⇒ los renglones duplicados **colapsan solos** al agruparse y la orden pide **un** renglón de compra con la suma. El snapshot nace ya canónico. |
+| `compras/comprometido-en-oc.ts` → `comprometidoEnOc` | Una OC escrita ANTES de la fusión sigue **neteando** contra la explosión de hoy. Sin esto se volvería a comprar lo ya comprado (§Post-F9.85 resucitado por una limpieza de catálogo). |
+| `compras/dado-por-cubierto.ts` | Un *«con esto queda cubierto»* decidido antes de la fusión **sigue contando**. |
+| `compras/mrp.ts` → snapshot previo, plan de compra y tablero R7 | Los dos lados del cruce en el MISMO espacio: si sólo se resolviera uno, el neteo mentiría. |
+| `compras/color-de-la-tela.ts` | La pantalla pliega los dos renglones en uno **y** el paso 1 de `casar-color-de-tela.ts` (*«la tela ya tiene ese color amarrado»*) vuelve a casar: la fusión repunta `TelaColor` al canónico, así que sin plegar la matriz quedaría comparando el id viejo contra el nuevo. |
+| `modelos/nomenclatura.ts` → `obtenerODerivarModeloDeProduccion` | La llave del linaje se arma con el canónico ⇒ no se estrena un segundo número. |
+
+**Y dónde NO se resuelve, a propósito:** dentro de UNA orden todo cuelga de su propia matriz —el corte,
+el envío, el recibo, la entrega, el kardex de PT, el auto-avance de la RC—, así que esos módulos comparan
+el id de la orden contra el de sus propios movimientos y **son coherentes entre sí sin ayuda**. Meter el
+canónico ahí no arreglaría nada y rompería esa coherencia. Tampoco se resuelve en los **impresos**: un
+papel dice el color con el que se hizo, y eso es lo correcto (D3).
+
+📌 **Consecuencia que hay que saber:** las **existencias de producto terminado** siguen viéndose por el
+color con el que entraron, así que un modelo que se produjo con los dos duplicados enseña dos renglones
+de existencia. No se junta: cada movimiento es un hecho asentado y juntarlos sería reescribirlos. De
+aquí en adelante sólo se puede capturar el canónico, así que el renglón viejo se agota y desaparece solo
+(REGLA 0-B: lo viejo se limpia, no se arregla).
+
+---
+
+### (d) 📌 Lo que NO se hizo, y por qué
+
+- **No hay script que busque y una los duplicados que ya existen.** Eso lo hace una persona desde la
+  pantalla de fusión, que es justo lo que esta fila vino a desbloquear (REGLA 0-B).
+- **No hay migración.** El rastro (`Color.idFusionadoEn`) ya existía desde V1-E8s (§Post-F9.143); esta
+  fila sólo lo empieza a usar donde hacía falta. Comprobado con `prisma migrate diff`: sin diferencia
+  entre el esquema y las migraciones.
+
+---
+
 #### (Post-F9.217) — ⭐ EL NÚMERO DE PRODUCCIÓN LO PONE DANIEL AL IMPORTAR (7-sep-2026, fila 0.151 / v0.127)
 
 **Daniel, probando el flujo real:** *«me generó el pedido y la OP **sin preguntar el número de modelo

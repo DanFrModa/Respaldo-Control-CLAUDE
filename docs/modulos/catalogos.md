@@ -125,8 +125,7 @@ Los colores en el sistema viejo son texto libre en `TelasColores.Nombre`. El ETL
 Cuando se fusionan colores desde la pantalla, el origen **se apaga** (borrado suave, D3) y queda
 apuntando al canónico en **`Color.idFusionadoEn`**. Ese rastro no es decorativo: es lo que permite que el
 **importador de OC por PDF** mande al **color bueno** una orden que nombre un color ya absorbido, en vez
-de resucitarlo (lo que deshacía la limpieza y, peor, dejaba ese color **imposible de volver a fusionar**,
-porque la fusión se niega a mover un origen con usos — §Post-F9.129).
+de resucitarlo (lo que deshacía la limpieza de Daniel).
 
 Reglas que lo mantienen sano:
 
@@ -136,7 +135,32 @@ Reglas que lo mantienen sano:
   cualquier anillo que haya sembrado, de cualquier longitud (a los del anillo se les borra el rastro: el
   dato es ambiguo y no hay canónico honesto que nombrar);
 - **reactivar un color a mano borra el rastro**: reactivar *es* deshacer la fusión;
-- `colorCanonico(tx, id)` (en `dominio/catalogos/colores.ts`, junto a `fusionarColores`) sigue la cadena
-  hasta el sobreviviente, con tope de saltos;
+- `colorCanonico(tx, id)` y su versión de LOTE `resolverColoresCanonicos` (las dos en
+  `dominio/catalogos/colores-canonicos.ts`, compartiendo una sola caminata) siguen la cadena hasta el
+  sobreviviente, con tope de saltos;
 - la relación reflexiva **no bloquea** la fusión (encadenar «A→B» y luego «B→C» es legítimo), y la
-  prueba que deriva la lista de bloqueos de `schema.prisma` **exige que esa exclusión sea explícita**.
+  prueba que deriva la clasificación de `schema.prisma` **exige que esa exclusión sea explícita**.
+
+### ⭐⭐ Fusionar un color YA EN USO (fila 0.159, §Post-F9.222)
+
+Hasta la fila 0.159 la fusión **se negaba** en cuanto el color origen se usaba fuera de las telas, y la
+primera referencia de esa lista era `OrdenLinea` ⇒ un color que hubiera entrado a UNA orden **no se podía
+unificar nunca**. Hoy la fusión **clasifica en vez de bloquear** (`colores-fusion-referencias.ts`, con la
+lista verificada contra `prisma/schema.prisma`):
+
+- **se REPUNTAN** al canónico las cuatro que son catálogo o amarre derivado: `TelaColor.idColor`,
+  `TelaProveedorColor.idColor`, `Modelo.idColor` (la llave `modelos_linaje_color_unico`) y
+  `OrdenTelaColor.idColor`. En colisión de llave única **gana el destino**, se rellena lo que él tuviera
+  nulo, y lo descartado queda escrito en la bitácora;
+- **se quedan CON RASTRO** —sin tocar una fila— la matriz de la orden (D7), los movimientos de producción
+  y de PT, los faltantes saldados, las líneas de OC, el snapshot de la explosión, los lotes y los
+  conteos cíclicos (D3).
+
+Y como los documentos no se reescriben, **quien COMPARA colores entre documentos resuelve por el
+canónico**: la explosión (`compras/mrp.ts`), el neteo contra las OC (`comprometido-en-oc.ts`), lo dado por
+cubierto, la pantalla de «de qué color se compra la tela» y la llave del linaje de modelos. Dentro de UNA
+orden no se resuelve nada: todo cuelga de su propia matriz y ya es coherente consigo mismo.
+
+⚠️ Su pareja obligada: `sincronizarMatriz` **acepta un color apagado que la orden YA TIENE** — sin eso,
+fusionar dejaría ineditables las órdenes que usaban el color, que era exactamente el daño que la antigua
+negativa evitaba.

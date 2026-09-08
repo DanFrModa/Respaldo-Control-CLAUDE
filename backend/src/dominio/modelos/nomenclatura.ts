@@ -59,6 +59,8 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { siguienteFolioGlobal } from '../../comun/secuencias.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222) — la llave `(desarrollo, color)` se arma con el color CANÓNICO.
+import { colorCanonico } from '../catalogos/colores-canonicos.js';
 
 import {
   CAMPOS_FICHA_HEREDADOS,
@@ -1300,7 +1302,19 @@ export async function obtenerODerivarModeloDeProduccion(
   idModeloDesarrollo: number,
   datos: DatosDerivarModelo = {},
 ): Promise<ResultadoModeloDeLaOp> {
-  const idColor = datos.idColor ?? null;
+  // ⭐⭐ fila 0.159 (§Post-F9.222) — **LA LLAVE SE ARMA CON EL COLOR CANÓNICO, SIEMPRE.**
+  //
+  // `idColor` es la mitad de `modelos_linaje_color_unico`, la llave que contesta *«¿este color ya
+  // tiene modelo?»*. Si llegara aquí el id de un color ABSORBIDO por una fusión —cosa que pasa en
+  // cuanto la OP se capturó antes de fusionar, porque la fusión NO reescribe la matriz (D7)— esta
+  // función no reconocería el modelo que ya existe y estrenaría OTRO número de 5 dígitos para la
+  // MISMA prenda: exactamente lo que la decisión de Daniel (*«se reúsa cuando sea el mismo
+  // modelo»*) vino a impedir, quemando además un número de una serie que sólo tiene 999 por par.
+  //
+  // La otra mitad la pone la fusión, que REPUNTA `Modelo.idColor` al canónico: así los modelos que
+  // ya existían quedan del lado bueno de la llave y esta búsqueda los encuentra. Las dos piezas son
+  // necesarias — ésta cubre lo que llega, aquélla lo que ya estaba.
+  const idColor = datos.idColor == null ? null : (await colorCanonico(tx, datos.idColor)).id;
 
   // El lock ANTES de mirar (ver el encabezado). Va SIEMPRE antes que el de la serie, nunca al revés.
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_MODELO_POR_COLOR}::int, ${idModeloDesarrollo}::int)`;
