@@ -218,6 +218,45 @@ describe('los pagos se aplican de más viejo a más nuevo (convención de las cu
     expect((await diasVencidosPorProveedor(cliente, empresa.id)).get(maquilero.id)).toBe(12);
   });
 
+  it('⭐ el DESCUENTO también salda, y también de lo más viejo primero', async () => {
+    // Gemela de la de arriba, con `descuentoMaquilero` en vez de `pagoMaquilero`. Existe porque una
+    // MUTACIÓN sobrevivió: borrando entera la rama `descuento_maquilero` del agregado de créditos
+    // no se ponía roja ni una prueba. ⚠️ Lo que estaría en juego no es cosmético — un maquilero al
+    // que se le saldó la deuda con un descuento arrastraría **días vencidos para siempre** en la
+    // pantalla con la que Daniel decide a quién le paga.
+    await cargoMaquila({ hace: 50, importe: 1000, folio: 1n });
+    await cargoMaquila({ hace: 20, importe: 1000, folio: 2n });
+    expect((await diasVencidosPorProveedor(cliente, empresa.id)).get(maquilero.id)).toBe(42);
+
+    await cliente.descuentoMaquilero.create({
+      data: {
+        idEmpresa: empresa.id,
+        idMaquilero: maquilero.id,
+        estadoRevision: 'revisado',
+        monto: 1000,
+        fecha: haceDias(1),
+        conFactura: false,
+      },
+    });
+    // Se fue el de 50 días (42 de atraso); queda el de 20 (12 de atraso).
+    expect((await diasVencidosPorProveedor(cliente, empresa.id)).get(maquilero.id)).toBe(12);
+  });
+
+  it('⭐ y un descuento que cubre TODO deja al maquilero sin días, no con los de siempre', async () => {
+    await cargoMaquila({ hace: 50, importe: 1000, folio: 1n });
+    await cliente.descuentoMaquilero.create({
+      data: {
+        idEmpresa: empresa.id,
+        idMaquilero: maquilero.id,
+        estadoRevision: 'revisado',
+        monto: 1000,
+        fecha: haceDias(1),
+        conFactura: false,
+      },
+    });
+    expect((await diasVencidosPorProveedor(cliente, empresa.id)).has(maquilero.id)).toBe(false);
+  });
+
   it('pagado todo ⇒ NO aparece (no hay nada que envejecer), que no es lo mismo que 0', async () => {
     await cargoMaquila({ hace: 50, importe: 1000, folio: 1n });
     await cliente.pagoMaquilero.create({
@@ -375,6 +414,42 @@ describe('⭐ la corrida semanal (la pantalla donde Daniel decide) trae los día
     // 🔴 Y la columna vieja sigue en null para la maquila: `vencido` son las CUBETAS del motor, que
     // no reparten EsMa. Si algún día se llenara, sería otra decisión — no un efecto lateral.
     expect(fila?.vencido).toBeNull();
+  });
+
+  it('⭐ y el renglón del PROVEEDOR CxP también — la columna vale igual para las dos secciones', async () => {
+    // Existe porque una MUTACIÓN sobrevivió: dejar `diasVencidos` en null para todo lo que NO fuera
+    // maquila —o sea, la sección de proveedores SIEMPRE en «—»— no ponía roja ni una prueba. La de
+    // arriba assertea `origen === 'maquila'`, así que medía sólo la mitad del cableado, justo en la
+    // columna que este mismo archivo declara «la única de referencia que vale igual para un
+    // maquilero y para un proveedor».
+    const proveedorSimple = await cliente.proveedor.create({
+      data: { nombre: 'AVIOS DEL CENTRO', modalidadFacturacion: 'solo_sin', diasCredito: 15 },
+    });
+    await registrarMovimientoTercero(
+      sesion(),
+      {
+        tipoTercero: 'proveedor',
+        idTercero: proveedorSimple.id,
+        fecha: haceDias(45).toISOString().slice(0, 10),
+        origen: 'entrada_sin_factura',
+        importe: 2_500,
+      },
+      bd(),
+    );
+
+    const detalle = await crearCorrida(sesion(), { semana: '2026-09-02', conFactura: false }, bd());
+    const completo = await obtenerCorridaDetalle(sesion(), detalle.corrida.id, bd());
+    const fila = completo.secciones
+      .flatMap((s) => s.filas)
+      .find((f) => f.idProveedor === proveedorSimple.id);
+
+    // No tiene rol de maquila: cae en la sección de proveedores…
+    expect(fila?.origen).toBe('proveedor');
+    expect(fila?.rubro).toBe('proveedores');
+    // …y trae SU edad: 45 días de antigüedad − 15 de plazo = 30.
+    expect(fila?.diasVencidos).toBe(30);
+    // Y aquí `vencido` SÍ viaja (son las cubetas del motor): las dos columnas conviven.
+    expect(fila?.vencido).toBe(2_500);
   });
 
   it('un beneficiario sin deuda envejecible sale con `null`, no con 0', async () => {

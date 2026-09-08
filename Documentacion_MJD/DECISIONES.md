@@ -12324,7 +12324,7 @@ repartirse** en las cuatro cubetas: para eso haría falta que EsMa registrara po
 falta para lo que Daniel pidió. ⇒ En la bandeja, `vencido` sigue siendo **sólo del motor**; los días
 vencidos son los que cruzan la frontera.
 
-- **Aplica en:** fila **0.121**, versión **0.129**. Confirma y ejecuta **§Post-F9.218(a)**.
+- **Aplica en:** fila **0.121**, versión **0.128**. Confirma y ejecuta **§Post-F9.218(a)**.
   **Fecha:** 2026-09-07.
 
 ---

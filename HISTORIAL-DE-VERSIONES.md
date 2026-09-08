@@ -71,7 +71,6 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
-<<<<<<< HEAD
 ## 0.128 · 7-sep-2026 · **en prueba** — **Los maquileros por fin tienen antigüedad: la pantalla de los jueves dice cuántos días lleva vencido cada quien**
 
 ### Qué se puede hacer ahora que antes no
@@ -122,7 +121,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   Lo que Daniel pidió —los días— sí está.
 - 🔻 **Un pago se sigue sin poder amarrar a una factura concreta.** Mientras eso no exista, la edad que
   se enseña es la mejor suposición posible, no una certeza. El **saldo total** nunca se ve afectado.
-=======
+
 ## 0.127 · 7-sep-2026 · **en prueba** — **El número de producción lo pones tú al importar, y la OP dice de qué desarrollo nació**
 
 ### Qué se puede hacer ahora que antes no
@@ -161,7 +160,6 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **La liga del expediente de Desarrollo NO se hace sola**, y es a propósito: un mismo modelo puede tener
   **un expediente por proyecto**, así que elegirlo automáticamente sería adivinar. Lo que sí se muestra es
   el **linaje**, que es un hecho.
->>>>>>> origin/prueba
 
 ## 0.126 · 7-sep-2026 · **en prueba** — **El precio que se negoció ya se ve desde fuera, al lado del aprobado**
 
