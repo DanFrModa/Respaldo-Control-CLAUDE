@@ -81,6 +81,29 @@ const COLUMNAS_OBLIGATORIAS: string[] = [
 /** Monedas que se aceptan como pesos mexicanos. `MovimientoTercero` NO tiene columna de moneda. */
 const MONEDAS_PESOS = new Set(['MXN', 'MXP', 'MN', 'PESOS', 'PESO']);
 
+/**
+ * Los valores de `Estatus en SAT` que significan **CANCELADO**, exactos y en minúsculas sin acentos.
+ *
+ * 🔴 **Por qué una lista y no un `includes('cancel')`.** El SAT tiene estados que llevan la palabra
+ * «cancel» y describen un comprobante **VIGENTE**: «Cancelable sin aceptación», «Cancelable con
+ * aceptación», «No cancelable» — hablan de si SE PUEDE cancelar, no de que se haya cancelado. Con la
+ * comparación por subcadena los tres se descartaban como cancelados: deuda REAL fuera de la carga, y
+ * con una etiqueta que además mentía sobre el motivo.
+ *
+ * ⚠️ Y por eso cualquier otro valor con «cancel» que no esté aquí **ABORTA** en vez de suponer: es el
+ * mismo criterio que ya se aplica a `Tipo fiscal` y a `Moneda`. No se puede comprobar contra el
+ * archivo real —no está en el repositorio, y es correcto que no esté—, y ésa es justamente la razón
+ * para no adivinar.
+ */
+const ESTATUS_SAT_CANCELADO = new Set([
+  'cancelado',
+  'cancelada',
+  'cancelado sin aceptacion',
+  'cancelada sin aceptacion',
+  'cancelado con aceptacion',
+  'cancelada con aceptacion',
+]);
+
 // ── Estructuras ────────────────────────────────────────────────────────────────────────────────────
 
 /** Un renglón del listado, ya tipado (crudo: sin reglas de negocio aplicadas). */
@@ -99,6 +122,13 @@ export interface RenglonSinube {
   estatusSat: string | null;
   tipoFiscal: string | null;
   uuid: string | null;
+  /**
+   * El TEXTO tal cual de la celda `Saldo`, aunque no se haya podido leer como número. Distingue las
+   * dos cosas que `saldo === null` confundía: la celda **de verdad vacía** (`saldoCrudo === null`,
+   * documento saldado) y la celda **con algo ilegible** dentro (`saldoCrudo !== null`: `N/D`,
+   * `1.234,56`, `(500)`…), que es un renglón del que NO se sabe cuánto se debe.
+   */
+  saldoCrudo: string | null;
 }
 
 /** Un renglón que NO se carga, con el motivo (siempre sale en el reporte de cuadre). */
@@ -166,14 +196,28 @@ function texto(valor: ExcelJS.CellValue): string | null {
   return null;
 }
 
-/** Número de una celda (acepta `$`, comas y espacios); `null` si no hay número. */
+/**
+ * Número de una celda. Acepta el número nativo de Excel y el formato **estadounidense** en texto
+ * (`8,000.00`, `$ 1,250.50`, `-300`). Devuelve `null` para cualquier otra cosa.
+ *
+ * 🔴 **Por qué NO basta con quitar las comas.** Quitarlas a ciegas convierte `1.234,56` (coma decimal
+ * europea) en `1.23456`: un número **finito y con pinta razonable** que entraba a la carga como si
+ * nada. No era «un texto que no se pudo leer», era **una cifra equivocada leída con toda confianza**,
+ * y en la columna `Saldo` eso es dinero. Aquí se exige que el formato sea inequívoco: si el separador
+ * decimal es ambiguo, se devuelve `null` y el renglón acaba abortando por «Saldo ILEGIBLE» — nombrado,
+ * no adivinado.
+ */
 function numero(valor: ExcelJS.CellValue): number | null {
   if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
   const t = texto(valor);
   if (t === null) return null;
-  const limpio = t.replace(/[$\s,]/g, '');
+  const limpio = t.replace(/[$\s]/g, '');
   if (limpio === '') return null;
-  const n = Number(limpio);
+  // Entero o decimal con punto, con comas SÓLO como separador de millares (grupos de 3 exactos).
+  if (!/^-?\d{1,3}(,\d{3})*(\.\d+)?$/.test(limpio) && !/^-?\d+(\.\d+)?$/.test(limpio)) {
+    return null;
+  }
+  const n = Number(limpio.replace(/,/g, ''));
   return Number.isFinite(n) ? n : null;
 }
 
@@ -293,6 +337,8 @@ export async function leerListadoSinube(buffer: Buffer): Promise<RenglonSinube[]
       razonSocial,
       importe: leerNumero(fila, cols.importe),
       saldo,
+      // El texto crudo viaja aparte para poder distinguir «celda vacía» de «celda ilegible».
+      saldoCrudo: leerTexto(fila, cols.saldo),
       moneda: leerTexto(fila, cols.moneda),
       estatusPago: leerTexto(fila, cols.estatusPago),
       rfc,
@@ -401,8 +447,19 @@ export function clasificarSinube(renglones: RenglonSinube[]): ClasificacionSinub
       continue;
     }
 
-    // (4) Sólo lo VIVO (regla 1). Un saldo NEGATIVO no se interpreta: aborta nombrándolo.
+    // (4) Sólo lo VIVO (regla 1). Ni el saldo NEGATIVO ni el ILEGIBLE se interpretan: abortan.
     if (r.saldo === null) {
+      // Celda con algo dentro que no se pudo leer como número (`N/D`, `1.234,56`, `(500)`…): NO es
+      // un documento saldado, es un renglón del que no se sabe cuánto se debe. Tratarlo como saldado
+      // lo dejaba fuera de la carga y encima el cuadre decía que había dejado fuera 0.00 — el número
+      // tranquilizador. Sólo la celda DE VERDAD vacía conserva el descarte.
+      if (r.saldoCrudo !== null) {
+        problemas.push({
+          motivo: 'Saldo ILEGIBLE (hay algo en la celda, pero no es un número)',
+          detalle: `${ref} saldo="${r.saldoCrudo}" — corrígelo en el origen y vuelve a correr`,
+        });
+        continue;
+      }
       descartar(r, MOTIVO_DESCARTE.saldoVacio, ref);
       continue;
     }
@@ -430,10 +487,24 @@ export function clasificarSinube(renglones: RenglonSinube[]): ClasificacionSinub
       continue;
     }
 
-    // (6) Un CFDI cancelado en el SAT no crea deuda. Se descarta CONTADO, nunca en silencio.
-    if (r.estatusSat !== null && plano(r.estatusSat).includes('cancel')) {
-      descartar(r, MOTIVO_DESCARTE.canceladoSat, `${ref} estatusSat="${r.estatusSat}"`);
-      continue;
+    // (6) Un CFDI cancelado en el SAT no crea deuda. Se descarta CONTADO, nunca en silencio. Y un
+    //     estado con «cancel» que NO esté en la lista no se interpreta: aborta (ver el porqué en
+    //     `ESTATUS_SAT_CANCELADO`).
+    if (r.estatusSat !== null) {
+      const estatus = plano(r.estatusSat).replace(/\s+/g, ' ');
+      if (ESTATUS_SAT_CANCELADO.has(estatus)) {
+        descartar(r, MOTIVO_DESCARTE.canceladoSat, `${ref} estatusSat="${r.estatusSat}"`);
+        continue;
+      }
+      if (estatus.includes('cancel')) {
+        problemas.push({
+          motivo: 'Estatus en SAT con «cancel» que NO se sabe si es un CFDI cancelado',
+          detalle:
+            `${ref} estatusSat="${r.estatusSat}" — «Cancelable…» y «No cancelable» son comprobantes ` +
+            'VIGENTES; dime cuál es y se añade a la lista de cancelados',
+        });
+        continue;
+      }
     }
 
     // (7) Sin fecha no hay antigüedad; sin RFC no hay proveedor; sin UUID no hay idempotencia.

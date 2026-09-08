@@ -168,6 +168,21 @@ export async function ejecutarEtlAperturaSinube(
         : ''),
   );
 
+  // 🔴 Los UUID que YA existían no se tocaron: la idempotencia es por UUID y es GLOBAL, así que el
+  //    movimiento conserva el importe con el que nació —normalmente el TOTAL del CFDI que metió
+  //    `etl-cfdi-masivo.ts`—, NO el saldo vivo de SINUBE. Si el CFDI ya estaba, la cuenta puede
+  //    quedar con deuda que ya se pagó. Va al REPORTE (que se archiva), no sólo a la consola.
+  if (res.existentes > 0) {
+    reporte.agregar(
+      'UUID que YA existían: conservan su importe, NO el saldo de SINUBE',
+      `${String(res.existentes)} renglón(es) del archivo ya tenían movimiento con ese UUID. El ETL ` +
+        'NO los modificó: siguen con el importe con el que nacieron (si los metió `etl-cfdi-masivo`, ' +
+        'ése es el TOTAL del CFDI, no el saldo vivo). Revisa «Diferencia contra el archivo» en el ' +
+        'cuadre: si no es 0.00, ésta es la causa más probable. Por eso la apertura de SINUBE se ' +
+        'corre ANTES del cargador de CFDI (ver migracion/README.md).',
+    );
+  }
+
   const cuadre = formatearCuadreApertura(await calcularCuadreApertura(cliente, clasificacion));
   console.log('ETL apertura de saldos (SINUBE) — fin de carga');
   return {

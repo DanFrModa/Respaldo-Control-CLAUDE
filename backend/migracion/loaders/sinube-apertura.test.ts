@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ENCABEZADO_SINUBE,
+  FECHA_VACIA_AUTOCERRADA,
   RFC_FIXTURE_A,
   RFC_FIXTURE_B,
   construirXlsxSinube,
@@ -91,6 +92,67 @@ describe('fechas `t="d"` (ISO 8601 en la celda) — el defecto de exceljs y su p
     const c = clasificarSinube(renglones);
     expect(c.aperturas).toEqual([]);
     expect(c.problemas[0]!.motivo).toMatch(/SIN fecha/);
+  });
+
+  it('🔻 una celda de fecha VACÍA no HEREDA la fecha de la celda de al lado (las dos formas)', () => {
+    // Una celda de fecha sin valor viene de dos formas y CADA UNA la para una guarda distinta:
+    //   · autocerrada  `<c … t="d"/>`      → se salta la celda entera;
+    //   · abierta y vacía `<c … t="d"></c>` → el `<v>` que sigue es de OTRA celda, y se descarta.
+    // Sin ellas, el barrido se lleva el `<v>` del vecino y la fecha de uno se copia en el otro.
+    //
+    // ⚠️ Esto SÓLO se ve con dos columnas de fecha PEGADAS, y el listado de SINUBE no las tiene (C,
+    // Q y T, con texto en medio): ahí lo que se heredaría es un texto, que no parsea como fecha y
+    // deja el mismo `null` que el comportamiento correcto. Por eso las dos guardas seguían sin que
+    // nada las midiera aunque la prueba «de la celda vacía» existiera (H5 de la revisión), y por eso
+    // aquí la hoja se escribe en crudo.
+    const buffer = construirXlsxSinube([], {
+      filasExtra: [
+        '<row r="9"><c r="A9" t="d" s="1"/><c r="B9" t="d" s="1"><v>2026-12-25T00:00:00</v></c></row>',
+        '<row r="10"><c r="A10" t="d" s="1"></c><c r="B10" t="d" s="1"><v>2026-11-30T00:00:00</v></c></row>',
+      ],
+    });
+    const fechas = fechasIsoDeHoja(buffer);
+
+    // La autocerrada ni siquiera entra al mapa (no hay nada que corregirle a exceljs: está vacía).
+    expect(fechas.has('A9')).toBe(false);
+    // La abierta y vacía entra con `null` = «hay una fecha aquí y NO se pudo leer».
+    expect(fechas.has('A10')).toBe(true);
+    expect(fechas.get('A10')).toBeNull();
+    // Lo que importa de las dos: ninguna se quedó con la fecha de su vecina…
+    expect(fechas.get('B9')?.toISOString().slice(0, 10)).toBe('2026-12-25');
+    expect(fechas.get('B10')?.toISOString().slice(0, 10)).toBe('2026-11-30');
+    // …y las vecinas sí se leyeron (si el barrido se hubiera desincronizado, se perderían).
+    expect([...fechas.keys()].sort()).toEqual(['A10', 'B10', 'B9']);
+  });
+
+  it('🔻 y de punta a punta: el renglón con la fecha vacía no se carga, aborta', async () => {
+    const buffer = construirXlsxSinube([
+      renglonIngreso({
+        Fecha: FECHA_VACIA_AUTOCERRADA,
+        'Pago probable': '2026-12-25T00:00:00',
+      }),
+    ]);
+    expect(fechasIsoDeHoja(buffer).has('C2')).toBe(false); // C = Fecha: vacía
+    expect(fechasIsoDeHoja(buffer).get('Q2')?.toISOString().slice(0, 10)).toBe('2026-12-25');
+    const renglones = await leerListadoSinube(buffer);
+    expect(renglones[0]!.fecha).toBeNull();
+    expect(clasificarSinube(renglones).problemas[0]!.motivo).toMatch(/SIN fecha/);
+  });
+
+  it('la fecha se ancla a UTC: no se corre un día fuera de UTC', async () => {
+    // El CI corre en UTC, así que el anclaje explícito a medianoche UTC no lo mide nadie ahí. Con una
+    // zona al oeste, construir la fecha en hora local devolvería el día ANTERIOR.
+    const tzOriginal = process.env.TZ;
+    try {
+      process.env.TZ = 'America/Mexico_City';
+      const renglones = await leerListadoSinube(
+        construirXlsxSinube([renglonIngreso({ Fecha: '2026-08-31T00:00:00' })]),
+      );
+      expect(renglones[0]!.fecha?.toISOString()).toBe('2026-08-31T00:00:00.000Z');
+    } finally {
+      if (tzOriginal === undefined) delete process.env.TZ;
+      else process.env.TZ = tzOriginal;
+    }
   });
 
   it('resuelve la hoja por su RELACIÓN, no adivinando `sheet1.xml`', () => {
@@ -190,6 +252,23 @@ describe('reglas de Daniel: sólo lo vivo, y se carga el Saldo', () => {
     expect(c.resumen.descartesPorMotivo[MOTIVO_DESCARTE.saldoVacio]).toBe(1);
   });
 
+  it('⭐ un Saldo ILEGIBLE ABORTA; sólo la celda de verdad vacía se lee como saldada', async () => {
+    // `N/D`, `(500)`, `1.234,56` (coma decimal europea)… son celdas CON algo dentro que no es un
+    // número. Leerlas como «saldado» dejaba el renglón fuera de la carga y el cuadre declaraba que
+    // había dejado fuera 0.00 — el número tranquilizador. Y `1.234,56` era peor: se cargaba como
+    // 1.234 (H3 de la revisión). Ahora abortan, como el saldo negativo.
+    for (const texto of ['N/D', 'no disponible', '(500)', '1.234,56', '1,5']) {
+      const c = await leerYClasificar([renglonIngreso({ Saldo: texto as unknown as number })]);
+      expect(c.aperturas, texto).toEqual([]);
+      expect(c.problemas[0]?.motivo, texto).toMatch(/Saldo ILEGIBLE/);
+      expect(c.problemas[0]?.detalle, texto).toContain(texto);
+    }
+    // La celda DE VERDAD vacía conserva el descarte (documento saldado).
+    const vacia = await leerYClasificar([renglonIngreso({ Saldo: '' })]);
+    expect(vacia.problemas).toEqual([]);
+    expect(vacia.resumen.descartesPorMotivo[MOTIVO_DESCARTE.saldoVacio]).toBe(1);
+  });
+
   it('una NOTA DE CRÉDITO viva entra como abono y RESTA en el neto', async () => {
     const c = await leerYClasificar([
       renglonIngreso({ UUID: 'F-1', Importe: 10_000, Saldo: 10_000 }),
@@ -204,6 +283,44 @@ describe('reglas de Daniel: sólo lo vivo, y se carga el Saldo', () => {
     // …pero el efecto sobre la cuenta resta la nota de crédito.
     expect(c.resumen.netoCargado).toBe(8_500);
     expect(c.resumen.sumaSaldoPorTipoFiscal).toEqual({ Ingreso: 10_000, Egreso: 1_500 });
+  });
+
+  it('⭐ los estatus VIGENTES con «cancel» ya NO se tiran como cancelados: ABORTAN nombrados', async () => {
+    // «Cancelable…» y «No cancelable» dicen si el comprobante SE PUEDE cancelar, no que lo esté. Con
+    // la comparación por subcadena los tres se caían de la carga como «CFDI CANCELADO»: deuda REAL
+    // fuera, y con una etiqueta que además mentía sobre el motivo (H2 de la revisión).
+    //
+    // 🔑 Lo que NO se hace es lo contrario —darlos por vigentes y cargarlos—, porque eso sería el
+    // mismo pecado en la otra dirección: adivinar el vocabulario de un archivo que no está en el
+    // repositorio. Abortan NOMBRADOS, igual que un `Tipo fiscal` o una `Moneda` desconocidos, y quien
+    // sepa qué significan los añade a `ESTATUS_SAT_CANCELADO` o los deja pasar.
+    for (const estatus of [
+      'Cancelable sin aceptación',
+      'Cancelable con aceptación',
+      'No cancelable',
+      'En proceso de cancelación',
+    ]) {
+      const c = await leerYClasificar([renglonIngreso({ 'Estatus en SAT': estatus })]);
+      expect(c.aperturas, estatus).toEqual([]);
+      // Lo importante: NO se descarta en silencio como cancelado.
+      expect(c.descartes, estatus).toEqual([]);
+      expect(c.problemas[0]?.motivo, estatus).toMatch(/NO se sabe si es un CFDI cancelado/);
+      expect(c.problemas[0]?.detalle, estatus).toContain(estatus);
+    }
+  });
+
+  it('⭐ los estatus que SÍ son cancelados siguen descartándose (lista exacta)', async () => {
+    for (const estatus of [
+      'Cancelado',
+      'Cancelada',
+      'Cancelado sin aceptación',
+      'Cancelada con aceptación',
+    ]) {
+      const c = await leerYClasificar([renglonIngreso({ 'Estatus en SAT': estatus })]);
+      expect(c.problemas, estatus).toEqual([]);
+      expect(c.aperturas, estatus).toEqual([]);
+      expect(c.resumen.descartesPorMotivo[MOTIVO_DESCARTE.canceladoSat], estatus).toBe(1);
+    }
   });
 
   it('descarta un CFDI cancelado en el SAT (no crea deuda) y lo dice', async () => {

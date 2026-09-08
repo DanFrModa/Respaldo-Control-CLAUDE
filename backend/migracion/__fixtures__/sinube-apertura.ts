@@ -5,8 +5,10 @@
  * repositorio es PÚBLICO (cicatriz de la fila 0.123): ni el archivo ni su contenido entran aquí. Lo
  * que sí se reproduce —porque sin eso las pruebas no probarían nada— es su ESTRUCTURA medida:
  *
- *  • una sola hoja, encabezados en la fila 1, **53 columnas** (las 20 que el ETL usa, por su nombre
- *    exacto, más relleno para que el lector tenga que buscarlas por NOMBRE y no por posición);
+ *  • una sola hoja, encabezados en la fila 1, **53 columnas**: las **20 que el archivo real trae con
+ *    nombre conocido** (de las cuales el ETL sólo lee **12** — ver `COL` en
+ *    `loaders/sinube-apertura.ts`, y de ésas **6 son obligatorias**), más relleno, para que el lector
+ *    tenga que buscarlas por NOMBRE y no por posición;
  *  • los textos en la tabla de cadenas compartidas (`sharedStrings`), como los escribe un exportador
  *    de verdad;
  *  • ⭐ **las fechas en celdas `t="d"`** (ISO 8601 dentro del `<v>`), que es la trampa que `exceljs`
@@ -22,7 +24,14 @@ import { letraColumna } from '../comun/xlsx-fechas-iso.js';
 
 // ── Las columnas del listado (nombres EXACTOS del export de SINUBE) ────────────────────────────────
 
-/** Las 20 columnas que el ETL lee, en el orden en que aparecen en el archivo real. */
+/**
+ * Las 20 columnas con nombre conocido del listado real, en su orden.
+ *
+ * ⚠️ **No son «las que el ETL lee»**: el ETL lee **12** (`COL` en `loaders/sinube-apertura.ts`) y
+ * exige **6** (`COLUMNAS_OBLIGATORIAS`). Las demás se reproducen para que el fixture se parezca al
+ * archivo, no porque nadie las consulte. La primera versión de este comentario decía «las 20 que el
+ * ETL usa» y era falso: el código lo desmiente.
+ */
 export const COLUMNAS_SINUBE = [
   'Serie',
   'Folio',
@@ -45,6 +54,12 @@ export const COLUMNAS_SINUBE = [
   'Uso CFDI',
   'Fecha alta',
 ] as const;
+
+/**
+ * Marcador para pedirle al fixture una celda de fecha `t="d"` **autocerrada** (`<c … t="d"/>`), sin
+ * `<v>`. Es el caso que destapa si el lector se come el valor de la celda de al lado.
+ */
+export const FECHA_VACIA_AUTOCERRADA = '\u0000celda-fecha-autocerrada';
 
 /** Columnas de relleno hasta las 53 del archivo real (su contenido no lo lee nadie). */
 const COLUMNAS_RELLENO = Array.from({ length: 33 }, (_, i) => `Extra ${String(i + 1)}`);
@@ -156,10 +171,14 @@ function escribirZip(entradas: EntradaSalida[]): Buffer {
  * @param opciones  `fechasComoSerie` escribe las fechas al estilo CLÁSICO (número de serie de 1900,
  *                  que `exceljs` sí entiende) en vez de `t="d"`: existe SÓLO para que las pruebas
  *                  puedan contrastar los dos formatos y demostrar que el parche no rompe el normal.
+ *                  `filasExtra` pega renglones `<row>` en CRUDO al final de la hoja: el listado de
+ *                  SINUBE no tiene dos columnas de fecha PEGADAS, así que sin esto es imposible
+ *                  medir si una celda de fecha vacía se hereda la fecha de su vecina — que es
+ *                  justamente lo que el barrido de `xlsx-fechas-iso.ts` tiene que impedir.
  */
 export function construirXlsxSinube(
   renglones: RenglonFixture[],
-  opciones: { fechasComoSerie?: boolean; rutaHoja?: string } = {},
+  opciones: { fechasComoSerie?: boolean; rutaHoja?: string; filasExtra?: string[] } = {},
 ): Buffer {
   // `exceljs` SÓLO reconoce las hojas que se llamen `xl/worksheets/sheetN.xml` (su lector las busca
   // con esa expresión regular, `lib/xlsx/xlsx.js`), así que el fixture normal usa ese nombre —como el
@@ -194,6 +213,14 @@ export function construirXlsxSinube(
       if (valor === undefined || valor === '') return;
       const dir = `${letraColumna(iCol + 1)}${String(nFila)}`;
       if (COLUMNAS_FECHA.has(columna)) {
+        // Celda de fecha `t="d"` AUTOCERRADA (sin `<v>`): existe en archivos reales y es la que
+        // obliga al lector a saltarla. ⚠️ En ESTE layout las columnas de fecha no son vecinas
+        // (C, Q, T), así que lo que se heredaría es el `<v>` de una columna de texto y el daño no
+        // se ve: la herencia de una fecha AJENA se mide con `filasExtra`, no aquí.
+        if (valor === FECHA_VACIA_AUTOCERRADA) {
+          celdas.push(`<c r="${dir}" t="d" s="1"/>`);
+          return;
+        }
         const iso = String(valor);
         if (opciones.fechasComoSerie === true) {
           // Serie de 1900 con el bug histórico de Lotus (1900 bisiesto): días desde 1899-12-30.
@@ -208,6 +235,14 @@ export function construirXlsxSinube(
         return;
       }
       if (COLUMNAS_NUMERO.has(columna)) {
+        // Una columna numérica puede traer TEXTO en el archivo real (`N/D`, `1.234,56`, `(500)`…), y
+        // Excel lo guarda como celda de texto, NO como un `<v>` numérico con letras dentro. Escribirlo
+        // por la ruta numérica producía un fixture que no existe y hacía IMPOSIBLE probar el caso —
+        // por eso la primera versión no medía el saldo ilegible (H3 de la revisión).
+        if (typeof valor === 'string' && !Number.isFinite(Number(valor))) {
+          celdas.push(`<c r="${dir}" t="s"><v>${String(idCadena(valor))}</v></c>`);
+          return;
+        }
         celdas.push(`<c r="${dir}"><v>${String(valor)}</v></c>`);
         return;
       }
@@ -215,6 +250,8 @@ export function construirXlsxSinube(
     });
     filasXml.push(`<row r="${String(nFila)}">${celdas.join('')}</row>`);
   });
+
+  for (const cruda of opciones.filasExtra ?? []) filasXml.push(cruda);
 
   const hoja = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${filasXml.join('')}</sheetData></worksheet>`;

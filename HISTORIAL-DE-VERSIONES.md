@@ -104,6 +104,26 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   y las facturas **canceladas en el SAT** salen listadas en la hoja de cuentas, con su suma.
 - **Se puede volver a correr sin miedo.** El sistema reconoce cada comprobante por su folio fiscal, así
   que una segunda corrida no duplica nada: retoma lo que faltaba.
+- ⭐ **Primero se carga esto y DESPUÉS los XML.** Los dos meten facturas en la misma cuenta y el sistema
+  reconoce cada comprobante por su folio fiscal: el que llegue segundo **no toca** lo que ya está. Y no
+  cargan lo mismo — el archivo de SINUBE trae **lo que falta por pagar**; los XML traen el **total de la
+  factura**. Si se hace al revés, una factura a la que ya le abonaste queda dentro **por su total**: deuda
+  ya pagada, sin que nada se queje. El orden está escrito donde se corre, la carga **te avisa** si
+  encuentra comprobantes que ya estaban, y la hoja de cuentas **te lo marca en rojo** si su suma no le
+  cuadra a la de tu archivo.
+- ⚠️ **«Cancelable» no es «cancelada».** El SAT le pone a las facturas **vivas** etiquetas como
+  *«Cancelable sin aceptación»* o *«No cancelable»* —dicen si se *podría* cancelar, no que lo esté—. El
+  sistema las estaba tirando de la carga **como si estuvieran canceladas**: deuda de verdad fuera de la
+  cuenta, y encima listada bajo un motivo equivocado, así que ni revisando la hoja se veía. Ya sólo
+  descarta las que de verdad dicen *cancelada*; y con cualquier otra etiqueta que lleve esa palabra
+  —esas tres incluidas— **se para y te la enseña** en vez de decidir por su cuenta. ⚠️ **Ojo el día que
+  se corra:** si tu archivo trae esas etiquetas, la carga se va a detener la primera vez; me dices qué
+  significan, se anota, y de ahí en adelante pasa sola. Preferí eso a que el sistema decidiera por sí
+  mismo en cualquiera de las dos direcciones.
+- ⚠️ **Si el saldo de un renglón no se entiende, la carga se para y te dice cuál.** Antes se tomaba como
+  vacío y la factura se descartaba **como si estuviera pagada**. Peor: un saldo escrito al estilo europeo
+  (`1.234,56`) se podía convertir en **1.23** sin que nada fallara. Ahora sólo se aceptan las formas que
+  no admiten duda, y cualquier otra cosa detiene la corrida señalando el renglón.
 - 🔴 **Y un error que casi se cuela sin hacer ruido:** SINUBE guarda las fechas en un formato poco común,
   y la librería con la que el sistema lee Excel **lo lee mal sin avisar**: devolvía **18 de julio de
   1905** para todas y cada una de las 460 fechas del archivo. No fallaba: devolvía mal. De haberse
@@ -125,6 +145,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   `DECISIONES.md`). La que más conviene que mires: **una nota de crédito que todavía tenga saldo se carga
   y resta**, porque en SINUBE una nota ya aplicada queda en cero. **Si me dices que ese saldo ya viene
   descontado de la factura, hay que dejarlas fuera.**
+- ⏳ **Y una pregunta suelta, que no frena nada:** ¿el **saldo** sale **siempre como número** en el
+  archivo de SINUBE, o hay renglones con texto («N/D», un guion, un importe entre paréntesis)? En el
+  archivo que mandaste salieron todos numéricos. Mientras no lo digas, si aparece uno raro **la carga se
+  detiene y te lo enseña**, que es la única respuesta honesta.
 ## 0.129 · 7-sep-2026 · **en prueba** — **La receta ya sabe cuánto cárdigan lleva la felpa, y la compra lo pide sola**
 
 ### Qué se puede hacer ahora que antes no

@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../src/datos/index.js';
+import { cancelarMovimientoTerceroInterno } from '../src/dominio/terceros/cuenta-terceros.js';
 import { insertarAperturasMigradas } from '../src/dominio/terceros/migracion.js';
 import { clientePruebas, limpiarBaseDatos, sembrarPermisos } from '../src/pruebas/contexto.js';
 
@@ -403,5 +404,106 @@ describe('ETL de apertura desde SINUBE', () => {
     expect(r.existentes).toBe(1);
     expect(r.fallidos).toBe(0);
     expect(await cliente.movimientoTercero.count({ where: { uuidCfdi: 'F-0001' } })).toBe(1);
+  });
+
+  // ── Las tres ALARMAS del cuadre, medidas de verdad (H4 de la revisión) ─────────────────────────
+  // Las tres líneas de abajo son las que Daniel mira para decidir si la carga sirve. Estaban
+  // ESCRITAS pero no MEDIDAS: el reviewer probó que se podían romper las tres y las pruebas seguían
+  // en verde, porque ninguna corrida llegaba nunca a un estado que las encendiera. Cada prueba
+  // FABRICA ese estado a propósito.
+
+  it('⭐ el cuadre GRITA si un cargo quedó SIN vencimiento (la antigüedad no lo podría mostrar)', async () => {
+    // Se fabrica a mano el estado que la guarda de días de crédito existe para impedir: un cargo
+    // vivo, con su UUID, y SIN fecha de vencimiento. Entra por escritura directa —no por el motor—
+    // justo porque el motor ya no lo permite; el cuadre es la red de abajo, para lo que llegue por
+    // cualquier otra vía. Folio muy alto para no chocar con el bloque que reserva la corrida (A3).
+    await cliente.movimientoTercero.create({
+      data: {
+        idEmpresa,
+        folio: 900_001n,
+        tipoTercero: 'proveedor',
+        idProveedor: idP90,
+        fecha: new Date('2026-06-30T00:00:00.000Z'),
+        origen: 'factura_proveedor',
+        monto: 100_000,
+        fechaVencimiento: null, // ← el defecto que se está simulando
+        esFiscal: true,
+        uuidCfdi: 'F-0001',
+        rfcTercero: RFC_FIXTURE_A,
+      },
+    });
+
+    const r = await ejecutarEtlAperturaSinube(cliente, archivoFixture(listadoBueno()));
+    expect(r.creados).toBe(3); // F-0001 ya estaba
+    expect(r.existentes).toBe(1);
+    // El importe coincide con el del archivo, así que la línea de la diferencia NO se enciende:
+    // la única alarma que suena es la del vencimiento, y por eso esta prueba la aísla.
+    expect(r.cuadre).toContain('Diferencia contra el archivo : 0.00  (cuadra)');
+    expect(r.cuadre).toContain('Cargos SIN vencimiento     : 1');
+    expect(r.cuadre).toContain('LA PANTALLA DE ANTIGÜEDAD NO LOS VA A PODER MOSTRAR');
+    // Y se ve de quién es, que es lo que permite ir a arreglarlo.
+    expect(r.cuadre).toMatch(/TELAS SINTETICAS DE PRUEBA SA DE CV.*sin vencimiento: 1/);
+  });
+
+  it('⭐ el cuadre NO CUADRA si un UUID ya existía con OTRO importe (choque con etl-cfdi-masivo)', async () => {
+    // El choque real: `etl-cfdi-masivo.ts` carga el TOTAL del comprobante (100 000 + 30 000 de un
+    // renglón que en SINUBE ya está abonado); la apertura manda el SALDO (100 000) y no lo toca,
+    // porque el UUID es único global. La cuenta se queda con deuda que ya se pagó, y la ÚNICA
+    // señal de eso es esta diferencia. Antes salía como un número más en la lista.
+    await insertarAperturasMigradas(
+      sesionEtl(idEmpresa),
+      idEmpresa,
+      { tipoTercero: 'proveedor', idTercero: idP90, diasCredito: 90 },
+      'CfdiPrevioDePrueba',
+      [
+        {
+          origen: 'factura_proveedor',
+          fecha: new Date('2026-06-30T00:00:00.000Z'),
+          importe: 130_000, // ← el TOTAL del CFDI, no el saldo
+          esFiscal: true,
+          uuidCfdi: 'F-0001',
+          rfcTercero: RFC_FIXTURE_A,
+          observaciones: null,
+          refTipo: null,
+          refId: null,
+          claveFuente: 'previo:F-0001',
+        },
+      ],
+      { cliente },
+    );
+
+    const r = await ejecutarEtlAperturaSinube(cliente, archivoFixture(listadoBueno()));
+    expect(r.creados).toBe(3);
+    expect(r.existentes).toBe(1);
+    // 130 000 + 20 000 + 7 000 + 5 000 = 162 000 en la base contra 132 000 que manda el archivo.
+    expect(r.cuadre).toContain('Σ |monto| en la base         : 162000.00');
+    expect(r.cuadre).toContain('Diferencia contra el archivo : 30000.00  🔴 NO CUADRA');
+    expect(r.cuadre).toContain('conservan su importe, no el saldo');
+    // El aviso del propio ETL apunta al mismo sitio.
+    expect(r.cuadre).toContain('Cargos SIN vencimiento     : 0');
+  });
+
+  it('⭐ un movimiento CANCELADO no cuenta en el cuadre (D3: se neutraliza, no se borra)', async () => {
+    await ejecutarEtlAperturaSinube(cliente, archivoFixture(listadoBueno()));
+    const f3 = await cliente.movimientoTercero.findFirstOrThrow({ where: { uuidCfdi: 'F-0003' } });
+    // Cancelación de verdad, por el dominio: crea el INVERSO y marca el original (D3).
+    await cancelarMovimientoTerceroInterno(
+      sesionEtl(idEmpresa),
+      f3.id,
+      { motivo: 'prueba de cuadre' },
+      { cliente },
+    );
+
+    const r = await ejecutarEtlAperturaSinube(cliente, archivoFixture(listadoBueno()));
+    expect(r.creados).toBe(0);
+    expect(r.existentes).toBe(4);
+    // El cancelado (7 000) sale de las sumas: 132 000 − 7 000.
+    expect(r.cuadre).toContain('Σ |monto| en la base         : 125000.00');
+    expect(r.cuadre).toContain('Diferencia contra el archivo : -7000.00  🔴 NO CUADRA');
+    // Pero el UUID SÍ se encontró: la fila no desapareció de la base, sólo dejó de pesar.
+    expect(r.cuadre).toContain('UUID del archivo encontrados : 4 de 4');
+    // Y el proveedor de contado ya no aparece en el desglose (su único movimiento está anulado).
+    expect(r.cuadre).not.toContain('HILOS AL CONTADO SA');
+    expect(await saldo(idP0)).toBe(0);
   });
 });

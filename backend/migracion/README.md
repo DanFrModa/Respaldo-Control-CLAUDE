@@ -146,7 +146,10 @@ npx tsx --env-file=.env migracion/etl-cfdi-masivo.ts     -- --dir=./cfdi-histori
 npx tsx --env-file=.env migracion/cuadre-f9.ts           -- --archivo=saldos.csv    # F9: cuadre (corte vs aperturas cargadas)
 
 # Fila 0.131 — APERTURA DESDE EL LISTADO DE SINUBE (XLSX). Es la MISMA carga de aperturas que la de
-# arriba, pero leyendo el archivo que Daniel exporta de SINUBE. SIEMPRE el ensayo en seco primero:
+# arriba, pero leyendo el archivo que Daniel exporta de SINUBE. SIEMPRE el ensayo en seco primero.
+# 🔴 Y SIEMPRE ANTES de `etl-cfdi-masivo.ts`: comparten la clave (el UUID) y la idempotencia es
+#    global, pero la apertura carga el SALDO VIVO y el cargador de CFDI el TOTAL del comprobante ⇒
+#    al revés queda deuda ya pagada. Ver la sección «Apertura de saldos desde SINUBE» más abajo.
 npx tsx --env-file=.env migracion/etl-apertura-sinube.ts    -- --archivo=sinube.xlsx --simular
 npx tsx --env-file=.env migracion/etl-apertura-sinube.ts    -- --archivo=sinube.xlsx
 npx tsx --env-file=.env migracion/cuadre-apertura-sinube.ts -- --archivo=sinube.xlsx  # sólo el cuadre
@@ -412,6 +415,19 @@ una hoja, encabezados en la fila 1, **53 columnas** (el ETL las busca **por nomb
 ⚠️ **NO SE HA CORRIDO.** Daniel decidió (§Post-F9.201 punto 2) que **el corte real se saca el día del
 arranque** — uno anterior se desactualiza. El ETL está construido y probado con un fixture sintético.
 
+🔴 **EL ORDEN IMPORTA, Y NO ES REVERSIBLE: la apertura de SINUBE va ANTES de `etl-cfdi-masivo.ts`.**
+Los dos cargadores identifican el comprobante por el **mismo UUID**, y la idempotencia es **global**:
+el que corre primero fija el importe y el segundo no toca nada. Pero **no cargan lo mismo** — la
+apertura carga el **saldo VIVO** y `etl-cfdi-masivo` el **TOTAL del CFDI** —, así que el orden decide
+la cifra. Y Daniel pidió (§Post-F9.201·5) que **también** se importen los XML vivos, o sea que los dos
+van a tocar **las mismas facturas**.
+
+⚠️ **Al revés mete deuda que ya se pagó.** Medido: CFDI previo de 50 000 + SINUBE dice 20 000 ⇒ la
+apertura reporta `creados=0 existentes=1`, **la cuenta se queda en 50 000** y lo único que lo delata
+es la línea `Diferencia contra el archivo` del cuadre (que por eso ahora sale marcada en rojo cuando
+no es 0.00, y el reporte lo dice aparte). Si ya corriste el cargador de CFDI, **el cuadre es
+obligatorio antes de dar la apertura por buena**.
+
 ```bash
 # 1) ENSAYO EN SECO — lee, valida TODO y saca el cuadre sin escribir nada. Hazlo siempre primero.
 npx tsx --env-file=.env migracion/etl-apertura-sinube.ts -- --archivo=sinube.xlsx --simular
@@ -440,9 +456,24 @@ calcula el motor** (fecha de la factura + `Proveedor.diasCredito`), nunca se lee
 | Moneda que no sean pesos (o vacía) | `MovimientoTercero` no guarda moneda; decide qué hacer con esos renglones |
 | Mismo UUID dos veces en el archivo | Quita el duplicado |
 | Saldo negativo · `Tipo fiscal` desconocido · renglón vivo sin fecha, sin RFC o sin UUID | Corrige el renglón en el origen |
+| **`Saldo` ILEGIBLE** (hay algo en la celda pero no es un número: `N/D`, `1.234,56`, `(500)`…) | Corrígelo en el origen. No se lee como «saldado»: de ese renglón **no se sabe cuánto se debe** |
+| **`Estatus en SAT` con «cancel» que no está en la lista de cancelados** | Dime cuál es; si de verdad significa cancelado se añade a la lista |
 
 **Qué se descarta (no aborta) y sale contado en el cuadre:** complementos de pago (`Tipo fiscal =
-Pago`), documentos con saldo 0 o con la celda vacía, y **CFDI cancelados en el SAT**.
+Pago`), documentos con saldo 0 o con la celda **de verdad vacía**, y **CFDI cancelados en el SAT**,
+reconocidos por una **lista EXACTA**: `Cancelado`/`Cancelada`, con o sin aceptación (mayúsculas y
+acentos dan igual).
+
+⚠️ **Cualquier OTRO estatus que contenga la palabra «cancel» ABORTA la corrida nombrándolo** — sin
+excepciones, incluidos **«Cancelable sin aceptación»**, **«Cancelable con aceptación»** y **«No
+cancelable»**, que son comprobantes **VIGENTES** (dicen si el CFDI *se podría* cancelar, no que lo
+esté). La corrida se para a propósito: antes se comparaba **por subcadena** y esos tres se caían de
+la carga **etiquetados como cancelados**, así que **deuda viva desaparecía** con un motivo que además
+mentía. Y darlos por vigentes por nuestra cuenta sería el mismo error al revés. **Si te para con uno
+de éstos:** averigua qué significa **antes de tocar nada**. Si de verdad es un cancelado, se añade a
+`ESTATUS_SAT_CANCELADO` (en `loaders/sinube-apertura.ts`) y se descarta como los demás. Si resulta
+ser un estatus **vigente**, la decisión es de negocio y hoy **no hay lista de vigentes**: hay que
+crearla y dejar escrito el porqué en `DECISIONES.md` — precisamente para que nadie la ensanche a ojo.
 
 **Qué reporta.** El cuadre trae: renglones leídos (y cuántos de cada `Tipo fiscal`) · cargados ·
 **descartados por motivo, con la suma que se queda fuera** · ⭐ **la suma de saldos cargada** (la cifra

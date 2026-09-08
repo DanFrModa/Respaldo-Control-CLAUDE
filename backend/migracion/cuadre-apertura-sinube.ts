@@ -173,7 +173,17 @@ export function formatearCuadreApertura(c: CuadreApertura): string {
   p.push('── LO QUE QUEDÓ EN LA BASE ────────────────────────────────────');
   p.push(`  UUID del archivo encontrados : ${String(c.encontrados)} de ${String(r.cargados)}`);
   p.push(`  Σ |monto| en la base         : ${c.sumaAbsolutaBd.toFixed(2)}`);
-  p.push(`  Diferencia contra el archivo : ${(c.sumaAbsolutaBd - r.sumaSaldoCargado).toFixed(2)}`);
+  // 🔴 La diferencia ≠ 0 es el ÚNICO cable trampa del choque con `etl-cfdi-masivo.ts`: si ese CFDI
+  //    ya existía con el TOTAL del comprobante, la apertura no lo tocó y la cuenta lleva deuda que ya
+  //    se pagó. Antes salía como un número más en la lista; ahora grita, igual que los cargos sin
+  //    vencimiento.
+  const diferencia = redondear2(c.sumaAbsolutaBd - r.sumaSaldoCargado);
+  p.push(
+    `  Diferencia contra el archivo : ${diferencia.toFixed(2)}` +
+      (diferencia === 0
+        ? '  (cuadra)'
+        : '  🔴 NO CUADRA — revisa los UUID que ya existían: conservan su importe, no el saldo'),
+  );
   p.push(`  Σ monto (neto) en la base    : ${c.netoBd.toFixed(2)}`);
   p.push(
     `  🔴 Cargos SIN vencimiento     : ${String(c.cargosSinVencimiento)}` +

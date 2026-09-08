@@ -12202,7 +12202,7 @@ TSDoc del dominio: eso afecta a todo el motor y no era de esta fila. Lo único q
 | **P3** | El **mismo UUID en dos archivos** | **No pasa nada**: la 2ª corrida lo cuenta como *existente* | Doble red ya construida: `MapeoMigracion` (clave `uuid:<UUID>`) **y** la unique global de `MovimientoTercero.uuidCfdi`. Y el UUID se guarda **en mayúsculas**, para que el mismo comprobante no se cuele dos veces por una diferencia de caja entre SINUBE y el importador de XML |
 | **P4** | El **mismo UUID dos veces en el MISMO archivo** | **ABORTA** nombrando el UUID y sus filas | Escoger uno «a ojo» podría duplicar o partir un saldo en silencio |
 | **P5** | Un renglón en **moneda que no son pesos** | **ABORTA** nombrándolo | `MovimientoTercero` **no tiene columna de moneda**: cargarlo sería guardar un número en la unidad equivocada, sin que nada lo diga. Se aceptan `MXN`/`MXP`/`MN`/`PESOS`; **la celda vacía tampoco se supone MXN** |
-| **P6** | Un CFDI **cancelado en el SAT** con saldo > 0 | **Se descarta** (no aborta), contado en el cuadre con su suma | Un comprobante cancelado no crea deuda. Es contradictorio con el saldo, así que **sale listado**, nunca en silencio |
+| **P6** | Un CFDI **cancelado en el SAT** con saldo > 0 | **Se descarta** (no aborta), contado en el cuadre con su suma. ⚠️ La lista de valores que cuentan como cancelado es **EXACTA** — ver (f.2) | Un comprobante cancelado no crea deuda. Es contradictorio con el saldo, así que **sale listado**, nunca en silencio |
 | **P7** | `Estatus pago` dice **«Pagada»** pero queda saldo | **Se carga el saldo** y sale un **aviso** | Manda la regla 2 (el saldo), pero la contradicción se enseña |
 | **P8** | Un renglón vivo **sin fecha, sin RFC o sin UUID** | **ABORTA** | Sin fecha no hay antigüedad; sin RFC no hay proveedor (se identifica **por RFC**, no por razón social); sin UUID no hay clave que haga la carga re-corrible |
 | **P9** | Un `Tipo fiscal` que no sea Ingreso/Egreso/Pago, o un **saldo negativo** | **ABORTA** | No se inventa una interpretación para un dato que nadie ha visto |
@@ -12248,6 +12248,93 @@ vivo, aborta por eso. La primera versión hacía `fechaDelXml ?? fechaDeExceljs`
 `<v>2026</v>` dentro de una celda `t="d"` —el valor exacto que produce el 1905-07-18— habría vuelto a
 entrar, esta vez **sin que ninguna prueba lo estuviera mirando**. La decisión se toma con `has()`, no
 con el valor, y hay una prueba con ese caso.
+
+---
+
+##### (f) LO QUE CAMBIÓ EN LA RONDA DE CORRECCIÓN — dos errores de dinero, en direcciones opuestas
+
+La revisión independiente comprobó lo de arriba pieza por pieza y **rechazó** por tres cosas que
+tocan la cifra. Ninguna era cara; las tres estaban en la parte que **decide qué es dinero vivo**.
+
+**(f.1) 🔴 EL ORDEN DE LAS CARGAS IMPORTA, y ahora está escrito.** La apertura y el importador de CFDI
+(`etl-cfdi-masivo.ts`) escriben en la **misma** tabla y comparten la **unique global del `uuidCfdi`**:
+el que llegue segundo **no toca** el movimiento que ya existe. Y **cargan cifras distintas a
+propósito**: el importador mete el **TOTAL del comprobante**; la apertura, el **SALDO** que queda vivo.
+⇒ si el importador entra primero, una factura de 50 000 con 30 000 ya abonados se queda en la cuenta
+**por 50 000**, y la apertura la cuenta como «ya existía» sin corregir nada: **deuda que ya se pagó,
+sin un solo error en pantalla**.
+
+**DECIDIDO:** la **apertura va PRIMERO**, y el `README.md` de migración lo dice en los dos sitios donde
+alguien lo va a leer. Además, el ETL **avisa** cuando encuentra UUID que ya existían (*«conservan su
+importe, NO el saldo de SINUBE»*) y el cuadre **grita** con la línea *«Diferencia contra el archivo»*
+en cuanto la suma de la base no le cuadra a la del archivo. Antes esa diferencia salía como **un
+número más en la lista**, sin decir que era una alarma.
+
+**(f.2) 🔴 «Cancelable» NO es «cancelado» — se estaba tirando deuda VIVA.** El descarte del CFDI
+cancelado (P6) comparaba **por subcadena**: cualquier `Estatus en SAT` que contuviera «cancel» se
+caía de la carga. El SAT usa, para comprobantes **perfectamente vigentes**, los valores **«Cancelable
+sin aceptación»**, **«Cancelable con aceptación»** y **«No cancelable»** — que dicen si el comprobante
+*se podría* cancelar, no que lo esté. ⇒ deuda real fuera de la cuenta, **y encima etiquetada como
+«CFDI CANCELADO»**: el motivo del descarte mentía, así que ni revisando el cuadre se veía.
+
+**DECIDIDO:** la lista de valores cancelados es **EXACTA** (`cancelado`, `cancelada`, y sus variantes
+`con`/`sin aceptación`). Y ante **cualquier otro** valor que contenga «cancel» y no esté en la lista,
+el ETL **ABORTA nombrándolo** — el mismo criterio que un `Tipo fiscal` o una `Moneda` desconocidos
+(P9/P5): **no se adivina el vocabulario de un archivo que nadie ha visto**. Suponerlo vigente sería
+el mismo pecado en la otra dirección.
+
+⚠️ **Y eso incluye a los tres «Cancelable…»/«No cancelable»: tampoco se cargan solos.** El ETL **se
+para y los enseña**; no los descarta (que era el defecto) ni los da por buenos por su cuenta. Se
+cargan cuando alguien confirme qué significan y quede escrito aquí. Hoy **la única lista que existe
+en el código es la de cancelados**; si hiciera falta una de vigentes, se crea con su decisión al
+lado, para que nadie la ensanche a ojo.
+
+✅ **MEDIDO SOBRE EL ARCHIVO REAL (el lead, 8-sep), y baja el susto:** en el listado que Daniel subió
+(BLOOM TEXTILES, 7-sep) la columna `Estatus en SAT` tiene **un solo valor distinto en los 115
+renglones: «Vigente»**. ⇒ **la corrida del día del arranque no se va a parar por esto**, al menos con
+exportaciones como ésa. ⚠️ **Es UN proveedor y UN día**: la guarda se queda igual —su valor es que
+avise en vez de adivinar—, pero el temor concreto no se materializa en la única evidencia real que
+existe. *(Comprobación de un minuto, repetible sobre cualquier archivo nuevo: listar los valores
+distintos de esa columna.)*
+
+**(f.3) 🔴 Un `Saldo` que no se puede leer ya no vale CERO.** Si la celda del saldo traía algo que no
+es un número, el lector lo daba por vacío y el renglón se descartaba como **«saldo 0 = ya pagada»**:
+una factura viva desaparecía de la carga por un formato raro, contada en el cuadre bajo un motivo que
+**no era el suyo**. ⚠️ **Y había algo peor, que se vio midiendo:** la limpieza de la cifra quitaba las
+comas, así que un `1.234,56` (formato europeo) se convertía en `1.23456` — un número **finito y
+creíble**: el ETL no habría fallado, habría cargado **un peso con veintitrés centavos** donde había
+mil doscientos treinta y cuatro.
+
+✅ **Y la pregunta abierta, contestada para este archivo (el lead, 8-sep):** los **115 saldos del
+listado real son numéricos**, sin una sola celda de texto ⇒ el caso no ocurre hoy. **Sigue en pie para
+Daniel** —es un proveedor y un día—, y la guarda se queda: su valor es que un formato raro **se pare y
+se enseñe** en vez de convertirse en un peso con veintitrés centavos.
+
+**DECIDIDO:** el lector distingue **la celda vacía** (→ se descarta como saldada, con su motivo) de
+**la celda con algo ilegible** (→ **ABORTA nombrando el renglón y lo que traía**, para corregirlo en
+el origen). Sólo se aceptan las dos formas inequívocas: `1234.56` y `1,234.56`. **Nada ambiguo se
+interpreta.**
+
+⏳ **PREGUNTA ABIERTA PARA DANIEL (no bloquea):** *¿el `Saldo` sale SIEMPRE numérico de SINUBE, o hay
+renglones con texto («N/D», «—», un importe entre paréntesis)?* En el archivo medido salieron todos
+numéricos, así que hoy la guarda no se dispara nunca. Si él dice que SÍ aparece texto y qué significa,
+se convierte en regla; mientras tanto **aborta**, que es la única respuesta honesta.
+
+---
+
+##### (g) LO QUE LA REVISIÓN ENSEÑÓ SOBRE LAS PRUEBAS (y que vale para cualquier fila)
+
+**Las tres alarmas del cuadre estaban ESCRITAS pero no MEDIDAS.** El reviewer rompió a propósito el
+contador de cargos sin vencimiento, la línea de la diferencia y el descarte de los cancelados: las
+pruebas **siguieron en verde**, porque ninguna corrida llegaba nunca a un estado que las encendiera.
+Una alarma que nunca se dispara en las pruebas no está probada: está **escrita**. Ahora cada una
+tiene una prueba que **fabrica** ese estado (un cargo sin vencimiento, un UUID previo con otro
+importe, un movimiento cancelado) y las tres roturas la tumban.
+
+**Y el hermano del mismo error:** la prueba de la celda de fecha vacía «pasaba» sin medir nada, porque
+en el listado de SINUBE **no hay dos columnas de fecha pegadas** — lo que se heredaría es un texto,
+que produce el mismo vacío que el comportamiento correcto. La herencia de una fecha ajena sólo se ve
+con dos celdas `t="d"` **contiguas**, así que la prueba escribe esa hoja en crudo.
 
 - **Aplica en:** versión **0.131**, fila 0.131. **Fecha:** 2026-09-08.
 #### (Post-F9.219) — ⭐⭐ CÓMO SE PIDE EL CÁRDIGAN: la receta guarda un NÚMERO PROPIO y la compra lo aplica como RAZÓN (fila 0.156 / v0.129, 7-sep-2026)
