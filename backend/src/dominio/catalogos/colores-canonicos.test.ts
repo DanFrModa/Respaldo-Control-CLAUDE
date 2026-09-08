@@ -108,6 +108,32 @@ describe('colorCanonico', () => {
     await expect(colorCanonico(tx, 99)).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 
+  it('🔴 una cadena MÁS LARGA que el tope se dice, no devuelve un color a medio camino', async () => {
+    // ⚠️ Nació de un sondeo del reviewer (ronda 2): con 25 eslabones esto devolvía `id=21,
+    // activo=false` —ni canónico ni activo— **sin lanzar**, porque la carga paraba en el nivel 20 y
+    // la caminata caía en el `break` de «el canónico ya no existe». Como la FK es `Restrict` ese
+    // caso NO puede pasar: un eslabón que falta en la caché sólo significa que la carga se truncó.
+    // Devolver un color absorbido en silencio es peor que un 409: con él se captura una orden.
+    const largos: FilaColor[] = [
+      ...Array.from({ length: 24 }, (_, i) => absorbido(i + 1, `Eslabón ${String(i + 1)}`, i + 2)),
+      activo(25, 'El que sobrevive'),
+    ];
+    const { tx } = catalogoFalso(largos);
+
+    await expect(colorCanonico(tx, 1)).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(colorCanonico(tx, 1)).rejects.toThrow(/no termina/);
+    await expect(resolverColoresCanonicos(tx, [1])).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('una cadena que CABE en el tope sí se resuelve entera (el tope no muerde de más)', async () => {
+    const cabe: FilaColor[] = [
+      ...Array.from({ length: 20 }, (_, i) => absorbido(i + 1, `Eslabón ${String(i + 1)}`, i + 2)),
+      activo(21, 'El que sobrevive'),
+    ];
+    const { tx } = catalogoFalso(cabe);
+    expect((await colorCanonico(tx, 1)).id).toBe(21);
+  });
+
   it('un ANILLO no cuelga: se corta con un error que dice cómo romperlo', async () => {
     const { tx } = catalogoFalso([absorbido(1, 'A', 2), absorbido(2, 'B', 1)]);
     await expect(colorCanonico(tx, 1)).rejects.toBeInstanceOf(ErrorConflicto);

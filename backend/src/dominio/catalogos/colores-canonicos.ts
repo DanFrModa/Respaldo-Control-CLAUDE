@@ -112,6 +112,23 @@ async function cargarNodos(
 }
 
 /**
+ * El mismo texto de rechazo en los dos caminos por los que una cadena puede no terminar.
+ *
+ * ⚠️ **Nombra las DOS causas, no sólo el anillo.** Desde que este error también cubre «la cadena es
+ * más larga que el tope» (ver la caminata), decir sólo *«en círculo»* mandaría a buscar un círculo
+ * que puede no existir — y *un aviso que describe mal su propia causa* es el pecado que §Post-F9.85
+ * vino a corregir. El REMEDIO es el mismo en los dos casos (reactivar un eslabón corta la caminata),
+ * así que la frase que lo dice no cambia.
+ */
+function errorCadenaSinFin(nombre: string): ErrorConflicto {
+  return new ErrorConflicto(
+    `La cadena de fusiones del color "${nombre}" no termina (más de ` +
+      `${String(MAX_SALTOS_FUSION)} saltos): hay colores fusionados en círculo, o la cadena es ` +
+      `más larga que el tope. Reactiva uno de ellos para romper la cadena.`,
+  );
+}
+
+/**
  * La caminata, EN MEMORIA, desde un color hasta su canónico. Es la ÚNICA implementación de la
  * regla: la usan tanto {@link colorCanonico} (uno) como {@link resolverColoresCanonicos} (muchos),
  * para que no puedan contestar distinto.
@@ -119,6 +136,15 @@ async function cargarNodos(
  * **La regla, en una línea:** *un color absorbido nunca revive; el canónico sí puede.* La caminata
  * para en cuanto el color está ACTIVO (ya es usable) o ya no tiene rastro (nadie se lo llevó: si
  * está apagado, lo apagó su dueño, y reactivarlo no deshace ninguna fusión).
+ *
+ * 🔴 **UN ESLABÓN QUE FALTA EN LA CACHÉ SIGNIFICA QUE LA CARGA SE TRUNCÓ — NO que el canónico no
+ * exista** (fila 0.159, ronda 2). La FK `idFusionadoEn` es `Restrict`, así que el color al que
+ * apunta el rastro **siempre está en la base**: si `cargarNodos` no lo trajo es porque paró en el
+ * nivel {@link MAX_SALTOS_FUSION}, es decir, porque la cadena es más larga que el tope. Devolver el
+ * eslabón donde se cortó sería lo peor de los dos mundos: **un color ni canónico ni activo**,
+ * entregado en silencio, con el que después se captura una orden. Se lanza el MISMO error del
+ * anillo — que es lo que este módulo promete en su docstring y lo que hacía la versión anterior a
+ * esta fila.
  */
 function caminarHastaElCanonico(cache: Map<number, NodoColor>, inicio: NodoColor): ColorCanonico {
   let actual = inicio;
@@ -127,14 +153,12 @@ function caminarHastaElCanonico(cache: Map<number, NodoColor>, inicio: NodoColor
   while (!actual.activo && actual.idFusionadoEn !== null) {
     const siguiente = cache.get(actual.idFusionadoEn);
     if (siguiente === undefined) {
-      break; // el canónico ya no existe (no debería: la FK es Restrict) → se queda en éste
+      // La carga se truncó en el tope de niveles (ver el bloque de arriba): la cadena es demasiado
+      // larga, y eso se dice — no se devuelve un color a medio camino.
+      throw errorCadenaSinFin(actual.nombre);
     }
     if (vistos.has(siguiente.id) || vistos.size > MAX_SALTOS_FUSION) {
-      throw new ErrorConflicto(
-        `La cadena de fusiones del color "${actual.nombre}" no termina (más de ` +
-          `${String(MAX_SALTOS_FUSION)} saltos): hay colores fusionados en círculo. ` +
-          `Reactiva uno de ellos para romper la cadena.`,
-      );
+      throw errorCadenaSinFin(actual.nombre);
     }
     vistos.add(siguiente.id);
     actual = siguiente;

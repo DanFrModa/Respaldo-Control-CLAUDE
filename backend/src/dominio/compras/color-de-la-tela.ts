@@ -279,8 +279,14 @@ function proyectarColores(
   // se pliegan en uno sumando sus piezas. Sin plegarlos, la pantalla pediría capturar dos veces el
   // color de tela del mismo color y —peor— `coloresDeLaOrden.length` diría 2, lo que apagaría la
   // regla `unico-color` de la propuesta (que sólo actúa cuando la orden es de UN color).
-  // El PANTONE se queda con el primero que lo traiga: es el que la OP capturó para ese color, y dos
-  // renglones del mismo color canónico no pueden estar diciendo dos tonos distintos.
+  // ⚠️ **EL PANTONE SE QUEDA CON EL PRIMERO QUE LO TRAIGA, Y ESO PUEDE DESCARTAR UNO DISTINTO.**
+  // Se dice en vez de callarlo (ronda 2): dos renglones que ahora son el MISMO color canónico
+  // pueden traer pantones distintos —y no es teórico, porque los nombres duplicados de Daniel
+  // CODIFICAN el pantone («Blanco Hueso Pantone 14-0002 Tcx Pumice Stone» vs. «Blanco Hueso»)—.
+  // Gana el primero por orden de matriz (`orderBy: idColor asc`), que es determinista, y el otro
+  // sólo se usaba para PROPONER un color de tela: el amarre lo confirma una persona y el pantone
+  // original sigue intacto en `OrdenLinea` (no se reescribe nada). Elegir «el más específico» sería
+  // inventar un criterio que nadie pidió; si algún día estorba, la salida honesta es preguntar.
   const porColor = new Map<
     number,
     { idColor: number; nombre: string; pantone: string | null; piezas: number }

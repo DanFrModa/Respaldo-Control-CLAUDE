@@ -12236,8 +12236,78 @@ aquí en adelante sólo se puede capturar el canónico, así que el renglón vie
 - **No hay script que busque y una los duplicados que ya existen.** Eso lo hace una persona desde la
   pantalla de fusión, que es justo lo que esta fila vino a desbloquear (REGLA 0-B).
 - **No hay migración.** El rastro (`Color.idFusionadoEn`) ya existía desde V1-E8s (§Post-F9.143); esta
-  fila sólo lo empieza a usar donde hacía falta. Comprobado con `prisma migrate diff`: sin diferencia
-  entre el esquema y las migraciones.
+  fila sólo lo empieza a usar donde hacía falta. Comprobado con
+  `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code`
+  sobre una base con las migraciones aplicadas: **EXIT=0, «No difference detected»**.
+
+---
+
+### 🔁 RONDA 2 (la revisión) — el defecto que faltaba, y por qué «falla visible» no bastaba
+
+**(e) 🔴 EL IMPORTADOR DE EXCEL EMPUJABA AL USUARIO A DESHACER LA FUSIÓN.** La primera entrega dejó
+esa ruta declarada como *«falla visible, no silenciosa»* — el archivo se rechazaba y se veía. Lo que
+no se midió es **a dónde manda esa falla**: el mensaje dice *«…no existen en el catálogo;
+**agrégalos** o corrige el archivo»*, el usuario va al catálogo, y ahí le contestan *«Ya existe …
+(está desactivado; **puedes reactivarlo**)»*. **Reactivar borra `idFusionadoEn`.** Desde ese instante
+toda la resolución canónica deja de operar **sin un solo aviso** —el MRP vuelve a partir la OP, el
+neteo pierde la OC anterior, el linaje estrena un segundo número— **y los repuntes que la fusión ya
+movió no vuelven**. El estado final es **peor que antes de fusionar**.
+
+📌 **La lección, para no repetirla:** *un bloqueo es visible; la SALIDA que el producto sugiere puede
+no serlo.* Clasificar una falla por lo que se ve no basta: hay que seguir el camino que el mensaje
+propone hasta el final.
+
+✅ **Arreglado copiando lo que el importador de PDF ya hacía**, con un matiz propio: el mapa de
+colores se llena en **DOS pasadas** —primero los ACTIVOS, exactamente como siempre, y sólo después
+los absorbidos, en las claves que quedaron libres—. Sin eso, un color absorbido con id menor le
+robaría la clave a uno activo que normaliza igual («Café» vs. «Cafe») y un archivo que hoy importa
+bien cambiaría de color en silencio. Un color **apagado a mano** (sin fusión) sigue diciendo *«no
+existe»*: ahí no hay ninguna fusión que deshacer.
+
+🔴 **Y con el arreglo vino su otra mitad, que el PDF ya tenía y el Excel no: EL DESVÍO SE ANOTA.**
+Resolver al canónico sin dejar rastro cambia **en silencio** lo que el papel del cliente pedía: la OC
+dice «Azul marino», la OP nace en «Rojo», y **la vista previa del Excel ni siquiera enseña los
+colores**, así que no habría dónde enterarse de por qué. El importador de PDF ya lo anotaba —es
+literalmente el *«hallazgo H2»* de su propia revisión, escrito en `resolverOCrearColor`— y copiar
+sólo la mitad resuelta habría repetido la trampa de la **rama gemela** (fila 0.107: *se arregla un
+lado y el verde del lado arreglado no dice nada del otro*). Hoy el confirm escribe en la bitácora del
+color **ABSORBIDO** —el nombre que trae el papel y por el que alguien va a preguntar— un apunte
+`redirigido-por-fusion` con `origen: 'importacion-excel'`. Va **uno por color y sólo por los colores
+que el archivo nombra**: un catálogo con veinte fusiones viejas no deja veinte apuntes en cada
+importación.
+
+**(f) Una cadena de fusiones más larga que el tope devolvía un color a medio camino, callando.** Con
+más de 20 eslabones se devolvía un color **ni canónico ni activo** en vez de lanzar — regresión
+contra el comportamiento anterior a esta fila. La FK `idFusionadoEn` es `Restrict`, así que un
+eslabón que falta en la caché **sólo puede significar que la carga se truncó**: ahí se lanza el mismo
+error del anillo — que por eso pasó a **nombrar sus dos causas** (ver (g)3).
+
+**(g) Cuatro cosas más que se dicen en vez de callarse:**
+1. El **pantone** del renglón plegado se queda con el primero por orden de matriz y **puede
+   descartar uno distinto** —y no es teórico, porque los nombres duplicados de Daniel codifican el
+   pantone—. Sólo alimenta una PROPUESTA que una persona confirma, y el pantone original sigue
+   intacto en `OrdenLinea`. Elegir «el más específico» sería inventar un criterio que nadie pidió.
+2. El repunte de `Modelo.idColor` ahora toma el **mismo advisory lock por desarrollo** que
+   `obtenerODerivarModeloDeProduccion`. Antes, fusionar mientras alguien generaba una OP del mismo
+   desarrollo abortaba con un P2002 crudo: seguro (A2 revierte), pero feo.
+   ⭐ **Y tiene prueba, porque sin ella no era medible:** quitar la línea del lock dejaba las 117
+   pruebas de fusión/colores/nomenclatura **en verde** —ninguna corre concurrente—, que es
+   exactamente el agujero que la prueba del par en `nomenclatura.int.test.ts` describe con sus
+   palabras (*«sin una prueba que lo ejercite, ese lock es una línea que un refactor puede borrar en
+   silencio»*). Se copió su forma: **N fusiones simultáneas** de colores distintos del MISMO
+   desarrollo hacia el mismo canónico; con el lock **ninguna falla** y una sola se lleva la casilla,
+   sin él las que pierden la carrera revientan contra `modelos_linaje_color_unico`.
+3. El error de *«la cadena no termina»* ahora **nombra sus dos causas** (el anillo **o** una cadena
+   más larga que el tope), porque desde (f) lo lanzan las dos: decir sólo *«en círculo»* mandaría a
+   buscar un círculo que puede no existir. El remedio no cambia —reactivar un eslabón corta la
+   caminata—, así que la frase que lo dice se quedó igual.
+4. 🔶 **El color absorbido desaparece de los dos selectores de producto terminado** (ajuste manual y
+   traspaso). No es corrupción —las existencias y el kardex se siguen viendo, y la entrega al
+   cliente toma el color de la matriz—, pero esas dos capturas quedan sin puerta para ESE color.
+   **No se arregló a ciegas**: el remedio obvio (ofrecer todos los inactivos) llena una pantalla de
+   captura de colores retirados, y elegir cuáles ofrecer es decisión de producto. Queda como **fila
+   0.164**, con una pregunta para Daniel: *¿cada cuánto ajusta o traspasa producto terminado a
+   mano?* — de eso depende si sube a bloqueante.
 
 ---
 

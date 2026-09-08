@@ -53,6 +53,8 @@
 import type { Prisma } from '../../datos/index.js';
 import type { Tx } from '../../comun/transaccion.js';
 
+import { bloquearModelosDelDesarrollo } from '../modelos/nomenclatura.js';
+
 /** Qué hace la fusión con una referencia entrante de `Color`. */
 export type TratoDeReferencia = 'repuntar' | 'rastro';
 
@@ -255,6 +257,12 @@ export const REFERENCIAS_DE_COLOR: ReferenciaDeColor[] = [
       const descartados: Prisma.JsonObject[] = [];
       for (const modelo of delOrigen) {
         if (modelo.idModeloDesarrollo !== null) {
+          // ⭐ ronda 2 — EL MISMO LOCK POR DESARROLLO que toma `obtenerODerivarModeloDeProduccion`
+          // antes de mirar. Sin él, fusionar mientras alguien genera una OP del mismo desarrollo
+          // choca contra `modelos_linaje_color_unico` y aborta con un P2002 crudo: seguro (A2
+          // revierte la fusión entera) pero feo. Con él, una espera. Va ANTES del `findFirst`, que
+          // es lo que vuelve atómico el par «¿ya hay uno del canónico?» + «muévelo».
+          await bloquearModelosDelDesarrollo(tx, modelo.idModeloDesarrollo);
           // ⚠️ ¿El desarrollo YA tiene un hijo del color canónico? Entonces son DOS modelos de
           // producción para el MISMO color real, y unificarlos NO es esta operación: el número es
           // del modelo y arrastra órdenes, inventario y kardex. Se deja quieto (conserva su

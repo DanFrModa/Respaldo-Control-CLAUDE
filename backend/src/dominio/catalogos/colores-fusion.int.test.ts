@@ -669,3 +669,80 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
     });
   });
 });
+
+// ── ⭐ El LOCK POR DESARROLLO del repunte de `Modelo.idColor` (fila 0.159, ronda 2) ─────────
+
+/**
+ * El repunte de `Modelo.idColor` toma el MISMO `pg_advisory_xact_lock(20548, idModeloDesarrollo)`
+ * que `obtenerODerivarModeloDeProduccion`, porque el par «¿este desarrollo ya tiene un modelo del
+ * canónico?» + «entonces muévelo» tiene que ser un solo hecho serializado: si no, dos operaciones
+ * del MISMO desarrollo leen «no hay» a la vez y las dos escriben, chocando contra
+ * `modelos_linaje_color_unico` con un P2002 crudo.
+ *
+ * 🔴 **Esta prueba es el candado del lock**, y nació de una MUTACIÓN QUE SOBREVIVIÓ: quitar la línea
+ * del lock dejaba las 117 pruebas de fusión/colores/nomenclatura en verde, porque ninguna corría
+ * concurrente. Es el mismo agujero que la prueba del par en `nomenclatura.int.test.ts` vino a tapar
+ * —y la misma forma de taparlo—: sin algo que lo ejercite, un lock es una línea que cualquier
+ * refactor puede borrar en silencio.
+ */
+describe('concurrencia: el advisory lock por desarrollo del repunte de `Modelo.idColor`', () => {
+  const CONCURRENTES = 4;
+
+  it('N fusiones SIMULTÁNEAS hacia el mismo canónico: ninguna falla, una mueve y las demás se anotan', async () => {
+    const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+    // UN solo desarrollo con N hijos de producción, cada uno nacido de un duplicado distinto: todos
+    // compiten por la misma casilla `[idModeloDesarrollo, idColor=destino]`.
+    const padre = await cliente.modelo.create({
+      data: {
+        codigo: 'MOD-0159-LOCK-DES',
+        origen: 'desarrollo',
+        codigoDesarrollo: 'MOD-0159-LOCK-DES',
+      },
+    });
+    const origenes: number[] = [];
+    for (let i = 0; i < CONCURRENTES; i += 1) {
+      const color = await crearColor(sesionAdmin(), { nombre: `NEGRO ${String(i)}` }, bd());
+      await cliente.modelo.create({
+        data: {
+          codigo: `MOD-0159-LOCK-${String(i)}`,
+          origen: 'produccion',
+          idModeloDesarrollo: padre.id,
+          idColor: color.id,
+          numeroProduccion: 72_000 + i,
+        },
+      });
+      origenes.push(color.id);
+    }
+
+    const resultados = await Promise.allSettled(
+      origenes.map((idOrigen) =>
+        fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [idOrigen] }, bd()),
+      ),
+    );
+
+    // 1) NINGUNA falla. Sin el lock, las que pierden la carrera revientan contra
+    //    `modelos_linaje_color_unico` con un P2002. Se comparan los MENSAJES, no el conteo: si algo
+    //    falla, el `expect` lo enseña en el diff en vez de decir "esperaba 0, hubo 3".
+    const fallidas = resultados.filter((r) => r.status === 'rejected');
+    expect(fallidas.map((r) => String(r.reason))).toEqual([]);
+
+    // 2) EXACTAMENTE UNO se llevó la casilla del canónico (la primera que ganó la carrera).
+    const delCanonico = await cliente.modelo.findMany({
+      where: { idModeloDesarrollo: padre.id, idColor: destino.id },
+      select: { id: true },
+    });
+    expect(delCanonico).toHaveLength(1);
+
+    // 3) Y los otros N−1 conservan su color absorbido (su historia), como manda el descarte.
+    const conservados = await cliente.modelo.count({
+      where: { idModeloDesarrollo: padre.id, idColor: { in: origenes } },
+    });
+    expect(conservados).toBe(CONCURRENTES - 1);
+
+    // 4) Los N colores quedaron absorbidos igual: el descarte es del MODELO, no de la fusión.
+    const absorbidos = await cliente.color.count({
+      where: { id: { in: origenes }, activo: false, idFusionadoEn: destino.id },
+    });
+    expect(absorbidos).toBe(CONCURRENTES);
+  });
+});

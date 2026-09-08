@@ -164,3 +164,18 @@ orden no se resuelve nada: todo cuelga de su propia matriz y ya es coherente con
 ⚠️ Su pareja obligada: `sincronizarMatriz` **acepta un color apagado que la orden YA TIENE** — sin eso,
 fusionar dejaría ineditables las órdenes que usaban el color, que era exactamente el daño que la antigua
 negativa evitaba.
+
+🔴 **Y la otra pareja, que la revisión destapó: los DOS importadores tienen que resolver el rastro.** El de
+PDF ya lo hacía (`resolverOCrearColor`); el de **Excel** (`pedidos/importacion.ts`) miraba sólo colores
+ACTIVOS, así que un archivo con un color absorbido moría con *«no existe; agrégalo»* — y quien seguía ese
+consejo acababa **reactivando el color**, lo que **borra `idFusionadoEn`** y apaga toda la resolución
+canónica sin avisar, dejando además los repuntes ya hechos sin vuelta. Hoy resuelve al canónico, en **dos
+pasadas** (primero los activos, para que un archivo que ya importaba bien no cambie de color; después los
+absorbidos, sólo en las claves libres). Un color apagado **a mano** sigue diciendo *«no existe»*. Y
+**el desvío se anota**: el confirm deja en la bitácora del color absorbido un `redirigido-por-fusion`
+con `origen: 'importacion-excel'` (uno por color, sólo por los que el archivo nombra), igual que el
+de PDF — si no, el papel diría «Azul marino», la OP diría «Rojo» y no habría dónde saber por qué.
+
+📌 **Lo que NO alcanza la fusión, dicho:** el color absorbido desaparece de los selectores de
+**Movimientos de PT** y **Traspasos de PT** (piden sólo activos) ⇒ el ajuste manual y el traspaso de ESE
+color quedan sin puerta, aunque sus existencias y su kardex se sigan viendo. Es la **fila 0.164**.

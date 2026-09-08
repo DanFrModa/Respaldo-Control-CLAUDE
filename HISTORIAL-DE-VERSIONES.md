@@ -90,6 +90,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **La propuesta de «de qué color se compra la tela» vuelve a acertar.** La pantalla enseña **un renglón
   por color real** (con sus piezas sumadas) y propone el tono de tela que ya estaba amarrado a ese color,
   en vez de proponerlo por parecido.
+- **Un Excel del cliente que nombra un color ya juntado se importa igual.** Antes la importación se caía
+  entera diciendo *«ese color no existe; agrégalo»*, y quien seguía ese consejo acababa **reactivando el
+  color y deshaciendo la limpieza sin enterarse**. Ahora el archivo entra y la orden queda con el color
+  bueno. El papel del cliente no cambia: sigue diciendo lo que decía.
 
 ### Qué cambió y puede sorprender
 
@@ -110,6 +114,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   reusa el del color bueno. Queda anotado en la bitácora.
 - **Si los dos colores tenían precio del mismo proveedor de tela**, gana el del color que se conserva; el
   del repetido queda escrito en la bitácora por si era el bueno.
+- **Cuando un archivo del cliente nombra un color ya juntado, queda escrito a dónde se mandó.** El papel
+  puede decir «Azul marino» y la orden decir «Rojo»: para que eso nunca sea un misterio, la importación
+  deja el apunte en la bitácora de ese color (uno por color, no uno por renglón).
 
 ### Qué sigue pendiente o roto
 
@@ -121,6 +128,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   destrabar.
 - **Los papeles ya impresos no cambian.** Una orden de compra o una ficha de corte que ya salió sigue
   diciendo el color con el que se hizo.
+- **El color juntado ya no aparece en dos pantallas de inventario**: «Movimientos de PT» y «Traspasos de
+  PT» sólo ofrecen colores vigentes. Las existencias y el kardex de ese color **se siguen viendo**, y la
+  entrega al cliente lo toma de la orden — pero si hace falta **ajustar a mano o traspasar** piezas que
+  entraron con el nombre viejo, hoy no hay por dónde. Queda anotado como pendiente.
 
 ---
 ## 0.128 · 7-sep-2026 · **en prueba** — **Los maquileros por fin tienen antigüedad: la pantalla de los jueves dice cuántos días lleva vencido cada quien**

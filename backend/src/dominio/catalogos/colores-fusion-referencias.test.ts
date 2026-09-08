@@ -18,6 +18,24 @@ import { describe, expect, it } from 'vitest';
 
 import { REFERENCIAS_DE_COLOR } from './colores-fusion-referencias.js';
 
+/** Tipos ESCALARES de Prisma: llevan inicial mayúscula pero no son una relación. */
+const ESCALARES = new Set([
+  'String',
+  'Int',
+  'BigInt',
+  'Float',
+  'Decimal',
+  'Boolean',
+  'DateTime',
+  'Json',
+  'Bytes',
+]);
+
+/** Los `enum` declarados en el esquema: tampoco son relaciones aunque empiecen en mayúscula. */
+function enumsDelEsquema(esquema: string): Set<string> {
+  return new Set([...esquema.matchAll(/^enum ([A-Za-z0-9]+) \{/gm)].map((m) => m[1]!));
+}
+
 /** Nombres de las relaciones declaradas dentro de `model Color` en el esquema de Prisma. */
 function relacionesDeModeloColor(): string[] {
   const ruta = fileURLToPath(new URL('../../../prisma/schema.prisma', import.meta.url));
@@ -26,9 +44,24 @@ function relacionesDeModeloColor(): string[] {
   if (bloque === null) throw new Error('No se encontró `model Color` en prisma/schema.prisma');
   const relaciones: string[] = [];
   for (const linea of bloque[1]!.split('\n')) {
-    // Una relación de vuelta se declara `nombre  OtroModelo[]` (lista, sin `@relation` de FK).
-    const m = /^\s{2}([a-zA-Z][a-zA-Z0-9]*)\s+[A-Z][A-Za-z0-9]*\[\]/.exec(linea);
-    if (m !== null) relaciones.push(m[1]!);
+    // ⭐ ronda 2 — se casan las DOS formas de una relación de vuelta: la de LISTA
+    // (`nombre OtroModelo[]`, 1:N) y la OPCIONAL (`nombre OtroModelo?`, que es como se declara una
+    // 1:1). Antes sólo la primera, así que una back-relation 1:1 futura se habría colado sin rojo —
+    // el hueco que el reviewer señaló. Hoy no existe ninguna, y por eso ampliarlo no cambia el
+    // resultado: es la red la que se ensancha, no la lista.
+    //
+    // 🔴 Y se DESCARTA el lado que declara `fields:`: ése es la llave foránea SALIENTE, no una
+    // referencia entrante. Sin este filtro, `fusionadoEn Color? @relation(… fields: [idFusionadoEn]…)`
+    // —el propio rastro de la fusión— entraría en la lista y la prueba exigiría clasificarlo, que
+    // es justo lo contrario de lo que significa.
+    if (linea.includes('fields:')) continue;
+    const m = /^\s{2}([a-zA-Z][a-zA-Z0-9]*)\s+([A-Z][A-Za-z0-9]*)(\[\]|\?)/.exec(linea);
+    if (m === null) continue;
+    // Un `?` no basta para saber que es una relación: `idFusionadoEn Int?` y `creadoPorId String?`
+    // casan igual. Se descartan los ESCALARES de Prisma y los ENUM declarados en el propio esquema,
+    // que es lo único que puede aparecer con inicial mayúscula sin ser un modelo.
+    if (ESCALARES.has(m[2]!) || enumsDelEsquema(esquema).has(m[2]!)) continue;
+    relaciones.push(m[1]!);
   }
   return relaciones;
 }

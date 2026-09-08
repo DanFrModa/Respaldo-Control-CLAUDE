@@ -4514,6 +4514,36 @@ describe('⭐⭐ fila 0.159 — colores duplicados fusionados en la explosión',
     return orden.id;
   }
 
+  /** Orden con UN SOLO renglón, en el color duplicado: 20 piezas (CH 5 + M 15). */
+  async function ordenSoloDelDuplicado(folio: bigint): Promise<number> {
+    const orden = await cliente.orden.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idColor: colorDuplicado.id,
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 5 },
+                  { idTalla: tallaM.id, cantidad: 15 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
   /** Los renglones de BOTÓN de la explosión (el material que se parte por color). */
   async function renglonesDeBoton(id: number) {
     const ex = await explosionarOrden(sesion(), id, bd());
@@ -4568,6 +4598,61 @@ describe('⭐⭐ fila 0.159 — colores duplicados fusionados en la explosión',
     });
     expect(guardados).toHaveLength(1);
     expect(guardados[0]?.idColorPrenda).toBe(colorRojo.id);
+  });
+
+  it('🔴 el DIFF post-fusión NO dice «nuevo» cuando el color canónico NO estaba en el snapshot', async () => {
+    // ⚠️ Nació de un MUTANTE SUPERVIVIENTE (ronda 2): la primera versión de esta prueba usaba la
+    // orden de DOS colores, y ahí el canónico (Rojo) YA estaba en el snapshot anterior ⇒ la clave
+    // casaba con o sin canonizar y la mutación sobrevivía. El caso que de verdad mide la regla es
+    // éste: una orden que SÓLO trae el color absorbido, fusionado en uno que ella no usa. Sin
+    // canonizar `previos`, el renglón viejo (color absorbido) no casa con el nuevo (canónico) y la
+    // pantalla anuncia un material NUEVO sobre una orden que no cambió nada — alarma falsa justo
+    // cuando alguien limpia el catálogo.
+    const idSolo = await ordenSoloDelDuplicado(901n);
+    await explosionarOrden(sesion(), idSolo, bd()); // snapshot en el color ABSORBIDO
+
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: colorRojo.id, origenes: [colorDuplicado.id] },
+      bd(),
+    );
+
+    const ex = await explosionarOrden(sesion(), idSolo, bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === avioBoton.id);
+
+    expect(boton).toHaveLength(1);
+    expect(boton[0]?.idColorPrenda).toBe(colorRojo.id);
+    // Mismo material, misma cantidad (20 × 6), mismo color real ⇒ NADA cambió.
+    expect(boton[0]?.cantidadAComprar).toBe(120);
+    expect(boton[0]?.diff).toBe('sin-cambio');
+    expect(boton[0]?.diff).not.toBe('nuevo');
+    // Y la orden no se marca como «la receta cambió» por una limpieza de catálogo.
+    expect(ex.huboCambios).toBe(false);
+  });
+
+  it('🔴 el DIFF de la primera explosión post-fusión NO dice «nuevo»: es el mismo material', async () => {
+    // ⚠️ Nació de un MUTANTE SUPERVIVIENTE (ronda 2): sustituir `previos` por `previosCrudos` en
+    // `mrp.ts` dejaba las otras cinco pruebas de esta batería en verde. El comentario del código
+    // promete justo esto — que el snapshot anterior se compare en espacio canónico— y sin la
+    // comparación el renglón viejo (color absorbido) no casaría con el nuevo (color canónico): la
+    // pantalla diría «material NUEVO» y marcaría la receta como cambiada, sobre una orden que no
+    // cambió nada. Lo que se ve es una alarma falsa justo cuando alguien limpia el catálogo.
+    await explosionarOrden(sesion(), idOrdenDosColores, bd()); // deja snapshot con los DOS colores
+
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: colorRojo.id, origenes: [colorDuplicado.id] },
+      bd(),
+    );
+
+    const ex = await explosionarOrden(sesion(), idOrdenDosColores, bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === avioBoton.id);
+
+    expect(boton).toHaveLength(1);
+    // Cambió la CANTIDAD (180 + 120 → 300) porque los dos renglones se plegaron en uno, pero es el
+    // MISMO material del MISMO color: nunca «nuevo».
+    expect(boton[0]?.diff).toBe('cantidad-cambiada');
+    expect(boton[0]?.diff).not.toBe('nuevo');
   });
 
   it('🔴 lo DADO POR CUBIERTO antes de la fusión sigue contando', async () => {

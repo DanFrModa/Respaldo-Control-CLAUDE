@@ -100,7 +100,24 @@ const NAMESPACE_LOCK_NUMERO_PRODUCCION = 20_546;
  * ⚠️ **Orden de los locks:** éste SIEMPRE antes que el de la serie (nunca al revés), que es lo que
  * impide un abrazo mortal entre dos salidas del mismo par de dígitos.
  */
-const NAMESPACE_LOCK_MODELO_POR_COLOR = 20_548;
+export const NAMESPACE_LOCK_MODELO_POR_COLOR = 20_548;
+
+/**
+ * ⭐ fila 0.159 ronda 2 — toma el MISMO lock por desarrollo que {@link
+ * obtenerODerivarModeloDeProduccion}, para quien tenga que tocar `Modelo.idColor` desde fuera.
+ *
+ * Hoy lo usa la FUSIÓN DE COLORES, que repunta esa columna: sin el lock, una fusión concurrente con
+ * una salida a producción del mismo desarrollo choca contra `modelos_linaje_color_unico` y aborta
+ * con un P2002 crudo. Es SEGURO (la transacción se revierte entera, A2) pero feo: dos líneas lo
+ * convierten en una espera. Se exporta la función y no la constante suelta para que el `namespace`
+ * y el `lock` no puedan separarse.
+ */
+export async function bloquearModelosDelDesarrollo(
+  tx: Pick<Tx, '$executeRaw'>,
+  idModeloDesarrollo: number,
+): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_MODELO_POR_COLOR}::int, ${idModeloDesarrollo}::int)`;
+}
 
 /** Un código de producción es SIEMPRE numérico de 5 dígitos (concepto ≥ 2 → nunca empieza en 0). */
 const PATRON_CODIGO_PRODUCCION = /^\d{5}$/;
