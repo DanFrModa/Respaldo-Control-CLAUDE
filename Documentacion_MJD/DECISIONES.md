@@ -12136,7 +12136,6 @@ nuevo **sí** pasan.
 
 ---
 
-<<<<<<< HEAD
 #### (Post-F9.219) — ⭐⭐ CÓMO SE PIDE EL CÁRDIGAN: la receta guarda un NÚMERO PROPIO y la compra lo aplica como RAZÓN (fila 0.156 / v0.129, 7-sep-2026)
 
 Es la **ejecución** de lo que Daniel ya decidió en **§Post-F9.210·6** (*«Número propio, pero hoy no se ve
@@ -12238,6 +12237,30 @@ decidió, en una fila que venía a arreglar otra cosa.
 la mitad que falta para que llevar el cárdigan **como complemento** sea de verdad equivalente a llevarlo
 **suelto** — que es la promesa entera de §Post-F9.214. Anotada también en `HOJA-DE-RUTA.md` §6.
 
+
+##### (g) 🔴 SON **CINCO** PUERTAS, NO CUATRO — lo encontró la revisión, y la lección es la puerta que se enumera sola
+*Corregido en la ronda de corrección; la primera vuelta decía «cuatro».*
+
+Copiar una receta no es una operación: son **cinco**, y cada una es un `createMany`/`create` que
+**enumera sus campos a mano**. Cuatro llevan al complemento a la ORDEN —alta
+(`copiarRecetaDelModelo`), agregar renglón, restaurar y «traer del modelo»— y la quinta lo lleva a
+**otro MODELO**: `modelos/versiones.ts::copiarRecetaAModeloNuevo`, con **dos llamadores reales**
+(`crearVersionDeModelo` y `desarrollo/modelo-en-la-mesa.ts`, el *«copiar un modelo ya desarrollado»*
+que Daniel pidió en la 0.064).
+
+🔴 **Ésa se quedó fuera en la primera vuelta**, y el daño es exactamente el que esta fila vino a
+cerrar: el modelo nuevo nace **sin cárdigan**, sus órdenes vuelven a nacer con el complemento
+pendiente, y **nadie se entera** — omitir un campo en un `createMany` no rompe nada, Prisma escribe
+NULL. El comentario encima de esa misma puerta decía, palabra por palabra, *«misma razón que en
+`copiarBom`»*… y `copiarBom` sí lo copiaba.
+
+📌 **LA LECCIÓN, que vale más que el arreglo: un `createMany` que enumera campos es una puerta que
+hay que CONTAR, y contarlas se hace midiendo, no leyendo.** El reviewer destripó **tres puertas a la
+vez** y la suite entera —241 archivos, 3555 unit, 289 de integración— se quedó **en verde**: sólo la
+del alta estaba medida. Por eso ahora hay **una prueba por puerta**, con su nombre («PUERTA 2 ·
+AGREGAR…»), y no una que las cubra de paso: *una garantía sin su propia prueba no es una garantía,
+aunque el código esté bien escrito.*
+
 ---
 
 - **Aplica en:** versión **0.129**, fila **0.156**. **Fecha:** 2026-09-07.
@@ -12248,7 +12271,6 @@ la mitad que falta para que llevar el cárdigan **como complemento** sea de verd
 
 ---
 
-=======
 #### (Post-F9.217) — ⭐ EL NÚMERO DE PRODUCCIÓN LO PONE DANIEL AL IMPORTAR (7-sep-2026, fila 0.151 / v0.127)
 
 **Daniel, probando el flujo real:** *«me generó el pedido y la OP **sin preguntar el número de modelo
@@ -12308,7 +12330,7 @@ estaba en **cuatro sitios de tres pantallas**, hoy en cero, y también se corrig
 rediseño**, que lo describían como conducta vigente y **mandan sobre la implementación**.
 ⏳ **Queda una, a criterio de Daniel:** la frase sigue en `docs/rediseno/prototipo.html` (un `toast` del
 demo). **Es su mockup**, no una spec en prosa, y editarlo es otro tipo de acto.
->>>>>>> origin/prueba
+
 #### (Post-F9.216) — ⭐ QUÉ ES «EL PRECIO NEGOCIADO» QUE SE VE DESDE FUERA (7-sep-2026, fila 0.153 / v0.126)
 
 **Daniel:** *«dice precio aprobado, **pero dentro de la negociación quedó otro**. Debe de haber

@@ -47,8 +47,14 @@ import {
   generarOCDesdeExplosion,
   previoCompraDesdeExplosion,
 } from '../compras/mrp.js';
-import { copiarRecetaDelModelo } from '../produccion/receta-orden.js';
+import {
+  agregarRenglonReceta,
+  copiarRecetaDelModelo,
+  restaurarRenglonReceta,
+  traerDelModelo,
+} from '../produccion/receta-orden.js';
 import { copiarBom, listarTelasBom, reemplazarTelasBom } from './bom-modelo.js';
+import { copiarRecetaAModeloNuevo } from './versiones.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -67,6 +73,10 @@ const PERM: ClavePermiso[] = [
   'compras.ver',
   'compras.administrar',
   'compras.autorizar',
+  // Las tres puertas de la receta de la ORDEN (agregar / restaurar / traer del modelo) piden esto.
+  'ordenes.ver',
+  'desarrollo.ver',
+  'desarrollo.administrar',
 ];
 
 const sesion = (): SesionUsuario => sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM });
@@ -277,6 +287,96 @@ describe('La orden CONGELA el consumo del complemento (0.156)', () => {
     expect(congelada.consumoPorPrenda.toNumber()).toBeCloseTo(1.2);
     expect(congelada.consumoComplementoPorPrenda?.toNumber()).toBeCloseTo(0.15);
   });
+
+  /**
+   * ⭐⭐ **LAS CINCO PUERTAS, UNA POR UNA.** El complemento sólo llega a la orden si TODAS las
+   * copias del modelo lo llevan, y cada una es un `create`/`update` que enumera sus campos a mano:
+   * omitirlo no rompe nada —Prisma escribe NULL— y el cárdigan **se pierde en silencio**.
+   *
+   * 🔴 Así se coló la QUINTA (`versiones.ts::copiarRecetaAModeloNuevo`) en la primera vuelta de esta
+   * fila: el reviewer destripó tres de las otras cuatro **a la vez** y la suite entera se quedó en
+   * verde. Por eso cada puerta tiene aquí su propia prueba, y no una que las cubra «de paso».
+   */
+
+  /** Deja la orden SIN el renglón de la felpa, para poder volver a meterlo por una puerta. */
+  async function quitarLaFelpaDeLaOrden(idOrden: number): Promise<void> {
+    await cliente.ordenTela.deleteMany({ where: { idOrden, idTela: felpa.id } });
+  }
+
+  /** El consumo de complemento congelado en la orden para la felpa (null = no llegó). */
+  async function complementoCongelado(idOrden: number): Promise<number | null> {
+    const fila = await cliente.ordenTela.findFirstOrThrow({
+      where: { idOrden, idTela: felpa.id },
+    });
+    return fila.consumoComplementoPorPrenda === null
+      ? null
+      : fila.consumoComplementoPorPrenda.toNumber();
+  }
+
+  it('PUERTA 2 · AGREGAR el renglón a la receta de la orden lo hereda del modelo', async () => {
+    await recetaConFelpa(0.15);
+    const idOrden = await crearOrdenConReceta();
+    await quitarLaFelpaDeLaOrden(idOrden);
+
+    await agregarRenglonReceta(
+      sesion(),
+      idOrden,
+      { tipo: 'tela', idTela: felpa.id, consumoPorPrenda: 1.2 },
+      bd(),
+    );
+
+    // El cuerpo lo trajo el cuerpo del PATCH; el complemento sólo puede venir del BOM (H5 del
+    // encabezado de `receta-orden.ts`: lo que el cuerpo no dice, se hereda del modelo).
+    expect(await complementoCongelado(idOrden)).toBeCloseTo(0.15);
+  });
+
+  it('PUERTA 3 · RESTAURAR pisa el complemento con lo que dice el modelo HOY', async () => {
+    await recetaConFelpa(0.15);
+    const idOrden = await crearOrdenConReceta();
+    // Alguien dejó la orden con OTRO número (o sin él): restaurar promete traer el del modelo.
+    const renglon = await cliente.ordenTela.findFirstOrThrow({
+      where: { idOrden, idTela: felpa.id },
+      select: { id: true },
+    });
+    await cliente.ordenTela.update({
+      where: { id: renglon.id },
+      data: { consumoComplementoPorPrenda: null },
+    });
+
+    await restaurarRenglonReceta(sesion(), idOrden, 'tela', renglon.id, bd());
+
+    // Restaurar es «déjalo como el modelo», y el modelo dice 0.15. Dejarlo en NULL habría hecho que
+    // el renglón restaurado NO fuera el del modelo — lo único que ese botón promete.
+    expect(await complementoCongelado(idOrden)).toBeCloseTo(0.15);
+  });
+
+  it('PUERTA 4 · TRAER DEL MODELO lo trae con todo lo suyo, complemento incluido', async () => {
+    await recetaConFelpa(0.15);
+    const idOrden = await crearOrdenConReceta();
+    await quitarLaFelpaDeLaOrden(idOrden);
+
+    await traerDelModelo(sesion(), idOrden, {}, bd());
+
+    expect(await complementoCongelado(idOrden)).toBeCloseTo(0.15);
+  });
+
+  it('🔴 PUERTA 5 · COPIAR LA RECETA A UN MODELO NUEVO (versión / «copiar un modelo ya desarrollado»)', async () => {
+    // 🔴 LA QUE SE ESCAPÓ EN LA PRIMERA VUELTA. Sus dos llamadores son reales
+    // (`crearVersionDeModelo` y `desarrollo/modelo-en-la-mesa.ts`): sin esto el modelo nuevo nace
+    // sin cárdigan y **sus órdenes vuelven a nacer con el complemento pendiente**, en silencio.
+    await recetaConFelpa(0.15);
+    const hijo = await cliente.modelo.create({
+      data: { codigo: 'A-100-V2', descripcion: 'Sudadera v2' },
+    });
+
+    await copiarRecetaAModeloNuevo(cliente, sesion(), modelo.id, hijo.id);
+
+    const heredada = await cliente.modeloTela.findUniqueOrThrow({
+      where: { idModelo_idTela: { idModelo: hijo.id, idTela: felpa.id } },
+    });
+    expect(heredada.consumoPorPrenda.toNumber()).toBeCloseTo(1.2);
+    expect(heredada.consumoComplementoPorPrenda?.toNumber()).toBeCloseTo(0.15);
+  });
 });
 
 describe('La OC del MRP ya no nace con el complemento pendiente (0.156)', () => {
@@ -312,8 +412,12 @@ describe('La OC del MRP ya no nace con el complemento pendiente (0.156)', () => 
       { fechaEntrega: '2026-10-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
-    const lineaPrevia = previa.proveedores[0]?.renglones[0]?.porOrden[0];
-    expect(lineaPrevia?.cantidadComplemento).toBeCloseTo(4.5);
+    const renglonPrevia = previa.proveedores[0]?.renglones[0];
+    expect(renglonPrevia?.porOrden[0]?.cantidadComplemento).toBeCloseTo(4.5);
+    // 🔑 Y EL NOMBRE, que es lo que deja a la pantalla explicar la diferencia. Sin él, la previa
+    // sigue cobrando el cárdigan pero **deja de decir de qué es**: la última pantalla antes de
+    // comprometer el dinero enseñaría una cuenta inexplicada. Lo dice el CATÁLOGO, no la UI.
+    expect(renglonPrevia?.nombreComplemento).toBe('Cardigan');
 
     const resultado = await generarOCDesdeExplosion(
       sesion(),

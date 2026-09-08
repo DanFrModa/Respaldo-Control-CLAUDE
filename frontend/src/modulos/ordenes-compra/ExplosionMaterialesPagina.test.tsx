@@ -1606,10 +1606,13 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     await llegarALaPrevia(plan);
 
+    // 🔴 LA IGUALDAD IMPRESA TIENE QUE SER VERDADERA: (36 + 4.5) × 90 = 3,645. La versión anterior
+    // ponía `36 kg × $90.00 = $3,645.00` con una leyenda al lado explicando la diferencia — una
+    // cuenta falsa con nota al pie, en la pantalla donde se compromete el dinero.
     const linea = screen.getAllByTestId('exp-previa-reparto')[0] as HTMLElement;
-    expect(linea).toHaveTextContent('36 kg × $90.00 = $3,645.00');
-    // 🔑 Y la diferencia queda EXPLICADA, con el nombre que le da el catálogo.
-    expect(linea).toHaveTextContent('incluye 4.5 kg de Cardigan');
+    expect(linea).toHaveTextContent('(36 kg + 4.5 kg de Cardigan) × $90.00 = $3,645.00');
+    // Y NO se imprime la igualdad falsa que había antes.
+    expect(linea).not.toHaveTextContent('36 kg × $90.00 = $3,645.00');
     expect(screen.getByTestId('exp-previa-complemento')).toBeInTheDocument();
   });
 
@@ -1618,6 +1621,9 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     // antes de la fila. Sin esta prueba, pintar la frase siempre pasaría inadvertido.
     await llegarALaPrevia();
     expect(screen.queryByTestId('exp-previa-complemento')).not.toBeInTheDocument();
+    // Y la línea conserva su forma de siempre, sin paréntesis ni sumandos.
+    const linea = screen.getAllByTestId('exp-previa-reparto')[0] as HTMLElement;
+    expect(linea).toHaveTextContent('180 pza × $2.00 = $360.00');
   });
 
   it('⭐ la revisión previa enseña la OC completa, con DE QUÉ OP es cada cantidad', async () => {

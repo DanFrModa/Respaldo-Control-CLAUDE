@@ -71,7 +71,6 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
-<<<<<<< HEAD
 ## 0.129 · 7-sep-2026 · **en prueba** — **La receta ya sabe cuánto cárdigan lleva la felpa, y la compra lo pide sola**
 
 ### Qué se puede hacer ahora que antes no
@@ -83,6 +82,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Que la orden de compra que genera la explosión de materiales salga ya con el cárdigan puesto.** Hasta
   ahora **todas** nacían con esa casilla vacía y había que teclearla a mano, orden por orden, antes de
   poder autorizar la compra. Con la receta capturada, el sistema la calcula solo.
+- **Que el cárdigan viaje también cuando se COPIA un modelo**: al sacar una versión nueva de un
+  modelo, o al «copiar un modelo ya desarrollado» desde la cotización, la receta nueva se lleva el
+  cárdigan igual que se lleva la tela. *(En la primera vuelta de este cambio ese camino se quedaba
+  sin él, en silencio; la revisión lo cazó antes de salir.)*
 - **Y con eso, poder llevar el cárdigan COMO COMPLEMENTO de su tela en vez de darlo de alta como una tela
   aparte.** Se hacía aparte porque la receta no sabía llevarlo — y darlo aparte **rompe en silencio el
   vínculo de LOTE** entre la felpa y su cárdigan, que es justo lo que el aviso de riesgo de tono necesita
@@ -99,9 +102,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   nada; ahora se pide junto con la tela y **su importe entra al total del renglón**. Si no se le capturó
   un precio propio al cárdigan, se cobra **al precio de la tela** (eso ya era así desde antes). **La
   revisión previa —la pantalla que enseña las compras antes de crearlas— ya trae ese total incluido**,
-  así que lo que se ve antes de confirmar es exactamente lo que se va a pedir. Y para que la cuenta
-  cierre a la vista, cada renglón de esa previa **dice cuánto cárdigan lleva**: *«36 kg × $90.00 =
-  $3,645.00 (incluye 4.5 kg de Cardigan)»*.
+  así que lo que se ve antes de confirmar es exactamente lo que se va a pedir. Y la cuenta impresa
+  **cuadra**: el renglón dice *«(36 kg + 4.5 kg de Cardigan) × $90.00 = $3,645.00»*, con el cárdigan
+  dentro de la suma y no como una nota al margen.
 - ⚠️ **Sólo se puede capturar en telas que el CATÁLOGO dice que llevan complemento.** Si una tela no lo
   declara, el campo ni siquiera aparece, y el sistema rechaza el número con un aviso que dice qué hacer:
   declararle el complemento en el catálogo de telas primero. Quién lleva complemento lo decide el
@@ -135,7 +138,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   tela.** El cárdigan aparece en la **revisión previa** y en la orden de compra, que es donde se pide y
   donde se paga; lo que la tabla de faltantes enseña sigue siendo el consumo del cuerpo. Nadie ha pedido
   otra cosa; se dice para que no sorprenda.
-=======
+
 ## 0.127 · 7-sep-2026 · **en prueba** — **El número de producción lo pones tú al importar, y la OP dice de qué desarrollo nació**
 
 ### Qué se puede hacer ahora que antes no
@@ -174,7 +177,6 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **La liga del expediente de Desarrollo NO se hace sola**, y es a propósito: un mismo modelo puede tener
   **un expediente por proyecto**, así que elegirlo automáticamente sería adivinar. Lo que sí se muestra es
   el **linaje**, que es un hecho.
->>>>>>> origin/prueba
 
 ## 0.126 · 7-sep-2026 · **en prueba** — **El precio que se negoció ya se ve desde fuera, al lado del aprobado**
 
