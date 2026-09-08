@@ -37,8 +37,14 @@ function flag(clave: string): string | null {
   return arg === undefined ? null : arg.slice(pref.length);
 }
 
-/** Resuelve la empresa por defecto: la del flag `--empresa` (id o nombre), o la favorita, o la primera. */
-async function empresaPorDefecto(cliente: PrismaClient, ref: string | null): Promise<number> {
+/**
+ * Resuelve la empresa por defecto: la del flag `--empresa` (id o nombre), o la favorita, o la primera.
+ * Exportada porque la reusa el ETL de apertura de SINUBE (fila 0.131) — misma regla, un solo lugar.
+ */
+export async function empresaPorDefecto(
+  cliente: PrismaClient,
+  ref: string | null,
+): Promise<number> {
   if (ref !== null) {
     const comoId = Number(ref);
     if (Number.isInteger(comoId)) {

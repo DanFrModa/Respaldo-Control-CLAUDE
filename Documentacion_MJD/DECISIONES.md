@@ -12136,6 +12136,310 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.221) — ⭐ CON QUÉ PRECIO SE VALÚA EL COMPLEMENTO DE LA TELA (Daniel, 8-sep-2026, fila 0.163)
+
+**La pregunta nació de la 0.156.** Al construir el consumo del complemento se midió que
+`backend/src/dominio/costos/` **no menciona «complemento» ni una sola vez**: el precosto y el costo real
+valúan **sólo el cuerpo**. Mientras el cárdigan se daba de alta como tela suelta entraba al costo por su
+cuenta; desde la v0.129 **puede vivir dentro de su felpa, y ahí su costo desaparece** — y de ese
+precosto sale el precio que se le cotiza al cliente. **Se compra y no se cobra.**
+
+No se construyó de paso **a propósito**: valuarlo exige decidir **con qué precio**, y el único que existe
+es `TelaColor.precioComplemento`, que es **POR COLOR**, mientras que la receta del modelo **no tiene
+color**. Inventar la cascada habría metido una regla de dinero que nadie decidió.
+
+**DECIDIDO — Daniel, textual:**
+
+> *«En la receta. Cuando no sabemos el color. **Ponemos el más caro.** Si ya sabemos el color, **tomamos
+> el que nos piden**.»*
+
+**En los dos niveles del sistema:**
+- **Receta del modelo** (`ModeloTela`, sin color) → el **MÁS CARO** de los `TelaColor.precioComplemento`
+  de esa tela.
+- **Receta congelada de la orden** (`OrdenTela`, con color) → el `precioComplemento` **de ESE color**.
+
+🔑 **Por qué hacía falta una regla, medido:** el **cuerpo** ya tiene una cascada completa
+(`costos/resolucion-precios.ts`, `resolverPrecioTela`, 6 escalones: última compra al proveedor amarrado
+→ amarre con color si `manejaPrecioPorColor` → precio base del amarre → última compra de cualquiera →
+`TelaColor.precio` → `Tela.precioSugerido`) ⇒ para el cuerpo, *«no hay color»* **ya está resuelto**: cae
+a un escalón que no depende del color. **El complemento no tiene NINGUNA cascada.** La regla de Daniel
+**es** su cascada.
+
+📌 **Y una diferencia deliberada, que conviene no leer como incoherencia:** el cuerpo manda por *«el
+precio real más reciente»*; el complemento, por *«el más caro»*. Es **conservador a propósito** — más
+vale cotizar de más y ajustar que cotizar de menos. ⇒ **precosto y costo real pueden diferir en el
+complemento, y con esta regla eso es lo correcto**, no un defecto.
+
+⏳ **Lo único que la regla no cubre, con default del lead:** si **ningún** color de esa tela tiene
+`precioComplemento`, no hay «el más caro» que tomar. **Default: no inventarlo y DECIRLO** —el complemento
+queda sin valuar y el precosto lo avisa— en vez de valuarlo en **0** en silencio, que es exactamente el
+defecto que la 0.163 vino a cerrar. Pendiente de que Daniel lo confirme; **no bloquea construirla**.
+
+- **Aplica en:** fila **0.163**. **Fecha:** 2026-09-08.
+
+---
+
+#### (Post-F9.223) — ⭐ LA CARGA DE APERTURA: QUÉ SE CARGA Y CON QUÉ FECHA (Daniel, 8-sep-2026, fila 0.131)
+
+Daniel subió el listado que SINUBE saca **por proveedor** (BLOOM TEXTILES, 7-sep-2026) y de medirlo
+salieron las reglas. ⚠️ **El archivo NO entra al repositorio** (proveedor real, repo público — fila
+0.123): se midió fuera del árbol y aquí sólo vive lo aprendido.
+
+**Lo que el archivo trae, medido:** 115 renglones = **98 facturas** + 15 complementos de pago + **2 notas
+de crédito**; **68 vivas** por **$3,390,950.87** (cifra que Daniel confirmó), fechas 26-mar → 31-ago-2026,
+todo MXN y PPD, y **2 con abono parcial**. Columnas útiles: Serie · Folio · Fecha · Importe · **Saldo** ·
+Moneda · Estatus pago · **RFC** · Met.Pag. · Tipo fiscal · Monto base · Monto IVA · Ret. ISR · Ret. IVA ·
+**UUID** · Uso CFDI · Fecha alta.
+
+**(a) SÓLO LO VIVO, y se carga el SALDO.** Daniel: *«sólo vamos a meter para cada proveedor las facturas
+que tengan vivas. No tiene caso meter las anteriores»*. ⇒ entran los renglones con `Saldo > 0`; lo
+pagado, los complementos de pago y las notas de crédito saldadas **no**. ⚠️ **Se carga el `Saldo`, NO el
+`Importe`**: hay 2 facturas con abono parcial donde no coinciden, y cargar el importe metería deuda ya
+pagada.
+
+**(b) EL VENCIMIENTO SE CALCULA, no se toma del archivo.** Daniel: *«la fecha de vencimiento mejor la
+calculamos. Esta fecha que trae no es necesariamente lo que está negociado. El trato son 90 días»*.
+⭐ **Medido y le da la razón:** 97 de las 98 facturas tienen **exactamente 90 días** entre `Fecha` y
+`Pago probable`; **una tiene 92** — la desviación manual que él llama *«errores de Lupita»*
+(§Post-F9.186(j)). Calcular da lo mismo en 97 casos **y corrige el que se desvió**.
+
+**(c) EL PLAZO CORRE DESDE LA FACTURA — y el recibo queda para V2.** Él lo planteó (*«la fecha de la
+factura es una cosa y la fecha de recibo es la otra… estrictamente debería correr a partir de la fecha de
+recibo»*) y, al medirse el costo, decidió: *«lo dejamos para V2. No es tan importante… como ya no quiero
+atrasar más V1, por ahora cargamos las facturas con el mismo criterio que SINUBE»*. ⇒ **fila 0.167,
+⏸️ post-V1**. ✅ **Y no cuesta nada hacerlo así: el motor YA lo hace** (`calcularVencimiento`,
+`terceros/cuenta-terceros.ts:164`, es `fecha del documento + diasCredito`).
+📌 Lo medido para cuando se retome: `Fecha alta` va **+6.9 días** de media sobre la factura (mín 0, máx
+30) ⇒ hoy el plazo arranca ~una semana antes de lo pactado. Y queda **una pregunta abierta**: ¿el recibo
+de la **mercancía** (ya existe, R7) o el de la **factura** (hoy sólo `creadoEn`)?
+
+🔴 **(d) DOS TRAMPAS MEDIDAS EN EL ARCHIVO, que el importador tiene que tapar:**
+1. **Las fechas se leen MAL EN SILENCIO.** El archivo usa celdas `t="d"` (fecha ISO 8601 en el XML:
+   `<v>2026-08-31T00:00:00</v>`), válido pero poco común, y **`exceljs` —la librería que el proyecto ya
+   usa— devuelve `1905-07-18` para las 460**. No falla: **devuelve mal**. Sin taparlo, las 68 facturas
+   entrarían fechadas en 1905 y la pantalla de los jueves diría **44 mil días vencidos**. *(Se estuvo a
+   punto de reportarle a Daniel que su exportación estaba rota: era el lector.)*
+2. **La columna «Recepción» NO es la fecha de recibo**: es idéntica al «Pago probable» (factura + 90) en
+   97 de 98. Está **mal etiquetada** y no debe usarse para nada.
+
+🔑 **(e) EL VERDADERO PASO PREVIO NO SON LOS XML: son los `diasCredito`.** Si el vencimiento se calcula,
+**cada proveedor necesita sus días capturados antes de cargar sus saldos**. Bloom = 90, pero no todos
+(hay maquileros con 8 y con 30). ⚠️ **Y hay una trampa de esquema:** `Proveedor.diasCredito` es
+**nullable** y el TSDoc dice *«null o 0 = contado»* ⇒ un proveedor **nunca configurado** se leería como
+contado y sus facturas nacerían **vencidas el día uno**, sin dar error. **El ETL exige `diasCredito`
+EXPLÍCITO**: `null` ⇒ aborta nombrando al proveedor; `0` ⇒ es una decisión válida (contado) y se carga.
+**La ambigüedad `null`/`0` sigue viva en el resto del motor**, como límite conocido: esta fila no la
+resuelve.
+
+📌 **Los XML: sólo los de las facturas vivas, y son opcionales.** El Excel basta para la deuda; los XML
+sirven para que la factura quede completa hacia adelante (amarrar el complemento de pago que llegue
+después). El proveedor se identifica por **RFC**, no por razón social.
+
+- **Aplica en:** fila **0.131**, y abre la **0.167**. **Fecha:** 2026-09-08.
+
+---
+
+#### (Post-F9.224) — LA CARGA DE APERTURA DESDE SINUBE (fila 0.131, 8-sep-2026): cómo se lee el archivo, qué se carga y qué ABORTA
+
+**De dónde nace.** Daniel quiere **apagar SINUBE**, y para eso hay que meter al sistema los **saldos
+vivos de cada proveedor** como movimientos de apertura. Él exporta de SINUBE un listado por proveedor
+(§Post-F9.192(7): *«te voy a mandar un archivo de SINUBE para que veas cómo va a salir la
+información»*), y el lead midió uno real. Las reglas de negocio ya las había dictado él; lo que esta
+sección cierra son **la forma del archivo, los casos que él no nombró, y una guarda que sólo se ve
+midiendo el modelo de datos**.
+
+⚠️ **El motor NO se tocó.** La apertura se inserta con el **modo migración de F9-E6**
+(`src/dominio/terceros/migracion.ts`, D15c): folios en bloque (A3), transacción (A2), inserción por
+lotes, idempotencia por `MapeoMigracion`, el signo por `signoDeOrigen` y el vencimiento por
+`calcularVencimiento` (A1). Lo que se construyó es **el lector del Excel y el mapeo**.
+
+---
+
+##### 🔴 (a) EL ETL EXIGE `diasCredito` EXPLÍCITO — porque cargar sin él NO fallaría
+
+`Proveedor.diasCredito` es **`Int?`** y la semántica documentada del motor dice que **`null` y `0`
+significan lo mismo: contado**. ⇒ un proveedor que **nadie configuró** queda en `null`, el motor lo
+trata como contado, y `calcularVencimiento` le pone **vencimiento = la propia fecha de la factura**:
+**todas sus facturas de apertura nacen vencidas**, con un error de hasta 90 días. Y **no daría ningún
+error**: saldría un número, sólo que equivocado — justo en la pantalla con la que Daniel decide a
+quién le paga (fila 0.121).
+
+**DECIDIDO — la guarda distingue lo que el motor no distingue:**
+- `diasCredito === null` ⇒ **HUECO** ⇒ **aborta nombrando al proveedor** (RFC, id y razón social), sin
+  cargar nada suyo. El ETL exige que **alguien haya decidido** el plazo.
+- `diasCredito === 0` ⇒ **CONTADO DECIDIDO** ⇒ **es válido**: se carga y vence el mismo día.
+
+🔻 **Límite declarado, para que nadie crea que esta fila lo resolvió: la ambigüedad `null`/`0` SIGUE
+VIVA en el resto del motor.** Aquí no se cambió la semántica global, ni `calcularVencimiento`, ni el
+TSDoc del dominio: eso afecta a todo el motor y no era de esta fila. Lo único que hay es un ETL que
+**se niega a apoyarse en ella**.
+
+---
+
+##### (b) LAS REGLAS QUE YA HABÍA DICTADO DANIEL, y cómo quedaron
+
+1. **Sólo lo VIVO** (*«sólo vamos a meter para cada proveedor las facturas que tengan vivas»*) ⇒ se
+   cargan los renglones con **`Saldo > 0`**. Lo pagado, los **complementos de pago** (`Tipo fiscal =
+   Pago`) y las notas de crédito ya aplicadas **no se cargan**.
+2. **Se carga el `Saldo`, NO el `Importe`.** En el archivo real hay **dos facturas con abono parcial**
+   donde no coinciden; cargar el importe metería deuda que ya se pagó. La nota del movimiento dice el
+   importe original y lo abonado, para que se vea de dónde salió la cifra.
+3. **El vencimiento se CALCULA, no se lee del archivo** (*«esta fecha que trae no es necesariamente lo
+   que está negociado. El trato son 90 días»*). ⭐ **Medido, y le da la razón:** 97 de 98 facturas
+   traen exactamente 90 días entre `Fecha` y `Pago probable`; **una trae 92** — la desviación manual
+   que calcular corrige.
+4. **El plazo corre desde la FECHA DE LA FACTURA**, no desde el recibo — él lo planteó y lo aparcó
+   (*«lo dejamos para V2… por ahora cargamos con el mismo criterio que SINUBE»*). Es lo que el motor
+   ya hacía: **cero código**.
+5. ⚠️ **La columna «Recepción» del archivo NO es la fecha de recibo**: es idéntica al «Pago probable»
+   en 97 de 98 renglones. Está **mal etiquetada** y **no se usa para nada**.
+
+---
+
+##### (c) LOS CASOS QUE LA FILA NO CERRABA — decididos por el lead, con default, ⏳ pendientes de ratificación
+
+| # | Caso | Default tomado | Por qué |
+|---|---|---|---|
+| **P1** | Una **nota de crédito con saldo vivo** (`Tipo fiscal = Egreso`) | **Se carga**, como `nota_credito` (abono, resta) | En SINUBE una nota **aplicada** queda en saldo 0; si su saldo es > 0 es que **no está aplicada a ninguna factura**, así que cargarla no duplica nada. **Dejarla fuera sí haría daño**: el saldo saldría más alto que en SINUBE y se pagaría de más. ⚠️ Descansa en cómo entiende SINUBE su columna `Saldo`: **si Daniel dice que ya viene neteada, hay que quitarlas** |
+| **P2** | El **origen** del movimiento de apertura | `factura_proveedor` para el Ingreso · `nota_credito` para el Egreso — **no** un origen «apertura» aparte | Son facturas de verdad, con su CFDI y su UUID. Inventar un origen sintético las sacaría de las vistas fiscales y del aging que ya existen |
+| **P3** | El **mismo UUID en dos archivos** | **No pasa nada**: la 2ª corrida lo cuenta como *existente* | Doble red ya construida: `MapeoMigracion` (clave `uuid:<UUID>`) **y** la unique global de `MovimientoTercero.uuidCfdi`. Y el UUID se guarda **en mayúsculas**, para que el mismo comprobante no se cuele dos veces por una diferencia de caja entre SINUBE y el importador de XML |
+| **P4** | El **mismo UUID dos veces en el MISMO archivo** | **ABORTA** nombrando el UUID y sus filas | Escoger uno «a ojo» podría duplicar o partir un saldo en silencio |
+| **P5** | Un renglón en **moneda que no son pesos** | **ABORTA** nombrándolo | `MovimientoTercero` **no tiene columna de moneda**: cargarlo sería guardar un número en la unidad equivocada, sin que nada lo diga. Se aceptan `MXN`/`MXP`/`MN`/`PESOS`; **la celda vacía tampoco se supone MXN** |
+| **P6** | Un CFDI **cancelado en el SAT** con saldo > 0 | **Se descarta** (no aborta), contado en el cuadre con su suma. ⚠️ La lista de valores que cuentan como cancelado es **EXACTA** — ver (f.2) | Un comprobante cancelado no crea deuda. Es contradictorio con el saldo, así que **sale listado**, nunca en silencio |
+| **P7** | `Estatus pago` dice **«Pagada»** pero queda saldo | **Se carga el saldo** y sale un **aviso** | Manda la regla 2 (el saldo), pero la contradicción se enseña |
+| **P8** | Un renglón vivo **sin fecha, sin RFC o sin UUID** | **ABORTA** | Sin fecha no hay antigüedad; sin RFC no hay proveedor (se identifica **por RFC**, no por razón social); sin UUID no hay clave que haga la carga re-corrible |
+| **P9** | Un `Tipo fiscal` que no sea Ingreso/Egreso/Pago, o un **saldo negativo** | **ABORTA** | No se inventa una interpretación para un dato que nadie ha visto |
+
+---
+
+##### (d) TODO O NADA, y el aviso cuando ya no se puede
+
+**Ningún renglón se escribe hasta que TODAS las guardas duras pasan**: el script junta los problemas
+del archivo **y** los del catálogo, los imprime **todos juntos** (para arreglarlos de una pasada, no
+uno por corrida) y **termina en 1 sin haber tocado la base**. Está medido contra Postgres: tras un
+aborto, `movimientos_tercero` queda en **cero** — no sólo el proveedor culpable.
+
+⚠️ **Lo que SÍ puede quedar a medias, dicho en vez de callado:** una vez empezada la escritura, el
+cargador por lotes es **tolerante a propósito** (un bloque que revienta no tumba al resto). Antes,
+eso se veía como una corrida exitosa. Ahora el ETL **cuenta los renglones que no se pudieron
+escribir**, saca un aviso grande y **sale en 1**; volver a correrlo retoma lo que falta (es
+idempotente). El caso real que lo dispara está documentado en `migracion/README.md`: **un folio ya
+ocupado**.
+
+---
+
+##### (e) LA TRAMPA TÉCNICA, MEDIDA: `exceljs` lee mal las fechas de SINUBE
+
+SINUBE guarda las fechas en celdas **`t="d"`** (fecha ISO 8601 dentro del `<v>`, ECMA-376 §18.18.11).
+Es válido y poco común, y **`exceljs` 4.4.0 —la librería que el proyecto ya usa— no implementa ese
+tipo**: su `cell-xform.js` cae al `default:` y hace `parseFloat("2026-08-31T00:00:00")` = **2026**,
+que con estilo de fecha se convierte en **`1905-07-18`**.
+
+🔴 **No lanza: devuelve mal.** Sin taparlo, las **460 fechas** del archivo real entrarían en 1905 y la
+pantalla de antigüedad diría **~44 mil días vencidos**, con un número y sin un error.
+
+**Cómo se tapó:** `exceljs` sigue leyendo la estructura (hojas, `sharedStrings`, estilos) y sólo las
+celdas `t="d"` se **re-leen del XML crudo** y se superponen por dirección de celda
+(`migracion/comun/xlsx-fechas-iso.ts`). Es la superficie mínima: ni se reimplementa un lector de
+XLSX, ni se toca la librería. El XLSX es un ZIP, y se abre con `node:zlib` **en vez de sumar una
+dependencia**: `jszip`/`unzipper` sólo están en el árbol como dependencias **transitivas** de
+`exceljs`, y colgar el ETL de un paquete que nadie declaró es una avería esperando a un `npm i`.
+
+🔻 **Y la puerta de atrás del mismo defecto, cerrada de paso:** una celda `t="d"` cuyo contenido NO se
+pueda leer **no cae al valor de `exceljs`** — se registra como **«sin fecha»**, y el renglón, si está
+vivo, aborta por eso. La primera versión hacía `fechaDelXml ?? fechaDeExceljs`, y con eso un
+`<v>2026</v>` dentro de una celda `t="d"` —el valor exacto que produce el 1905-07-18— habría vuelto a
+entrar, esta vez **sin que ninguna prueba lo estuviera mirando**. La decisión se toma con `has()`, no
+con el valor, y hay una prueba con ese caso.
+
+---
+
+##### (f) LO QUE CAMBIÓ EN LA RONDA DE CORRECCIÓN — dos errores de dinero, en direcciones opuestas
+
+La revisión independiente comprobó lo de arriba pieza por pieza y **rechazó** por tres cosas que
+tocan la cifra. Ninguna era cara; las tres estaban en la parte que **decide qué es dinero vivo**.
+
+**(f.1) 🔴 EL ORDEN DE LAS CARGAS IMPORTA, y ahora está escrito.** La apertura y el importador de CFDI
+(`etl-cfdi-masivo.ts`) escriben en la **misma** tabla y comparten la **unique global del `uuidCfdi`**:
+el que llegue segundo **no toca** el movimiento que ya existe. Y **cargan cifras distintas a
+propósito**: el importador mete el **TOTAL del comprobante**; la apertura, el **SALDO** que queda vivo.
+⇒ si el importador entra primero, una factura de 50 000 con 30 000 ya abonados se queda en la cuenta
+**por 50 000**, y la apertura la cuenta como «ya existía» sin corregir nada: **deuda que ya se pagó,
+sin un solo error en pantalla**.
+
+**DECIDIDO:** la **apertura va PRIMERO**, y el `README.md` de migración lo dice en los dos sitios donde
+alguien lo va a leer. Además, el ETL **avisa** cuando encuentra UUID que ya existían (*«conservan su
+importe, NO el saldo de SINUBE»*) y el cuadre **grita** con la línea *«Diferencia contra el archivo»*
+en cuanto la suma de la base no le cuadra a la del archivo. Antes esa diferencia salía como **un
+número más en la lista**, sin decir que era una alarma.
+
+**(f.2) 🔴 «Cancelable» NO es «cancelado» — se estaba tirando deuda VIVA.** El descarte del CFDI
+cancelado (P6) comparaba **por subcadena**: cualquier `Estatus en SAT` que contuviera «cancel» se
+caía de la carga. El SAT usa, para comprobantes **perfectamente vigentes**, los valores **«Cancelable
+sin aceptación»**, **«Cancelable con aceptación»** y **«No cancelable»** — que dicen si el comprobante
+*se podría* cancelar, no que lo esté. ⇒ deuda real fuera de la cuenta, **y encima etiquetada como
+«CFDI CANCELADO»**: el motivo del descarte mentía, así que ni revisando el cuadre se veía.
+
+**DECIDIDO:** la lista de valores cancelados es **EXACTA** (`cancelado`, `cancelada`, y sus variantes
+`con`/`sin aceptación`). Y ante **cualquier otro** valor que contenga «cancel» y no esté en la lista,
+el ETL **ABORTA nombrándolo** — el mismo criterio que un `Tipo fiscal` o una `Moneda` desconocidos
+(P9/P5): **no se adivina el vocabulario de un archivo que nadie ha visto**. Suponerlo vigente sería
+el mismo pecado en la otra dirección.
+
+⚠️ **Y eso incluye a los tres «Cancelable…»/«No cancelable»: tampoco se cargan solos.** El ETL **se
+para y los enseña**; no los descarta (que era el defecto) ni los da por buenos por su cuenta. Se
+cargan cuando alguien confirme qué significan y quede escrito aquí. Hoy **la única lista que existe
+en el código es la de cancelados**; si hiciera falta una de vigentes, se crea con su decisión al
+lado, para que nadie la ensanche a ojo.
+
+✅ **MEDIDO SOBRE EL ARCHIVO REAL (el lead, 8-sep), y baja el susto:** en el listado que Daniel subió
+(BLOOM TEXTILES, 7-sep) la columna `Estatus en SAT` tiene **un solo valor distinto en los 115
+renglones: «Vigente»**. ⇒ **con exportaciones como la medida, la corrida del día del arranque no
+debería pararse por esto.** ⚠️ **Es UN proveedor y UN día**: la guarda se queda igual —su valor es que
+avise en vez de adivinar—, pero el temor concreto no se materializa en la única evidencia real que
+existe. *(Comprobación de un minuto, repetible sobre cualquier archivo nuevo: listar los valores
+distintos de esa columna.)*
+
+**(f.3) 🔴 Un `Saldo` que no se puede leer ya no vale CERO.** Si la celda del saldo traía algo que no
+es un número, el lector lo daba por vacío y el renglón se descartaba como **«saldo 0 = ya pagada»**:
+una factura viva desaparecía de la carga por un formato raro, contada en el cuadre bajo un motivo que
+**no era el suyo**. ⚠️ **Y había algo peor, que se vio midiendo:** la limpieza de la cifra quitaba las
+comas, así que un `1.234,56` (formato europeo) se convertía en `1.23456` — un número **finito y
+creíble**: el ETL no habría fallado, habría cargado **un peso con veintitrés centavos** donde había
+mil doscientos treinta y cuatro.
+
+✅ **Y la pregunta abierta, contestada para este archivo (el lead, 8-sep):** los **115 saldos del
+listado real son numéricos**, sin una sola celda de texto ⇒ el caso no ocurre hoy. **Sigue en pie para
+Daniel** —es un proveedor y un día—, y la guarda se queda: su valor es que un formato raro **se pare y
+se enseñe** en vez de convertirse en un peso con veintitrés centavos.
+
+**DECIDIDO:** el lector distingue **la celda vacía** (→ se descarta como saldada, con su motivo) de
+**la celda con algo ilegible** (→ **ABORTA nombrando el renglón y lo que traía**, para corregirlo en
+el origen). Sólo se aceptan las dos formas inequívocas: `1234.56` y `1,234.56`. **Nada ambiguo se
+interpreta.**
+
+⏳ **PREGUNTA ABIERTA PARA DANIEL (no bloquea):** *¿el `Saldo` sale SIEMPRE numérico de SINUBE, o hay
+renglones con texto («N/D», «—», un importe entre paréntesis)?* En el archivo medido salieron todos
+numéricos, así que hoy la guarda no se dispara nunca. Si él dice que SÍ aparece texto y qué significa,
+se convierte en regla; mientras tanto **aborta**, que es la única respuesta honesta.
+
+---
+
+##### (g) LO QUE LA REVISIÓN ENSEÑÓ SOBRE LAS PRUEBAS (y que vale para cualquier fila)
+
+**Las tres alarmas del cuadre estaban ESCRITAS pero no MEDIDAS.** El reviewer rompió a propósito el
+contador de cargos sin vencimiento, la línea de la diferencia y el descarte de los cancelados: las
+pruebas **siguieron en verde**, porque ninguna corrida llegaba nunca a un estado que las encendiera.
+Una alarma que nunca se dispara en las pruebas no está probada: está **escrita**. Ahora cada una
+tiene una prueba que **fabrica** ese estado (un cargo sin vencimiento, un UUID previo con otro
+importe, un movimiento cancelado) y las tres roturas la tumban.
+
+**Y el hermano del mismo error:** la prueba de la celda de fecha vacía «pasaba» sin medir nada, porque
+en el listado de SINUBE **no hay dos columnas de fecha pegadas** — lo que se heredaría es un texto,
+que produce el mismo vacío que el comportamiento correcto. La herencia de una fecha ajena sólo se ve
+con dos celdas `t="d"` **contiguas**, así que la prueba escribe esa hoja en crudo.
+
+- **Aplica en:** versión **0.131**, fila 0.131. **Fecha:** 2026-09-08.
 #### (Post-F9.222) — ⭐⭐ LOS COLORES DUPLICADOS SE PUEDEN FUSIONAR AUNQUE YA ESTÉN EN ÓRDENES (fila 0.159 / v0.130, 8-sep-2026)
 
 **De dónde nace.** De la pantalla de Daniel: dos renglones de etiqueta que decían

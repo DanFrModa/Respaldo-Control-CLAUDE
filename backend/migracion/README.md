@@ -72,7 +72,9 @@ npx tsx --env-file=.env migracion/cuadre-f7.ts   # costos + indicadores
 #    (Regla 2 — arrancan del conteo físico, no del histórico). Lo demás sí debe cuadrar.
 
 # ❌ NO se corren: etl-ipt (PT) ni etl-telas (telas) — ver la Regla 2.
-# F9 (etl-terceros-saldos / etl-cfdi-masivo) NO sale de Access: va cuando llegue el corte de SINUBE.
+# F9 (etl-terceros-saldos / etl-apertura-sinube / etl-cfdi-masivo) NO sale de Access: va cuando llegue
+#    el corte de SINUBE, que Daniel saca EL DÍA DEL ARRANQUE (§Post-F9.201·2). Ver la sección
+#    «Apertura de saldos desde SINUBE (fila 0.131)» más abajo.
 ```
 
 **Por qué `export` y no `ETL_DESDE=2025 npx tsx …` comando por comando:** si se olvida en UNO SOLO, ese ETL migra el histórico completo y **desalinea a todos los demás** — carga filas que apuntan a proveedores depurados, o mete al kardex partidas de hace años que ningún otro ETL trajo. Un interruptor, una vez, para toda la sesión. Verifícalo con `echo $ETL_DESDE` antes de empezar; además **cada ETL imprime la ventana que aplicó** en sus primeras líneas de log (desde el 11-ago-2026 lo hacen los ONCE, no solo seis: faltaban `etl-produccion`, `etl-calidad`, `etl-costos`, `etl-ruta-critica`, `etl-historico-ordenes` y la línea de consola de `etl-telas`), así que si un reporte dice "Ventana temporal: DESACTIVADA", ese ETL corrió mal. **La única excepción es `etl-historico-ordenes`**: imprime la ventana con el aviso de que **la ignora a propósito** (existe para guardar lo que ella deja fuera), así que ahí "DESACTIVADA" o no da igual — no cambia lo que carga.
@@ -139,9 +141,18 @@ npx tsx --env-file=.env migracion/cuadre-f7.ts             # F7: cuadre (conteos
 
 # F9 (Finanzas) — saldos iniciales de terceros + CFDI históricos. ⚠️ NO desde Access: la fuente es
 # el corte de SINUBE / export del contador. Se pasa el archivo/carpeta por flag (tras `--`):
-npx tsx --env-file=.env migracion/etl-terceros-saldos.ts -- --archivo=saldos.csv   # F9: saldos iniciales CxC/CxP (aperturas)
+npx tsx --env-file=.env migracion/etl-terceros-saldos.ts -- --archivo=saldos.csv   # F9: saldos iniciales CxC/CxP (aperturas, CSV flexible)
 npx tsx --env-file=.env migracion/etl-cfdi-masivo.ts     -- --dir=./cfdi-historicos # F9: importación masiva de CFDI (XML)
 npx tsx --env-file=.env migracion/cuadre-f9.ts           -- --archivo=saldos.csv    # F9: cuadre (corte vs aperturas cargadas)
+
+# Fila 0.131 — APERTURA DESDE EL LISTADO DE SINUBE (XLSX). Es la MISMA carga de aperturas que la de
+# arriba, pero leyendo el archivo que Daniel exporta de SINUBE. SIEMPRE el ensayo en seco primero.
+# 🔴 Y SIEMPRE ANTES de `etl-cfdi-masivo.ts`: comparten la clave (el UUID) y la idempotencia es
+#    global, pero la apertura carga el SALDO VIVO y el cargador de CFDI el TOTAL del comprobante ⇒
+#    al revés queda deuda ya pagada. Ver la sección «Apertura de saldos desde SINUBE» más abajo.
+npx tsx --env-file=.env migracion/etl-apertura-sinube.ts    -- --archivo=sinube.xlsx --simular
+npx tsx --env-file=.env migracion/etl-apertura-sinube.ts    -- --archivo=sinube.xlsx
+npx tsx --env-file=.env migracion/cuadre-apertura-sinube.ts -- --archivo=sinube.xlsx  # sólo el cuadre
 
 # Post-F9 (archivo histórico de órdenes + directorio de terceros) — ⚠️ DESPUÉS de `etl-catalogos`:
 npx tsx --env-file=.env migracion/etl-historico-ordenes.ts # §Post-F9.26/27/29: las 5,451 órdenes viejas + §Post-F9.43(e): su habilitación (OrdenesHab) + §Post-F9.28: la libreta de terceros
@@ -383,6 +394,8 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/etl-terceros-saldos.ts`      | **F9: saldos iniciales** de CxC/CxP (corte SINUBE → aperturas vía modo migración del motor; por lotes; `-- --archivo=<csv>`)                                                                                                         |
 | `migracion/etl-cfdi-masivo.ts`          | **F9: importación masiva de CFDI** (carpeta de XML → reusa E3/E4; compra/venta por RFC de empresa; `-- --dir=<carpeta>`)                                                                                                             |
 | `migracion/etl-historico-ordenes.ts`    | **Post-F9: archivo histórico de órdenes** (las 5,451 del viejo, con `empresaV1` — §Post-F9.26/27/29), **su HABILITACIÓN** (`OrdenesHab`, 28,432 renglones con el avío en TEXTO — §Post-F9.43(e), V1-E3d) **+ directorio histórico de terceros** (§Post-F9.28). ⚠️ Va DESPUÉS de `etl-catalogos`: sin sus mapeos se niega a correr. Si el archivo ya estaba cargado SIN la habilitación, **re-correrlo la completa** |
+| `migracion/etl-apertura-sinube.ts`      | **Fila 0.131: apertura de saldos desde el listado de SINUBE** (XLSX de 53 columnas → aperturas vía el modo migración de F9-E6; `--simular` para el ensayo en seco; `-- --archivo=<xlsx>`)                                        |
+| `migracion/cuadre-apertura-sinube.ts`   | **Fila 0.131: cuadre de esa apertura** (leídos/cargados/descartados con su motivo + Σ saldos + cargos sin vencimiento; sólo lee; `-- --archivo=<xlsx>`)                                                                 |
 | `migracion/cuadre-f9.ts`                | **F9: cuadre** (saldo esperado del corte vs Σ aperturas cargadas; descuadres listados; `-- --archivo=<csv>`)                                                                                                                         |
 | `migracion/cuadre.ts`                   | Cuadre F1 (conteos v1 CSV vs v2)                                                                                                                                                                                                     |
 | `migracion/cuadre-fase.ts`              | Cuadre por fase                                                                                                                                                                                                                      |
@@ -392,6 +405,89 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/analisis/catalogo-tallas.ts` | Análisis (read-only): catálogo de cadenas `Ordenes.Tallas` con frecuencia                                                                                                                                                            |
 
 Todos: `npx tsx --env-file=.env migracion/<script>.ts`.
+
+## Apertura de saldos desde SINUBE (fila 0.131)
+
+**Qué es.** Meter al sistema los **saldos vivos de cada proveedor** que hoy viven en SINUBE, como
+movimientos de apertura, para poder apagarlo. La fuente es el **XLSX que Daniel exporta de SINUBE**:
+una hoja, encabezados en la fila 1, **53 columnas** (el ETL las busca **por nombre**, no por posición).
+
+⚠️ **NO SE HA CORRIDO.** Daniel decidió (§Post-F9.201 punto 2) que **el corte real se saca el día del
+arranque** — uno anterior se desactualiza. El ETL está construido y probado con un fixture sintético.
+
+🔴 **EL ORDEN IMPORTA, Y NO ES REVERSIBLE: la apertura de SINUBE va ANTES de `etl-cfdi-masivo.ts`.**
+Los dos cargadores identifican el comprobante por el **mismo UUID**, y la idempotencia es **global**:
+el que corre primero fija el importe y el segundo no toca nada. Pero **no cargan lo mismo** — la
+apertura carga el **saldo VIVO** y `etl-cfdi-masivo` el **TOTAL del CFDI** —, así que el orden decide
+la cifra. Y Daniel pidió (§Post-F9.201·5) que **también** se importen los XML vivos, o sea que los dos
+van a tocar **las mismas facturas**.
+
+⚠️ **Al revés mete deuda que ya se pagó.** Medido: CFDI previo de 50 000 + SINUBE dice 20 000 ⇒ la
+apertura reporta `creados=0 existentes=1`, **la cuenta se queda en 50 000** y lo único que lo delata
+es la línea `Diferencia contra el archivo` del cuadre (que por eso ahora sale marcada en rojo cuando
+no es 0.00, y el reporte lo dice aparte). Si ya corriste el cargador de CFDI, **el cuadre es
+obligatorio antes de dar la apertura por buena**.
+
+```bash
+# 1) ENSAYO EN SECO — lee, valida TODO y saca el cuadre sin escribir nada. Hazlo siempre primero.
+npx tsx --env-file=.env migracion/etl-apertura-sinube.ts -- --archivo=sinube.xlsx --simular
+
+# 2) La carga de verdad (idempotente: se puede re-correr sin duplicar).
+npx tsx --env-file=.env migracion/etl-apertura-sinube.ts -- --archivo=sinube.xlsx [--empresa=<id|nombre>]
+```
+
+**Qué espera del archivo** (columnas por su nombre exacto): `Fecha` · `Saldo` · `RFC proveedor` ·
+`Tipo fiscal` · `UUID` · `Moneda` son **obligatorias** (si falta alguna, no arranca). Usa además
+`Serie` · `Folio` · `Razón social proveedor` · `Importe` · `Estatus pago` · `Estatus en SAT`.
+⚠️ **`Pago probable` y `Recepción` NO se usan**: la segunda está mal etiquetada (es idéntica a la
+primera en 97 de 98 renglones del archivo real).
+
+**Qué carga.** Sólo lo **vivo** (`Saldo > 0`), y carga **el `Saldo`, no el `Importe`**. `Tipo fiscal =
+Ingreso` → cargo (`factura_proveedor`); `Egreso` → nota de crédito (abono). El **vencimiento lo
+calcula el motor** (fecha de la factura + `Proveedor.diasCredito`), nunca se lee del archivo.
+
+**Qué ABORTA la corrida (sin escribir NADA, y nombrando todos los casos de golpe):**
+
+| Causa | Cómo se arregla |
+| --- | --- |
+| **Proveedor sin `diasCredito` capturado** (`null`) | Captúrale los días de crédito. **`0` = contado es una respuesta válida**; lo que no vale es el hueco, porque haría nacer sus facturas ya vencidas sin dar ningún error |
+| RFC del archivo que no está en el catálogo | Da de alta al proveedor con su RFC |
+| Dos proveedores con el mismo RFC | Deja uno solo |
+| Moneda que no sean pesos (o vacía) | `MovimientoTercero` no guarda moneda; decide qué hacer con esos renglones |
+| Mismo UUID dos veces en el archivo | Quita el duplicado |
+| Saldo negativo · `Tipo fiscal` desconocido · renglón vivo sin fecha, sin RFC o sin UUID | Corrige el renglón en el origen |
+| **`Saldo` ILEGIBLE** (hay algo en la celda pero no es un número: `N/D`, `1.234,56`, `(500)`…) | Corrígelo en el origen. No se lee como «saldado»: de ese renglón **no se sabe cuánto se debe** |
+| **`Estatus en SAT` con «cancel» que no está en la lista de cancelados** | Dime cuál es; si de verdad significa cancelado se añade a la lista |
+
+**Qué se descarta (no aborta) y sale contado en el cuadre:** complementos de pago (`Tipo fiscal =
+Pago`), documentos con saldo 0 o con la celda **de verdad vacía**, y **CFDI cancelados en el SAT**,
+reconocidos por una **lista EXACTA**: `Cancelado`/`Cancelada`, con o sin aceptación (mayúsculas y
+acentos dan igual).
+
+⚠️ **Cualquier OTRO estatus que contenga la palabra «cancel» ABORTA la corrida nombrándolo** — sin
+excepciones, incluidos **«Cancelable sin aceptación»**, **«Cancelable con aceptación»** y **«No
+cancelable»**, que son comprobantes **VIGENTES** (dicen si el CFDI *se podría* cancelar, no que lo
+esté). La corrida se para a propósito: antes se comparaba **por subcadena** y esos tres se caían de
+la carga **etiquetados como cancelados**, así que **deuda viva desaparecía** con un motivo que además
+mentía. Y darlos por vigentes por nuestra cuenta sería el mismo error al revés. **Si te para con uno
+de éstos:** averigua qué significa **antes de tocar nada**. Si de verdad es un cancelado, se añade a
+`ESTATUS_SAT_CANCELADO` (en `loaders/sinube-apertura.ts`) y se descarta como los demás. Si resulta
+ser un estatus **vigente**, la decisión es de negocio y hoy **no hay lista de vigentes**: hay que
+crearla y dejar escrito el porqué en `DECISIONES.md` — precisamente para que nadie la ensanche a ojo.
+
+**Qué reporta.** El cuadre trae: renglones leídos (y cuántos de cada `Tipo fiscal`) · cargados ·
+**descartados por motivo, con la suma que se queda fuera** · ⭐ **la suma de saldos cargada** (la cifra
+que se compara contra el archivo) · el efecto neto en la cuenta · lo que quedó en la base por
+proveedor · y **cuántos cargos quedaron sin fecha de vencimiento, que debe ser 0**. Cada corrida deja
+un `reporte-etl-apertura-sinube-*.txt`.
+
+🔴 **Si la corrida termina en 1 diciendo «LA CARGA QUEDÓ INCOMPLETA»**, es que algún bloque no se pudo
+escribir — casi siempre por un **folio ya ocupado** (ver la red de seguridad más arriba). No canta
+victoria a medias: corre `reparar-secuencias.ts` y vuelve a lanzarlo, que es idempotente.
+
+🔒 **Los archivos reales NO entran al repositorio** (es público; cicatriz de la fila 0.123). El fixture
+de las pruebas es **sintético** (`__fixtures__/sinube-apertura.ts`) pero reproduce la estructura real,
+incluidas las celdas de fecha `t="d"` que `exceljs` lee mal — ver `comun/xlsx-fechas-iso.ts`.
 
 ## Fotos masivas (`--fotos-modelos`)
 

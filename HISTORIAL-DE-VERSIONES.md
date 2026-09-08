@@ -71,6 +71,84 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.131 · 8-sep-2026 · **en prueba** — **La máquina para meter los saldos de SINUBE queda lista (y se cazó un error que habría fechado todas las facturas en 1905)**
+
+### Qué se puede hacer ahora que antes no
+
+- **Cargar los saldos vivos de cada proveedor desde el archivo que sale de SINUBE**, para poder apagarlo.
+  El sistema lee ese Excel tal como viene (una hoja, 53 columnas), se queda **sólo con lo vivo** y mete
+  cada factura pendiente **con su fecha**, para que la antigüedad de saldos funcione desde el primer día.
+- **Ver antes de tocar nada qué se va a cargar**: hay un **ensayo en seco** que lee el archivo, lo revisa
+  entero y saca la hoja de cuentas —cuántos renglones traía, **cuántos se cargan**, **cuántos se
+  descartan y por qué**, y **la suma de saldos**— sin escribir una sola línea en el sistema. Esa suma es
+  la que se compara contra el archivo para saber que cuadró.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Se carga el SALDO, no el importe de la factura.** Si a una factura ya le abonaste una parte, entra
+  sólo lo que falta. Cargar el importe metería deuda que ya está pagada.
+- ⭐ **La fecha de vencimiento la calcula el sistema** (fecha de la factura + los días de crédito del
+  proveedor), **no la toma del archivo**. Es lo que pediste: *«esa fecha que trae no es necesariamente lo
+  que está negociado; el trato son 90 días»*. Y midiendo el archivo real te da la razón: de 98 facturas,
+  **97 traen exactamente 90 días y una trae 92**.
+- ⭐⭐ **Si a un proveedor no le has capturado los días de crédito, la carga NO se hace y te dice quién
+  es** (con su RFC y su razón social). Suena severo y es a propósito: sin ese dato sus facturas
+  **nacerían todas vencidas** —hasta 90 días de error— y **no saldría ningún error**, sólo un número
+  equivocado en la pantalla con la que decides a quién pagas. Ojo con la diferencia: **«contado» (0 días)
+  sí es una respuesta válida**; lo que no vale es dejarlo en blanco.
+- **Es todo o nada.** Si hay algo que el sistema no puede representar bien —un RFC que no está en el
+  catálogo, un proveedor sin plazo, una factura en dólares, un mismo comprobante repetido— **no carga
+  nada** y te enseña **la lista completa de golpe**, para que lo arregles de una sola pasada en vez de
+  descubrir un problema por corrida.
+- **Lo que se queda fuera se queda fuera contado, nunca en silencio:** los recibos de pago, lo ya saldado
+  y las facturas **canceladas en el SAT** salen listadas en la hoja de cuentas, con su suma.
+- **Se puede volver a correr sin miedo.** El sistema reconoce cada comprobante por su folio fiscal, así
+  que una segunda corrida no duplica nada: retoma lo que faltaba.
+- ⭐ **Primero se carga esto y DESPUÉS los XML.** Los dos meten facturas en la misma cuenta y el sistema
+  reconoce cada comprobante por su folio fiscal: el que llegue segundo **no toca** lo que ya está. Y no
+  cargan lo mismo — el archivo de SINUBE trae **lo que falta por pagar**; los XML traen el **total de la
+  factura**. Si se hace al revés, una factura a la que ya le abonaste queda dentro **por su total**: deuda
+  ya pagada, sin que nada se queje. El orden está escrito donde se corre, la carga **te avisa** si
+  encuentra comprobantes que ya estaban, y la hoja de cuentas **te lo marca en rojo** si su suma no le
+  cuadra a la de tu archivo.
+- ⚠️ **«Cancelable» no es «cancelada».** El SAT le pone a las facturas **vivas** etiquetas como
+  *«Cancelable sin aceptación»* o *«No cancelable»* —dicen si se *podría* cancelar, no que lo esté—. El
+  sistema las estaba tirando de la carga **como si estuvieran canceladas**: deuda de verdad fuera de la
+  cuenta, y encima listada bajo un motivo equivocado, así que ni revisando la hoja se veía. Ya sólo
+  descarta las que de verdad dicen *cancelada*; y con cualquier otra etiqueta que lleve esa palabra
+  —esas tres incluidas— **se para y te la enseña** en vez de decidir por su cuenta. ⚠️ **Ojo el día que
+  se corra:** si tu archivo trae esas etiquetas, la carga se va a detener la primera vez; me dices qué
+  significan, se anota, y de ahí en adelante pasa sola. Preferí eso a que el sistema decidiera por sí
+  mismo en cualquiera de las dos direcciones.
+- ⚠️ **Si el saldo de un renglón no se entiende, la carga se para y te dice cuál.** Antes se tomaba como
+  vacío y la factura se descartaba **como si estuviera pagada**. Peor: un saldo escrito al estilo europeo
+  (`1.234,56`) se podía convertir en **1.23** sin que nada fallara. Ahora sólo se aceptan las formas que
+  no admiten duda, y cualquier otra cosa detiene la corrida señalando el renglón.
+- 🔴 **Y un error que casi se cuela sin hacer ruido:** SINUBE guarda las fechas en un formato poco común,
+  y la librería con la que el sistema lee Excel **lo lee mal sin avisar**: devolvía **18 de julio de
+  1905** para todas y cada una de las 460 fechas del archivo. No fallaba: devolvía mal. De haberse
+  quedado así, la pantalla de antigüedad habría dicho **44 mil días vencidos** para todo. Ya está
+  corregido, y hay una prueba que lo vigila para que no vuelva en silencio.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Esto todavía NO se ha corrido con datos de verdad, y es el plan, no un descuido.** Quedamos en que
+  **el corte de SINUBE se saca el día del arranque**, porque uno anterior se desactualiza. Lo que hay
+  ahora es la máquina lista y probada.
+- 🔧 **Lo que hace falta el día que se corra:** (1) el corte de SINUBE; (2) que **todos los proveedores
+  del archivo estén en el catálogo, con su RFC y con sus días de crédito**; (3) correr primero el ensayo
+  en seco y comparar la suma contra el archivo; (4) correrlo de verdad.
+- **Faltan por medir los otros archivos**: los Excel de estados de cuenta *con* y *sin* factura que
+  quedaste en mandar aparte. Para ésos ya hay un cargador de formato flexible; si su forma no encaja,
+  habrá que medirla igual que se midió ésta.
+- **Nueve decisiones se tomaron con un valor por omisión y esperan tu visto bueno** (están todas en
+  `DECISIONES.md`). La que más conviene que mires: **una nota de crédito que todavía tenga saldo se carga
+  y resta**, porque en SINUBE una nota ya aplicada queda en cero. **Si me dices que ese saldo ya viene
+  descontado de la factura, hay que dejarlas fuera.**
+- ⏳ **Y una pregunta suelta, que no frena nada:** ¿el **saldo** sale **siempre como número** en el
+  archivo de SINUBE, o hay renglones con texto («N/D», un guion, un importe entre paréntesis)? En el
+  archivo que mandaste salieron todos numéricos. Mientras no lo digas, si aparece uno raro **la carga se
+  detiene y te lo enseña**, que es la única respuesta honesta.
 ## 0.130 · 8-sep-2026 · **en prueba** — **Los colores repetidos por fin se pueden juntar, aunque ya estén en órdenes**
 
 ### Qué se puede hacer ahora que antes no
