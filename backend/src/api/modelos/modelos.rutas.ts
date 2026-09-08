@@ -221,6 +221,8 @@ function aTelaBomSalida(
     idTela: t.idTela,
     nombre: t.nombre,
     consumoPorPrenda: t.consumoPorPrenda,
+    nombreComplemento: t.nombreComplemento,
+    consumoComplementoPorPrenda: t.consumoComplementoPorPrenda,
     paraPreCosto: t.paraPreCosto,
     paraProduccion: t.paraProduccion,
     paraCosto: t.paraCosto,

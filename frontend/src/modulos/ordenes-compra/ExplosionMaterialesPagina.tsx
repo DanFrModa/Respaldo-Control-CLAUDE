@@ -2462,9 +2462,30 @@ function RevisionPrevia({
                       data-testid="exp-previa-reparto"
                       data-se-escribe={l.seEscribe ? 'si' : 'no'}
                     >
-                      Orden {l.folioOrden}: {formatearCantidad(l.cantidad)}
-                      {r.unidad === null ? '' : ` ${r.unidad}`} × {formatearMoneda(l.precio)} ={' '}
-                      {formatearMoneda(l.importe)}
+                      {/* ⭐⭐ 0.156 (§Post-F9.219) — EL CÁRDIGAN, DENTRO DE LA CUENTA.
+                          🔴 **La igualdad que se imprime tiene que ser VERDADERA**, y ésta es la
+                          pantalla donde se compromete el dinero. El importe de la línea ya incluye
+                          el complemento (la tela se compra con su cárdigan y su importe suma al
+                          subtotal), así que dejar `36 kg × $90.00 = $3,645.00` imprimía una cuenta
+                          FALSA —36 × 90 son 3,240— y una leyenda al lado no la arregla: la explica.
+                          Por eso el cárdigan entra en el PARÉNTESIS del multiplicando, y se nombra
+                          con lo que dice el catálogo («Cardigan»), nunca con la palabra genérica. */}
+                      Orden {l.folioOrden}:{' '}
+                      {typeof l.cantidadComplemento !== 'number' ||
+                      typeof r.nombreComplemento !== 'string' ? (
+                        <>
+                          {formatearCantidad(l.cantidad)}
+                          {r.unidad === null ? '' : ` ${r.unidad}`}
+                        </>
+                      ) : (
+                        <span data-testid="exp-previa-complemento">
+                          ({formatearCantidad(l.cantidad)}
+                          {r.unidad === null ? '' : ` ${r.unidad}`} +{' '}
+                          {formatearCantidad(l.cantidadComplemento)}
+                          {r.unidad === null ? '' : ` ${r.unidad}`} de {r.nombreComplemento})
+                        </span>
+                      )}{' '}
+                      × {formatearMoneda(l.precio)} = {formatearMoneda(l.importe)}
                       {l.seEscribe ? null : ' — no alcanza el mínimo: esta orden no lleva línea'}
                     </li>
                   ))}

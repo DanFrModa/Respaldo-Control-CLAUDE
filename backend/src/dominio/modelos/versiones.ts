@@ -484,11 +484,20 @@ export async function copiarRecetaAModeloNuevo(
     // El AMARRE de precio (R17, `idTelaProveedor`) viaja con el renglón: heredar la receta y
     // perder el proveedor amarrado dejaría a la versión costeando con el precio genérico sin
     // avisar (misma razón que en `copiarBom`).
+    //
+    // ⭐⭐ 0.156 — Y por la MISMA razón viaja `consumoComplementoPorPrenda`. 🔴 **Ésta es la QUINTA
+    // puerta del complemento, y la que se quedó fuera en la primera vuelta**: este `createMany`
+    // lista los campos uno por uno, así que omitir el cárdigan no rompe nada — Prisma escribe NULL
+    // y **la versión nueva nace sin él, en silencio**. Sus dos llamadores son reales
+    // (`crearVersionDeModelo` y `desarrollo/modelo-en-la-mesa.ts`, el «copiar un modelo ya
+    // desarrollado» de la 0.064), y el daño es exactamente el que esta fila vino a cerrar: las
+    // órdenes del modelo nuevo vuelven a nacer con el complemento PENDIENTE.
     await tx.modeloTela.createMany({
       data: telas.map((t) => ({
         idModelo: idHijo,
         idTela: t.idTela,
         consumoPorPrenda: t.consumoPorPrenda,
+        consumoComplementoPorPrenda: t.consumoComplementoPorPrenda,
         paraPreCosto: t.paraPreCosto,
         paraProduccion: t.paraProduccion,
         paraCosto: t.paraCosto,

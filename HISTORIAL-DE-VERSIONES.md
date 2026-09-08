@@ -71,6 +71,73 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.129 · 7-sep-2026 · **en prueba** — **La receta ya sabe cuánto cárdigan lleva la felpa, y la compra lo pide sola**
+
+### Qué se puede hacer ahora que antes no
+
+- **Capturar en la receta cuánto lleva el CÁRDIGAN** —o el complemento que sea— de cada tela. El campo
+  está **al lado del consumo de la tela, a la vista, sin abrir nada**, y se llama como el catálogo diga
+  que se llama ese complemento («Cardigan»), no «complemento» a secas. Era literalmente lo que faltaba:
+  *«no se ve el campo de la segunda tela para meter la info. Sólo se ve el campo de la tela principal»*.
+- **Que la orden de compra que genera la explosión de materiales salga ya con el cárdigan puesto.** Hasta
+  ahora **todas** nacían con esa casilla vacía y había que teclearla a mano, orden por orden, antes de
+  poder autorizar la compra. Con la receta capturada, el sistema la calcula solo.
+- **Que el cárdigan viaje también cuando se COPIA un modelo**: al sacar una versión nueva de un
+  modelo, o al «copiar un modelo ya desarrollado» desde la cotización, la receta nueva se lleva el
+  cárdigan igual que se lleva la tela. *(En la primera vuelta de este cambio ese camino se quedaba
+  sin él, en silencio; la revisión lo cazó antes de salir.)*
+- **Y con eso, poder llevar el cárdigan COMO COMPLEMENTO de su tela en vez de darlo de alta como una tela
+  aparte.** Se hacía aparte porque la receta no sabía llevarlo — y darlo aparte **rompe en silencio el
+  vínculo de LOTE** entre la felpa y su cárdigan, que es justo lo que el aviso de riesgo de tono necesita
+  para poder decir *«éstas dos vinieron del mismo rollo»*.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Cuánto cárdigan pide la compra sale de una PROPORCIÓN, no de las piezas.** Si la receta dice
+  1.2 kg de felpa y 0.15 kg de cárdigan por prenda, y la compra acaba pidiendo **480 kg** de felpa —porque
+  ya había algo en almacén, o porque el comprador ajustó la cantidad—, se piden **60 kg** de cárdigan: los
+  que le tocan a esos 480. El cárdigan **viaja con su felpa** (mismo renglón, mismo proveedor, mismo
+  lote), así que sigue al cuerpo. *(Es una decisión que se tomó con un default; ver abajo.)*
+- ⚠️ **El TOTAL de esa orden de compra sube, y está bien.** Antes el cárdigan iba en blanco y no sumaba
+  nada; ahora se pide junto con la tela y **su importe entra al total del renglón**. Si no se le capturó
+  un precio propio al cárdigan, se cobra **al precio de la tela** (eso ya era así desde antes). **La
+  revisión previa —la pantalla que enseña las compras antes de crearlas— ya trae ese total incluido**,
+  así que lo que se ve antes de confirmar es exactamente lo que se va a pedir. Y la cuenta impresa
+  **cuadra**: el renglón dice *«(36 kg + 4.5 kg de Cardigan) × $90.00 = $3,645.00»*, con el cárdigan
+  dentro de la suma y no como una nota al margen.
+- ⚠️ **Sólo se puede capturar en telas que el CATÁLOGO dice que llevan complemento.** Si una tela no lo
+  declara, el campo ni siquiera aparece, y el sistema rechaza el número con un aviso que dice qué hacer:
+  declararle el complemento en el catálogo de telas primero. Quién lleva complemento lo decide el
+  catálogo; **cuánto lleva**, la receta.
+- ⚠️ **No es obligatorio, y no capturarlo deja todo igual que antes.** Las recetas que ya existen no
+  cambian: su orden de compra sigue naciendo con el cárdigan pendiente y el sistema lo sigue pidiendo
+  antes de dejar autorizar. **No se tocó ni un dato existente.**
+- ⚠️ **Dejar el campo en blanco NO es lo mismo que poner cero.** En blanco significa «no se ha
+  capturado»; un cero diría «esta tela no lleva cárdigan», que es otra cosa — y el sistema no lo acepta.
+- ✅ **Dar de alta un cárdigan como tela independiente SIGUE FUNCIONANDO IGUAL.** No se quitó nada: hay
+  cárdigans especiales que se compran así, y ese camino queda intacto. Lo que cambia es que ahora el otro
+  camino —el bueno para el control de la tela— ya es posible.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Una pregunta para Daniel, con su default:** cuando la compra pide **menos** felpa de la calculada
+  (porque ya había en almacén, o porque se ajustó la cantidad), ¿el cárdigan debe **bajar en la misma
+  proporción** —como quedó hecho— o debe pedirse **completo**, el de todas las piezas? *Default: baja en
+  proporción*, porque los dos se compran en el mismo renglón y llegan en el mismo lote.
+- 📌 **El campo se captura en la receta del MODELO.** En la receta congelada de una orden ya se ve
+  reflejado en lo que se compra, pero **ahí todavía no se puede corregir a mano** para una orden suelta:
+  si hay que cambiarlo, se cambia en el modelo. Nadie lo ha pedido; se dice para que no sorprenda.
+- 🔴 **FALTA LA OTRA MITAD, y conviene saberlo antes de empezar a usarlo: el COSTO del cárdigan no entra
+  en el precosto.** El sistema costea la prenda con el consumo de la **tela**, y nunca supo costear
+  complementos. Mientras el cárdigan se daba de alta como una tela aparte, entraba al costo por su cuenta;
+  **si se mueve a complemento, su costo se cae del precosto** — y de ese precosto sale el precio que se le
+  cotiza al cliente, así que el número quedaría **más bajo de lo real**. No se hizo en esta versión porque
+  hace falta decidir antes **con qué precio se valúa el cárdigan** (hoy el único precio que existe es por
+  COLOR, y la receta del modelo todavía no tiene color). **Recomendación: arreglarlo antes de arrancar.**
+- 📌 **La TABLA de la explosión de materiales —la de arriba, la del «qué falta»— sigue contando sólo la
+  tela.** El cárdigan aparece en la **revisión previa** y en la orden de compra, que es donde se pide y
+  donde se paga; lo que la tabla de faltantes enseña sigue siendo el consumo del cuerpo. Nadie ha pedido
+  otra cosa; se dice para que no sorprenda.
 ## 0.128 · 7-sep-2026 · **en prueba** — **Los maquileros por fin tienen antigüedad: la pantalla de los jueves dice cuántos días lleva vencido cada quien**
 
 ### Qué se puede hacer ahora que antes no

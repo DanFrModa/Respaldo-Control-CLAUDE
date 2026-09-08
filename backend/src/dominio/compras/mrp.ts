@@ -3056,6 +3056,24 @@ async function planearCompra(
    * una mutación que sobrevivió porque el guard que quitaba nunca podía ser falso).
    */
   const delPlan: RenglonDelPlan[] = [];
+
+  // ⭐⭐ 0.156 — EL COMPLEMENTO (el cárdigan de la felpa) se resuelve AQUÍ, en el PLAN, y no en la
+  // generación. 🔑 **La razón es la invariante de la previa** (§Post-F9.85): el importe de una línea
+  // se calcula «con la MISMA regla que `aCompraSalida` usa para el subtotal», y ese subtotal es
+  // `cantidad × precio + complemento × (precioComplemento ?? precio)`. Si el complemento naciera en
+  // la generación, la previa prometería un total MENOR del que la orden de compra acabaría
+  // guardando — exactamente la separación que la revisión previa existe para impedir.
+  const complementos = await razonesDeComplementoPorOrdenYTela(
+    tx,
+    [...porProveedor.values()].flatMap((materiales) =>
+      [...materiales.values()]
+        .filter((acum) => acum.tipo === 'tela')
+        .flatMap((acum) =>
+          acum.integrantes.map((r) => ({ idOrden: r.idOrden, idTela: acum.idMaterial })),
+        ),
+    ),
+  );
+
   const proveedores: PlanProveedor[] = [];
   for (const [idProveedor, materiales] of porProveedor) {
     const renglones: PlanRenglon[] = [];
@@ -3122,6 +3140,16 @@ async function planearCompra(
         const precio = ajustado.precioAjustado
           ? (ajustado.precioUnitario ?? 0)
           : redondearPrecioCompra(r.precioSugerido ?? 0);
+        // ⭐⭐ 0.156 — el COMPLEMENTO de esta línea, calculado UNA vez: lo usan el importe (para que
+        // la previa prometa el mismo total que se va a guardar) y la propia línea (para que la
+        // generación lo copie sin recalcular nada).
+        const complemento =
+          acum.tipo === 'tela'
+            ? cantidadComplementoDeLinea(
+                cantidad,
+                complementos.razones.get(claveComplemento(r.idOrden, acum.idMaterial)),
+              )
+            : null;
         return {
           idRequerimiento: r.id,
           idOrden: r.idOrden,
@@ -3135,10 +3163,16 @@ async function planearCompra(
           // la línea**, exactamente, aunque el comprador haya bajado el total o ya hubiera parte en
           // otra OC. Es la invariante que hace que el papel no se contradiga a sí mismo.
           medidas: repartirDesglose(r.medidas, cantidad),
+          // ⭐⭐ 0.156 — el COMPLEMENTO de ESTA línea. Se calcula aquí (y NO en la generación) para
+          // que la previa y la orden de compra usen **el mismo número**: la generación lo copia tal
+          // cual. `null` = esta línea nace con el complemento pendiente, como todas hasta la 0.156.
+          cantidadComplemento: complemento,
           // Y el importe se calcula con la MISMA regla que `aCompraSalida` usa para el subtotal de
-          // la línea (`redondear2(cantidad × precio)`), llamando a la misma función: si las dos
-          // sumaran distinto, el total prometido y el guardado volverían a separarse.
-          importe: redondear2(cantidad * precio),
+          // la línea (`redondear2(cantidad × precio + complemento × precio)`): si las dos sumaran
+          // distinto, el total prometido y el guardado volverían a separarse. ⭐⭐ 0.156 — el
+          // complemento se valúa **al precio del cuerpo**, porque la OC automática no captura
+          // `precioComplemento` y `aCompraSalida` cae a `precioComplemento ?? precio`.
+          importe: redondear2(cantidad * precio + (complemento ?? 0) * precio),
           // ⭐ V1-E3z — ¿esta línea SÍ se escribe? Es EXACTAMENTE el predicado con el que la
           // generación filtra (`seGuardaComoAlgo`), llamado desde aquí para que la previa no pueda
           // prometer una línea que luego se salta. Se volvió visible al hacer editable la cantidad
@@ -3188,6 +3222,11 @@ async function planearCompra(
         // ⭐⭐ V1-E3u — hasta la ÚLTIMA pantalla antes de comprometer el dinero (§Post-F9.89).
         cantidadEnOcSinColor: elegidoDe(acum),
         material: acum.material,
+        // ⭐⭐ 0.156 — cómo se llama el complemento de esta tela, para que la previa pueda decir de
+        // QUÉ es la cantidad extra que su importe ya incluye (sin el nombre, `36 kg × $90 = $3,645`
+        // sería una cuenta que no cierra a la vista). Lo dice el CATÁLOGO.
+        nombreComplemento:
+          acum.tipo === 'tela' ? (complementos.nombres.get(acum.idMaterial) ?? null) : null,
         unidad: acum.unidad,
         cantidadTotal: total,
         cantidadPropuesta: propuesta,
@@ -3602,6 +3641,130 @@ async function escribirDadosPorCubierto(
   });
 }
 
+/**
+ * ⭐⭐ 0.156 (§Post-F9.214/.219) — **CUÁNTO COMPLEMENTO LLEVA CADA LÍNEA QUE VA A NACER.**
+ *
+ * Hasta esta fila, cada OC que generaba la explosión nacía con el complemento en NULL porque *"el
+ * BOM guarda un solo consumo por tela"*, y alguien lo tecleaba a mano orden por orden antes de
+ * poder autorizarla (`exigirComplementosCapturados`). Ahora la receta SÍ lo trae.
+ *
+ * **Aquí sólo se LEEN los datos**; la regla de si hay razón y cuál es vive en
+ * {@link razonDeComplemento} — pura, y por eso medible sin base de datos. La lectura es UNA consulta
+ * para todos los pares (orden, tela) del plan, con los pares **deduplicados**: nada de N+1 dentro
+ * del bucle que crea las OC, y nada de repetir el mismo par en el `OR` porque un renglón se partió
+ * en varias líneas.
+ */
+async function razonesDeComplementoPorOrdenYTela(
+  tx: Tx,
+  pares: readonly { idOrden: number; idTela: number }[],
+): Promise<ComplementosDelPlan> {
+  const razones = new Map<string, number>();
+  const nombres = new Map<number, string>();
+  const unicos = new Map(pares.map((par) => [claveComplemento(par.idOrden, par.idTela), par]));
+  if (unicos.size === 0) return { razones, nombres };
+
+  const filas = await tx.ordenTela.findMany({
+    where: {
+      OR: [...unicos.values()].map((par) => ({ idOrden: par.idOrden, idTela: par.idTela })),
+    },
+    select: {
+      idOrden: true,
+      idTela: true,
+      consumoPorPrenda: true,
+      consumoComplementoPorPrenda: true,
+      tela: { select: { nombreComplemento: true } },
+    },
+  });
+
+  for (const f of filas) {
+    if (f.tela.nombreComplemento !== null) nombres.set(f.idTela, f.tela.nombreComplemento);
+    const razon = razonDeComplemento(
+      f.tela.nombreComplemento,
+      f.consumoPorPrenda.toNumber(),
+      f.consumoComplementoPorPrenda === null ? null : f.consumoComplementoPorPrenda.toNumber(),
+    );
+    if (razon !== null) razones.set(claveComplemento(f.idOrden, f.idTela), razon);
+  }
+  return { razones, nombres };
+}
+
+/**
+ * Lo que el plan necesita saber del complemento: **cuánto** (la razón por par orden-tela) y **cómo
+ * se llama** (por tela). Los dos salen de la MISMA consulta.
+ *
+ * El nombre no es adorno: el importe de la línea YA incluye el complemento, así que la previa pinta
+ * `36 kg × $90 = $3,645` — una cuenta que **no cierra a la vista** si no se dice de qué es la
+ * diferencia. Con él, la línea puede decir *«incluye 4.5 kg de Cardigan»*.
+ */
+interface ComplementosDelPlan {
+  /** Razón complemento ÷ cuerpo por par (orden, tela). Ausente = esa línea nace pendiente. */
+  razones: Map<string, number>;
+  /** Nombre del complemento por tela, tal como lo dice el CATÁLOGO. Ausente = no lleva. */
+  nombres: Map<number, string>;
+}
+
+/**
+ * ⭐⭐ 0.156 — **¿HAY COMPLEMENTO QUE PEDIR EN ESTE RENGLÓN, Y EN QUÉ PROPORCIÓN?** `null` = no se
+ * pide nada y la línea nace PENDIENTE, como todas hasta esta fila.
+ *
+ * **Las tres puertas, y por qué cada una:**
+ *  1. **La TELA tiene que declarar complemento** (`Tela.nombreComplemento`). Quién lleva
+ *     complemento lo dice el CATÁLOGO, y sólo él: si a una tela se le quitó el complemento después
+ *     de capturarle la receta, el número congelado en la orden ya no significa nada, y mandarlo
+ *     haría que `validarLineas` rechazara la OC entera con un error sobre un renglón que el
+ *     comprador nunca capturó. **Ésta es la puerta que evita romper la generación**, no un adorno.
+ *  2. **La receta congelada de ESA orden tiene que traer el consumo** (`OrdenTela`, nunca el BOM
+ *     del modelo: la orden manda, V1-E3d). NULL = no capturado ⇒ se sigue dejando pendiente,
+ *     exactamente como antes de esta fila. Ésa es la respuesta a *«¿funciona bien cuando el dato NO
+ *     está?»* (REGLA 0-B): sí, se comporta como el sistema de ayer.
+ *  3. **El consumo del CUERPO tiene que ser > 0**, porque lo que se devuelve es una RAZÓN. Con el
+ *     cuerpo en cero la división daría `Infinity` (y con un cuerpo negativo, una cantidad negativa)
+ *     y ese valor viajaría hasta la línea de OC. Hoy la explosión no genera línea para un material
+ *     con consumo cero —no hay nada que comprar—, pero esa protección es de OTRO módulo y de otra
+ *     regla: **la aritmética se defiende sola**, no se apoya en que el llamador de hoy no la
+ *     llame así.
+ *
+ * 🔑 **Por qué una RAZÓN y no `piezas × consumoComplemento`** (§Post-F9.219): la cantidad de cuerpo
+ * de una línea ya pasó por el neteo contra existencias, el reparto entre OP y los ajustes que
+ * tecleó el comprador. El cárdigan **viaja con su felpa**: se compra en el mismo renglón, al mismo
+ * proveedor y —lo que da sentido a todo esto— en el **mismo lote** (`CLAUDE.md` §5). Si se compran
+ * 480 kg de felpa en vez de los 500 calculados, lo que se necesita es el cárdigan de esos 480. Un
+ * requerimiento calculado aparte se separaría de su cuerpo en cuanto alguien tocara una cantidad.
+ */
+export function razonDeComplemento(
+  nombreComplemento: string | null,
+  consumoCuerpo: number,
+  consumoComplemento: number | null,
+): number | null {
+  if (nombreComplemento === null) return null;
+  if (consumoComplemento === null) return null;
+  if (consumoCuerpo <= 0) return null;
+  return consumoComplemento / consumoCuerpo;
+}
+
+/** Clave del mapa de razones: un par (orden, tela) — el mismo par que identifica una línea de OC. */
+function claveComplemento(idOrden: number, idTela: number): string {
+  return `${String(idOrden)}|${String(idTela)}`;
+}
+
+/**
+ * ⭐⭐ 0.156 — la CANTIDAD de complemento de una línea, o `null` si se queda pendiente.
+ *
+ * Se redondea a la escala de la columna (`OrdenCompraLinea.cantidadComplemento Decimal(14,2)`) con
+ * la MISMA función que redondea el cuerpo, y lo que no sobrevive a ese redondeo se deja en `null`:
+ * el esquema exige que la cantidad del complemento sea **positiva**, así que un `0.00` no sólo
+ * sería una compra falsa — reventaría la creación de la OC.
+ */
+export function cantidadComplementoDeLinea(
+  cantidadCuerpo: number,
+  razon: number | null | undefined,
+): number | null {
+  if (razon == null) return null;
+  const crudo = cantidadCuerpo * razon;
+  if (!seGuardaComoAlgo(crudo)) return null;
+  return redondearCantidadCompra(crudo);
+}
+
 export async function generarOCDesdeExplosion(
   sesion: SesionUsuario,
   cuerpo: DatosGenerarOc,
@@ -3626,6 +3789,7 @@ export async function generarOCDesdeExplosion(
     const ordenesCompra: OcGeneradaSalida[] = [];
     /** ⭐⭐ V1-E8e: proveedores que SÍ acabaron con una OC — los únicos cuyas marcas se escriben. */
     const conOc = new Set<number>();
+
     for (const p of plan.proveedores) {
       // ⭐ UNA LÍNEA POR (MATERIAL, OP) — el reparto que sí se guarda (§Post-F9.86).
       const lineas = p.renglones.flatMap((r) =>
@@ -3660,6 +3824,12 @@ export async function generarOCDesdeExplosion(
               orden: m.orden,
             })),
             cantidad: l.cantidad,
+            // ⭐⭐ 0.156 — EL COMPLEMENTO, YA NO PENDIENTE. 🔑 Se COPIA del plan, no se recalcula:
+            // el importe que la previa prometió ya lo incluyó, y recalcularlo aquí sería una
+            // segunda regla que puede separarse de la primera. `null` sigue siendo posible (tela
+            // sin complemento, o receta que no lo capturó) y significa lo de siempre: `autorizarOC`
+            // lo pedirá antes de dejar pasar la orden.
+            cantidadComplemento: l.cantidadComplemento,
             // ⭐ V1-E3u (§Post-F9.89(a)) — LO QUE EL SISTEMA PROPUSO, guardado junto a lo que se
             // pidió. No es decoración: es lo que le deja a la bandeja de autorización decir *"aquí
             // se está pidiendo 30 % más de lo calculado"* sin volver a explotar nada.
@@ -3680,10 +3850,11 @@ export async function generarOCDesdeExplosion(
         lineas,
       };
       // REUSA crearOC (se une a esta tx): folio atómico, auditoría, ligas N:N — sin duplicar nada.
-      // `automatica`: la explosión NO sabe cuánto COMPLEMENTO (Cardigan) lleva una tela que lo
-      // tiene —el BOM guarda un solo consumo por tela—, así que estas OC nacen con el complemento
-      // PENDIENTE en vez de con una cantidad inventada. `autorizarOC` no las deja pasar hasta que
-      // alguien lo capture (§Post-F9.18).
+      // `automatica`: PERMITE dejar el COMPLEMENTO (Cardigan) pendiente, sin obligar a inventarlo.
+      // ⭐⭐ 0.156 — hasta esta fila era SIEMPRE así, porque el BOM guardaba un solo consumo por
+      // tela; ahora la receta lo trae y la línea nace con su cantidad ya calculada. Sigue naciendo
+      // pendiente cuando la receta NO lo capturó (o la tela no lleva complemento), y para ese caso
+      // `autorizarOC` mantiene intacta su guarda (§Post-F9.18): nadie compra media tela.
       const oc = await crearOC(sesion, entrada, { tx }, { automatica: true });
       conOc.add(p.idProveedor);
       ordenesCompra.push({

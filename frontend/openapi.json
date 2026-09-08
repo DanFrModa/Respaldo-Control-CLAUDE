@@ -35183,7 +35183,29 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo de tela por prenda."
+                            "description": "Consumo de tela por prenda. En una tela con complemento, del CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento de la tela (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado."
                           },
                           "paraPreCosto": {
                             "type": "boolean",
@@ -35279,6 +35301,8 @@
                           "idTela",
                           "nombre",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
                           "paraCosto",
@@ -41565,7 +41589,29 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo de tela por prenda."
+                            "description": "Consumo de tela por prenda. En una tela con complemento, del CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento de la tela (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado."
                           },
                           "paraPreCosto": {
                             "type": "boolean",
@@ -41661,6 +41707,8 @@
                           "idTela",
                           "nombre",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
                           "paraCosto",
@@ -41886,6 +41934,18 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "consumoComplementoPorPrenda": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -41947,7 +42007,29 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo de tela por prenda."
+                            "description": "Consumo de tela por prenda. En una tela con complemento, del CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento de la tela (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado."
                           },
                           "paraPreCosto": {
                             "type": "boolean",
@@ -42043,6 +42125,8 @@
                           "idTela",
                           "nombre",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
                           "paraCosto",
@@ -46994,7 +47078,29 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo de tela por prenda."
+                            "description": "Consumo de tela por prenda. En una tela con complemento, del CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento de la tela (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado."
                           },
                           "paraPreCosto": {
                             "type": "boolean",
@@ -47090,6 +47196,8 @@
                           "idTela",
                           "nombre",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
                           "paraCosto",
@@ -111534,6 +111642,17 @@
                                 "material": {
                                   "type": "string"
                                 },
+                                "nombreComplemento": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del complemento de la tela de este renglón («Cardigan»), o null."
+                                },
                                 "unidad": {
                                   "anyOf": [
                                     {
@@ -111627,9 +111746,20 @@
                                         "type": "number",
                                         "description": "Precio unitario con el que nace esa línea."
                                       },
+                                      "cantidadComplemento": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Cantidad del COMPLEMENTO de esta línea, o null si nace pendiente."
+                                      },
                                       "importe": {
                                         "type": "number",
-                                        "description": "cantidad × precio."
+                                        "description": "cantidad × precio (+ el complemento, valuado al precio del cuerpo)."
                                       },
                                       "medidas": {
                                         "type": "array",
@@ -111687,6 +111817,7 @@
                                       "cantidad",
                                       "cantidadPropuesta",
                                       "precio",
+                                      "cantidadComplemento",
                                       "importe",
                                       "medidas",
                                       "seEscribe"
@@ -111709,6 +111840,7 @@
                                 "medidas",
                                 "cantidadEnOcSinColor",
                                 "material",
+                                "nombreComplemento",
                                 "unidad",
                                 "cantidadTotal",
                                 "cantidadPropuesta",

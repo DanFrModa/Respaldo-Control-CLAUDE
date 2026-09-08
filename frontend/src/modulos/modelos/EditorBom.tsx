@@ -73,6 +73,17 @@ interface RenglonComponente {
   detalle: string | null;
   /** Consumo por prenda como texto (`<input type=number>` entrega string). */
   consumo: string;
+  /**
+   * ⭐⭐ 0.156 — cómo se llama el COMPLEMENTO de esta tela ("Cardigan"), o `null` si no lleva. Lo
+   * dice el servidor desde el catálogo (`Tela.nombreComplemento`); la pantalla NO lo adivina, y es
+   * lo único que decide si el segundo campo de consumo existe.
+   */
+  nombreComplemento: string | null;
+  /**
+   * ⭐⭐ 0.156 — consumo del complemento por prenda, como texto. Vacío = sin capturar (viaja como
+   * `null`), y entonces la orden de compra que genere la explosión seguirá pidiéndolo a mano.
+   */
+  consumoComplemento: string;
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
@@ -121,6 +132,9 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
     etiqueta: t.nombre,
     detalle: null,
     consumo: String(t.consumoPorPrenda),
+    nombreComplemento: t.nombreComplemento,
+    consumoComplemento:
+      t.consumoComplementoPorPrenda === null ? '' : String(t.consumoComplementoPorPrenda),
     paraPreCosto: t.paraPreCosto,
     paraProduccion: t.paraProduccion,
     paraCosto: t.paraCosto,
@@ -143,6 +157,9 @@ function aRenglonAvio(a: ModeloAvio): RenglonComponente {
     etiqueta: a.clave,
     detalle: a.descripcion,
     consumo: String(a.consumoPorPrenda),
+    // El complemento es de la TELA (una felpa con su cárdigan): un avío nunca lo tiene.
+    nombreComplemento: null,
+    consumoComplemento: '',
     paraPreCosto: a.paraPreCosto,
     paraProduccion: a.paraProduccion,
     paraCosto: a.paraCosto,
@@ -257,6 +274,10 @@ export function EditorBom({
         etiqueta: tela.nombre,
         detalle: null,
         consumo: '',
+        // ⭐⭐ 0.156 — el catálogo ya dijo si esta tela lleva complemento: el campo aparece desde
+        // que se agrega, sin esperar a guardar.
+        nombreComplemento: tela.nombreComplemento,
+        consumoComplemento: '',
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
@@ -288,6 +309,8 @@ export function EditorBom({
         etiqueta: avio.clave,
         detalle: avio.descripcion,
         consumo: '',
+        nombreComplemento: null,
+        consumoComplemento: '',
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
@@ -313,6 +336,14 @@ export function EditorBom({
         telas: telas.map((r) => ({
           idTela: r.id,
           consumoPorPrenda: Number(r.consumo),
+          // ⭐⭐ 0.156 — vacío = NO capturado, y eso es `null`, no 0: un cárdigan que consume 0 no
+          // existe, y el servidor rechaza el cero por la misma razón. Sólo se manda cuando la tela
+          // declara complemento; si el catálogo se lo quitó, lo tecleado no viaja (el servidor
+          // también lo rechazaría, pero el rechazo hablaría de un campo que ya no se ve).
+          consumoComplementoPorPrenda:
+            r.nombreComplemento === null || r.consumoComplemento.trim() === ''
+              ? null
+              : Number(r.consumoComplemento),
           paraPreCosto: r.paraPreCosto,
           paraProduccion: r.paraProduccion,
           paraCosto: r.paraCosto,
@@ -428,7 +459,7 @@ export function EditorBom({
           guardando={guardarTelas.isPending}
           deshabilitadoGlobal={guardando}
           alGuardar={guardarSeccionTelas}
-          unidadAyuda="Consumo de tela por prenda."
+          unidadAyuda="Consumo de tela por prenda. La tela que lleva complemento (el cárdigan de la felpa) pide el suyo aparte: es un número propio —cuánto cárdigan por prenda—, no un porcentaje de la tela, y es el que la compra usa para pedir los dos juntos."
           selectorAgregar={
             <SelectorTela
               idSeleccionado={undefined}
@@ -721,6 +752,34 @@ function RenglonBom({
             onChange={(e) => alActualizar({ consumo: e.target.value })}
             data-testid={`consumo-bom-${r.id}`}
           />
+          {/* ⭐⭐ 0.156 (§Post-F9.214) — EL SEGUNDO CAMPO, el que Daniel echó de menos: «no se ve el
+              campo de la segunda tela para meter la info. Sólo se ve el campo de la tela
+              principal». Va AQUÍ, en el renglón, y NO en el panel que hay que desplegar: si hubiera
+              que abrirlo para verlo, seguiría sin verse. Se rotula con el nombre REAL del
+              complemento que dice el catálogo ("Cardigan"), nunca con la palabra «complemento». */}
+          {r.nombreComplemento === null ? null : (
+            <div className="mt-1 flex items-center justify-end gap-1.5">
+              <span
+                className="truncate text-[11px] text-muted-foreground"
+                title={`Consumo de ${r.nombreComplemento} por prenda (el complemento de ${r.etiqueta})`}
+              >
+                {r.nombreComplemento}
+              </span>
+              <Input
+                type="number"
+                min={0}
+                step="0.0001"
+                inputMode="decimal"
+                className="h-7 w-24 text-right"
+                placeholder="—"
+                aria-label={`Consumo de ${r.nombreComplemento} (complemento de ${r.etiqueta})`}
+                value={r.consumoComplemento}
+                disabled={!puedeAdministrar || deshabilitadoGlobal}
+                onChange={(e) => alActualizar({ consumoComplemento: e.target.value })}
+                data-testid={`consumo-complemento-bom-${r.id}`}
+              />
+            </div>
+          )}
         </TablaDensaCelda>
         <TablaDensaCelda className="p-0 pr-2">
           {puedeAdministrar ? (
