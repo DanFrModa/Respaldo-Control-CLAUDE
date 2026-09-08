@@ -12193,6 +12193,83 @@ que **la queja de Daniel puede reaparecer ahí**. Fuera del alcance de esta fila
 
 ---
 
+#### (Post-F9.220) — LOS DÍAS VENCIDOS DE LOS JUEVES: cómo se calculan, y las tres decisiones que el lead tomó con default (fila 0.121, 7-sep-2026)
+
+**De dónde viene.** Daniel arma cada jueves un Excel a mano para decidir a quién le paga:
+*«Este archivo lo necesito **todos los jueves**… ahí voy decidiendo qué vamos a pagar y lo voy
+capturando. Me gustaría que **todo eso lo haga directo en el sistema**»*. La presentación ya la cerró
+él en **§Post-F9.218(a)**: *«**Solo con que pongas los días vencidos es suficiente**»* ⇒ un número por
+renglón, sin cubetas. Lo que faltaba —y es lo que esta fila construyó— es que **ese número exista
+para los maquileros**.
+
+### 🔴 LA CAUSA, MEDIDA: no era que el plazo no llegara — es que la deuda de maquila nunca pasa por el motor
+
+`calcularVencimiento()` **sí** se llama al registrar, y **sí** funciona. Lo que pasa es que los cargos
+de maquila **no son movimientos del motor**: viven en las tablas de EsMa (F6), y la convivencia de F9
+las re-expresa **por LECTURA** sin migrarlas (`convivencia-esma.ts`, opción (b) de F9-E1). Esas tablas
+**no tienen columna de vencimiento** —`EsMaCargo` ni siquiera tiene columna de fecha: su fecha es su
+`creadoEn`— así que la proyección escribía `fechaVencimiento: null` **para los cuatro conceptos, a
+mano**, y de ahí salía el «—» que Daniel veía.
+
+⇒ **El arreglo no es guardar una columna: es DERIVARLA al leer.** Fecha del cargo + los días de
+crédito del proveedor, con la MISMA aritmética del motor (`sumarPlazo`, que se extrajo de
+`calcularVencimiento` y vive en `aging-comun.ts`). **No se guarda nada, no se toca ni un movimiento
+ya registrado, y no hay migración** — REGLA 0-B cumplida sin esfuerzo, porque un número derivado no
+tiene pasado que reparar.
+
+🔒 **Y confirma la regla que Daniel dictó:** *«las inconsistencias son errores de Lupita»* ⇒ **el plazo
+es SIEMPRE del proveedor y la fecha se calcula sola.** No hay ni un campo nuevo que teclear: cambiar
+`Proveedor.diasCredito` cambia la antigüedad de toda su deuda, y nada más la cambia.
+
+### ⚠️ LA TRAMPA QUE CASI CUESTA EL ARREGLO: en EsMa el «abono» es un CARGO
+
+`SIGNO_SALDO` (`esma/formula-saldo.ts`) lo dice desde F6: en EsMa **cargo +, abono +, pago −,
+descuento −** — el abono es un **cargo extra al maquilero**. Pero el `abono` del **motor** RESTA. La
+proyección etiqueta los renglones de EsMa con los orígenes del motor, así que preguntarle a
+`calcularVencimiento` —que decide por el ORIGEN— habría devuelto `null` para un abono de EsMa: un
+renglón que **sí** envejece se habría quedado sin edad, en silencio, sólo para ese concepto.
+⇒ **Quién envejece se decide por el SIGNO**, leído de `SIGNO_SALDO`, nunca por la etiqueta. Está
+medido con una mutación (cambiar el signo por la etiqueta pone dos pruebas en rojo).
+
+### ✅ Las TRES decisiones que el lead tomó con default — ⏳ PENDIENTES DE RATIFICACIÓN DE DANIEL
+
+**(a) ¿QUÉ número es «los días vencidos» de un proveedor que debe varias cosas?**
+**Default tomado: los días del cargo MÁS VIEJO que todavía no se ha pagado.** Es el que decide la
+urgencia; un promedio ponderado escondería justo la factura vieja que hay que sacar, y sumar las
+edades no significa nada. Coincide con cómo lo lee él en su archivo (*«BORDA PRINT lleva 8 días»*: una
+edad por beneficiario, no una por factura).
+⚠️ **El matiz honesto:** los pagos **no están amarrados a un cargo concreto** (el motor todavía no liga
+pago↔factura; ya lo advierte `aging-comun.ts`), así que «el más viejo que sigue sin pagarse» hay que
+**suponerlo**. Se supone con **la misma convención que ya usan las cubetas**: los créditos se aplican
+de más viejo a más nuevo. Reusarla es lo que impide que esta columna y la bandeja cuenten historias
+distintas del mismo proveedor. *(Si Daniel prefiriera «el más viejo a secas, aunque ya le haya pagado»,
+es cambiar una línea — pero entonces un proveedor al corriente saldría marcado en rojo para siempre.)*
+
+**(b) ¿Y si debe pero todavía no le vence nada?**
+**Default tomado: TRES estados distintos, que no se colapsan.** `—` = no hay nada que envejecer (no
+debe, o los pagos ya lo cubrieron) · `al día` = debe, pero está dentro de su plazo · `n d` = su cargo
+más viejo lleva `n` días vencido. Un `0` a secas donde debería ir `—` se lee como *«no debe nada»*,
+que es lo contrario de lo que pasa; por eso son tres y no dos.
+
+**(c) ¿Dónde va la columna, y se puede trabajar sobre ella?**
+**Default tomado: en la corrida semanal que ya existe (fila 0.113), NO en una pantalla nueva.** Esa
+pantalla **ya es** la sesión de decisión de los jueves —Daniel la dibujó en §Post-F9.189(f): *«Eso
+puede vivir en la pantalla y de ahí ir llenando la información de pagos»*— y tiene el campo abierto
+para capturar lo que se paga. Construir una segunda relación habría duplicado la que él pidió y
+partido en dos el total que sólo tiene sentido junto. La columna vive **pegada al saldo**, y es la
+**única de referencia que vale igual para un maquilero y para un proveedor**.
+
+📌 **Lo que NO se tocó, a propósito:** el **aging por cubetas** sigue exactamente donde estaba y sigue
+configurable (§Post-F9.218(a) lo pide así). La cubeta «Maquila» de la bandeja de CxP **sigue sin
+repartirse** en las cuatro cubetas: para eso haría falta que EsMa registrara por el motor, y no hacía
+falta para lo que Daniel pidió. ⇒ En la bandeja, `vencido` sigue siendo **sólo del motor**; los días
+vencidos son los que cruzan la frontera.
+
+- **Aplica en:** fila **0.121**, versión **0.129**. Confirma y ejecuta **§Post-F9.218(a)**.
+  **Fecha:** 2026-09-07.
+
+---
+
 #### (Post-F9.218) — TRES RESPUESTAS DE DANIEL: ANTIGÜEDAD, FACTORES Y PERMISOS (7-sep-2026)
 
 Tres preguntas que el lead había dejado abiertas con su default propuesto, contestadas de una vez

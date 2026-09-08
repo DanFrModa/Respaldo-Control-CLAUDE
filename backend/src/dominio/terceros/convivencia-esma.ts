@@ -24,6 +24,7 @@ import type { PrismaClient } from '../../datos/index.js';
 import {
   aporteCargoAlSaldo,
   cuentaAlSaldoPlano,
+  type ConceptoSaldo,
   WHERE_VIVO_ABONO,
   WHERE_VIVO_DESCUENTO,
   WHERE_VIVO_PAGO,
@@ -33,6 +34,7 @@ import {
 } from '../esma/formula-saldo.js';
 import { etiquetaProcesoDelCargo } from '../esma/etiqueta-cargo.js';
 import { esSinFactura, importeGuardadoDe } from '../finanzas/correccion-comun.js';
+import { vencimientoEsMa } from './dias-vencidos.js';
 import { calcularSaldoMaquilero, type SaldoMaquileroCalculado } from '../esma/saldos.js';
 import { saldosEsMaPorMaquilero, type AporteEsMaLote } from '../esma/saldos-todos.js';
 
@@ -119,8 +121,9 @@ export async function aporteEsMaSaldo(
  * (misma fórmula de F6 → no-regresión). Devuelve un Map idProveedor→{saldo, pendiente}: el saldo EsMa
  * (sólo lo REVISADO) y lo capturado que aún espera revisión; entra quien tenga saldo ≠ 0 **o** algo
  * pendiente (§Post-F9.188a: el maquilero con todo sin revisar no desaparece de la bandeja). Vista
- * operativa. El saldo es lo que la bandeja muestra como cubeta "Maquila" (sin antigüedad: los cargos
- * EsMa no traen fecha de vencimiento por ítem — el aging fino llega cuando EsMa registre por el motor).
+ * operativa. El saldo es lo que la bandeja muestra como cubeta "Maquila", que sigue sin repartirse en
+ * las cuatro cubetas del aging. ⭐ Los **días vencidos** de esa maquila sí se calculan desde la fila
+ * 0.121, derivando el vencimiento de cada cargo (`dias-vencidos.ts`).
  */
 export async function aportesEsMaSaldoLote(
   cliente: Tx | PrismaClient,
@@ -172,7 +175,14 @@ export async function proyectarMovimientosEsMa(
   const conNota = (texto: string | null, cuenta: boolean): string | null =>
     cuenta ? texto : `${texto ?? ''} (pendiente de revisión)`.trim();
 
-  const [cargos, abonos, descuentos, pagos] = await Promise.all([
+  const [proveedor, cargos, abonos, descuentos, pagos] = await Promise.all([
+    // ⭐ Fila 0.121 — EL PLAZO ES SIEMPRE DEL PROVEEDOR (Daniel: «las inconsistencias son errores de
+    // Lupita») ⇒ la fecha de vencimiento de un renglón de EsMa se DERIVA de aquí, nunca se teclea.
+    // Se lee en la MISMA consulta paralela que los movimientos: ni una ida más a la base.
+    cliente.proveedor.findUnique({
+      where: { id: idProveedor },
+      select: { diasCredito: true },
+    }),
     cliente.esMaCargo.findMany({
       where: {
         idEmpresa,
@@ -266,6 +276,13 @@ export async function proyectarMovimientosEsMa(
     }),
   ]);
 
+  // ⭐ Fila 0.121 — el plazo del proveedor. Sin plazo capturado, contado (vence el mismo día): la
+  // MISMA convención que `exigirTercero` aplica en el motor.
+  const diasCredito = proveedor?.diasCredito ?? 0;
+  /** El vencimiento derivado de un renglón, en el `YYYY-MM-DD` que usa el contrato (o null). */
+  const vence = (concepto: ConceptoSaldo, fecha: Date): string | null =>
+    vencimientoEsMa(concepto, fecha, diasCredito)?.toISOString().slice(0, 10) ?? null;
+
   const base = (id: number, conFactura: boolean | null) => ({
     fuente: 'esma' as const,
     id,
@@ -274,7 +291,11 @@ export async function proyectarMovimientosEsMa(
     tipoTercero: 'proveedor' as const,
     idTercero: idProveedor,
     tercero: nombre,
-    fechaVencimiento: null,
+    // 🔴 ERA `null` PARA TODO, y ése era el hueco de la fila 0.121: Daniel SÍ envejece a los
+    // maquileros con plazo pactado y el estado de cuenta les enseñaba «—» en la columna de
+    // vencimiento. Cada concepto lo pone abajo con `vence()`; aquí se deja en null como piso porque
+    // los créditos (pago/descuento) no vencen nunca.
+    fechaVencimiento: null as string | null,
     esFiscal: conFactura === true,
     uuidCfdi: null,
     rfcTercero: null,
@@ -305,6 +326,9 @@ export async function proyectarMovimientosEsMa(
     const monto = aporte === null ? null : oculto(aporte);
     filas.push({
       ...base(c.id, c.conFactura),
+      // El cargo de EsMa no tiene columna de fecha propia: su fecha ES `creadoEn` (la misma que
+      // viaja abajo en `fecha`), así que el plazo se cuenta desde ahí.
+      fechaVencimiento: vence('cargo', c.creadoEn),
       origen: 'recibo_maquila',
       monto,
       observaciones:
@@ -331,6 +355,9 @@ export async function proyectarMovimientosEsMa(
       // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
       // —que es, por definición, el caso de lo capturado por error—.
       importeGuardado: importeGuardadoDe(a.monto.toNumber(), puedeVerImportes),
+      // ⚠️ En EsMa el abono SUMA (es un cargo extra al maquilero): sí vence. Quien lo decide es
+      // `SIGNO_SALDO`, no la etiqueta `origen` de aquí abajo —que es la del motor, donde resta—.
+      fechaVencimiento: vence('abono', a.fecha),
       origen: 'abono',
       monto: cuentaA ? oculto(a.monto.toNumber()) : null,
       observaciones: conNota(a.observaciones, cuentaA),
@@ -356,6 +383,9 @@ export async function proyectarMovimientosEsMa(
       // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
       // —que es, por definición, el caso de lo capturado por error—.
       importeGuardado: importeGuardadoDe(d.monto.toNumber(), puedeVerImportes),
+      // Crédito: no vence. Se pregunta igual, en vez de escribir `null`, para que los cuatro
+      // conceptos salgan de la MISMA definición de signos.
+      fechaVencimiento: vence('descuento', d.fecha),
       origen: 'descuento',
       monto: cuentaD ? oculto(-d.monto.toNumber()) : null,
       observaciones: conNota(d.observaciones, cuentaD),
@@ -380,6 +410,8 @@ export async function proyectarMovimientosEsMa(
       // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
       // —que es, por definición, el caso de lo capturado por error—.
       importeGuardado: importeGuardadoDe(p.monto.toNumber(), puedeVerImportes),
+      // Crédito: no vence (ver la nota del descuento).
+      fechaVencimiento: vence('pago', p.fecha),
       origen: 'pago',
       monto: cuentaP ? oculto(-p.monto.toNumber()) : null,
       observaciones: conNota(p.observaciones, cuentaP),

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { TablaDensaCelda, TablaDensaFila } from '@/components/dominio/TablaDensa';
 
-import { ETIQUETA_FORMA, moneda, montoEditable, textoReferencia } from './comun';
+import { ETIQUETA_FORMA, moneda, montoEditable, textoDiasVencidos, textoReferencia } from './comun';
 
 /**
  * ⭐ UN RENGLÓN DE LA PANTALLA DE TRABAJO: el beneficiario, su REFERENCIA al lado, y el campo
@@ -129,6 +129,23 @@ export function RenglonPago({
       {/* Referencia: lo que ayuda a decidir, jamás el número que se paga. */}
       <TablaDensaCelda numerica className="text-muted-foreground">
         {fila.origen === 'concepto' ? '' : moneda(fila.saldo)}
+      </TablaDensaCelda>
+      {/*
+        ⭐ Fila 0.121 — LOS DÍAS VENCIDOS, la única columna de referencia que vale igual para un
+        maquilero y para un proveedor. Va pegada al saldo porque las dos se leen juntas («debe
+        tanto, desde hace tanto»), y lo vencido de verdad se marca para que salte a la vista sin
+        pintar un semáforo por tramos —que es exactamente lo que Daniel dijo que no mira—.
+      */}
+      <TablaDensaCelda
+        numerica
+        data-testid="corrida-dias-vencidos"
+        className={
+          fila.diasVencidos !== null && fila.diasVencidos > 0
+            ? 'font-medium text-destructive'
+            : 'text-muted-foreground'
+        }
+      >
+        {textoDiasVencidos(fila)}
       </TablaDensaCelda>
       <TablaDensaCelda className="text-xs text-muted-foreground">{textoDeApoyo}</TablaDensaCelda>
 
