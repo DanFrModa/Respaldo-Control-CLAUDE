@@ -12213,11 +12213,19 @@ uno. Los sitios que resuelven, y por qué **son ésos y no todos**:
 | `compras/mrp.ts` → `cargarOrden` | La matriz entra en espacio canónico ⇒ los renglones duplicados **colapsan solos** al agruparse y la orden pide **un** renglón de compra con la suma. El snapshot nace ya canónico. |
 | `compras/comprometido-en-oc.ts` → `comprometidoEnOc` | Una OC escrita ANTES de la fusión sigue **neteando** contra la explosión de hoy. Sin esto se volvería a comprar lo ya comprado (§Post-F9.85 resucitado por una limpieza de catálogo). |
 | `compras/dado-por-cubierto.ts` | Un *«con esto queda cubierto»* decidido antes de la fusión **sigue contando**. |
-| `compras/mrp.ts` → snapshot previo, plan de compra y tablero R7 | Los dos lados del cruce en el MISMO espacio: si sólo se resolviera uno, el neteo mentiría. |
+| `compras/mrp.ts` → snapshot previo y plan de compra | Los dos lados del cruce en el MISMO espacio: si sólo se resolviera uno, el neteo mentiría. El **plan** es el que se mide solo: el snapshot puede seguir diciendo el color absorbido si alguien fusiona **entre** la explosión que tiene en pantalla y el clic de comprar, y sin resolver ahí la previa (y `generarOCDesdeExplosion`, que usa el mismo cálculo) volvería a pedir lo que ya viaja en una OC. |
+| `produccion/salida-produccion.ts` → la descripción del modelo que nace | El hijo se llama como el color **que quedó** («Playera · Blanco Hueso»), no como el absorbido. ⚠️ Hoy queda **por debajo** de la guarda de la matriz (b), que rechaza antes una OP nueva con un color apagado; se conserva porque el orden entre las dos guardas no es una garantía. |
 | `compras/color-de-la-tela.ts` | La pantalla pliega los dos renglones en uno **y** el paso 1 de `casar-color-de-tela.ts` (*«la tela ya tiene ese color amarrado»*) vuelve a casar: la fusión repunta `TelaColor` al canónico, así que sin plegar la matriz quedaría comparando el id viejo contra el nuevo. |
 | `modelos/nomenclatura.ts` → `obtenerODerivarModeloDeProduccion` | La llave del linaje se arma con el canónico ⇒ no se estrena un segundo número. |
 
-**Y dónde NO se resuelve, a propósito:** dentro de UNA orden todo cuelga de su propia matriz —el corte,
+**Y dónde NO se resuelve, a propósito:** el **tablero R7** *«qué tengo / qué falta»* de la orden
+(`estatusMaterialesOrden`) **no** resuelve, y llegó a hacerlo por inercia: su cruce es **por material**
+(`tela-5`/`avio-9`) y nunca mira el color —es la decisión (c) de Daniel, *«se compra el color y el
+almacén lo reparte»*—, así que canonizar ahí daba el mismo resultado exacto pagando una consulta de más
+y, peor, se leía como una guarda que hacía creer que el tablero distingue tonos. Se retiró en la **ronda
+3** de esta fila.
+
+Y dentro de UNA orden todo cuelga de su propia matriz —el corte,
 el envío, el recibo, la entrega, el kardex de PT, el auto-avance de la RC—, así que esos módulos comparan
 el id de la orden contra el de sus propios movimientos y **son coherentes entre sí sin ayuda**. Meter el
 canónico ahí no arreglaría nada y rompería esa coherencia. Tampoco se resuelve en los **impresos**: un
@@ -12308,6 +12316,40 @@ error del anillo — que por eso pasó a **nombrar sus dos causas** (ver (g)3).
    captura de colores retirados, y elegir cuáles ofrecer es decisión de producto. Queda como **fila
    0.164**, con una pregunta para Daniel: *¿cada cuánto ajusta o traspasa producto terminado a
    mano?* — de eso depende si sube a bloqueante.
+
+### 🔁 RONDA 3 (la revisión) — dos guardas de esta misma fila que ninguna prueba sostenía
+
+El reviewer no encontró un defecto de comportamiento: encontró **dos líneas de esta fila cuyo mutante
+sobrevivía**, o sea dos promesas escritas en comentarios que ninguna prueba obligaba a cumplir. Y una
+tercera que resultó no prometer nada.
+
+**(h) 🔴 EL PLAN DE COMPRA: la ventana es «fusionar CON LA EXPLOSIÓN YA EN PANTALLA».** Quitar la
+canonización de `planearCompra` dejaba `mrp.int.test.ts` **entero** en verde, porque todas las pruebas
+de la batería explotan la orden **después** de fusionar — y esa explosión ya reescribe el snapshot en
+canónico, así que tapaba el hueco. El caso que de verdad mide la regla es el otro: alguien tiene la
+explosión calculada, se limpia el catálogo, y le da a comprar **sin volver a explotar**. Ahí el
+snapshot sigue diciendo el color absorbido, la OC ya se lee en canónico, y sin poner los dos lados en
+el mismo espacio la previa **vuelve a ofrecer lo que ya viaja en una orden de compra**. No se queda en
+la previa: `generarOCDesdeExplosion` usa el MISMO `planearCompra`, así que la línea duplicada se
+crearía. La prueba nueva reproduce esa secuencia exacta y comprueba las dos mitades —el material sale
+en `omitidos` con `ya-en-oc`, y **no** aparece como renglón a comprar—; con el mutante puesto, las dos
+salen rojas.
+
+**(i) 📌 EL NOMBRE DEL MODELO QUE NACE: correcto, pero HOY INALCANZABLE — y eso se dice.** La
+descripción del hijo se arma con el color canónico (*«Playera · Blanco Hueso»*, no *«…Pantone 14-0002
+Tcx Pumice Stone»*), y tampoco tenía prueba. Al intentar escribirla se midió por qué: **una OP nueva
+con un color absorbido nunca llega a nacer**, porque la guarda (b) la rechaza unas líneas después y la
+transacción entera se va atrás. O sea que la línea **no es equivalente pero sí está a la sombra** de la
+otra mitad de esta misma fila. Comprobado desactivando (b): con la lectura canónica sale el nombre
+corto; con la de antes de la fila, el largo. **Se conserva** —el orden entre las dos guardas no es una
+garantía: (b) perdona a propósito el color que la orden YA tiene, y ese perdón podría alcanzar otra
+puerta— **y su comentario se corrigió**, porque prometía un escenario que otra guarda bloquea. La
+prueba nueva fija lo que **sí** es alcanzable y nadie cubría: por esta puerta el modelo se deriva
+**antes** de validarse la matriz, así que al rechazarse la OP no queda ni el hijo ni la orden (A2).
+
+**(j) ✂️ Y una que era adorno: el tablero R7 dejó de canonizar.** Ver el párrafo *«dónde NO se
+resuelve»* de (c). Un no-op que **aparenta ser una guarda** es peor que no tener nada: cuesta una
+consulta y le miente al siguiente lector sobre lo que el tablero sabe.
 #### (Post-F9.219) — ⭐⭐ CÓMO SE PIDE EL CÁRDIGAN: la receta guarda un NÚMERO PROPIO y la compra lo aplica como RAZÓN (fila 0.156 / v0.129, 7-sep-2026)
 
 Es la **ejecución** de lo que Daniel ya decidió en **§Post-F9.210·6** (*«Número propio, pero hoy no se ve

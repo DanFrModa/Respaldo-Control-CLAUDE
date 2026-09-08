@@ -4709,4 +4709,57 @@ describe('⭐⭐ fila 0.159 — colores duplicados fusionados en la explosión',
     expect(despues[0]?.cantidadEnOc).toBe(120);
     expect(despues[0]?.cantidadPendiente).toBe(180);
   });
+
+  it('🔴 la PREVIA sin re-explotar NO vuelve a ofrecer lo que ya está en OC', async () => {
+    // ⚠️ Nació de un MUTANTE SUPERVIVIENTE (ronda 3): quitar la canonización del PLAN DE COMPRA
+    // (`const filas = await canonizarColorPrenda(filasCrudas, …)` en `planearCompra`, `mrp.ts`)
+    // dejaba en verde `mrp.int.test.ts` ENTERO —las 147 pruebas— porque todas las demás explotan
+    // la orden DESPUÉS de fusionar, y esa explosión ya reescribe el snapshot en canónico.
+    //
+    // 🔴 La ventana que el comentario del código promete cerrar es la OTRA: alguien tiene la
+    // explosión en pantalla, se limpia el catálogo, y le da a comprar SIN volver a explotar. Ahí
+    // el snapshot sigue diciendo el color ABSORBIDO y la OC ya se lee en CANÓNICO: si el plan no
+    // pone los dos lados en el mismo espacio, el neteo no los casa y la previa propone comprar
+    // otra vez lo que ya viaja en una OC. Y no se queda en la previa: `generarOCDesdeExplosion`
+    // usa el MISMO `planearCompra`, así que la línea duplicada se crearía de verdad.
+    const idSolo = await ordenSoloDelDuplicado(902n);
+    const antes = await renglonesDeBoton(idSolo); // snapshot en el color ABSORBIDO
+    expect(antes).toHaveLength(1);
+    expect(antes[0]?.idColorPrenda).toBe(colorDuplicado.id);
+    expect(antes[0]?.cantidadAComprar).toBe(120); // 20 piezas × 6 botones
+    const idsRequerimiento = antes.flatMap((r) => r.idsRequerimiento);
+
+    // 1) Se compra: la OC nace con el id del color absorbido.
+    await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idSolo], idsRequerimiento, fechaEntrega: '2026-09-01' },
+      bd(),
+    );
+
+    // 2) Se limpia el catálogo — con la explosión ya calculada y en pantalla.
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: colorRojo.id, origenes: [colorDuplicado.id] },
+      bd(),
+    );
+
+    // 3) Y AHORA el clic de comprar, SIN volver a explotar: los MISMOS `idsRequerimiento`.
+    const previa = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idSolo], idsRequerimiento, fechaEntrega: '2026-09-01' },
+      bd(),
+    );
+
+    // El botón se queda FUERA, y por la razón correcta: ya está comprado.
+    const omitidos = previa.omitidos.filter((o) => o.material.includes('BOT-01'));
+    expect(omitidos).toHaveLength(1);
+    expect(omitidos[0]?.motivo).toBe('ya-en-oc');
+    expect(omitidos[0]?.cantidadEnOc).toBe(120);
+    // 🔴 Y lo que de verdad duele si falla: NO aparece como renglón a comprar.
+    expect(
+      previa.proveedores
+        .flatMap((p) => p.renglones)
+        .filter((r) => r.tipo === 'avio' && r.idMaterial === avioBoton.id),
+    ).toEqual([]);
+  });
 });

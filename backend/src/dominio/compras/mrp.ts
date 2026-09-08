@@ -3985,16 +3985,21 @@ export async function estatusMaterialesOrden(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
-  const requerimientos = await canonizarColorPrenda(
-    await cliente.requerimientoOrden.findMany({
-      where: { idOrden },
-      include: {
-        tela: { select: { nombre: true } },
-        avio: { select: { clave: true, descripcion: true } },
-      },
-    }),
-    bd,
-  );
+  // ⚠️ fila 0.159 — **AQUÍ NO SE CANONIZA EL COLOR, y es a propósito.** Todas las demás lecturas de
+  // este módulo pasan por `canonizarColorPrenda` porque cruzan `(material, color)` contra otra
+  // fuente y los dos lados tienen que hablar del mismo color. Este tablero **no cruza por color**:
+  // agrupa por `claveMaterial` (`tela-5`/`avio-9`) y `comprometidoEnOc` viene indexado igual — el
+  // porqué está unas líneas abajo, y es la decisión (c) de Daniel. Canonizar aquí salía en el mismo
+  // resultado, exacto, gastando una consulta de más; peor, se leía como una guarda y hacía creer que
+  // el tablero distingue tonos. Si algún día este tablero pasa a ser por color, la canonización
+  // vuelve **junto** con el cruce por color, no antes.
+  const requerimientos = await cliente.requerimientoOrden.findMany({
+    where: { idOrden },
+    include: {
+      tela: { select: { nombre: true } },
+      avio: { select: { clave: true, descripcion: true } },
+    },
+  });
 
   // ⭐ V1-E3q: LA verdad de "cuánto ya está en OC", compartida (`comprometido-en-oc.ts`).
   const porMaterial: Map<string, ComprometidoMaterial> =

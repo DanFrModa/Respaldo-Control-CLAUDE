@@ -332,8 +332,21 @@ async function resolverModeloDeLaOp(
     //
     // ⭐⭐ fila 0.159 — y se lee el **CANÓNICO**, no el color crudo: el modelo que va a nacer lleva
     // la llave del canónico (`obtenerODerivarModeloDeProduccion`), así que su descripción tiene que
-    // decir ESE nombre. Si no, un modelo del color «Blanco Hueso» se llamaría «Blanco Hueso Pantone
-    // 14-0002 Tcx Pumice Stone» por haberse capturado la OP antes de la fusión.
+    // decir ESE nombre; si no, el modelo del color «Blanco Hueso» se llamaría «Blanco Hueso Pantone
+    // 14-0002 Tcx Pumice Stone» — el nombre largo que la fusión vino a retirar, pegado a un modelo
+    // nuevo.
+    //
+    // ⚠️ **Hoy esto NO se puede observar desde fuera, y conviene saberlo antes de tocarlo**: una OP
+    // NUEVA con un color absorbido no llega a nacer, porque `sincronizarMatriz` la rechaza unas
+    // líneas después (*«se fusionó en X: captura la orden con X»*) y la transacción entera se va
+    // atrás — lo prueba `salida-produccion.int.test.ts` («OP con un color ya fusionado…»). Las dos
+    // guardas son de esta misma fila y la de la matriz llega primero, así que ésta queda por debajo.
+    // Se conserva porque **el orden entre las dos no es una garantía**: la de la matriz perdona a
+    // propósito el color que la orden YA tiene (para que una OP vieja siga siendo editable), y el
+    // día que ese perdón alcance a otra puerta, el nombre de aquí seguiría siendo el correcto.
+    // Medido en la ronda 3 desactivando la guarda de la matriz: con `colorCanonico` sale «Playera ·
+    // Blanco Hueso»; con el `findUnique` de antes de la fila, «Playera · Blanco Hueso Pantone
+    // 14-0002 Tcx Pumice Stone». O sea: la línea hace lo que dice, sólo que hoy nadie la alcanza.
     color = await colorCanonico(tx, idColor);
   }
   const descripcion =
