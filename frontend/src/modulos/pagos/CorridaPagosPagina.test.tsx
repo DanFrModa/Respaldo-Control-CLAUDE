@@ -86,6 +86,8 @@ const filaMaquilero = {
   puedeConFactura: false,
   saldo: 12_345,
   vencido: null,
+  // ⭐ Fila 0.121: un maquilero CON días vencidos — antes esta columna no existía para él.
+  diasVencidos: 12,
   porRevisarNeto: 500,
   porRevisarPartidas: 2,
   recibosSemanaImporte: 9_000,
@@ -114,6 +116,7 @@ const detalle: CorridaDetalle = {
           puedeConFactura: false,
           saldo: null,
           vencido: null,
+          diasVencidos: null,
           porRevisarNeto: null,
           porRevisarPartidas: 0,
           recibosSemanaImporte: null,
@@ -268,6 +271,20 @@ describe('la pantalla de trabajo', () => {
     // …y el campo NO los toma: el monto lo decide Daniel (§Post-F9.189(b)).
     const campo = within(seccion).getByLabelText('A pagar a TALLER NORTE');
     expect(campo).toHaveValue(null);
+  });
+
+  it('⭐ los DÍAS VENCIDOS del maquilero se ven en su columna (fila 0.121)', () => {
+    // El hueco que cerró la fila: la maquila no tenía antigüedad y aquí SÍ sale su edad.
+    pintar();
+    const seccion = screen.getByTestId('corrida-seccion-maquila');
+    expect(within(seccion).getByTestId('corrida-dias-vencidos')).toHaveTextContent('12 d');
+    expect(within(seccion).getByRole('columnheader', { name: /Días venc/ })).toBeInTheDocument();
+  });
+
+  it('un concepto no tiene días vencidos: su celda va vacía, no en cero', () => {
+    pintar();
+    const seccion = screen.getByTestId('corrida-seccion-caja_chica');
+    expect(within(seccion).getByTestId('corrida-dias-vencidos')).toHaveTextContent('');
   });
 
   it('un concepto no lleva referencia: nace en cero', () => {

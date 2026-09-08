@@ -11,7 +11,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { FilaCorrida, RenglonCorrida } from '@/api/tipos';
 
-import { montoEditable, moneda, textoReferencia, textoTotales, tieneCaptura } from './comun';
+import {
+  montoEditable,
+  moneda,
+  textoDiasVencidos,
+  textoReferencia,
+  textoTotales,
+  tieneCaptura,
+} from './comun';
 
 /** Un renglón capturado mínimo (los campos que estas reglas miran). */
 function renglon(monto: number | null): RenglonCorrida {
@@ -52,6 +59,7 @@ const filaConReferencia: FilaCorrida = {
   puedeConFactura: false,
   saldo: 12_345,
   vencido: null,
+  diasVencidos: 12,
   porRevisarNeto: 500,
   porRevisarPartidas: 2,
   recibosSemanaImporte: 9_000,
@@ -153,5 +161,39 @@ describe('el formato de dinero', () => {
   it('«—» es el ocultamiento de importes, no un cero', () => {
     expect(moneda(null)).toBe('—');
     expect(moneda(0)).toBe('$0.00');
+  });
+});
+
+describe('⭐ LOS DÍAS VENCIDOS de la fila (0.121, §Post-F9.218(a))', () => {
+  /**
+   * DANIEL: *«Es irrelevante [los tramos]. Ni siquiera veo eso. **Solo con que pongas los días
+   * vencidos es suficiente**.»* Aquí se fija que los tres estados digan cosas DISTINTAS: un «0» a
+   * secas donde debería ir «—» se leería como «no debe nada», que es lo contrario de lo que pasa.
+   */
+  const con = (diasVencidos: number | null): FilaCorrida => ({
+    ...filaConReferencia,
+    diasVencidos,
+  });
+
+  it('un número de días se enseña como número', () => {
+    expect(textoDiasVencidos(con(12))).toBe('12 d');
+    expect(textoDiasVencidos(con(365))).toBe('365 d');
+  });
+
+  it('CERO no es «—»: debe, pero está dentro de su plazo', () => {
+    expect(textoDiasVencidos(con(0))).toBe('al día');
+  });
+
+  it('«—» es «no hay nada que envejecer», y NO se confunde con el cero', () => {
+    expect(textoDiasVencidos(con(null))).toBe('—');
+    expect(textoDiasVencidos(con(null))).not.toBe(textoDiasVencidos(con(0)));
+  });
+
+  it('un concepto del catálogo no tiene cuenta corriente: celda vacía', () => {
+    expect(textoDiasVencidos({ ...con(30), origen: 'concepto' })).toBe('');
+  });
+
+  it('los días NO se cuelan en el texto de referencia (tienen columna propia)', () => {
+    expect(textoReferencia(con(12))).not.toContain('12 d');
   });
 });

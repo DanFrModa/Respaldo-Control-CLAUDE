@@ -54,7 +54,9 @@ import {
  * Excel; y los totales de efectivo/transferencia sólo tienen sentido sobre el conjunto.
  *
  * Lo que CAMBIA por sección son las columnas de REFERENCIA —maquileros: saldo, lo que espera
- * revisión y lo recibido en la semana; proveedores: saldo y vencido; conceptos: nada—. Lo que NO
+ * revisión y lo recibido en la semana; proveedores: saldo y vencido; conceptos: nada—, con una
+ * excepción que la fila 0.121 estrenó: los **días vencidos** valen para las dos secciones, porque
+ * son el único dato de antigüedad que un maquilero tiene. Lo que NO
  * cambia es el campo «a pagar esta semana» y el selector efectivo/transferencia: son iguales en las
  * tres.
  *
@@ -461,6 +463,10 @@ function SeccionRelacion({
             <TablaDensaFila>
               <TablaDensaHead>{esConcepto ? 'Concepto' : 'Beneficiario'}</TablaDensaHead>
               <TablaDensaHead numerica>{esConcepto ? '' : 'Saldo'}</TablaDensaHead>
+              {/* ⭐ Fila 0.121: los días vencidos, lo único que Daniel mira de la antigüedad. */}
+              <TablaDensaHead numerica title="Días que lleva vencido el cargo más viejo sin pagar">
+                {esConcepto ? '' : 'Días venc.'}
+              </TablaDensaHead>
               <TablaDensaHead>
                 {esMaquila ? 'Por revisar · recibió esta semana' : esConcepto ? '' : 'Vencido'}
               </TablaDensaHead>

@@ -67271,6 +67271,8 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
+                  /** @description Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. */
+                  diasVencidos: number | null;
                   /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
                   /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
@@ -67520,6 +67522,8 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
+                  /** @description Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. */
+                  diasVencidos: number | null;
                   /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
                   /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
@@ -67895,6 +67899,8 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
+                  /** @description Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. */
+                  diasVencidos: number | null;
                   /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
                   /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
@@ -68168,6 +68174,8 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
+                  /** @description Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. */
+                  diasVencidos: number | null;
                   /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
                   /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
@@ -68407,6 +68415,8 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
+                  /** @description Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. */
+                  diasVencidos: number | null;
                   /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
                   /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
@@ -68657,6 +68667,8 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
+                  /** @description Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. */
+                  diasVencidos: number | null;
                   /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
                   /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */
@@ -68908,6 +68920,8 @@ export interface paths {
                   saldo: number | null;
                   /** @description Parte vencida del saldo (sólo CxP), o null. */
                   vencido: number | null;
+                  /** @description Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. */
+                  diasVencidos: number | null;
                   /** @description Neto de lo que espera decisión y aún NO suma al saldo (sólo maquila): lo capturado sin revisar más el importe derivado de los cargos propuestos, o null. */
                   porRevisarNeto: number | null;
                   /** @description Cuántas partidas esperan revisión, cargos propuestos incluidos (0 si no aplica). NO es un importe. */

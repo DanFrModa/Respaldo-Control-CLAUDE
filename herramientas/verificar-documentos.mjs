@@ -47,6 +47,37 @@ const leer = (ruta) => readFileSync(join(raiz, ruta), 'utf8');
 const problemas = [];
 const decir = (linea) => process.stdout.write(`${linea}\n`);
 
+// ── 0 · Marcadores de conflicto sin resolver ────────────────────────────────────────────────────
+//
+// Va PRIMERO porque invalida todo lo demás: un archivo a medio mergear no se puede cruzar contra
+// nada. Y nadie más lo caza — el CI no linta markdown, prettier ignora estos archivos y el propio
+// verificador leía «HISTORIAL · primera entrada: 0.128» tan campante con un `<<<<<<< HEAD` tres
+// líneas más arriba.
+//
+// Cicatriz del 8-sep-2026: se resolvió un merge mirando la salida de `git merge` truncada con
+// `tail -8`, así que dos de los cuatro conflictos NO SE VIERON; después se revisaron sólo los
+// archivos que esa salida truncada mencionaba, y un `git add -A` comiteó el historial con sus tres
+// marcadores dentro. Es el archivo que Daniel lee para saber qué salió. Lo cazó un reviewer, no el
+// CI. ⇒ nunca trunques la salida de un merge, y que la comprobación no dependa de acordarse.
+const CON_MARCADORES = [
+  'HOJA-DE-RUTA.md',
+  'HISTORIAL-DE-VERSIONES.md',
+  'CLAUDE.md',
+  'Documentacion_MJD/DECISIONES.md',
+];
+for (const archivo of CON_MARCADORES) {
+  const lineas = leer(archivo).split('\n');
+  const sucias = [];
+  lineas.forEach((linea, i) => {
+    if (/^(<{7} |={7}$|>{7} )/.test(linea)) sucias.push(`${i + 1}: ${linea.slice(0, 40)}`);
+  });
+  if (sucias.length > 0) {
+    problemas.push(
+      `${archivo} tiene ${sucias.length} marcador(es) de conflicto sin resolver — ${sucias.join(' · ')}`,
+    );
+  }
+}
+
 // ── 1 · El tablero de filas contra su línea de resumen ──────────────────────────────────────────
 const hoja = leer('HOJA-DE-RUTA.md');
 
@@ -88,6 +119,45 @@ if (resumen === null) {
         `El resumen dice ${dicho[clave]} en «${clave}» y el tablero tiene ${real[clave]}.`,
       );
     }
+  }
+}
+
+// ── 1b · Las LISTAS enumeradas del resumen contra el tablero ────────────────────────────────────
+//
+// El bloque de arriba cruza CUÁNTAS hay; éste cruza CUÁLES son. No es lo mismo, y la diferencia
+// muerde: el 8-sep-2026 la lista de pendientes traía una fila **ya cerrada** y le faltaba **una
+// nueva** — el total cuadraba en 26 y el ojo lo dio por bueno. Dos filas equivocadas que se
+// compensan dejan el conteo perfecto y la lista mintiendo.
+const listasDelResumen = [
+  { simbolo: '⏸️', patron: /\*\*\d+ ⏸️ aparcadas a fase 2\*\* \(([^)]*)\)/, nombre: 'aparcadas' },
+  { simbolo: '⬜', patron: /\*\*\d+ ⬜ por hacer en la V1\*\* \(([^)]*)\)/, nombre: 'por hacer' },
+];
+for (const { simbolo, patron, nombre } of listasDelResumen) {
+  const hallada = hoja.match(patron);
+  if (hallada === null) {
+    problemas.push(`No se encontró la lista enumerada de «${nombre}» (${simbolo}) en el resumen.`);
+    continue;
+  }
+  const enLaLista = new Set(
+    hallada[1]
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean),
+  );
+  const enElTablero = new Set(
+    [...estadoPorFila].filter(([, e]) => e === simbolo).map(([fila]) => fila),
+  );
+  const faltan = [...enElTablero].filter((f) => !enLaLista.has(f)).sort();
+  const sobran = [...enLaLista].filter((f) => !enElTablero.has(f)).sort();
+  if (faltan.length > 0) {
+    problemas.push(
+      `La lista de «${nombre}» no menciona ${faltan.join(', ')}, que en el tablero está ${simbolo}.`,
+    );
+  }
+  if (sobran.length > 0) {
+    problemas.push(
+      `La lista de «${nombre}» menciona ${sobran.join(', ')}, que en el tablero ya NO está ${simbolo}.`,
+    );
   }
 }
 

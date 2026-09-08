@@ -58,6 +58,7 @@ import {
 import { aportesEsMaSaldoLote } from '../convivencia-esma.js';
 import { leerLimitesAging } from '../config-aging.js';
 import { type LimitesAging } from '../aging-comun.js';
+import { diasVencidosPorProveedor } from '../dias-vencidos.js';
 import { netearCubetas, type CubetasAging, type CubetasBrutas } from './aging.js';
 import { resolverSegmentoCxp, segmentoCartera } from './facturacion-cxp.js';
 
@@ -255,14 +256,22 @@ interface FilaAgregadoCxp {
 }
 
 /**
- * Fila ya neteada: aging del MOTOR (4 cubetas) + la cubeta MAQUILA (aporte EsMa, SIN antigüedad) +
- * saldo combinado. Antes de ocultar importes.
+ * Fila ya neteada: aging del MOTOR (4 cubetas) + la cubeta MAQUILA (aporte EsMa, que sigue SIN
+ * repartirse en cubetas) + saldo combinado + los DÍAS VENCIDOS de todo junto. Antes de ocultar
+ * importes.
  */
 export interface FilaNeta extends CubetasAging {
   idProveedor: number;
   proveedor: string;
   nombreCorto: string | null;
   diasCredito: number;
+  /**
+   * ⭐ Fila 0.121 — **días que lleva vencido el cargo más viejo que sigue sin pagarse**, contando
+   * TODA la deuda (motor **y** maquila). `null` = no hay nada que envejecer; `0` = debe, pero
+   * dentro de su plazo. Es lo único que Daniel mira (§Post-F9.218(a): *«solo con que pongas los
+   * días vencidos es suficiente»*) y, a diferencia de las cubetas, **sí cubre la maquila**.
+   */
+  diasVencidos: number | null;
   /** Aporte EsMa (maquila) — cubeta APARTE: no entra al aging del motor ni al "vencido". */
   maquila: number;
   /**
@@ -358,6 +367,9 @@ function netearFila(f: FilaAgregadoCxp): FilaNeta {
     maquila: 0,
     maquilaPorRevisar: armarPendiente(PENDIENTE_VACIO),
     saldo: 0,
+    // Los días vencidos NO salen de las cubetas (que ya perdieron la fecha de cada cargo): los pone
+    // `carteraCombinadaPorProveedor` con su propio agregado, que sí ve motor y maquila juntos.
+    diasVencidos: null,
   };
   fila.saldo = saldoDeFila(fila);
   return fila;
@@ -455,6 +467,10 @@ export async function carteraCombinadaPorProveedor(
 ): Promise<FilaNeta[]> {
   const crudas = await agregarPorProveedor(cliente, idEmpresa, limites, segmento);
   const aportesEsMa = await aportesEsMaSaldoLote(cliente, idEmpresa, segmento);
+  // ⭐ Fila 0.121 — los DÍAS VENCIDOS, en su propio agregado (nunca N+1). Va aparte de las cubetas
+  // a propósito: las cubetas ya sumaron y perdieron la fecha de cada cargo, y este número necesita
+  // saber CUÁL es el más viejo que sobrevive a los pagos. Cubre motor **y** maquila.
+  const diasPorProveedor = await diasVencidosPorProveedor(cliente, idEmpresa, segmento);
 
   const porId = new Map<number, FilaNeta>();
   for (const f of crudas) {
@@ -493,7 +509,13 @@ export async function carteraCombinadaPorProveedor(
       maquila: aporte.saldo,
       maquilaPorRevisar: aporte.pendiente,
       saldo: redondear2(aporte.saldo),
+      diasVencidos: null,
     });
+  }
+  // Los días se reparten AL FINAL, cuando ya están todas las filas (las del motor y las que sólo
+  // tienen maquila): así el maquilero puro también los recibe, que es justo el caso de la fila.
+  for (const fila of porId.values()) {
+    fila.diasVencidos = diasPorProveedor.get(fila.idProveedor) ?? null;
   }
   return [...porId.values()];
 }
@@ -509,8 +531,13 @@ export async function carteraCombinadaPorProveedor(
  * UNA sola consulta agregada (`aportesEsMaSaldoLote`, NUNCA N+1). Así (a) un maquilero con deuda EsMa
  * y 0 en el motor APARECE en la bandeja, (b) `carteraTotal`/`vencido`/`proveedoresConSaldo` son
  * veraces, y (c) la bandeja concuerda con el estado de cuenta del click. El aporte EsMa va en una
- * cubeta APARTE ("maquila", SIN antigüedad): los cargos EsMa no traen fecha de vencimiento por ítem
- * — el aging fino de maquila llegará cuando EsMa registre por el motor (E6/decisión posterior).
+ * cubeta APARTE ("maquila"), que sigue **sin repartirse en las cuatro cubetas**: las tablas de EsMa
+ * no tienen columna de vencimiento y las cubetas se agregan en SQL sobre una que sí existe.
+ *
+ * ⭐ **Lo que SÍ cubre a la maquila desde la fila 0.121 son los DÍAS VENCIDOS** (`diasVencidos` de
+ * cada fila), que derivan el vencimiento de cada cargo EsMa —su fecha + los días de crédito del
+ * proveedor— en vez de exigir una columna. Es el número que Daniel mira (§Post-F9.218(a)); las
+ * cubetas se quedaron como estaban, a propósito.
  *
  * ⭐ §Post-F9.188(a) (Daniel): un maquilero con TODO sin revisar NO desaparece de la bandeja. Su saldo
  * es 0 (al saldo sólo entra lo revisado, fila 0.115) pero la fila se queda, con su «por revisar»
