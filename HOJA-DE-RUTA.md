@@ -2628,7 +2628,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   que ahí no hay limpieza que deshacer; lo único que les faltaba era la **bitácora al reactivar**, que ya
   quedó. Detalle y tabla de mutaciones en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8s.
 
-- **🔴 ABIERTO POR V1-E8p (fusión de departamentos, §Post-F9.122a) — LA QUINTA PIEZA: la búsqueda por
+- **🔴 ABIERTO POR V1-E8p (fusión de departamentos, §Post-F9.122(a)) — LA QUINTA PIEZA: la búsqueda por
   referencia sigue partida después de fusionar.** La fusión repunta las **cuatro** llaves foráneas del
   departamento (proyectos, listas de precios, cotizaciones, factores), pero el importador de OC guarda
   **además** el texto CRUDO de la División (`"2-HOMBRE"`) en `OrdenReferencia.valor` (D7), **indexado
