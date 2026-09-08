@@ -203,6 +203,7 @@ import {
   type RenglonDelPlan,
 } from './ajuste-comprador.js';
 import {
+  canonizarColorPrenda,
   claveMaterial,
   claveMaterialColor,
   colorDelRenglon,
@@ -212,6 +213,11 @@ import {
   type ComprometidoMaterial,
   type ComprometidoPorOrden,
 } from './comprometido-en-oc.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222) — la explosión razona con el color CANÓNICO. Ver `cargarOrden`.
+import {
+  canonizarLineasDeColor,
+  resolverColoresCanonicos,
+} from '../catalogos/colores-canonicos.js';
 // ⭐⭐ V1-E8e (§Post-F9.99) — el TERCER sumando de "¿qué falta comprar?": lo que alguien decidió no
 // perseguir. Vive en su propio módulo (y en su propia tabla) porque el snapshot se reescribe entero
 // en cada explosión y una bandera ahí se borraría sola.
@@ -445,7 +451,27 @@ type OrdenParaExplosion = Prisma.OrdenGetPayload<{ select: typeof seleccionOrden
 
 // ── Helpers ────────────────────────────────────────────────────────────────────────────────────────
 
-/** Carga la orden (empresa activa, A9) con su RECETA y matriz, o lanza `ErrorNoEncontrado`. */
+/**
+ * Carga la orden (empresa activa, A9) con su RECETA y matriz, o lanza `ErrorNoEncontrado`.
+ *
+ * ⭐⭐ **fila 0.159 (§Post-F9.222) — LA MATRIZ ENTRA EN ESPACIO CANÓNICO AQUÍ, Y SÓLO AQUÍ.**
+ *
+ * Daniel tenía en su catálogo dos colores que eran el mismo — «Blanco Hueso Pantone 14-0002 Tcx
+ * Pumice Stone» y «Blanco Hueso»— y las dos variantes metidas en las mismas OP. Aunque se fusionen,
+ * la fusión **no reescribe la matriz** (es lo que el cliente pidió, D7), así que la orden sigue
+ * teniendo dos renglones para un solo color real: la explosión pediría **dos veces** la misma tela y
+ * el mismo avío, con dos renglones de compra que el proveedor no puede distinguir.
+ *
+ * 🔑 Resolver el rastro de la fusión **aquí**, al cargar, es lo que hace que todo lo de aguas abajo
+ * funcione sin enterarse: `piezasPorColorOrden`, `piezasPorColorYTallaOrden` y `coloresDeOrden`
+ * agrupan por `idColor`, así que los dos renglones **colapsan solos** y sus piezas se suman. Y el
+ * snapshot que se persiste nace ya con el color canónico, que es lo que después netea contra las
+ * líneas de OC (`comprometidoEnOc`, que resuelve del otro lado).
+ *
+ * ⚠️ Los AMARRES de color de tela (`OrdenTelaColor`) y los precios por color del proveedor
+ * (`TelaProveedorColor`) **no** se resuelven aquí: los repunta la propia fusión, así que ya están en
+ * canónico y sus llaves casan con la matriz sin ayuda (`colores-fusion-referencias.ts`).
+ */
 async function cargarOrden(
   tx: Tx,
   idOrden: number,
@@ -458,7 +484,11 @@ async function cargarOrden(
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
-  return orden;
+  const canonicos = await resolverColoresCanonicos(
+    tx,
+    orden.lineas.map((l) => l.idColor),
+  );
+  return { ...orden, lineas: canonizarLineasDeColor(orden.lineas, canonicos) };
 }
 
 /** Σ de TODAS las piezas color×talla de la orden = la base del cálculo R3. */
@@ -1953,7 +1983,7 @@ async function explosionarUna(
   // Snapshot anterior (para el diff). Se relee por clave material — se traen también proveedor/precio
   // sugeridos: desde F8-E6 el amarre puede cambiar de proveedor/precio SIN mover la cantidad, y ese
   // cambio SÍ es relevante para la UI (los valores ya se persisten bien; solo faltaba la etiqueta).
-  const previos = await tx.requerimientoOrden.findMany({
+  const previosCrudos = await tx.requerimientoOrden.findMany({
     where: { idOrden },
     select: {
       idTela: true,
@@ -1966,6 +1996,10 @@ async function explosionarUna(
       precioSugerido: true,
     },
   });
+  // ⭐⭐ fila 0.159 — el snapshot anterior se compara en ESPACIO CANÓNICO. Si no, la PRIMERA
+  // explosión después de una fusión diría que el renglón viejo se dio de baja y que nació otro,
+  // cuando es el mismo material del mismo color dicho con el nombre que quedó.
+  const previos = await canonizarColorPrenda(previosCrudos, { tx });
   const previoPorClave = new Map(previos.map((p) => [claveRequerimiento(p), p]));
   const clavesNuevas = new Set(calculados.map(claveRequerimiento));
   /**
@@ -2757,7 +2791,7 @@ async function planearCompra(
   }
 
   // ── 3) El requerido de todas las OP, neteado contra lo YA COMPRADO ──
-  const filas = await tx.requerimientoOrden.findMany({
+  const filasCrudas = await tx.requerimientoOrden.findMany({
     where: { idOrden: { in: unicos } },
     select: {
       id: true,
@@ -2786,6 +2820,11 @@ async function planearCompra(
     // orden en que Postgres devuelva las filas.
     orderBy: [{ idOrden: 'asc' }, { id: 'asc' }],
   });
+  // ⭐⭐ fila 0.159 — el snapshot y lo comprometido en OC tienen que estar en el MISMO espacio de
+  // colores o el neteo miente: un requerimiento del color absorbido no encontraría la OC que lo
+  // cubre y la previa propondría comprarlo otra vez (el defecto de §Post-F9.85, resucitado por una
+  // limpieza de catálogo). Los dos lados se resuelven por el canónico.
+  const filas = await canonizarColorPrenda(filasCrudas, { tx });
   const comprometido = await comprometidoEnOc(idEmpresa, unicos, { tx });
   // ⭐⭐ V1-E8e (§Post-F9.99): y lo que alguien dio por cubierto, el otro sumando del MISMO criterio.
   const cubierto = await dadoPorCubierto(unicos, { tx });
@@ -3946,6 +3985,14 @@ export async function estatusMaterialesOrden(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
+  // ⚠️ fila 0.159 — **AQUÍ NO SE CANONIZA EL COLOR, y es a propósito.** Todas las demás lecturas de
+  // este módulo pasan por `canonizarColorPrenda` porque cruzan `(material, color)` contra otra
+  // fuente y los dos lados tienen que hablar del mismo color. Este tablero **no cruza por color**:
+  // agrupa por `claveMaterial` (`tela-5`/`avio-9`) y `comprometidoEnOc` viene indexado igual — el
+  // porqué está unas líneas abajo, y es la decisión (c) de Daniel. Canonizar aquí salía en el mismo
+  // resultado, exacto, gastando una consulta de más; peor, se leía como una guarda y hacía creer que
+  // el tablero distingue tonos. Si algún día este tablero pasa a ser por color, la canonización
+  // vuelve **junto** con el cruce por color, no antes.
   const requerimientos = await cliente.requerimientoOrden.findMany({
     where: { idOrden },
     include: {

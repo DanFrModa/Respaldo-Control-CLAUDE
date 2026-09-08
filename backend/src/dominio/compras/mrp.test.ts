@@ -1395,7 +1395,19 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
       pedidoLinea: null,
       lineas: [{ tallas: [{ idTalla: 1, cantidad: 100 }] }],
     };
-    const tablas: Record<string, Record<string, () => Promise<unknown>>> = {
+    const tablas: Record<string, Record<string, (args?: never) => Promise<unknown>>> = {
+      // ⭐ fila 0.159 — el rastro de la fusión de colores (`colores-canonicos.ts`). Aquí no hay
+      // ninguna fusión, así que cada color es su propio canónico y la resolución es un no-op; el
+      // doble tiene que implementarlo igual porque la explosión ahora SIEMPRE pregunta.
+      color: {
+        findMany: (args?: never) =>
+          Promise.resolve(
+            (
+              (args as unknown as { where: { id: { in: number[] } } } | undefined)?.where.id.in ??
+              []
+            ).map((id) => ({ id, nombre: 'Rojo', activo: true, idFusionadoEn: null })),
+          ),
+      },
       orden: {
         findMany: () => Promise.resolve([orden]),
         // ⭐⭐ V1-E8z: las columnas del candado de compra, en NULL (receta no reabierta).

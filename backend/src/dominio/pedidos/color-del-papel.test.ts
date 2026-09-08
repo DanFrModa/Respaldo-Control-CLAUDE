@@ -36,9 +36,13 @@ interface ColorFake {
   idFusionadoEn: number | null;
 }
 
-/** Argumentos que el código bajo prueba le pasa al cliente de Prisma. */
+/**
+ * Argumentos que el código bajo prueba le pasa al cliente de Prisma. Son DOS formas de `findMany`:
+ * la búsqueda por NOMBRE (la del resolvedor) y —desde la fila 0.159— la búsqueda por IDS que usa
+ * `colorCanonico` para seguir el rastro de la fusión por lotes en vez de fila por fila.
+ */
 interface ArgsFindMany {
-  where: { nombre: { in: string[]; mode?: 'insensitive' } };
+  where: { nombre?: { in: string[]; mode?: 'insensitive' }; id?: { in: number[] } };
   select?: Partial<Record<keyof ColorFake, boolean>>;
 }
 interface ArgsFindUnique {
@@ -70,8 +74,18 @@ function catalogo(filas: ColorFake[]) {
   };
 
   const findMany = vi.fn((args: ArgsFindMany) => {
-    const insensible = args.where.nombre.mode === 'insensitive';
-    const buscados = args.where.nombre.in.map((n) => (insensible ? n.toLowerCase() : n));
+    // ⭐ fila 0.159 — la búsqueda POR IDS (la caminata en lote del rastro de la fusión).
+    const porId = args.where.id;
+    if (porId !== undefined) {
+      const pedidos = new Set(porId.in);
+      return Promise.resolve(
+        datos.filter((f) => pedidos.has(f.id)).map((f) => proyectar(f, args.select)),
+      );
+    }
+    const porNombre = args.where.nombre;
+    if (porNombre === undefined) return Promise.resolve([]);
+    const insensible = porNombre.mode === 'insensitive';
+    const buscados = porNombre.in.map((n) => (insensible ? n.toLowerCase() : n));
     return Promise.resolve(
       datos
         .filter((f) => buscados.includes(insensible ? f.nombre.toLowerCase() : f.nombre))
@@ -204,10 +218,17 @@ describe('resolverColoresDelPapel', () => {
     const rojo: ColorFake = { id: 3, nombre: 'Rojo', activo: true, idFusionadoEn: null };
     const { bd, findMany } = catalogo([CANONICO, rojo]);
     await resolverColoresDelPapel(bd, ['Blanco Optico', 'Rojo', 'blanco optico']);
-    expect(findMany).toHaveBeenCalledTimes(1);
-    // Y el nombre repetido (misma clave, distintas mayúsculas) no se pregunta dos veces.
-    const args = findMany.mock.calls[0]?.[0];
-    expect(args?.where.nombre.in).toEqual(['Blanco Optico', 'Rojo', 'blanco optico']);
+
+    // Los nombres se preguntan de UNA vez, y el nombre repetido (misma clave, distintas
+    // mayúsculas) no se pregunta dos veces.
+    const porNombre = findMany.mock.calls.filter((c) => c[0]?.where.nombre !== undefined);
+    expect(porNombre).toHaveLength(1);
+    expect(porNombre[0]?.[0]?.where.nombre?.in).toEqual(['Blanco Optico', 'Rojo', 'blanco optico']);
+
+    // ⭐ fila 0.159 — y el rastro de la fusión también va POR LOTES: una consulta de ids por nivel
+    // de cadena, nunca una por color (antes era `colorCanonico` dentro del bucle).
+    const porId = findMany.mock.calls.filter((c) => c[0]?.where.id !== undefined);
+    expect(porId.length).toBeLessThanOrEqual(2);
   });
 });
 

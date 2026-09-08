@@ -149,6 +149,69 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   archivo de SINUBE, o hay renglones con texto («N/D», un guion, un importe entre paréntesis)? En el
   archivo que mandaste salieron todos numéricos. Mientras no lo digas, si aparece uno raro **la carga se
   detiene y te lo enseña**, que es la única respuesta honesta.
+## 0.130 · 8-sep-2026 · **en prueba** — **Los colores repetidos por fin se pueden juntar, aunque ya estén en órdenes**
+
+### Qué se puede hacer ahora que antes no
+
+- **Juntar dos colores que son el mismo, aunque ya se hayan usado.** Es el caso de «Blanco Hueso Pantone
+  14-0002 Tcx Pumice Stone» y «Blanco Hueso»: el mismo color escrito de dos formas. Hasta hoy, bastaba con
+  que uno de los dos hubiera entrado a **una sola orden** para que el sistema **se negara** a unirlos, y
+  ya no había manera de arreglarlo nunca. Ahora se juntan desde Catálogos › Colores › Fusionar, como
+  siempre, y ya está.
+- **El sistema deja de comprar dos veces lo mismo.** Una orden que llevaba los dos colores repetidos pedía
+  **dos renglones** del mismo botón, del mismo cierre y de la misma tela — dos renglones que el proveedor
+  no puede distinguir. Después de juntarlos, la explosión de materiales pide **un solo renglón con la
+  suma**.
+- **El modelo de producción ya no se duplica.** Si una orden vieja usó el color repetido y una nueva usa
+  el bueno, antes el sistema **no reconocía el modelo que ya existía** y estrenaba otro número de cinco
+  dígitos para la misma prenda. Ahora reusa el que ya está.
+- **La propuesta de «de qué color se compra la tela» vuelve a acertar.** La pantalla enseña **un renglón
+  por color real** (con sus piezas sumadas) y propone el tono de tela que ya estaba amarrado a ese color,
+  en vez de proponerlo por parecido.
+- **Un Excel del cliente que nombra un color ya juntado se importa igual.** Antes la importación se caía
+  entera diciendo *«ese color no existe; agrégalo»*, y quien seguía ese consejo acababa **reactivando el
+  color y deshaciendo la limpieza sin enterarse**. Ahora el archivo entra y la orden queda con el color
+  bueno. El papel del cliente no cambia: sigue diciendo lo que decía.
+
+### Qué cambió y puede sorprender
+
+- **Las órdenes NO se reescriben, y eso se ve.** Una orden hecha con el color repetido **sigue diciendo
+  ese color** en su matriz, en su corte, en su recibo y en sus papeles. Es a propósito: eso es lo que el
+  cliente pidió y lo que de verdad pasó, y no se toca. Lo que cambia es que **de ahí en adelante el
+  sistema sabe que los dos colores son uno** y los trata como uno donde importa: al comprar, al netear lo
+  ya comprado y al buscar el modelo.
+- **El aviso del diálogo de fusión cambió de sentido.** Antes decía *«sólo se pueden fusionar colores que
+  aún no se usan»*. Ahora explica lo contrario: sí se puede, lo capturado no se reescribe, y lo que se
+  mueve al color conservado es el catálogo (colores de tela, precios por color del proveedor, modelos de
+  producción y colores de tela ya amarrados a una orden).
+- **El color absorbido desaparece de las listas para elegir**, como siempre — pero si intentas capturarlo
+  en una orden nueva, el mensaje ahora **te dice a cuál ir**: *«se fusionó en "Blanco Hueso": captura la
+  orden con ése»*.
+- **Si el mismo desarrollo ya tenía un modelo de cada color repetido**, esos dos modelos **no se juntan**
+  (cada uno tiene su número, sus órdenes y su inventario): se conserva cada uno y de ahí en adelante se
+  reusa el del color bueno. Queda anotado en la bitácora.
+- **Si los dos colores tenían precio del mismo proveedor de tela**, gana el del color que se conserva; el
+  del repetido queda escrito en la bitácora por si era el bueno.
+- **Cuando un archivo del cliente nombra un color ya juntado, queda escrito a dónde se mandó.** El papel
+  puede decir «Azul marino» y la orden decir «Rojo»: para que eso nunca sea un misterio, la importación
+  deja el apunte en la bitácora de ese color (uno por color, no uno por renglón).
+
+### Qué sigue pendiente o roto
+
+- **Las existencias de producto terminado siguen partidas** si un modelo se produjo con los dos colores
+  repetidos: cada entrada al almacén es un hecho ya asentado y no se reescribe. De aquí en adelante sólo
+  se puede capturar el color bueno, así que el renglón viejo se agota solo conforme se entrega.
+- **Nadie junta los duplicados por ti.** No hay ningún proceso automático que busque colores parecidos y
+  los una: eso lo decide una persona desde la pantalla, que es justo lo que esta versión vino a
+  destrabar.
+- **Los papeles ya impresos no cambian.** Una orden de compra o una ficha de corte que ya salió sigue
+  diciendo el color con el que se hizo.
+- **El color juntado ya no aparece en dos pantallas de inventario**: «Movimientos de PT» y «Traspasos de
+  PT» sólo ofrecen colores vigentes. Las existencias y el kardex de ese color **se siguen viendo**, y la
+  entrega al cliente lo toma de la orden — pero si hace falta **ajustar a mano o traspasar** piezas que
+  entraron con el nombre viejo, hoy no hay por dónde. Queda anotado como pendiente.
+
+---
 ## 0.129 · 7-sep-2026 · **en prueba** — **La receta ya sabe cuánto cárdigan lleva la felpa, y la compra lo pide sola**
 
 ### Qué se puede hacer ahora que antes no

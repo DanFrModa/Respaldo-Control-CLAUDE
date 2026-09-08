@@ -45,8 +45,11 @@ import {
   digitosDelModelo,
   leerSerie,
   mintearCodigoDesarrollo,
+  obtenerODerivarModeloDeProduccion,
   proponerNumeroProduccion,
 } from './nomenclatura.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222): la llave del linaje se arma con el color CANÓNICO.
+import { fusionarColores } from '../catalogos/colores.js';
 
 // El listado construye el servicio de archivos (foto principal) aunque no haya fotos.
 process.env.R2_ACCOUNT_ID ??= 'cuenta-fake';
@@ -1833,5 +1836,69 @@ describe('derivarModeloDeProduccion — el linaje 1:N', () => {
 
     await expect(cliente.modelo.delete({ where: { id: idDesarrollo } })).rejects.toThrow();
     expect(await cliente.modelo.count({ where: { id: idDesarrollo } })).toBe(1);
+  });
+});
+
+/**
+ * ⭐⭐ **fila 0.159 (§Post-F9.222) — EL COLOR ABSORBIDO NO ESTRENA UN SEGUNDO NÚMERO.**
+ *
+ * `modelos_linaje_color_unico` —la llave `(desarrollo, color)`— es la que contesta *«¿este color ya
+ * tiene modelo?»*. Si una fusión de colores dejara el modelo colgando del color absorbido, o si a
+ * esta puerta llegara el id absorbido, la siguiente OC del color canónico **no reconocería el modelo
+ * que existe** y quemaría OTRO número de 5 dígitos para la misma prenda — justo lo contrario de la
+ * decisión de Daniel (*«se reúsa cuando sea el mismo modelo»*).
+ *
+ * Son DOS piezas y hacen falta las dos: la fusión REPUNTA `Modelo.idColor` al canónico (lo que ya
+ * estaba), y esta función resuelve el rastro del color que le entra (lo que llega).
+ */
+describe('⭐⭐ fila 0.159 — la llave del linaje se arma con el color CANÓNICO', () => {
+  it('reusa el modelo aunque le entre el color que la fusión absorbió', async () => {
+    const idDesarrollo = (
+      await cliente.modelo.create({
+        data: {
+          codigo: 'CYA-0159-A',
+          codigoDesarrollo: 'CYA-0159-A',
+          origen: 'desarrollo',
+          idTipoProducto: pantalon.id,
+          idGenero: caballero.id,
+        },
+        select: { id: true },
+      })
+    ).id;
+    const canonico = await cliente.color.create({ data: { nombre: 'Blanco Hueso' } });
+    const duplicado = await cliente.color.create({
+      data: { nombre: 'Blanco Hueso Pantone 14-0002 Tcx Pumice Stone' },
+    });
+
+    // La OP vieja nació con el DUPLICADO.
+    const primero = await enTx((tx) =>
+      obtenerODerivarModeloDeProduccion(tx, sesion(), idDesarrollo, { idColor: duplicado.id }),
+    );
+    expect(primero.reusado).toBe(false);
+
+    // Se limpia el catálogo: el duplicado se absorbe en el canónico.
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: canonico.id, origenes: [duplicado.id] },
+      bd(),
+    );
+
+    // La OC de HOY viene con el canónico → tiene que REUSAR, no estrenar número.
+    const porElCanonico = await enTx((tx) =>
+      obtenerODerivarModeloDeProduccion(tx, sesion(), idDesarrollo, { idColor: canonico.id }),
+    );
+    expect(porElCanonico.reusado).toBe(true);
+    expect(porElCanonico.idModelo).toBe(primero.idModelo);
+
+    // Y una OP capturada ANTES de la fusión (que sigue trayendo el id absorbido) también reusa:
+    // el rastro se resuelve al entrar, así que las dos puertas contestan lo mismo.
+    const porElAbsorbido = await enTx((tx) =>
+      obtenerODerivarModeloDeProduccion(tx, sesion(), idDesarrollo, { idColor: duplicado.id }),
+    );
+    expect(porElAbsorbido.reusado).toBe(true);
+    expect(porElAbsorbido.idModelo).toBe(primero.idModelo);
+
+    // Un solo modelo de producción para ese desarrollo: ningún número quemado de más.
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(1);
   });
 });

@@ -27,6 +27,8 @@ import {
   guardarPlantilla,
   obtenerPlantillaVigente,
 } from './importacion.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222): un color absorbido por una fusión se resuelve al canónico.
+import { fusionarColores } from '../catalogos/colores.js';
 
 let cliente: PrismaClient;
 let idEmpresa: number;
@@ -530,5 +532,209 @@ describe('⭐ la misma OC del cliente NO se importa dos veces (V1-E4)', () => {
     // Documentado a propósito (ver `exigirOcNoImportada`): inventar una identidad bloquearía
     // importaciones legítimas del mismo cliente el mismo día.
     expect(await cliente.pedido.count()).toBe(2);
+  });
+});
+
+/**
+ * ⭐⭐ **fila 0.159 ronda 2 (§Post-F9.222) — UN COLOR ABSORBIDO POR UNA FUSIÓN NO BLOQUEA LA
+ * IMPORTACIÓN: se resuelve al canónico.**
+ *
+ * 🔴 **Por qué esto no era «una falla visible y ya».** Antes, un archivo que nombrara un color
+ * absorbido moría con *«…no existen en el catálogo; **agrégalos** o corrige el archivo»*. El usuario
+ * obedece, va al catálogo, y ahí le dicen *«Ya existe … puedes **reactivarlo**»* — y reactivar BORRA
+ * el rastro `idFusionadoEn`. Desde ese instante toda la resolución canónica de esta fila deja de
+ * operar **sin un solo aviso** (el MRP vuelve a partir la OP, el neteo pierde la OC, el linaje
+ * estrena otro número), y los repuntes que la fusión ya movió **no vuelven**: el estado final es
+ * PEOR que antes de fusionar. El bloqueo se veía; la salida que el producto sugería destruía la
+ * limpieza.
+ *
+ * El importador de **PDF** ya hacía lo correcto; esta ruta se había quedado atrás.
+ */
+describe('⭐⭐ fila 0.159 — el Excel con un color ya fusionado', () => {
+  const sesionColores = (): SesionUsuario =>
+    sesionDePrueba({ idEmpresaActiva: idEmpresa, permisos: ['colores.administrar'] });
+
+  /** Fusiona «Azul marino» dentro de «Rojo» y devuelve los dos ids. */
+  async function fusionarAzulEnRojo(): Promise<{ idRojo: number; idAzul: number }> {
+    const rojo = await cliente.color.findFirstOrThrow({ where: { nombre: 'Rojo' } });
+    const azul = await cliente.color.findFirstOrThrow({ where: { nombre: 'Azul marino' } });
+    await fusionarColores(sesionColores(), { idDestino: rojo.id, origenes: [azul.id] }, bd());
+    return { idRojo: rojo.id, idAzul: azul.id };
+  }
+
+  it('🔴 IMPORTA, y la matriz queda en el color CANÓNICO (antes rechazaba el archivo entero)', async () => {
+    await sembrarDesarrollo('DEV-114', 'CA-KM-114');
+    const { idRojo, idAzul } = await fusionarAzulEnRojo();
+    // El archivo del cliente sigue diciendo «Azul marino»: su papel no cambia porque nosotros
+    // hayamos limpiado el catálogo.
+    const archivoBase64 = await construirXlsxBase64([
+      ['CA-KM-114', 'Azul marino', 'CH', 400, 168],
+      ['CA-KM-114', 'Azul marino', 'M', 600, 168],
+    ]);
+
+    const resultado = await confirmarImportacion(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        nombreArchivo: 'OC C&A.xlsx',
+        archivoBase64,
+        mapeo: MAPEO_DEMO,
+        ocCliente: 'OC-CA-0159',
+        resoluciones: [],
+      },
+      bd(),
+    );
+
+    expect(resultado.ordenes).toHaveLength(1);
+    const orden = await cliente.orden.findUniqueOrThrow({
+      where: { id: resultado.ordenes[0]?.idOrden ?? 0 },
+      include: { lineas: { include: { tallas: true } } },
+    });
+    // Un solo renglón, en el color que QUEDÓ — no en el absorbido.
+    expect(orden.lineas).toHaveLength(1);
+    expect(orden.lineas[0]?.idColor).toBe(idRojo);
+    expect(orden.lineas[0]?.idColor).not.toBe(idAzul);
+    expect(orden.lineas[0]?.tallas.reduce((s, t) => s + t.cantidad, 0)).toBe(1000);
+
+    // 🔴 Y el absorbido sigue absorbido: la importación NO lo resucitó (que es lo que el usuario
+    // habría hecho a mano siguiendo el mensaje viejo, deshaciendo la fusión sin enterarse).
+    const azulDespues = await cliente.color.findUniqueOrThrow({ where: { id: idAzul } });
+    expect(azulDespues.activo).toBe(false);
+    expect(azulDespues.idFusionadoEn).toBe(idRojo);
+  });
+
+  it('🔴 el DESVÍO queda ANOTADO: el papel dice «Azul marino» y la OP dice «Rojo», y se sabe por qué', async () => {
+    // ⚠️ El importador de PDF ya anotaba su desvío («hallazgo H2 de su revisión») y el de Excel no:
+    // resolver al canónico SIN rastro cambia en silencio lo que el papel del cliente pedía, y aquí
+    // es peor que en el PDF porque la vista previa del Excel **ni siquiera enseña los colores**.
+    await sembrarDesarrollo('DEV-114', 'CA-KM-114');
+    const { idRojo, idAzul } = await fusionarAzulEnRojo();
+
+    await confirmarImportacion(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        nombreArchivo: 'OC.xlsx',
+        // DOS renglones del mismo color: el apunte va UNO por color, no uno por renglón.
+        archivoBase64: await construirXlsxBase64([
+          ['CA-KM-114', 'Azul marino', 'CH', 400, 168],
+          ['CA-KM-114', 'Azul marino', 'M', 600, 168],
+        ]),
+        mapeo: MAPEO_DEMO,
+        ocCliente: 'OC-CA-0159-D',
+        resoluciones: [],
+      },
+      bd(),
+    );
+
+    const apuntes = await cliente.bitacora.findMany({
+      where: { entidad: 'Color', idEntidad: String(idAzul), accion: 'OTRO' },
+    });
+    const desvios = apuntes.filter((a) =>
+      JSON.stringify(a.datos).includes('redirigido-por-fusion'),
+    );
+    expect(desvios, 'el desvío por fusión no quedó anotado en la bitácora').toHaveLength(1);
+    const datos = JSON.stringify(desvios[0]?.datos);
+    expect(datos).toContain('importacion-excel');
+    expect(datos).toContain(String(idRojo));
+    expect(datos).toContain('Rojo');
+  });
+
+  it('un color que el archivo nombra DIRECTO no genera apunte de desvío', async () => {
+    // El apunte es del DESVÍO, no de la fusión: si el papel ya dice el color bueno no hay nada que
+    // explicar, y llenar la bitácora de apuntes vacíos la vuelve ilegible justo cuando importa.
+    await sembrarDesarrollo('DEV-114', 'CA-KM-114');
+    const { idAzul } = await fusionarAzulEnRojo();
+
+    await confirmarImportacion(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        nombreArchivo: 'OC.xlsx',
+        archivoBase64: await construirXlsxBase64([['CA-KM-114', 'Rojo', 'CH', 400, 168]]),
+        mapeo: MAPEO_DEMO,
+        ocCliente: 'OC-CA-0159-E',
+        resoluciones: [],
+      },
+      bd(),
+    );
+
+    const apuntes = await cliente.bitacora.findMany({
+      where: { entidad: 'Color', idEntidad: String(idAzul), accion: 'OTRO' },
+    });
+    expect(
+      apuntes.filter((a) => JSON.stringify(a.datos).includes('redirigido-por-fusion')),
+    ).toEqual([]);
+  });
+
+  it('la VISTA PREVIA dice lo mismo que el confirm: ni un color sin resolver', async () => {
+    await sembrarDesarrollo('DEV-114', 'CA-KM-114');
+    await fusionarAzulEnRojo();
+    const archivoBase64 = await construirXlsxBase64([['CA-KM-114', 'Azul marino', 'CH', 400, 168]]);
+
+    const salida = await analizarImportacion(
+      sesion(),
+      { idCliente: idClienteNegocio, nombreArchivo: 'OC.xlsx', archivoBase64, mapeo: MAPEO_DEMO },
+      bd(),
+    );
+
+    const previa = salida.preview as NonNullable<typeof salida.preview>;
+    const grupo = previa.grupos.find((g) => g.modeloCliente === 'CA-KM-114');
+    expect(grupo?.reconocido).toBe(true);
+    expect(grupo?.coloresNoResueltos).toEqual([]);
+  });
+
+  it('un color apagado A MANO (sin fusión) sigue diciendo que NO EXISTE — ahí no hay nada que resolver', async () => {
+    await sembrarDesarrollo('DEV-114', 'CA-KM-114');
+    const azul = await cliente.color.findFirstOrThrow({ where: { nombre: 'Azul marino' } });
+    await cliente.color.update({ where: { id: azul.id }, data: { activo: false } });
+    const archivoBase64 = await construirXlsxBase64([['CA-KM-114', 'Azul marino', 'CH', 400, 168]]);
+
+    await expect(
+      confirmarImportacion(
+        sesion(),
+        {
+          idCliente: idClienteNegocio,
+          nombreArchivo: 'OC.xlsx',
+          archivoBase64,
+          mapeo: MAPEO_DEMO,
+          ocCliente: 'OC-CA-0159-B',
+          resoluciones: [],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/no existen en el catálogo/);
+  });
+
+  it('un color ACTIVO no pierde su clave contra un absorbido que normaliza igual', async () => {
+    // `normalizarClave` aplana acentos: «Café» y «Cafe» son dos colores con la MISMA clave. Si el
+    // absorbido (id menor) le robara la clave al activo, un archivo que hoy importa bien empezaría
+    // a caer en otro color sin que nadie lo pidiera. Por eso el mapa se llena en DOS pasadas.
+    await sembrarDesarrollo('DEV-114', 'CA-KM-114');
+    const cafeViejo = await cliente.color.create({ data: { nombre: 'Café' } });
+    const beige = await cliente.color.create({ data: { nombre: 'Beige' } });
+    const cafeActivo = await cliente.color.create({ data: { nombre: 'Cafe' } });
+    await fusionarColores(sesionColores(), { idDestino: beige.id, origenes: [cafeViejo.id] }, bd());
+
+    const resultado = await confirmarImportacion(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        nombreArchivo: 'OC.xlsx',
+        archivoBase64: await construirXlsxBase64([['CA-KM-114', 'CAFE', 'CH', 100, 168]]),
+        mapeo: MAPEO_DEMO,
+        ocCliente: 'OC-CA-0159-C',
+        resoluciones: [],
+      },
+      bd(),
+    );
+
+    const orden = await cliente.orden.findUniqueOrThrow({
+      where: { id: resultado.ordenes[0]?.idOrden ?? 0 },
+      include: { lineas: true },
+    });
+    // Gana el ACTIVO, como antes de esta fila; el absorbido no se lo lleva a «Beige».
+    expect(orden.lineas[0]?.idColor).toBe(cafeActivo.id);
+    expect(orden.lineas[0]?.idColor).not.toBe(beige.id);
   });
 });

@@ -1712,6 +1712,10 @@ con producción viva no se cambia»** · **`LARGO_MAX_PACK = 12`**.
   color (el cascade no toca las etapas). Ya existía; con packs la consecuencia es nueva **y ésa sí se cerró**.
 - **`colores-fusion-referencias.ts` sin tocar** (0 líneas): el bloqueo de fusionar colores con
   `OrdenLinea`/`EtapaMovimientoDet` sigue en pie.
+  ⚠️ **YA NO: ese bloqueo se levantó en la fila 0.159 / v0.130** (§Post-F9.222). La fusión ahora
+  **clasifica** —repunta lo que es catálogo y deja con rastro los documentos— y `sincronizarMatriz`
+  acepta un color apagado que la orden ya tenía. Se anota aquí porque esta línea decía lo contrario y
+  alguien podría leerla como el estado de hoy.
 
 ### Despliegue
 
