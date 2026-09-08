@@ -125,6 +125,123 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   `DECISIONES.md`). La que más conviene que mires: **una nota de crédito que todavía tenga saldo se carga
   y resta**, porque en SINUBE una nota ya aplicada queda en cero. **Si me dices que ese saldo ya viene
   descontado de la factura, hay que dejarlas fuera.**
+## 0.129 · 7-sep-2026 · **en prueba** — **La receta ya sabe cuánto cárdigan lleva la felpa, y la compra lo pide sola**
+
+### Qué se puede hacer ahora que antes no
+
+- **Capturar en la receta cuánto lleva el CÁRDIGAN** —o el complemento que sea— de cada tela. El campo
+  está **al lado del consumo de la tela, a la vista, sin abrir nada**, y se llama como el catálogo diga
+  que se llama ese complemento («Cardigan»), no «complemento» a secas. Era literalmente lo que faltaba:
+  *«no se ve el campo de la segunda tela para meter la info. Sólo se ve el campo de la tela principal»*.
+- **Que la orden de compra que genera la explosión de materiales salga ya con el cárdigan puesto.** Hasta
+  ahora **todas** nacían con esa casilla vacía y había que teclearla a mano, orden por orden, antes de
+  poder autorizar la compra. Con la receta capturada, el sistema la calcula solo.
+- **Que el cárdigan viaje también cuando se COPIA un modelo**: al sacar una versión nueva de un
+  modelo, o al «copiar un modelo ya desarrollado» desde la cotización, la receta nueva se lleva el
+  cárdigan igual que se lleva la tela. *(En la primera vuelta de este cambio ese camino se quedaba
+  sin él, en silencio; la revisión lo cazó antes de salir.)*
+- **Y con eso, poder llevar el cárdigan COMO COMPLEMENTO de su tela en vez de darlo de alta como una tela
+  aparte.** Se hacía aparte porque la receta no sabía llevarlo — y darlo aparte **rompe en silencio el
+  vínculo de LOTE** entre la felpa y su cárdigan, que es justo lo que el aviso de riesgo de tono necesita
+  para poder decir *«éstas dos vinieron del mismo rollo»*.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Cuánto cárdigan pide la compra sale de una PROPORCIÓN, no de las piezas.** Si la receta dice
+  1.2 kg de felpa y 0.15 kg de cárdigan por prenda, y la compra acaba pidiendo **480 kg** de felpa —porque
+  ya había algo en almacén, o porque el comprador ajustó la cantidad—, se piden **60 kg** de cárdigan: los
+  que le tocan a esos 480. El cárdigan **viaja con su felpa** (mismo renglón, mismo proveedor, mismo
+  lote), así que sigue al cuerpo. *(Es una decisión que se tomó con un default; ver abajo.)*
+- ⚠️ **El TOTAL de esa orden de compra sube, y está bien.** Antes el cárdigan iba en blanco y no sumaba
+  nada; ahora se pide junto con la tela y **su importe entra al total del renglón**. Si no se le capturó
+  un precio propio al cárdigan, se cobra **al precio de la tela** (eso ya era así desde antes). **La
+  revisión previa —la pantalla que enseña las compras antes de crearlas— ya trae ese total incluido**,
+  así que lo que se ve antes de confirmar es exactamente lo que se va a pedir. Y la cuenta impresa
+  **cuadra**: el renglón dice *«(36 kg + 4.5 kg de Cardigan) × $90.00 = $3,645.00»*, con el cárdigan
+  dentro de la suma y no como una nota al margen.
+- ⚠️ **Sólo se puede capturar en telas que el CATÁLOGO dice que llevan complemento.** Si una tela no lo
+  declara, el campo ni siquiera aparece, y el sistema rechaza el número con un aviso que dice qué hacer:
+  declararle el complemento en el catálogo de telas primero. Quién lleva complemento lo decide el
+  catálogo; **cuánto lleva**, la receta.
+- ⚠️ **No es obligatorio, y no capturarlo deja todo igual que antes.** Las recetas que ya existen no
+  cambian: su orden de compra sigue naciendo con el cárdigan pendiente y el sistema lo sigue pidiendo
+  antes de dejar autorizar. **No se tocó ni un dato existente.**
+- ⚠️ **Dejar el campo en blanco NO es lo mismo que poner cero.** En blanco significa «no se ha
+  capturado»; un cero diría «esta tela no lleva cárdigan», que es otra cosa — y el sistema no lo acepta.
+- ✅ **Dar de alta un cárdigan como tela independiente SIGUE FUNCIONANDO IGUAL.** No se quitó nada: hay
+  cárdigans especiales que se compran así, y ese camino queda intacto. Lo que cambia es que ahora el otro
+  camino —el bueno para el control de la tela— ya es posible.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Una pregunta para Daniel, con su default:** cuando la compra pide **menos** felpa de la calculada
+  (porque ya había en almacén, o porque se ajustó la cantidad), ¿el cárdigan debe **bajar en la misma
+  proporción** —como quedó hecho— o debe pedirse **completo**, el de todas las piezas? *Default: baja en
+  proporción*, porque los dos se compran en el mismo renglón y llegan en el mismo lote.
+- 📌 **El campo se captura en la receta del MODELO.** En la receta congelada de una orden ya se ve
+  reflejado en lo que se compra, pero **ahí todavía no se puede corregir a mano** para una orden suelta:
+  si hay que cambiarlo, se cambia en el modelo. Nadie lo ha pedido; se dice para que no sorprenda.
+- 🔴 **FALTA LA OTRA MITAD, y conviene saberlo antes de empezar a usarlo: el COSTO del cárdigan no entra
+  en el precosto.** El sistema costea la prenda con el consumo de la **tela**, y nunca supo costear
+  complementos. Mientras el cárdigan se daba de alta como una tela aparte, entraba al costo por su cuenta;
+  **si se mueve a complemento, su costo se cae del precosto** — y de ese precosto sale el precio que se le
+  cotiza al cliente, así que el número quedaría **más bajo de lo real**. No se hizo en esta versión porque
+  hace falta decidir antes **con qué precio se valúa el cárdigan** (hoy el único precio que existe es por
+  COLOR, y la receta del modelo todavía no tiene color). **Recomendación: arreglarlo antes de arrancar.**
+- 📌 **La TABLA de la explosión de materiales —la de arriba, la del «qué falta»— sigue contando sólo la
+  tela.** El cárdigan aparece en la **revisión previa** y en la orden de compra, que es donde se pide y
+  donde se paga; lo que la tabla de faltantes enseña sigue siendo el consumo del cuerpo. Nadie ha pedido
+  otra cosa; se dice para que no sorprenda.
+## 0.128 · 7-sep-2026 · **en prueba** — **Los maquileros por fin tienen antigüedad: la pantalla de los jueves dice cuántos días lleva vencido cada quien**
+
+### Qué se puede hacer ahora que antes no
+
+- **Ver, en la relación semanal de pagos, cuántos días lleva vencido cada beneficiario** — una columna
+  nueva, «Días venc.», pegada al saldo. Es la que Daniel pidió: *«**Solo con que pongas los días
+  vencidos es suficiente**»*.
+- ⭐ **Y por primera vez eso incluye a los MAQUILEROS.** Hasta hoy la antigüedad sólo existía para los
+  proveedores de factura; la deuda de maquila salía **sin edad**, en un montón aparte. Eso era falso en
+  la práctica: hay maquileros con plazo pactado a los que Daniel **sí** les cuenta los días (en su
+  archivo, BORDA PRINT lleva 8 y BORDADOS COMPUTARIZADOS 30), y el sistema no sabía decirlo.
+- **Ver la fecha de vencimiento de un recibo de maquila en el estado de cuenta del proveedor**, donde
+  antes había un guion.
+- **Cambiar los días de crédito de un proveedor y ver cómo se re-envejece toda su deuda al instante**,
+  sin capturar una sola fecha.
+
+### Qué cambió y puede sorprender
+
+- 🔒 **La fecha de vencimiento NO se teclea nunca, ni aquí ni en ningún lado: se calcula sola** con el
+  plazo del proveedor. Es la regla que Daniel dictó (*«las inconsistencias son errores de Lupita»*):
+  otro error que deja de ser posible. Si un vencimiento sale raro, **lo que hay que corregir son los
+  días de crédito del proveedor**, no el movimiento.
+- **Un proveedor sin días de crédito capturado es de CONTADO**: su deuda vence el mismo día en que se
+  registra, así que va a aparecer con muchos días vencidos. No es un error del sistema: es lo que dice
+  su ficha. Se arregla capturándole su plazo en el catálogo de proveedores.
+- **La columna tiene tres respuestas distintas, y conviene no confundirlas:** un **número** («12 d») es
+  lo que lleva vencido su deuda más vieja · **«al día»** es que sí debe pero está dentro de su plazo ·
+  **«—»** es que no hay nada que envejecer (no debe, o lo que debía ya se pagó).
+- ⚠️ **El número es el del cargo MÁS VIEJO que sigue sin pagarse, no un promedio.** Y como los pagos no
+  se aplican a una factura concreta, el sistema **supone** que lo que se paga salda primero lo más
+  atrasado — la misma suposición que ya usaba la antigüedad de la bandeja, para que las dos pantallas
+  no digan cosas distintas del mismo proveedor.
+- **La antigüedad por tramos (30/60 días, configurable) sigue exactamente donde estaba.** No se retiró
+  nada: sólo se decidió que la pantalla de los jueves no se arma alrededor de ella, porque Daniel no la
+  mira. En la bandeja de «a quién le debo», la columna «vencido» **sigue siendo sólo de los proveedores
+  de factura** — los días vencidos son lo único que cruza a la maquila.
+- **Nada se guardó ni se recalculó hacia atrás**: el vencimiento se calcula al momento de mirar. Ningún
+  movimiento viejo se tocó.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Tres cosas que decidió el lead y Daniel tiene que ratificar** (están en `DECISIONES.md`
+  §Post-F9.220): **(a)** que el número sea el del cargo más viejo *que sobrevive a los pagos* y no el
+  más viejo a secas; **(b)** que «debe pero no le vence nada» se lea **«al día»** y no un cero; **(c)**
+  que la columna viva en la relación semanal que ya existe en vez de en una pantalla nueva.
+- 🔻 **La maquila sigue sin repartirse en los tramos de 30/60 días** de la bandeja de CxP: para eso
+  haría falta que los recibos de maquila se registraran por el motor de cuentas, que es otro trabajo.
+  Lo que Daniel pidió —los días— sí está.
+- 🔻 **Un pago se sigue sin poder amarrar a una factura concreta.** Mientras eso no exista, la edad que
+  se enseña es la mejor suposición posible, no una certeza. El **saldo total** nunca se ve afectado.
 
 ## 0.127 · 7-sep-2026 · **en prueba** — **El número de producción lo pones tú al importar, y la OP dice de qué desarrollo nació**
 

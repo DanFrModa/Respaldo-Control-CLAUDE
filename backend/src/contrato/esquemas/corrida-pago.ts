@@ -186,6 +186,8 @@ export type RenglonCorridaSalida = z.infer<typeof esquemaRenglonCorridaSalida>;
  * Las columnas de referencia CAMBIAN por sección y por eso viajan todas nullable:
  *  • maquileros → `saldo` (EsMa, sólo lo revisado) + `porRevisar` + `recibosSemana`;
  *  • proveedores CxP → `saldo` + `vencido` (las cubetas de la bandeja);
+ *  • los DOS → `diasVencidos` (fila 0.121): es la única columna de referencia que cruza la frontera
+ *    entre el motor y la maquila, porque es la que Daniel mira para decidir a quién le paga;
  *  • conceptos del catálogo → ninguna: nacen en cero.
  * NINGUNA es el número que se paga (§Post-F9.189(b)).
  */
@@ -211,6 +213,27 @@ export const esquemaFilaCorridaSalida = z
     // ── Referencia (NUNCA el número que se paga) ────────────────────────────────────────────
     saldo: z.number().nullable().describe('Saldo a favor del beneficiario, o null.'),
     vencido: z.number().nullable().describe('Parte vencida del saldo (sólo CxP), o null.'),
+    /**
+     * ⭐ **DÍAS VENCIDOS** (fila 0.121) — los días que lleva vencido el cargo MÁS VIEJO que sigue
+     * sin pagarse. **DANIEL (§Post-F9.218(a)):** *«Es irrelevante [los tramos]. Ni siquiera veo eso.
+     * Solo con que pongas los días vencidos es suficiente.»*
+     *
+     * `null` = no hay nada que envejecer (no debe, o los pagos ya lo cubrieron) · `0` = debe pero
+     * está dentro de su plazo · `n` = su cargo más viejo lleva `n` días vencido.
+     *
+     * ⚠️ A diferencia de `vencido` —que son las cubetas del motor y por eso deja fuera la maquila—
+     * este número **cubre las dos fuentes**: es el único dato de antigüedad que un maquilero tiene.
+     * NO es un importe: no se oculta con `consultas.ver-importes` (saber que algo lleva 30 días
+     * vencido no revela cuánto es).
+     */
+    diasVencidos: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del ' +
+          'plazo; null = nada que envejecer.',
+      ),
     porRevisarNeto: z
       .number()
       .nullable()

@@ -10,7 +10,7 @@
 | `SecuenciaGlobal` | `secuencias_globales` | Contador atómico SIN empresa (A3) para las numeraciones de los catálogos globales; hoy la del consecutivo de DESARROLLO por cliente+año (clave `modelo-desarrollo-<idCliente>-<año>`). |
 | `ModeloFoto` | `modelo_foto` | N fotos por modelo (tipo FRENTE/ESPALDA/OTRO + orden). |
 | `Archivo` | `archivos` | Registro de cada foto en R2 (bucket, key, metadatos). |
-| `ModeloTela` | `modelo_tela` | Renglones BOM de tela (consumo + 3 banderas). PK compuesta (idModelo, idTela). |
+| `ModeloTela` | `modelo_tela` | Renglones BOM de tela (consumo del CUERPO + consumo del COMPLEMENTO, opcional + 3 banderas). PK compuesta (idModelo, idTela). |
 | `ModeloAvio` | `modelo_avio` | Renglones BOM de avío (consumo + 3 banderas). PK compuesta (idModelo, idAvio). |
 | `ModeloArte` | `modelo_arte` | **ARTE del modelo** (V1-E3d, §Post-F9.35): nombre, tipo, puntadas, precio (el que viaja a la OP), proveedor y foto. Hijo del modelo, ya NO un puente a un catálogo. `nombre` único dentro del modelo; `precio` nullable en BD (histórico migrado). |
 
@@ -189,6 +189,49 @@ desmarcan la casilla, está como incompleto. Es decir, siempre hay que atender e
 ### BOM — banderas `b*` → `para*`
 
 Los CSV del BOM viejo usan banderas `bPreCosto`/`bProduccion`/`bCosto` (valores `0`/`1`). En v2 son `paraPreCosto`/`paraProduccion`/`paraCosto` (booleanos). La transformación es directa y está cubierta por unit tests en `etl-modelos-unit.test.ts`.
+
+### BOM — el CONSUMO DEL COMPLEMENTO de la tela (fila 0.156, §Post-F9.214 / §Post-F9.219)
+
+Muchos modelos llevan **felpa + cárdigan**, y el cárdigan **comparte lote con su felpa**
+(`CLAUDE.md` §5, de la ingeniería inversa: *«doble componente ExTela1/ExTela2 — mismo lote»*). La
+tela ya declaraba su complemento (`Tela.nombreComplemento`) y la compra ya lo exigía
+(`OrdenCompraLinea.cantidadComplemento`), pero el BOM guardaba **un solo consumo por tela**: por eso
+la gente acababa dando de alta el cárdigan como tela suelta —rompiendo el vínculo de lote en
+silencio— y por eso cada OC que generaba la explosión nacía con el complemento **pendiente**.
+
+- **`ModeloTela.consumoComplementoPorPrenda`** (Decimal(12,4), **nullable**) — el consumo del
+  cárdigan por prenda. Es un **NÚMERO PROPIO**, no una proporción del cuerpo (decisión de Daniel,
+  §Post-F9.210·6). `NULL` = nadie lo capturó ⇒ el sistema se comporta como antes de la fila.
+- **El reparto de autoridad:** *quién* lleva complemento lo dice el **CATÁLOGO**
+  (`Tela.nombreComplemento`), *cuánto* lleva lo dice la **RECETA**. El dominio rechaza capturarlo en
+  una tela que no lo declara (`exigirTelasValidas`, `bom-modelo.ts`), palabra por palabra el mismo
+  reparto que ya usaba la línea de orden de compra (§Post-F9.18).
+- **Viaja copiado por las CINCO puertas que copian una receta**, cada una con su prueba de
+  integración: las cuatro que llegan a la ORDEN (`OrdenTela.consumoComplementoPorPrenda`) — alta
+  (`copiarRecetaDelModelo`), agregar renglón, restaurar y «traer del modelo»— y la quinta, que llega
+  a **otro MODELO**: `versiones.ts::copiarRecetaAModeloNuevo`, la de crear una versión y la de
+  «copiar un modelo ya desarrollado». La explosión del MRP lee **la receta de la orden**, nunca el
+  BOM (V1-E3d), así que sin ese segundo campo el número no llegaría a la compra.
+  ⚠️ **Son cinco `createMany`/`create` que enumeran sus campos a mano**: olvidar el complemento en
+  cualquiera de ellos no rompe nada —Prisma escribe NULL— y el cárdigan **se pierde en silencio**.
+  Fue exactamente lo que pasó con la quinta en la primera vuelta de la fila. Por eso hay **una
+  prueba por puerta**, no una que las cubra de paso.
+- **En la compra:** `mrp.ts` aplica la **razón** `complemento ÷ cuerpo` sobre lo que cada línea compra
+  de cuerpo (`razonDeComplemento` + `cantidadComplementoDeLinea`, las dos puras y con pruebas). Si la
+  tela ya no declara complemento, si la receta no lo capturó o si el cuerpo es 0, la línea nace
+  **pendiente** y `autorizarOC` la sigue parando — sin inventar cantidades.
+- **En pantalla:** el campo está en el **renglón** de la receta, al lado del consumo de la tela y
+  **sin desplegar el panel**, rotulado con el nombre real del complemento («Cardigan»).
+
+> ### ⚠️ ANTES DE EMPEZAR A USARLO: el COSTO del complemento todavía NO se valúa
+>
+> **Hasta la fila 0.163, ni el precosto ni el costo real valúan el complemento: sólo el cuerpo.**
+> Mientras el cárdigan se dé de alta como **tela suelta** sigue costeando bien (entra como su propio
+> renglón); en cuanto se mueve a **complemento**, su costo **desaparece del precosto** — y de ahí
+> sale el precio que se le cotiza al cliente, así que el número queda **más bajo de lo real**.
+>
+> Este aviso vive AQUÍ, pegado al campo, y no sólo en `DECISIONES.md` §Post-F9.219(f) y en la fila
+> 0.163: quien decide usar la función lee esta ficha, no el documento maestro (`CLAUDE.md` §8).
 
 ### BOM — avíos FAVORITOS sugeridos (V1-E3v, §Post-F9.90)
 

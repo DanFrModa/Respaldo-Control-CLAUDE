@@ -271,6 +271,8 @@ function fichaBase(
         idTela: 9,
         nombre: 'Jersey',
         consumoPorPrenda: 1,
+        nombreComplemento: null,
+        consumoComplementoPorPrenda: null,
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
@@ -467,6 +469,8 @@ describe('<EditorBom> — secciones de la receta', () => {
               idTela: 9,
               nombre: 'Jersey',
               consumoPorPrenda: 1,
+              nombreComplemento: null,
+              consumoComplementoPorPrenda: null,
               paraPreCosto: true,
               paraProduccion: true,
               paraCosto: true,
@@ -523,6 +527,8 @@ describe('<EditorBom> — secciones de la receta', () => {
               idTela: 9,
               nombre: 'Jersey',
               consumoPorPrenda: 1,
+              nombreComplemento: null,
+              consumoComplementoPorPrenda: null,
               paraPreCosto: true,
               paraProduccion: true,
               paraCosto: true,
@@ -561,6 +567,8 @@ describe('<EditorBom> — secciones de la receta', () => {
               idTela: 9,
               nombre: 'Jersey',
               consumoPorPrenda: 1,
+              nombreComplemento: null,
+              consumoComplementoPorPrenda: null,
               paraPreCosto: true,
               paraProduccion: true,
               paraCosto: true,
@@ -718,6 +726,8 @@ describe('<EditorBom> — secciones de la receta', () => {
               idTela: 9,
               nombre: 'Jersey',
               consumoPorPrenda: 1,
+              nombreComplemento: null,
+              consumoComplementoPorPrenda: null,
               paraPreCosto: true,
               paraProduccion: true,
               paraCosto: true,
@@ -1021,5 +1031,110 @@ describe('<EditorBom> — secciones de la receta', () => {
       const sugerida = screen.getByTestId('curva-sugerida-3-4');
       expect(within(sugerida).getByRole('button', { name: /Asignar esta curva/ })).toBeEnabled();
     });
+  });
+});
+
+/**
+ * ⭐⭐ 0.156 (§Post-F9.214) — **EL CAMPO DE LA SEGUNDA TELA.**
+ *
+ * DANIEL, mirando esta pantalla: *«no se ve el campo de la segunda tela para meter la info. Sólo
+ * se ve el campo de la tela principal»*. El complemento (el cárdigan de la felpa) es un **número
+ * propio** y se captura AQUÍ, en el renglón —no en el panel que hay que desplegar: si hubiera que
+ * abrirlo para verlo, seguiría sin verse—, rotulado con el nombre que le da el CATÁLOGO.
+ */
+describe('El consumo del COMPLEMENTO de la tela (0.156)', () => {
+  // ⚠️ Este bloque vive FUERA del describe grande, así que necesita su propio reseteo: sin él, la
+  // prueba de «dejarlo en blanco» leía la llamada de la prueba ANTERIOR y pasaba/fallaba por
+  // contagio (así se cazó, en rojo, la primera vez que se corrió).
+  beforeEach(() => {
+    guardarTelasMutate.mockReset();
+    guardarAviosMutate.mockReset();
+    favoritosMock = { sugeridos: [], yaEnLaReceta: [], sinCantidad: [] };
+    curvasMock = { idModelo: 1, yaTieneCurva: false, sugerencias: [] };
+  });
+
+  /** Ficha con una tela que SÍ lleva complemento, con el consumo que se le pase. */
+  function fichaConComplemento(consumoComplemento: number | null): ModeloFicha {
+    return fichaBase([], {
+      telas: [
+        {
+          idTela: 9,
+          nombre: 'Felpa 50/50',
+          consumoPorPrenda: 1.2,
+          nombreComplemento: 'Cardigan',
+          consumoComplementoPorPrenda: consumoComplemento,
+          paraPreCosto: true,
+          paraProduccion: true,
+          paraCosto: true,
+          idTelaProveedor: null,
+          proveedorAmarrado: null,
+          precioPorColor: false,
+          precioCosteo: 40,
+          origenPrecio: 'referencia' as const,
+          proveedorPrecio: null,
+          amarreIgnorado: false,
+          precioReferencia: 40,
+        },
+      ],
+    });
+  }
+
+  it('se ve SIN desplegar el panel, y se rotula con el nombre del catálogo', () => {
+    renderConProveedores(<EditorBom ficha={fichaConComplemento(0.15)} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    // El panel sigue cerrado (es la queja original: el campo no se veía).
+    expect(screen.queryByTestId('detalle-bom-9')).not.toBeInTheDocument();
+
+    const campo = screen.getByTestId('consumo-complemento-bom-9');
+    expect(campo).toHaveValue(0.15);
+    // Rotulado «Cardigan», que es lo que dice el catálogo — nunca la palabra genérica.
+    expect(
+      screen.getByLabelText('Consumo de Cardigan (complemento de Felpa 50/50)'),
+    ).toBeInTheDocument();
+    expect(within(screen.getByTestId('renglon-bom-9')).getByText('Cardigan')).toBeInTheDocument();
+  });
+
+  it('NO aparece en una tela que no lleva complemento (lo decide el catálogo, no la pantalla)', () => {
+    renderConProveedores(<EditorBom ficha={fichaBase()} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+    expect(screen.queryByTestId('consumo-complemento-bom-9')).not.toBeInTheDocument();
+  });
+
+  it('lo capturado viaja al guardar, junto al consumo del cuerpo', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<EditorBom ficha={fichaConComplemento(null)} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.type(screen.getByTestId('consumo-complemento-bom-9'), '0.15');
+    await usuario.click(screen.getByTestId('guardar-bom-telas'));
+
+    const args = guardarTelasMutate.mock.calls[0]?.[0] as {
+      telas: { consumoPorPrenda: number; consumoComplementoPorPrenda: number | null }[];
+    };
+    expect(args.telas[0]).toMatchObject({
+      consumoPorPrenda: 1.2,
+      consumoComplementoPorPrenda: 0.15,
+    });
+  });
+
+  it('dejarlo EN BLANCO viaja como null, no como 0', async () => {
+    // 🔑 Un cárdigan que consume 0 no existe: el servidor sólo acepta números positivos, y un 0
+    // afirmaría que la tela no lleva complemento — que es una afirmación distinta y falsa.
+    const usuario = userEvent.setup();
+    renderConProveedores(<EditorBom ficha={fichaConComplemento(0.15)} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.clear(screen.getByTestId('consumo-complemento-bom-9'));
+    await usuario.click(screen.getByTestId('guardar-bom-telas'));
+
+    const args = guardarTelasMutate.mock.calls[0]?.[0] as {
+      telas: { consumoComplementoPorPrenda: number | null }[];
+    };
+    expect(args.telas[0]?.consumoComplementoPorPrenda).toBeNull();
   });
 });

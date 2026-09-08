@@ -58,6 +58,7 @@ import {
   MENSAJE_SIN_CAMBIOS,
   resolverCambios,
 } from '../finanzas/correccion-comun.js';
+import { sumarPlazo } from './aging-comun.js';
 import { esOrigenCargo, signoDeOrigen } from './origen-tercero.js';
 import { resolverEsFiscalMotor } from './segmento-motor.js';
 import { exigirTercero, obtenerNombreTercero } from './terceros.js';
@@ -169,7 +170,7 @@ export function calcularVencimiento(
   if (!esOrigenCargo(origen)) {
     return null;
   }
-  return new Date(fecha.getTime() + diasCredito * 86_400_000);
+  return sumarPlazo(fecha, diasCredito);
 }
 
 /** Los dos campos scalar del tercero según el tipo (D15a: exactamente uno poblado). */

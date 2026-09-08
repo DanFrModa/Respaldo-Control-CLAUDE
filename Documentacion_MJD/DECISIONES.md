@@ -12250,6 +12250,138 @@ entrar, esta vez **sin que ninguna prueba lo estuviera mirando**. La decisión s
 con el valor, y hay una prueba con ese caso.
 
 - **Aplica en:** versión **0.131**, fila 0.131. **Fecha:** 2026-09-08.
+#### (Post-F9.219) — ⭐⭐ CÓMO SE PIDE EL CÁRDIGAN: la receta guarda un NÚMERO PROPIO y la compra lo aplica como RAZÓN (fila 0.156 / v0.129, 7-sep-2026)
+
+Es la **ejecución** de lo que Daniel ya decidió en **§Post-F9.210·6** (*«Número propio, pero hoy no se ve
+el campo de la segunda tela para meter la info. Sólo se ve el campo de la tela principal»*) y en
+**§Post-F9.214** (*«sí es importante meterlo como complemento porque hay proveedores que así lo manejan y
+para el control de la tela siempre es mejor ponerla como un complemento de su tela»*). Aquí sólo se
+escribe **lo que hubo que decidir para construirlo**, que él no había contestado porque no se le había
+preguntado — con su default y su razón, para que pueda corregirlo de un vistazo.
+
+**Lo que la fila entregó:** el consumo del complemento se captura en la receta del modelo, **al lado del
+consumo de la tela y sin desplegar nada**, rotulado con el nombre que el catálogo le da a ese complemento
+(«Cardigan»); viaja congelado a la receta de la ORDEN; y desde ahí la explosión del MRP **ya emite la
+orden de compra con la cantidad de cárdigan puesta**, en vez de dejarla PENDIENTE para que alguien la
+teclee orden por orden.
+
+---
+
+##### (a) 🔑 La CANTIDAD de la orden de compra se calcula como una RAZÓN sobre el cuerpo de esa línea
+*Default tomado por el coder.* **⏳ Pendiente de que Daniel lo confirme o lo corrija.**
+
+El consumo del complemento es un **número propio** (eso ya lo decidió él y no se toca): se teclea
+`0.15 kg de cárdigan por prenda`, no «un 12 % de la felpa». La pregunta que quedaba es **otra**: cuando la
+orden de compra pide **480 kg de felpa** —después de netear existencias, repartir entre OP y aplicar los
+ajustes que tecleó el comprador—, ¿cuánto cárdigan pide?
+
+- **Lo que se hizo:** `cárdigan = cuerpo de esa línea × (consumo del cárdigan ÷ consumo de la felpa)`.
+- **Por qué:** el cárdigan **viaja con su felpa**. Se compra en el mismo renglón, al mismo proveedor y
+  —lo que da sentido a toda la fila— **en el mismo lote** (`CLAUDE.md` §5, de la ingeniería inversa:
+  *«doble componente ExTela1/ExTela2 — mismo lote»*). Si se compran 480 kg de felpa en lugar de los 500
+  calculados, lo que hace falta es el cárdigan **de esos 480**. Un requerimiento calculado por separado
+  (piezas × consumo) se **separaría de su cuerpo** en cuanto alguien tocara una cantidad, que es
+  exactamente el caso que Daniel describió en §Post-F9.99 (*«compré 480 en lugar de 481»*).
+- **La alternativa que se descartó**, y qué habría que hacer si él la prefiere: netear el complemento
+  **contra su propia existencia** y repartirlo aparte. Es más trabajo y —mientras cuerpo y complemento
+  se compren en el mismo renglón— daría números que no cuadran con el rollo que llega.
+- ⭐ **Dónde se calcula, y por qué importa: en el PLAN, no en la generación.** El subtotal de una línea
+  de orden de compra es `cantidad × precio + complemento × (precioComplemento ?? precio)`, así que en
+  cuanto el cárdigan deja de nacer vacío **empieza a costar dinero**. Si se calculara al generar, la
+  **revisión previa** prometería un total MENOR del que la orden acabaría pidiendo — justo la
+  separación que §Post-F9.85 existe para impedir (*«una revisión previa que no fuera el mismo cálculo
+  sería una promesa que el sistema no cumple»*). Ahora el número nace **una sola vez**, en el plan: la
+  previa lo enseña en su importe y la generación **lo copia**. Queda fijado con una prueba que compara
+  el total prometido contra el guardado. ⚠️ Como la OC automática no captura precio del complemento, el
+  cárdigan se valúa **al precio del cuerpo** (`precioComplemento ?? precio`, la regla que ya existía).
+- ⚠️ **Y la segunda mitad de eso, que apareció al medir:** la previa pinta literalmente
+  `cantidad × precio = importe`, así que un importe que ya trae el cárdigan **deja de cuadrar a la
+  vista**. Cada renglón dice ahora **cuánto complemento incluye**, con el nombre del catálogo:
+  *«36 kg × $90.00 = $3,645.00 (incluye 4.5 kg de Cardigan)»*.
+
+##### (b) Quién lleva complemento lo dice el CATÁLOGO; cuánto lleva, la RECETA
+*Default tomado. Es el mismo reparto que ya gobernaba la línea de orden de compra desde §Post-F9.18.*
+
+La receta **rechaza** capturar consumo de complemento en una tela que no lo declara
+(`Tela.nombreComplemento`), con un error que dice qué hacer (*«decláraselo primero en el catálogo de
+telas»*). Y si a una tela se le **quita** el complemento después de que una orden ya lo congeló, la
+compra **no lo pide** y no se rompe: manda el catálogo de hoy.
+**Por qué:** sin esa puerta, un número congelado sin sentido llegaría a la orden de compra y
+`validarLineas` **rechazaría la OC entera** —incluidas sus otras líneas— con un error sobre un renglón
+que el comprador nunca capturó.
+
+##### (c) Capturarlo es OPCIONAL, y no capturarlo deja el sistema exactamente como estaba
+*Default tomado.*
+
+Sin el número, la orden de compra **sigue naciendo con el complemento pendiente** y `autorizarOC` lo
+sigue exigiendo antes de dejarla pasar. Es la respuesta a la única pregunta que la **REGLA 0-B** permite
+—*«¿esto funciona bien cuando el dato NO está?»*—: sí, se comporta como el sistema de ayer.
+**Por qué no se hizo obligatorio:** volverlo obligatorio dejaría **sin poder guardar** cualquier receta
+existente que tenga una tela con complemento, obligando a completar el histórico — justo lo que la REGLA
+0-B prohíbe gastar. ⏳ Si Daniel prefiere que sea obligatorio **de aquí en adelante**, se puede: es una
+línea en el dominio.
+
+##### (d) Cero no es un valor válido
+*Default tomado.* Un cárdigan que consume 0 **no es un cárdigan**: se deja el campo en blanco. Además, la
+línea de orden de compra ya exigía que la cantidad del complemento fuera **positiva**, así que un 0
+guardado reventaría la creación de la OC.
+
+##### (e) 🔴 La tela suelta NO se retiró, y no se va a retirar
+Daniel dijo que hay cárdigans que se dan de alta como tela independiente **porque son especiales**. Eso
+sigue siendo válido y no se tocó ni un renglón de ese camino. Lo que esta fila arregla es que el otro
+camino —el que él prefiere— **ya no sea imposible**.
+
+##### (f) 🔴 LO QUE ESTA FILA **NO** HIZO, y hay que decidir: el COSTO del complemento
+**Medido, no supuesto:** `backend/src/dominio/costos/` **no menciona «complemento» ni una sola vez**.
+El precosto y el costo real de una tela valúan **sólo el cuerpo** (`consumoPorPrenda × precio`).
+
+Mientras el cárdigan se daba de alta como **tela suelta**, eso no se notaba: entraba al costo como su
+propio renglón. **Desde esta fila el cárdigan puede vivir dentro de su felpa — y entonces su costo
+desaparece del precosto.** ⚠️ De ese precosto sale **el precio que se le cotiza al cliente**, así que
+el número quedaría BAJO justo cuando alguien haga lo que Daniel pidió.
+
+**Por qué no se construyó aquí, dicho completo:** valuar el complemento obliga a decidir **con qué
+precio**. Hoy el único precio de complemento que existe es `TelaColor.precioComplemento` —que es **por
+COLOR**, y la receta del modelo **no tiene color** (el color llega con la orden)—, y **no hay ninguna
+cascada de resolución de precios para el complemento**, como sí la hay para el cuerpo
+(`costos/resolucion-precios.ts`). Inventarla de pasada habría metido una regla de **dinero** que nadie
+decidió, en una fila que venía a arreglar otra cosa.
+
+⏳ **Queda como decisión abierta, con recomendación del coder: 🔴 debería bloquear V1.** Es dinero, y es
+la mitad que falta para que llevar el cárdigan **como complemento** sea de verdad equivalente a llevarlo
+**suelto** — que es la promesa entera de §Post-F9.214. Anotada también en `HOJA-DE-RUTA.md` §6.
+
+
+##### (g) 🔴 SON **CINCO** PUERTAS, NO CUATRO — lo encontró la revisión, y la lección es la puerta que se enumera sola
+*Corregido en la ronda de corrección; la primera vuelta decía «cuatro».*
+
+Copiar una receta no es una operación: son **cinco**, y cada una es un `createMany`/`create` que
+**enumera sus campos a mano**. Cuatro llevan al complemento a la ORDEN —alta
+(`copiarRecetaDelModelo`), agregar renglón, restaurar y «traer del modelo»— y la quinta lo lleva a
+**otro MODELO**: `modelos/versiones.ts::copiarRecetaAModeloNuevo`, con **dos llamadores reales**
+(`crearVersionDeModelo` y `desarrollo/modelo-en-la-mesa.ts`, el *«copiar un modelo ya desarrollado»*
+que Daniel pidió en la 0.064).
+
+🔴 **Ésa se quedó fuera en la primera vuelta**, y el daño es exactamente el que esta fila vino a
+cerrar: el modelo nuevo nace **sin cárdigan**, sus órdenes vuelven a nacer con el complemento
+pendiente, y **nadie se entera** — omitir un campo en un `createMany` no rompe nada, Prisma escribe
+NULL. El comentario encima de esa misma puerta decía, palabra por palabra, *«misma razón que en
+`copiarBom`»*… y `copiarBom` sí lo copiaba.
+
+📌 **LA LECCIÓN, que vale más que el arreglo: un `createMany` que enumera campos es una puerta que
+hay que CONTAR, y contarlas se hace midiendo, no leyendo.** El reviewer destripó **tres puertas a la
+vez** y la suite entera —241 archivos, 3555 unit, 289 de integración— se quedó **en verde**: sólo la
+del alta estaba medida. Por eso ahora hay **una prueba por puerta**, con su nombre («PUERTA 2 ·
+AGREGAR…»), y no una que las cubra de paso: *una garantía sin su propia prueba no es una garantía,
+aunque el código esté bien escrito.*
+
+---
+
+- **Aplica en:** versión **0.129**, fila **0.156**. **Fecha:** 2026-09-07.
+- **Migración** `20260907130000_consumo_del_complemento_en_la_receta`: **aditiva y nullable**, dos
+  columnas (`modelo_tela` y `orden_tela`) porque son **dos momentos** —lo que se teclea y lo que la
+  orden congela—; la explosión lee la receta de la ORDEN y nunca el BOM del modelo (V1-E3d), así que sin
+  la segunda el número no llegaría jamás a la compra. **SIN backfill, SIN semillas, SIN permisos nuevos.**
 
 ---
 
@@ -12312,6 +12444,7 @@ estaba en **cuatro sitios de tres pantallas**, hoy en cero, y también se corrig
 rediseño**, que lo describían como conducta vigente y **mandan sobre la implementación**.
 ⏳ **Queda una, a criterio de Daniel:** la frase sigue en `docs/rediseno/prototipo.html` (un `toast` del
 demo). **Es su mockup**, no una spec en prosa, y editarlo es otro tipo de acto.
+
 #### (Post-F9.216) — ⭐ QUÉ ES «EL PRECIO NEGOCIADO» QUE SE VE DESDE FUERA (7-sep-2026, fila 0.153 / v0.126)
 
 **Daniel:** *«dice precio aprobado, **pero dentro de la negociación quedó otro**. Debe de haber
@@ -12366,6 +12499,83 @@ pantalla de la **ORDEN**, vía `liga-orden.ts:465`. (Confirmado por el coder y p
 ⚠️ **No cambia el diseño entregado, pero deja un cabo:** en esa pantalla **persiste la incongruencia
 original** —el precio sugerido sale del **aprobado** mientras los acuerdos de abajo muestran otro—, así
 que **la queja de Daniel puede reaparecer ahí**. Fuera del alcance de esta fila.
+
+---
+
+#### (Post-F9.220) — LOS DÍAS VENCIDOS DE LOS JUEVES: cómo se calculan, y las tres decisiones que el lead tomó con default (fila 0.121, 7-sep-2026)
+
+**De dónde viene.** Daniel arma cada jueves un Excel a mano para decidir a quién le paga:
+*«Este archivo lo necesito **todos los jueves**… ahí voy decidiendo qué vamos a pagar y lo voy
+capturando. Me gustaría que **todo eso lo haga directo en el sistema**»*. La presentación ya la cerró
+él en **§Post-F9.218(a)**: *«**Solo con que pongas los días vencidos es suficiente**»* ⇒ un número por
+renglón, sin cubetas. Lo que faltaba —y es lo que esta fila construyó— es que **ese número exista
+para los maquileros**.
+
+### 🔴 LA CAUSA, MEDIDA: no era que el plazo no llegara — es que la deuda de maquila nunca pasa por el motor
+
+`calcularVencimiento()` **sí** se llama al registrar, y **sí** funciona. Lo que pasa es que los cargos
+de maquila **no son movimientos del motor**: viven en las tablas de EsMa (F6), y la convivencia de F9
+las re-expresa **por LECTURA** sin migrarlas (`convivencia-esma.ts`, opción (b) de F9-E1). Esas tablas
+**no tienen columna de vencimiento** —`EsMaCargo` ni siquiera tiene columna de fecha: su fecha es su
+`creadoEn`— así que la proyección escribía `fechaVencimiento: null` **para los cuatro conceptos, a
+mano**, y de ahí salía el «—» que Daniel veía.
+
+⇒ **El arreglo no es guardar una columna: es DERIVARLA al leer.** Fecha del cargo + los días de
+crédito del proveedor, con la MISMA aritmética del motor (`sumarPlazo`, que se extrajo de
+`calcularVencimiento` y vive en `aging-comun.ts`). **No se guarda nada, no se toca ni un movimiento
+ya registrado, y no hay migración** — REGLA 0-B cumplida sin esfuerzo, porque un número derivado no
+tiene pasado que reparar.
+
+🔒 **Y confirma la regla que Daniel dictó:** *«las inconsistencias son errores de Lupita»* ⇒ **el plazo
+es SIEMPRE del proveedor y la fecha se calcula sola.** No hay ni un campo nuevo que teclear: cambiar
+`Proveedor.diasCredito` cambia la antigüedad de toda su deuda, y nada más la cambia.
+
+### ⚠️ LA TRAMPA QUE CASI CUESTA EL ARREGLO: en EsMa el «abono» es un CARGO
+
+`SIGNO_SALDO` (`esma/formula-saldo.ts`) lo dice desde F6: en EsMa **cargo +, abono +, pago −,
+descuento −** — el abono es un **cargo extra al maquilero**. Pero el `abono` del **motor** RESTA. La
+proyección etiqueta los renglones de EsMa con los orígenes del motor, así que preguntarle a
+`calcularVencimiento` —que decide por el ORIGEN— habría devuelto `null` para un abono de EsMa: un
+renglón que **sí** envejece se habría quedado sin edad, en silencio, sólo para ese concepto.
+⇒ **Quién envejece se decide por el SIGNO**, leído de `SIGNO_SALDO`, nunca por la etiqueta. Está
+medido con una mutación (cambiar el signo por la etiqueta pone dos pruebas en rojo).
+
+### ✅ Las TRES decisiones que el lead tomó con default — ⏳ PENDIENTES DE RATIFICACIÓN DE DANIEL
+
+**(a) ¿QUÉ número es «los días vencidos» de un proveedor que debe varias cosas?**
+**Default tomado: los días del cargo MÁS VIEJO que todavía no se ha pagado.** Es el que decide la
+urgencia; un promedio ponderado escondería justo la factura vieja que hay que sacar, y sumar las
+edades no significa nada. Coincide con cómo lo lee él en su archivo (*«BORDA PRINT lleva 8 días»*: una
+edad por beneficiario, no una por factura).
+⚠️ **El matiz honesto:** los pagos **no están amarrados a un cargo concreto** (el motor todavía no liga
+pago↔factura; ya lo advierte `aging-comun.ts`), así que «el más viejo que sigue sin pagarse» hay que
+**suponerlo**. Se supone con **la misma convención que ya usan las cubetas**: los créditos se aplican
+de más viejo a más nuevo. Reusarla es lo que impide que esta columna y la bandeja cuenten historias
+distintas del mismo proveedor. *(Si Daniel prefiriera «el más viejo a secas, aunque ya le haya pagado»,
+es cambiar una línea — pero entonces un proveedor al corriente saldría marcado en rojo para siempre.)*
+
+**(b) ¿Y si debe pero todavía no le vence nada?**
+**Default tomado: TRES estados distintos, que no se colapsan.** `—` = no hay nada que envejecer (no
+debe, o los pagos ya lo cubrieron) · `al día` = debe, pero está dentro de su plazo · `n d` = su cargo
+más viejo lleva `n` días vencido. Un `0` a secas donde debería ir `—` se lee como *«no debe nada»*,
+que es lo contrario de lo que pasa; por eso son tres y no dos.
+
+**(c) ¿Dónde va la columna, y se puede trabajar sobre ella?**
+**Default tomado: en la corrida semanal que ya existe (fila 0.113), NO en una pantalla nueva.** Esa
+pantalla **ya es** la sesión de decisión de los jueves —Daniel la dibujó en §Post-F9.189(f): *«Eso
+puede vivir en la pantalla y de ahí ir llenando la información de pagos»*— y tiene el campo abierto
+para capturar lo que se paga. Construir una segunda relación habría duplicado la que él pidió y
+partido en dos el total que sólo tiene sentido junto. La columna vive **pegada al saldo**, y es la
+**única de referencia que vale igual para un maquilero y para un proveedor**.
+
+📌 **Lo que NO se tocó, a propósito:** el **aging por cubetas** sigue exactamente donde estaba y sigue
+configurable (§Post-F9.218(a) lo pide así). La cubeta «Maquila» de la bandeja de CxP **sigue sin
+repartirse** en las cuatro cubetas: para eso haría falta que EsMa registrara por el motor, y no hacía
+falta para lo que Daniel pidió. ⇒ En la bandeja, `vencido` sigue siendo **sólo del motor**; los días
+vencidos son los que cruzan la frontera.
+
+- **Aplica en:** fila **0.121**, versión **0.128**. Confirma y ejecuta **§Post-F9.218(a)**.
+  **Fecha:** 2026-09-07.
 
 ---
 
