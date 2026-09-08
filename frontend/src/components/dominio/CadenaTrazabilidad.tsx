@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
  * CADENA DE TRAZABILIDAD del flujo de captura (rediseño R3, §4.1 — proto `cadenaTraza`):
  * `OC cliente → Desarrollo → Lista de precios → Pedido interno → OP · producción`. Cada nodo es
  * una tarjetita etiqueta+valor; los ACTIVOS navegan a su pantalla, los que no existen para ese
- * registro se pintan APAGADOS (p. ej. un modelo histórico sin ficha de desarrollo lleva la nota
- * "modelo anterior al módulo de Desarrollo" en su tooltip). El nodo de la OC del cliente se
+ * registro se pintan APAGADOS, con la razón en su tooltip (p. ej. una orden que no viene de ningún
+ * expediente de Desarrollo). El nodo de la OC del cliente se
  * distingue con borde PUNTEADO (es la referencia externa, no una pantalla del sistema).
  *
  * Presentación PURA (A1): no conoce pedidos ni órdenes; el padre arma los nodos y su navegación.
@@ -25,7 +25,7 @@ export interface NodoTraza {
   activo: boolean;
   /** Navegación al hacer clic (solo si `activo`). */
   onNavegar?: () => void;
-  /** Tooltip (p. ej. la nota "modelo anterior al módulo de Desarrollo"). */
+  /** Tooltip: por qué el nodo está apagado, o qué es el valor que enseña. */
   titulo?: string;
 }
 

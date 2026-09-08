@@ -23631,6 +23631,10 @@ export interface paths {
                 codigoModelo: string;
                 /** @description Descripción del modelo, o null. */
                 descripcionModelo: string | null;
+                /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+                idModeloDesarrollo: number | null;
+                /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+                codigoModeloDesarrollo: string | null;
                 /** @description Cliente de la orden. */
                 idCliente: number;
                 /** @description Nombre del cliente (para la UI). */
@@ -24850,6 +24854,14 @@ export interface paths {
                   /** @description Mensaje legible para la vista previa. */
                   mensaje: string;
                 }[];
+                /** @description Qué le va a pasar al MODELO de la OP de este PDF si se confirma con la liga que hoy trae el renglón, o null si todavía no hay ninguna liga (no hay modelo del que hablar). SOLO en `nacido` tiene sentido teclear un número. */
+                modeloDeProduccion: ('nacido' | 'reusado' | 'heredado') | null;
+                /** @description Nº de 5 dígitos que el sistema PROPONE para el modelo que nacería de esta OC, con el que la pantalla precarga el campo. Null si el desenlace no es `nacido` o si la serie está llena. ⚠️ Es INFORMATIVO: se calcula sin el candado del par y sin escribir nada, así que entre esta consulta y el confirm otro puede tomarlo. Quien decide de verdad es el confirm, que vuelve a proponer bajo candado y BLOQUEA si el número capturado ya está ocupado. La pantalla NO debe prometer que el número queda apartado. */
+                numeroProduccionPropuesto: number | null;
+                /** @description Nº de producción del modelo con el que la OP va a quedar cuando NO nace uno nuevo: el del modelo que ya existe para ese color (`reusado`) o el del modelo de producción ya ligado (`heredado`). También trae el número que va a estrenar OTRO PDF de esta misma tanda cuando dos OC comparten modelo y color. Null si no aplica, si el modelo histórico no tiene número, o si el modelo de ese color está DESCONTINUADO (ahí no hay reuso que prometer: el confirm rechaza la importación; el motivo va en `avisosNumeroProduccion`). */
+                numeroProduccionModelo: number | null;
+                /** @description Avisos de la numeración de ESTE PDF (serie cerca del tope, color que ya tiene modelo, modelo sin dígitos para numerar…). NUNCA bloquean. */
+                avisosNumeroProduccion: string[];
                 /** @description La OP que YA nació de esta MISMA OC del cliente (nº de orden), o null si es la primera vez. Cuando viene, el PDF NO se importa al confirmar: se devuelve en `noReconocidos` (defensa V1-E4 contra la doble importación). */
                 yaImportado: {
                   /** @description Id de la OP que ya existe con ese nº de orden del cliente. */
@@ -25002,6 +25014,8 @@ export interface paths {
               }[];
               /** @description Código PANTONE del color de la OP (editado/prefilleado); vacío = sin pantone. */
               pantone?: string;
+              /** @description Nº de producción CONFIRMADO por el usuario para el modelo que va a NACER de ESTA OC (fila 0.151, §Post-F9.46: el sistema lo precarga en la vista previa y el usuario lo puede cambiar). Omitir = aceptar el que proponga el sistema al confirmar. ⚠️ Se IGNORA —con aviso, sin bloquear— cuando el desenlace NO es `nacido`: si ese color ya tenía modelo de producción (se reusa el suyo) o si el modelo ligado ya era de producción (la OP lo hereda). El número es del MODELO, no de la orden. */
+              numeroProduccion?: number;
             }[];
             /**
              * @description Ligas modelo-del-cliente → nuestro modelo (aprendidas o elegidas a mano).
@@ -25050,6 +25064,13 @@ export interface paths {
                 totalPiezas: number;
                 /** @description true si el PDF se adjuntó a la OP. */
                 adjuntado: boolean;
+                /**
+                 * @description Qué pasó DE VERDAD con el modelo de la OP (fila 0.151). Puede no coincidir con lo que anunció la vista previa: entre analizar y confirmar el color pudo estrenar modelo por otra puerta, y entonces un `nacido` anunciado sale `reusado`.
+                 * @enum {string}
+                 */
+                modeloDeProduccion: 'nacido' | 'reusado' | 'heredado';
+                /** @description Avisos de la numeración de ESTA OP (dígitos que no cuadran, serie cerca del tope, número capturado que NO se usó porque el color ya tenía modelo). NUNCA bloquean, pero hay que enseñarlos: son la única señal de que un número tecleado no se aplicó. */
+                avisosNumeroProduccion: string[];
               }[];
               /** @description PDFs que quedaron sin importar. */
               noReconocidos: {
@@ -25219,6 +25240,10 @@ export interface paths {
                 codigoModelo: string;
                 /** @description Descripción del modelo, o null. */
                 descripcionModelo: string | null;
+                /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+                idModeloDesarrollo: number | null;
+                /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+                codigoModeloDesarrollo: string | null;
                 /** @description Cliente de la orden. */
                 idCliente: number;
                 /** @description Nombre del cliente (para la UI). */
@@ -25535,6 +25560,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -25806,6 +25835,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -26094,6 +26127,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -26388,6 +26425,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -26669,6 +26710,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -26949,6 +26994,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -27230,6 +27279,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -27511,6 +27564,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -27795,6 +27852,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */
@@ -28746,6 +28807,10 @@ export interface paths {
               codigoModelo: string;
               /** @description Descripción del modelo, o null. */
               descripcionModelo: string | null;
+              /** @description Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más. */
+              idModeloDesarrollo: number | null;
+              /** @description Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null. */
+              codigoModeloDesarrollo: string | null;
               /** @description Cliente de la orden. */
               idCliente: number;
               /** @description Nombre del cliente (para la UI). */

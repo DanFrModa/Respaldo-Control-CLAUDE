@@ -296,13 +296,27 @@ async function resolverModeloDeLaOp(
   });
 
   if (modelo.origen !== 'desarrollo') {
+    // 🔴 EL NÚMERO CAPTURADO SE IGNORA AQUÍ, Y HASTA LA FILA 0.151 SE IGNORABA **EN SILENCIO**.
+    // El `describe` del contrato ya prometía avisar («se IGNORA —con aviso— … si el renglón ya
+    // apunta a un modelo de producción») y esta rama devolvía `avisos: []`: el contrato decía una
+    // cosa y el código hacía otra. Se nota ahora porque el importador de OC por PDF empezó a
+    // MANDAR el campo, y un modelo de desarrollo puede pasar a producción por otra puerta entre la
+    // vista previa y el confirm — el usuario tecleó un número y nunca se enteraría de que no se usó.
+    const avisos =
+      datos.numeroProduccion === undefined || datos.numeroProduccion === modelo.numeroProduccion
+        ? []
+        : [
+            `El modelo "${modelo.codigo}" ya está en el catálogo de producción, así que la orden ` +
+              `se hizo con él y el número ${String(datos.numeroProduccion)} que capturaste NO se ` +
+              `usó: el número es del modelo, no de la orden.`,
+          ];
     return {
       idModelo: idModeloRenglon,
       codigo: modelo.codigo,
       numeroProduccion: modelo.numeroProduccion,
       idModeloDesarrollo: null,
       codigoModeloDesarrollo: null,
-      avisos: [],
+      avisos,
       estado: 'heredado',
     };
   }

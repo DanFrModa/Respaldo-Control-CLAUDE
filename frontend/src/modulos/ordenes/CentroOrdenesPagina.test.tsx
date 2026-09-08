@@ -674,3 +674,67 @@ describe('<CentroOrdenesPagina> — la OP que no va igual que sus hermanas', () 
     }
   });
 });
+
+// ── ⭐⭐ Fila 0.151 — EL NODO «DESARROLLO» DEJA DE MENTIR ──────────────────────────────
+
+/**
+ * DANIEL: *«¿qué pasa si me equivoqué con el modelo de desarrollo al que lo relacioné?… **en la
+ * OP no veo el modelo de desarrollo**»*.
+ *
+ * 🔴 Lo que había: el nodo sólo se encendía con la LIGA del expediente, y toda OP nacida del
+ * importador de OC por PDF llega SIN liga (`crearOrdenDesdePdf` crea el renglón sin
+ * `idDesarrollo`). Su tooltip decía *«modelo anterior al módulo de Desarrollo (sin liga)»* de una
+ * OP importada hace un minuto y cuyo modelo SÍ nació de un desarrollo. `useSugerenciaLiga` está
+ * simulado sin datos en todo este archivo ⇒ `yaLigada` es false, que es exactamente el caso.
+ */
+describe('nodo Desarrollo de la cadena de trazabilidad (fila 0.151)', () => {
+  beforeEach(() => {
+    useOrdenesCentro.mockReset();
+    useFotosModelo.mockReset();
+    useFotosModelo.mockReturnValue({ data: [] });
+    useOrden.mockReset();
+  });
+
+  it('una OP nacida del PDF enseña su modelo de DESARROLLO, sin liga de expediente', () => {
+    useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+    useOrden.mockImplementation(() =>
+      detalleResuelto({
+        ...ordenDetalle(1, 101),
+        codigoModelo: '71001',
+        idModeloDesarrollo: 42,
+        codigoModeloDesarrollo: 'CYA-26-71-003',
+      }),
+    );
+    // Con `desarrollo.ver`, el nodo además NAVEGA a la ficha del desarrollo (§Post-F9.68).
+    renderConProveedores(<CentroOrdenesPagina />, {
+      sesion: estadoSesionDePrueba(['desarrollo.ver']),
+    });
+
+    const nodo = screen.getByTestId('traza-desarrollo');
+    expect(nodo).toHaveTextContent('#CYA-26-71-003');
+    expect(nodo).not.toBeDisabled();
+    // 🔴 La afirmación falsa, muerta: ni aquí ni en ninguna otra forma.
+    expect(nodo.getAttribute('title')).not.toContain('anterior al módulo de Desarrollo');
+    expect(nodo.getAttribute('title')).toContain('nació del desarrollo CYA-26-71-003');
+  });
+
+  it('una OP SIN linaje se apaga con un texto que sólo afirma lo comprobable', () => {
+    useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+    useOrden.mockImplementation(() =>
+      detalleResuelto({
+        ...ordenDetalle(1, 101),
+        codigoModelo: '51783',
+        idModeloDesarrollo: null,
+        codigoModeloDesarrollo: null,
+      }),
+    );
+    renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+
+    const nodo = screen.getByTestId('traza-desarrollo');
+    expect(nodo).toHaveTextContent('—');
+    expect(nodo).toBeDisabled();
+    // Nada sobre la EDAD del modelo (que la pantalla no puede saber): sólo los dos hechos que sí.
+    expect(nodo.getAttribute('title')).not.toContain('anterior al módulo de Desarrollo');
+    expect(nodo.getAttribute('title')).toContain('no nació de un desarrollo');
+  });
+});

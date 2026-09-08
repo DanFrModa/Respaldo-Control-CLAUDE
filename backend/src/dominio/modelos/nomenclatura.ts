@@ -271,13 +271,29 @@ export interface SerieProduccion {
   libres: number;
 }
 
-/** Lee el estado de UNA serie: cuántos números tiene usados y cuál es el hueco más bajo. */
+/**
+ * Lee el estado de UNA serie: cuántos números tiene usados y cuál es el hueco más bajo.
+ *
+ * `reservados` son números de 5 dígitos que **todavía no están en la base** pero que el llamador ya
+ * apartó en esta misma pasada; se cuentan como ocupados. Existe por UN caso medido (fila 0.151): la
+ * vista previa del importador de OC por PDF precarga el nº de cada PDF y, sin apartar los ya
+ * propuestos, **cuatro OC de cuatro colores del mismo modelo se precargarían con el MISMO número** —
+ * el usuario confirmaría creyendo que son cuatro y el segundo nacimiento reventaría la tanda entera
+ * con "ese número ya está ocupado". Los reservados de otro par se ignoran solos.
+ */
 export async function leerSerie(
   tx: Tx,
   concepto: number,
   genero: number,
+  reservados: ReadonlySet<number> = new Set(),
 ): Promise<SerieProduccion> {
   const usados = await consecutivosUsados(tx, concepto, genero);
+  const parSerie = parDe(concepto, genero);
+  for (const numero of reservados) {
+    if (Math.floor(numero / 1000) === parSerie) {
+      usados.add(numero - parSerie * 1000);
+    }
+  }
   let libre: number | null = null;
   for (let n = 1; n <= CONSECUTIVO_MAX; n += 1) {
     if (!usados.has(n)) {
@@ -317,18 +333,22 @@ export interface PropuestaNumeroProduccion {
  *
  * ⚠️ Debe llamarse DENTRO de la transacción que va a guardar el número, y después de tomar el
  * lock del par ({@link promoverAProduccion} lo hace): fuera de eso la propuesta es informativa.
+ *
+ * `reservados` (fila 0.151) apartan números que el llamador ya propuso en esta misma pasada y que
+ * todavía no están en la base — ver {@link leerSerie}.
  */
 export async function proponerNumeroProduccion(
   tx: Tx,
   digitos: DigitosModelo,
+  reservados: ReadonlySet<number> = new Set(),
 ): Promise<PropuestaNumeroProduccion> {
   const avisos: string[] = [];
-  const base = await leerSerie(tx, digitos.concepto, digitos.genero);
+  const base = await leerSerie(tx, digitos.concepto, digitos.genero, reservados);
 
   let serie = base;
   let continuada = false;
   if (base.libre === null && digitos.generoAlterno !== null) {
-    serie = await leerSerie(tx, digitos.concepto, digitos.generoAlterno);
+    serie = await leerSerie(tx, digitos.concepto, digitos.generoAlterno, reservados);
     continuada = true;
     avisos.push(
       `La serie ${base.par} se agotó (999 de 999 usados); se continúa en la serie ${serie.par}, ` +

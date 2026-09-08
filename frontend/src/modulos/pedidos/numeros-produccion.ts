@@ -24,3 +24,38 @@ export function numerosDeProduccion(renglon: {
   }
   return renglon.numeroProduccion === null ? '' : String(renglon.numeroProduccion);
 }
+
+/**
+ * ⭐ **QUÉ DECIR DEL «DESARROLLO» DE UN RENGLÓN DE PEDIDO CUANDO NO TIENE EXPEDIENTE** (fila 0.151).
+ *
+ * 🔴 El pedido apagaba ese nodo con la nota *«modelo anterior al módulo de Desarrollo»* en **tres
+ * sitios medidos** (`PanelGenerarOP` y las dos veces de `PedidosMesPagina`: la columna de la tabla y
+ * la cadena del cajón; el cuarto sitio vivía en el Centro de Órdenes y lo cura `nodoDesarrollo`),
+ * una nota que **afirma la EDAD del modelo** — un dato que la pantalla no tiene y que
+ * `idDesarrollo === null` no demuestra. Y es falso justo en el caso más común de hoy: los renglones
+ * que nacen del importador de OC por PDF, que se crean **sin `idDesarrollo`** aunque su modelo sea
+ * un modelo de DESARROLLO recién capturado. El usuario leía «este modelo es viejo» de un renglón
+ * importado hace un minuto.
+ *
+ * 🔑 La cura es no adivinar: `origenModelo` ya viaja en el renglón y dice exactamente en qué
+ * catálogo vive el modelo. Con eso se afirma sólo lo comprobable — en qué catálogo está y que este
+ * renglón no trae expediente— y nunca cuándo se creó.
+ *
+ * ⚠️ Devuelve el texto SÓLO para el caso sin expediente. Con expediente el nodo se enciende y su
+ * tooltip es otro (lo pone cada pantalla), así que aquí no hay nada que decir: `null`.
+ */
+export function notaSinExpedienteDesarrollo(renglon: {
+  codigoModelo: string;
+  origenModelo: 'desarrollo' | 'produccion';
+  idDesarrollo: number | null;
+}): string | null {
+  if (renglon.idDesarrollo !== null) {
+    return null;
+  }
+  return renglon.origenModelo === 'desarrollo'
+    ? `El modelo ${renglon.codigoModelo} está en el catálogo de DESARROLLO, pero este renglón no ` +
+        `está ligado a un expediente de Desarrollo (así nacen los renglones que llegan por el ` +
+        `importador de OC del cliente).`
+    : `El modelo ${renglon.codigoModelo} está en el catálogo de producción y este renglón no viene ` +
+        `de un expediente de Desarrollo.`;
+}
