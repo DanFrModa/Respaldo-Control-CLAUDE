@@ -16,6 +16,23 @@
  * favor), la última cubeta (corriente) queda NEGATIVA: `saldo` neto = negativo, coherente con D3.
  */
 
+/**
+ * ⭐ LA ARITMÉTICA DEL PLAZO, y el ÚNICO sitio donde vive: fecha del cargo + los días de crédito del
+ * tercero. Un tercero de contado (0 días, o sin plazo capturado) vence el mismo día.
+ *
+ * Vive aquí —y no junto a `calcularVencimiento`, que es quien la usaba— desde la fila **0.121**, por
+ * dos razones que se refuerzan: es mecánica pura de antigüedad (lo que este archivo es), y la
+ * convivencia con EsMa necesita la misma cuenta **sin poder pasar por `calcularVencimiento`**, que
+ * la cierra detrás de un `esOrigenCargo`. ⚠️ En EsMa el `abono` es un CARGO extra al maquilero
+ * (suma) mientras que el `abono` del motor resta ⇒ preguntarle al ORIGEN devolvería `null` para un
+ * renglón que sí envejece. Quien deriva desde EsMa decide por el SIGNO (`SIGNO_SALDO`,
+ * `esma/formula-saldo.ts`) y llama aquí. La fórmula sigue siendo UNA sola (A1) — el motor la usa a
+ * través de `calcularVencimiento` y EsMa directamente.
+ */
+export function sumarPlazo(fecha: Date, diasCredito: number): Date {
+  return new Date(fecha.getTime() + diasCredito * 86_400_000);
+}
+
 /** Límites (en días de atraso) de las cubetas de aging. `d30` = fin de "1–30"; `d60` = fin de "31–60". */
 export interface LimitesAging {
   /** Fin de la cubeta "1–30 días" (atraso ≤ d30). */

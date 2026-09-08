@@ -83,6 +83,9 @@ export function tieneCaptura(fila: FilaCorrida): boolean {
  *  • maquileros → saldo, lo que espera revisión y lo recibido en la semana;
  *  • proveedores → saldo y la parte vencida;
  *  • conceptos → nada (nacen en cero).
+ *
+ * 📌 Los **días vencidos** NO viven aquí: tienen columna propia ({@link textoDiasVencidos}), porque
+ * Daniel los lee de un vistazo por toda la relación y dentro de un texto corrido no se escanean.
  */
 export function textoReferencia(fila: FilaCorrida): string {
   if (fila.origen === 'concepto') {
@@ -109,6 +112,35 @@ export function textoReferencia(fila: FilaCorrida): string {
     partes.push(`vencido ${moneda(fila.vencido)}`);
   }
   return partes.join(' · ');
+}
+
+/**
+ * ⭐ LOS DÍAS VENCIDOS de una fila, como TEXTO de su celda (fila 0.121).
+ *
+ * **DANIEL (§Post-F9.218(a)):** *«Es irrelevante [los tramos]. Ni siquiera veo eso. **Solo con que
+ * pongas los días vencidos es suficiente**.»* Así que aquí no hay cubetas ni semáforo por rango:
+ * hay un número.
+ *
+ * Los tres estados dicen cosas DISTINTAS y por eso no se colapsan en uno:
+ *  • `null` → **«—»**: no hay nada que envejecer (no debe, o los pagos ya lo cubrieron);
+ *  • `0` → **«al día»**: sí debe, pero está dentro de su plazo;
+ *  • `n > 0` → **«n d»**: su cargo más viejo sin pagar lleva `n` días vencido.
+ *
+ * ⚠️ Un «0» a secas se leería como «no debe nada», que es justo lo contrario de lo que significa.
+ * Y el número lo calcula el SERVIDOR (A1: nada de restar fechas en el cliente); aquí sólo se
+ * redacta. Los conceptos del catálogo no tienen cuenta corriente: su celda va vacía.
+ */
+export function textoDiasVencidos(fila: FilaCorrida): string {
+  if (fila.origen === 'concepto') {
+    return '';
+  }
+  if (fila.diasVencidos === null) {
+    return '—';
+  }
+  if (fila.diasVencidos === 0) {
+    return 'al día';
+  }
+  return `${String(fila.diasVencidos)} d`;
 }
 
 /**

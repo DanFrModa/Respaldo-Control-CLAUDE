@@ -172586,6 +172586,19 @@
                                   ],
                                   "description": "Parte vencida del saldo (sólo CxP), o null."
                                 },
+                                "diasVencidos": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer."
+                                },
                                 "porRevisarNeto": {
                                   "anyOf": [
                                     {
@@ -172864,6 +172877,7 @@
                                 "puedeConFactura",
                                 "saldo",
                                 "vencido",
+                                "diasVencidos",
                                 "porRevisarNeto",
                                 "porRevisarPartidas",
                                 "recibosSemanaImporte",
@@ -173462,6 +173476,19 @@
                                   ],
                                   "description": "Parte vencida del saldo (sólo CxP), o null."
                                 },
+                                "diasVencidos": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer."
+                                },
                                 "porRevisarNeto": {
                                   "anyOf": [
                                     {
@@ -173740,6 +173767,7 @@
                                 "puedeConFactura",
                                 "saldo",
                                 "vencido",
+                                "diasVencidos",
                                 "porRevisarNeto",
                                 "porRevisarPartidas",
                                 "recibosSemanaImporte",
@@ -174591,6 +174619,19 @@
                                   ],
                                   "description": "Parte vencida del saldo (sólo CxP), o null."
                                 },
+                                "diasVencidos": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer."
+                                },
                                 "porRevisarNeto": {
                                   "anyOf": [
                                     {
@@ -174869,6 +174910,7 @@
                                 "puedeConFactura",
                                 "saldo",
                                 "vencido",
+                                "diasVencidos",
                                 "porRevisarNeto",
                                 "porRevisarPartidas",
                                 "recibosSemanaImporte",
@@ -175557,6 +175599,19 @@
                                   ],
                                   "description": "Parte vencida del saldo (sólo CxP), o null."
                                 },
+                                "diasVencidos": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer."
+                                },
                                 "porRevisarNeto": {
                                   "anyOf": [
                                     {
@@ -175835,6 +175890,7 @@
                                 "puedeConFactura",
                                 "saldo",
                                 "vencido",
+                                "diasVencidos",
                                 "porRevisarNeto",
                                 "porRevisarPartidas",
                                 "recibosSemanaImporte",
@@ -176442,6 +176498,19 @@
                                   ],
                                   "description": "Parte vencida del saldo (sólo CxP), o null."
                                 },
+                                "diasVencidos": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer."
+                                },
                                 "porRevisarNeto": {
                                   "anyOf": [
                                     {
@@ -176720,6 +176789,7 @@
                                 "puedeConFactura",
                                 "saldo",
                                 "vencido",
+                                "diasVencidos",
                                 "porRevisarNeto",
                                 "porRevisarPartidas",
                                 "recibosSemanaImporte",
@@ -177318,6 +177388,19 @@
                                   ],
                                   "description": "Parte vencida del saldo (sólo CxP), o null."
                                 },
+                                "diasVencidos": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer."
+                                },
                                 "porRevisarNeto": {
                                   "anyOf": [
                                     {
@@ -177596,6 +177679,7 @@
                                 "puedeConFactura",
                                 "saldo",
                                 "vencido",
+                                "diasVencidos",
                                 "porRevisarNeto",
                                 "porRevisarPartidas",
                                 "recibosSemanaImporte",
@@ -178194,6 +178278,19 @@
                                   ],
                                   "description": "Parte vencida del saldo (sólo CxP), o null."
                                 },
+                                "diasVencidos": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer."
+                                },
                                 "porRevisarNeto": {
                                   "anyOf": [
                                     {
@@ -178472,6 +178569,7 @@
                                 "puedeConFactura",
                                 "saldo",
                                 "vencido",
+                                "diasVencidos",
                                 "porRevisarNeto",
                                 "porRevisarPartidas",
                                 "recibosSemanaImporte",

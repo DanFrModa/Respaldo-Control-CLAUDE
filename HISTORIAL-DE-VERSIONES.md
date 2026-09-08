@@ -71,6 +71,57 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.128 · 7-sep-2026 · **en prueba** — **Los maquileros por fin tienen antigüedad: la pantalla de los jueves dice cuántos días lleva vencido cada quien**
+
+### Qué se puede hacer ahora que antes no
+
+- **Ver, en la relación semanal de pagos, cuántos días lleva vencido cada beneficiario** — una columna
+  nueva, «Días venc.», pegada al saldo. Es la que Daniel pidió: *«**Solo con que pongas los días
+  vencidos es suficiente**»*.
+- ⭐ **Y por primera vez eso incluye a los MAQUILEROS.** Hasta hoy la antigüedad sólo existía para los
+  proveedores de factura; la deuda de maquila salía **sin edad**, en un montón aparte. Eso era falso en
+  la práctica: hay maquileros con plazo pactado a los que Daniel **sí** les cuenta los días (en su
+  archivo, BORDA PRINT lleva 8 y BORDADOS COMPUTARIZADOS 30), y el sistema no sabía decirlo.
+- **Ver la fecha de vencimiento de un recibo de maquila en el estado de cuenta del proveedor**, donde
+  antes había un guion.
+- **Cambiar los días de crédito de un proveedor y ver cómo se re-envejece toda su deuda al instante**,
+  sin capturar una sola fecha.
+
+### Qué cambió y puede sorprender
+
+- 🔒 **La fecha de vencimiento NO se teclea nunca, ni aquí ni en ningún lado: se calcula sola** con el
+  plazo del proveedor. Es la regla que Daniel dictó (*«las inconsistencias son errores de Lupita»*):
+  otro error que deja de ser posible. Si un vencimiento sale raro, **lo que hay que corregir son los
+  días de crédito del proveedor**, no el movimiento.
+- **Un proveedor sin días de crédito capturado es de CONTADO**: su deuda vence el mismo día en que se
+  registra, así que va a aparecer con muchos días vencidos. No es un error del sistema: es lo que dice
+  su ficha. Se arregla capturándole su plazo en el catálogo de proveedores.
+- **La columna tiene tres respuestas distintas, y conviene no confundirlas:** un **número** («12 d») es
+  lo que lleva vencido su deuda más vieja · **«al día»** es que sí debe pero está dentro de su plazo ·
+  **«—»** es que no hay nada que envejecer (no debe, o lo que debía ya se pagó).
+- ⚠️ **El número es el del cargo MÁS VIEJO que sigue sin pagarse, no un promedio.** Y como los pagos no
+  se aplican a una factura concreta, el sistema **supone** que lo que se paga salda primero lo más
+  atrasado — la misma suposición que ya usaba la antigüedad de la bandeja, para que las dos pantallas
+  no digan cosas distintas del mismo proveedor.
+- **La antigüedad por tramos (30/60 días, configurable) sigue exactamente donde estaba.** No se retiró
+  nada: sólo se decidió que la pantalla de los jueves no se arma alrededor de ella, porque Daniel no la
+  mira. En la bandeja de «a quién le debo», la columna «vencido» **sigue siendo sólo de los proveedores
+  de factura** — los días vencidos son lo único que cruza a la maquila.
+- **Nada se guardó ni se recalculó hacia atrás**: el vencimiento se calcula al momento de mirar. Ningún
+  movimiento viejo se tocó.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Tres cosas que decidió el lead y Daniel tiene que ratificar** (están en `DECISIONES.md`
+  §Post-F9.220): **(a)** que el número sea el del cargo más viejo *que sobrevive a los pagos* y no el
+  más viejo a secas; **(b)** que «debe pero no le vence nada» se lea **«al día»** y no un cero; **(c)**
+  que la columna viva en la relación semanal que ya existe en vez de en una pantalla nueva.
+- 🔻 **La maquila sigue sin repartirse en los tramos de 30/60 días** de la bandeja de CxP: para eso
+  haría falta que los recibos de maquila se registraran por el motor de cuentas, que es otro trabajo.
+  Lo que Daniel pidió —los días— sí está.
+- 🔻 **Un pago se sigue sin poder amarrar a una factura concreta.** Mientras eso no exista, la edad que
+  se enseña es la mejor suposición posible, no una certeza. El **saldo total** nunca se ve afectado.
+
 ## 0.127 · 7-sep-2026 · **en prueba** — **El número de producción lo pones tú al importar, y la OP dice de qué desarrollo nació**
 
 ### Qué se puede hacer ahora que antes no

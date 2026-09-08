@@ -105,7 +105,10 @@ function aporteEsMaDe(segmento: Segmento): Map<number, unknown> {
  * dejara de llegar al SQL, esta prueba se cae sola en vez de pasar en verde con la cartera entera.
  */
 function segmentoDeLaConsulta(consulta: Prisma.Sql): Segmento {
-  if (!consulta.sql.includes('m.es_fiscal =')) {
+  // Las dos redacciones de la misma condición: el aging la escribe sin comillas y el agregado de
+  // días vencidos con ellas. Se aceptan las dos a propósito, para que el doble no obligue a
+  // escribir el SQL de una forma concreta.
+  if (!consulta.sql.includes('m.es_fiscal =') && !consulta.sql.includes('m."es_fiscal" =')) {
     return 'todos';
   }
   return consulta.values.includes(true) ? 'con' : 'sin';
@@ -113,15 +116,45 @@ function segmentoDeLaConsulta(consulta: Prisma.Sql): Segmento {
 
 /** El último SQL que el motor emitió (para afirmar sobre él sin adivinar). */
 let ultimoSql: Prisma.Sql | null = null;
+/** El último SQL de los DÍAS VENCIDOS (fila 0.121), para lo mismo. */
+let ultimoSqlDias: Prisma.Sql | null = null;
 
 /**
- * Cliente de lectura de mentiras: sólo las tres lecturas que la bandeja hace. `configuracionEmpresa`
+ * ⭐ Fila 0.121 — los cargos fechados que el agregado de DÍAS VENCIDOS devuelve, por segmento. La
+ * antigüedad de cada uno la calcula Postgres (`CURRENT_DATE − vencimiento`), así que el doble la
+ * entrega ya hecha, igual que la haría la base: Hilaturas (con factura) lleva 40 días y Avíos (sin)
+ * lleva 5.
+ */
+const CARGOS_FECHADOS: Record<Segmento, Record<string, unknown>[]> = {
+  todos: [
+    { idProveedor: 7, diasAtraso: 40, importe: new Prisma.Decimal(1000) },
+    { idProveedor: 8, diasAtraso: 5, importe: new Prisma.Decimal(400) },
+  ],
+  con: [{ idProveedor: 7, diasAtraso: 40, importe: new Prisma.Decimal(1000) }],
+  sin: [{ idProveedor: 8, diasAtraso: 5, importe: new Prisma.Decimal(400) }],
+};
+
+/**
+ * Cliente de lectura de mentiras: sólo las lecturas que la bandeja hace. `configuracionEmpresa`
  * devuelve `null` → los límites de aging caen en el default 30/60 (código real, no mockeado).
+ *
+ * ⚠️ Desde la fila 0.121 la cartera emite TRES consultas crudas y no una: la del aging por cubetas
+ * y las dos de los días vencidos (cargos fechados y créditos). El doble las distingue por lo que
+ * cada una PIDE —`"diasAtraso"` y `pago_maquilero`—, no por el orden en que llegan: atarlo al orden
+ * lo volvería una prueba de la implementación.
  */
 function clienteFalso(): ContextoBd {
   const cliente = {
     configuracionEmpresa: { findUnique: () => Promise.resolve(null) },
     $queryRaw: (consulta: Prisma.Sql) => {
+      if (consulta.sql.includes('"diasAtraso"')) {
+        ultimoSqlDias = consulta;
+        return Promise.resolve(CARGOS_FECHADOS[segmentoDeLaConsulta(consulta)]);
+      }
+      if (consulta.sql.includes('pago_maquilero')) {
+        // Créditos de los días vencidos: en este escenario nadie ha pagado nada.
+        return Promise.resolve([]);
+      }
       ultimoSql = consulta;
       return Promise.resolve(FILAS_MOTOR[segmentoDeLaConsulta(consulta)]);
     },
@@ -135,6 +168,7 @@ function clienteFalso(): ContextoBd {
 
 beforeEach(() => {
   ultimoSql = null;
+  ultimoSqlDias = null;
   aportesEsMa.mockReset();
   aportesEsMa.mockImplementation((_cliente: unknown, _idEmpresa: unknown, segmento?: Segmento) =>
     Promise.resolve(aporteEsMaDe(segmento ?? 'todos')),
@@ -238,5 +272,42 @@ describe('bandejaPorPagar por segmento', () => {
     expect(bandeja.total).toBe(1);
     // …pero NO el resumen, que sigue siendo el de toda la relación "sin factura".
     expect(bandeja.resumen.carteraTotal).toBe(700);
+  });
+});
+
+// ── (4) Fila 0.121: el segmento también parte los DÍAS VENCIDOS ──────────────────────────────────
+describe('⭐ los DÍAS VENCIDOS se piden por el MISMO segmento que la cartera', () => {
+  /**
+   * Si el segmento no llegara a este agregado, la relación «sin factura» enseñaría la edad de una
+   * deuda que se paga en la OTRA relación —y Daniel decide a quién pagar mirando justo ese número—.
+   */
+  it('sin segmento, el agregado de días tampoco filtra', async () => {
+    await bandejaPorPagar(SESION, {}, clienteFalso());
+    expect(ultimoSqlDias?.sql).not.toContain('es_fiscal');
+  });
+
+  it('`con` y `sin` viajan hasta el SQL de los días', async () => {
+    await bandejaPorPagar(SESION, { segmento: 'con' }, clienteFalso());
+    expect(ultimoSqlDias?.sql).toContain('es_fiscal');
+    expect(ultimoSqlDias?.values).toContain(true);
+
+    await bandejaPorPagar(SESION, { segmento: 'sin' }, clienteFalso());
+    expect(ultimoSqlDias?.values).toContain(false);
+  });
+
+  it('⭐ cada proveedor recibe SU edad, y el que no tiene cargos fechados se queda sin ella', async () => {
+    const { carteraCombinadaPorProveedor } = await import('./cxp.js');
+    const { cliente } = clienteFalso();
+    const cartera = await carteraCombinadaPorProveedor(
+      cliente as Parameters<typeof carteraCombinadaPorProveedor>[0],
+      1,
+      { d30: 30, d60: 60 },
+    );
+    const dias = new Map(cartera.map((f) => [f.idProveedor, f.diasVencidos]));
+
+    expect(dias.get(7)).toBe(40);
+    expect(dias.get(8)).toBe(5);
+    // Maquilas del Sur (9) sólo existe por su aporte EsMa; en este doble no tiene cargos fechados.
+    expect(dias.get(9)).toBeNull();
   });
 });

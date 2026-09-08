@@ -56,7 +56,8 @@ const CHIPS_SEGMENTO: OpcionChip<SegmentoCxp>[] = [
  * (aporte EsMa, SIN antigüedad), + KPIs de vistazo (cartera total, vencido, % al corriente,
  * proveedores con saldo). Todo el aging y el resumen los calcula el SERVIDOR (A1); la pantalla pinta
  * escalares. La columna "Maquila" es el saldo de maquila de EsMa (F6, convivencia): no tiene
- * antigüedad por ítem, por eso va aparte — el aging fino de maquila llegará cuando EsMa registre por
+ * antigüedad por CUBETAS, por eso va aparte; sus DÍAS VENCIDOS sí se calculan (fila 0.121) y se ven
+ * en la corrida semanal — el reparto en cubetas llegará cuando EsMa registre por
  * el motor. Click en un renglón → estado de cuenta. Solo lectura (`cxp.ver`); importes en "—" sin
  * `consultas.ver-importes`.
  *
