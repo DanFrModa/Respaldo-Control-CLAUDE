@@ -12136,6 +12136,109 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.221) — ⭐ CON QUÉ PRECIO SE VALÚA EL COMPLEMENTO DE LA TELA (Daniel, 8-sep-2026, fila 0.163)
+
+**La pregunta nació de la 0.156.** Al construir el consumo del complemento se midió que
+`backend/src/dominio/costos/` **no menciona «complemento» ni una sola vez**: el precosto y el costo real
+valúan **sólo el cuerpo**. Mientras el cárdigan se daba de alta como tela suelta entraba al costo por su
+cuenta; desde la v0.129 **puede vivir dentro de su felpa, y ahí su costo desaparece** — y de ese
+precosto sale el precio que se le cotiza al cliente. **Se compra y no se cobra.**
+
+No se construyó de paso **a propósito**: valuarlo exige decidir **con qué precio**, y el único que existe
+es `TelaColor.precioComplemento`, que es **POR COLOR**, mientras que la receta del modelo **no tiene
+color**. Inventar la cascada habría metido una regla de dinero que nadie decidió.
+
+**DECIDIDO — Daniel, textual:**
+
+> *«En la receta. Cuando no sabemos el color. **Ponemos el más caro.** Si ya sabemos el color, **tomamos
+> el que nos piden**.»*
+
+**En los dos niveles del sistema:**
+- **Receta del modelo** (`ModeloTela`, sin color) → el **MÁS CARO** de los `TelaColor.precioComplemento`
+  de esa tela.
+- **Receta congelada de la orden** (`OrdenTela`, con color) → el `precioComplemento` **de ESE color**.
+
+🔑 **Por qué hacía falta una regla, medido:** el **cuerpo** ya tiene una cascada completa
+(`costos/resolucion-precios.ts`, `resolverPrecioTela`, 6 escalones: última compra al proveedor amarrado
+→ amarre con color si `manejaPrecioPorColor` → precio base del amarre → última compra de cualquiera →
+`TelaColor.precio` → `Tela.precioSugerido`) ⇒ para el cuerpo, *«no hay color»* **ya está resuelto**: cae
+a un escalón que no depende del color. **El complemento no tiene NINGUNA cascada.** La regla de Daniel
+**es** su cascada.
+
+📌 **Y una diferencia deliberada, que conviene no leer como incoherencia:** el cuerpo manda por *«el
+precio real más reciente»*; el complemento, por *«el más caro»*. Es **conservador a propósito** — más
+vale cotizar de más y ajustar que cotizar de menos. ⇒ **precosto y costo real pueden diferir en el
+complemento, y con esta regla eso es lo correcto**, no un defecto.
+
+⏳ **Lo único que la regla no cubre, con default del lead:** si **ningún** color de esa tela tiene
+`precioComplemento`, no hay «el más caro» que tomar. **Default: no inventarlo y DECIRLO** —el complemento
+queda sin valuar y el precosto lo avisa— en vez de valuarlo en **0** en silencio, que es exactamente el
+defecto que la 0.163 vino a cerrar. Pendiente de que Daniel lo confirme; **no bloquea construirla**.
+
+- **Aplica en:** fila **0.163**. **Fecha:** 2026-09-08.
+
+---
+
+#### (Post-F9.223) — ⭐ LA CARGA DE APERTURA: QUÉ SE CARGA Y CON QUÉ FECHA (Daniel, 8-sep-2026, fila 0.131)
+
+Daniel subió el listado que SINUBE saca **por proveedor** (BLOOM TEXTILES, 7-sep-2026) y de medirlo
+salieron las reglas. ⚠️ **El archivo NO entra al repositorio** (proveedor real, repo público — fila
+0.123): se midió fuera del árbol y aquí sólo vive lo aprendido.
+
+**Lo que el archivo trae, medido:** 115 renglones = **98 facturas** + 15 complementos de pago + **2 notas
+de crédito**; **68 vivas** por **$3,390,950.87** (cifra que Daniel confirmó), fechas 26-mar → 31-ago-2026,
+todo MXN y PPD, y **2 con abono parcial**. Columnas útiles: Serie · Folio · Fecha · Importe · **Saldo** ·
+Moneda · Estatus pago · **RFC** · Met.Pag. · Tipo fiscal · Monto base · Monto IVA · Ret. ISR · Ret. IVA ·
+**UUID** · Uso CFDI · Fecha alta.
+
+**(a) SÓLO LO VIVO, y se carga el SALDO.** Daniel: *«sólo vamos a meter para cada proveedor las facturas
+que tengan vivas. No tiene caso meter las anteriores»*. ⇒ entran los renglones con `Saldo > 0`; lo
+pagado, los complementos de pago y las notas de crédito saldadas **no**. ⚠️ **Se carga el `Saldo`, NO el
+`Importe`**: hay 2 facturas con abono parcial donde no coinciden, y cargar el importe metería deuda ya
+pagada.
+
+**(b) EL VENCIMIENTO SE CALCULA, no se toma del archivo.** Daniel: *«la fecha de vencimiento mejor la
+calculamos. Esta fecha que trae no es necesariamente lo que está negociado. El trato son 90 días»*.
+⭐ **Medido y le da la razón:** 97 de las 98 facturas tienen **exactamente 90 días** entre `Fecha` y
+`Pago probable`; **una tiene 92** — la desviación manual que él llama *«errores de Lupita»*
+(§Post-F9.186(j)). Calcular da lo mismo en 97 casos **y corrige el que se desvió**.
+
+**(c) EL PLAZO CORRE DESDE LA FACTURA — y el recibo queda para V2.** Él lo planteó (*«la fecha de la
+factura es una cosa y la fecha de recibo es la otra… estrictamente debería correr a partir de la fecha de
+recibo»*) y, al medirse el costo, decidió: *«lo dejamos para V2. No es tan importante… como ya no quiero
+atrasar más V1, por ahora cargamos las facturas con el mismo criterio que SINUBE»*. ⇒ **fila 0.167,
+⏸️ post-V1**. ✅ **Y no cuesta nada hacerlo así: el motor YA lo hace** (`calcularVencimiento`,
+`terceros/cuenta-terceros.ts:164`, es `fecha del documento + diasCredito`).
+📌 Lo medido para cuando se retome: `Fecha alta` va **+6.9 días** de media sobre la factura (mín 0, máx
+30) ⇒ hoy el plazo arranca ~una semana antes de lo pactado. Y queda **una pregunta abierta**: ¿el recibo
+de la **mercancía** (ya existe, R7) o el de la **factura** (hoy sólo `creadoEn`)?
+
+🔴 **(d) DOS TRAMPAS MEDIDAS EN EL ARCHIVO, que el importador tiene que tapar:**
+1. **Las fechas se leen MAL EN SILENCIO.** El archivo usa celdas `t="d"` (fecha ISO 8601 en el XML:
+   `<v>2026-08-31T00:00:00</v>`), válido pero poco común, y **`exceljs` —la librería que el proyecto ya
+   usa— devuelve `1905-07-18` para las 460**. No falla: **devuelve mal**. Sin taparlo, las 68 facturas
+   entrarían fechadas en 1905 y la pantalla de los jueves diría **44 mil días vencidos**. *(Se estuvo a
+   punto de reportarle a Daniel que su exportación estaba rota: era el lector.)*
+2. **La columna «Recepción» NO es la fecha de recibo**: es idéntica al «Pago probable» (factura + 90) en
+   97 de 98. Está **mal etiquetada** y no debe usarse para nada.
+
+🔑 **(e) EL VERDADERO PASO PREVIO NO SON LOS XML: son los `diasCredito`.** Si el vencimiento se calcula,
+**cada proveedor necesita sus días capturados antes de cargar sus saldos**. Bloom = 90, pero no todos
+(hay maquileros con 8 y con 30). ⚠️ **Y hay una trampa de esquema:** `Proveedor.diasCredito` es
+**nullable** y el TSDoc dice *«null o 0 = contado»* ⇒ un proveedor **nunca configurado** se leería como
+contado y sus facturas nacerían **vencidas el día uno**, sin dar error. **El ETL exige `diasCredito`
+EXPLÍCITO**: `null` ⇒ aborta nombrando al proveedor; `0` ⇒ es una decisión válida (contado) y se carga.
+**La ambigüedad `null`/`0` sigue viva en el resto del motor**, como límite conocido: esta fila no la
+resuelve.
+
+📌 **Los XML: sólo los de las facturas vivas, y son opcionales.** El Excel basta para la deuda; los XML
+sirven para que la factura quede completa hacia adelante (amarrar el complemento de pago que llegue
+después). El proveedor se identifica por **RFC**, no por razón social.
+
+- **Aplica en:** fila **0.131**, y abre la **0.167**. **Fecha:** 2026-09-08.
+
+---
+
 #### (Post-F9.224) — LA CARGA DE APERTURA DESDE SINUBE (fila 0.131, 8-sep-2026): cómo se lee el archivo, qué se carga y qué ABORTA
 
 **De dónde nace.** Daniel quiere **apagar SINUBE**, y para eso hay que meter al sistema los **saldos
@@ -12291,8 +12394,8 @@ lado, para que nadie la ensanche a ojo.
 
 ✅ **MEDIDO SOBRE EL ARCHIVO REAL (el lead, 8-sep), y baja el susto:** en el listado que Daniel subió
 (BLOOM TEXTILES, 7-sep) la columna `Estatus en SAT` tiene **un solo valor distinto en los 115
-renglones: «Vigente»**. ⇒ **la corrida del día del arranque no se va a parar por esto**, al menos con
-exportaciones como ésa. ⚠️ **Es UN proveedor y UN día**: la guarda se queda igual —su valor es que
+renglones: «Vigente»**. ⇒ **con exportaciones como la medida, la corrida del día del arranque no
+debería pararse por esto.** ⚠️ **Es UN proveedor y UN día**: la guarda se queda igual —su valor es que
 avise en vez de adivinar—, pero el temor concreto no se materializa en la única evidencia real que
 existe. *(Comprobación de un minuto, repetible sobre cualquier archivo nuevo: listar los valores
 distintos de esa columna.)*

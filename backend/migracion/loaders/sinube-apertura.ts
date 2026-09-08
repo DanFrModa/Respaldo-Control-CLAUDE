@@ -203,9 +203,16 @@ function texto(valor: ExcelJS.CellValue): string | null {
  * 🔴 **Por qué NO basta con quitar las comas.** Quitarlas a ciegas convierte `1.234,56` (coma decimal
  * europea) en `1.23456`: un número **finito y con pinta razonable** que entraba a la carga como si
  * nada. No era «un texto que no se pudo leer», era **una cifra equivocada leída con toda confianza**,
- * y en la columna `Saldo` eso es dinero. Aquí se exige que el formato sea inequívoco: si el separador
- * decimal es ambiguo, se devuelve `null` y el renglón acaba abortando por «Saldo ILEGIBLE» — nombrado,
- * no adivinado.
+ * y en la columna `Saldo` eso es dinero. Aquí se exige que el formato sea **inequívoco**: lo que no
+ * encaja en la lectura estadounidense devuelve `null` y el renglón aborta por «Saldo ILEGIBLE»
+ * —nombrado, no adivinado—.
+ *
+ * ⚠️ **Con una excepción que hay que decir, porque es inevitable:** `1.234` y `1,234` **sí** se leen
+ * (1.234 y 1234), y son las dos únicas formas que quedan **genuinamente ambiguas** — un europeo
+ * escribiría el primero para «mil doscientos treinta y cuatro». No hay forma de distinguirlas sin
+ * saber el idioma del archivo, así que se elige la lectura estadounidense, que es la del resto del
+ * formato. Endurecerlo rechazaría un `1.234` legítimo sin ganar nada. *(Medido: los 115 saldos del
+ * archivo real de Daniel son numéricos nativos, así que esta rama no se pisa hoy.)*
  */
 function numero(valor: ExcelJS.CellValue): number | null {
   if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
