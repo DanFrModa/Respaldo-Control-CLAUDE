@@ -20,6 +20,8 @@ import { useSesion } from '@/sesion/useSesion';
 import { cn } from '@/lib/utils';
 import { AgregarColorMatriz } from '@/modulos/ordenes/AgregarColorMatriz';
 
+import { notaSinExpedienteDesarrollo } from './numeros-produccion';
+
 /**
  * PANEL "GENERAR OP" (rediseño R3, §4.1 — proto `renderOpGen`): la SALIDA A PRODUCCIÓN de un
  * renglón del pedido. Aquí NACE la matriz color×talla de la orden (se eligen colores/tallas del
@@ -135,7 +137,10 @@ export function PanelGenerarOP({
             onNavegar: () =>
               void navigate('/desarrollo', { state: { idModelo: renglon.idModelo } }),
           }
-        : { titulo: 'modelo anterior al módulo de Desarrollo' }),
+        : // Fila 0.151: el texto sólo afirma en qué catálogo vive el modelo, nunca su edad — un
+          // renglón sin expediente NO quiere decir "modelo viejo" (los del importador por PDF nacen
+          // así). Ver `notaSinExpedienteDesarrollo`.
+          { titulo: notaSinExpedienteDesarrollo(renglon) ?? '' }),
     },
     {
       clave: 'lista',

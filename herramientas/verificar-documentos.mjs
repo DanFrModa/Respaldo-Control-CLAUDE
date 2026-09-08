@@ -170,6 +170,45 @@ for (let i = 0; i < entradas.length - 1; i += 1) {
   }
 }
 
+// ── 4 · REFERENCIAS COLGANTES: toda §Post-F9.NNN citada tiene que EXISTIR ───────────────────────
+//
+// 🔴 Nació de una cicatriz repetida CINCO veces en una sola sesión (7-sep-2026): se escribió «ver
+// §Post-F9.204», «.207», «.216», «.217» y «la fila 0.162» y **la sección no existía donde el lector
+// iba a buscarla**. Cuatro de las cinco las cazó un reviewer humano; el verificador decía «todo
+// cuadra» porque sólo cruzaba versiones y contadores.
+//
+// ⚠️ Y la lección de método, que es la razón de que esto sea CÓDIGO y no otra regla escrita: la regla
+// «comprueba que existe antes de citarla» YA ESTABA ESCRITA en CLAUDE.md, la redactó la misma persona
+// que volvió a romperla en la fila siguiente. Una comprobación que depende de acordarse no es una
+// comprobación. Ésta corre sola en cada CI.
+//
+// El daño no es cosmético: una referencia colgante manda a alguien a buscar una decisión que no puede
+// leer, y en un repo cuya ley es «el porqué vive en DECISIONES.md» eso equivale a que la decisión no
+// exista.
+const decisiones = leer('Documentacion_MJD/DECISIONES.md');
+const DEFINE = /^#### \(Post-F9\.([\d.]+[a-z]?)\)/gm;
+const definidas = new Set([...decisiones.matchAll(DEFINE)].map((m) => m[1]));
+const colgantes = new Map();
+for (const [archivo, texto] of Object.entries({
+  'HOJA-DE-RUTA.md': hoja,
+  'HISTORIAL-DE-VERSIONES.md': historial,
+  'Documentacion_MJD/DECISIONES.md': decisiones,
+})) {
+  for (const m of texto.matchAll(/§Post-F9\.([\d.]+[a-z]?)/g)) {
+    // Una cita como «§Post-F9.213·A» apunta a la sección 213: se comprueba la raíz.
+    const raiz = m[1].split('.').slice(0, 1).join('.');
+    if (!definidas.has(m[1]) && !definidas.has(raiz)) {
+      if (!colgantes.has(m[1])) colgantes.set(m[1], new Set());
+      colgantes.get(m[1]).add(archivo);
+    }
+  }
+}
+for (const [seccion, archivos] of [...colgantes].sort())
+  problemas.push(
+    `§Post-F9.${seccion} se cita en ${[...archivos].join(', ')} y NO existe en DECISIONES.md.`,
+  );
+decir(`  secciones definidas en DECISIONES.md: ${String(definidas.size)}`);
+
 // ── Veredicto ───────────────────────────────────────────────────────────────────────────────────
 if (problemas.length === 0) {
   decir('\n✅ Todo cuadra.');

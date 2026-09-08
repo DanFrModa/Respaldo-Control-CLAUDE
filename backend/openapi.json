@@ -56862,6 +56862,30 @@
                           ],
                           "description": "Descripción del modelo, o null."
                         },
+                        "idModeloDesarrollo": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                        },
+                        "codigoModeloDesarrollo": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                        },
                         "idCliente": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -57431,6 +57455,8 @@
                         "idModelo",
                         "codigoModelo",
                         "descripcionModelo",
+                        "idModeloDesarrollo",
+                        "codigoModeloDesarrollo",
                         "idCliente",
                         "cliente",
                         "idMaquilero",
@@ -59960,6 +59986,56 @@
                             },
                             "description": "Advertencias de validación (no bloquean)."
                           },
+                          "modeloDeProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "nacido",
+                                  "reusado",
+                                  "heredado"
+                                ],
+                                "description": "Qué le pasa al modelo de producción de la OP de este PDF."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Qué le va a pasar al MODELO de la OP de este PDF si se confirma con la liga que hoy trae el renglón, o null si todavía no hay ninguna liga (no hay modelo del que hablar). SOLO en `nacido` tiene sentido teclear un número."
+                          },
+                          "numeroProduccionPropuesto": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº de 5 dígitos que el sistema PROPONE para el modelo que nacería de esta OC, con el que la pantalla precarga el campo. Null si el desenlace no es `nacido` o si la serie está llena. ⚠️ Es INFORMATIVO: se calcula sin el candado del par y sin escribir nada, así que entre esta consulta y el confirm otro puede tomarlo. Quien decide de verdad es el confirm, que vuelve a proponer bajo candado y BLOQUEA si el número capturado ya está ocupado. La pantalla NO debe prometer que el número queda apartado."
+                          },
+                          "numeroProduccionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº de producción del modelo con el que la OP va a quedar cuando NO nace uno nuevo: el del modelo que ya existe para ese color (`reusado`) o el del modelo de producción ya ligado (`heredado`). También trae el número que va a estrenar OTRO PDF de esta misma tanda cuando dos OC comparten modelo y color. Null si no aplica, si el modelo histórico no tiene número, o si el modelo de ese color está DESCONTINUADO (ahí no hay reuso que prometer: el confirm rechaza la importación; el motivo va en `avisosNumeroProduccion`)."
+                          },
+                          "avisosNumeroProduccion": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Avisos de la numeración de ESTE PDF (serie cerca del tope, color que ya tiene modelo, modelo sin dígitos para numerar…). NUNCA bloquean."
+                          },
                           "yaImportado": {
                             "anyOf": [
                               {
@@ -60019,6 +60095,10 @@
                           "colorFusionadoEn",
                           "tallasNuevas",
                           "advertencias",
+                          "modeloDeProduccion",
+                          "numeroProduccionPropuesto",
+                          "numeroProduccionModelo",
+                          "avisosNumeroProduccion",
                           "yaImportado"
                         ],
                         "additionalProperties": false,
@@ -60315,6 +60395,12 @@
                           "description": "Código PANTONE del color de la OP (editado/prefilleado); vacío = sin pantone.",
                           "type": "string",
                           "maxLength": 60
+                        },
+                        "numeroProduccion": {
+                          "description": "Nº de producción CONFIRMADO por el usuario para el modelo que va a NACER de ESTA OC (fila 0.151, §Post-F9.46: el sistema lo precarga en la vista previa y el usuario lo puede cambiar). Omitir = aceptar el que proponga el sistema al confirmar. ⚠️ Se IGNORA —con aviso, sin bloquear— cuando el desenlace NO es `nacido`: si ese color ya tenía modelo de producción (se reusa el suyo) o si el modelo ligado ya era de producción (la OP lo hereda). El número es del MODELO, no de la orden.",
+                          "type": "integer",
+                          "minimum": 10000,
+                          "maximum": 99999
                         }
                       },
                       "required": [
@@ -60448,6 +60534,22 @@
                           "adjuntado": {
                             "type": "boolean",
                             "description": "true si el PDF se adjuntó a la OP."
+                          },
+                          "modeloDeProduccion": {
+                            "type": "string",
+                            "enum": [
+                              "nacido",
+                              "reusado",
+                              "heredado"
+                            ],
+                            "description": "Qué pasó DE VERDAD con el modelo de la OP (fila 0.151). Puede no coincidir con lo que anunció la vista previa: entre analizar y confirmar el color pudo estrenar modelo por otra puerta, y entonces un `nacido` anunciado sale `reusado`."
+                          },
+                          "avisosNumeroProduccion": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Avisos de la numeración de ESTA OP (dígitos que no cuadran, serie cerca del tope, número capturado que NO se usó porque el color ya tenía modelo). NUNCA bloquean, pero hay que enseñarlos: son la única señal de que un número tecleado no se aplicó."
                           }
                         },
                         "required": [
@@ -60459,7 +60561,9 @@
                           "numeroOrden",
                           "nombreArchivo",
                           "totalPiezas",
-                          "adjuntado"
+                          "adjuntado",
+                          "modeloDeProduccion",
+                          "avisosNumeroProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Una OP creada por la importación de un PDF."
@@ -60870,6 +60974,30 @@
                               }
                             ],
                             "description": "Descripción del modelo, o null."
+                          },
+                          "idModeloDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                          },
+                          "codigoModeloDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
                           },
                           "idCliente": {
                             "type": "integer",
@@ -61440,6 +61568,8 @@
                           "idModelo",
                           "codigoModelo",
                           "descripcionModelo",
+                          "idModeloDesarrollo",
+                          "codigoModeloDesarrollo",
                           "idCliente",
                           "cliente",
                           "idMaquilero",
@@ -61945,6 +62075,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -62514,6 +62668,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -62799,6 +62955,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -63368,6 +63548,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -63772,6 +63954,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -64341,6 +64547,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -64708,6 +64916,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -65277,6 +65509,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -65583,6 +65817,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -66152,6 +66410,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -66458,6 +66718,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -67027,6 +67311,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -67332,6 +67618,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -67901,6 +68211,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -68209,6 +68521,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -68778,6 +69114,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -69102,6 +69440,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -69671,6 +70033,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",
@@ -71563,6 +71927,30 @@
                       ],
                       "description": "Descripción del modelo, o null."
                     },
+                    "idModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo de DESARROLLO del que nació el modelo de esta OP —y de quien es, por lo tanto, la receta que comparten todos sus colores—, o null cuando la OP lleva un modelo que no nació de un desarrollo (el histórico del Access, o cualquier modelo de producción elegido a mano). DANIEL: *«en la OP no veo el modelo de desarrollo»* — el dato existía en la base y sólo lo devolvía la respuesta del alta, ese instante y nunca más."
+                    },
+                    "codigoModeloDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código VIGENTE de ese modelo de desarrollo (su nº de desarrollo), o null."
+                    },
                     "idCliente": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -72132,6 +72520,8 @@
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
+                    "idModeloDesarrollo",
+                    "codigoModeloDesarrollo",
                     "idCliente",
                     "cliente",
                     "idMaquilero",

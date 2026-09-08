@@ -151,6 +151,11 @@ const RENGLON: AnalizarPdf['renglones'][number] = {
   colorFusionadoEn: null,
   tallasNuevas: ['5-6'],
   advertencias: [],
+  // ⭐ Fila 0.151 — de esta OC NACE el modelo de producción de su color, con el nº propuesto.
+  modeloDeProduccion: 'nacido',
+  numeroProduccionPropuesto: 71_001,
+  numeroProduccionModelo: null,
+  avisosNumeroProduccion: [],
   yaImportado: null,
 };
 
@@ -249,10 +254,44 @@ const PREVIEW_SIN_LIGA: AnalizarPdf = {
   ],
 };
 
-/** Lleva la pantalla del paso 1 (cliente + PDF) al paso 2 (vista previa) con el preview indicado. */
+/**
+ * ⭐ Fila 0.151 — DOS OC de la MISMA tanda que resuelven al MISMO (modelo, color) con `modeloCliente`
+ * DISTINTO: la 1ª hace nacer el modelo (71001) y la 2ª sale `reusado` apuntando a ESE número. Es la
+ * forma exacta en que la numeración de un renglón depende de OTRO renglón.
+ */
+const PREVIEW_TANDA: AnalizarPdf = {
+  ...PREVIEW,
+  totalReconocidos: 2,
+  renglones: [
+    RENGLON,
+    {
+      ...RENGLON,
+      nombreArchivo: 'oc-620885.pdf',
+      numeroOrden: '620885',
+      modeloCliente: '9999999',
+      modeloDeProduccion: 'reusado',
+      numeroProduccionPropuesto: null,
+      numeroProduccionModelo: 71_001,
+      avisosNumeroProduccion: [
+        'Otra OC de esta misma tanda hace nacer el modelo de producción de este color.',
+      ],
+    },
+  ],
+};
+
+/**
+ * Lleva la pantalla del paso 1 (cliente + PDF) al paso 2 (vista previa) con el preview indicado.
+ *
+ * ⚠️ `archivos` NO es decoración: el confirm arma su cuerpo a partir de los ARCHIVOS cargados
+ * (`archivosABase64(archivos)`), no de los renglones del preview mockeado. Una prueba de tanda que
+ * cargue un solo PDF nunca podrá ver qué se manda del segundo renglón: `archivos[1]` sale
+ * `undefined`, el cuerpo llega con un solo elemento y la aserción sobre el segundo revienta. No es un
+ * falso verde — es que el caso de tanda no se puede medir sin cargar los dos PDFs.
+ */
 async function irAVistaPrevia(
   preview: AnalizarPdf = PREVIEW,
   permisos: ClavePermiso[] = [],
+  archivos: string[] = ['oc-620884.pdf'],
 ): Promise<void> {
   analizarMock.mockImplementation((_body, opciones: { onSuccess: (r: AnalizarPdf) => void }) => {
     opciones.onSuccess(preview);
@@ -265,13 +304,17 @@ async function irAVistaPrevia(
   fireEvent.change(screen.getByTestId('importador-pdf-cliente-input'), { target: { value: 'C' } });
   fireEvent.mouseDown(await screen.findByTestId('importador-pdf-cliente-opcion'));
 
-  // Carga un PDF.
+  // Carga los PDFs (uno por defecto; la tanda carga los suyos).
   fireEvent.change(screen.getByTestId('importador-pdf-archivos'), {
-    target: { files: [new File(['x'], 'oc-620884.pdf', { type: 'application/pdf' })] },
+    target: {
+      files: archivos.map((nombre) => new File(['x'], nombre, { type: 'application/pdf' })),
+    },
   });
 
   fireEvent.click(screen.getByTestId('importador-pdf-continuar-origen'));
-  await screen.findByTestId('importador-pdf-fila');
+  // `findAll`, no `find`: una tanda de varios PDFs pinta varias tarjetas y `findByTestId` reventaría
+  // con "Found multiple elements" — el helper tiene que servir para la tanda, que es el caso real.
+  await screen.findAllByTestId('importador-pdf-fila');
 }
 
 describe('ImportadorPedidoPdf', () => {
@@ -874,5 +917,305 @@ describe('ImportadorPedidoPdf — abierto desde el constructor con el PDF ya ele
     await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
     const cuerpo = confirmarMock.mock.calls[0]?.[0] as { porcentajeAdicional?: number };
     expect(cuerpo.porcentajeAdicional).toBe(7);
+  });
+  // ── ⭐⭐ Fila 0.151 — EL Nº DE PRODUCCIÓN LO PONE EL USUARIO ─────────────────────────
+
+  /**
+   * DANIEL: *«me generó el pedido y la OP **sin preguntar el número de modelo interno**… quedamos
+   * que ese lo ponía yo, con una **sugerencia previa**»*. El campo llega precargado con el que
+   * propone el servidor y viaja al confirmar — igual que en el panel manual «Generar OP».
+   */
+  describe('nº de producción por OC (fila 0.151)', () => {
+    it('llega PRECARGADO con el propuesto y viaja al confirmar', async () => {
+      await irAVistaPrevia();
+
+      const campo = screen.getByTestId('importador-pdf-numero-0');
+      expect(campo).toHaveValue('71001');
+
+      confirmarMock.mockImplementation(() => {});
+      fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+      await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+      const cuerpo = confirmarMock.mock.calls[0]?.[0] as {
+        archivos: { numeroProduccion?: number }[];
+      };
+      expect(cuerpo.archivos[0]?.numeroProduccion).toBe(71_001);
+    });
+
+    it('el número EDITADO por el usuario es el que se manda (no el propuesto)', async () => {
+      await irAVistaPrevia();
+      confirmarMock.mockImplementation(() => {});
+
+      fireEvent.change(screen.getByTestId('importador-pdf-numero-0'), {
+        target: { value: '71042' },
+      });
+      fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+      await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+      const cuerpo = confirmarMock.mock.calls[0]?.[0] as {
+        archivos: { numeroProduccion?: number }[];
+      };
+      expect(cuerpo.archivos[0]?.numeroProduccion).toBe(71_042);
+    });
+
+    it('sin un número de 5 dígitos NO se importa: se dice qué OC falta', async () => {
+      await irAVistaPrevia();
+
+      fireEvent.change(screen.getByTestId('importador-pdf-numero-0'), { target: { value: '710' } });
+      fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+      expect(confirmarMock).not.toHaveBeenCalled();
+      expect(toastErrorMock).toHaveBeenCalledWith(expect.stringContaining('620884'));
+    });
+
+    /**
+     * ⭐⭐ LA MITAD QUE HABRÍA PASADO EN VERDE SIN ESTA PRUEBA. Si ese color YA tiene modelo de
+     * producción, `obtenerODerivarModeloDeProduccion` DESCARTA el número capturado: ofrecer la
+     * casilla sería prometer algo que la capa de abajo tira. En `reusado` no hay campo — se enseña,
+     * de sólo lectura, con qué modelo va a quedar la OP — y el confirm NO manda número.
+     */
+    it('⭐ en desenlace REUSADO no se ofrece campo, y el confirm no manda número', async () => {
+      await irAVistaPrevia({
+        ...PREVIEW,
+        renglones: [
+          {
+            ...RENGLON,
+            modeloDeProduccion: 'reusado',
+            numeroProduccionPropuesto: null,
+            numeroProduccionModelo: 71_001,
+            avisosNumeroProduccion: ['Este color ya tiene el modelo de producción 71001.'],
+          },
+        ],
+      });
+
+      expect(screen.queryByTestId('importador-pdf-numero-0')).not.toBeInTheDocument();
+      expect(screen.getByTestId('importador-pdf-numero-reuso-0')).toHaveTextContent('#71001');
+      expect(
+        screen.getByText('Este color ya tiene el modelo de producción 71001.'),
+      ).toBeInTheDocument();
+
+      confirmarMock.mockImplementation(() => {});
+      fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+      await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+      const cuerpo = confirmarMock.mock.calls[0]?.[0] as {
+        archivos: { numeroProduccion?: number }[];
+      };
+      expect(cuerpo.archivos[0]?.numeroProduccion).toBeUndefined();
+    });
+
+    it('en desenlace HEREDADO tampoco hay campo (el modelo ligado ya es de producción)', async () => {
+      await irAVistaPrevia({
+        ...PREVIEW,
+        renglones: [
+          {
+            ...RENGLON,
+            modeloDeProduccion: 'heredado',
+            numeroProduccionPropuesto: null,
+            numeroProduccionModelo: 51_783,
+            avisosNumeroProduccion: [],
+          },
+        ],
+      });
+
+      expect(screen.queryByTestId('importador-pdf-numero-0')).not.toBeInTheDocument();
+      expect(screen.getByTestId('importador-pdf-numero-reuso-0')).toHaveTextContent('#51783');
+    });
+
+    it('un PDF SIN liga no pide número (no hay modelo del que hablar)', async () => {
+      await irAVistaPrevia({
+        ...PREVIEW,
+        renglones: [
+          {
+            ...RENGLON,
+            idModeloSugerido: null,
+            codigoModeloSugerido: null,
+            descripcionModeloSugerido: null,
+            modeloDeProduccion: null,
+            numeroProduccionPropuesto: null,
+          },
+        ],
+      });
+
+      expect(screen.queryByTestId('importador-pdf-numero-0')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('importador-pdf-numero-reuso-0')).not.toBeInTheDocument();
+    });
+
+    /**
+     * ⭐⭐ EL AGUJERO QUE QUEDABA ABIERTO, Y QUE ES EL CASO DE ESTRENO.
+     *
+     * El servidor numera al ANALIZAR y lo hace con la liga APRENDIDA. **La primera OC de cada
+     * modelo del cliente se liga a mano** (la liga se aprende al confirmar), así que en el estreno
+     * de un modelo —justo cuando NACE su modelo de producción— el renglón llega sin desenlace, y
+     * antes de esto no ofrecía casilla: la OP se generaba con el número que eligiera el sistema.
+     * Que es, literal, lo que Daniel pidió que dejara de pasar.
+     */
+    it('⭐ ligado A MANO tras analizar: SÍ hay casilla (vacía) y el nº tecleado viaja', async () => {
+      await irAVistaPrevia(
+        {
+          ...PREVIEW,
+          renglones: [
+            {
+              ...RENGLON,
+              idModeloSugerido: null,
+              codigoModeloSugerido: null,
+              descripcionModeloSugerido: null,
+              modeloDeProduccion: null,
+              numeroProduccionPropuesto: null,
+            },
+          ],
+        },
+        ['modelos.administrar'],
+      );
+      // Sin liga no hay nada que numerar.
+      expect(screen.queryByTestId('importador-pdf-numero-0')).not.toBeInTheDocument();
+
+      // El usuario liga a mano (crea el modelo desde la propia vista previa).
+      fireEvent.click(screen.getByTestId('importador-pdf-crear-modelo'));
+      fireEvent.click(await screen.findByTestId('stub-crear-modelo'));
+      await screen.findByText('ligado a mano');
+
+      const campo = await screen.findByTestId('importador-pdf-numero-0');
+      // VACÍO: nadie pudo proponer un número para un modelo elegido después de analizar…
+      expect(campo).toHaveValue('');
+      // …y se dice, en vez de inventar una propuesta o callarlo.
+      expect(screen.getByText(/después de analizar/i)).toBeInTheDocument();
+
+      confirmarMock.mockImplementation(() => {});
+      fireEvent.change(campo, { target: { value: '71042' } });
+      fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+      await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+      const cuerpo = confirmarMock.mock.calls[0]?.[0] as {
+        archivos: { numeroProduccion?: number }[];
+      };
+      expect(cuerpo.archivos[0]?.numeroProduccion).toBe(71_042);
+    });
+
+    it('ligado a mano y dejado VACÍO: no bloquea, y no se manda ningún número', async () => {
+      await irAVistaPrevia(
+        {
+          ...PREVIEW,
+          renglones: [
+            {
+              ...RENGLON,
+              idModeloSugerido: null,
+              codigoModeloSugerido: null,
+              descripcionModeloSugerido: null,
+              modeloDeProduccion: null,
+              numeroProduccionPropuesto: null,
+            },
+          ],
+        },
+        ['modelos.administrar'],
+      );
+      fireEvent.click(screen.getByTestId('importador-pdf-crear-modelo'));
+      fireEvent.click(await screen.findByTestId('stub-crear-modelo'));
+      await screen.findByText('ligado a mano');
+
+      confirmarMock.mockImplementation(() => {});
+      fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+      await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+      expect(toastErrorMock).not.toHaveBeenCalled();
+      const cuerpo = confirmarMock.mock.calls[0]?.[0] as {
+        archivos: { numeroProduccion?: number }[];
+      };
+      expect(cuerpo.archivos[0]?.numeroProduccion).toBeUndefined();
+    });
+
+    /**
+     * ⭐ LA OTRA MITAD DEL MISMO DEFECTO. El nº propuesto es del modelo SUGERIDO; si el renglón se
+     * re-liga a otro, ese número habla de un modelo que ya no es éste —y puede ser de otra serie—.
+     * Dejarlo precargado lo mandaría al confirm como si el usuario lo hubiera elegido para el
+     * modelo nuevo.
+     */
+    it('⭐ re-ligar a OTRO modelo tira el nº propuesto: no viaja el del modelo anterior', async () => {
+      await irAVistaPrevia(PREVIEW, ['modelos.administrar']);
+      expect(screen.getByTestId('importador-pdf-numero-0')).toHaveValue('71001');
+
+      // Crear modelo → advierte (el Modelo ID ya estaba ligado) → confirmar → liga al 999.
+      fireEvent.click(screen.getByTestId('importador-pdf-crear-modelo'));
+      fireEvent.click(await screen.findByTestId('confirmar-accion'));
+      fireEvent.click(await screen.findByTestId('stub-crear-modelo'));
+      await screen.findByText('ligado a mano');
+
+      expect(screen.getByTestId('importador-pdf-numero-0')).toHaveValue('');
+
+      confirmarMock.mockImplementation(() => {});
+      fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+      await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+      const cuerpo = confirmarMock.mock.calls[0]?.[0] as {
+        archivos: { numeroProduccion?: number }[];
+      };
+      expect(cuerpo.archivos[0]?.numeroProduccion).toBeUndefined();
+    });
+
+    /**
+     * 🔴 EL PIE NO PUEDE PROMETER QUE EL NÚMERO SE VA A USAR. El combobox de la liga busca con
+     * `origen: 'todos'`, así que **elegir a mano un modelo de PRODUCCIÓN del Access es un camino
+     * normal**: ahí el desenlace es `heredado` y nada se asigna, igual que si el color ya tuviera
+     * modelo (`reusado`). Decir *«lo asigna el sistema al generar»* a secas contradice la razón
+     * misma por la que aquí el campo es opcional — que el servidor NO dijo que de este renglón vaya
+     * a nacer un modelo — y el usuario se enteraría después de generar, por un `toast`.
+     */
+    it('⭐ el pie del campo ligado a mano enumera los DOS desenlaces, no promete asignación', async () => {
+      await irAVistaPrevia(PREVIEW, ['modelos.administrar']);
+      fireEvent.click(screen.getByTestId('importador-pdf-crear-modelo'));
+      fireEvent.click(await screen.findByTestId('confirmar-accion'));
+      fireEvent.click(await screen.findByTestId('stub-crear-modelo'));
+      await screen.findByText('ligado a mano');
+
+      const pie = screen.getByText(/Elegiste este modelo después de analizar/i);
+      // La rama en la que SÍ se usa…
+      expect(pie).toHaveTextContent(/si de esta OC nace un modelo nuevo/i);
+      // …y la rama en la que NO, que es la que faltaba.
+      expect(pie).toHaveTextContent(/ya tiene\s+modelo|ya es de producción/i);
+      expect(pie).toHaveTextContent(/no se aplica/i);
+    });
+
+    /**
+     * ⭐⭐ EL HUECO DEL PREDICADO: la numeración de un renglón puede depender de OTRO.
+     *
+     * Dos `modeloCliente` distintos que resuelven al mismo (modelo, color): el 2º sale `reusado`
+     * apuntando al número que va a estrenar el 1º. Si el 1º se re-liga, **el 2º pasa a ser el que
+     * hace nacer el modelo** — y mientras la pantalla siguiera enseñando de sólo lectura un `#71001`
+     * que ya no es de nadie, su OP nacería con el número que eligiera el sistema: la queja de Daniel
+     * otra vez, en un caso angosto.
+     */
+    it('⭐ re-ligar la OC que hace nacer el modelo invalida el `reusado` de su hermana', async () => {
+      await irAVistaPrevia(
+        PREVIEW_TANDA,
+        ['modelos.administrar'],
+        ['oc-620884.pdf', 'oc-620885.pdf'],
+      );
+      // Arranque: la 1ª estrena el 71001 y la 2ª lo reusa (sólo lectura, sin casilla).
+      expect(screen.getByTestId('importador-pdf-numero-0')).toHaveValue('71001');
+      expect(screen.getByTestId('importador-pdf-numero-reuso-1')).toHaveTextContent('#71001');
+      expect(screen.queryByTestId('importador-pdf-numero-1')).not.toBeInTheDocument();
+
+      // Se re-liga la PRIMERA (la que hacía nacer el modelo) a otro modelo.
+      const [crearPrimera] = screen.getAllByTestId('importador-pdf-crear-modelo');
+      fireEvent.click(crearPrimera as HTMLElement);
+      fireEvent.click(await screen.findByTestId('confirmar-accion'));
+      fireEvent.click(await screen.findByTestId('stub-crear-modelo'));
+      await screen.findByText('ligado a mano');
+
+      // La hermana YA NO enseña un número que no es de nadie: ahora se le puede poner el suyo.
+      expect(screen.queryByTestId('importador-pdf-numero-reuso-1')).not.toBeInTheDocument();
+      const campoHermana = screen.getByTestId('importador-pdf-numero-1');
+      expect(campoHermana).toHaveValue('');
+
+      confirmarMock.mockImplementation(() => {});
+      fireEvent.change(campoHermana, { target: { value: '71055' } });
+      fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+      await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+      const cuerpo = confirmarMock.mock.calls[0]?.[0] as {
+        archivos: { numeroProduccion?: number }[];
+      };
+      expect(cuerpo.archivos[1]?.numeroProduccion).toBe(71_055);
+    });
   });
 });

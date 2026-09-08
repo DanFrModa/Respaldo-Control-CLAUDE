@@ -59,7 +59,17 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { colorCanonico, normalizarNombreColor } from '../catalogos/colores.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
-import { claveColor, marcarColorDelPapel, resolverColoresDelPapel } from './color-del-papel.js';
+import {
+  claveColor,
+  marcarColorDelPapel,
+  resolverColoresDelPapel,
+  type ResolucionColorPapel,
+} from './color-del-papel.js';
+import {
+  resolverNumerosDeProduccion,
+  type DesenlaceNumeroPdf,
+  type RenglonParaNumerar,
+} from './numero-produccion-pdf.js';
 import { agruparPacksEnRenglones } from './packs-cya.js';
 import { guardarPlantilla, leerCamposVariablesJson } from './importacion.js';
 import {
@@ -527,6 +537,35 @@ async function cargarLigasAprendidas(
   return mapa;
 }
 
+/**
+ * La liga que la vista previa SUGIERE para un modelo del cliente: la aprendida, y **sólo si su
+ * modelo sigue activo** (sugerir uno descontinuado haría reventar la tx al confirmar).
+ *
+ * 🔑 Es una función y no dos líneas repetidas porque la pregunta se hace en DOS sitios de la misma
+ * pasada —al numerar la tanda y al armar cada renglón— y dos copias de la regla es como empiezan a
+ * contestar distinto: bastaría con que una mirara `activo` y la otra no para que la previa numerara
+ * un modelo que después no va a sugerir.
+ */
+function ligaSugerida(
+  ligas: ReadonlyMap<string, LigaAprendida>,
+  modeloCliente: string,
+): LigaAprendida | null {
+  const aprendida = ligas.get(claveModeloCliente(modeloCliente)) ?? null;
+  return aprendida !== null && aprendida.activo ? aprendida : null;
+}
+
+/**
+ * En qué color va a acabar la OP, como ID: el canónico si una fusión lo desvía, el mismo si no, y
+ * `null` cuando el color todavía no existe (se crea al confirmar) — que es justo el caso en el que
+ * NO puede haber un modelo de producción previo para ese color.
+ */
+function idColorResuelto(resolucion: ResolucionColorPapel | undefined): number | null {
+  if (resolucion === undefined || resolucion.estado === 'nuevo') {
+    return null;
+  }
+  return resolucion.estado === 'fusionado' ? resolucion.canonico.id : resolucion.id;
+}
+
 /** Config pdf-cya VIGENTE del cliente (campos variables + % adicional); defaults si no hay plantilla. */
 async function leerConfigPlantillaPdf(
   bd: ReturnType<typeof clienteLectura>,
@@ -585,7 +624,12 @@ export async function analizarImportacionPdf(
   const etiquetasTalla = new Set<string>();
   for (const p of procesados) {
     if (p.parseado === null) continue;
-    if (p.parseado.colorGenerico !== '') nombresColor.add(p.parseado.colorGenerico);
+    // ⚠️ El papel SIN color genérico igual acaba en un color: el confirm resuelve-o-crea
+    // `SIN COLOR` (ver `resolverOCrearColor`). Se pregunta también por ése —y no sólo por los
+    // nombres del papel— porque de ese id depende saber si el color YA tiene modelo de producción
+    // (fila 0.151). No cambia lo que ve `marcarColorDelPapel`, que sigue preguntando por el nombre
+    // del papel: `claveColor('')` nunca casa con la de `SIN COLOR`.
+    nombresColor.add(p.parseado.colorGenerico === '' ? 'SIN COLOR' : p.parseado.colorGenerico);
     for (const t of p.parseado.tallas) etiquetasTalla.add(t.talla);
   }
   // ⭐ No basta con saber si el color EXISTE: hay que saber si una fusión lo va a DESVIAR a otro
@@ -610,6 +654,30 @@ export async function analizarImportacionPdf(
     ),
   );
 
+  /**
+   * ⭐ Fila 0.151 — el Nº DE PRODUCCIÓN de cada OC, calculado para TODA la tanda de golpe y ANTES de
+   * escribir nada (`numero-produccion-pdf.ts`): qué le va a pasar al modelo de este PDF y con qué
+   * número, para que la pantalla llegue con el campo precargado y sólo lo ofrezca cuando de verdad
+   * va a nacer un modelo. Los PDFs que NO se van a importar (ilegibles, sin liga, OC repetida) no
+   * gastan número: entran con `idModelo: null`.
+   */
+  const numeracion = await resolverNumerosDeProduccion(
+    cliente,
+    procesados.map((p, i) => {
+      const r = p.parseado;
+      if (r === null || (duplicados[i] ?? null) !== null) {
+        return { idModelo: null, idColor: null, claveColor: '' };
+      }
+      const sugerida = ligaSugerida(ligas, r.modeloCliente);
+      const nombre = r.colorGenerico === '' ? 'SIN COLOR' : r.colorGenerico;
+      return {
+        idModelo: sugerida?.idModelo ?? null,
+        idColor: idColorResuelto(coloresDelPapel.get(claveColor(nombre))),
+        claveColor: claveColor(nombre),
+      } satisfies RenglonParaNumerar;
+    }),
+  );
+
   const renglones: RenglonPdfPreview[] = procesados.map((p, i) => {
     if (p.parseado === null) {
       return renglonError(p.nombreArchivo, p.error ?? 'No se pudo leer el PDF.');
@@ -619,7 +687,13 @@ export async function analizarImportacionPdf(
     const aprendida = ligas.get(claveModeloCliente(r.modeloCliente)) ?? null;
     // Sólo se SUGIERE una liga a un modelo ACTIVO: sugerir uno descontinuado haría reventar la tx al
     // confirmar. Si la liga aprendida apunta a un inactivo, el renglón llega SIN sugerencia + advertencia.
-    const sugerida = aprendida !== null && aprendida.activo ? aprendida : null;
+    const sugerida = ligaSugerida(ligas, r.modeloCliente);
+    const numero: DesenlaceNumeroPdf = numeracion[i] ?? {
+      modeloDeProduccion: null,
+      numeroProduccionPropuesto: null,
+      numeroProduccionModelo: null,
+      avisos: [],
+    };
     const advertencias: AdvertenciaPdf[] = r.advertencias.map((a) => ({
       tipo: a.tipo,
       mensaje: a.mensaje,
@@ -684,6 +758,10 @@ export async function analizarImportacionPdf(
       colorFusionadoEn: marcaColor.colorFusionadoEn,
       tallasNuevas: [...new Set(tallasNuevas)],
       advertencias,
+      modeloDeProduccion: numero.modeloDeProduccion,
+      numeroProduccionPropuesto: numero.numeroProduccionPropuesto,
+      numeroProduccionModelo: numero.numeroProduccionModelo,
+      avisosNumeroProduccion: numero.avisos,
       yaImportado:
         duplicado !== null &&
         duplicado.origen === 'importado' &&
@@ -740,6 +818,10 @@ function renglonError(nombreArchivo: string, error: string): RenglonPdfPreview {
     colorFusionadoEn: null,
     tallasNuevas: [],
     advertencias: [{ tipo: 'parseo', mensaje: error }],
+    modeloDeProduccion: null,
+    numeroProduccionPropuesto: null,
+    numeroProduccionModelo: null,
+    avisosNumeroProduccion: [],
     yaImportado: null,
   };
 }
@@ -788,6 +870,11 @@ interface PdfAImportar {
   matrizEditada: RenglonMatrizEditada[] | null;
   /** Pantone editado/prefilleado del color de la OP (uno por OC); null = sin pantone. */
   pantone: string | null;
+  /**
+   * ⭐ Fila 0.151 — nº de producción CONFIRMADO por el usuario para el modelo que nazca de ESTA OC
+   * (`undefined` = acepta el que proponga el sistema). Se IGNORA —con aviso— si el modelo no nace.
+   */
+  numeroProduccion: number | undefined;
   subido: {
     bucket: string;
     key: string;
@@ -933,7 +1020,17 @@ export async function confirmarImportacionPdf(
         : r.pantone !== ''
           ? r.pantone
           : null;
-    aImportar.push({ nombreArchivo: p.nombreArchivo, r, idModelo, matrizEditada, pantone, subido });
+    aImportar.push({
+      nombreArchivo: p.nombreArchivo,
+      r,
+      idModelo,
+      matrizEditada,
+      pantone,
+      // Fila 0.151: el nº que el usuario confirmó en la vista previa para ESTE PDF. Zod ya lo validó
+      // (5 dígitos); `salidaAProduccion` lo vuelve a validar y el dominio decide si aplica.
+      numeroProduccion: ajuste?.numeroProduccion,
+      subido,
+    });
   }
 
   if (aImportar.length === 0) {
@@ -1005,6 +1102,7 @@ export async function confirmarImportacionPdf(
         porcentajeAdicional: pct,
         matrizEditada: item.matrizEditada,
         pantone: item.pantone,
+        numeroProduccion: item.numeroProduccion,
         idCliente: datos.idCliente,
         subido: item.subido,
       });
@@ -1141,6 +1239,8 @@ async function crearOrdenDesdePdf(
     matrizEditada: RenglonMatrizEditada[] | null;
     /** Pantone del color de la OP (editado/prefilleado), o null. */
     pantone: string | null;
+    /** Nº de producción confirmado por el usuario para el modelo que nazca de esta OC (0.151). */
+    numeroProduccion: number | undefined;
     subido: PdfAImportar['subido'];
   },
 ): Promise<Omit<OrdenPdfImportada, 'nombreArchivo' | 'modeloCliente'>> {
@@ -1231,6 +1331,12 @@ async function crearOrdenDesdePdf(
       lineas: matriz,
       referencias,
       ...(r.fechaEntrega !== null ? { fechaEntrega: r.fechaEntrega } : {}),
+      // ⭐ Fila 0.151 (DANIEL: *«quedamos que ese lo ponía yo, con una sugerencia previa»*): el nº de
+      // producción que el usuario CONFIRMÓ en la vista previa viaja hasta el nacimiento del modelo.
+      // Sin esta línea el importador llamaba a la MISMA función que el panel manual «Generar OP»
+      // pero sin el campo, así que el número lo elegía el sistema y nadie lo veía hasta después.
+      // Omitirlo = aceptar el que proponga el sistema (conducta anterior, intacta).
+      ...(args.numeroProduccion === undefined ? {} : { numeroProduccion: args.numeroProduccion }),
     },
     { tx },
   );
@@ -1281,6 +1387,11 @@ async function crearOrdenDesdePdf(
     numeroOrden: r.numeroOrden,
     totalPiezas: totalFabricar,
     adjuntado: true,
+    // Fila 0.151 — qué pasó DE VERDAD con el modelo, y los avisos de la numeración. Son la ÚNICA
+    // señal de que un número tecleado NO se aplicó (porque el color ya tenía modelo): hasta ahora
+    // `salidaAProduccion` los devolvía y este importador los tiraba a la basura.
+    modeloDeProduccion: salida.modeloDeProduccion,
+    avisosNumeroProduccion: salida.avisosNumeroProduccion,
   };
 }
 
