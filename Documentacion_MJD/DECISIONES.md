@@ -12252,6 +12252,81 @@ que **la queja de Daniel puede reaparecer ahí**. Fuera del alcance de esta fila
 
 ---
 
+#### (Post-F9.218) — TRES RESPUESTAS DE DANIEL: ANTIGÜEDAD, FACTORES Y PERMISOS (7-sep-2026)
+
+Tres preguntas que el lead había dejado abiertas con su default propuesto, contestadas de una vez
+(regla de §6: las preguntas se juntan y no frenan el trabajo).
+
+**(a) LA ANTIGÜEDAD DE SALDOS NO LLEVA CUBETAS: LLEVA DÍAS VENCIDOS (fila 0.121).**
+
+Se le preguntó por los tramos (7 / 14 / 21+) con los que agrupar la antigüedad de los maquileros.
+**Daniel:** *«Es irrelevante. Ni siquiera veo eso. **Solo con que pongas los días vencidos es
+suficiente**.»*
+
+**DECIDIDO:** el reporte de los jueves muestra, por renglón, **los días vencidos como número** — no una
+cubeta. ⚠️ Esto **NO retira** el aging por cubetas que ya existe y es configurable: sigue donde está
+para quien lo use. Lo que se decide es que **la pantalla de los jueves no se diseña alrededor de las
+cubetas**, porque él no las mira.
+
+🔑 **Y no confundir: su respuesta simplifica la PRESENTACIÓN, no el arreglo.** El hueco que la fila
+0.121 recoge sigue entero — hay maquileros a los que él **sí** envejece el saldo y el sistema les pone
+`fechaVencimiento: null` ⇒ **sin fecha de vencimiento no hay días vencidos que enseñar**. Calcular esa
+fecha sigue siendo el trabajo de la fila; lo que se ahorra es diseñar cubetas para ella.
+
+**(b) LOS FACTORES SON DEL CLIENTE, SE MUEVEN DESDE CLIENTES, Y NADA SE PROPAGA SOLO.**
+
+Se le preguntó con qué frecuencia mueve los factores de una lista ya aprobada. **Daniel:** *«Cada
+cliente se le pone sus factores por default. Cuando quiera moverlos, **los muevo desde clientes**. **Que
+no se haga nada automático**.»*
+
+**Confirma y extiende §Post-F9.156** (*«los factores son su calculadora, el precio cerrado es un
+compromiso»* ⇒ mover un factor **no toca** a los terminales).
+
+✅ **MEDIDO — el sistema ya cumple, y por construcción, así que no hay nada que construir.**
+`ClienteFactores` cuelga del cliente, y `ListaPrecios` guarda un **SNAPSHOT** copiado al crearla
+(`backend/prisma/schema.prisma:8729` y `:8745`). Y `clienteFactores` **no se lee en vivo desde ningún
+cálculo de precio**: las únicas lecturas de producción en todo el repo están en su propio CRUD
+(`dominio/desarrollo/cliente-factores.ts`) y en la fusión de departamentos
+(`dominio/catalogos/cliente-departamentos.ts` y `…-fusion-referencias.ts`) ⇒ **no existe ninguna vía por
+la que mover un factor del cliente altere una lista ya hecha**. *(Establecido leyendo el esquema y
+cruzando las lecturas de `clienteFactores` en `backend/src`; no se midió contra una base de datos.)*
+
+📌 **El único cabo, y se deja como está:** el snapshot de la lista **también es editable ahí**
+(`schema.prisma:8745`: *«editables aquí»*). Daniel no pidió retirarlo, y su frase dice dónde vive el
+**default**, no que se prohíba el ajuste puntual ⇒ **se conserva**, como escotilla para una negociación
+suelta. Si algún día dice que sólo desde Clientes, es quitar la edición de un sitio.
+
+**(c) LOS PERMISOS SE DEFINEN AL SALIR — pero el DEFECTO se arregla antes (fila 0.120).**
+
+Se le preguntó qué debe pasar en los **cinco** sitios donde `roles.administrar` se usa como interruptor
+de «es admin». **Daniel:** *«Hay que definir los permisos **una vez que vayamos a salir**.»*
+
+⚠️ **No es una respuesta nueva: es la MISMA de hace cuatro días**, y el lead volvió a preguntar sin
+comprobarlo. El 3-sep ya había dicho (**§Post-F9.187(c)**): *«déjalo así por ahora. **Lo arreglamos
+cuando vayamos a producción**»*. La fila lo recogía, palabra por palabra, y aun así se le volvió a
+poner delante. *(Cicatriz: antes de preguntar, mirar si la fila ya trae la respuesta.)*
+
+**DECIDIDO — sin cambio de fondo, y con una consecuencia de calendario que sí es nueva:** «cuando
+vayamos a salir» **es ahora**, porque V1 está a días. ⇒ la 0.120 deja de ser un pendiente lejano y
+**entra en el trabajo del arranque**, que es exactamente por lo que sigue marcada 🔴 **BLOQUEA V1**.
+
+🔑 **Y dentro de ese trabajo, el orden importa:** el arreglo de código va **antes** de que él reparta,
+no después. Mientras los cinco poderes cuelguen de `roles.administrar`, el día que se siente a asignar
+permisos **no habrá cinco interruptores que mover** — dárselo a alguien para que administre roles le
+abrirá, en silencio, cinco módulos que nadie le concedió. Separar cada poder en su permiso explícito es
+lo que convierte su reparto en un reparto **real** y no en una ilusión. **No se adelanta nada: se
+ordena.**
+
+**Y un pendiente manual que se cierra:** *«Teníamos pendiente subir el RFC. **Ya lo subí**»* ⇒ el RFC de
+FR Moda **ya está capturado** en Administración › Empresas. Era uno de los dos requisitos operativos que
+la fila **0.097** (su repaso de Finanzas) tenía que dejar listos antes de que él entre. Queda el otro:
+el **ETL de saldos de apertura**, construido y **sin correr**, esperando su corte de SINUBE (D15c).
+
+- **Aplica en:** filas **0.120**, **0.121** y **0.097**, y confirma **§Post-F9.156**.
+  **Fecha:** 2026-09-07.
+
+---
+
 #### (Post-F9.215) — ✅ EL BORRADOR DE ORDEN DE COMPRA **NO** CUENTA COMO COMPRADO (Daniel, 7-sep-2026)
 
 **Decisión pedida por el lead al construir la guarda de cancelación (fila 0.150) y contestada por Daniel
