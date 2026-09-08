@@ -29,8 +29,9 @@
  *
  * ## Y lo que NO hace, dicho a propósito
  * NO deriva el monto de los recibos ni del saldo (§Post-F9.189(b): *«yo voy decidiendo los montos a
- * pagar de cada uno. Manualmente»*). El saldo, lo pendiente de revisión, el vencido y lo recibido
- * en la semana viajan **al lado** del campo, como referencia — nunca lo llenan.
+ * pagar de cada uno. Manualmente»*). El saldo, lo pendiente de revisión, el vencido, **los días
+ * vencidos** (fila 0.121) y lo recibido en la semana viajan **al lado** del campo, como referencia —
+ * nunca lo llenan.
  */
 import {
   esquemaCorridaCrear,
@@ -453,13 +454,19 @@ export async function obtenerCorridaDetalle(
       cuentas: proveedor.cuentas.map(proyectarCuentaDestino),
       puedeConFactura: proveedor.cuentas.some((c) => c.esFiscal),
       saldo: neta === undefined ? oculto(0) : oculto(neta.saldo),
-      // El «vencido» es sólo de CxP: son las cubetas del aging del motor. La maquila no tiene
-      // antigüedad por ítem (los cargos EsMa no traen fecha de vencimiento), así que en la sección
-      // de maquileros va en null en vez de en un cero que parecería «no debe nada vencido».
+      // El «vencido» es sólo de CxP: son las cubetas del aging del motor, que no reparten la
+      // maquila (las tablas de EsMa no tienen columna de vencimiento). En la sección de maquileros
+      // va en null en vez de en un cero que parecería «no debe nada vencido».
       vencido:
         esMaquila || neta === undefined
           ? null
           : oculto(redondear2(neta.d1a30 + neta.d31a60 + neta.mas60)),
+      // ⭐ Fila 0.121 — LOS DÍAS VENCIDOS, y aquí SÍ para los maquileros: es exactamente el hueco
+      // que la fila vino a cerrar. Daniel envejece a los que tienen plazo pactado y el sistema los
+      // mandaba a una cubeta sin edad; ahora el vencimiento se DERIVA (fecha del cargo + días de
+      // crédito del proveedor) y esta columna es la misma para las dos secciones.
+      // NO se oculta con `consultas.ver-importes`: no es dinero.
+      diasVencidos: neta?.diasVencidos ?? null,
       // El «por revisar» viene ENTERO del mismo agregado que la bandeja de CxP: desde la fila 0.111
       // incluye los RECIBOS SIN VALIDAR del maquilero (cargos `propuesto`) además de sus abonos,
       // pagos y descuentos capturados. Aquí no se filtra ni se recalcula nada — si se recalculara,
@@ -506,6 +513,7 @@ export async function obtenerCorridaDetalle(
       // Un concepto no tiene cuenta corriente: nace en cero y no hay nada que enseñar al lado.
       saldo: null,
       vencido: null,
+      diasVencidos: null,
       porRevisarNeto: null,
       porRevisarPartidas: 0,
       recibosSemanaImporte: null,

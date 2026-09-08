@@ -55,7 +55,8 @@ auditado** (patrón kardex), jamás una edición/borrado. Toda la lógica vive e
   - `cxp/` y `cxc/` — usos de negocio del motor por **composición** (cero duplicación): registrar
     pagos/abonos/descuentos/NC, estado de cuenta operativo/fiscal, **aging server-side**
     (`aging-comun.ts`: cubetas + neteo FIFO). La bandeja "por pagar" **foldea** el saldo EsMa (misma
-    cuenta del maquilero, en cubeta "Maquila sin antigüedad"); el `%` al corriente es honesto (`null`
+    cuenta del maquilero, en una cubeta "Maquila" que **no se reparte** en las cuatro del aging — sus
+    DÍAS VENCIDOS sí se calculan, ver `dias-vencidos.ts`); el `%` al corriente es honesto (`null`
     si no hay cartera clasificable). El fold trae DOS cosas por maquilero (`aportesEsMaSaldoLote`, un
     solo agregado, nunca N+1): el **saldo** —al que sólo entra lo REVISADO en los cuatro conceptos,
     V1 fila 0.115— y `maquilaPorRevisar`, lo capturado que aún espera revisión.
@@ -80,6 +81,34 @@ auditado** (patrón kardex), jamás una edición/borrado. Toda la lógica vive e
     del periodo completo. Exports **Excel** (exceljs) y **PDF** (@react-pdf, con leyenda de truncado).
   - `config-aging.ts` — límites del aging **configurables por empresa**
     (`ConfiguracionEmpresa.agingLimite1/2`, default 30/60 — cierra D15d).
+  - ⭐ `dias-vencidos.ts` — **LOS DÍAS VENCIDOS** (V1, fila **0.121**; §Post-F9.218(a)/§Post-F9.220).
+    Daniel: *«**Solo con que pongas los días vencidos es suficiente**»* ⇒ un número por renglón, no
+    una cubeta. Es **el único dato de antigüedad que cubre la MAQUILA**, y ahí está el porqué de este
+    archivo: los cargos de maquila **no viven en el motor** —viven en EsMa, cuyas tablas **no tienen
+    columna de vencimiento** (`EsMaCargo` ni siquiera tiene columna de fecha: su fecha es su
+    `creadoEn`)— así que `convivencia-esma.ts` los proyectaba con `fechaVencimiento: null` y no había
+    edad que enseñar. ⇒ el vencimiento se **DERIVA al leer**: fecha del cargo + `Proveedor.diasCredito`,
+    con la aritmética única `sumarPlazo` (extraída de `calcularVencimiento` a `aging-comun.ts`).
+    **Sin columna, sin migración y sin backfill** — y por eso el histórico ya migrado también envejece.
+    - **Qué número es:** los días del **cargo más viejo que sobrevive a los pagos**, aplicándolos de
+      más viejo a más nuevo — la MISMA convención de `netearCubetas`, para que esta columna y las
+      cubetas de la bandeja no cuenten historias distintas del mismo proveedor. Tres estados que **no
+      se colapsan**: `n` días · `0` (debe, dentro de plazo) · `null` (nada que envejecer).
+    - **Cómo se obtiene:** DOS agregados SQL (nunca N+1) sobre **tres** fuentes de cargo (motor ·
+      cargo EsMa · **abono** EsMa) y **dos** de crédito. Los días los resta **Postgres**
+      (`CURRENT_DATE − vencimiento`), la misma expresión de las cubetas: si el servidor de la
+      aplicación usara su propio reloj, dos números de la misma pantalla podrían desfasarse un día.
+    - 🔴 **La trampa de los signos, que hay que conocer antes de tocar esto:** en EsMa el `abono` es un
+      **CARGO extra al maquilero** (suma) y en el motor **resta**. Quién envejece se decide por el
+      **SIGNO** (`SIGNO_SALDO`, definición única), **nunca** por la etiqueta del origen — preguntarle a
+      `calcularVencimiento`, que decide por el origen, dejaría al abono de EsMa sin edad en silencio.
+    - 🔻 **Lo que NO cubre:** la cubeta «Maquila» **sigue sin repartirse** en las cuatro cubetas del
+      aging, y en la bandeja `vencido` **sigue siendo sólo del motor**. Eso pide que EsMa registre por
+      el motor; §Post-F9.218(a) no lo pidió. Y un **pago sigue sin amarrarse a una factura**, así que la
+      edad es la mejor suposición posible (el saldo total nunca se ve afectado).
+    - **Dónde se ve:** columna «Días venc.» de **la corrida semanal de pagos** (fila 0.113) — la
+      pantalla de los jueves donde Daniel decide a quién le paga—, y la fecha derivada en el estado de
+      cuenta del proveedor.
   - `migracion.ts` — **modo migración** (F9-E6): `insertarAperturasMigradas` inserta los saldos
     iniciales por **LOTES** (ver §ETL abajo).
 - **Rutas** `backend/src/api/terceros/` — delegan al dominio; RBAC deny-by-default.
