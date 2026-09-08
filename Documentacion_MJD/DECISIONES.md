@@ -12136,6 +12136,123 @@ nuevo **sí** pasan.
 
 ---
 
+#### (Post-F9.224) — LA CARGA DE APERTURA DESDE SINUBE (fila 0.131, 8-sep-2026): cómo se lee el archivo, qué se carga y qué ABORTA
+
+**De dónde nace.** Daniel quiere **apagar SINUBE**, y para eso hay que meter al sistema los **saldos
+vivos de cada proveedor** como movimientos de apertura. Él exporta de SINUBE un listado por proveedor
+(§Post-F9.192(7): *«te voy a mandar un archivo de SINUBE para que veas cómo va a salir la
+información»*), y el lead midió uno real. Las reglas de negocio ya las había dictado él; lo que esta
+sección cierra son **la forma del archivo, los casos que él no nombró, y una guarda que sólo se ve
+midiendo el modelo de datos**.
+
+⚠️ **El motor NO se tocó.** La apertura se inserta con el **modo migración de F9-E6**
+(`src/dominio/terceros/migracion.ts`, D15c): folios en bloque (A3), transacción (A2), inserción por
+lotes, idempotencia por `MapeoMigracion`, el signo por `signoDeOrigen` y el vencimiento por
+`calcularVencimiento` (A1). Lo que se construyó es **el lector del Excel y el mapeo**.
+
+---
+
+##### 🔴 (a) EL ETL EXIGE `diasCredito` EXPLÍCITO — porque cargar sin él NO fallaría
+
+`Proveedor.diasCredito` es **`Int?`** y la semántica documentada del motor dice que **`null` y `0`
+significan lo mismo: contado**. ⇒ un proveedor que **nadie configuró** queda en `null`, el motor lo
+trata como contado, y `calcularVencimiento` le pone **vencimiento = la propia fecha de la factura**:
+**todas sus facturas de apertura nacen vencidas**, con un error de hasta 90 días. Y **no daría ningún
+error**: saldría un número, sólo que equivocado — justo en la pantalla con la que Daniel decide a
+quién le paga (fila 0.121).
+
+**DECIDIDO — la guarda distingue lo que el motor no distingue:**
+- `diasCredito === null` ⇒ **HUECO** ⇒ **aborta nombrando al proveedor** (RFC, id y razón social), sin
+  cargar nada suyo. El ETL exige que **alguien haya decidido** el plazo.
+- `diasCredito === 0` ⇒ **CONTADO DECIDIDO** ⇒ **es válido**: se carga y vence el mismo día.
+
+🔻 **Límite declarado, para que nadie crea que esta fila lo resolvió: la ambigüedad `null`/`0` SIGUE
+VIVA en el resto del motor.** Aquí no se cambió la semántica global, ni `calcularVencimiento`, ni el
+TSDoc del dominio: eso afecta a todo el motor y no era de esta fila. Lo único que hay es un ETL que
+**se niega a apoyarse en ella**.
+
+---
+
+##### (b) LAS REGLAS QUE YA HABÍA DICTADO DANIEL, y cómo quedaron
+
+1. **Sólo lo VIVO** (*«sólo vamos a meter para cada proveedor las facturas que tengan vivas»*) ⇒ se
+   cargan los renglones con **`Saldo > 0`**. Lo pagado, los **complementos de pago** (`Tipo fiscal =
+   Pago`) y las notas de crédito ya aplicadas **no se cargan**.
+2. **Se carga el `Saldo`, NO el `Importe`.** En el archivo real hay **dos facturas con abono parcial**
+   donde no coinciden; cargar el importe metería deuda que ya se pagó. La nota del movimiento dice el
+   importe original y lo abonado, para que se vea de dónde salió la cifra.
+3. **El vencimiento se CALCULA, no se lee del archivo** (*«esta fecha que trae no es necesariamente lo
+   que está negociado. El trato son 90 días»*). ⭐ **Medido, y le da la razón:** 97 de 98 facturas
+   traen exactamente 90 días entre `Fecha` y `Pago probable`; **una trae 92** — la desviación manual
+   que calcular corrige.
+4. **El plazo corre desde la FECHA DE LA FACTURA**, no desde el recibo — él lo planteó y lo aparcó
+   (*«lo dejamos para V2… por ahora cargamos con el mismo criterio que SINUBE»*). Es lo que el motor
+   ya hacía: **cero código**.
+5. ⚠️ **La columna «Recepción» del archivo NO es la fecha de recibo**: es idéntica al «Pago probable»
+   en 97 de 98 renglones. Está **mal etiquetada** y **no se usa para nada**.
+
+---
+
+##### (c) LOS CASOS QUE LA FILA NO CERRABA — decididos por el lead, con default, ⏳ pendientes de ratificación
+
+| # | Caso | Default tomado | Por qué |
+|---|---|---|---|
+| **P1** | Una **nota de crédito con saldo vivo** (`Tipo fiscal = Egreso`) | **Se carga**, como `nota_credito` (abono, resta) | En SINUBE una nota **aplicada** queda en saldo 0; si su saldo es > 0 es que **no está aplicada a ninguna factura**, así que cargarla no duplica nada. **Dejarla fuera sí haría daño**: el saldo saldría más alto que en SINUBE y se pagaría de más. ⚠️ Descansa en cómo entiende SINUBE su columna `Saldo`: **si Daniel dice que ya viene neteada, hay que quitarlas** |
+| **P2** | El **origen** del movimiento de apertura | `factura_proveedor` para el Ingreso · `nota_credito` para el Egreso — **no** un origen «apertura» aparte | Son facturas de verdad, con su CFDI y su UUID. Inventar un origen sintético las sacaría de las vistas fiscales y del aging que ya existen |
+| **P3** | El **mismo UUID en dos archivos** | **No pasa nada**: la 2ª corrida lo cuenta como *existente* | Doble red ya construida: `MapeoMigracion` (clave `uuid:<UUID>`) **y** la unique global de `MovimientoTercero.uuidCfdi`. Y el UUID se guarda **en mayúsculas**, para que el mismo comprobante no se cuele dos veces por una diferencia de caja entre SINUBE y el importador de XML |
+| **P4** | El **mismo UUID dos veces en el MISMO archivo** | **ABORTA** nombrando el UUID y sus filas | Escoger uno «a ojo» podría duplicar o partir un saldo en silencio |
+| **P5** | Un renglón en **moneda que no son pesos** | **ABORTA** nombrándolo | `MovimientoTercero` **no tiene columna de moneda**: cargarlo sería guardar un número en la unidad equivocada, sin que nada lo diga. Se aceptan `MXN`/`MXP`/`MN`/`PESOS`; **la celda vacía tampoco se supone MXN** |
+| **P6** | Un CFDI **cancelado en el SAT** con saldo > 0 | **Se descarta** (no aborta), contado en el cuadre con su suma | Un comprobante cancelado no crea deuda. Es contradictorio con el saldo, así que **sale listado**, nunca en silencio |
+| **P7** | `Estatus pago` dice **«Pagada»** pero queda saldo | **Se carga el saldo** y sale un **aviso** | Manda la regla 2 (el saldo), pero la contradicción se enseña |
+| **P8** | Un renglón vivo **sin fecha, sin RFC o sin UUID** | **ABORTA** | Sin fecha no hay antigüedad; sin RFC no hay proveedor (se identifica **por RFC**, no por razón social); sin UUID no hay clave que haga la carga re-corrible |
+| **P9** | Un `Tipo fiscal` que no sea Ingreso/Egreso/Pago, o un **saldo negativo** | **ABORTA** | No se inventa una interpretación para un dato que nadie ha visto |
+
+---
+
+##### (d) TODO O NADA, y el aviso cuando ya no se puede
+
+**Ningún renglón se escribe hasta que TODAS las guardas duras pasan**: el script junta los problemas
+del archivo **y** los del catálogo, los imprime **todos juntos** (para arreglarlos de una pasada, no
+uno por corrida) y **termina en 1 sin haber tocado la base**. Está medido contra Postgres: tras un
+aborto, `movimientos_tercero` queda en **cero** — no sólo el proveedor culpable.
+
+⚠️ **Lo que SÍ puede quedar a medias, dicho en vez de callado:** una vez empezada la escritura, el
+cargador por lotes es **tolerante a propósito** (un bloque que revienta no tumba al resto). Antes,
+eso se veía como una corrida exitosa. Ahora el ETL **cuenta los renglones que no se pudieron
+escribir**, saca un aviso grande y **sale en 1**; volver a correrlo retoma lo que falta (es
+idempotente). El caso real que lo dispara está documentado en `migracion/README.md`: **un folio ya
+ocupado**.
+
+---
+
+##### (e) LA TRAMPA TÉCNICA, MEDIDA: `exceljs` lee mal las fechas de SINUBE
+
+SINUBE guarda las fechas en celdas **`t="d"`** (fecha ISO 8601 dentro del `<v>`, ECMA-376 §18.18.11).
+Es válido y poco común, y **`exceljs` 4.4.0 —la librería que el proyecto ya usa— no implementa ese
+tipo**: su `cell-xform.js` cae al `default:` y hace `parseFloat("2026-08-31T00:00:00")` = **2026**,
+que con estilo de fecha se convierte en **`1905-07-18`**.
+
+🔴 **No lanza: devuelve mal.** Sin taparlo, las **460 fechas** del archivo real entrarían en 1905 y la
+pantalla de antigüedad diría **~44 mil días vencidos**, con un número y sin un error.
+
+**Cómo se tapó:** `exceljs` sigue leyendo la estructura (hojas, `sharedStrings`, estilos) y sólo las
+celdas `t="d"` se **re-leen del XML crudo** y se superponen por dirección de celda
+(`migracion/comun/xlsx-fechas-iso.ts`). Es la superficie mínima: ni se reimplementa un lector de
+XLSX, ni se toca la librería. El XLSX es un ZIP, y se abre con `node:zlib` **en vez de sumar una
+dependencia**: `jszip`/`unzipper` sólo están en el árbol como dependencias **transitivas** de
+`exceljs`, y colgar el ETL de un paquete que nadie declaró es una avería esperando a un `npm i`.
+
+🔻 **Y la puerta de atrás del mismo defecto, cerrada de paso:** una celda `t="d"` cuyo contenido NO se
+pueda leer **no cae al valor de `exceljs`** — se registra como **«sin fecha»**, y el renglón, si está
+vivo, aborta por eso. La primera versión hacía `fechaDelXml ?? fechaDeExceljs`, y con eso un
+`<v>2026</v>` dentro de una celda `t="d"` —el valor exacto que produce el 1905-07-18— habría vuelto a
+entrar, esta vez **sin que ninguna prueba lo estuviera mirando**. La decisión se toma con `has()`, no
+con el valor, y hay una prueba con ese caso.
+
+- **Aplica en:** versión **0.131**, fila 0.131. **Fecha:** 2026-09-08.
+
+---
+
 #### (Post-F9.217) — ⭐ EL NÚMERO DE PRODUCCIÓN LO PONE DANIEL AL IMPORTAR (7-sep-2026, fila 0.151 / v0.127)
 
 **Daniel, probando el flujo real:** *«me generó el pedido y la OP **sin preguntar el número de modelo
