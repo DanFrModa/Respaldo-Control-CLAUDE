@@ -86,7 +86,15 @@ test.describe('Ruta Crítica — catálogo configurable (F5-E1)', () => {
     await page.getByTestId('guardar-dependencias').click();
 
     // El backend rechaza el ciclo con un mensaje claro en español (toast).
-    await expect(page.getByText(/ciclo/i)).toBeVisible();
+    //
+    // ⚠️ El texto del toast va COMPLETO a propósito. Un `/ciclo/i` suelto NO sirve aquí: el
+    // subtítulo de la página (`DependenciasPagina.tsx:97`, «…No se admiten ciclos.») se pinta
+    // SIEMPRE, desde que carga la pantalla y mucho antes de pulsar guardar ⇒ la aserción se
+    // cumplía con el subtítulo, sin mirar el toast, y habría seguido en verde aunque el backend
+    // dejara de rechazar el ciclo. Cuando el toast llegaba a tiempo, además, el locator resolvía
+    // a DOS elementos y Playwright reventaba por strict mode: en verde no medía nada y en rojo
+    // no era culpa del código.
+    await expect(page.getByText(/Crear esta dependencia formaría un ciclo/i)).toBeVisible();
   });
 
   test('Procesos y responsables (R4): agrega un rango de dificultad y edita una dependencia', async ({
