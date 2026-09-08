@@ -326,6 +326,13 @@ export async function copiarRecetaDelModelo(
           filas.map((f) => ({
             idTela: f.idTela,
             consumoPorPrenda: f.consumoPorPrenda.toNumber(),
+            // ⭐⭐ 0.156 — el consumo del COMPLEMENTO se congela con el resto de la receta. La
+            // explosión del MRP lee ESTA copia (V1-E3d), nunca el BOM del modelo: sin esto el
+            // número no llegaría jamás a la orden de compra.
+            consumoComplementoPorPrenda:
+              f.consumoComplementoPorPrenda === null
+                ? null
+                : f.consumoComplementoPorPrenda.toNumber(),
             precioCosteo: null as number | null,
             paraPreCosto: f.paraPreCosto,
             paraProduccion: f.paraProduccion,
@@ -371,6 +378,10 @@ export async function copiarRecetaDelModelo(
         idOrden: orden.id,
         idTela: t.idTela,
         consumoPorPrenda: new Prisma.Decimal(t.consumoPorPrenda),
+        consumoComplementoPorPrenda:
+          t.consumoComplementoPorPrenda === null
+            ? null
+            : new Prisma.Decimal(t.consumoComplementoPorPrenda),
         precio: t.precioCosteo === null ? null : new Prisma.Decimal(t.precioCosteo),
         paraPreCosto: t.paraPreCosto,
         paraProduccion: t.paraProduccion,
@@ -2004,6 +2015,14 @@ export async function agregarRenglonReceta(
               idOrden: orden.id,
               idTela: datos.idTela,
               consumoPorPrenda: delCuerpo.consumoPorPrenda,
+              // ⭐⭐ 0.156 — como el precio y las banderas (H5): si el material SÍ está en el BOM,
+              // el renglón nuevo se trae de ahí el consumo del complemento. Agregado a mano
+              // (`delModelo === undefined`) nace en NULL, y su OC sigue pidiendo el complemento a
+              // mano — que es exactamente lo que pasaba antes de esta fila.
+              consumoComplementoPorPrenda:
+                delModelo?.consumoComplementoPorPrenda == null
+                  ? null
+                  : new Prisma.Decimal(delModelo.consumoComplementoPorPrenda),
               precio: delCuerpo.precio ?? precioDecimal(delModelo?.precioCosteo ?? null),
               paraPreCosto: datos.paraPreCosto ?? delModelo?.paraPreCosto ?? true,
               paraProduccion: datos.paraProduccion ?? delModelo?.paraProduccion ?? true,
@@ -2864,6 +2883,13 @@ export async function restaurarRenglonReceta(
           where: { id: fila.id },
           data: {
             consumoPorPrenda: new Prisma.Decimal(delModelo.consumoPorPrenda),
+            // ⭐⭐ 0.156 — restaurar PISA con lo que dice el modelo HOY, y eso incluye el consumo
+            // del complemento: dejarlo con el valor viejo haría que el renglón «restaurado» no
+            // fuera el del modelo, que es justo lo único que este botón promete.
+            consumoComplementoPorPrenda:
+              delModelo.consumoComplementoPorPrenda === null
+                ? null
+                : new Prisma.Decimal(delModelo.consumoComplementoPorPrenda),
             precio:
               delModelo.precioCosteo === null ? null : new Prisma.Decimal(delModelo.precioCosteo),
             paraPreCosto: delModelo.paraPreCosto,
@@ -3555,6 +3581,11 @@ export async function traerDelModelo(
             idOrden: orden.id,
             idTela: t.idTela,
             consumoPorPrenda: new Prisma.Decimal(t.consumoPorPrenda),
+            // ⭐⭐ 0.156 — se trae del modelo con todo lo suyo, complemento incluido.
+            consumoComplementoPorPrenda:
+              t.consumoComplementoPorPrenda === null
+                ? null
+                : new Prisma.Decimal(t.consumoComplementoPorPrenda),
             precio: precioDecimal(t.precioCosteo),
             paraPreCosto: t.paraPreCosto,
             paraProduccion: t.paraProduccion,

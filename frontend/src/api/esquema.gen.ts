@@ -14820,8 +14820,12 @@ export interface paths {
                 idTela: number;
                 /** @description Nombre de la tela (para la UI). */
                 nombre: string;
-                /** @description Consumo de tela por prenda. */
+                /** @description Consumo de tela por prenda. En una tela con complemento, del CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento de la tela ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado. */
+                consumoComplementoPorPrenda: number | null;
                 /** @description ¿Entra en el pre-costeo? */
                 paraPreCosto: boolean;
                 /** @description ¿Se considera al producir? */
@@ -17190,8 +17194,12 @@ export interface paths {
                 idTela: number;
                 /** @description Nombre de la tela (para la UI). */
                 nombre: string;
-                /** @description Consumo de tela por prenda. */
+                /** @description Consumo de tela por prenda. En una tela con complemento, del CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento de la tela ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado. */
+                consumoComplementoPorPrenda: number | null;
                 /** @description ¿Entra en el pre-costeo? */
                 paraPreCosto: boolean;
                 /** @description ¿Se considera al producir? */
@@ -17335,6 +17343,8 @@ export interface paths {
               paraCosto?: boolean;
               /** @default null */
               idTelaProveedor?: number | null;
+              /** @default null */
+              consumoComplementoPorPrenda?: number | null;
             }[];
           };
         };
@@ -17353,8 +17363,12 @@ export interface paths {
                 idTela: number;
                 /** @description Nombre de la tela (para la UI). */
                 nombre: string;
-                /** @description Consumo de tela por prenda. */
+                /** @description Consumo de tela por prenda. En una tela con complemento, del CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento de la tela ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado. */
+                consumoComplementoPorPrenda: number | null;
                 /** @description ¿Entra en el pre-costeo? */
                 paraPreCosto: boolean;
                 /** @description ¿Se considera al producir? */
@@ -19677,8 +19691,12 @@ export interface paths {
                 idTela: number;
                 /** @description Nombre de la tela (para la UI). */
                 nombre: string;
-                /** @description Consumo de tela por prenda. */
+                /** @description Consumo de tela por prenda. En una tela con complemento, del CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento de la tela ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado. */
+                consumoComplementoPorPrenda: number | null;
                 /** @description ¿Entra en el pre-costeo? */
                 paraPreCosto: boolean;
                 /** @description ¿Se considera al producir? */
@@ -42466,6 +42484,8 @@ export interface paths {
                   /** @description ⭐⭐ V1-E3u (§Post-F9.89) — de lo ya comprado que se le restó a este renglón, cuánto vino de una OC que **no dice de qué color** era. Viaja hasta la previa porque **es la última pantalla antes de comprometer el dinero**: la cantidad que se va a comprar salió de restar ese número, y atribuirlo a este color fue una ELECCIÓN del sistema, no un dato de la orden. 0 = nada que advertir. */
                   cantidadEnOcSinColor: number;
                   material: string;
+                  /** @description Nombre del complemento de la tela de este renglón («Cardigan»), o null. */
+                  nombreComplemento: string | null;
                   unidad: string | null;
                   /** @description Lo que se va a pedir de este material (Σ del reparto). */
                   cantidadTotal: number;
@@ -42497,7 +42517,9 @@ export interface paths {
                     cantidadPropuesta: number;
                     /** @description Precio unitario con el que nace esa línea. */
                     precio: number;
-                    /** @description cantidad × precio. */
+                    /** @description Cantidad del COMPLEMENTO de esta línea, o null si nace pendiente. */
+                    cantidadComplemento: number | null;
+                    /** @description cantidad × precio (+ el complemento, valuado al precio del cuerpo). */
                     importe: number;
                     /** @description ⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida que se va a GUARDAR en esta línea de OC. **Σ de sus cantidades = `cantidad` de la línea, exactamente** (se reparte con la misma función que reparte la compra entre las OP). Vacío = el avío no se pide por medida. */
                     medidas: {

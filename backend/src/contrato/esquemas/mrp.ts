@@ -769,7 +769,19 @@ export const esquemaPlanLineaOrden = z
           'que la bandeja de autorización mide el desvío. El desvío AVISA, no bloquea.',
       ),
     precio: z.number().describe('Precio unitario con el que nace esa línea.'),
-    importe: z.number().describe('cantidad × precio.'),
+    /**
+     * ⭐⭐ 0.156 (§Post-F9.219) — cuánto COMPLEMENTO (el cárdigan de la felpa) va a pedir esta
+     * línea. Lo calcula el PLAN —no la generación— para que la previa y la orden de compra usen el
+     * mismo número y el importe prometido no se separe del guardado. `null` = nace pendiente (la
+     * tela no lleva complemento, o la receta no capturó su consumo) y `autorizarOC` lo exigirá.
+     */
+    cantidadComplemento: z
+      .number()
+      .nullable()
+      .describe('Cantidad del COMPLEMENTO de esta línea, o null si nace pendiente.'),
+    importe: z
+      .number()
+      .describe('cantidad × precio (+ el complemento, valuado al precio del cuerpo).'),
     medidas: z
       .array(esquemaMedidaDesglose)
       .describe(
@@ -839,6 +851,16 @@ export const esquemaPlanRenglon = z
           'de la orden. 0 = nada que advertir.',
       ),
     material: z.string(),
+    /**
+     * ⭐⭐ 0.156 (§Post-F9.219) — cómo se llama el COMPLEMENTO de esta tela («Cardigan»), o null si
+     * no lleva. Viaja para que la previa pueda decir **de qué** es la cantidad extra que suma al
+     * importe: sin el nombre, la línea enseñaría `36 kg × $90 = $3,645` y la cuenta no cerraría a
+     * la vista. Lo dice el catálogo (`Tela.nombreComplemento`), no lo adivina la pantalla.
+     */
+    nombreComplemento: z
+      .string()
+      .nullable()
+      .describe('Nombre del complemento de la tela de este renglón («Cardigan»), o null.'),
     unidad: z.string().nullable(),
     cantidadTotal: z.number().describe('Lo que se va a pedir de este material (Σ del reparto).'),
     cantidadPropuesta: z

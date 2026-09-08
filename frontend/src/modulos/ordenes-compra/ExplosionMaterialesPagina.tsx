@@ -2465,6 +2465,19 @@ function RevisionPrevia({
                       Orden {l.folioOrden}: {formatearCantidad(l.cantidad)}
                       {r.unidad === null ? '' : ` ${r.unidad}`} × {formatearMoneda(l.precio)} ={' '}
                       {formatearMoneda(l.importe)}
+                      {/* ⭐⭐ 0.156 (§Post-F9.219) — EL CÁRDIGAN, DICHO EN LA MISMA LÍNEA. El
+                          importe YA lo incluye (la tela se compra con su complemento y su importe
+                          suma al subtotal), así que sin esta frase la cuenta de arriba
+                          —`36 kg × $90 = $3,645`— NO CIERRA A LA VISTA. Se nombra con lo que dice
+                          el catálogo («Cardigan»), no con la palabra «complemento». */}
+                      {typeof l.cantidadComplemento !== 'number' ||
+                      typeof r.nombreComplemento !== 'string' ? null : (
+                        <span data-testid="exp-previa-complemento">
+                          {' '}
+                          (incluye {formatearCantidad(l.cantidadComplemento)}
+                          {r.unidad === null ? '' : ` ${r.unidad}`} de {r.nombreComplemento})
+                        </span>
+                      )}
                       {l.seEscribe ? null : ' — no alcanza el mínimo: esta orden no lleva línea'}
                     </li>
                   ))}

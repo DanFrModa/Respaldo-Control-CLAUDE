@@ -2817,22 +2817,34 @@ model ModeloFoto {
 /// tela usada por un modelo no se borra físico → se desactiva). Auditoría COMPLETA: los
 /// campos son editables (A7).
 model ModeloTela {
-  idModelo         Int            @map("id_modelo")
-  idTela           Int            @map("id_tela")
-  /// Consumo de tela por prenda (doc 01-Modelos §2: `CantTela`).
-  consumoPorPrenda Decimal        @map("consumo_por_prenda") @db.Decimal(12, 4)
+  idModelo                    Int            @map("id_modelo")
+  idTela                      Int            @map("id_tela")
+  /// Consumo de tela por prenda (doc 01-Modelos §2: `CantTela`). En una tela CON complemento,
+  /// éste es el consumo del CUERPO (la felpa).
+  consumoPorPrenda            Decimal        @map("consumo_por_prenda") @db.Decimal(12, 4)
+  /// ⭐⭐ 0.156 (§Post-F9.214 + §Post-F9.219) — CONSUMO DEL COMPLEMENTO POR PRENDA (el cárdigan de
+  /// esa felpa). Daniel: *«sí es importante meterlo como complemento porque hay proveedores que así
+  /// lo manejan y para el control de la tela siempre es mejor ponerla como un complemento de su
+  /// tela»* — y el cárdigan comparte LOTE con su felpa, vínculo que darlo de alta como tela suelta
+  /// rompía en silencio. Es un **NÚMERO PROPIO**, no una proporción del cuerpo (§Post-F9.210·6).
+  ///
+  /// NULL = nadie lo capturó todavía: el sistema sigue exactamente como antes (la OC automática
+  /// nace con el complemento PENDIENTE y `autorizarOC` no la deja pasar hasta que alguien lo
+  /// teclee). Sólo se puede capturar si la TELA declara complemento (`Tela.nombreComplemento`):
+  /// quién tiene complemento lo dice el CATÁLOGO, cuánto lleva lo dice la RECETA.
+  consumoComplementoPorPrenda Decimal?       @map("consumo_complemento_por_prenda") @db.Decimal(12, 4)
   /// 🔑 Entra en el PRE-costeo (estimación antes de producir).
-  paraPreCosto     Boolean        @default(true) @map("para_pre_costo")
+  paraPreCosto                Boolean        @default(true) @map("para_pre_costo")
   /// 🔑 Se considera al PRODUCIR (lo que realmente se manda pedir/usar).
-  paraProduccion   Boolean        @default(true) @map("para_produccion")
+  paraProduccion              Boolean        @default(true) @map("para_produccion")
   /// 🔑 Entra en el COSTEO real de la orden.
-  paraCosto        Boolean        @default(true) @map("para_costo")
+  paraCosto                   Boolean        @default(true) @map("para_costo")
   /// F8-E1 (R17): amarre OPCIONAL al renglón proveedor–tela–precio elegido por Desarrollo. La
   /// cascada de resolución de precios (dominio/costos/resolucion-precios.ts) lo PREFIERE; NULL =
   /// sin amarre → cascada por color/sugerido. SetNull: si el renglón proveedor se retira de la
   /// tela, el amarre se limpia (degrada a la cascada, nunca cuelga).
-  idTelaProveedor  Int?           @map("id_tela_proveedor")
-  telaProveedor    TelaProveedor? @relation(fields: [idTelaProveedor], references: [id], onDelete: SetNull)
+  idTelaProveedor             Int?           @map("id_tela_proveedor")
+  telaProveedor               TelaProveedor? @relation(fields: [idTelaProveedor], references: [id], onDelete: SetNull)
 
   modelo Modelo @relation(fields: [idModelo], references: [id], onDelete: Cascade)
   tela   Tela   @relation(fields: [idTela], references: [id], onDelete: Restrict)
@@ -3925,12 +3937,19 @@ model OrdenTela {
   idTela  Int   @map("id_tela")
   tela    Tela  @relation(fields: [idTela], references: [id], onDelete: Restrict)
 
-  /// Consumo de tela por prenda EN ESTA ORDEN (copiado de `ModeloTela.consumoPorPrenda`).
-  consumoPorPrenda Decimal  @map("consumo_por_prenda") @db.Decimal(12, 4)
+  /// Consumo de tela por prenda EN ESTA ORDEN (copiado de `ModeloTela.consumoPorPrenda`). En una
+  /// tela CON complemento, es el consumo del CUERPO.
+  consumoPorPrenda            Decimal  @map("consumo_por_prenda") @db.Decimal(12, 4)
+  /// ⭐⭐ 0.156 (§Post-F9.219) — CONSUMO DEL COMPLEMENTO congelado EN ESTA ORDEN (copiado de
+  /// `ModeloTela.consumoComplementoPorPrenda`). Sin él la explosión del MRP no podría saber cuánto
+  /// cárdigan pedir: la explosión lee la RECETA CONGELADA DE LA ORDEN, nunca el BOM del modelo
+  /// (V1-E3d), así que el número tiene que viajar hasta aquí. NULL = la receta no lo trajo → la OC
+  /// automática sigue naciendo con el complemento pendiente, como hasta hoy.
+  consumoComplementoPorPrenda Decimal? @map("consumo_complemento_por_prenda") @db.Decimal(12, 4)
   /// PRECIO congelado de esta tela EN ESTA ORDEN (el "precio del día" del viejo). Se copia del
   /// precio que la receta del modelo COSTEA (la cascada única de §Post-F9.48) y desde entonces es
   /// de la orden. NULL = no había ningún precio que congelar (el catálogo tampoco lo tenía).
-  precio           Decimal? @db.Decimal(12, 2)
+  precio                      Decimal? @db.Decimal(12, 2)
 
   /// 🔑 Las tres banderas, copiadas del modelo. Aquí significan lo mismo, pero **para esta orden**.
   paraPreCosto   Boolean @default(true) @map("para_pre_costo")

@@ -1405,6 +1405,9 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
               tipo: 'avio' as const,
               idMaterial: 3,
               material: 'BOT-01 — Botón',
+              // ⭐⭐ 0.156: el avío no lleva complemento. Se anota ANCHO (como `precioUnitario` aquí
+              // abajo) para que el fixture admita también el caso de la tela con su cárdigan.
+              nombreComplemento: null as string | null,
               unidad: 'pza',
               cantidadTotal: 300,
               cantidadPropuesta: 300,
@@ -1441,6 +1444,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
                   cantidad: 180,
                   cantidadPropuesta: 180,
                   precio: 2,
+                  cantidadComplemento: null as number | null,
                   importe: 360,
                   medidas: [] as {
                     idAvioMedida: number | null;
@@ -1457,6 +1461,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
                   cantidad: 120,
                   cantidadPropuesta: 120,
                   precio: 2,
+                  cantidadComplemento: null as number | null,
                   importe: 240,
                   medidas: [] as {
                     idAvioMedida: number | null;
@@ -1562,6 +1567,58 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
   }
+
+  /**
+   * ⭐⭐ **0.156 (§Post-F9.219) — EL CÁRDIGAN, DICHO EN LA LÍNEA QUE LO COBRA.**
+   *
+   * Desde la 0.156 la tela con complemento se compra **junto con su cárdigan**, y el importe de la
+   * línea **ya lo incluye** (`cantidad × precio + complemento × precio`). Sin decirlo, la previa
+   * pintaría `36 kg × $90.00 = $3,645.00` — una cuenta que **no cierra a la vista** justo en la
+   * última pantalla antes de comprometer el dinero.
+   */
+  it('⭐⭐ 0.156: la línea dice cuánto CÁRDIGAN incluye su importe, con el nombre del catálogo', async () => {
+    // El plan de siempre, con su único renglón convertido en una TELA con cárdigan: 36 kg de felpa
+    // a $90 (= $3,240) más 4.5 kg de cárdigan al mismo precio (= $405) ⇒ importe $3,645.
+    const base = planDePrueba();
+    const plan = {
+      ...base,
+      proveedores: base.proveedores.map((prov) => ({
+        ...prov,
+        renglones: prov.renglones.map((r) => ({
+          ...r,
+          material: 'Felpa 50/50',
+          nombreComplemento: 'Cardigan',
+          unidad: 'kg',
+          porOrden: r.porOrden.map((l, i) =>
+            i === 0
+              ? {
+                  ...l,
+                  cantidad: 36,
+                  precio: 90,
+                  cantidadComplemento: 4.5,
+                  importe: 3645,
+                }
+              : l,
+          ),
+        })),
+      })),
+    };
+
+    await llegarALaPrevia(plan);
+
+    const linea = screen.getAllByTestId('exp-previa-reparto')[0] as HTMLElement;
+    expect(linea).toHaveTextContent('36 kg × $90.00 = $3,645.00');
+    // 🔑 Y la diferencia queda EXPLICADA, con el nombre que le da el catálogo.
+    expect(linea).toHaveTextContent('incluye 4.5 kg de Cardigan');
+    expect(screen.getByTestId('exp-previa-complemento')).toBeInTheDocument();
+  });
+
+  it('🔑 0.156: sin complemento capturado, la línea NO dice nada de cárdigan', async () => {
+    // El caso de siempre (y el de toda tela sin complemento): la previa se ve exactamente igual que
+    // antes de la fila. Sin esta prueba, pintar la frase siempre pasaría inadvertido.
+    await llegarALaPrevia();
+    expect(screen.queryByTestId('exp-previa-complemento')).not.toBeInTheDocument();
+  });
 
   it('⭐ la revisión previa enseña la OC completa, con DE QUÉ OP es cada cantidad', async () => {
     await llegarALaPrevia();
@@ -1762,6 +1819,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
           cantidad: 30,
           cantidadPropuesta: 30,
           precio: 6,
+          cantidadComplemento: null,
           importe: 180,
           medidas,
           seEscribe: true,
