@@ -674,10 +674,30 @@ Seis reglas que el **dominio** impone (la UI solo ayuda; el servidor es la autor
 | Una OC liga **varias OP** | `OrdenCompraLinea.idOrden` → N:N derivado | Ya existía; se hizo visible en la UI y quedó probado. |
 | La tela se compra **con su complemento** | `validarLineas` + `exigirComplementosCapturados` | `cantidadComplemento`/`precioComplemento` por renglón; el importe suma al subtotal. |
 
-**El complemento y la explosión MRP** (la única excepción, cerrada sin inventar datos): el BOM guarda
-un solo `consumoPorPrenda` por tela, así que la explosión **no sabe** cuánto complemento comprar. Sus
-OC nacen con `cantidadComplemento` en NULL —vía la bandera interna `automatica` de `crearOC`, que NO
-viaja por el API— y **`autorizarOC` las detiene** hasta que alguien capture la cantidad. La
+**El complemento y la explosión MRP** — ⭐⭐ **CERRADO EN LA FILA 0.156** (§Post-F9.214 /
+§Post-F9.219). Hasta la v0.129 el BOM guardaba **un solo** `consumoPorPrenda` por tela, así que la
+explosión **no sabía** cuánto complemento comprar y todas sus OC nacían con `cantidadComplemento` en
+NULL. Ahora la receta lo trae (`ModeloTela.consumoComplementoPorPrenda` → congelado en
+`OrdenTela.consumoComplementoPorPrenda`) y la explosión calcula la cantidad como una **razón sobre el
+cuerpo de esa línea**: `cárdigan = cuerpo × (consumo del cárdigan ÷ consumo de la felpa)`
+(`razonDeComplemento` + `cantidadComplementoDeLinea`, ambas puras). Es una razón —y no
+`piezas × consumo`— porque **el cárdigan viaja con su felpa**: mismo renglón, mismo proveedor, mismo
+lote; si el comprador ajusta el cuerpo a 480 kg, lo que hace falta es el cárdigan de esos 480.
+
+⭐ **El número nace en el PLAN, no en la generación**, y no es un detalle de implementación: el
+subtotal de una línea de OC es `cantidad × precio + complemento × (precioComplemento ?? precio)`, así
+que en cuanto el cárdigan deja de ir vacío **empieza a costar**. Calcularlo al generar dejaría la
+**revisión previa** prometiendo un total menor del que la orden guarda — lo que §Post-F9.85 prohíbe.
+La previa lo lleva en `PlanLineaOrden.cantidadComplemento` y en su `importe`; la generación **lo
+copia**. La OC automática no captura precio del complemento, así que se valúa **al precio del cuerpo**.
+Y como la previa pinta literalmente `cantidad × precio = importe`, cada renglón dice **cuánto
+complemento incluye** su importe (`PlanRenglon.nombreComplemento` da el nombre): sin eso, la cuenta
+dejaría de cerrar a la vista justo en la última pantalla antes de comprometer el dinero.
+
+La línea **sigue naciendo pendiente** en los tres casos en que no hay nada que calcular: la tela ya no
+declara complemento en el catálogo, la receta no lo capturó, o el consumo del cuerpo es 0. Para eso se
+conserva intacta la bandera interna `automatica` de `crearOC` (que NO viaja por el API) y
+**`autorizarOC` sigue deteniendo** esas OC hasta que alguien capture la cantidad. La
 **dirección** de esas OC sale de la **favorita** del catálogo; la **fecha de entrega** hay que
 capturarla a mano al generar las compras (la de arriba para todas, o una por proveedor) — 🔴 desde
 **V1-E7f (§Post-F9.120) NO se hereda de la orden de producción**: la fecha de la OP es cuándo se le

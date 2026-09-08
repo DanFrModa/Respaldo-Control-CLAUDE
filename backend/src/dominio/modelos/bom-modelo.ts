@@ -177,7 +177,15 @@ function amarreNoFirmaElPrecio(
 export type ModeloTelaDetalle = {
   idTela: number;
   nombre: string;
+  /** Consumo por prenda. En una tela CON complemento, el del CUERPO. */
   consumoPorPrenda: number;
+  /**
+   * ⭐⭐ 0.156 — cómo se llama el complemento de esta tela (`Tela.nombreComplemento`), o null.
+   * Lo decide el CATÁLOGO; viaja para que la pantalla rotule el campo con su nombre real.
+   */
+  nombreComplemento: string | null;
+  /** ⭐⭐ 0.156 — consumo del COMPLEMENTO por prenda (número propio); null = sin capturar. */
+  consumoComplementoPorPrenda: number | null;
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
@@ -264,6 +272,7 @@ export async function leerTelasBom(
     select: {
       idTela: true,
       consumoPorPrenda: true,
+      consumoComplementoPorPrenda: true,
       paraPreCosto: true,
       paraProduccion: true,
       paraCosto: true,
@@ -276,7 +285,9 @@ export async function leerTelasBom(
           proveedor: { select: { nombre: true } },
         },
       },
-      tela: { select: { nombre: true, precioSugerido: true } },
+      // ⭐⭐ 0.156 — `nombreComplemento` viene del CATÁLOGO en la MISMA consulta (nada de N+1):
+      // es lo que dice si esta tela lleva complemento y cómo se llama.
+      tela: { select: { nombre: true, precioSugerido: true, nombreComplemento: true } },
     },
     orderBy: { tela: { nombre: 'asc' } },
   });
@@ -310,6 +321,9 @@ export async function leerTelasBom(
       idTela: f.idTela,
       nombre: f.tela.nombre,
       consumoPorPrenda: f.consumoPorPrenda.toNumber(),
+      nombreComplemento: f.tela.nombreComplemento,
+      consumoComplementoPorPrenda:
+        f.consumoComplementoPorPrenda === null ? null : f.consumoComplementoPorPrenda.toNumber(),
       paraPreCosto: f.paraPreCosto,
       paraProduccion: f.paraProduccion,
       paraCosto: f.paraCosto,
@@ -584,12 +598,30 @@ export async function obtenerFichaModelo(
 
 // ── Validación de componentes (existen y están activos) ────────────────────────
 
-/** Valida que todas las telas existan y estén ACTIVAS (no se mete una tela desactivada al BOM). */
-async function exigirTelasValidas(tx: Tx, ids: number[]): Promise<void> {
-  if (ids.length === 0) return;
+/**
+ * Valida que todas las telas existan y estén ACTIVAS (no se mete una tela desactivada al BOM) y
+ * —⭐⭐ 0.156— que el CONSUMO DEL COMPLEMENTO sólo se capture donde el catálogo dice que hay
+ * complemento.
+ *
+ * 🔑 **El reparto de autoridad, que es la razón de que esto viva aquí y no en el esquema Zod:**
+ * *quién* lleva complemento lo decide el CATÁLOGO (`Tela.nombreComplemento`) y *cuánto* lleva lo
+ * decide la RECETA. Es palabra por palabra el mismo reparto que ya gobierna la línea de orden de
+ * compra (`compras/ordenes-compra.ts`, §Post-F9.18), y por eso el rechazo tiene que ser del dominio
+ * (A1): el esquema no puede consultar el catálogo.
+ *
+ * ⚠️ Sin esta guarda, un consumo de complemento capturado sobre una tela SIN complemento viajaría
+ * congelado hasta la orden y la explosión intentaría meterlo en la OC — donde `validarLineas` lo
+ * rechaza con un error que hablaría de una orden de compra que el usuario no estaba haciendo. Se
+ * corta en la puerta, que es donde se puede explicar.
+ *
+ * Se resuelve en UNA consulta (nada de N+1): el catálogo se lee una vez para las dos reglas.
+ */
+async function exigirTelasValidas(tx: Tx, deseados: TelaBomValidada[]): Promise<void> {
+  if (deseados.length === 0) return;
+  const ids = deseados.map((d) => d.idTela);
   const telas = await tx.tela.findMany({
     where: { id: { in: ids } },
-    select: { id: true, nombre: true, activo: true },
+    select: { id: true, nombre: true, activo: true, nombreComplemento: true },
   });
   if (telas.length !== ids.length) {
     throw new ErrorValidacion('Una o más telas seleccionadas no existen.');
@@ -599,6 +631,20 @@ async function exigirTelasValidas(tx: Tx, ids: number[]): Promise<void> {
     throw new ErrorValidacion(
       `La tela "${inactiva.nombre}" está desactivada y no se puede agregar al modelo.`,
     );
+  }
+  const porId = new Map(telas.map((t) => [t.id, t]));
+  for (const d of deseados) {
+    const tela = porId.get(d.idTela);
+    if (
+      tela !== undefined &&
+      tela.nombreComplemento === null &&
+      d.consumoComplementoPorPrenda !== null
+    ) {
+      throw new ErrorValidacion(
+        `La tela "${tela.nombre}" no lleva complemento: no se le puede capturar consumo de ` +
+          `complemento. Si sí lo lleva, decláraselo primero en el catálogo de telas.`,
+      );
+    }
   }
 }
 
@@ -714,10 +760,7 @@ async function sincronizarTelas(
   idModelo: number,
   deseados: TelaBomValidada[],
 ): Promise<boolean> {
-  await exigirTelasValidas(
-    tx,
-    deseados.map((d) => d.idTela),
-  );
+  await exigirTelasValidas(tx, deseados);
   await exigirAmarresTelaValidos(tx, deseados);
 
   const actuales = await tx.modeloTela.findMany({ where: { idModelo } });
@@ -728,10 +771,19 @@ async function sincronizarTelas(
   const aAgregar = deseados.filter((d) => !actualPorId.has(d.idTela));
   const aActualizar = deseados.filter((d) => {
     const actual = actualPorId.get(d.idTela);
-    return (
-      actual !== undefined &&
-      cambiaRenglonComponente(actual, d, actual.idTelaProveedor, d.idTelaProveedor)
-    );
+    if (actual === undefined) return false;
+    // ⭐⭐ 0.156 — el CONSUMO DEL COMPLEMENTO también es un cambio. Sin este término, teclear el
+    // cárdigan sobre un renglón que por lo demás no se movió dejaba el diff vacío: la pantalla
+    // decía "guardado" y el número no llegaba a la base. La comparación es por VALOR (los dos
+    // lados ya son `number | null`), nunca por `Decimal`.
+    if (
+      (actual.consumoComplementoPorPrenda === null
+        ? null
+        : actual.consumoComplementoPorPrenda.toNumber()) !== d.consumoComplementoPorPrenda
+    ) {
+      return true;
+    }
+    return cambiaRenglonComponente(actual, d, actual.idTelaProveedor, d.idTelaProveedor);
   });
 
   if (aQuitar.length === 0 && aAgregar.length === 0 && aActualizar.length === 0) {
@@ -747,6 +799,7 @@ async function sincronizarTelas(
         idModelo,
         idTela: d.idTela,
         consumoPorPrenda: d.consumoPorPrenda,
+        consumoComplementoPorPrenda: d.consumoComplementoPorPrenda,
         paraPreCosto: d.paraPreCosto,
         paraProduccion: d.paraProduccion,
         paraCosto: d.paraCosto,
@@ -761,6 +814,7 @@ async function sincronizarTelas(
       where: { idModelo_idTela: { idModelo, idTela: d.idTela } },
       data: {
         consumoPorPrenda: d.consumoPorPrenda,
+        consumoComplementoPorPrenda: d.consumoComplementoPorPrenda,
         paraPreCosto: d.paraPreCosto,
         paraProduccion: d.paraProduccion,
         paraCosto: d.paraCosto,
@@ -1114,6 +1168,9 @@ export async function copiarBom(
           idModelo: idDestino,
           idTela: t.idTela,
           consumoPorPrenda: t.consumoPorPrenda,
+          // ⭐⭐ 0.156 — el consumo del COMPLEMENTO viaja con el renglón, igual que el amarre:
+          // copiar una receta y perder el cárdigan dejaría al destino comprando media tela.
+          consumoComplementoPorPrenda: t.consumoComplementoPorPrenda,
           paraPreCosto: t.paraPreCosto,
           paraProduccion: t.paraProduccion,
           paraCosto: t.paraCosto,

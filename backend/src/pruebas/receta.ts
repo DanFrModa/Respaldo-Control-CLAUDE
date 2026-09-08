@@ -92,6 +92,11 @@ export async function sembrarRecetaDeOrden(
           idOrden,
           idTela: t.idTela,
           consumoPorPrenda: t.consumoPorPrenda,
+          // ⭐⭐ 0.156 — el CONSUMO DEL COMPLEMENTO se congela igual que el resto. Este helper
+          // promete «lo mismo que hace el alta»: si no lo copiara, cualquier fixture que capture un
+          // cárdigan en el BOM produciría una orden que la explosión ve SIN complemento — un
+          // escenario que el alta de verdad no genera.
+          consumoComplementoPorPrenda: t.consumoComplementoPorPrenda,
           precio: null,
           paraPreCosto: t.paraPreCosto,
           paraProduccion: t.paraProduccion,

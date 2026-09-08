@@ -44,6 +44,21 @@ const esquemaConsumo = z
   .positive({ error: 'El consumo debe ser mayor a 0' });
 
 /**
+ * Consumo OPCIONAL por prenda (0.156): mismo número positivo, pero `null` = no capturado. Se usa
+ * para el COMPLEMENTO de la tela, que no todas las telas tienen y que nadie está obligado a
+ * capturar. Omitirlo equivale a `null` — el PUT del BOM es SET-COMPLETO: lo que no viene, no está.
+ *
+ * ⚠️ Cero NO es un valor válido (igual que en el cuerpo): una tela cuyo cárdigan consume 0 no lleva
+ * cárdigan, y guardarlo como 0 haría que la orden de compra pidiera una cantidad que la propia
+ * `esquemaCompraLineaEntrada.cantidadComplemento` rechaza por no ser positiva.
+ */
+const esquemaConsumoOpcional = z
+  .number({ error: 'El consumo debe ser un número' })
+  .positive({ error: 'El consumo debe ser mayor a 0' })
+  .nullable()
+  .default(null);
+
+/**
  * Id de un AMARRE de precio del renglón del BOM (R17/D13): entero positivo, `null` = sin amarre.
  * Es opcional en la captura y su default es `null` — el PUT del BOM es SET-COMPLETO: lo que no
  * viene, no está (un renglón que se manda sin amarre queda sin amarre, no conserva el anterior).
@@ -77,6 +92,17 @@ export const esquemaModeloTelaEntrada = z.object({
    * esté activo. Omitirlo equivale a `null` (el set-completo no conserva amarres implícitos).
    */
   idTelaProveedor: esquemaAmarre,
+  /**
+   * ⭐⭐ 0.156 (§Post-F9.214/.219) — CONSUMO DEL COMPLEMENTO por prenda (el cárdigan de esa felpa).
+   * **Número propio**, no una proporción del cuerpo (§Post-F9.210·6): se teclea.
+   *
+   * `null`/omitido = nadie lo capturó ⇒ todo sigue como antes (la OC que genera la explosión nace
+   * con el complemento PENDIENTE y `autorizarOC` lo exige). El dominio RECHAZA capturarlo en una
+   * tela que no declara complemento: **quién lleva complemento lo dice el catálogo
+   * (`Tela.nombreComplemento`), cuánto lleva lo dice la receta** — el mismo reparto que ya usa la
+   * línea de orden de compra (`validarLineas`, §Post-F9.18).
+   */
+  consumoComplementoPorPrenda: esquemaConsumoOpcional,
 });
 
 /** Datos validados de un renglón de tela del BOM. */
@@ -538,7 +564,25 @@ export const esquemaModeloTelaSalida = z
   .object({
     idTela: z.number().int().describe('Id de la tela.'),
     nombre: z.string().describe('Nombre de la tela (para la UI).'),
-    consumoPorPrenda: z.number().describe('Consumo de tela por prenda.'),
+    consumoPorPrenda: z
+      .number()
+      .describe('Consumo de tela por prenda. En una tela con complemento, del CUERPO.'),
+    /**
+     * ⭐⭐ 0.156 — cómo se llama el complemento de ESTA tela (`Tela.nombreComplemento`: "Cardigan"),
+     * o null si no lleva. Viaja para que la pantalla pueda ROTULAR el campo con su nombre real en
+     * vez de decir "complemento": lo dice el catálogo, no lo adivina la UI.
+     */
+    nombreComplemento: z
+      .string()
+      .nullable()
+      .describe('Nombre del complemento de la tela ("Cardigan"); null = no lleva.'),
+    /** ⭐⭐ 0.156 — consumo del complemento por prenda; null = no capturado. */
+    consumoComplementoPorPrenda: z
+      .number()
+      .nullable()
+      .describe(
+        'Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado.',
+      ),
     paraPreCosto: z.boolean().describe('¿Entra en el pre-costeo?'),
     paraProduccion: z.boolean().describe('¿Se considera al producir?'),
     paraCosto: z.boolean().describe('¿Entra en el costeo real?'),

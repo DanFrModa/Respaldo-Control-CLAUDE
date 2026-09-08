@@ -717,6 +717,10 @@ describe('armarDatosImpresoOrden', () => {
           idTela: 1,
           nombre: 'Jersey',
           consumoPorPrenda: 0.4,
+          // 0.156: esta tela no lleva complemento (el impreso no lo muestra; el campo viaja
+          // porque la receta ahora lo tiene).
+          nombreComplemento: null,
+          consumoComplementoPorPrenda: null,
           paraPreCosto: false,
           paraProduccion: true,
           paraCosto: false,
@@ -733,6 +737,8 @@ describe('armarDatosImpresoOrden', () => {
           idTela: 2,
           nombre: 'Forro',
           consumoPorPrenda: 0.1,
+          nombreComplemento: null,
+          consumoComplementoPorPrenda: null,
           paraPreCosto: false,
           paraProduccion: false,
           paraCosto: false,
