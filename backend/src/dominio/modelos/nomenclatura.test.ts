@@ -882,6 +882,21 @@ function txDerivacion(
     temporada: { findUnique: (args: unknown) => reg('temporada.findUnique', args, activo) },
     curvaTalla: { findUnique: (args: unknown) => reg('curvaTalla.findUnique', args, activo) },
     proveedor: { findFirst: (args: unknown) => reg('proveedor.findFirst', args, activo) },
+    // ⭐ fila 0.159 — el rastro de la fusión de colores: la llave `(desarrollo, color)` se arma con
+    // el CANÓNICO. Aquí no hay ninguna fusión, así que cada color es su propio canónico.
+    color: {
+      findMany: (args: unknown) =>
+        reg(
+          'color.findMany',
+          args,
+          ((args as { where: { id: { in: number[] } } }).where.id.in ?? []).map((id) => ({
+            id,
+            nombre: 'Rojo',
+            activo: true,
+            idFusionadoEn: null,
+          })),
+        ),
+    },
     $executeRaw: (plantilla: TemplateStringsArray, ...valores: unknown[]) =>
       reg('$executeRaw', { sql: plantilla.join('?'), valores }, 1),
     $queryRaw: (plantilla: TemplateStringsArray, ...valores: unknown[]) =>

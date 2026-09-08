@@ -471,7 +471,9 @@ async function exigirTelaExiste(tx: Tx, idTela: number): Promise<void> {
  *    matriz mitad y mitad dejaría sin respuesta la pregunta de la que cuelga todo lo de aguas abajo
  *    —«¿el corte de esta orden tiene que declarar pack?»— y produciría órdenes en las que unas
  *    piezas se pueden cortar y otras no, sin que nada lo explique.
- *  • Todos los colores existen y están activos.
+ *  • Todos los colores existen y, si son NUEVOS en esta orden, están activos. ⭐ fila 0.159: un
+ *    color que la orden YA TIENE se acepta aunque esté apagado — si no, fusionar un color dejaría
+ *    ineditables las órdenes que lo usaban (la fusión NO reescribe la matriz, D7).
  *  • Todas las tallas existen en el catálogo y no se repiten dentro de un mismo renglón.
  *  • Cantidades enteras ≥0 (ya las validó Zod; aquí se confía en el tipo).
  *
@@ -509,20 +511,45 @@ async function sincronizarMatriz(
 
   const idsColor = set.map((l) => l.idColor);
 
-  // 2) Colores existen y están activos.
+  // 2) Colores existen y —si son NUEVOS en esta orden— están activos.
+  //
+  // ⭐⭐ fila 0.159 (§Post-F9.222) — **UN COLOR QUE LA ORDEN YA TIENE NO TIENE QUE ESTAR ACTIVO.**
+  // Ésta es la mitad que hace posible fusionar colores duplicados. La fusión apaga el absorbido y
+  // **no reescribe la matriz** (es lo que el cliente pidió, D7), así que sin esta excepción una
+  // orden que usara ese color quedaba INEDITABLE para siempre: cualquier guardado reenvía la matriz
+  // entera y moría aquí. Era el daño concreto que §Post-F9.129 evitaba prohibiendo la fusión.
+  //
+  // ⚠️ La excepción es estrecha a propósito: sólo perdona el color **que ya está en esta orden**.
+  // Capturar uno nuevo con un color apagado se sigue rechazando — y si lo apagó una fusión, el
+  // mensaje dice a cuál ir, que es lo único que la persona necesita saber para seguir.
   if (idsColor.length > 0) {
     const colores = await tx.color.findMany({
       where: { id: { in: [...new Set(idsColor)] } },
-      select: { id: true, activo: true, nombre: true },
+      select: { id: true, activo: true, nombre: true, fusionadoEn: { select: { nombre: true } } },
     });
     const porId = new Map(colores.map((c) => [c.id, c]));
+    // Sólo se pregunta por la matriz vigente si de verdad hay algún color apagado en el set: en el
+    // camino normal (todos activos) esto no cuesta una consulta de más.
+    const hayApagado = colores.some((c) => !c.activo);
+    const yaEnLaOrden = new Set<number>(
+      hayApagado
+        ? (await tx.ordenLinea.findMany({ where: { idOrden }, select: { idColor: true } })).map(
+            (l) => l.idColor,
+          )
+        : [],
+    );
     for (const idColor of new Set(idsColor)) {
       const color = porId.get(idColor);
       if (color === undefined) {
         throw new ErrorNoEncontrado('Color', idColor);
       }
-      if (!color.activo) {
-        throw new ErrorConflicto(`El color "${color.nombre}" está desactivado; no se puede usar.`);
+      if (!color.activo && !yaEnLaOrden.has(idColor)) {
+        throw new ErrorConflicto(
+          color.fusionadoEn === null
+            ? `El color "${color.nombre}" está desactivado; no se puede usar.`
+            : `El color "${color.nombre}" se fusionó en "${color.fusionadoEn.nombre}": ` +
+                `captura la orden con "${color.fusionadoEn.nombre}", que es el color que quedó.`,
+        );
       }
     }
   }

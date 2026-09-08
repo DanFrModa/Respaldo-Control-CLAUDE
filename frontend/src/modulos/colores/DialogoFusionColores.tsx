@@ -22,14 +22,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 const TOPE_COLORES_FUSION = 100;
 
 /**
- * DIÁLOGO DE FUSIÓN DE COLORES DUPLICADOS (F1-E6).
+ * DIÁLOGO DE FUSIÓN DE COLORES DUPLICADOS (F1-E6; fila 0.159 le quitó el candado).
  *
  * Resuelve la deuda de la normalización: en el viejo el color era texto libre, así que
  * la carga histórica deja alias ("NEGRO A"/"NEGRO B") que aquí se consolidan. El usuario:
  *   1. elige el color que se CONSERVA (canónico/destino);
  *   2. marca uno o varios DUPLICADOS (origen) a fusionar en él;
- *   3. confirma; las telas que usaban los duplicados pasan al canónico y los duplicados
- *      quedan desactivados.
+ *   3. confirma; el catálogo pasa al canónico y los duplicados quedan desactivados.
  *
  * El backend resuelve la colisión de PK del puente Tela↔Color y es la autoridad (A1):
  * aquí solo se PRESENTA el impacto y se llama al endpoint. Carga su propio listado de
@@ -123,24 +122,28 @@ export function DialogoFusionColores({
         <DialogHeader>
           <DialogTitle>Fusionar colores duplicados</DialogTitle>
           <DialogDescription>
-            Elige el color que se conserva y marca los duplicados que se fusionarán en él. Las telas
-            que usaban los duplicados pasarán al color conservado y los duplicados quedarán
-            desactivados. No se puede deshacer automáticamente.
+            Elige el color que se conserva y marca los duplicados que se fusionarán en él. Lo que
+            usaba los duplicados pasa al color conservado y los duplicados quedan desactivados. No
+            se puede deshacer automáticamente.
           </DialogDescription>
-          {/* §Post-F9.129: la promesa de arriba habla SOLO de telas, y el servidor ahora RECHAZA
-              fusionar un color usado en órdenes/movimientos. Se dice aquí para que el 409 no
-              sorprenda — sobre todo ahora que el catálogo tiene "Negro A"/"Negro B" viejos que
-              invitan justo a este atajo.
+          {/* ⭐⭐ fila 0.159 (§Post-F9.222): el servidor YA NO rechaza fusionar un color usado. Lo
+              que hace es distinto y hay que decirlo, porque es lo que la persona necesita saber
+              ANTES de confirmar: el catálogo y los amarres se mueven al color que se conserva, y
+              las órdenes, los cortes y las compras que ya existen **se quedan como están** — el
+              sistema sabe que ese color se fusionó y los sigue tratando como uno solo.
 
               ⚠️ Va como <p> normal y NO como un segundo <DialogDescription>: el primitivo de Radix
               toma su `id` del CONTEXTO del diálogo, no de cada instancia, así que dos descripciones
               nacen con el MISMO id — HTML inválido, y el `aria-describedby` del diálogo apunta sólo
-              a la primera. O sea: este aviso, que es justo el que evita que el 409 sorprenda, sería
-              invisible para un lector de pantalla. Las clases replican las del primitivo. */}
+              a la primera. O sea: este aviso sería invisible para un lector de pantalla. Las clases
+              replican las del primitivo. */}
           <p className="text-sm text-muted-foreground" data-testid="fusion-colores-aviso-uso">
-            Solo se pueden fusionar colores que <b>aún no se usan</b> en órdenes, cortes, inventario
-            o compras. Si alguno ya se usa, el sistema lo rechaza y te dice cuál: unificar órdenes
-            ya capturadas es otra tarea, no una fusión de catálogo.
+            Un color <b>que ya se usa también se puede fusionar</b>. Lo que ya está capturado —las
+            órdenes, los cortes, el inventario y las compras— <b>no se reescribe</b>: sigue diciendo
+            lo que decía, y el sistema ya sabe que ese color y el que se conserva son el mismo. Lo
+            que sí se mueve al color conservado es el catálogo: los colores de tela, los precios por
+            color del proveedor, los modelos de producción y los colores de tela ya amarrados a una
+            orden.
           </p>
         </DialogHeader>
 

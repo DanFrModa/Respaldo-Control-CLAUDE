@@ -74,6 +74,8 @@ import {
   NAMESPACE_LOCK_IMPORTACION,
 } from './oc-duplicada.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222): un color absorbido por una fusión se resuelve al canónico.
+import { resolverColoresCanonicos } from '../catalogos/colores-canonicos.js';
 
 /** Tope del archivo decodificado (los OCs son chicos; blinda memoria/parseo). */
 const MAX_ARCHIVO_BYTES = 10 * 1024 * 1024;
@@ -280,12 +282,24 @@ interface DesarrolloAmarre {
   numeroProduccion: number | null;
 }
 
+/**
+ * Un color que el ARCHIVO nombra y que una fusión ya mandó a otro. Se guarda para poder ANOTARLO al
+ * confirmar: el papel del cliente dice «Azul marino» y la OP va a decir «Rojo», y sin este apunte no
+ * habría dónde enterarse de por qué (la vista previa del Excel ni siquiera enseña los colores).
+ */
+interface DesvioPorFusion {
+  de: { id: number; nombre: string };
+  a: { id: number; nombre: string };
+}
+
 /** Diccionarios de reconocimiento (por nº de cliente + por id para las ligas manuales). */
 interface Reconocedor {
   porNumeroCliente: Map<string, DesarrolloAmarre>;
   porId: Map<number, DesarrolloAmarre>;
   colores: Map<string, number>;
   tallas: Map<string, number>;
+  /** Clave normalizada del nombre que trae el archivo → a dónde lo mandó la fusión. */
+  redirigidos: Map<string, DesvioPorFusion>;
 }
 
 /** Carga los desarrollos del cliente y los catálogos de color/talla, normalizados para comparar. */
@@ -333,10 +347,11 @@ async function cargarReconocedor(
   // qué id gana dependería del scan de Postgres, y como `analizar` y `confirmar` cargan el reconocedor
   // por separado la matriz de la OP podría quedar con un id distinto al de la vista previa.
   const [colores, tallas] = await Promise.all([
+    // ⭐⭐ fila 0.159 ronda 2 (§Post-F9.222) — **SIN filtrar por `activo`**, y esa palabra que falta
+    // es el arreglo entero. Ver el bloque de abajo.
     bd.color.findMany({
-      where: { activo: true },
       orderBy: { id: 'asc' },
-      select: { id: true, nombre: true },
+      select: { id: true, nombre: true, activo: true },
     }),
     bd.talla.findMany({
       where: { activo: true },
@@ -344,10 +359,60 @@ async function cargarReconocedor(
       select: { id: true, etiqueta: true },
     }),
   ]);
+
+  /**
+   * ⭐⭐ **fila 0.159 ronda 2 — UN COLOR ABSORBIDO POR UNA FUSIÓN SE RESUELVE AL CANÓNICO, NO SE
+   * DECLARA INEXISTENTE.**
+   *
+   * 🔴 **El daño que esto cierra, y por qué "falla visible" NO bastaba.** Antes esta consulta miraba
+   * sólo colores ACTIVOS, así que un archivo que nombrara un color absorbido no casaba y la
+   * importación moría con *«…que no existen en el catálogo; **agrégalos** o corrige el archivo»*.
+   * El usuario obedece, va al catálogo, y ahí le contestan *«Ya existe … (está desactivado; **puedes
+   * reactivarlo**)»*. Reactivar **BORRA `idFusionadoEn`** (`actualizarColor`) ⇒ desde ese instante
+   * toda la resolución canónica deja de operar **sin un solo aviso**: el MRP vuelve a partir la OP,
+   * el neteo deja de encontrar la OC anterior y el linaje estrena un segundo número de 5 dígitos —
+   * y los repuntes que la fusión YA movió (telas, precios por color, modelos, amarres) **no
+   * vuelven**. El estado final es PEOR que antes de fusionar. O sea: el bloqueo se veía, pero **la
+   * salida que el producto sugería destruía la limpieza**.
+   *
+   * ✅ **La cura ya existía en el repo**: es lo que hace el importador de **PDF**
+   * (`importacion-pdf.ts`, `resolverOCrearColor` — busca sin filtrar `activo`, sigue el rastro y
+   * devuelve el canónico). Esta ruta se había quedado atrás.
+   *
+   * ⚠️ **Las dos pasadas NO son adorno: son lo que impide cambiar el comportamiento de hoy.**
+   * `normalizarClave` aplana acentos y mayúsculas, así que "Café" y "Cafe" pueden ser dos colores
+   * distintos con la MISMA clave. Si se mezclaran en una sola pasada, un color absorbido con id más
+   * bajo le robaría la clave a uno ACTIVO que hoy gana — un cambio silencioso en archivos que
+   * importan bien. Por eso: **primero los activos (exactamente como siempre, menor id gana), y sólo
+   * después los absorbidos, y sólo en las claves que quedaron libres.**
+   *
+   * ⚠️ Y un color **apagado A MANO** (sin fusión) sigue SIN entrar: su canónico es él mismo y está
+   * inactivo, así que el archivo sigue diciendo *«no existe en el catálogo»* — que es la verdad, y
+   * ahí reactivarlo no deshace ninguna fusión.
+   */
+  const canonicos = await resolverColoresCanonicos(
+    bd,
+    colores.filter((c) => !c.activo).map((c) => c.id),
+  );
   const mapaColores = new Map<string, number>();
   for (const color of colores) {
+    if (!color.activo) continue;
     const clave = normalizarClave(color.nombre);
     if (!mapaColores.has(clave)) mapaColores.set(clave, color.id);
+  }
+  const redirigidos = new Map<string, DesvioPorFusion>();
+  for (const color of colores) {
+    if (color.activo) continue;
+    const canonico = canonicos.get(color.id);
+    // `canonico.id === color.id` = lo apagó su dueño, no una fusión: no hay a dónde mandarlo.
+    if (canonico === undefined || canonico.id === color.id || !canonico.activo) continue;
+    const clave = normalizarClave(color.nombre);
+    if (mapaColores.has(clave)) continue;
+    mapaColores.set(clave, canonico.id);
+    redirigidos.set(clave, {
+      de: { id: color.id, nombre: color.nombre },
+      a: { id: canonico.id, nombre: canonico.nombre },
+    });
   }
   const mapaTallas = new Map<string, number>();
   for (const talla of tallas) {
@@ -355,7 +420,7 @@ async function cargarReconocedor(
     if (!mapaTallas.has(clave)) mapaTallas.set(clave, talla.id);
   }
 
-  return { porNumeroCliente, porId, colores: mapaColores, tallas: mapaTallas };
+  return { porNumeroCliente, porId, colores: mapaColores, tallas: mapaTallas, redirigidos };
 }
 
 // ── Resolución de un grupo (reconocimiento + matriz) ─────────────────────────
@@ -746,6 +811,40 @@ export async function confirmarImportacion(
       throw new ErrorValidacion(
         'Los modelos reconocidos no traen piezas (todas las cantidades están en 0).',
       );
+    }
+
+    /**
+     * ⭐⭐ **fila 0.159 ronda 2 — EL DESVÍO POR FUSIÓN SE ANOTA SIEMPRE**, igual que en el importador
+     * de PDF (`resolverOCrearColor`, hallazgo H2 de su revisión). Resolver al canónico sin dejar
+     * rastro sería cambiar lo que dice el papel del cliente **en silencio**: la OC dice «Azul
+     * marino», la OP nace en «Rojo», y la vista previa del Excel **ni siquiera enseña los colores**,
+     * así que nadie tendría dónde enterarse de por qué. Va en el color ABSORBIDO, que es el nombre
+     * que trae el papel y por el que alguien va a preguntar.
+     *
+     * ⚠️ Sólo se anotan los colores que el ARCHIVO nombra y que de verdad entran (`aGenerar`): un
+     * catálogo con veinte fusiones viejas no tiene por qué dejar veinte apuntes en cada importación.
+     * Y va UNO por color, no uno por renglón.
+     */
+    if (reconocedor.redirigidos.size > 0) {
+      const modelosQueEntran = new Set(aGenerar.map((grupo) => grupo.modeloCliente));
+      const clavesDelArchivo = new Set(
+        gruposCrudos
+          .filter((grupo) => modelosQueEntran.has(grupo.modeloCliente))
+          .flatMap((grupo) => grupo.renglones.map((renglon) => normalizarClave(renglon.color))),
+      );
+      for (const [clave, desvio] of reconocedor.redirigidos) {
+        if (!clavesDelArchivo.has(clave)) continue;
+        await registrarBitacora(tx, sesion, {
+          entidad: 'Color',
+          idEntidad: desvio.de.id,
+          accion: 'OTRO',
+          datos: {
+            operacion: 'redirigido-por-fusion',
+            a: { id: desvio.a.id, nombre: desvio.a.nombre },
+            origen: 'importacion-excel',
+          },
+        });
+      }
     }
 
     // Pedido interno (empresa activa A9, folio A3, OC del cliente B3).

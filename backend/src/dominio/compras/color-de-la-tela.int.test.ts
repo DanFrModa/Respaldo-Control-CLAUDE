@@ -46,6 +46,8 @@ import {
   previoCompraDesdeExplosion,
 } from './mrp.js';
 import { autorizarOC, obtenerOC } from './ordenes-compra.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222): la matriz se lee por el color CANÓNICO tras una fusión.
+import { fusionarColores } from '../catalogos/colores.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -962,5 +964,99 @@ describe('🔴 V1-E4c — la orden SIN matriz color×talla lo dice', () => {
   it('una orden CON matriz no se marca como sin matriz', async () => {
     const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
     expect(salida.sinMatrizColores).toBe(false);
+  });
+});
+
+/**
+ * ⭐⭐ **fila 0.159 (§Post-F9.222) — DOS COLORES DE LA MATRIZ QUE ERAN EL MISMO.**
+ *
+ * La fusión de colores **no reescribe la matriz de la orden** (es lo que el cliente pidió, D7), así
+ * que después de unificar dos duplicados la OP sigue teniendo dos renglones para un solo color real.
+ * Esta pantalla los pliega en uno resolviendo el rastro de la fusión — y con eso el PASO 1 de
+ * `casar-color-de-tela.ts` (*«la tela YA tiene ese color amarrado»*) vuelve a casar: la fusión SÍ
+ * repunta `TelaColor.idColor` al canónico, así que sin plegar la matriz quedaría comparando el id
+ * viejo del renglón contra el nuevo del catálogo, y **no casaría nunca**.
+ */
+describe('⭐⭐ fila 0.159 — la matriz se lee por el color CANÓNICO', () => {
+  /** Un tono de la felpa LIGADO al catálogo de prenda (la liga legada de F1-E6, el paso 1). */
+  async function tonoLigadoA(idColor: number): Promise<TelaColor> {
+    return cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Tono ligado', idColor, precio: 70 },
+    });
+  }
+
+  const sesionColores = () =>
+    sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] });
+
+  it('pliega los dos renglones en UNO y suma sus piezas', async () => {
+    // Rojo (30 pzs) se absorbe en Azul (10 pzs): la orden pide 40 piezas de un solo color real.
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: colorAzul.id, origenes: [colorRojo.id] },
+      bd(),
+    );
+
+    const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
+    const felpa = salida.telas.find((t) => t.idTela === telaFelpa.id);
+
+    expect(felpa?.colores).toHaveLength(1);
+    expect(felpa?.colores[0]?.idColor).toBe(colorAzul.id);
+    expect(felpa?.colores[0]?.color).toBe('Azul');
+    expect(felpa?.colores[0]?.piezas).toBe(40);
+    expect(felpa?.colores[0]?.cantidadRequerida).toBeCloseTo(60); // 40 × 1.5
+  });
+
+  it('🔴 el PASO 1 (liga al catálogo) casa por el CANÓNICO, no por el id viejo del renglón', async () => {
+    const ligado = await tonoLigadoA(colorAzul.id);
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: colorAzul.id, origenes: [colorRojo.id] },
+      bd(),
+    );
+
+    const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
+    const unico = salida.telas.find((t) => t.idTela === telaFelpa.id)?.colores[0];
+
+    // Sin resolver el canónico habría DOS renglones y el del rojo propondría por PANTONE (Grana),
+    // que es una regla más débil y un tono distinto.
+    expect(unico?.origenPropuesta).toBe('liga-catalogo');
+    expect(unico?.propuestaIdTelaColor).toBe(ligado.id);
+  });
+
+  it('la liga que viajó con la fusión sigue apuntando al color bueno', async () => {
+    const ligado = await tonoLigadoA(colorRojo.id); // ligado al que se va a ABSORBER
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: colorAzul.id, origenes: [colorRojo.id] },
+      bd(),
+    );
+
+    // La fusión REPUNTA `TelaColor.idColor` (es catálogo, no documento).
+    const despues = await cliente.telaColor.findUniqueOrThrow({ where: { id: ligado.id } });
+    expect(despues.idColor).toBe(colorAzul.id);
+
+    const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
+    const unico = salida.telas.find((t) => t.idTela === telaFelpa.id)?.colores[0];
+    expect(unico?.origenPropuesta).toBe('liga-catalogo');
+    expect(unico?.propuestaIdTelaColor).toBe(ligado.id);
+  });
+
+  it('el AMARRE ya capturado viaja al canónico y se sigue viendo', async () => {
+    await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: tonoGrana.id },
+      bd(),
+    );
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: colorAzul.id, origenes: [colorRojo.id] },
+      bd(),
+    );
+
+    const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
+    const unico = salida.telas.find((t) => t.idTela === telaFelpa.id)?.colores[0];
+    expect(unico?.idTelaColor).toBe(tonoGrana.id);
+    expect(unico?.telaColor).toBe('Grana 7700');
   });
 });

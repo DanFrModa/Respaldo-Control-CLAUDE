@@ -165,6 +165,19 @@ function txRegistrador(
     },
     color: {
       findUnique: (args: unknown) => reg('color.findUnique', args, { nombre: 'Rojo' }),
+      // ⭐ fila 0.159 — el color de la matriz se lee por su CANÓNICO (`colorCanonico`), que
+      // pregunta por LOTES de ids. Aquí no hay ninguna fusión: cada color es su propio canónico.
+      findMany: (args: unknown) =>
+        reg(
+          'color.findMany',
+          args,
+          ((args as { where: { id: { in: number[] } } }).where.id.in ?? []).map((id) => ({
+            id,
+            nombre: 'Rojo',
+            activo: true,
+            idFusionadoEn: null,
+          })),
+        ),
     },
     tipoProducto: {
       findUnique: (args: unknown) =>

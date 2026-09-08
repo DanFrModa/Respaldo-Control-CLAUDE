@@ -58,9 +58,12 @@ describe('<DialogoFusionColores>', () => {
     useColores.mockReturnValue(consultaConDatos([color(1, 'Negro'), color(2, 'Negro A')]));
     renderConProveedores(<DialogoFusionColores abierto alCambiarAbierto={vi.fn()} />);
 
-    // El aviso existe y dice lo que el servidor va a hacer (rechazar), no una promesa vaga.
+    // ⭐⭐ fila 0.159: el aviso ya no promete un rechazo (el servidor dejó de rechazar). Dice las
+    // dos mitades que la persona necesita antes de confirmar: lo capturado NO se reescribe, y lo
+    // que sí se mueve es el catálogo.
     const aviso = screen.getByTestId('fusion-colores-aviso-uso');
-    expect(aviso).toHaveTextContent(/aún no se usan/i);
+    expect(aviso).toHaveTextContent(/ya se usa también se puede fusionar/i);
+    expect(aviso).toHaveTextContent(/no se reescribe/i);
     expect(aviso).toHaveTextContent(/órdenes/i);
 
     // ⚠️ Y NO es un segundo <DialogDescription>: el primitivo de Radix toma su `id` del CONTEXTO

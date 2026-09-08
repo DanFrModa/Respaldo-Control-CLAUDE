@@ -23,6 +23,8 @@ import type { SesionUsuario } from '../../comun/permisos.js';
 import type { PrismaClient } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222): la DESCRIPCIÓN del modelo que nace lleva el color CANÓNICO.
+import { fusionarColores } from '../catalogos/colores.js';
 import { crearOrdenMigrada } from './migracion.js';
 import { salidaAProduccion } from './salida-produccion.js';
 
@@ -348,6 +350,46 @@ describe('salidaAProduccion (R3, B4)', () => {
     expect(segunda.modeloDeProduccion).toBe('reusado');
     expect(segunda.idModeloProduccion).toBe(primera.idModeloProduccion);
     expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(1);
+  });
+
+  /**
+   * ⭐⭐ **fila 0.159 (§Post-F9.222) — UNA OP NUEVA NO SE CAPTURA CON UN COLOR YA FUSIONADO, Y NO
+   * DEJA NADA A MEDIAS.**
+   *
+   * 🔴 Aquí se cruzan las DOS mitades de la fila, y el orden en que corren es lo que hace falta
+   * medir: `resolverModeloDeLaOp` resuelve —y puede HACER NACER— el modelo de producción **antes**
+   * de que `sincronizarMatriz` valide los colores. Así que la OP con un color absorbido se rechaza
+   * (el mensaje dice con cuál capturarla, igual que al editar una matriz), pero **por esta puerta
+   * hay un modelo recién creado en vuelo**: si la transacción no fuera una sola (A2), quedaría un
+   * hijo huérfano del color equivocado en el catálogo de producción.
+   *
+   * ⚠️ Y es también la razón por la que la lectura CANÓNICA del nombre en `salida-produccion.ts`
+   * (`colorCanonico`, el que arma *"Playera · Blanco Hueso"*) **no se puede observar con un color
+   * absorbido**: no llega hasta ahí un caso que sobreviva. Medido en la ronda 3 — ver la nota de esa
+   * línea.
+   */
+  it('⭐⭐ OP con un color ya fusionado: se rechaza diciendo a cuál ir, y NO nace ningún modelo', async () => {
+    const { idModelo, idLinea } = await sembrarPedidoConDesarrollo({
+      codigoModelo: 'DEV-0159-FUSION',
+    });
+    const canonico = await cliente.color.create({ data: { nombre: 'Blanco Hueso' } });
+    const absorbido = await cliente.color.create({
+      data: { nombre: 'Blanco Hueso Pantone 14-0002 Tcx Pumice Stone' },
+    });
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: idEmpresa, permisos: ['colores.administrar'] }),
+      { idDestino: canonico.id, origenes: [absorbido.id] },
+      bd(),
+    );
+
+    const ordenesAntes = await cliente.orden.count();
+    await expect(
+      salidaAProduccion(sesion(), idLinea, { lineas: matrizDe(absorbido.id) }, bd()),
+    ).rejects.toThrow(/se fusionó en "Blanco Hueso"/);
+
+    // 🔴 Rollback TOTAL: ni el hijo que `resolverModeloDeLaOp` alcanzó a derivar, ni la orden.
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(0);
+    expect(await cliente.orden.count()).toBe(ordenesAntes);
   });
 
   /**

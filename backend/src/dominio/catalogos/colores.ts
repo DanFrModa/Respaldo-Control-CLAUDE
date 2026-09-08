@@ -44,10 +44,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import {
-  contarUsosQueBloqueanFusion,
-  mensajeFusionBloqueada,
-} from './colores-fusion-referencias.js';
+import { contarUsosConRastro, repuntarReferenciasDeColor } from './colores-fusion-referencias.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearColor = z.input<typeof esquemaColorCrear>;
@@ -290,91 +287,31 @@ export async function reactivarColor(
 }
 
 /**
- * Reasigna TODAS las referencias del color `idOrigen` al color `idDestino`, dentro de
- * la transacción `tx`. Hoy la ÚNICA tabla que referencia a `Color` es `TelaColor` — y
- * desde §Post-F9.11 esa referencia es la LIGA LEGACY `idColor` (nullable) de las filas
- * MIGRADAS: los colores de tela nuevos nacen sin liga y esta fusión no los toca.
+ * ⭐⭐ **FUSIONA COLORES DUPLICADOS EN UNO CANÓNICO — y desde la fila 0.159 ya no se niega a hacerlo
+ * porque el duplicado esté en uso** (§Post-F9.222).
  *
- * PUNTO CENTRAL DE EXTENSIÓN: cuando en el futuro otras tablas referencien a `Color`
- * (p. ej. colores de avíos, de modelos, de pedidos), agrega aquí su reasignación —
- * todas dentro de la MISMA transacción para que la fusión siga siendo todo-o-nada (A2).
+ * Qué hace, en orden, dentro de UNA transacción (A2: o se consolida entero o no se toca nada):
+ *  1. **REPUNTA** al destino lo que es catálogo o amarre derivado —los colores de tela ligados, los
+ *     precios por color de proveedor, los modelos nacidos del color y los amarres color-de-tela de
+ *     las órdenes—, resolviendo las colisiones de llave única a favor del destino
+ *     (`colores-fusion-referencias.ts`).
+ *  2. **DEJA QUIETO** todo lo que es documento o movimiento asentado —la matriz de la orden (D7), el
+ *     corte, el recibo, el kardex de PT, los faltantes saldados, las líneas de OC— y lo **anota en la
+ *     bitácora**: son las filas que se quedan apuntando al color absorbido, y que quien las compara
+ *     resuelve por el CANÓNICO (`colores-canonicos.ts`).
+ *  3. **APAGA** cada origen (borrado suave, D3: nunca se borra físico) sellando el RASTRO
+ *     `idFusionadoEn` de quién se lo llevó.
  *
- * REGLA DE COLISIÓN (TelaColor): si el destino YA tiene una fila ligada en la MISMA
- * tela, no se mueve ciegamente (la tela quedaría con dos filas ligadas al mismo color
- * de prenda — el duplicado que la fusión existe para eliminar). Para esas telas:
- *   - GANA EL DESTINO (es el canónico), PERO cada dato que el destino tenga NULO y el
- *     origen SÍ traiga se RELLENA — `precio`, `pantone` y `precioComplemento` por igual
- *     (§Post-F9.11: no perder un dato que solo existía en el duplicado).
- *   - El renglón duplicado del origen se ELIMINA (ya no aporta nada).
- * Las telas SIN colisión simplemente re-ligan (`update` de `idColor`), conservando su
- * nombre propio.
+ * ⚠️ **Por qué dejó de bloquear.** §Post-F9.129 la hizo negarse en cuanto el origen se usaba fuera de
+ * las telas, y la primera referencia de esa lista era `OrdenLinea` ⇒ un color que hubiera entrado a
+ * UNA orden ya no se podía unificar **nunca**, y el problema empeoraba solo. La negativa protegía algo
+ * real (una orden con color inactivo no se podía editar); eso se arregló donde tocaba —en
+ * `sincronizarMatriz`, que ya no exige que un color YA PRESENTE en la matriz esté activo— en vez de
+ * dejar los duplicados atrapados para siempre.
  *
- * @returns cuántas referencias `TelaColor` se reasignaron o consolidaron (para bitácora).
- */
-async function reasignarReferenciasColor(
-  tx: Tx,
-  idOrigen: number,
-  idDestino: number,
-): Promise<number> {
-  const referenciasOrigen = await tx.telaColor.findMany({ where: { idColor: idOrigen } });
-  if (referenciasOrigen.length === 0) {
-    return 0;
-  }
-
-  // Telas donde el destino YA tiene fila ligada (para detectar colisiones).
-  const referenciasDestino = await tx.telaColor.findMany({
-    where: { idColor: idDestino },
-    select: { id: true, idTela: true, precio: true, pantone: true, precioComplemento: true },
-  });
-  const destinoPorTela = new Map(referenciasDestino.map((r) => [r.idTela, r]));
-
-  for (const ref of referenciasOrigen) {
-    const destino = destinoPorTela.get(ref.idTela);
-    if (destino === undefined) {
-      // Sin colisión: la tela solo estaba ligada al origen → se re-liga al destino.
-      await tx.telaColor.update({ where: { id: ref.id }, data: { idColor: idDestino } });
-      continue;
-    }
-
-    // Colisión: el destino ya tiene fila en esta tela. Gana el destino; se rellena TODO
-    // dato que tuviera nulo y el origen sí traiga (precio, pantone y precioComplemento).
-    const relleno: {
-      precio?: Prisma.Decimal;
-      pantone?: string;
-      precioComplemento?: Prisma.Decimal;
-    } = {
-      ...(destino.precio === null && ref.precio !== null ? { precio: ref.precio } : {}),
-      ...(destino.pantone === null && ref.pantone !== null ? { pantone: ref.pantone } : {}),
-      ...(destino.precioComplemento === null && ref.precioComplemento !== null
-        ? { precioComplemento: ref.precioComplemento }
-        : {}),
-    };
-    if (Object.keys(relleno).length > 0) {
-      await tx.telaColor.update({ where: { id: destino.id }, data: relleno });
-    }
-    await tx.telaColor.delete({ where: { id: ref.id } });
-  }
-
-  return referenciasOrigen.length;
-}
-
-/**
- * Fusiona color(es) DUPLICADOS en un color DESTINO canónico (F1-E6). Reasigna las
- * referencias de TELA de cada origen al destino (resolviendo colisiones de PK en el puente
- * `TelaColor`, ver {@link reasignarReferenciasColor}), DESACTIVA cada origen (borrado
- * suave, no se borra físico) y registra bitácora de la fusión. Todo en UNA transacción
- * (A2): o se consolida entero o no se toca nada.
- *
- * ⚠️ **SE NIEGA si el origen ya se usa fuera de las telas** (§Post-F9.129): `Color` tiene
- * DOCE llaves foráneas entrantes y esta fusión sólo sabe mover UNA (`TelaColor`). Las otras
- * once quedarían apuntando a un color APAGADO — y una orden viva con color inactivo ya no se
- * puede editar (`sincronizarMatriz`). En vez de corromper en silencio, se RECHAZA con el
- * camino de salida dicho con letras. El porqué completo y la lista viven en
- * `colores-fusion-referencias.ts`. Rechazar no toca ni un dato: es la opción reversible.
- *
- * Reglas: permiso `colores.administrar`; el destino y cada origen deben existir; un
- * color no puede fusionarse consigo mismo (Zod ya excluye el destino de los orígenes).
- * El destino se REACTIVA si estaba desactivado (es el canónico que sobrevive).
+ * Reglas: permiso `colores.administrar`; el destino y cada origen deben existir; un color no puede
+ * fusionarse consigo mismo (Zod ya excluye el destino de los orígenes). El destino se REACTIVA si
+ * estaba desactivado (es el canónico que sobrevive).
  *
  * @returns el color DESTINO sobreviviente (ya consolidado).
  */
@@ -395,14 +332,15 @@ export async function fusionarColores(
     for (const idOrigen of datos.origenes) {
       const origen = await exigirColor(tx, idOrigen);
 
-      // ⛔ §Post-F9.129 — el origen no puede estar en uso fuera de las telas. Se comprueba ANTES
-      // de mover o desactivar nada: la tx entera se aborta (A2) y el catálogo queda intacto.
-      const usos = await contarUsosQueBloqueanFusion(tx, idOrigen);
-      if (usos.length > 0) {
-        throw new ErrorConflicto(mensajeFusionBloqueada(origen.nombre, usos));
-      }
-
-      referenciasMovidas += await reasignarReferenciasColor(tx, idOrigen, datos.idDestino);
+      // Lo que NO se mueve se cuenta ANTES de apagar el origen: después seguiría dando el mismo
+      // número (nada se borra), pero contarlo aquí deja claro que es una FOTO del momento de la
+      // fusión, que es lo que la bitácora tiene que poder contestar dentro de un año.
+      const conRastro = await contarUsosConRastro(tx, idOrigen);
+      const repunte = await repuntarReferenciasDeColor(tx, {
+        idOrigen,
+        idDestino: datos.idDestino,
+      });
+      referenciasMovidas += repunte.movidos;
 
       // Borrado suave del origen + ⭐ V1-E8s: el RASTRO de quién se lo llevó (`idFusionadoEn`).
       // Se escribe SIEMPRE, aunque el origen ya estuviera apagado: el dato nuevo es a DÓNDE se fue,
@@ -419,7 +357,8 @@ export async function fusionarColores(
       });
       origenesFusionados.push({ id: origen.id, nombre: origen.nombre });
 
-      // Bitácora por cada origen absorbido (auditoría granular A7).
+      // Bitácora por cada origen absorbido (auditoría granular A7): a dónde se fue, cuántas
+      // referencias se movieron, QUÉ SE QUEDÓ colgando de él y qué se descartó por colisión.
       await registrarBitacora(tx, sesion, {
         entidad: 'Color',
         idEntidad: origen.id,
@@ -427,6 +366,11 @@ export async function fusionarColores(
         datos: {
           operacion: 'fusionar',
           fusionadoEn: { id: destino.id, nombre: destino.nombre },
+          referenciasRepuntadas: repunte.movidos,
+          // Lo que se queda apuntando a este color (documentos y movimientos, D3/D7). No es un
+          // error: es la parte de la fusión que se resuelve leyendo el rastro, y queda dicha.
+          quedanConRastro: conRastro.map((u) => ({ que: u.etiqueta, cuantos: u.cuenta })),
+          ...(repunte.descartados.length > 0 ? { descartados: repunte.descartados } : {}),
         },
       });
     }
@@ -461,80 +405,12 @@ export async function fusionarColores(
 }
 
 /**
- * Tope de saltos al seguir la cadena de fusiones. Una cadena real tiene 1 o 2 eslabones ("Negro A" →
- * "Negro"); 20 es holgadísimo (medido: una cadena legítima de cuatro resuelve en milisegundos).
- *
- * ⚠️ Es el **PARACAÍDAS, no la solución**. La fuente conocida de un anillo es el **backfill** de la
- * migración `20260829120000_a_donde_se_fue_el_color`, que lo reconstruye a partir de la bitácora — y
- * **esa migración lo rompe ella misma**, que es donde de verdad se arregla. Esto queda por si un día
- * otro dato viejo dejara uno: mejor un error con nombre que un ciclo infinito.
+ * ⭐ El **CANÓNICO** de un color (el que sobrevivió a la fusión) vive en su propio módulo desde la
+ * fila 0.159, junto a la versión de LOTE que necesita la explosión de materiales. Se re-exporta
+ * aquí porque `colores.ts` era su casa y media docena de módulos lo importan por este nombre:
+ * mover el archivo sin dejar la puerta habría sido un renombre disfrazado de refactor.
  */
-const MAX_SALTOS_FUSION = 20;
-
-/** Lo mínimo que hay que saber de un color para decidir si se puede usar. */
-export interface ColorCanonico {
-  id: number;
-  nombre: string;
-  activo: boolean;
-}
-
-/**
- * ⭐ V1-E8s (§Post-F9.143) — sigue el rastro `idFusionadoEn` hasta el color CANÓNICO: el que de
- * verdad sobrevivió a la(s) fusión(es). Devuelve el mismo color si nunca lo absorbieron.
- *
- * **PARA QUÉ EXISTE.** La fusión retira al absorbido apagándolo (borrado suave, D3), así que quien
- * después se topa con ese nombre —el importador de OC de C&A, hoy el único— sólo veía "un color
- * apagado" y lo RESUCITABA: deshacía la limpieza de Daniel y, como ese camino AMARRA el id a la
- * matriz color×talla de la OP, el revivido volvía a acumular referencias y ya no se podía volver a
- * fusionar (§Post-F9.129 lo niega en cuanto hay usos). Con el rastro hay a dónde mandarlo.
- *
- * **LA REGLA, en una línea:** *un color absorbido nunca revive; el canónico sí puede.* Por eso la
- * caminata para en cuanto el color está ACTIVO (ya es usable) o ya no tiene rastro (nadie se lo
- * llevó: si está apagado, lo apagó su dueño, y reactivarlo no deshace ninguna fusión — esa decisión
- * es de quien llama).
- *
- * Un color ACTIVO se devuelve tal cual aunque conserve rastro: reactivar a mano es deshacer la
- * fusión, y `actualizarColor` limpia el rastro al hacerlo — pero si por lo que sea quedara uno
- * colgando, gana lo que se ve (está activo), no la historia.
- *
- * Es un ayudante INTERNO de la misma transacción (no verifica permiso): quien lo llama ya pasó su
- * propio gate — `fusionarColores` por `colores.administrar`, el importador por `ordenes.administrar`.
- *
- * Pide `Pick<Tx, 'color'>` y no el `Tx` entero porque es lo ÚNICO que toca: así lo puede llamar
- * también una LECTURA suelta (la vista previa del importador, que no abre transacción) y se puede
- * probar contra un catálogo falso en memoria, sin Postgres.
- */
-export async function colorCanonico(
-  tx: Pick<Tx, 'color'>,
-  idColor: number,
-): Promise<ColorCanonico> {
-  const seleccion = { id: true, nombre: true, activo: true, idFusionadoEn: true } as const;
-  const primero = await tx.color.findUnique({ where: { id: idColor }, select: seleccion });
-  if (primero === null) {
-    throw new ErrorNoEncontrado('Color', idColor);
-  }
-  let actual: ColorCanonico & { idFusionadoEn: number | null } = primero;
-
-  for (let salto = 0; !actual.activo && actual.idFusionadoEn !== null; salto++) {
-    if (salto >= MAX_SALTOS_FUSION) {
-      throw new ErrorConflicto(
-        `La cadena de fusiones del color "${actual.nombre}" no termina (más de ` +
-          `${String(MAX_SALTOS_FUSION)} saltos): hay colores fusionados en círculo. ` +
-          `Reactiva uno de ellos para romper la cadena.`,
-      );
-    }
-    const siguiente = await tx.color.findUnique({
-      where: { id: actual.idFusionadoEn },
-      select: { id: true, nombre: true, activo: true, idFusionadoEn: true },
-    });
-    if (siguiente === null) {
-      break; // el canónico ya no existe (no debería: la FK es Restrict) → se queda en éste
-    }
-    actual = siguiente;
-  }
-
-  return { id: actual.id, nombre: actual.nombre, activo: actual.activo };
-}
+export { colorCanonico, type ColorCanonico } from './colores-canonicos.js';
 
 /** Obtiene un color por id o lanza `ErrorNoEncontrado`. */
 export async function obtenerColor(

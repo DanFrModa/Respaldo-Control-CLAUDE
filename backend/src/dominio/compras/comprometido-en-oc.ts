@@ -48,6 +48,7 @@ import type { EstatusOrdenCompra } from '../../datos/index.js';
 import { redondearCantidadCompra } from './reparto-ordenes.js';
 import type { ContextoBd } from '../../comun/transaccion.js';
 import { clienteLectura } from '../../comun/transaccion.js';
+import { idCanonico, resolverColoresCanonicos } from '../catalogos/colores-canonicos.js';
 
 /**
  * Estatus de OC que cuentan como "el material ya está cubierto por un documento vivo". Es la lista
@@ -94,6 +95,47 @@ export const ESTATUS_OC_COMPROMETIDA: readonly EstatusOrdenCompra[] = [
  */
 export function algunaRecibida(estatus: readonly EstatusOrdenCompra[]): boolean {
   return estatus.some((e) => e === 'recibida_parcial' || e === 'recibida_total');
+}
+
+/**
+ * ⭐⭐ **PONE UN PUÑADO DE RENGLONES EN ESPACIO CANÓNICO** (fila 0.159, §Post-F9.222) — el único
+ * ajuste que la fusión de colores necesitó en todo el módulo de compras.
+ *
+ * ## El problema, en una frase
+ *
+ * Desde la fila 0.159 la fusión de colores **ya no reescribe los documentos**: la matriz de la orden,
+ * las líneas de OC y lo que alguien dio por cubierto se quedan con el id del color ABSORBIDO (D3/D7),
+ * mientras todo lo nuevo nace con el CANÓNICO. Los dos números nombran el mismo color real.
+ *
+ * 🔴 **Y este módulo compara justo esos dos números.** El neteo pregunta *«¿cuánto de esto ya está en
+ * una OC?»* cruzando `(material, color)` del snapshot contra `(material, color)` de las líneas de OC.
+ * Si un lado dijera «color 7» y el otro «color 12» siendo el mismo color, el cruce no casaría y la
+ * explosión **volvería a pedir lo que ya viaja en una orden de compra** — el defecto exacto que
+ * §Post-F9.85 cerró, resucitado por una limpieza de catálogo.
+ *
+ * ⚠️ **Por qué es una función y no la resolución escrita en cada consulta.** Los dos lados del cruce
+ * tienen que estar en el MISMO espacio o el neteo miente, y "acordarse de resolver también en el otro
+ * sitio" es exactamente como se separan dos verdades. Aquí se aplica de una línea en cada lectura, y
+ * la lista de qué lecturas la llevan vive en `DECISIONES.md` §Post-F9.222.
+ *
+ * ⚠️ **Sólo toca `idColorPrenda`** (catálogo `Color`, el de la prenda). `idTelaColor` es de OTRO
+ * catálogo (`TelaColor`), que no tiene fusión: pasarlo por aquí sería confundir dos mundos que
+ * {@link colorDelRenglon} mantiene separados a propósito.
+ *
+ * Devuelve copias; sin colores o sin rastro devuelve las filas tal cual y el módulo se comporta
+ * EXACTAMENTE como antes de esta fila (que es lo que lo hace seguro cuando no hay ninguna fusión).
+ */
+export async function canonizarColorPrenda<T extends { idColorPrenda: number | null }>(
+  filas: readonly T[],
+  bd?: ContextoBd,
+): Promise<T[]> {
+  if (filas.length === 0) return [];
+  const mapa = await resolverColoresCanonicos(
+    clienteLectura(bd),
+    filas.map((f) => f.idColorPrenda),
+  );
+  if (mapa.size === 0) return [...filas];
+  return filas.map((f) => ({ ...f, idColorPrenda: idCanonico(mapa, f.idColorPrenda) }));
 }
 
 /**
@@ -240,7 +282,7 @@ export async function comprometidoEnOc(
   if (idsOrden.length === 0) return resultado;
 
   const cliente = clienteLectura(bd);
-  const lineas = await cliente.ordenCompraLinea.findMany({
+  const lineasCrudas = await cliente.ordenCompraLinea.findMany({
     where: {
       idOrden: { in: [...idsOrden] },
       // A9 + el criterio de arriba: la OC tiene que ser de esta empresa y estar VIVA.
@@ -265,6 +307,11 @@ export async function comprometidoEnOc(
       },
     },
   });
+
+  // ⭐⭐ fila 0.159 — EN ESPACIO CANÓNICO ANTES DE CRUZAR NADA (ver {@link canonizarColorPrenda}).
+  // Una OC escrita ANTES de que se fusionaran dos colores duplicados sigue neteando contra la
+  // explosión de HOY; sin esto, la explosión propondría comprar otra vez lo que esa OC ya cubre.
+  const lineas = await canonizarColorPrenda(lineasCrudas, bd);
 
   for (const l of lineas) {
     if (l.idOrden === null) continue; // imposible por el `where`, pero el tipo lo permite

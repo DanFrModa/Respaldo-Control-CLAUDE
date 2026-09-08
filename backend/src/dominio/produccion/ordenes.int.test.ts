@@ -21,6 +21,8 @@ import {
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { fusionarDepartamentosCliente } from '../catalogos/cliente-departamentos.js';
+// ⭐⭐ fila 0.159 (§Post-F9.222): la matriz tolera un color que una fusión absorbió.
+import { fusionarColores } from '../catalogos/colores.js';
 import { crearArte } from '../modelos/arte-modelo.js';
 import { reemplazarAviosBom } from '../modelos/bom-modelo.js';
 import { actualizarModelo } from '../modelos/modelos.js';
@@ -1329,5 +1331,79 @@ describe('Matriz de la OP por PACK (§Post-F9.10)', () => {
     const copiada = await copiarDetalleOrden(s(), destino.id, { idOrdenOrigen: origen.id }, bd());
     expect(copiada.totalPiezas).toBe(4);
     expect(copiada.lineas[0]?.pack).toBe('');
+  });
+});
+
+/**
+ * ⭐⭐ **fila 0.159 (§Post-F9.222) — UNA ORDEN CON UN COLOR FUSIONADO SIGUE SIENDO EDITABLE.**
+ *
+ * Ésta es la mitad que hace POSIBLE fusionar colores duplicados. §Post-F9.129 prohibió la fusión
+ * justo por esto: la fusión apaga el color absorbido y **no reescribe la matriz** (es lo que el
+ * cliente pidió, D7), así que cualquier guardado posterior —que reenvía la matriz entera— moría en
+ * *«El color … está desactivado; no se puede usar»* y la orden quedaba INEDITABLE para siempre.
+ *
+ * La excepción es estrecha a propósito: perdona el color **que ya está en esta orden**, no capturar
+ * uno nuevo con un color apagado.
+ */
+describe('⭐⭐ fila 0.159 — la matriz tolera un color absorbido por una fusión', () => {
+  const sesionColores = () =>
+    sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] });
+
+  it('se puede volver a guardar la matriz con el color que la fusión apagó', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    const matriz = {
+      lineas: [{ idColor: colorAzul.id, tallas: [{ idTalla: tallaCH.id, cantidad: 7 }] }],
+    };
+    await guardarMatrizOrden(s, orden.id, matriz, bd());
+
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: colorRojo.id, origenes: [colorAzul.id] },
+      bd(),
+    );
+
+    // 🔴 Volver a guardar LO MISMO no puede fallar: es la orden que ya existía.
+    const guardada = await guardarMatrizOrden(
+      s,
+      orden.id,
+      { lineas: [{ idColor: colorAzul.id, tallas: [{ idTalla: tallaCH.id, cantidad: 9 }] }] },
+      bd(),
+    );
+    expect(guardada.totalPiezas).toBe(9);
+  });
+
+  it('capturar un color absorbido que la orden NO tenía se rechaza, y el mensaje dice a cuál ir', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: colorRojo.id, origenes: [colorAzul.id] },
+      bd(),
+    );
+
+    await expect(
+      guardarMatrizOrden(
+        s,
+        orden.id,
+        { lineas: [{ idColor: colorAzul.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }] },
+        bd(),
+      ),
+    ).rejects.toThrow(/se fusionó en "Rojo"/);
+  });
+
+  it('un color apagado A MANO (sin fusión) se sigue rechazando con el mensaje de siempre', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await cliente.color.update({ where: { id: colorAzul.id }, data: { activo: false } });
+
+    await expect(
+      guardarMatrizOrden(
+        s,
+        orden.id,
+        { lineas: [{ idColor: colorAzul.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }] },
+        bd(),
+      ),
+    ).rejects.toThrow(/está desactivado; no se puede usar/);
   });
 });

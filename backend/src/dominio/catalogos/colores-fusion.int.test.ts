@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { PrismaClient } from '../../datos/index.js';
+import type { Empresa, PrismaClient } from '../../datos/index.js';
 import {
   ErrorConflicto,
   ErrorNoEncontrado,
   ErrorPermiso,
   ErrorValidacion,
 } from '../../comun/errores.js';
-import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   colorCanonico,
@@ -44,6 +44,11 @@ const bd = () => ({ cliente });
 
 let idCategoria: number;
 let idProveedor: number;
+let empresa: Empresa;
+let idClienteNegocio: number;
+let idTalla: number;
+/** Folio correlativo de las órdenes que fabrican las pruebas (la columna es única por empresa). */
+let folioOrden = 0n;
 
 beforeAll(() => {
   cliente = clientePruebas();
@@ -60,6 +65,11 @@ beforeEach(async () => {
   // El alta de tela ahora exige el proveedor DUEÑO (§Post-F9.11).
   const proveedor = await cliente.proveedor.create({ data: { nombre: 'Alsatex' } });
   idProveedor = proveedor.id;
+  // ⭐ fila 0.159 — mínimo indispensable para poder meter un color en una ORDEN y en un MODELO,
+  // que es justo lo que antes hacía imposible fusionarlo.
+  empresa = await crearEmpresaPrueba(cliente);
+  idClienteNegocio = (await cliente.cliente.create({ data: { nombre: 'C&A' } })).id;
+  idTalla = (await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } })).id;
 });
 
 /**
@@ -95,6 +105,52 @@ async function telaConLigas(
     });
   }
   return tela;
+}
+
+/**
+ * ⭐ fila 0.159 — una ORDEN con matriz color×talla en los colores dados. Es la referencia que
+ * §Post-F9.129 usaba para NEGAR la fusión, así que es la que tiene que dejar de estorbar.
+ */
+async function ordenConColores(idsColor: number[]): Promise<{ idOrden: number }> {
+  const modelo = await cliente.modelo.create({
+    data: { codigo: `MOD-ORD-${String(++folioOrden)}`, origen: 'produccion' },
+  });
+  const orden = await cliente.orden.create({
+    data: {
+      folio: folioOrden,
+      idEmpresa: empresa.id,
+      idModelo: modelo.id,
+      idCliente: idClienteNegocio,
+      lineas: {
+        create: idsColor.map((idColor) => ({
+          idColor,
+          tallas: { create: [{ idTalla, cantidad: 10 }] },
+        })),
+      },
+    },
+  });
+  return { idOrden: orden.id };
+}
+
+/** Un modelo de DESARROLLO con un hijo de PRODUCCIÓN nacido de `idColor` (la llave del linaje). */
+async function desarrolloConHijoDeColor(
+  idColor: number,
+  codigo: string,
+  numeroProduccion: number,
+): Promise<{ idPadre: number; idHijo: number }> {
+  const padre = await cliente.modelo.create({
+    data: { codigo: `${codigo}-DES`, origen: 'desarrollo', codigoDesarrollo: `${codigo}-DES` },
+  });
+  const hijo = await cliente.modelo.create({
+    data: {
+      codigo,
+      origen: 'produccion',
+      idModeloDesarrollo: padre.id,
+      idColor,
+      numeroProduccion,
+    },
+  });
+  return { idPadre: padre.id, idHijo: hijo.id };
 }
 
 describe('Fusión de colores duplicados (F1-E6)', () => {
@@ -322,46 +378,15 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
     });
   });
 
-  describe('⭐ §Post-F9.129 — se NIEGA si el origen ya se usa fuera de las telas', () => {
-    it('rechaza con ErrorConflicto y NO toca nada (el origen sigue activo y su tela no se movió)', async () => {
-      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
-      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
-      const tela = await telaConLigas('Felpa lisa', [{ nombre: 'Negro A', idColor: origen.id }]);
-      // El origen se usa fuera de las telas: un lote teñido en ese color.
-      await cliente.lote.create({ data: { clave: 'LOTE-NEGRO-A-1', idColor: origen.id } });
-
-      await expect(
-        fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd()),
-      ).rejects.toBeInstanceOf(ErrorConflicto);
-
-      // A2: la tx entera se revirtió. El origen sigue ACTIVO (no quedó apagado a medias)…
-      const origenDespues = await cliente.color.findUniqueOrThrow({ where: { id: origen.id } });
-      expect(origenDespues.activo).toBe(true);
-      // …su tela sigue ligada a ÉL (no se movió al destino)…
-      const ligas = await cliente.telaColor.findMany({ where: { idTela: tela.id } });
-      expect(ligas.map((l) => l.idColor)).toEqual([origen.id]);
-      // …y no se escribió bitácora de fusión.
-      expect(
-        await cliente.bitacora.count({
-          where: { entidad: 'Color', idEntidad: String(origen.id), accion: 'OTRO' },
-        }),
-      ).toBe(0);
-    });
-
-    it('el mensaje nombra el color, el uso que estorba y el camino de salida', async () => {
-      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
-      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
-      await cliente.lote.create({ data: { clave: 'LOTE-NEGRO-A-2', idColor: origen.id } });
-
-      await expect(
-        fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd()),
-      ).rejects.toThrow(/NEGRO A[\s\S]*lotes de tela[\s\S]*§Post-F9\.129/);
-    });
-
-    it('un origen LIMPIO se sigue fusionando (la guarda no estorba a la depuración legítima)', async () => {
-      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
-      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
-      await telaConLigas('Felpa lisa', [{ nombre: 'Negro A', idColor: origen.id }]);
+  describe('⭐⭐ fila 0.159 (§Post-F9.222) — YA NO SE NIEGA porque el color esté en uso', () => {
+    it('fusiona un color METIDO EN UNA ORDEN: la matriz NO se toca y el origen queda apagado con rastro', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'Blanco Hueso' }, bd());
+      const origen = await crearColor(
+        sesionAdmin(),
+        { nombre: 'Blanco Hueso Pantone 14-0002 Tcx Pumice Stone' },
+        bd(),
+      );
+      const { idOrden } = await ordenConColores([origen.id]);
 
       const sobreviviente = await fusionarColores(
         sesionAdmin(),
@@ -370,8 +395,131 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       );
 
       expect(sobreviviente.id).toBe(destino.id);
+      // 🔴 LO QUE EL CLIENTE PIDIÓ NO SE REESCRIBE (D7/D3): la matriz sigue diciendo el color viejo.
+      const lineas = await cliente.ordenLinea.findMany({ where: { idOrden } });
+      expect(lineas.map((l) => l.idColor)).toEqual([origen.id]);
+      // …y el origen queda apagado, con el rastro de a dónde se fue.
       const origenDespues = await cliente.color.findUniqueOrThrow({ where: { id: origen.id } });
       expect(origenDespues.activo).toBe(false);
+      expect(origenDespues.idFusionadoEn).toBe(destino.id);
+    });
+
+    it('fusiona aunque el color esté en un LOTE, un movimiento o un conteo: nada de eso bloquea', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      await cliente.lote.create({ data: { clave: 'LOTE-NEGRO-A-1', idColor: origen.id } });
+
+      await expect(
+        fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd()),
+      ).resolves.toMatchObject({ id: destino.id });
+
+      // El lote sigue apuntando al color absorbido: es un hecho asentado, no se reescribe.
+      const lote = await cliente.lote.findFirstOrThrow({ where: { clave: 'LOTE-NEGRO-A-1' } });
+      expect(lote.idColor).toBe(origen.id);
+    });
+
+    it('la BITÁCORA dice qué se quedó colgando del absorbido (no se calla)', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      await cliente.lote.create({ data: { clave: 'LOTE-NEGRO-A-2', idColor: origen.id } });
+
+      await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd());
+
+      const apunte = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Color', idEntidad: String(origen.id), accion: 'OTRO' },
+      });
+      expect(apunte.datos).toMatchObject({
+        operacion: 'fusionar',
+        quedanConRastro: [{ que: 'lotes de tela (legado)', cuantos: 1 }],
+      });
+    });
+
+    it('REPUNTA el precio por color del proveedor de tela (catálogo, no documento)', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      const tela = await telaConLigas('Felpa lisa', []);
+      const proveedorTela = await cliente.telaProveedor.create({
+        data: { idTela: tela.id, idProveedor, manejaPrecioPorColor: true },
+      });
+      await cliente.telaProveedorColor.create({
+        data: { idTelaProveedor: proveedorTela.id, idColor: origen.id, precio: 42 },
+      });
+
+      await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd());
+
+      const precios = await cliente.telaProveedorColor.findMany({
+        where: { idTelaProveedor: proveedorTela.id },
+      });
+      expect(precios).toHaveLength(1);
+      expect(precios[0]?.idColor).toBe(destino.id);
+      expect(Number(precios[0]?.precio)).toBe(42);
+    });
+
+    it('en COLISIÓN de precio por color gana el destino, y el descartado queda en la bitácora', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      const tela = await telaConLigas('Felpa lisa', []);
+      const proveedorTela = await cliente.telaProveedor.create({
+        data: { idTela: tela.id, idProveedor, manejaPrecioPorColor: true },
+      });
+      await cliente.telaProveedorColor.createMany({
+        data: [
+          { idTelaProveedor: proveedorTela.id, idColor: destino.id, precio: 10 },
+          { idTelaProveedor: proveedorTela.id, idColor: origen.id, precio: 99 },
+        ],
+      });
+
+      await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd());
+
+      const precios = await cliente.telaProveedorColor.findMany({
+        where: { idTelaProveedor: proveedorTela.id },
+      });
+      expect(precios).toHaveLength(1);
+      expect(Number(precios[0]?.precio)).toBe(10); // gana el canónico
+      const apunte = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Color', idEntidad: String(origen.id), accion: 'OTRO' },
+      });
+      expect(JSON.stringify(apunte.datos)).toContain('"precio":"99"');
+    });
+
+    it('REPUNTA el color del que nació un modelo de producción (la llave del linaje)', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      const { idHijo } = await desarrolloConHijoDeColor(origen.id, 'MOD-0159-A', 71001);
+
+      await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd());
+
+      const hijo = await cliente.modelo.findUniqueOrThrow({ where: { id: idHijo } });
+      expect(hijo.idColor).toBe(destino.id);
+    });
+
+    it('si el desarrollo YA tiene modelo del canónico, el del duplicado se deja quieto y se anota', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      const { idPadre, idHijo } = await desarrolloConHijoDeColor(origen.id, 'MOD-0159-B', 71002);
+      const otro = await cliente.modelo.create({
+        data: {
+          codigo: 'MOD-0159-B-CANON',
+          origen: 'produccion',
+          idModeloDesarrollo: idPadre,
+          idColor: destino.id,
+          numeroProduccion: 71003,
+        },
+      });
+
+      await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd());
+
+      // El del duplicado conserva su color (y por lo tanto su historia); el canónico sigue en pie.
+      expect((await cliente.modelo.findUniqueOrThrow({ where: { id: idHijo } })).idColor).toBe(
+        origen.id,
+      );
+      expect((await cliente.modelo.findUniqueOrThrow({ where: { id: otro.id } })).idColor).toBe(
+        destino.id,
+      );
+      const apunte = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Color', idEntidad: String(origen.id), accion: 'OTRO' },
+      });
+      expect(JSON.stringify(apunte.datos)).toContain('MOD-0159-B-CANON');
     });
   });
 
@@ -519,5 +667,82 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
         fusionarColores(sesion, { idDestino: c.id, origenes: [b.id] }, bd()),
       ).resolves.toMatchObject({ id: c.id });
     });
+  });
+});
+
+// ── ⭐ El LOCK POR DESARROLLO del repunte de `Modelo.idColor` (fila 0.159, ronda 2) ─────────
+
+/**
+ * El repunte de `Modelo.idColor` toma el MISMO `pg_advisory_xact_lock(20548, idModeloDesarrollo)`
+ * que `obtenerODerivarModeloDeProduccion`, porque el par «¿este desarrollo ya tiene un modelo del
+ * canónico?» + «entonces muévelo» tiene que ser un solo hecho serializado: si no, dos operaciones
+ * del MISMO desarrollo leen «no hay» a la vez y las dos escriben, chocando contra
+ * `modelos_linaje_color_unico` con un P2002 crudo.
+ *
+ * 🔴 **Esta prueba es el candado del lock**, y nació de una MUTACIÓN QUE SOBREVIVIÓ: quitar la línea
+ * del lock dejaba las 117 pruebas de fusión/colores/nomenclatura en verde, porque ninguna corría
+ * concurrente. Es el mismo agujero que la prueba del par en `nomenclatura.int.test.ts` vino a tapar
+ * —y la misma forma de taparlo—: sin algo que lo ejercite, un lock es una línea que cualquier
+ * refactor puede borrar en silencio.
+ */
+describe('concurrencia: el advisory lock por desarrollo del repunte de `Modelo.idColor`', () => {
+  const CONCURRENTES = 4;
+
+  it('N fusiones SIMULTÁNEAS hacia el mismo canónico: ninguna falla, una mueve y las demás se anotan', async () => {
+    const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+    // UN solo desarrollo con N hijos de producción, cada uno nacido de un duplicado distinto: todos
+    // compiten por la misma casilla `[idModeloDesarrollo, idColor=destino]`.
+    const padre = await cliente.modelo.create({
+      data: {
+        codigo: 'MOD-0159-LOCK-DES',
+        origen: 'desarrollo',
+        codigoDesarrollo: 'MOD-0159-LOCK-DES',
+      },
+    });
+    const origenes: number[] = [];
+    for (let i = 0; i < CONCURRENTES; i += 1) {
+      const color = await crearColor(sesionAdmin(), { nombre: `NEGRO ${String(i)}` }, bd());
+      await cliente.modelo.create({
+        data: {
+          codigo: `MOD-0159-LOCK-${String(i)}`,
+          origen: 'produccion',
+          idModeloDesarrollo: padre.id,
+          idColor: color.id,
+          numeroProduccion: 72_000 + i,
+        },
+      });
+      origenes.push(color.id);
+    }
+
+    const resultados = await Promise.allSettled(
+      origenes.map((idOrigen) =>
+        fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [idOrigen] }, bd()),
+      ),
+    );
+
+    // 1) NINGUNA falla. Sin el lock, las que pierden la carrera revientan contra
+    //    `modelos_linaje_color_unico` con un P2002. Se comparan los MENSAJES, no el conteo: si algo
+    //    falla, el `expect` lo enseña en el diff en vez de decir "esperaba 0, hubo 3".
+    const fallidas = resultados.filter((r) => r.status === 'rejected');
+    expect(fallidas.map((r) => String(r.reason))).toEqual([]);
+
+    // 2) EXACTAMENTE UNO se llevó la casilla del canónico (la primera que ganó la carrera).
+    const delCanonico = await cliente.modelo.findMany({
+      where: { idModeloDesarrollo: padre.id, idColor: destino.id },
+      select: { id: true },
+    });
+    expect(delCanonico).toHaveLength(1);
+
+    // 3) Y los otros N−1 conservan su color absorbido (su historia), como manda el descarte.
+    const conservados = await cliente.modelo.count({
+      where: { idModeloDesarrollo: padre.id, idColor: { in: origenes } },
+    });
+    expect(conservados).toBe(CONCURRENTES - 1);
+
+    // 4) Los N colores quedaron absorbidos igual: el descarte es del MODELO, no de la fusión.
+    const absorbidos = await cliente.color.count({
+      where: { id: { in: origenes }, activo: false, idFusionadoEn: destino.id },
+    });
+    expect(absorbidos).toBe(CONCURRENTES);
   });
 });
