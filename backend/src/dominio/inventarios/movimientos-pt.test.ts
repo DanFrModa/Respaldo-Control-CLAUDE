@@ -22,7 +22,17 @@ import {
  * Postgres en `movimientos-pt.int.test.ts` (CI).
  */
 
+/**
+ * Quien captura movimientos de PT. Lleva `ipt.fecha-libre` a propósito (fila 0.171): estas pruebas
+ * fechan a mano días concretos de 2026 para medir OTRAS reglas —la dirección `traspaso`, el motivo,
+ * la matriz—, y sin la llave el candado de la ventana las cortaría antes de llegar a lo que miden.
+ * No es un atajo: los 6 perfiles del seed que pueden mover PT llevan hoy ese permiso.
+ * El candado se mide aparte, con {@link sesionSinFechaLibre}.
+ */
 const sesionMover = () =>
+  sesionDePrueba({ permisos: ['inventario-pt.ver', 'inventario-pt.mover', 'ipt.fecha-libre'] });
+/** La misma sesión SIN la llave de fecha libre: sólo puede fechar dentro de la ventana. */
+const sesionSinFechaLibre = () =>
   sesionDePrueba({ permisos: ['inventario-pt.ver', 'inventario-pt.mover'] });
 const sesionSoloVer = () => sesionDePrueba({ permisos: ['inventario-pt.ver'] });
 const sesionSinNada = () => sesionDePrueba({ permisos: [] });
@@ -429,5 +439,109 @@ describe('dominio Inventario PT — el PERIODO del kardex (fila 0.138)', () => {
     await expect(kardexPt(sesionSoloVer(), { idModelo: 1, limite: 0 }, {})).rejects.toBeInstanceOf(
       ErrorValidacion,
     );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⏳ FILA 0.171 (b) — LA FECHA DEL MOVIMIENTO VUELVE A TENER CANDADO
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// En el viejo era el acceso #28 («Poder meter la fecha que sea en los movimientos de almacen de
+// PT»). v2 se trajo el permiso `ipt.fecha-libre` al catálogo y NO la guarda: el esquema aceptaba
+// cualquier fecha sin mirar nada, y el permiso no tenía un solo llamador. Estas pruebas son la
+// guarda; se escribieron viéndolas fallar contra el código de antes.
+//
+// 🔑 Las fechas se calculan DESDE HOY a propósito. Una constante ('2026-06-19') haría que la prueba
+// se pusiera roja sola el día que la ventana la deje atrás — y sobre todo, una prueba de «hace 30
+// días» tiene que seguir significando «hace 30 días» dentro de un año.
+
+/** `YYYY-MM-DD` de hace `dias` días (negativo = futuro), medido en UTC como la guarda. */
+function fechaHaceDias(dias: number): string {
+  const hoy = new Date();
+  const base = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
+  return new Date(base - dias * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Movimiento manual válido salvo por la fecha, que la pone quien llama. */
+const movimientoEnFecha = (fecha: string) => ({
+  idTipoMov: 1,
+  idAlmacen: 1,
+  idModelo: 1,
+  fecha,
+  motivo: 'Ajuste de la prueba',
+  lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+});
+
+/** Traspaso válido salvo por la fecha. */
+const traspasoEnFecha = (fecha: string) => ({
+  idAlmacenOrigen: 1,
+  idAlmacenDestino: 2,
+  idModelo: 1,
+  fecha,
+  motivo: 'Ajuste de la prueba',
+  lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+});
+
+describe('dominio Inventario PT — la fecha LIBRE es un privilegio (fila 0.171, ex acceso #28)', () => {
+  it('⭐ SIN `ipt.fecha-libre`, backdatear un movimiento → ErrorPermiso (y NO toca la BD)', async () => {
+    // 30 días atrás: muy fuera de la ventana. Que no llegue a la BD lo prueba el `{}` como
+    // contexto — cualquier consulta reventaría por otro motivo.
+    await expect(
+      registrarMovimientoPt(sesionSinFechaLibre(), movimientoEnFecha(fechaHaceDias(30)), {}),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('⭐ el error NOMBRA el permiso que falta (para que la pantalla pueda decir qué pedir)', async () => {
+    await expect(
+      registrarMovimientoPt(sesionSinFechaLibre(), movimientoEnFecha(fechaHaceDias(30)), {}),
+    ).rejects.toMatchObject({ permiso: 'ipt.fecha-libre' });
+  });
+
+  it('SIN el permiso, una fecha FUTURA tampoco pasa (el inventario no se adivina)', async () => {
+    await expect(
+      registrarMovimientoPt(sesionSinFechaLibre(), movimientoEnFecha(fechaHaceDias(-1)), {}),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('SIN el permiso, DENTRO de la ventana sí pasa el candado (gemela positiva)', async () => {
+    // La guarda no puede estar bloqueando la captura normal. Se mide con el stub del tipo
+    // `traspaso`: si el candado deja pasar, la captura llega hasta el rechazo de la dirección
+    // (ErrorValidacion). Un ErrorPermiso aquí significaría que la ventana se cerró de más.
+    for (const dias of [0, 7]) {
+      await expect(
+        registrarMovimientoPt(
+          sesionSinFechaLibre(),
+          movimientoEnFecha(fechaHaceDias(dias)),
+          bdTipoTraspaso(),
+        ),
+        `la fecha de hace ${String(dias)} días está dentro de la ventana y no debería toparse con el permiso`,
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    }
+  });
+
+  it('CON `ipt.fecha-libre` una fecha de hace un AÑO pasa el candado (el privilegio sirve)', async () => {
+    await expect(
+      registrarMovimientoPt(sesionMover(), movimientoEnFecha(fechaHaceDias(400)), bdTipoTraspaso()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('⭐ el TRASPASO lleva el mismo candado (son dos movimientos con esa fecha)', async () => {
+    // Sin esto, la puerta de al lado quedaba abierta: el traspaso escribe DOS renglones de kardex
+    // fechados por quien captura, con el mismo permiso de por medio.
+    await expect(
+      registrarTraspasoPt(sesionSinFechaLibre(), traspasoEnFecha(fechaHaceDias(30)), {}),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('el traspaso DENTRO de la ventana pasa el candado (gemela positiva)', async () => {
+    // Origen = destino: una regla que se valida DESPUÉS del candado y ANTES de tocar la BD. Si sale
+    // ErrorValidacion, el candado dejó pasar la fecha; si saliera ErrorPermiso, se habría cerrado.
+    await expect(
+      registrarTraspasoPt(
+        sesionSinFechaLibre(),
+        { ...traspasoEnFecha(fechaHaceDias(1)), idAlmacenDestino: 1 },
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });

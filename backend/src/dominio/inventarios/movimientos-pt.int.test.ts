@@ -42,6 +42,7 @@ import {
   registrarMovimientoPt,
   registrarTraspasoPt,
 } from './movimientos-pt.js';
+import { listarTiposMovimiento } from './tipos-movimiento.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -52,10 +53,14 @@ let tallaM: Talla;
 let almPrimeras: Almacen;
 let almSegundas: Almacen;
 let tEntradaInicial: TipoMovimientoInventario;
-let tEntregaCliente: TipoMovimientoInventario;
+let tOtrasSalidas: TipoMovimientoInventario;
 let tTransferAlmacenes: TipoMovimientoInventario; // dirección traspaso (NO se usa como pata)
 
-const PERM_TODOS: ClavePermiso[] = ['inventario-pt.ver', 'inventario-pt.mover'];
+// `ipt.fecha-libre` (fila 0.171): estas pruebas fechan a mano días FIJOS de 2026 para medir el
+// kardex, y una fecha fija se aleja de «hoy» sola — sin la llave el candado de la ventana acabaría
+// cortándolas antes de llegar a lo que miden. No es un atajo: los 6 perfiles del seed que mueven PT
+// llevan hoy ese permiso. El candado se mide en `movimientos-pt.test.ts`, con fechas relativas.
+const PERM_TODOS: ClavePermiso[] = ['inventario-pt.ver', 'inventario-pt.mover', 'ipt.fecha-libre'];
 const sesion = (permisos: ClavePermiso[] = PERM_TODOS) =>
   sesionDePrueba({ idEmpresaActiva: empresa.id, permisos });
 const bd = () => ({ cliente });
@@ -81,8 +86,12 @@ beforeEach(async () => {
   tEntradaInicial = await cliente.tipoMovimientoInventario.create({
     data: { codigo: 'inventario-inicial', nombre: 'Inventario Inicial', direccion: 'entrada' },
   });
-  tEntregaCliente = await cliente.tipoMovimientoInventario.create({
-    data: { codigo: 'entrega-cliente', nombre: 'Entrega a Cliente', direccion: 'salida' },
+  // Fila 0.171 — la SALIDA de estas pruebas es «Otras Salidas», no «Entrega a Cliente». Ese rótulo
+  // pasó a estar reservado al SISTEMA (lo escribe la entrega, no una captura), así que el dominio
+  // lo rechaza como movimiento manual: usarlo aquí mediría el rechazo, no lo que estas pruebas
+  // quieren medir. `otras-salidas` es la salida genérica legítima de PT desde el sistema viejo.
+  tOtrasSalidas = await cliente.tipoMovimientoInventario.create({
+    data: { codigo: 'otras-salidas', nombre: 'Otras Salidas', direccion: 'salida' },
   });
   tTransferAlmacenes = await cliente.tipoMovimientoInventario.create({
     data: {
@@ -146,7 +155,7 @@ describe('Movimiento manual (F3-E3)', () => {
     await registrarMovimientoPt(
       sesion(),
       {
-        idTipoMov: tEntregaCliente.id,
+        idTipoMov: tOtrasSalidas.id,
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-06-20',
@@ -165,7 +174,7 @@ describe('Movimiento manual (F3-E3)', () => {
       registrarMovimientoPt(
         sesion(),
         {
-          idTipoMov: tEntregaCliente.id,
+          idTipoMov: tOtrasSalidas.id,
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
@@ -340,7 +349,7 @@ describe('Concurrencia: existencia nunca negativa (F3-E3)', () => {
       registrarMovimientoPt(
         sesion(),
         {
-          idTipoMov: tEntregaCliente.id,
+          idTipoMov: tOtrasSalidas.id,
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-06-20',
@@ -399,7 +408,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
     const salida = await registrarMovimientoPt(
       sesion(),
       {
-        idTipoMov: tEntregaCliente.id,
+        idTipoMov: tOtrasSalidas.id,
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-08-12',
@@ -427,7 +436,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
       registrarMovimientoPt(
         sesion(),
         {
-          idTipoMov: tEntregaCliente.id,
+          idTipoMov: tOtrasSalidas.id,
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-08-12',
@@ -449,7 +458,7 @@ describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () 
       registrarMovimientoPt(
         sesion(),
         {
-          idTipoMov: tEntregaCliente.id,
+          idTipoMov: tOtrasSalidas.id,
           idAlmacen: almPrimeras.id,
           idModelo: modelo.id,
           fecha: '2026-08-12',
@@ -566,7 +575,7 @@ describe('Kardex (F3-E3)', () => {
     await registrarMovimientoPt(
       sesion(),
       {
-        idTipoMov: tEntregaCliente.id,
+        idTipoMov: tOtrasSalidas.id,
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-06-20',
@@ -783,7 +792,7 @@ describe('El kardex por FECHAS (fila 0.138)', () => {
     await registrarMovimientoPt(
       sesion(),
       {
-        idTipoMov: tEntregaCliente.id,
+        idTipoMov: tOtrasSalidas.id,
         idAlmacen: almPrimeras.id,
         idModelo: modelo.id,
         fecha: '2026-02-10',
@@ -930,7 +939,7 @@ describe('El kardex por FECHAS (fila 0.138)', () => {
       const mov = await registrarMovimientoPt(
         ses,
         {
-          idTipoMov: opciones.salida === true ? tEntregaCliente.id : tEntradaInicial.id,
+          idTipoMov: opciones.salida === true ? tOtrasSalidas.id : tEntradaInicial.id,
           idAlmacen: opciones.idAlmacen ?? almPrimeras.id,
           idModelo: opciones.idModelo ?? modelo.id,
           fecha: opciones.fecha,
@@ -1532,5 +1541,82 @@ describe('Fila 0.100 · la HOJA del traspaso de PT', () => {
     await expect(
       armarDatosImpresoTraspasoPt(sesion(['inventario-pt.mover']), t.salida.id, bd()),
     ).rejects.toThrow();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ FILA 0.171 (a) — LOS RÓTULOS QUE SÓLO ESCRIBE EL SISTEMA NO SE CAPTURAN A MANO
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+describe('rótulos reservados al SISTEMA (fila 0.171)', () => {
+  /** Cuántos movimientos hay en la BD (para probar que un rechazo no escribió NADA). */
+  async function cuantosMovimientos(): Promise<number> {
+    return cliente.movimiento.count();
+  }
+
+  it('⭐ el movimiento manual NO puede estampar «Error de Entrada» (el rótulo de una CANCELACIÓN)', async () => {
+    // 🔴 El peor de los cinco. `error-entrada` es lo que el sistema escribe al CANCELAR una
+    // entrada: es el inverso auditado que exige D3, y va enlazado a lo que canceló. Puesto a mano
+    // sale un movimiento que AFIRMA una cancelación que nunca ocurrió, sin nada del otro lado.
+    //
+    // ⚠️ Se siembra existencia primero a propósito: sin ella el movimiento se caería igual, pero
+    // por «no hay existencia suficiente», y la prueba se estaría apoyando en el error equivocado.
+    // Con 30 piezas, la salida de 5 se escribiría sin problema si el rechazo no existiera.
+    await entrar(almPrimeras.id, 30);
+    const tError = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+      where: { codigo: 'error-entrada' },
+    });
+    const antes = await cuantosMovimientos();
+
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tError.id,
+          idAlmacen: almPrimeras.id,
+          idModelo: modelo.id,
+          fecha: '2026-06-20',
+          motivo: 'colándome por el movimiento manual',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+
+    // Ni medio movimiento: ni el encabezado, ni el detalle, ni el folio consumido de más.
+    expect(await cuantosMovimientos()).toBe(antes);
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(30);
+  });
+
+  it('«Entrada de Maquila» tampoco: a mano no mueve el WIP ni le carga al maquilero', async () => {
+    const tMaquila = await cliente.tipoMovimientoInventario.create({
+      data: { codigo: 'entrada-maquila', nombre: 'Entrada de Maquila', direccion: 'entrada' },
+    });
+    const antes = await cuantosMovimientos();
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tMaquila.id,
+          idAlmacen: almPrimeras.id,
+          idModelo: modelo.id,
+          fecha: '2026-06-20',
+          motivo: 'colándome por el movimiento manual',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    expect(await cuantosMovimientos()).toBe(antes);
+  });
+
+  it('y el catálogo ya no los OFRECE: `capturaManual` viene en falso (la pantalla los esconde)', async () => {
+    const tipos = await listarTiposMovimiento(sesion(), {}, bd());
+    const porCodigo = new Map(tipos.map((t) => [t.codigo, t.capturaManual]));
+    expect(porCodigo.get('error-entrada')).toBe(false);
+    expect(porCodigo.get('error-salida')).toBe(false);
+    // Y las salidas y entradas legítimas de siempre siguen ofreciéndose.
+    expect(porCodigo.get('otras-salidas')).toBe(true);
+    expect(porCodigo.get('inventario-inicial')).toBe(true);
   });
 });

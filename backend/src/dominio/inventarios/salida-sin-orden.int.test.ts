@@ -723,7 +723,15 @@ describe('(g) ⛔ los dos rótulos están RESERVADOS a la salida sin orden', () 
     const talla = await cliente.talla.create({ data: { etiqueta: 'M-0104', orden: 1 } });
     const quienMuevePt = sesionDePrueba({
       idEmpresaActiva: empresa.id,
-      permisos: ['inventario-pt.ver', 'inventario-pt.mover', PERMISO_SALIDA_SIN_ORDEN],
+      // `ipt.fecha-libre` (0.171): la captura lleva una fecha FIJA (2026-09-05). Hoy cae dentro de
+      // la ventana, pero eso dura días: sin la llave, esta prueba empezaría a fallar sola en cuanto
+      // el calendario la deje atrás. El permiso la ancla — la fecha de la prueba no es lo que mide.
+      permisos: [
+        'inventario-pt.ver',
+        'inventario-pt.mover',
+        'ipt.fecha-libre',
+        PERMISO_SALIDA_SIN_ORDEN,
+      ],
     });
     const capturaPt = {
       idAlmacen: almPt.id,

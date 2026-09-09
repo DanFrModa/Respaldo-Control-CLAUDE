@@ -121462,7 +121462,7 @@
                           },
                           "capturaManual": {
                             "type": "boolean",
-                            "description": "¿Se puede elegir en una captura MANUAL de movimiento? Falso en los tipos RESERVADOS a un flujo con permiso propio (fila 0.104: «Devolución a Proveedor» y «Venta de Material», que sólo escribe la salida de material sin orden). El servidor los rechaza igual si llegan; esta bandera existe para que ninguna pantalla los ofrezca."
+                            "description": "¿Se puede elegir en una captura MANUAL de movimiento? Falso por dos razones distintas: los RESERVADOS a la dirección (2 — fila 0.104: «Devolución a Proveedor» y «Venta de Material»), que sólo escribe la salida de material sin orden con su permiso propio; y los RESERVADOS al sistema (12 — fila 0.171), que no captura nadie porque son el efecto de otra operación: las dos patas de un traspaso, los dos rótulos de una cancelación, los dos del ajuste por cíclico, la recepción de compra, la salida de tela a una orden, la salida de avío por nota, la entrada de maquila, la entrega a cliente y la merma por prendas incompletas. El servidor los rechaza igual si llegan; esta bandera existe para que ninguna pantalla los ofrezca."
                           }
                         },
                         "required": [
@@ -121613,7 +121613,7 @@
                     "type": "string",
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
-                    "description": "Fecha del movimiento (YYYY-MM-DD)."
+                    "description": "Fecha del movimiento (YYYY-MM-DD). Sin el permiso `ipt.fecha-libre` (ex acceso #28) el DOMINIO sólo acepta los últimos 7 días y nunca una fecha futura — la regla vive ahí, no aquí (A1)."
                   },
                   "motivo": {
                     "type": "string",
@@ -122135,7 +122135,7 @@
                     "type": "string",
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
-                    "description": "Fecha del traspaso (YYYY-MM-DD)."
+                    "description": "Fecha del traspaso (YYYY-MM-DD). Mismo candado que el movimiento manual: sin `ipt.fecha-libre`, sólo los últimos 7 días y nunca futura (lo valida el dominio)."
                   },
                   "motivo": {
                     "type": "string",

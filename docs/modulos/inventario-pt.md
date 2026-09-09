@@ -39,6 +39,44 @@ del detalle, NUNCA la vista — ADR-0010 §3). `costoUnit` queda NULL en toda F3
   (lee la vista `existencia_pt` — aquí SÍ, es consulta), **kardex por modelo** (saldo corrido en memoria)
   y por folio. Permisos `inventario-pt.ver` / `inventario-pt.mover` (A4).
   **El kardex por modelo es SIEMPRE de un PERIODO (fila 0.138)** — ver la sección de abajo.
+- `tipos-reservados.ts` (fila 0.171) — **qué rótulo puede escribir una persona a mano**. El kardex ES el
+  inventario (D3) y de cada movimiento sólo se lee el NOMBRE de su tipo: el rótulo es la afirmación de
+  qué pasó. De los **29** tipos que siembra el seed, **14 están reservados** en **dos reservas
+  distintas**, que no se mezclan:
+
+  | Reserva | Cuántos | Quién los escribe |
+  |---|---|---|
+  | **a la DIRECCIÓN** | 2 | Daniel, por la pantalla de salida sin orden (0.104) con su permiso: `devolucion-proveedor`, `venta-material`. **Se capturan, por un camino.** |
+  | **al SISTEMA** | 12 | Nadie: sólo el código, como efecto de otra operación. `error-entrada`/`-salida` (cancelación) · `transferencia-salida`/`-entrada` (las dos patas de un traspaso) · `ajuste-ciclico-entrada`/`-salida` (conteo cíclico) · `entrada-recepcion` (recepción de compra) · `salida-a-orden` (surtido de tela a una OP) · `salida-por-nota` (avíos por nota) · `entrada-maquila` (recibo) · `entrega-cliente` (entrega) · `merma-incompletas` (tránsito). |
+
+  🔑 **El criterio**, porque no es «lo resuelve el código por `codigo`»: entra el tipo que **SÓLO**
+  escribe el código, sin captura legítima por ninguna pantalla. `ajuste-entrada`/`ajuste-salida` los
+  resuelve el código en algún flujo automático y aun así **se quedan capturables** — son el ajuste
+  manual de siempre, el que recomienda cada mensaje de rechazo; reservarlos dejaría al almacén sin cómo
+  corregir. Igual con `otras-salidas`, que la 0.104 ya decidió no reservar.
+  ⚠️ **La lista no se declara completa para siempre**: hoy son 12 porque se enumeraron los 29 y se cruzó
+  cada uno contra quién lo escribe. Una fila futura que estrene un tipo automático **tiene que añadirlo**.
+
+  `rechazarTipoReservado` es la pared, y la llaman los CUATRO escritores genéricos de inventario (PT,
+  tela por color, tela por lote legada y avíos); `tipoEsCapturableAMano` alimenta la bandera
+  `capturaManual` del catálogo para que además la pantalla no los ofrezca (A1: la pantalla esconde, el
+  servidor decide). Los doce flujos automáticos escriben por el **motor**, que no pasa por la guarda —
+  por eso cerrarlos no rompe nada.
+- **La FECHA del movimiento es un privilegio (fila 0.171)** — ex acceso #28 del sistema viejo, *«poder
+  meter la fecha que sea en los movimientos de almacen de PT»*. Sin `ipt.fecha-libre`, el movimiento
+  manual y el traspaso sólo aceptan los **últimos 7 días** y nunca una fecha futura; con el permiso,
+  cualquiera. La guarda es `comun/fecha-capturable.ts` (la misma que usa Indicadores con su propio
+  permiso, desde F7-E4). ⏳ **La ventana de 7 días es un default propuesto por simetría con
+  Indicadores: falta que Daniel confirme la buena para el almacén de PT.** El número vive en cuatro
+  sitios (la constante del dominio, las dos descripciones del contrato y el espejo de la pantalla) y los
+  cuatro están **atados a máquina**: `contrato/esquemas/ventana-fecha-honesta.test.ts` descubre la
+  ventana probando el dominio y la cruza contra lo que el OpenAPI anuncia, y
+  `frontend/src/ventana-fecha-pt.test.ts` (en la RAÍZ de `src/`, no junto al módulo: necesita `node:fs`) cruza el espejo contra ese mismo OpenAPI. Cambiar el 7 en un
+  solo lado pone rojo el CI.
+  🔴 Y con el seed de HOY el candado no le cierra a nadie: los SEIS perfiles que pueden mover PT llevan
+  también `ipt.fecha-libre` (herencia de la cascada del viejo — el mismo defecto que documenta el perfil
+  `Secretarial` en `prisma/seed.ts` y que las filas 0.105/0.128 vienen podando). El gemelo de Indicadores
+  está igual. El MECANISMO ya existe; a quién se le quita la llave es una decisión de perfiles de Daniel.
 - `impresos/impreso-traspaso-pt.ts` (fila 0.100) — **hoja del traspaso de PT** en PDF: el papel que
   acompaña las prendas que salen a otro almacén. Lleva el folio, la fecha, **quién lo registró**, los dos
   almacenes, el modelo, el **motivo** y la matriz color×talla con la orden de cada renglón. NO genera

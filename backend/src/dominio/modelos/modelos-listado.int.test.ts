@@ -54,7 +54,10 @@ let tSalida: TipoMovimientoInventario;
 const PERM_LISTADO: ClavePermiso[] = ['modelos.ver', 'costos.ver', 'consultas.ver-importes'];
 /** Lo que tiene GERENCIAL (el rol de Aurora): importes sí, costo real no. */
 const PERM_GERENCIAL: ClavePermiso[] = ['modelos.ver', 'consultas.ver-importes'];
-const PERM_MOVER: ClavePermiso[] = ['inventario-pt.ver', 'inventario-pt.mover'];
+// Con `ipt.fecha-libre` (0.171): estas altas llevan una fecha FIJA (2026-07-01) para armar el
+// escenario, y una fecha fija se aleja de «hoy» sola — sin la llave el candado de la ventana
+// acabaría cortándolas.
+const PERM_MOVER: ClavePermiso[] = ['inventario-pt.ver', 'inventario-pt.mover', 'ipt.fecha-libre'];
 
 const sesion = (permisos: ClavePermiso[] = PERM_LISTADO, idEmpresaActiva = empresa.id) =>
   sesionDePrueba({ idEmpresaActiva, permisos });
@@ -81,8 +84,10 @@ beforeEach(async () => {
   tEntradaInicial = await cliente.tipoMovimientoInventario.create({
     data: { codigo: 'inventario-inicial', nombre: 'Inventario Inicial', direccion: 'entrada' },
   });
+  // Fila 0.171 — «Entrega a Cliente» quedó reservada al sistema (la escribe la entrega, no una
+  // captura). La salida genérica legítima de PT es «Otras Salidas».
   tSalida = await cliente.tipoMovimientoInventario.create({
-    data: { codigo: 'entrega-cliente', nombre: 'Entrega a Cliente', direccion: 'salida' },
+    data: { codigo: 'otras-salidas', nombre: 'Otras Salidas', direccion: 'salida' },
   });
 });
 

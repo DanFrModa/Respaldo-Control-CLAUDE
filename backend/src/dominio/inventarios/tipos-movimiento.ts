@@ -13,15 +13,20 @@ import { z } from 'zod';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { CODIGOS_TIPO_RESERVADOS } from './salida-sin-orden.js';
+import { tipoEsCapturableAMano } from './tipos-reservados.js';
 
 /**
  * Un tipo de movimiento con la bandera que dice si se puede ELEGIR en una captura manual.
  *
- * 🔑 La decide el DOMINIO (A1), no la pantalla ni el mapper de la ruta: es la misma lista de
- * códigos reservados que rechazan los escritores genéricos (`salida-sin-orden.ts`), leída UNA vez.
- * Así la pantalla no tiene que repetir los códigos —el defecto que CLAUDE.md llama «un dato
- * repetido en N sitios»— y cualquier pantalla futura que liste tipos hereda la regla gratis.
+ * 🔑 La decide el DOMINIO (A1), no la pantalla ni el mapper de la ruta: es la MISMA fuente que usa
+ * el rechazo de los escritores genéricos (`tipos-reservados.ts`), leída UNA vez. Así la pantalla no
+ * tiene que repetir los códigos —el defecto que CLAUDE.md llama «un dato repetido en N sitios»— y
+ * cualquier pantalla futura que liste tipos hereda la regla gratis.
+ *
+ * Falso por DOS razones distintas (fila 0.171): los rótulos que se reserva la DIRECCIÓN (los
+ * captura Daniel, por su pantalla) y los que escribe SÓLO el sistema (no los captura nadie, nunca).
+ * La bandera no distingue cuál —a la pantalla le da igual, no los ofrece— pero el rechazo del
+ * servidor sí, y lo dice en el mensaje.
  */
 export type TipoMovimientoConCaptura = TipoMovimientoInventario & { capturaManual: boolean };
 
@@ -61,6 +66,6 @@ export async function listarTiposMovimiento(
   });
   return tipos.map((tipo) => ({
     ...tipo,
-    capturaManual: !CODIGOS_TIPO_RESERVADOS.has(tipo.codigo),
+    capturaManual: tipoEsCapturableAMano(tipo.codigo),
   }));
 }

@@ -47,6 +47,7 @@
     "src/limite-cuerpo-api.test.ts",
     "src/cabeceras-seguridad-nginx.test.ts",
     "src/abreviatura-e2e.test.ts",
-    "src/selector-proveedor-unico.test.ts"
+    "src/selector-proveedor-unico.test.ts",
+    "src/ventana-fecha-pt.test.ts"
   ]
 }

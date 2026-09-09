@@ -46,7 +46,6 @@
  */
 import type { ClavePermiso, ConceptoSalidaSinOrden } from '../../contrato/index.js';
 
-import { ErrorValidacion } from '../../comun/errores.js';
 import { ORIGEN } from '../../comun/origenes.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import type { Tx } from '../../comun/transaccion.js';
@@ -121,37 +120,19 @@ export const CODIGO_TIPO_MOV_POR_CONCEPTO: Readonly<Record<ConceptoSalidaSinOrde
  *
  * `otras-salidas` NO entra aquí a propósito: existe desde el sistema viejo, lo usa el producto
  * terminado con toda legitimidad, y reservarlo sería quitarle una capacidad que ya tenía.
+ *
+ * ⭐ **Fila 0.171 — esta lista es UNA de DOS reservas, y NO hay que engordarla.** Aquí van sólo los
+ * rótulos reservados **a la DIRECCIÓN**: nadie más los captura, pero Daniel SÍ, por la pantalla de
+ * esta fila y con {@link PERMISO_SALIDA_SIN_ORDEN}. Los que **no captura nadie por ninguna puerta**
+ * —los que escribe el propio código como efecto de un recibo, una entrega o una cancelación— viven
+ * aparte, en `tipos-reservados.ts`, junto con el rechazo (`rechazarTipoReservado`) que antes vivía
+ * en este archivo. Mezclarlos borraría la diferencia: darle a alguien el permiso de la 0.104 le
+ * abriría de paso los rótulos que sólo escribe el sistema.
  */
 export const CODIGOS_TIPO_RESERVADOS: ReadonlySet<string> = new Set([
   CODIGO_TIPO_MOV_POR_CONCEPTO['devolucion-proveedor'],
   CODIGO_TIPO_MOV_POR_CONCEPTO.venta,
 ]);
-
-/**
- * RECHAZA que un escritor GENÉRICO de inventario estampe uno de los rótulos reservados
- * ({@link CODIGOS_TIPO_RESERVADOS}). Se llama con el `idTipoMov` que llegó de la captura, DENTRO de
- * la transacción y ANTES de escribir nada.
- *
- * No hay llamador legítimo que los necesite: las dos funciones buenas
- * (`registrarSalidaTelaColorSinOrden` / `registrarSalidaAvioSinOrden`) los resuelven **por código**,
- * no por id, así que ni pasan por aquí. Por eso se rechaza en seco en vez de pedir la llave: un
- * camino alterno para escribir el mismo rótulo sería otra vez dos puertas para una decisión.
- *
- * El mensaje dice A DÓNDE ir, que es lo que convierte un rechazo en una instrucción.
- */
-export async function rechazarTipoReservado(tx: Tx, idTipoMov: number): Promise<void> {
-  const tipo = await tx.tipoMovimientoInventario.findUnique({
-    where: { id: idTipoMov },
-    select: { codigo: true, nombre: true },
-  });
-  if (tipo !== null && CODIGOS_TIPO_RESERVADOS.has(tipo.codigo)) {
-    throw new ErrorValidacion(
-      `"${tipo.nombre}" no se captura como un movimiento manual: es una salida que sólo autoriza ` +
-        `la dirección. Se registra en «Salida de material sin orden». Para corregir el inventario ` +
-        `usa un ajuste.`,
-    );
-  }
-}
 
 /**
  * Exige la llave del dueño para REGISTRAR una salida sin orden (A4, deny-by-default). La llaman

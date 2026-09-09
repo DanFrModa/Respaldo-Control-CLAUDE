@@ -34,10 +34,15 @@ export const esquemaTipoMovimientoSalida = z
     capturaManual: z
       .boolean()
       .describe(
-        '¿Se puede elegir en una captura MANUAL de movimiento? Falso en los tipos RESERVADOS a ' +
-          'un flujo con permiso propio (fila 0.104: «Devolución a Proveedor» y «Venta de ' +
-          'Material», que sólo escribe la salida de material sin orden). El servidor los rechaza ' +
-          'igual si llegan; esta bandera existe para que ninguna pantalla los ofrezca.',
+        '¿Se puede elegir en una captura MANUAL de movimiento? Falso por dos razones distintas: ' +
+          'los RESERVADOS a la dirección (2 — fila 0.104: «Devolución a Proveedor» y «Venta de ' +
+          'Material»), que sólo escribe la salida de material sin orden con su permiso propio; y ' +
+          'los RESERVADOS al sistema (12 — fila 0.171), que no captura nadie porque son el efecto ' +
+          'de otra operación: las dos patas de un traspaso, los dos rótulos de una cancelación, ' +
+          'los dos del ajuste por cíclico, la recepción de compra, la salida de tela a una orden, ' +
+          'la salida de avío por nota, la entrada de maquila, la entrega a cliente y la merma por ' +
+          'prendas incompletas. El servidor los rechaza igual si llegan; esta bandera existe para ' +
+          'que ninguna pantalla los ofrezca.',
       ),
   })
   .describe('Tipo de movimiento de inventario (catálogo de solo lectura en F3).');

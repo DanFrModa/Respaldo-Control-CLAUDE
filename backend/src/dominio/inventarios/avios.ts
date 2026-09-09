@@ -57,8 +57,8 @@ import {
   CODIGO_TIPO_MOV_POR_CONCEPTO,
   exigirPermisoParaCancelarSalidaSinOrden,
   exigirPermisoSalidaSinOrden,
-  rechazarTipoReservado,
 } from './salida-sin-orden.js';
+import { rechazarTipoReservado } from './tipos-reservados.js';
 
 // ── Códigos estables de tipos de movimiento ──────────────────────────────────────────────────────
 
@@ -276,7 +276,8 @@ export async function ajustarInventarioAvio(
     // Fila 0.137 — el almacén del ajuste tiene que ser de AVIO (además de existir, estar activo y
     // ser de esta empresa, A9). Antes no se miraba nada de eso aquí.
     await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'AVIO', idEmpresa);
-    // Fila 0.104 — ver `partidas-telas.ts`: los dos rótulos reservados no se capturan por aquí.
+    // Fila 0.104 + 0.171 — ver `tipos-reservados.ts`: ni los rótulos que se reserva la dirección
+    // ni los que sólo escribe el sistema (recibo, entrega, cancelación) se capturan por aquí.
     await rechazarTipoReservado(tx, datos.idTipoMov);
     const tipo = await tipoPorId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
