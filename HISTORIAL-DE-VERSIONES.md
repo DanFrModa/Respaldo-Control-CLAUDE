@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.135 · 9-sep-2026 · **en prueba** — **Mover tela o avíos entre almacenes ya exige decir por qué, como mover ropa**
+
+### Qué se puede hacer ahora que antes no
+
+- Nada nuevo que puedas hacer: **esta versión cierra un hueco en una decisión que ya habías tomado.**
+  Pediste motivo obligatorio al mover producto terminado, *«igual que telas y avíos»*, y así se hizo.
+  Pero **en telas y avíos los traspasos nunca lo pidieron** — sólo los ajustes. Así que hasta hoy
+  **mover mil metros de tela al cortador no exigía una palabra, y mover mil piezas de ropa sí.**
+  La comparación en la que te apoyaste al decidir no era cierta; ahora sí lo es.
+
+### Qué cambió y puede sorprender
+
+- **Al traspasar tela por color o avíos entre almacenes, el motivo es obligatorio** (mínimo 3 letras).
+  El campo se marca en rojo si falta y no deja guardar, exactamente igual que en ropa.
+- **Es el mismo texto y los mismos límites** que ya conocías del ajuste de inventario. Se copió palabra
+  por palabra a propósito: dos capturas que hacen lo mismo deben sentirse iguales.
+- **La hoja impresa del traspaso de tela ya no dice «Observaciones», dice «Motivo del traspaso»** — que
+  es lo que de verdad lleva. Los traspasos viejos, que no tienen motivo, se siguen imprimiendo igual.
+- **El motivo queda en los dos apuntes del traspaso**, el de salida y el de entrada. Importa: así el
+  almacén que **recibe** la mercancía también sabe por qué le llegó.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **En avíos, ese motivo hoy no se puede leer en ninguna pantalla.** Se guarda bien, pero el kardex
+  de materiales no lo muestra. En tela te salva la hoja impresa; en avíos no hay dónde verlo. Queda
+  anotado como pendiente — **pedir una explicación que después nadie puede consultar es la forma más
+  rápida de que la explicación se vuelva basura**.
+- **Los traspasos ya capturados se quedan sin motivo**, y está bien: no se reescribe lo que ya pasó.
+- **El traspaso viejo por lote no pide motivo, a propósito**: es el del flujo que se cerró hace dos
+  versiones y ya no tiene por dónde capturarse.
+
+---
+
 ## 0.134 · 9-sep-2026 · **en prueba** — **Ya no se puede escribir a mano en el historial de ropa algo que el sistema no hizo**
 
 ### Qué se puede hacer ahora que antes no

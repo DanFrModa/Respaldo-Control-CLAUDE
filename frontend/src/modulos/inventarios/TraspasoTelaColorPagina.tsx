@@ -7,7 +7,7 @@ import { useAlmacenes } from '@/api/almacenes';
 import { urlImpresoTraspasoTela, useTraspasarTelaColor } from '@/api/inventario-materiales';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
@@ -32,6 +32,11 @@ function hoy(): string {
  * es, y acepta el deep-link `state.idCortador` del avance de producción para llegar con el destino
  * ya puesto.
  *
+ * ⭐ Fila 0.172 — el MOTIVO es OBLIGATORIO (antes eran unas «observaciones» opcionales). Mandar
+ * tela a un cortador es sacarla de un almacén: tiene que decir por qué, igual que el ajuste y que el
+ * traspaso de PT. Se guarda en las observaciones de las DOS patas y sale IMPRESO en la hoja que
+ * acompaña la tela.
+ *
  * §Post-F9.38 — al guardar ofrece la HOJA DEL TRASPASO (el papel que acompaña la tela). NO es un
  * documento nuevo: imprime el folio que el traspaso YA tiene (Daniel: *"no debe de generar otro
  * folio de nada"*). Y no es la única vía: la REIMPRESIÓN vive en el kardex del color («Existencias
@@ -44,7 +49,9 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
   const [idAlmacenOrigen, setIdAlmacenOrigen] = useState<string>('');
   const [idAlmacenDestino, setIdAlmacenDestino] = useState<string>('');
   const [fecha, setFecha] = useState(hoy());
-  const [observaciones, setObservaciones] = useState('');
+  // Fila 0.172 — MOTIVO obligatorio del traspaso: por qué se mueve la tela. Se guarda en las
+  // observaciones de las DOS patas y sale impreso en la hoja que va con la tela.
+  const [motivo, setMotivo] = useState('');
   const [renglones, setRenglones] = useState<RenglonTelaColor[]>([]);
   // §Post-F9.38 — el traspaso recién guardado, para imprimir la hoja que va con la tela. NO es la
   // única vía: la reimpresión vive en el kardex del color (historial), como en producción (V1-E3a).
@@ -95,8 +102,11 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
 
   const almacenesDistintos =
     idAlmacenOrigen !== '' && idAlmacenDestino !== '' && idAlmacenOrigen !== idAlmacenDestino;
+  // El mínimo es el MISMO que exige el contrato (3 caracteres, ya recortado): así el botón no
+  // promete un guardado que el servidor va a rechazar.
+  const motivoOk = motivo.trim().length >= 3;
   const puedeGuardar =
-    puedeMover && almacenesDistintos && renglones.length > 0 && !traspasar.isPending;
+    puedeMover && almacenesDistintos && motivoOk && renglones.length > 0 && !traspasar.isPending;
 
   function guardar(): void {
     if (!almacenesDistintos) return;
@@ -105,7 +115,7 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
         idAlmacenOrigen: Number(idAlmacenOrigen),
         idAlmacenDestino: Number(idAlmacenDestino),
         fecha,
-        ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
+        motivo: motivo.trim(),
         lineas: renglones.map((r) => ({
           idTelaColor: r.idTelaColor,
           cantidad: r.cantidad,
@@ -118,7 +128,7 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
             `Traspaso registrado (salida #${t.salida.folio} → entrada #${t.entrada.folio}).`,
           );
           setRenglones([]);
-          setObservaciones('');
+          setMotivo('');
           // El folio del traspaso es el de la pata de SALIDA (no se genera ninguno nuevo).
           setRecienGuardado({ id: t.salida.id, folio: t.salida.folio });
         },
@@ -136,7 +146,7 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
             Dos movimientos atómicos (salida del origen + entrada al destino) · cuerpo y complemento
-            viajan juntos
+            viajan juntos · el motivo es obligatorio
           </p>
         </div>
       </header>
@@ -228,15 +238,19 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
             </p>
           ) : null}
 
-          <Field>
-            <FieldLabel htmlFor="traspaso-color-obs">Observaciones (opcional)</FieldLabel>
+          <Field data-invalid={!motivoOk}>
+            <FieldLabel htmlFor="traspaso-color-motivo">Motivo (obligatorio)</FieldLabel>
             <Input
-              id="traspaso-color-obs"
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
+              id="traspaso-color-motivo"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Por qué se mueve la tela (va al cortador, reacomodo, devolución…)"
               disabled={!puedeMover}
-              data-testid="traspaso-color-obs"
+              data-testid="traspaso-color-motivo"
             />
+            <FieldDescription>
+              Sale IMPRESO en la hoja que acompaña la tela. Mínimo 3 caracteres.
+            </FieldDescription>
           </Field>
 
           <CapturaRenglonesTelaColor

@@ -49783,7 +49783,7 @@ export interface paths {
         path?: never;
         cookie?: never;
       };
-      /** @description Traspaso de tela por color entre almacenes (dos patas atómicas). */
+      /** @description Traspaso de tela por color entre almacenes (dos patas atómicas). Motivo obligatorio. */
       requestBody: {
         content: {
           'application/json': {
@@ -49791,7 +49791,8 @@ export interface paths {
             idAlmacenDestino: number;
             /** Format: date */
             fecha: string;
-            observaciones?: string;
+            /** @description Por qué se mueve el material (obligatorio; se guarda en las observaciones de las dos patas). */
+            motivo: string;
             lineas: {
               idTelaColor: number;
               cantidad: number;
@@ -52959,7 +52960,7 @@ export interface paths {
         path?: never;
         cookie?: never;
       };
-      /** @description Traspaso de avío entre almacenes (R4). */
+      /** @description Traspaso de avío entre almacenes (R4). Motivo obligatorio. */
       requestBody: {
         content: {
           'application/json': {
@@ -52967,7 +52968,8 @@ export interface paths {
             idAlmacenDestino: number;
             /** Format: date */
             fecha: string;
-            observaciones?: string;
+            /** @description Por qué se mueve el material (obligatorio; se guarda en las observaciones de las dos patas). */
+            motivo: string;
             lineas: {
               idAvio: number;
               idLote?: number;

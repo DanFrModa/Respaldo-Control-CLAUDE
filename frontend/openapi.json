@@ -129392,9 +129392,11 @@
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                   },
-                  "observaciones": {
+                  "motivo": {
                     "type": "string",
-                    "maxLength": 1000
+                    "minLength": 3,
+                    "maxLength": 500,
+                    "description": "Por qué se mueve el material (obligatorio; se guarda en las observaciones de las dos patas)."
                   },
                   "lineas": {
                     "minItems": 1,
@@ -129427,13 +129429,14 @@
                   "idAlmacenOrigen",
                   "idAlmacenDestino",
                   "fecha",
+                  "motivo",
                   "lineas"
                 ],
-                "description": "Traspaso de tela por color entre almacenes (dos patas atómicas)."
+                "description": "Traspaso de tela por color entre almacenes (dos patas atómicas). Motivo obligatorio."
               }
             }
           },
-          "description": "Traspaso de tela por color entre almacenes (dos patas atómicas)."
+          "description": "Traspaso de tela por color entre almacenes (dos patas atómicas). Motivo obligatorio."
         },
         "security": [
           {
@@ -138131,9 +138134,11 @@
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                   },
-                  "observaciones": {
+                  "motivo": {
                     "type": "string",
-                    "maxLength": 1000
+                    "minLength": 3,
+                    "maxLength": 500,
+                    "description": "Por qué se mueve el material (obligatorio; se guarda en las observaciones de las dos patas)."
                   },
                   "lineas": {
                     "minItems": 1,
@@ -138167,13 +138172,14 @@
                   "idAlmacenOrigen",
                   "idAlmacenDestino",
                   "fecha",
+                  "motivo",
                   "lineas"
                 ],
-                "description": "Traspaso de avío entre almacenes (R4)."
+                "description": "Traspaso de avío entre almacenes (R4). Motivo obligatorio."
               }
             }
           },
-          "description": "Traspaso de avío entre almacenes (R4)."
+          "description": "Traspaso de avío entre almacenes (R4). Motivo obligatorio."
         },
         "security": [
           {

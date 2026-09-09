@@ -213,6 +213,15 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
   anti-doble-descuento de la nota de salida, decisión (e)), `traspasar` (atómico; no se cancela una
   sola pata, se revierte con traspaso inverso), `cancelar` (= movimiento INVERSO auditado, NUNCA
   edita/borra), `consultarExistencias` / `kardex`.
+  - ⭐ **Fila 0.172 — el traspaso también exige MOTIVO** (`traspasarTelaColor` y `traspasarAvio`).
+    Hasta esa fila lo exigían el ajuste, el conteo cíclico y la salida sin orden, pero los traspasos
+    llevaban unas `observaciones` OPCIONALES: mandarle mil metros de tela a un cortador no obligaba a
+    escribir una palabra, mientras que mover producto terminado sí (fila 0.100). Misma forma que
+    `esquemaAjusteTelaCrear.motivo` (3–500, mensajes verbatim) y mismo destino: se guarda en
+    `observaciones` de **las dos patas**, sin columna nueva ni migración. Los traspasos anteriores se
+    quedan con `observaciones` NULL y se leen e imprimen tal cual (REGLA 0-B).
+    ⚠️ El traspaso LEGADO por lote (`traspasarTela`) **no** lo lleva: la fila 0.170 le retiró la ruta
+    y hoy sólo es el andamio de las pruebas de integración.
 - `migracion.ts` (F4-E6) — helpers modo migración: `crearMovimientoTelaMigrado`,
   `crearTraspasoTelaMigrado`, `asegurarLoteLegacyTela` (vía el motor de kardex; A1/A2/A3/A7).
 - `cancelacion-comun.ts` (fila 0.099) — ⚠️ **lo que NO se cancela desde aquí**: un movimiento nacido

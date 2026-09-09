@@ -463,6 +463,7 @@ describe('Avíos — multi-almacén (R4)', () => {
         idAlmacenOrigen: almAvioA.id,
         idAlmacenDestino: almAvioB.id,
         fecha: '2026-06-21',
+        motivo: 'Surtido al taller',
         lineas: [{ idAvio: avioCierre.id, cantidad: 200 }],
       },
       bd(),
@@ -575,6 +576,7 @@ describe('Avíos — multi-almacén (R4)', () => {
         idAlmacenOrigen: almAvioA.id,
         idAlmacenDestino: almAvioB.id,
         fecha: '2026-06-21',
+        motivo: 'Surtido al taller',
         lineas: [{ idAvio: avioCierre.id, cantidad: 200 }],
       },
       bd(),
@@ -597,6 +599,50 @@ describe('Avíos — multi-almacén (R4)', () => {
     );
     expect(enA.filas[0]?.existencia).toBe(300);
     expect(enB.filas[0]?.existencia).toBe(200);
+  });
+});
+
+/**
+ * ⭐ FILA 0.172 — el MOTIVO del traspaso de AVÍO queda en LAS DOS patas.
+ *
+ * 🔴 Sólo se puede medir contra Postgres: el motor (`comun/kardex.ts` → `registrarTraspasoAvio`,
+ * patas en `:1234` y `:1249`) pasa el MISMO encabezado a las dos, así que basta con que alguien deje
+ * de pasarlo a la pata de ENTRADA para que el kardex del almacén que RECIBE el avío no diga por qué
+ * llegó — y ninguna otra prueba se pondría roja. En avíos duele más que en tela: aquí NO hay hoja
+ * impresa que lo rescate.
+ */
+describe('el MOTIVO del traspaso de avío queda en LAS DOS patas (fila 0.172)', () => {
+  it('⭐ salida Y entrada guardan el motivo, recortado, en `Movimiento.observaciones`', async () => {
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-06-20',
+        motivo: 'conteo',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 400 }],
+      },
+      bd(),
+    );
+    const t = await traspasarAvio(
+      sesion(PERM_AVIOS),
+      {
+        idAlmacenOrigen: almAvioA.id,
+        idAlmacenDestino: almAvioB.id,
+        fecha: '2026-06-21',
+        // Con espacios de sobra a propósito: el contrato lo recorta (`.trim()`).
+        motivo: '   Reacomodo de bodega   ',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 150 }],
+      },
+      bd(),
+    );
+
+    // 🔴 LAS DOS, leídas de la BASE (no del objeto que devuelve el dominio): es la columna que va a
+    // mirar el kardex de cada almacén.
+    const salida = await cliente.movimiento.findUniqueOrThrow({ where: { id: t.salida.id } });
+    const entrada = await cliente.movimiento.findUniqueOrThrow({ where: { id: t.entrada.id } });
+    expect(salida.observaciones).toBe('Reacomodo de bodega');
+    expect(entrada.observaciones).toBe('Reacomodo de bodega');
   });
 });
 
@@ -729,6 +775,7 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
           idAlmacenOrigen: almAvioA.id,
           idAlmacenDestino: almB.id, // 'Bodega B' es de TELA
           fecha: '2026-06-21',
+          motivo: 'Surtido al taller',
           lineas: [{ idAvio: avioCierre.id, cantidad: 100 }],
         },
         bd(),
