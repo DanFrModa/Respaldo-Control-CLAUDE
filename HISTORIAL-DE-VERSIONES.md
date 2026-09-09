@@ -71,6 +71,38 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.136 · 9-sep-2026 · **en prueba** — **El kardex de telas y avíos deja de traer diez años de golpe**
+
+### Qué se puede hacer ahora que antes no
+
+- **Pedir el kardex de una tela o un avío por fechas.** Antes, abrirlo traía **todo el histórico** de una
+  sola vez. Ahora enseña **los últimos 12 meses** por omisión, con un tope de mil renglones, y puedes
+  mover el rango a mano. Es lo mismo que ya hacía el kardex de ropa; faltaba en los otros tres.
+- **Y la pantalla te dice cuándo hay más de lo que ves**, en vez de callarse.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **La columna «Saldo» ya no arrancaría en cero al cortar por fechas.** Éste era el riesgo de verdad
+  de este cambio: si se recorta el periodo sin más, el primer renglón empieza desde cero y **todas las
+  cifras de abajo mienten de forma perfectamente creíble**. Por eso ahora aparece un renglón de
+  **«Saldo anterior»** arriba, que trae lo acumulado hasta la fecha de inicio. Sin él, el ahorro habría
+  costado un kardex equivocado.
+- **Al abrir el kardex verás sólo el último año.** Si buscas algo más viejo, hay que ampliar las fechas
+  — sobre todo en el kardex por **lote**, que es la ventana al histórico que se trajo del Access.
+- **El cajón de kardex de la pantalla de existencias por color también cambió**, porque enseña ese
+  mismo dato: si se le hubiera puesto la ventana a la consulta y no a esa pantalla, habría quedado
+  diciendo una cosa distinta.
+
+### Qué sigue pendiente o roto
+
+- **El tamaño del problema, medido:** una tela devolvía **10 000 renglones** de golpe —del orden de
+  3,4 MB en una sola respuesta—; ahora la vista por omisión son **305 renglones, 105 KB**.
+- **No se puso ningún índice nuevo, y es a propósito:** se midió y **empeoraba** dos de las consultas.
+- **Si los 12 meses estorban al operar**, el número está en un solo sitio y mueve los cuatro kardex a
+  la vez. Dilo y se cambia.
+
+---
+
 ## 0.135 · 9-sep-2026 · **en prueba** — **Mover tela o avíos entre almacenes ya exige decir por qué, como mover ropa**
 
 ### Qué se puede hacer ahora que antes no

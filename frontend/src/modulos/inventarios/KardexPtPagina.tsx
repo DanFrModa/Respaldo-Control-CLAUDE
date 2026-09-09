@@ -33,6 +33,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useSesion } from '@/sesion/useSesion';
 
+import { FiltroPeriodoKardex, LineaPeriodoKardex } from './PeriodoKardex';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { SelectorModelo } from './SelectorModelo';
 
@@ -130,32 +131,16 @@ function KardexPorModelo(): React.JSX.Element {
             {modelo.descripcion !== null ? <> — {modelo.descripcion}</> : null}
           </span>
         ) : null}
-        {/* El PERIODO (fila 0.138). Vacío = el servidor pone su ventana por omisión, y la línea de
-            abajo dice cuál quedó. */}
-        <div className="flex items-center gap-1.5">
-          <label htmlFor="kardex-desde" className="text-xs text-muted-foreground">
-            Desde
-          </label>
-          <Input
-            id="kardex-desde"
-            type="date"
-            className="h-8 w-36 text-sm"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            data-testid="kardex-desde"
-          />
-          <label htmlFor="kardex-hasta" className="text-xs text-muted-foreground">
-            Hasta
-          </label>
-          <Input
-            id="kardex-hasta"
-            type="date"
-            className="h-8 w-36 text-sm"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            data-testid="kardex-hasta"
-          />
-        </div>
+        {/* El PERIODO (fila 0.138; el par de campos y la línea de abajo viven en `PeriodoKardex`
+            desde la 0.173, compartidos con los kardex de materiales). Vacío = el servidor pone su
+            ventana por omisión, y la línea dice cuál quedó. */}
+        <FiltroPeriodoKardex
+          idBase="kardex"
+          desde={desde}
+          hasta={hasta}
+          alCambiarDesde={setDesde}
+          alCambiarHasta={setHasta}
+        />
         {/* Conteo a la derecha (proto `.count`: texto plano atenuado, sin pastilla). */}
         {modelo !== undefined ? (
           <span className="ml-auto text-xs text-faint">
@@ -167,39 +152,7 @@ function KardexPorModelo(): React.JSX.Element {
       {/* Qué periodo se está viendo REALMENTE — y si la lista vino cortada. Sin esta línea, una
           ventana por omisión se leería como «este modelo no tiene más movimientos». */}
       {modelo !== undefined && kardex !== undefined ? (
-        <p
-          className="border-b px-3 py-1.5 text-xs text-muted-foreground"
-          data-testid="kardex-periodo"
-        >
-          {/* ⚠️ Decía «a hoy» cuando no hay techo, y el techo se deja abierto A PROPÓSITO para que
-              salgan los movimientos con fecha futura (se capturan con la fecha del documento). Con
-              uno fechado el año que viene, la línea decía «a hoy» y la tabla enseñaba ese renglón:
-              la única línea de la pantalla cuyo trabajo es no mentir, mintiendo. */}
-          Periodo: <span className="num text-foreground">{kardex.desde}</span>
-          {kardex.hasta === null ? (
-            <> en adelante (sin fecha de corte: también salen los movimientos con fecha futura)</>
-          ) : (
-            <>
-              {' '}
-              a <span className="num text-foreground">{kardex.hasta}</span>
-            </>
-          )}
-          {/* ⚠️ Y el aviso de la ventana por omisión tiene DOS casos, no uno: con sólo «hasta», la
-              ventana son los 12 meses que TERMINAN ahí — ni son «los últimos 12 meses», ni es
-              verdad que el usuario no puso fechas. */}
-          {kardex.ventanaPorOmision
-            ? kardex.hasta === null
-              ? ' · últimos 12 meses por omisión — pon fechas para ver otro periodo'
-              : ' · son los 12 meses ANTERIORES a esa fecha (no se pidió «desde»)'
-            : ''}
-          {kardex.truncado ? (
-            <span className="ml-1.5 font-medium text-destructive" data-testid="kardex-truncado">
-              · El periodo no cabe: se muestran los {kardex.limite.toLocaleString('es-MX')} más
-              RECIENTES. Lo anterior queda fuera (el saldo sí lo cuenta): acota las fechas para
-              verlo.
-            </span>
-          ) : null}
-        </p>
+        <LineaPeriodoKardex idBase="kardex" periodo={kardex} />
       ) : null}
 
       {modelo === undefined ? (

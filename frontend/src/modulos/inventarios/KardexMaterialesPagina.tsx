@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoCancelarMaterial } from './DialogoCancelarMaterial';
+import { FiltroPeriodoKardex, LineaPeriodoKardex } from './PeriodoKardex';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { SelectorAvio } from './SelectorAvio';
 import { SelectorTela } from './SelectorTela';
@@ -110,9 +111,21 @@ function KardexTela(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-telas.mover');
   const [tela, setTela] = useState<Tela | undefined>(undefined);
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
   const [aCancelar, setACancelar] = useState<KardexTelaRenglon | null>(null);
-  const consulta = useKardexTela(tela !== undefined ? { idTela: tela.id } : undefined);
-  const renglones = consulta.data?.renglones ?? [];
+  const consulta = useKardexTela(
+    tela !== undefined
+      ? {
+          idTela: tela.id,
+          ...(desde !== '' ? { desde } : {}),
+          ...(hasta !== '' ? { hasta } : {}),
+        }
+      : undefined,
+  );
+  const kardex = consulta.data;
+  const renglones = kardex?.renglones ?? [];
+  const saldosIniciales = kardex?.saldosIniciales ?? [];
   const cancelar = useCancelarTela();
 
   return (
@@ -145,12 +158,28 @@ function KardexTela(): React.JSX.Element {
               {tela.descripcion !== null ? <> — {tela.descripcion}</> : null}
             </span>
           ) : null}
+          {/* El PERIODO (fila 0.173, mecanismo de la 0.138). Vacío = el servidor pone su ventana
+              por omisión, y la línea de abajo dice cuál quedó. */}
+          <FiltroPeriodoKardex
+            idBase="kardex-tela"
+            desde={desde}
+            hasta={hasta}
+            alCambiarDesde={setDesde}
+            alCambiarHasta={setHasta}
+          />
           {tela !== undefined ? (
             <span className="ml-auto text-xs text-faint">
               {renglones.length.toLocaleString('es-MX')} renglones
             </span>
           ) : null}
         </div>
+
+        {/* Qué periodo se está viendo REALMENTE — y si la lista vino cortada. Sin esta línea, una
+            ventana por omisión se leería como «esta tela no tiene más movimientos», que en un
+            kardex CONGELADO (sólo histórico migrado) es la lectura más fácil de hacer. */}
+        {tela !== undefined && kardex !== undefined ? (
+          <LineaPeriodoKardex idBase="kardex-tela" periodo={kardex} />
+        ) : null}
 
         {tela === undefined ? (
           <p className="p-6 text-sm text-muted-foreground">
@@ -167,8 +196,9 @@ function KardexTela(): React.JSX.Element {
           // 🔴 fila 0.098: este vacío era mudo («Esta tela no tiene movimientos») y era EL vacío que
           // se llevaba cualquiera que buscara aquí los movimientos del inventario vigente.
           <p className="p-6 text-sm text-muted-foreground" data-testid="kardex-tela-vacio">
-            Esta tela no tiene movimientos del flujo <b>LEGADO por lote</b>. Si la operas en el
-            inventario vigente, su kardex va por <b>color</b>:{' '}
+            Esta tela no tiene movimientos del flujo <b>LEGADO por lote</b> <b>en el periodo</b> — y
+            este kardex es sólo el histórico migrado, así que casi todo está más atrás: amplía las
+            fechas para verlo. Si la operas en el inventario vigente, su kardex va por <b>color</b>:{' '}
             <Link className="text-primary underline" to="/inventarios/telas/existencias">
               ábrelo en Inventario de telas
             </Link>{' '}
@@ -178,6 +208,20 @@ function KardexTela(): React.JSX.Element {
           <>
             {/* Móvil: tarjetas. */}
             <div className="space-y-3 p-3 md:hidden" data-testid="kardex-tela-tarjetas">
+              {/* SALDO ANTERIOR: de dónde arranca la columna Saldo. En móvil también, o el primer
+                  renglón parecería empezar de cero. */}
+              {saldosIniciales.map((si) => (
+                <div
+                  key={`ini-${String(si.idLote ?? 'sl')}-${String(si.idAlmacen)}`}
+                  className="flex items-center justify-between rounded-lg bg-primary-soft p-3 text-sm text-primary-soft-foreground"
+                  data-testid="kardex-tela-saldo-inicial"
+                >
+                  <span>
+                    Saldo anterior · {si.almacen} · Lote {si.loteClave ?? '(sin lote)'}
+                  </span>
+                  <span className="num font-semibold">{si.saldo.toLocaleString('es-MX')}</span>
+                </div>
+              ))}
               {renglones.map((r, i) => (
                 <div
                   key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
@@ -219,6 +263,33 @@ function KardexTela(): React.JSX.Element {
                   </TablaDensaFila>
                 </TablaDensaEncabezado>
                 <TablaDensaCuerpo>
+                  {/* SALDO ANTERIOR: lo que cada lote×almacén ya traía ANTES del primer renglón que
+                      se ve. Va arriba, como en cualquier kardex de papel, porque es de donde
+                      arranca la columna Saldo — y sin él la columna mentiría en cuanto el periodo
+                      o el tope recortan algo. */}
+                  {saldosIniciales.map((si) => (
+                    <TablaDensaFila
+                      key={`ini-${String(si.idLote ?? 'sl')}-${String(si.idAlmacen)}`}
+                      className="bg-primary-soft text-primary-soft-foreground"
+                      data-testid="kardex-tela-saldo-inicial"
+                    >
+                      <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                      <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                      <TablaDensaCelda className="font-medium">Saldo anterior</TablaDensaCelda>
+                      <TablaDensaCelda>{si.almacen}</TablaDensaCelda>
+                      <TablaDensaCelda>{si.loteClave ?? '(sin lote)'}</TablaDensaCelda>
+                      <TablaDensaCelda numerica className="text-muted-foreground">
+                        —
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica className="text-muted-foreground">
+                        —
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica className="font-semibold">
+                        {si.saldo.toLocaleString('es-MX')}
+                      </TablaDensaCelda>
+                      {puedeMover ? <TablaDensaCelda /> : null}
+                    </TablaDensaFila>
+                  ))}
                   {renglones.map((r, i) => (
                     <TablaDensaFila
                       key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
@@ -294,9 +365,21 @@ function KardexAvio(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-avios.mover');
   const [avio, setAvio] = useState<Avio | undefined>(undefined);
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
   const [aCancelar, setACancelar] = useState<KardexAvioRenglon | null>(null);
-  const consulta = useKardexAvio(avio !== undefined ? { idAvio: avio.id } : undefined);
-  const renglones = consulta.data?.renglones ?? [];
+  const consulta = useKardexAvio(
+    avio !== undefined
+      ? {
+          idAvio: avio.id,
+          ...(desde !== '' ? { desde } : {}),
+          ...(hasta !== '' ? { hasta } : {}),
+        }
+      : undefined,
+  );
+  const kardex = consulta.data;
+  const renglones = kardex?.renglones ?? [];
+  const saldosIniciales = kardex?.saldosIniciales ?? [];
   const cancelar = useCancelarAvio();
 
   return (
@@ -317,12 +400,27 @@ function KardexAvio(): React.JSX.Element {
             {avio.descripcion}
           </span>
         ) : null}
+        {/* El PERIODO (fila 0.173, mecanismo de la 0.138). Vacío = el servidor pone su ventana por
+            omisión, y la línea de abajo dice cuál quedó. */}
+        <FiltroPeriodoKardex
+          idBase="kardex-avio"
+          desde={desde}
+          hasta={hasta}
+          alCambiarDesde={setDesde}
+          alCambiarHasta={setHasta}
+        />
         {avio !== undefined ? (
           <span className="ml-auto text-xs text-faint">
             {renglones.length.toLocaleString('es-MX')} renglones
           </span>
         ) : null}
       </div>
+
+      {/* Qué periodo se está viendo REALMENTE — y si la lista vino cortada. Sin esta línea, una
+          ventana por omisión se leería como «este avío no tiene más movimientos». */}
+      {avio !== undefined && kardex !== undefined ? (
+        <LineaPeriodoKardex idBase="kardex-avio" periodo={kardex} />
+      ) : null}
 
       {avio === undefined ? (
         <p className="p-6 text-sm text-muted-foreground">
@@ -335,11 +433,25 @@ function KardexAvio(): React.JSX.Element {
       ) : consulta.isPending ? (
         <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
       ) : renglones.length === 0 ? (
-        <p className="p-6 text-sm text-muted-foreground">Este avío no tiene movimientos.</p>
+        <p className="p-6 text-sm text-muted-foreground" data-testid="kardex-avio-vacio">
+          Este avío no tiene movimientos en el periodo (amplía las fechas para ver más atrás).
+        </p>
       ) : (
         <>
           {/* Móvil: tarjetas. */}
           <div className="space-y-3 p-3 md:hidden" data-testid="kardex-avio-tarjetas">
+            {/* SALDO ANTERIOR: de dónde arranca la columna Saldo. En móvil también, o el primer
+                renglón parecería empezar de cero. */}
+            {saldosIniciales.map((si) => (
+              <div
+                key={`ini-${String(si.idAlmacen)}`}
+                className="flex items-center justify-between rounded-lg bg-primary-soft p-3 text-sm text-primary-soft-foreground"
+                data-testid="kardex-avio-saldo-inicial"
+              >
+                <span>Saldo anterior · {si.almacen}</span>
+                <span className="num font-semibold">{si.saldo.toLocaleString('es-MX')}</span>
+              </div>
+            ))}
             {renglones.map((r, i) => (
               <div
                 key={`${r.idMovimiento}-${i}`}
@@ -380,6 +492,31 @@ function KardexAvio(): React.JSX.Element {
                 </TablaDensaFila>
               </TablaDensaEncabezado>
               <TablaDensaCuerpo>
+                {/* SALDO ANTERIOR por almacén: lo que ya traía ANTES del primer renglón que se ve.
+                    Va arriba, como en cualquier kardex de papel, porque es de donde arranca la
+                    columna Saldo — y sin él la columna mentiría en cuanto algo se recorta. */}
+                {saldosIniciales.map((si) => (
+                  <TablaDensaFila
+                    key={`ini-${String(si.idAlmacen)}`}
+                    className="bg-primary-soft text-primary-soft-foreground"
+                    data-testid="kardex-avio-saldo-inicial"
+                  >
+                    <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                    <TablaDensaCelda className="font-medium">Saldo anterior</TablaDensaCelda>
+                    <TablaDensaCelda>{si.almacen}</TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      —
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      —
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="font-semibold">
+                      {si.saldo.toLocaleString('es-MX')}
+                    </TablaDensaCelda>
+                    {puedeMover ? <TablaDensaCelda /> : null}
+                  </TablaDensaFila>
+                ))}
                 {renglones.map((r, i) => (
                   <TablaDensaFila
                     key={`${r.idMovimiento}-${i}`}

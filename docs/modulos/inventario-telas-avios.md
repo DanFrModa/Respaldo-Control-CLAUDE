@@ -284,6 +284,88 @@ le devolvió o a quién se le vendió viaja en el **motivo obligatorio**, no en 
 cantidad, peso) — elimina el límite `ExTela1/ExTela2` del viejo. Un lote puede traer N telas
 acompañantes del mismo color en una sola captura.
 
+## Los TRES kardex son de un PERIODO (fila 0.173)
+
+Antes, pedir cualquiera de los tres kardex de materiales —tela por **color**, tela por **lote** (el
+legado) y **avíos**— traía **todo el histórico**: ni filtro de fechas ni `LIMIT`. Es la misma falla que
+la fila **0.138** ya había curado en producto terminado, y aquí se reusa **su** mecanismo, no otro: vive
+una sola vez en `backend/src/dominio/inventarios/periodo-kardex.ts` y de ahí lo toman los cuatro.
+
+| Regla | Qué hace |
+|---|---|
+| `desde` / `hasta` (YYYY-MM-DD) | Periodo, **ambos bordes INCLUSIVOS**. Se resuelve en el `WHERE` (`movimientos.fecha`), nunca recortando en el cliente lo que ya llegó. |
+| Ventana por omisión | Si no viene `desde`, se pone **hoy − 12 meses** (o `hasta` − 12 meses si sólo vino el techo): **el periodo SIEMPRE tiene piso**. Sin techo, para que un movimiento con fecha futura siga saliendo — y el histórico de Access trae fechas capturadas mal, hasta 2029. |
+| Tope duro `limite` | 1 000 renglones por omisión, **máximo 5 000**. Un rango ancho (`desde=2016-01-01`) no puede volver a traer todo. |
+| ⭐ Dirección del corte | Cuando el periodo no cabe, se conserva **el FINAL** (`folio DESC` + inversión), no el principio. |
+
+⭐ **Y el periodo trae de la mano su SALDO ANTERIOR (`saldosIniciales`).** Los tres kardex tienen columna
+de saldo corrido —el de color tiene **dos**, cuerpo y complemento—, así que recortar a secas las dejaría
+arrancando en cero y mintiendo hasta el último renglón. Una consulta agregada suma, por artículo, todo lo
+que se movió **antes del primer renglón visible** (D3: Σ de movimientos, jamás un saldo guardado). La
+llave del saldo es distinta en cada uno, y por eso el `GROUP BY` también:
+
+| Kardex | Llave del saldo corrido | Guardas de CORRECCIÓN en el saldo anterior | De rendimiento |
+|---|---|---|---|
+| Tela por **color** | almacén (cuerpo y complemento) | `id_empresa` (A9), `id_tela_color`, `id_partida` | `id_almacen` |
+| Tela por **lote** (legado) | lote × almacén | `id_empresa` (A9), `id_tela`, **`id_tela_color IS NULL`** | `id_lote`, `id_almacen` |
+| **Avíos** | almacén | `id_empresa` (A9), `id_avio` | `id_almacen` |
+
+La distinción no es cosmética: lo que está en la llave de agrupación produce, si se quita, grupos de más
+que el llamador descarta (rendimiento); lo que **no** está en la llave suma lo ajeno **dentro del mismo
+grupo** y hace mentir a toda la columna a la vez. Por eso las de corrección tienen prueba que muere al
+quitarlas y las otras no pueden tenerla — se dice en el código en vez de fingirlo. El caso más filoso es
+el `id_tela_color IS NULL` del legado: sin él, los renglones del inventario **vigente por color** (que
+llevan `id_lote` NULL) caerían en el cubo «sin lote» del saldo anterior — el mismo descuadre que el
+reviewer de la etapa A2 cazó en la lista.
+
+⚠️ **El desempate es `(folio, id)`, no la fecha**, la misma llave con la que la lista se ordena y se
+corta. En el kardex por color el caso no es teórico: desde la fila **0.142** un traspaso reparte FIFO
+entre las partidas del origen, así que **una pata escribe varios renglones del mismo color y almacén**;
+si el tope corta en medio, el renglón que queda fuera tiene el MISMO folio que el ancla y sólo el `id` los
+separa. En el legado pasa igual cuando un ajuste toca varios lotes de la misma tela. En **avíos no puede
+pasar**: la captura prohíbe repetir el avío en dos renglones, así que un movimiento aporta como mucho una
+línea a ese kardex y la llave degenera en el folio — ahí el `id` se conserva por coherencia con el
+`ORDER BY`, y **no hay prueba que muera al quitarlo** porque no la puede haber.
+
+### Por qué los mismos números que en producto terminado, y no otros (medido)
+
+La tentación era darle al kardex **legado por lote** una ventana distinta: es un archivo CONGELADO —desde
+la fila 0.170 nadie escribe ahí, sólo vive el histórico migrado de Access— y una ventana que corre con el
+calendario acabará dejándolo en blanco. Se midió antes de inventar nada, sobre los CSV de Access:
+
+- Histórico completo: **33 688** renglones de detalle en **813** telas; la más movida, **2 153**.
+- Con la ventana de migración vigente (`ETL_DESDE=2025`, §Post-F9.24), que es lo que hay en `prueba`:
+  **259** renglones en **51** telas; la más movida, **48**.
+
+⇒ el kardex que la fila daba por «el único con volumen real» es, en la práctica, **el más pequeño de los
+tres**. Sin un problema que resolver, una regla propia sería doblar el diseño para que le cuadre al
+histórico, y eso es justo lo que la **REGLA 0-B** prohíbe. Un solo mecanismo, un solo juego de números; lo
+que sí se hace es que la pantalla del legado **diga** que su vacío es del periodo y mande a ampliar las
+fechas.
+
+### Sin índice nuevo, y por qué (medido)
+
+Mismo veredicto que en la 0.138, re-medido aquí. Base local PostgreSQL 16 con **100 000 movimientos /
+500 000 renglones de tela por lote + 100 000 por color + 100 000 de avío** repartidos en diez años (10 000
+renglones para la tela medida). Tiempos de punta a punta de la función de dominio (mediana de 5):
+
+| Kardex (ventana por omisión) | SIN índices | CON los 4 candidatos |
+|---|---|---|
+| Tela por lote | **108 ms** (305 renglones, 105 KB) | 112 ms |
+| Tela por color | 53 ms (153 renglones, 73 KB) | 49 ms |
+| Avíos | 38 ms (61 renglones, 20 KB) | 34 ms |
+| Tela por lote, 10 años con tope 5 000 | 251 ms (1 691 KB) | 267 ms |
+
+Candidatos probados: `movimientos(id_empresa, fecha)`, `movimiento_det_tela(id_tela, id_movimiento)
+WHERE id_tela_color IS NULL`, `movimiento_det_tela(id_tela_color, id_movimiento)` y
+`movimiento_det_avio(id_avio, id_movimiento)`. El plan no cambia de forma (sigue mandando el índice por
+artículo, `Parallel Bitmap Heap Scan` sobre el detalle) y la ganancia queda dentro del ruido cuando la
+hay. **La selectividad ya la da el artículo, no la fecha** ⇒ **sin migración**.
+
+📏 **El tamaño del defecto que esto cierra:** con esa misma base, el kardex viejo de la tela medida
+devolvía sus **10 000 renglones** completos (los 5 000 que caben en el tope pesan ya **1 691 KB** ⇒ del
+orden de **3.4 MB** en una sola respuesta). Con la ventana por omisión son **305 renglones / 105 KB**.
+
 ## API y Frontend
 
 - 6 endpoints RBAC `inventario-{telas,avios}.{ver,mover}`; los **importes se ocultan server-side** a

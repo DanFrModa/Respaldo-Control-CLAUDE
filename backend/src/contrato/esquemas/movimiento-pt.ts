@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+import {
+  camposPeriodoKardexQuery,
+  camposPeriodoKardexRespuesta,
+  DESCRIPCION_FILTROS_PERIODO,
+  DESCRIPCION_SALDO_ANTERIOR,
+} from './periodo-kardex.js';
+
 /**
  * Esquemas Zod del INVENTARIO de PRODUCTO TERMINADO operable (F3-E3; doc 04-Inventarios). UNA sola
  * definición de reglas para UI y servidor (alimenta el OpenAPI). El detalle de un movimiento de PT
@@ -404,30 +411,9 @@ export const esquemaKardexPtQuery = z
       .positive()
       .optional()
       .describe('Filtra por una orden de producción (F6-E2).'),
-    desde: z.iso
-      .date({ error: 'La fecha «desde» no es válida (YYYY-MM-DD)' })
-      .optional()
-      .describe('Primer día del periodo (YYYY-MM-DD), INCLUSIVE.'),
-    hasta: z.iso
-      .date({ error: 'La fecha «hasta» no es válida (YYYY-MM-DD)' })
-      .optional()
-      .describe('Último día del periodo (YYYY-MM-DD), INCLUSIVE.'),
-    limite: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(5000)
-      .optional()
-      .describe(
-        'Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta ' +
-          'siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`).',
-      ),
+    ...camposPeriodoKardexQuery,
   })
-  .describe(
-    'Filtros del kardex de un modelo. El PERIODO manda: si no se pide `desde`, el dominio pone ' +
-      'una ventana por omisión (ver `desde`/`ventanaPorOmision` de la respuesta) — pedir el ' +
-      'kardex NUNCA trae diez años.',
-  );
+  .describe(`Filtros del kardex de un modelo. ${DESCRIPCION_FILTROS_PERIODO}`);
 
 /** Parámetros del kardex por modelo ya coaccionados. */
 export type KardexPtQuery = z.infer<typeof esquemaKardexPtQuery>;
@@ -493,13 +479,7 @@ const esquemaKardexPtSaldoInicial = z.object({
   almacen: z.string().describe('Nombre del almacén.'),
   idOrden: z.number().int().nullable().describe('Orden del artículo, o null (bucket sin orden).'),
   folioOrden: z.number().int().nullable().describe('Folio de la orden, o null.'),
-  saldo: z
-    .number()
-    .int()
-    .describe(
-      'Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo ' +
-        'sólo cuando `truncado` es false).',
-    ),
+  saldo: z.number().int().describe(DESCRIPCION_SALDO_ANTERIOR),
 });
 
 /** Un saldo anterior tal como lo devuelve la API. */
@@ -510,23 +490,7 @@ export const esquemaKardexPtLista = z
   .object({
     idModelo: z.number().int().describe('Modelo del kardex.'),
     modelo: z.string().describe('Código del modelo.'),
-    desde: z
-      .string()
-      .describe('Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive).'),
-    hasta: z
-      .string()
-      .nullable()
-      .describe('Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope.'),
-    ventanaPorOmision: z
-      .boolean()
-      .describe('true cuando `desde` lo puso el dominio porque nadie pidió periodo.'),
-    limite: z.number().int().describe('Tope de renglones que se aplicó.'),
-    truncado: z
-      .boolean()
-      .describe(
-        'true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo ' +
-          'que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde).',
-      ),
+    ...camposPeriodoKardexRespuesta,
     saldosIniciales: z
       .array(esquemaKardexPtSaldoInicial)
       .describe('Saldo de los artículos del periodo justo ANTES del primer renglón devuelto.'),

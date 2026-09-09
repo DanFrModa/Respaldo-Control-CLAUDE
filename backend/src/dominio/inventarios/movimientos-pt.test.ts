@@ -7,12 +7,14 @@ import {
   cancelarMovimientoPt,
   consultarExistenciasPt,
   kardexPt,
-  MESES_VENTANA_KARDEX_PT,
   registrarMovimientoPt,
   registrarTraspasoPt,
-  resolverVentanaKardexPt,
-  TOPE_RENGLONES_KARDEX_PT,
 } from './movimientos-pt.js';
+import {
+  MESES_VENTANA_KARDEX,
+  resolverVentanaKardex,
+  TOPE_RENGLONES_KARDEX,
+} from './periodo-kardex.js';
 
 /**
  * Unit del dominio de Inventario PT (F3-E3) — SIN Postgres. Cubre las reglas PURAS: el guard de
@@ -390,16 +392,16 @@ describe('dominio Inventario PT — el PERIODO del kardex (fila 0.138)', () => {
   const cincoDeSeptiembre = new Date('2026-09-05T18:00:00.000Z');
 
   it('⭐ sin `desde`: la ventana son los últimos 12 meses — el kardex NUNCA arranca sin piso', () => {
-    const ventana = resolverVentanaKardexPt({}, cincoDeSeptiembre);
+    const ventana = resolverVentanaKardex({}, cincoDeSeptiembre);
     expect(ventana.desde).toBe('2025-09-05');
     expect(ventana.porOmision).toBe(true);
     // Sin techo: un movimiento con fecha futura (se capturan con la fecha del documento) sigue saliendo.
     expect(ventana.hasta).toBeNull();
-    expect(MESES_VENTANA_KARDEX_PT).toBe(12);
+    expect(MESES_VENTANA_KARDEX).toBe(12);
   });
 
   it('con `desde` explícito, manda el usuario (y deja de ser ventana por omisión)', () => {
-    const ventana = resolverVentanaKardexPt(
+    const ventana = resolverVentanaKardex(
       { desde: '2016-01-01', hasta: '2016-12-31' },
       cincoDeSeptiembre,
     );
@@ -408,7 +410,7 @@ describe('dominio Inventario PT — el PERIODO del kardex (fila 0.138)', () => {
 
   it('`hasta` sin `desde`: son los 12 meses que TERMINAN en `hasta`, no «todo hasta esa fecha»', () => {
     // La garantía de piso vale también aquí: pedir solo el techo no puede destapar diez años.
-    const ventana = resolverVentanaKardexPt({ hasta: '2020-03-31' }, cincoDeSeptiembre);
+    const ventana = resolverVentanaKardex({ hasta: '2020-03-31' }, cincoDeSeptiembre);
     expect(ventana).toEqual({ desde: '2019-03-31', hasta: '2020-03-31', porOmision: true });
   });
 
@@ -416,7 +418,7 @@ describe('dominio Inventario PT — el PERIODO del kardex (fila 0.138)', () => {
     // 05-sep 03:00 UTC son todavía las 21:00 del 04-sep en Ciudad de México. El servidor corre en
     // UTC; si la ventana se anclara en su día, el periodo se correría 24 h respecto a lo que la
     // gente ve en la pantalla — el mismo desfase que `comun/fecha-negocio` vino a cerrar.
-    const ventana = resolverVentanaKardexPt({}, new Date('2026-09-05T03:00:00.000Z'));
+    const ventana = resolverVentanaKardex({}, new Date('2026-09-05T03:00:00.000Z'));
     expect(ventana.desde).toBe('2025-09-04');
   });
 
@@ -434,7 +436,7 @@ describe('dominio Inventario PT — el PERIODO del kardex (fila 0.138)', () => {
 
   it('el TOPE de renglones no se puede desbordar por parámetro', async () => {
     await expect(
-      kardexPt(sesionSoloVer(), { idModelo: 1, limite: TOPE_RENGLONES_KARDEX_PT + 1 }, {}),
+      kardexPt(sesionSoloVer(), { idModelo: 1, limite: TOPE_RENGLONES_KARDEX + 1 }, {}),
     ).rejects.toBeInstanceOf(ErrorValidacion);
     await expect(kardexPt(sesionSoloVer(), { idModelo: 1, limite: 0 }, {})).rejects.toBeInstanceOf(
       ErrorValidacion,

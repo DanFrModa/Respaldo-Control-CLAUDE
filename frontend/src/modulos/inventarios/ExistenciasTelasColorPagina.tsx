@@ -37,6 +37,7 @@ import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoCancelarMaterial } from './DialogoCancelarMaterial';
+import { FiltroPeriodoKardex, LineaPeriodoKardex } from './PeriodoKardex';
 
 /** Valor del filtro que significa "todos". */
 const TODOS = 'TODOS';
@@ -549,6 +550,8 @@ function CajonKardexTelaColor({
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-telas.mover');
   const [idPartida, setIdPartida] = useState<string>(TODOS);
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
   const [aCancelar, setACancelar] = useState<KardexTelaColorRenglon | null>(null);
   const cancelar = useCancelarTelaColor();
 
@@ -565,6 +568,10 @@ function CajonKardexTelaColor({
           idTelaColor: color.idTelaColor,
           ...(idAlmacen === undefined ? {} : { idAlmacen }),
           ...(idPartida === TODOS ? {} : { idPartida: Number(idPartida) }),
+          // El PERIODO (fila 0.173): vacío = el servidor pone su ventana por omisión. Las fechas
+          // VIAJAN al servidor; aquí nunca se recorta lo que ya llegó.
+          ...(desde !== '' ? { desde } : {}),
+          ...(hasta !== '' ? { hasta } : {}),
         },
   );
   // Las partidas del color, para el selector del filtro (folio + lote del proveedor).
@@ -592,6 +599,25 @@ function CajonKardexTelaColor({
       subtitulo="Movimientos cronológicos con saldo corrido (suma de movimientos, D3)"
       ancho="maximo"
     >
+      {/* El PERIODO (fila 0.173, mecanismo de la 0.138) + la línea que dice qué pedazo se ve. Va
+          SIEMPRE, no sólo cuando hay partidas: desde que este kardex tiene ventana por omisión, un
+          cajón sin la línea se leería como «este color no tiene más movimientos». */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <FiltroPeriodoKardex
+          idBase="kardex-color"
+          desde={desde}
+          hasta={hasta}
+          alCambiarDesde={setDesde}
+          alCambiarHasta={setHasta}
+        />
+      </div>
+      {kardex !== undefined ? (
+        <LineaPeriodoKardex
+          idBase="kardex-color"
+          periodo={kardex}
+          className="mb-3 text-xs text-muted-foreground"
+        />
+      ) : null}
       {(partidas.data?.datos.length ?? 0) > 0 ? (
         <div className="mb-3 flex items-center gap-2">
           <SelectNativo
@@ -620,7 +646,7 @@ function CajonKardexTelaColor({
         <p className="p-4 text-sm text-muted-foreground">Cargando kardex…</p>
       ) : kardex === undefined || kardex.renglones.length === 0 ? (
         <p className="p-4 text-sm text-muted-foreground" data-testid="kardex-color-vacio">
-          Este color aún no tiene movimientos.
+          Este color no tiene movimientos en el periodo (amplía las fechas para ver más atrás).
         </p>
       ) : (
         <div className="overflow-x-auto" data-testid="kardex-color-tabla">
@@ -648,6 +674,46 @@ function CajonKardexTelaColor({
               </TablaDensaFila>
             </TablaDensaEncabezado>
             <TablaDensaCuerpo>
+              {/* SALDO ANTERIOR por almacén (fila 0.173): lo que ya había ANTES del primer renglón
+                  que se ve. Va arriba, como en cualquier kardex de papel, porque es de donde
+                  arrancan las DOS columnas «Saldo» — sin él, en cuanto el periodo o el tope
+                  recortan algo, las dos mentirían desde el primer renglón. */}
+              {kardex.saldosIniciales.map((si) => (
+                <TablaDensaFila
+                  key={`ini-${String(si.idAlmacen)}`}
+                  className="bg-primary-soft text-primary-soft-foreground"
+                  data-testid="kardex-color-saldo-inicial"
+                >
+                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                  <TablaDensaCelda className="font-medium">Saldo anterior</TablaDensaCelda>
+                  <TablaDensaCelda>{si.almacen}</TablaDensaCelda>
+                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                  <TablaDensaCelda numerica className="text-muted-foreground">
+                    —
+                  </TablaDensaCelda>
+                  <TablaDensaCelda numerica className="text-muted-foreground">
+                    —
+                  </TablaDensaCelda>
+                  <TablaDensaCelda numerica className="font-semibold">
+                    {num(si.saldoCuerpo)}
+                  </TablaDensaCelda>
+                  {llevaComplemento ? (
+                    <>
+                      <TablaDensaCelda numerica className="text-muted-foreground">
+                        —
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica className="text-muted-foreground">
+                        —
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica className="font-semibold">
+                        {num(si.saldoComplemento)}
+                      </TablaDensaCelda>
+                    </>
+                  ) : null}
+                  {hayAcciones ? <TablaDensaCelda /> : null}
+                </TablaDensaFila>
+              ))}
               {kardex.renglones.map((r) => (
                 <TablaDensaFila
                   key={`${r.idMovimiento}-${r.idAlmacen}-${r.folio}`}

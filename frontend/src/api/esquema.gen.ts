@@ -48459,6 +48459,12 @@ export interface paths {
           idLote?: number;
           /** @description Filtra por un almacén. */
           idAlmacen?: number;
+          /** @description Primer día del periodo (YYYY-MM-DD), INCLUSIVE. */
+          desde?: string;
+          /** @description Último día del periodo (YYYY-MM-DD), INCLUSIVE. */
+          hasta?: string;
+          /** @description Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`). */
+          limite?: number;
         };
         header?: never;
         path?: never;
@@ -48466,7 +48472,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Kardex de una tela (movimientos con saldo corrido). */
+        /** @description Kardex de una tela en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -48475,6 +48481,29 @@ export interface paths {
             'application/json': {
               idTela: number;
               tela: string;
+              /** @description Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive). */
+              desde: string;
+              /** @description Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope. */
+              hasta: string | null;
+              /** @description true cuando `desde` lo puso el dominio porque nadie pidió periodo. */
+              ventanaPorOmision: boolean;
+              /** @description Tope de renglones que se aplicó. */
+              limite: number;
+              /** @description true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde). */
+              truncado: boolean;
+              /** @description Saldo de los artículos del periodo justo ANTES del primer renglón devuelto. */
+              saldosIniciales: {
+                /** @description Lote del artículo, o null (bucket sin lote). */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Almacén del artículo. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false). */
+                saldo: number;
+              }[];
               renglones: {
                 idMovimiento: number;
                 folio: number;
@@ -50387,6 +50416,12 @@ export interface paths {
           idAlmacen?: number;
           /** @description Filtra por una partida (traza de entrada). */
           idPartida?: number;
+          /** @description Primer día del periodo (YYYY-MM-DD), INCLUSIVE. */
+          desde?: string;
+          /** @description Último día del periodo (YYYY-MM-DD), INCLUSIVE. */
+          hasta?: string;
+          /** @description Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`). */
+          limite?: number;
         };
         header?: never;
         path?: never;
@@ -50394,7 +50429,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Kardex de un color de tela (movimientos con saldo corrido de ambos componentes). */
+        /** @description Kardex de un color de tela en un PERIODO: saldo anterior + movimientos con saldo corrido de ambos componentes. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -50411,6 +50446,27 @@ export interface paths {
               nombreCuerpo: string | null;
               /** @description null = la tela no lleva complemento. */
               nombreComplemento: string | null;
+              /** @description Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive). */
+              desde: string;
+              /** @description Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope. */
+              hasta: string | null;
+              /** @description true cuando `desde` lo puso el dominio porque nadie pidió periodo. */
+              ventanaPorOmision: boolean;
+              /** @description Tope de renglones que se aplicó. */
+              limite: number;
+              /** @description true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde). */
+              truncado: boolean;
+              /** @description Saldo de los almacenes del periodo justo ANTES del primer renglón devuelto. */
+              saldosIniciales: {
+                /** @description Almacén del saldo. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Cuerpo. Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false). */
+                saldoCuerpo: number;
+                /** @description Complemento. Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false). */
+                saldoComplemento: number;
+              }[];
               renglones: {
                 idMovimiento: number;
                 folio: number;
@@ -53630,6 +53686,12 @@ export interface paths {
           idAvio: number;
           /** @description Filtra por un almacén. */
           idAlmacen?: number;
+          /** @description Primer día del periodo (YYYY-MM-DD), INCLUSIVE. */
+          desde?: string;
+          /** @description Último día del periodo (YYYY-MM-DD), INCLUSIVE. */
+          hasta?: string;
+          /** @description Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`). */
+          limite?: number;
         };
         header?: never;
         path?: never;
@@ -53637,7 +53699,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Kardex de un avío (movimientos con saldo corrido). */
+        /** @description Kardex de un avío en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -53647,6 +53709,25 @@ export interface paths {
               idAvio: number;
               avio: string;
               descripcion: string;
+              /** @description Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive). */
+              desde: string;
+              /** @description Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope. */
+              hasta: string | null;
+              /** @description true cuando `desde` lo puso el dominio porque nadie pidió periodo. */
+              ventanaPorOmision: boolean;
+              /** @description Tope de renglones que se aplicó. */
+              limite: number;
+              /** @description true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde). */
+              truncado: boolean;
+              /** @description Saldo de los almacenes del periodo justo ANTES del primer renglón devuelto. */
+              saldosIniciales: {
+                /** @description Almacén del saldo. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false). */
+                saldo: number;
+              }[];
               renglones: {
                 idMovimiento: number;
                 folio: number;

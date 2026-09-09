@@ -58,7 +58,6 @@ import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarFechaCapturable } from '../../comun/fecha-capturable.js';
-import { ZONA_DEL_NEGOCIO } from '../../comun/fecha-negocio.js';
 import {
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
   exigirExistenciaPt,
@@ -76,6 +75,13 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { DONDE_CANCELAR_AJUSTE_CICLICO } from './cancelacion-comun.js';
+import {
+  camposPeriodoKardex,
+  diaDelPeriodo,
+  periodoAlDerecho,
+  recortarPorLaCola,
+  resolverVentanaKardex,
+} from './periodo-kardex.js';
 import { rechazarTipoReservado } from './tipos-reservados.js';
 
 // ── Códigos estables de los tipos de movimiento que el dominio resuelve por nombre ───────────────
@@ -703,39 +709,25 @@ const esquemaConsultaExistenciasPt = z.object({
   agrupar: z.enum(['color-talla']).optional(),
 });
 
-// ── El PERIODO del kardex (fila 0.138) ──────────────────────────────────────────────────────────
+// ── El PERIODO del kardex (fila 0.138, generalizado en la 0.173) ─────────────────────────────────
 //
-// Daniel, en el repaso de inventarios: *«con diez años cargados, pedirlo trae todo»*. Y era literal:
-// medido contra una base sintética de 10 años (100 000 movimientos / 500 000 renglones de detalle),
-// `kardexPt` de UN modelo devolvía **25 000 renglones y 8.3 MB de JSON** en una sola respuesta.
+// El mecanismo entero —ventana por omisión, tope duro, corte por la cola y por qué— vive UNA sola
+// vez en `periodo-kardex.ts`, que es de donde lo toman también los kardex de tela (por color y por
+// lote) y el de avíos. Aquí sólo se le pegan los filtros propios de producto terminado.
 //
-// La cura tiene dos piezas, y las DOS viven aquí (A1: ni la ruta ni la pantalla deciden nada):
-//  1. Un PERIODO (`desde`/`hasta`) que se resuelve EN SERVIDOR (`WHERE movimientos.fecha …`), nunca
-//     filtrando en el cliente lo que ya llegó.
-//  2. Una VENTANA POR OMISIÓN cuando nadie pide periodo: sin esto, la pantalla que hoy no manda
-//     fechas seguiría pidiendo los diez años y el defecto seguiría vivo para quien no toque el
-//     filtro — que es justo la mayoría.
+// ⚠️ LO QUE SÍ ES PROPIO DE PT Y NO SE PUEDE PERDER AL COMPARTIR EL MECANISMO. El periodo se lee SIN
+// TECHO cuando nadie pide `hasta`, para que un movimiento con FECHA FUTURA siga saliendo. En
+// materiales esas fechas son sobre todo basura del histórico de Access; en producto terminado el
+// matiz es otro: desde la fila 0.171 el movimiento manual y el traspaso RECHAZAN una fecha futura a
+// quien no tenga `ipt.fecha-libre`, así que hoy sólo pueden nacer con fecha futura (a) los que
+// capture alguien CON esa llave —que hoy son todos los perfiles que mueven PT— y (b) los que escriba
+// el sistema o traiga el ETL, que no pasan por la guarda. La lectura sigue sin techo a propósito: si
+// existen, se ven.
 //
-// Y como el rango solo no acota nada (quien escriba `desde=2016-01-01` vuelve al punto de partida),
-// hay además un TOPE DURO de renglones. Los tres datos —periodo efectivo, tope y si hubo corte—
-// VIAJAN EN LA RESPUESTA, para que la pantalla pueda decirlo: nadie debe creer que está viendo todo
-// cuando está viendo un pedazo.
-
-/**
- * Meses de la ventana por omisión cuando NADIE pide `desde`.
- *
- * Doce, no tres ni uno: un año es el ciclo completo del negocio (las dos temporadas y la
- * comparación contra el mismo mes del año pasado), y de un plumazo deja fuera el ~90 % de un
- * histórico de diez años. Un periodo más largo se pide a mano — y entonces es una decisión
- * consciente, no el precio por omisión de abrir la pantalla.
- */
-export const MESES_VENTANA_KARDEX_PT = 12;
-
-/** Renglones que devuelve el kardex si el llamador no pide otro tope. */
-export const RENGLONES_KARDEX_PT_POR_OMISION = 1000;
-
-/** Tope DURO de renglones: ni pidiéndolo se pasa de aquí (es el techo que el rango no garantiza). */
-export const TOPE_RENGLONES_KARDEX_PT = 5000;
+// ⏳ Y QUEDA UNA PREGUNTA DE NEGOCIO ABIERTA, numerada aparte: ¿el almacén de PT captura de verdad
+// movimientos con fecha futura? Si la respuesta es que sí y es habitual, la guarda de la 0.171 le
+// estorbaría a quien se quede sin la llave el día que se poden los perfiles. Va junto con la
+// pregunta de cuántos días debe durar la ventana — las dos las contesta Daniel de una vez.
 
 /**
  * Forma de DOMINIO de los filtros del kardex por modelo (ya coaccionados).
@@ -752,86 +744,9 @@ export const esquemaConsultaKardexPt = z
     idTalla: z.number().int().positive().optional(),
     idAlmacen: z.number().int().positive().optional(),
     idOrden: z.number().int().positive().optional(),
-    /** Primer día del periodo (YYYY-MM-DD), INCLUSIVE. */
-    desde: z.iso.date({ error: 'La fecha «desde» no es válida (YYYY-MM-DD)' }).optional(),
-    /** Último día del periodo (YYYY-MM-DD), INCLUSIVE. */
-    hasta: z.iso.date({ error: 'La fecha «hasta» no es válida (YYYY-MM-DD)' }).optional(),
-    limite: z
-      .number()
-      .int()
-      .min(1)
-      .max(TOPE_RENGLONES_KARDEX_PT)
-      .default(RENGLONES_KARDEX_PT_POR_OMISION),
+    ...camposPeriodoKardex,
   })
-  .refine((f) => f.desde === undefined || f.hasta === undefined || f.desde <= f.hasta, {
-    error: 'El periodo está al revés: «desde» no puede ser posterior a «hasta».',
-    path: ['desde'],
-  });
-
-/** El periodo que el kardex REALMENTE consultó (lo que viaja de vuelta a la pantalla). */
-export interface VentanaKardexPt {
-  /** Primer día consultado (YYYY-MM-DD, inclusive). SIEMPRE hay uno: nunca se lee sin piso. */
-  desde: string;
-  /** Último día consultado (YYYY-MM-DD, inclusive), o `null` si no se puso techo. */
-  hasta: string | null;
-  /** `true` cuando el `desde` lo puso esta función porque nadie pidió periodo. */
-  porOmision: boolean;
-}
-
-/** El día de HOY tal como lo vive el negocio (México), en YYYY-MM-DD. */
-function hoyDelNegocio(ahora: Date): string {
-  // `en-CA` da exactamente `YYYY-MM-DD`; la zona se toma de `comun/fecha-negocio` para no tener
-  // dos husos distintos en el sistema (el servidor corre en UTC y la gente captura en -06:00).
-  return ahora.toLocaleDateString('en-CA', { timeZone: ZONA_DEL_NEGOCIO });
-}
-
-/**
- * Resuelve el PERIODO del kardex. Función PURA (por eso se prueba sin base de datos).
- *
- * Reglas, y son las que la respuesta declara:
- *  • Los dos extremos son INCLUSIVOS: un movimiento fechado el mismo día que `hasta` SÍ entra
- *    (`fecha` es una columna `date`, así que no hay trampa de horas).
- *  • Si NO viene `desde`, se pone uno: {@link MESES_VENTANA_KARDEX_PT} meses hacia atrás desde
- *    `hasta` si lo hay, o desde hoy si no. Es decir, **el periodo SIEMPRE tiene piso**, y por eso
- *    pedir el kardex no puede volver a traer diez años.
- *  • Si viene `hasta` sin `desde`, la ventana son los 12 meses que TERMINAN en `hasta` (no «todo
- *    hasta esa fecha»): la garantía de piso vale también ahí.
- *  • Si no viene `hasta`, no se pone techo — un movimiento con fecha futura sigue apareciendo, que
- *    es lo que uno espera al abrir el kardex.
- *
- * ⚠️ **OJO con la frase «los hay: se capturan con la fecha del documento», que esta fila BORRÓ de
- * aquí porque ya no es cierta sin matices.** Desde la 0.171 el movimiento manual y el traspaso
- * RECHAZAN una fecha futura a quien no tenga `ipt.fecha-libre`. O sea que hoy sólo pueden nacer
- * con fecha futura: (a) los que capture alguien CON esa llave —que hoy son todos los perfiles que
- * mueven PT—, y (b) los que escriba el sistema o traiga el ETL, que no pasan por la guarda. La
- * lectura sigue sin techo a propósito: si existen, se ven.
- *
- * ⏳ **Y queda una pregunta de negocio abierta, numerada aparte:** ¿el almacén de PT captura de
- * verdad movimientos con fecha futura? Si la respuesta es que sí y es habitual, la guarda de la
- * 0.171 le estorbaría a quien se quede sin la llave el día que se poden los perfiles. Va junto con
- * la pregunta de cuántos días debe durar la ventana — las dos las contesta Daniel de una vez.
- */
-export function resolverVentanaKardexPt(
-  filtros: { desde?: string | undefined; hasta?: string | undefined },
-  ahora: Date = new Date(),
-): VentanaKardexPt {
-  const hasta = filtros.hasta ?? null;
-  if (filtros.desde !== undefined) {
-    return { desde: filtros.desde, hasta, porOmision: false };
-  }
-  const ancla = filtros.hasta ?? hoyDelNegocio(ahora);
-  const [anio, mes, dia] = ancla.split('-').map(Number);
-  // Aritmética de CALENDARIO en UTC (nada de restar milisegundos): un mes no dura siempre lo mismo.
-  const piso = new Date(
-    Date.UTC(anio as number, (mes as number) - 1 - MESES_VENTANA_KARDEX_PT, dia),
-  );
-  return { desde: piso.toISOString().slice(0, 10), hasta, porOmision: true };
-}
-
-/** Convierte un YYYY-MM-DD del periodo al `Date` que espera una columna `date` de Postgres. */
-function diaDelPeriodo(iso: string): Date {
-  return new Date(`${iso}T00:00:00.000Z`);
-}
+  .refine(periodoAlDerecho.predicado, periodoAlDerecho.opciones);
 
 /** Parámetros de la consulta de existencias (forma de dominio). */
 export type ParametrosExistenciasPt = z.input<typeof esquemaConsultaExistenciasPt>;
@@ -996,7 +911,7 @@ export type ParametrosKardexPt = z.input<typeof esquemaConsultaKardexPt>;
  *
  * ⭐ FILA 0.138 — EL PERIODO, y por qué el saldo sigue siendo verdad. El filtro de fechas se aplica
  * en el `WHERE` (servidor), NUNCA recortando en el cliente lo que ya llegó; y si nadie pide periodo
- * se aplica la ventana por omisión de {@link resolverVentanaKardexPt}. Pero recortar por fecha, a
+ * se aplica la ventana por omisión de {@link resolverVentanaKardex}. Pero recortar por fecha, a
  * secas, ROMPERÍA la columna «Saldo»: el primer renglón de la ventana arrancaría en cero y todos los
  * saldos de abajo serían falsos. Por eso el periodo trae de la mano su SALDO ANTERIOR: una sola
  * consulta agregada suma, por artículo, todo lo que pasó ANTES de `desde`, y con ese número se
@@ -1043,7 +958,7 @@ export async function kardexPt(
     throw new ErrorNoEncontrado('Modelo', filtros.idModelo);
   }
 
-  const ventana = resolverVentanaKardexPt(filtros);
+  const ventana = resolverVentanaKardex(filtros);
   const desdeDia = diaDelPeriodo(ventana.desde);
   const hastaDia = ventana.hasta === null ? undefined : diaDelPeriodo(ventana.hasta);
 
@@ -1096,9 +1011,8 @@ export async function kardexPt(
     take: filtros.limite + 1,
   });
 
-  const truncado = detalles.length > filtros.limite;
-  // Los `limite` MÁS NUEVOS, devueltos en orden cronológico (el `slice` ya copia: no se muta).
-  const enPeriodo = detalles.slice(0, filtros.limite).reverse();
+  // Los `limite` MÁS NUEVOS, devueltos en orden cronológico.
+  const { enPeriodo, truncado } = recortarPorLaCola(detalles, filtros.limite);
 
   // SALDO ANTERIOR por artículo: lo que cada uno traía JUSTO ANTES del primer renglón que se ve.
   // Es lo que hace verdadera la columna «Saldo» cuando el kardex viene recortado —por fechas o por

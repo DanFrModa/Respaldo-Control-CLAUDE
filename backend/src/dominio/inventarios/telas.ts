@@ -78,6 +78,13 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import {
+  camposPeriodoKardex,
+  diaDelPeriodo,
+  periodoAlDerecho,
+  recortarPorLaCola,
+  resolverVentanaKardex,
+} from './periodo-kardex.js';
 import { exigirCancelableFueraDelCiclico } from './cancelacion-comun.js';
 import { exigirPermisoParaCancelarSalidaSinOrden } from './salida-sin-orden.js';
 import { rechazarTipoReservado } from './tipos-reservados.js';
@@ -639,11 +646,19 @@ const esquemaConsultaExistenciasTela = z.object({
   incluirCeros: z.boolean().default(false),
 });
 
-const esquemaConsultaKardexTela = z.object({
-  idTela: z.number().int().positive(),
-  idLote: z.number().int().positive().optional(),
-  idAlmacen: z.number().int().positive().optional(),
-});
+/**
+ * Filtros del kardex de tela (flujo legado por lote) + el PERIODO (fila 0.173, mecanismo de la
+ * 0.138). **Se EXPORTA** para que `contrato/esquemas/tope-kardex-honesto.test.ts` cruce el tope
+ * contra el que publica el querystring: es el objeto que de verdad valida, no uno «equivalente».
+ */
+export const esquemaConsultaKardexTela = z
+  .object({
+    idTela: z.number().int().positive(),
+    idLote: z.number().int().positive().optional(),
+    idAlmacen: z.number().int().positive().optional(),
+    ...camposPeriodoKardex,
+  })
+  .refine(periodoAlDerecho.predicado, periodoAlDerecho.opciones);
 
 /** Parámetros de la consulta de existencias de tela (forma de dominio). */
 export type ParametrosExistenciasTela = z.input<typeof esquemaConsultaExistenciasTela>;
@@ -769,11 +784,19 @@ export async function consultarExistenciasTela(
 export type ParametrosKardexTela = z.input<typeof esquemaConsultaKardexTela>;
 
 /**
- * KARDEX por TELA (doc 04-Inventarios §B.4 — Movimientos por tela): lista CRONOLÓGICA de los
- * movimientos de la tela, con SALDO CORRIDO por tela×lote×almacén. Lee `MovimientoDetTela` DIRECTO
- * (sin la vista — la vista no preserva el orden). El saldo se calcula en memoria por artículo en
- * orden de folio. Los costos/importes se OMITEN (null) sin `telas.ver-totales` (ex-acceso #7).
- * Permiso `inventario-telas.ver`; empresa activa (A9).
+ * KARDEX por TELA del flujo LEGADO por lote (doc 04-Inventarios §B.4 — Movimientos por tela): lista
+ * CRONOLÓGICA de los movimientos de la tela EN UN PERIODO, con SALDO CORRIDO por tela×lote×almacén.
+ * Lee `MovimientoDetTela` DIRECTO (sin la vista — la vista no preserva el orden). Los costos/importes
+ * se OMITEN (null) sin `telas.ver-totales` (ex-acceso #7). Permiso `inventario-telas.ver`; empresa
+ * activa (A9).
+ *
+ * ⭐ FILA 0.173 — EL PERIODO, con el mecanismo que la 0.138 construyó para producto terminado
+ * (`periodo-kardex.ts`, léelo: ahí está el porqué completo y por qué los números son los mismos que
+ * en PT aunque este kardex sea un archivo congelado). En una línea: fechas en el `WHERE` del
+ * servidor, ventana por omisión de 12 meses, TOPE DURO que se lleva **el final** del periodo
+ * (`folio DESC`) y saldo corrido SEMBRADO con lo que el artículo traía justo antes del primer
+ * renglón visible — sin eso, recortar por fecha dejaría el primer renglón arrancando en cero y
+ * TODOS los saldos de abajo serían falsos.
  */
 export async function kardexTela(
   sesion: SesionUsuario,
@@ -794,6 +817,10 @@ export async function kardexTela(
     throw new ErrorNoEncontrado('Tela', filtros.idTela);
   }
 
+  const ventana = resolverVentanaKardex(filtros);
+  const desdeDia = diaDelPeriodo(ventana.desde);
+  const hastaDia = ventana.hasta === null ? undefined : diaDelPeriodo(ventana.hasta);
+
   const detalles = await cliente.movimientoDetTela.findMany({
     where: {
       idTela: filtros.idTela,
@@ -805,9 +832,15 @@ export async function kardexTela(
       movimiento: {
         idEmpresa,
         ...(filtros.idAlmacen === undefined ? {} : { idAlmacen: filtros.idAlmacen }),
+        // El PERIODO, resuelto en SERVIDOR. Los dos extremos inclusivos: `fecha` es `date`, así que
+        // `lte` del último día lo incluye entero (no hay medianoche que se coma el día).
+        fecha: { gte: desdeDia, ...(hastaDia === undefined ? {} : { lte: hastaDia }) },
       },
     },
     select: {
+      // El `id` del detalle NO es decorativo: junto con el folio forma la llave de orden, y con
+      // ella se ancla el saldo anterior en el punto exacto donde arranca la lista.
+      id: true,
       idLote: true,
       cantidad: true,
       costoUnit: true,
@@ -828,11 +861,39 @@ export async function kardexTela(
         },
       },
     },
-    orderBy: [{ movimiento: { folio: 'asc' } }, { id: 'asc' }],
+    // ⭐ DESCENDENTE a propósito: cuando el periodo no cabe en `limite`, lo que se conserva es el
+    // FINAL. La llave es folio (secuencia atómica por empresa, A3) + id del detalle, recorrida al
+    // revés; `recortarPorLaCola` la invierte y la lista sale igual de cronológica.
+    orderBy: [{ movimiento: { folio: 'desc' } }, { id: 'desc' }],
+    // Uno de más: la forma barata de saber que hay más SIN pagar un `count` sobre diez años.
+    take: filtros.limite + 1,
   });
 
-  const saldoPorArticulo = new Map<string, number>();
-  const renglones: KardexTelaRenglon[] = detalles.map((d) => {
+  const { enPeriodo, truncado } = recortarPorLaCola(detalles, filtros.limite);
+
+  // SALDO ANTERIOR por artículo (lote×almacén): lo que traía JUSTO ANTES del primer renglón que se
+  // ve. Sin renglones no hay punto de anclaje NI nada que explicar: se ahorra la consulta.
+  const ancla = enPeriodo[0];
+  const saldosPrevios =
+    ancla === undefined
+      ? []
+      : await saldosTelaAntesDelPeriodo(cliente, {
+          idEmpresa,
+          idTela: filtros.idTela,
+          idLote: filtros.idLote,
+          idAlmacen: filtros.idAlmacen,
+          desde: desdeDia,
+          hasta: hastaDia,
+          anclaFolio: ancla.movimiento.folio,
+          anclaIdDetalle: ancla.id,
+        });
+
+  const saldoPorArticulo = new Map<string, number>(
+    saldosPrevios.map((s) => [claveArticuloTela(s.idLote, s.idAlmacen), s.saldo]),
+  );
+  const articulosDelPeriodo = new Set<string>();
+
+  const renglones: KardexTelaRenglon[] = enPeriodo.map((d) => {
     const m = d.movimiento;
     const esEntrada = m.tipoMov.direccion === DireccionMovimiento.entrada;
     const esSalida = m.tipoMov.direccion === DireccionMovimiento.salida;
@@ -840,7 +901,8 @@ export async function kardexTela(
     const entrada = esEntrada ? cantidad : 0;
     const salida = esSalida ? cantidad : 0;
 
-    const claveArt = `${d.idLote ?? 0}:${m.idAlmacen}`;
+    const claveArt = claveArticuloTela(d.idLote, m.idAlmacen);
+    articulosDelPeriodo.add(claveArt);
     const saldoPrevio = saldoPorArticulo.get(claveArt) ?? 0;
     const saldo = saldoPrevio + entrada - salida;
     saldoPorArticulo.set(claveArt, saldo);
@@ -869,5 +931,146 @@ export async function kardexTela(
     };
   });
 
-  return { idTela: tela.id, tela: tela.nombre, renglones };
+  return {
+    idTela: tela.id,
+    tela: tela.nombre,
+    desde: ventana.desde,
+    hasta: ventana.hasta,
+    ventanaPorOmision: ventana.porOmision,
+    limite: filtros.limite,
+    truncado,
+    // Sólo los artículos que SE MOVIERON en el periodo: son los que la tabla enseña y los únicos
+    // cuyo saldo hay que poder explicar. Lo que no se movió no es kardex del periodo — es
+    // existencia, y para eso está la pantalla de Existencias.
+    saldosIniciales: saldosPrevios.filter((s) =>
+      articulosDelPeriodo.has(claveArticuloTela(s.idLote, s.idAlmacen)),
+    ),
+    renglones,
+  };
+}
+
+/**
+ * La llave del saldo corrido del flujo legado: un artículo es lote×almacén. El lote NULL («sin
+ * lote») es su propio cubo, y se nombra con `0` porque los ids de lote son autoincrementales desde 1
+ * — es la MISMA convención que traía el saldo corrido de esta función desde F4-E1.
+ */
+function claveArticuloTela(idLote: number | null, idAlmacen: number): string {
+  return `${String(idLote ?? 0)}:${String(idAlmacen)}`;
+}
+
+/** Filtros con los que se calcula el saldo anterior de una tela (los MISMOS del kardex + el ancla). */
+interface FiltrosSaldoAnteriorTela {
+  idEmpresa: number;
+  idTela: number;
+  idLote?: number | undefined;
+  idAlmacen?: number | undefined;
+  /** Primer día del periodo. Todo lo ESTRICTAMENTE anterior a este día es «antes del periodo». */
+  desde: Date;
+  /** Último día del periodo, o `undefined` si no hay techo. */
+  hasta?: Date | undefined;
+  /** Folio del PRIMER renglón que se va a enseñar (el punto donde arranca el saldo corrido). */
+  anclaFolio: bigint;
+  /** Id del detalle de ese mismo renglón: desempata los renglones del mismo movimiento. */
+  anclaIdDetalle: number;
+}
+
+/**
+ * SALDO ANTERIOR por lote×almacén: Σ(cantidad·signo) de todo lo que ese artículo movió ANTES del
+ * punto donde arranca la lista (D3 — la existencia siempre es suma de movimientos, nunca un saldo
+ * guardado). Ese punto son dos cosas a la vez, y por eso la condición tiene dos ramas:
+ *
+ *  1. **Todo lo anterior al periodo** (`fecha < desde`) — el saldo de apertura de siempre.
+ *  2. **Lo del periodo que el TOPE dejó fuera por arriba** (dentro del periodo, pero con
+ *     `(folio, id)` anterior al primer renglón visible). Sin corte esta rama está vacía.
+ *
+ * Las dos ramas son excluyentes (una mira `fecha <`, la otra `fecha >=`), así que nada se cuenta dos
+ * veces. Y la segunda usa **la misma llave con la que la lista se ordena y se corta**, no la fecha:
+ * es lo que evita que dos movimientos del mismo día a ambos lados del límite se dupliquen o se
+ * pierdan.
+ *
+ * ⚠️ **`id_empresa` (A9), `id_tela` y `id_tela_color IS NULL` son de CORRECCIÓN; `id_lote` e
+ * `id_almacen` son de RENDIMIENTO.** La llave de agrupación es lote×almacén, así que un renglón de
+ * otro lote o de otro almacén cae en OTRO grupo y el llamador lo descarta; pero empresa, tela y —
+ * sobre todo— el filtro del flujo legado **no** están en esa llave. Quitar el `id_tela_color IS
+ * NULL` metería los movimientos del inventario VIGENTE por color dentro del mismo grupo «sin lote»,
+ * que es exactamente el descuadre que el reviewer de la etapa A2 cazó en la lista: el saldo anterior
+ * tiene que mirar el mismo universo que los renglones o la columna «Saldo» miente entera.
+ *
+ * Va en SQL crudo a propósito: el signo lo da `tipos_movimiento_inventario.direccion`, que cuelga
+ * del encabezado `movimientos`, y Prisma no sabe agrupar por columnas de una relación. Los nombres
+ * se pegan DESPUÉS, para que los JOIN de catálogo trabajen sobre el puñado de grupos y no sobre el
+ * histórico entero.
+ */
+async function saldosTelaAntesDelPeriodo(
+  cliente: ReturnType<typeof clienteLectura>,
+  filtros: FiltrosSaldoAnteriorTela,
+): Promise<KardexTelaLista['saldosIniciales']> {
+  const dentroDelPeriodo =
+    filtros.hasta === undefined
+      ? Prisma.sql`m."fecha" >= ${filtros.desde}::date`
+      : Prisma.sql`m."fecha" >= ${filtros.desde}::date AND m."fecha" <= ${filtros.hasta}::date`;
+
+  const condiciones: Prisma.Sql[] = [
+    Prisma.sql`d."id_tela" = ${filtros.idTela}`,
+    Prisma.sql`d."id_tela_color" IS NULL`,
+    Prisma.sql`m."id_empresa" = ${filtros.idEmpresa}`,
+    Prisma.sql`(
+      m."fecha" < ${filtros.desde}::date
+      OR (
+        ${dentroDelPeriodo}
+        AND (m."folio", d."id") < (${filtros.anclaFolio}::bigint, ${filtros.anclaIdDetalle}::int)
+      )
+    )`,
+  ];
+  if (filtros.idLote !== undefined) condiciones.push(Prisma.sql`d."id_lote" = ${filtros.idLote}`);
+  if (filtros.idAlmacen !== undefined)
+    condiciones.push(Prisma.sql`m."id_almacen" = ${filtros.idAlmacen}`);
+  const where = Prisma.join(condiciones, ' AND ');
+
+  const filas = await cliente.$queryRaw<
+    {
+      idLote: number | null;
+      loteClave: string | null;
+      idAlmacen: number;
+      almacen: string;
+      saldo: Prisma.Decimal;
+    }[]
+  >(Prisma.sql`
+    WITH previos AS (
+      SELECT
+        d."id_lote"    AS "idLote",
+        m."id_almacen" AS "idAlmacen",
+        SUM(
+          CASE
+            WHEN t."direccion" = 'entrada' THEN d."cantidad"
+            WHEN t."direccion" = 'salida'  THEN -d."cantidad"
+            ELSE 0
+          END
+        ) AS "saldo"
+      FROM "movimiento_det_tela" d
+      JOIN "movimientos" m ON m."id" = d."id_movimiento"
+      JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+      WHERE ${where}
+      GROUP BY 1, 2
+    )
+    SELECT
+      p."idLote",
+      l."clave"    AS "loteClave",
+      p."idAlmacen",
+      a."nombre"   AS "almacen",
+      p."saldo"
+    FROM previos p
+    JOIN "almacenes" a ON a."id" = p."idAlmacen"
+    LEFT JOIN "lotes" l ON l."id" = p."idLote"
+    WHERE p."saldo" <> 0
+    ORDER BY a."nombre" ASC, l."clave" ASC NULLS FIRST
+  `);
+
+  return filas.map((f) => ({
+    idLote: f.idLote,
+    loteClave: f.loteClave,
+    idAlmacen: f.idAlmacen,
+    almacen: f.almacen,
+    saldo: Number(f.saldo),
+  }));
 }
