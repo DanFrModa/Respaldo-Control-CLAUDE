@@ -2,19 +2,23 @@
  * Utilidades de FECHA compartidas por los submódulos de captura de Indicadores (F7-E4:
  * productividad, fichas confiables y muestrarios). Todas las fechas de captura son de DÍA
  * (`@db.Date`); se manejan a medianoche UTC para evitar corrimientos por zona horaria.
+ *
+ * ⭐ La REGLA de la ventana de captura («sin la llave, sólo los últimos N días») ya NO vive aquí:
+ * subió a `comun/fecha-capturable.ts` en la fila 0.171, cuando el inventario de PT necesitó la
+ * misma frase con su propio permiso (`ipt.fecha-libre`). Aquí queda el envoltorio que le pone el
+ * permiso de Indicadores, para que los llamadores de este módulo no cambien.
  */
-import { ErrorPermiso } from '../../comun/errores.js';
-import { tienePermiso, type SesionUsuario } from '../../comun/permisos.js';
+import {
+  hoyUtc,
+  verificarFechaCapturable as verificarFechaCapturableConPermiso,
+} from '../../comun/fecha-capturable.js';
+import type { SesionUsuario } from '../../comun/permisos.js';
+
+export { hoyUtc };
 
 /** Convierte una fecha ISO (AAAA-MM-DD) a Date en medianoche UTC (para columnas @db.Date). */
 export function fechaAUtc(fechaIso: string): Date {
   return new Date(`${fechaIso}T00:00:00.000Z`);
-}
-
-/** Hoy a medianoche UTC (base del gate de fecha libre). */
-export function hoyUtc(): Date {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
 }
 
 /**
@@ -23,12 +27,5 @@ export function hoyUtc(): Date {
  * Hoy/Ayer/Sábado de la captura móvil). Con el permiso, cualquier fecha.
  */
 export function verificarFechaCapturable(sesion: SesionUsuario, fecha: Date): void {
-  if (tienePermiso(sesion, 'indicadores.fecha-libre')) return;
-  const dias = (hoyUtc().getTime() - fecha.getTime()) / 86_400_000;
-  if (dias < 0 || dias > 7) {
-    throw new ErrorPermiso(
-      'Solo puedes capturar fechas de los últimos 7 días; para otra fecha necesitas el permiso de fecha libre.',
-      'indicadores.fecha-libre',
-    );
-  }
+  verificarFechaCapturableConPermiso(sesion, fecha, { permiso: 'indicadores.fecha-libre' });
 }

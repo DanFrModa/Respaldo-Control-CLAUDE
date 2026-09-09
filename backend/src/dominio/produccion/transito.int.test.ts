@@ -74,6 +74,10 @@ const PERM_TODOS: ClavePermiso[] = [
   'produccion.wip-ver',
   'inventario-pt.ver',
   'inventario-pt.mover',
+  // Fila 0.171 — los helpers `meterAPt*` siembran existencia con una fecha FIJA (2026-08-17). Una
+  // fecha fija se aleja de «hoy» sola: sin la llave, el candado de la ventana acabaría cortando el
+  // armado del escenario. El permiso la ancla.
+  'ipt.fecha-libre',
   'produccion.entrega',
 ];
 

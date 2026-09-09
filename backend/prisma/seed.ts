@@ -1167,6 +1167,11 @@ async function sembrarGeneros(prisma: PrismaClient): Promise<void> {
  *
  * Se siembran por `codigo`; `update` NO pisa nombre/activo/dirección si ya existen (idempotente).
  */
+// ⛔ Fila 0.171 — de esta lista, CINCO no se pueden capturar a mano (`entrada-maquila`,
+// `entrega-cliente`, `error-entrada`/`error-salida` —los rótulos de una CANCELACIÓN— y
+// `merma-incompletas`). Son parte de los DOCE reservados al sistema; los otros siete están en las
+// listas de abajo (las dos patas del traspaso, los dos del cíclico, la recepción, la salida a orden
+// y la salida por nota). La lista completa y su rechazo: `src/dominio/inventarios/tipos-reservados.ts`.
 const TIPOS_MOVIMIENTO_BASE: {
   codigo: string;
   nombre: string;
@@ -1202,7 +1207,8 @@ const TIPOS_MOVIMIENTO_BASE: {
   // ⭐ 0.061 (§Post-F9.154(a), DANIEL): la prenda INCOMPLETA sale sola del almacén de TRÁNSITO al
   // registrar el recibo. Hasta hoy se quedaba ahí para siempre (nadie la iba a devolver) y sólo
   // salía con un movimiento manual que nadie hacía. NO se inventaría en ningún lado: es merma.
-  // Lo mueve `dominio/produccion/transito.ts::darSalidaMermaIncompletas`, nunca a mano.
+  // Lo mueve `dominio/produccion/transito.ts::darSalidaMermaIncompletas`, nunca a mano — y desde la
+  // fila 0.171 eso ya no es sólo un comentario: el dominio RECHAZA capturarlo (`tipos-reservados.ts`).
   { codigo: 'merma-incompletas', nombre: 'Merma por prendas incompletas', direccion: 'salida' },
 ];
 
@@ -1352,6 +1358,14 @@ const TIPOS_MOVIMIENTO_SALIDA_SIN_ORDEN: {
  * TODOS los tipos de movimiento que el seed siembra: los 19 canónicos del CSV viejo + los 2 de
  * F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex de telas y avíos) + los 2 de F7-E5 (ajuste
  * por cíclico) + los 2 de la fila 0.104 (salida sin orden).
+ *
+ * ⛔ **Fila 0.171 — DOCE de estos tipos NO los puede capturar una persona**: los escribe sólo el
+ * código, como efecto de otra operación (las dos patas de un traspaso, los dos rótulos de una
+ * cancelación, los dos del ajuste por cíclico, la recepción de compra, la salida de tela a una
+ * orden, la salida de avío por nota, el recibo de maquila, la entrega a cliente y la merma por
+ * prendas incompletas). Otros DOS están reservados a la dirección (fila 0.104). La lista, el
+ * criterio y el rechazo viven en `src/dominio/inventarios/tipos-reservados.ts`, y su prueba cruza
+ * esa lista contra ÉSTA: un código mal escrito allá dejaría la reserva muda.
  *
  * 🔴 **Está EXPORTADA para que se pueda cruzar a máquina con lo que el dominio EXIGE.** Un flujo
  * que resuelve su tipo por `codigo` y no lo encuentra sembrado nace muerto en `prueba`, y el

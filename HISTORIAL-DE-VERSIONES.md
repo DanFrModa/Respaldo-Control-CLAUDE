@@ -71,6 +71,57 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.134 · 9-sep-2026 · **en prueba** — **Ya no se puede escribir a mano en el historial de ropa algo que el sistema no hizo**
+
+### Qué se puede hacer ahora que antes no
+
+- Nada nuevo: **esta versión cierra dos formas de que el historial cuente algo que no ocurrió.** Y eso
+  importa más de lo que suena, porque en este sistema **el historial ES el inventario**: la existencia
+  no se guarda, se calcula sumando los movimientos. Escribirle un renglón falso no «descuadra un
+  reporte» — cambia lo que hay.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **El desplegable de movimientos de producto terminado pierde DOCE rótulos.** Son los que el sistema
+  se escribe a sí mismo, y que a mano decían mentiras:
+  - **«Error de Entrada» y «Error de Salida»** son los que el sistema pone **cuando cancelas** algo.
+    Tecleados a mano, el historial afirmaba una cancelación que nunca hubo.
+  - **«Transferencia entre almacenes»** dejaba **media transferencia**: la mercancía salía de un
+    almacén y no llegaba a ninguno.
+  - **«Ajuste por cíclico»** afirmaba un conteo que nadie hizo · **«Entrada por recepción»**, una compra
+    que no existe · **«Salida a orden»** y **«Salida por nota»**, un consumo sin orden ni nota.
+  - Y **«Entrada de maquila»**, **«Entrega a cliente»** y **«Merma por prendas incompletas»**, que a mano
+    no actualizaban el recibo, la entrega ni el tránsito que representan.
+- ✅ **Lo que SÍ se sigue capturando a mano, y a propósito:** el **ajuste** de entrada y salida —el de
+  toda la vida, el que el propio sistema te recomienda cuando rechaza uno de los de arriba—, «Otras
+  entradas», «Otras salidas», el inventario inicial y el resto. **Reservar el ajuste habría dejado al
+  almacén sin manera de corregir nada**, así que se dejó fuera adrede.
+- **El bloqueo es del servidor, no de la pantalla.** Esconderlos no bastaba: quien llegue por otro
+  camino topa con la misma pared. Y aplica a **las cuatro puertas** —ropa, tela, tela por color y
+  avíos— porque el catálogo de rótulos es común: poner «Entrada de maquila» en un ajuste de tela sería
+  igual de falso.
+- **La fecha de un movimiento vuelve a tener candado.** En el sistema viejo, poner una fecha cualquiera
+  era un privilegio; se había perdido. Ahora, quien no tenga ese permiso sólo puede fechar **dentro de
+  los últimos 7 días** y **nunca en el futuro**. El selector de la pantalla ya no ofrece más.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Hoy ese candado no le cierra a NADIE, y hay que decidirlo.** Los **seis** perfiles que pueden
+  mover inventario llevan **también** la llave para saltárselo — herencia del sistema viejo, no una
+  decisión. **No se le quitó a nadie a propósito:** a quién se le da un permiso lo decide Daniel.
+  Recomendación: quitársela al menos a **Secretarial** y **Asistente** — backdatear inventario debería
+  ser de quien responde por el saldo.
+- ⏳ **Dos preguntas juntas, para Daniel:** ¿**cuántos días** debe durar esa ventana? (se puso **7**, por
+  simetría con la parte del sistema que ya lo hacía bien) · y ¿**el almacén captura de verdad
+  movimientos con fecha futura**? El código lo afirmaba en un comentario —«se capturan con la fecha del
+  documento»— y ahora se prohíbe: si es habitual, hay que ajustarlo.
+- **Lo ya capturado no se toca.** Los movimientos con rótulos falsos o fechas libres que existan siguen
+  como están: lo que cambia es que de aquí en adelante no se pueden hacer.
+- **La lista de doce no está cerrada para siempre.** Se midió uno por uno contra los 29 rótulos que hay,
+  pero el día que se estrene uno automático nuevo, hay que añadirlo — queda dicho en el código.
+
+---
+
 ## 0.133 · 9-sep-2026 · **en prueba** — **Se cierra la última puerta vieja que descontaba tela donde nadie la veía**
 
 ### Qué se puede hacer ahora que antes no

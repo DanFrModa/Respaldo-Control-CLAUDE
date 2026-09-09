@@ -84,8 +84,8 @@ import {
   CODIGO_TIPO_MOV_POR_CONCEPTO,
   exigirPermisoParaCancelarSalidaSinOrden,
   exigirPermisoSalidaSinOrden,
-  rechazarTipoReservado,
 } from './salida-sin-orden.js';
+import { rechazarTipoReservado } from './tipos-reservados.js';
 import { aDateColumna, aNumero, tipoPorCodigo, tipoPorId } from './telas.js';
 
 /** Clave de la secuencia de folios de partida (A3 — consecutivo por empresa, jamás Max()+1). */
@@ -756,7 +756,8 @@ export async function ajustarInventarioTelaColor(
     // ser de esta empresa, A9). Antes no se miraba nada de eso aquí.
     await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     // Fila 0.104 — un ajuste NO puede estampar «Devolución a Proveedor» ni «Venta de Material»:
-    // esos dos rótulos sólo los escribe la salida sin orden, que exige la llave del dueño.
+    // esos dos rótulos sólo los escribe la salida sin orden, que exige la llave del dueño. Y desde
+    // la 0.171 tampoco los que escribe SÓLO el sistema (`error-*`, recibo, entrega, merma).
     await rechazarTipoReservado(tx, datos.idTipoMov);
     const tipo = await tipoPorId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {

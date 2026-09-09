@@ -140,7 +140,11 @@ export const esquemaMovimientoPtCrear = z
       .describe('Modelo del movimiento (un movimiento manual es de UN modelo).'),
     fecha: z.iso
       .date({ error: 'La fecha del movimiento es obligatoria (YYYY-MM-DD)' })
-      .describe('Fecha del movimiento (YYYY-MM-DD).'),
+      .describe(
+        'Fecha del movimiento (YYYY-MM-DD). Sin el permiso `ipt.fecha-libre` (ex acceso #28) el ' +
+          'DOMINIO sólo acepta los últimos 7 días y nunca una fecha futura — la regla vive ahí, ' +
+          'no aquí (A1).',
+      ),
     motivo: esquemaMotivoMovimientoPt,
     lineas: esquemaMovPtMatriz,
   })
@@ -178,7 +182,10 @@ export const esquemaTraspasoPtCrear = z
       .describe('Modelo a traspasar (un traspaso es de UN modelo).'),
     fecha: z.iso
       .date({ error: 'La fecha del traspaso es obligatoria (YYYY-MM-DD)' })
-      .describe('Fecha del traspaso (YYYY-MM-DD).'),
+      .describe(
+        'Fecha del traspaso (YYYY-MM-DD). Mismo candado que el movimiento manual: sin ' +
+          '`ipt.fecha-libre`, sólo los últimos 7 días y nunca futura (lo valida el dominio).',
+      ),
     motivo: esquemaMotivoMovimientoPt,
     lineas: esquemaMovPtMatriz,
   })

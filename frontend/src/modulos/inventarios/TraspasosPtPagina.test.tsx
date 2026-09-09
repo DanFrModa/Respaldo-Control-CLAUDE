@@ -6,6 +6,7 @@ import type * as ApiInventarios from '@/api/inventarios';
 import type { Modelo } from '@/api/modelos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
+import { hoy } from './fecha-captura-pt';
 import { TraspasosPtPagina } from './TraspasosPtPagina';
 
 const crearMutate = vi.fn();
@@ -79,6 +80,9 @@ vi.mock('@/api/modelos', () => ({
 }));
 
 const sesion = () => estadoSesionDePrueba(['inventario-pt.ver', 'inventario-pt.mover']);
+/** La misma sesión CON la llave de fecha libre (ex acceso #28 del viejo, fila 0.171). */
+const sesionConFechaLibre = () =>
+  estadoSesionDePrueba(['inventario-pt.ver', 'inventario-pt.mover', 'ipt.fecha-libre']);
 
 /** Fila 0.100 — el motivo es OBLIGATORIO: sin él el botón de guardar no se habilita. */
 async function ponerMotivo(
@@ -274,6 +278,42 @@ describe('TraspasosPtPagina (F3-E3)', () => {
         'noopener',
       );
       abrir.mockRestore();
+    });
+  });
+
+  /**
+   * ⏳ Fila 0.171 — el traspaso escribe DOS movimientos de kardex fechados por quien captura, así
+   * que lleva el MISMO candado que el movimiento manual. La guarda está en el dominio; esto sólo
+   * fija que la pantalla no ofrezca una fecha que el servidor va a rebotar.
+   */
+  describe('la fecha del traspaso (fila 0.171, ex acceso #28)', () => {
+    it('SIN `ipt.fecha-libre` el selector se acota a la ventana', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      // El campo de fecha sólo se pinta con un modelo elegido (la captura arranca por ahí).
+      await elegirModelo(usuario);
+      const campo = screen.getByTestId('traspaso-fecha');
+      // ⚠️ El `min` se calcula APARTE, no con la misma función que lo produce: si se afirmara con
+      // `inicioVentanaCapturaPt()` la prueba diría «el helper es igual a sí mismo» y un error de
+      // aritmética pasaría en verde. Aquí se mide lo que importa: son 7 días completos hacia atrás.
+      const hoyUtc = new Date();
+      const sieteAtras = new Date(
+        Date.UTC(hoyUtc.getUTCFullYear(), hoyUtc.getUTCMonth(), hoyUtc.getUTCDate()) -
+          7 * 86_400_000,
+      )
+        .toISOString()
+        .slice(0, 10);
+      expect(campo).toHaveAttribute('max', hoy());
+      expect(campo).toHaveAttribute('min', sieteAtras);
+    });
+
+    it('CON `ipt.fecha-libre` no hay tope (gemela positiva)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesionConFechaLibre() });
+      await elegirModelo(usuario);
+      const campo = screen.getByTestId('traspaso-fecha');
+      expect(campo).not.toHaveAttribute('min');
+      expect(campo).not.toHaveAttribute('max');
     });
   });
 });

@@ -125,6 +125,9 @@ async function sembrarTiposMovimiento(): Promise<void> {
     data: [
       { codigo: 'entrada-maquila', nombre: 'Entrada de Maquila', direccion: 'entrada' },
       { codigo: 'error-entrada', nombre: 'Error de Entrada', direccion: 'salida' },
+      // Fila 0.171 — «Otras Entradas» para las altas MANUALES de estas pruebas: los dos de arriba
+      // los resuelve el dominio por código (el recibo y su cancelación) y ya NO se pueden capturar.
+      { codigo: 'otras-entradas', nombre: 'Otras Entradas', direccion: 'entrada' },
     ],
   });
 }
@@ -1216,11 +1219,15 @@ describe('Backfill PT por orden (migración F6-E2)', () => {
       bd(),
     );
     // Movimiento MANUAL de PT (entrada suelta, SIN orden): su detalle nace con id_orden NULL.
+    // ⚠️ Fila 0.171 — antes esto capturaba «Entrada de Maquila» a mano, que es EXACTAMENTE lo que
+    // esa fila prohibió (a mano no mueve el WIP ni le carga al maquilero). Lo que la prueba mide es
+    // que el backfill distinga por `origen_tipo`, no por el rótulo: con «Otras Entradas» mide lo
+    // mismo y ya no se apoya en un movimiento que el dominio rechaza.
     const tipoEntrada = await cliente.tipoMovimientoInventario.findFirstOrThrow({
-      where: { codigo: 'entrada-maquila' },
+      where: { codigo: 'otras-entradas' },
     });
     await registrarMovimientoPt(
-      sesion(['inventario-pt.mover']),
+      sesion(['inventario-pt.mover', 'ipt.fecha-libre']),
       {
         idTipoMov: tipoEntrada.id,
         idAlmacen: almPrimeras.id,

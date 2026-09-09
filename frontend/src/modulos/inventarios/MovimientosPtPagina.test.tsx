@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Modelo } from '@/api/modelos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
+import { hoy } from './fecha-captura-pt';
 import { MovimientosPtPagina } from './MovimientosPtPagina';
 
 // ── Mocks de la capa de datos (sin red) ──────────────────────────────────────
@@ -76,12 +77,42 @@ const TIPOS_MOV_OK = {
         direccion: 'entrada',
         capturaManual: true,
       },
+      // La SALIDA legítima de siempre: existe desde el sistema viejo y el PT la usa a mano.
       {
         id: 5,
+        codigo: 'otras-salidas',
+        nombre: 'Otras Salidas',
+        direccion: 'salida',
+        capturaManual: true,
+      },
+      // ⛔ Fila 0.171 — «Entrega a Cliente» pasó a estar reservada al SISTEMA: la escribe la
+      // entrega (que además marca la orden y alimenta la RC), no una captura. Va con dirección
+      // `salida` y `capturaManual: false`, como la manda el servidor.
+      {
+        id: 6,
         codigo: 'entrega-cliente',
         nombre: 'Entrega a Cliente',
         direccion: 'salida',
-        capturaManual: true,
+        capturaManual: false,
+      },
+      // ⛔ Fila 0.171 — de los doce del sistema: es el rótulo que se estampa al CANCELAR.
+      {
+        id: 11,
+        codigo: 'error-entrada',
+        nombre: 'Error de Entrada',
+        direccion: 'salida',
+        capturaManual: false,
+      },
+      // ⛔ Fila 0.171 — LA PATA de un traspaso. Va con dirección `salida` a propósito: el filtro por
+      // dirección (que excluye `transferencia-almacenes`, el tipo viejo) NO la ve, así que hasta
+      // esta fila se ofrecía. Capturarla a mano es media transferencia: sale del origen y no entra
+      // a ningún destino.
+      {
+        id: 21,
+        codigo: 'transferencia-salida',
+        nombre: 'Transferencia entre Almacenes (Salida)',
+        direccion: 'salida',
+        capturaManual: false,
       },
       {
         id: 9,
@@ -161,6 +192,9 @@ vi.mock('@/api/modelos', () => ({
 }));
 
 const sesion = () => estadoSesionDePrueba(['inventario-pt.ver', 'inventario-pt.mover']);
+/** La misma sesión CON la llave de fecha libre (ex acceso #28 del viejo, fila 0.171). */
+const sesionConFechaLibre = () =>
+  estadoSesionDePrueba(['inventario-pt.ver', 'inventario-pt.mover', 'ipt.fecha-libre']);
 
 /** Fila 0.100 — el motivo es OBLIGATORIO: sin él el botón de guardar no se habilita. */
 async function ponerMotivo(
@@ -217,19 +251,25 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     const opciones = screen.getByTestId('mov-tipo').querySelectorAll('option');
     const textos = [...opciones].map((o) => o.textContent ?? '');
     expect(textos.some((t) => t.includes('Inventario Inicial'))).toBe(true);
-    expect(textos.some((t) => t.includes('Entrega a Cliente'))).toBe(true);
+    expect(textos.some((t) => t.includes('Otras Salidas'))).toBe(true);
     expect(textos.some((t) => t.includes('Transferencia entre almacenes'))).toBe(false);
   });
 
-  it('⛔ el dropdown NO ofrece los rótulos RESERVADOS a la salida sin orden (fila 0.104)', async () => {
+  it('⛔ el dropdown NO ofrece los rótulos RESERVADOS (fila 0.104 + fila 0.171)', async () => {
     // «Devolución a Proveedor» y «Venta de Material» nacieron en la 0.104 para telas y avíos, pero
     // el catálogo de tipos es GLOBAL: se colaban aquí, y cualquiera con `inventario-pt.mover`
     // —que son 8 de los 9 perfiles— podía estampar el rótulo que Daniel se reservó. Quien luego
     // leyera el kardex creería que esa salida la autorizó él. La venta de producto terminado tiene
     // su propia fila (0.130), con cliente y precio.
     //
-    // Ojo con lo que fija esta prueba: NO basta con excluir por dirección (las dos son `salida`,
-    // igual que «Entrega a Cliente», que sí debe estar). La pantalla se fía de la bandera
+    // Fila 0.171 — y a esos dos se suman los DOCE que escribe SÓLO el sistema (las dos patas de un
+    // traspaso, los dos rótulos de una cancelación, los dos del ajuste por cíclico, la recepción,
+    // la salida de tela a orden, la de avío por nota, el recibo de maquila, la entrega y la merma).
+    // Son dos reservas distintas: los de la 0.104 SÍ los captura la dirección por su pantalla;
+    // éstos no los captura nadie, nunca.
+    //
+    // Ojo con lo que fija esta prueba: NO basta con excluir por dirección (todos son `salida`,
+    // igual que «Otras Salidas», que sí debe estar). La pantalla se fía de la bandera
     // `capturaManual` que decide el SERVIDOR, para no repetir los códigos aquí.
     const usuario = userEvent.setup();
     renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
@@ -240,8 +280,14 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     );
     expect(textos.some((t) => t.includes('Devolución a Proveedor'))).toBe(false);
     expect(textos.some((t) => t.includes('Venta de Material'))).toBe(false);
+    // ⭐ Fila 0.171 — y tampoco los que escribe SÓLO el sistema. «Error de Entrada» es el peor: es
+    // el rótulo de una CANCELACIÓN, así que a mano el kardex afirmaría una que nunca ocurrió.
+    expect(textos.some((t) => t.includes('Entrega a Cliente'))).toBe(false);
+    expect(textos.some((t) => t.includes('Error de Entrada'))).toBe(false);
+    // ⭐ Y la pata del traspaso, que es la que el filtro por dirección NO alcanzaba.
+    expect(textos.some((t) => t.includes('Transferencia entre Almacenes (Salida)'))).toBe(false);
     // Y las salidas legítimas siguen ahí: la reserva no se llevó por delante lo de siempre.
-    expect(textos.some((t) => t.includes('Entrega a Cliente'))).toBe(true);
+    expect(textos.some((t) => t.includes('Otras Salidas'))).toBe(true);
   });
 
   it('guardar arranca DESHABILITADO y se habilita al completar la captura', async () => {
@@ -277,7 +323,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     const usuario = userEvent.setup();
     renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
     await elegirModelo(usuario);
-    await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Entrega a Cliente (salida)
+    await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas (salida)
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
 
     const opciones = [...screen.getByTestId('mov-orden').querySelectorAll('option')];
@@ -457,6 +503,43 @@ describe('MovimientosPtPagina (F3-E3)', () => {
         opciones.onSuccess({ folio: 4321, totalPiezas: 12 });
       });
       expect(screen.getByTestId('mov-motivo')).toHaveValue('');
+    });
+  });
+
+  /**
+   * ⏳ Fila 0.171 — LA VENTANA DE FECHA. La guarda de verdad está en el dominio (sin
+   * `ipt.fecha-libre`, sólo los últimos 7 días y nunca futura); esto sólo fija que la pantalla no
+   * ofrezca una fecha que el servidor va a rebotar. Se mide con `min`/`max` porque es lo que
+   * acota el selector nativo sin pintar un control roto.
+   */
+  describe('la fecha del movimiento (fila 0.171, ex acceso #28)', () => {
+    it('SIN `ipt.fecha-libre` el selector se acota a la ventana (min = hace 7 días, max = hoy)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      // El campo de fecha sólo se pinta con un modelo elegido (la captura arranca por ahí).
+      await elegirModelo(usuario);
+      const campo = screen.getByTestId('mov-fecha');
+      // ⚠️ El `min` se calcula APARTE, no con la misma función que lo produce: si se afirmara con
+      // `inicioVentanaCapturaPt()` la prueba diría «el helper es igual a sí mismo» y un error de
+      // aritmética pasaría en verde. Aquí se mide lo que importa: son 7 días completos hacia atrás.
+      const hoyUtc = new Date();
+      const sieteAtras = new Date(
+        Date.UTC(hoyUtc.getUTCFullYear(), hoyUtc.getUTCMonth(), hoyUtc.getUTCDate()) -
+          7 * 86_400_000,
+      )
+        .toISOString()
+        .slice(0, 10);
+      expect(campo).toHaveAttribute('max', hoy());
+      expect(campo).toHaveAttribute('min', sieteAtras);
+    });
+
+    it('CON `ipt.fecha-libre` no hay tope: cualquier fecha (gemela positiva)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesionConFechaLibre() });
+      await elegirModelo(usuario);
+      const campo = screen.getByTestId('mov-fecha');
+      expect(campo).not.toHaveAttribute('min');
+      expect(campo).not.toHaveAttribute('max');
     });
   });
 });

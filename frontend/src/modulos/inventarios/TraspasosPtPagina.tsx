@@ -30,11 +30,7 @@ import {
   tallasColumnas,
   totalMatriz,
 } from './matriz-inventario';
-
-/** Fecha de hoy en YYYY-MM-DD (zona local). */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoy, limitesFechaCapturaPt } from './fecha-captura-pt';
 
 /**
  * TRASPASO entre almacenes (F3-E3, doc 04-Inventarios — Transferencia entre almacenes). Mueve un
@@ -64,6 +60,9 @@ function hoy(): string {
 export function TraspasosPtPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-pt.mover');
+  // Fila 0.171 — mismo candado que el movimiento manual: el traspaso escribe DOS movimientos de
+  // kardex con esta fecha. Sin `ipt.fecha-libre`, el selector se acota a la ventana del servidor.
+  const limitesFecha = limitesFechaCapturaPt(tienePermiso('ipt.fecha-libre'));
 
   const [idAlmacenOrigen, setIdAlmacenOrigen] = useState<string>('');
   const [idAlmacenDestino, setIdAlmacenDestino] = useState<string>('');
@@ -322,6 +321,7 @@ export function TraspasosPtPagina(): React.JSX.Element {
                     value={fecha}
                     onChange={(e) => setFecha(e.target.value)}
                     disabled={!puedeMover}
+                    {...limitesFecha}
                     data-testid="traspaso-fecha"
                   />
                 </Field>

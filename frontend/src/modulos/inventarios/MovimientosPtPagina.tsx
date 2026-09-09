@@ -30,11 +30,7 @@ import {
   tallasColumnas,
   totalMatriz,
 } from './matriz-inventario';
-
-/** Fecha de hoy en YYYY-MM-DD (zona local), para el default del campo fecha. */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoy, limitesFechaCapturaPt } from './fecha-captura-pt';
 
 /**
  * MOVIMIENTOS MANUALES de inventario PT (F3-E3, doc 04-Inventarios). Captura una entrada, salida o
@@ -65,6 +61,10 @@ function hoy(): string {
 export function MovimientosPtPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-pt.mover');
+  // Fila 0.171 — la fecha LIBRE es un privilegio (`ipt.fecha-libre`, ex acceso #28 del viejo). Sin
+  // él, el selector se acota a la ventana que el servidor acepta. La guarda de verdad está en el
+  // dominio: esto es para no ofrecer una fecha que va a rebotar.
+  const limitesFecha = limitesFechaCapturaPt(tienePermiso('ipt.fecha-libre'));
 
   const [idTipoMov, setIdTipoMov] = useState<string>('');
   const [idAlmacen, setIdAlmacen] = useState<string>('');
@@ -310,6 +310,7 @@ export function MovimientosPtPagina(): React.JSX.Element {
                     value={fecha}
                     onChange={(e) => setFecha(e.target.value)}
                     disabled={!puedeMover}
+                    {...limitesFecha}
                     data-testid="mov-fecha"
                   />
                 </Field>

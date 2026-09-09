@@ -57,6 +57,7 @@ import { z } from 'zod';
 import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { verificarFechaCapturable } from '../../comun/fecha-capturable.js';
 import { ZONA_DEL_NEGOCIO } from '../../comun/fecha-negocio.js';
 import {
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
@@ -75,7 +76,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { DONDE_CANCELAR_AJUSTE_CICLICO } from './cancelacion-comun.js';
-import { rechazarTipoReservado } from './salida-sin-orden.js';
+import { rechazarTipoReservado } from './tipos-reservados.js';
 
 // ── Códigos estables de los tipos de movimiento que el dominio resuelve por nombre ───────────────
 
@@ -340,6 +341,40 @@ function aDateColumna(valor: string): Date {
   return new Date(`${valor}T00:00:00.000Z`);
 }
 
+/**
+ * ⏳ **LA FECHA DEL MOVIMIENTO VUELVE A TENER CANDADO (fila 0.171).**
+ *
+ * En el sistema viejo, poner una fecha libre a un movimiento de PT era un privilegio: el **acceso
+ * #28**, *«Poder meter la fecha que sea en los movimientos de almacen de PT»* (doc
+ * `04-Inventarios`). v2 se trajo el permiso al catálogo —`ipt.fecha-libre`, con su `idAcceso: 28`
+ * anotado— pero **se le olvidó la guarda**: hasta esta fila el esquema aceptaba cualquier fecha sin
+ * mirar permiso, y el permiso no tenía UN SOLO llamador en todo `backend/src`. El gemelo de
+ * Indicadores (`indicadores.fecha-libre`) sí protege desde F7-E4, y es lo que demuestra que aquí
+ * hubo un descuido y no una decisión.
+ *
+ * Backdatear un movimiento no es cosmético: el kardex ES el inventario (D3) y la fecha es por
+ * dónde se corta el saldo a un día, se cuadra un cíclico y se lee «cuánto había cuando». Una
+ * entrada fechada el mes pasado cambia una historia que ya se leyó.
+ *
+ * 🔑 Va en el DOMINIO, no en el esquema del contrato (A1): la pantalla puede acotar el selector,
+ * pero quien llame por otro camino se topa con la misma pared.
+ *
+ * ⏳ **La VENTANA (7 días) es un DEFAULT PROPUESTO, pendiente de que lo confirme Daniel.** Se toma
+ * de `comun/fecha-capturable.ts` por simetría con Indicadores; nadie ha decidido cuál es la buena
+ * para el almacén de PT.
+ *
+ * 🔴 **Y hay que decirlo aquí, pegado a la guarda: con el seed de HOY esta puerta no le cierra a
+ * nadie.** Los SEIS perfiles que pueden mover PT (`Directivo`, `Gerencial`, `Ventas`, `Logística`,
+ * `Asistente`, `Secretarial`) llevan también `ipt.fecha-libre` — herencia de la cascada del sistema
+ * viejo, el mismo defecto que documenta el perfil `Secretarial` en `prisma/seed.ts` y que las filas
+ * 0.105/0.128 vienen podando de a uno. El gemelo de Indicadores está exactamente igual. El
+ * MECANISMO ya existe (que es lo que faltaba); a QUIÉN se le quita la llave es una decisión de
+ * perfiles que le toca a Daniel, no a esta fila.
+ */
+function verificarFechaMovimientoPt(sesion: SesionUsuario, fechaIso: string): void {
+  verificarFechaCapturable(sesion, aDateColumna(fechaIso), { permiso: 'ipt.fecha-libre' });
+}
+
 /** Obtiene un movimiento (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9). */
 async function obtenerMovimiento(
   idMovimiento: number,
@@ -378,14 +413,21 @@ export async function registrarMovimientoPt(
 ): Promise<MovimientoPtSalida> {
   verificarPermiso(sesion, 'inventario-pt.mover');
   const datos = validarEntrada(esquemaMovimientoPtCrear, entrada);
+  // Fila 0.171 — la fecha LIBRE es un privilegio (ex acceso #28); sin él, sólo la ventana.
+  verificarFechaMovimientoPt(sesion, datos.fecha);
   const idEmpresa = sesion.idEmpresaActiva;
 
   const idMovimiento = await enTransaccion(async (tx) => {
-    // ⛔ Fila 0.104 — «Devolución a Proveedor» y «Venta de Material» NO son movimientos manuales
-    // de producto terminado. Nacieron en esa fila para telas y avíos, y como el catálogo de tipos
-    // es global se colaban al desplegable de esta pantalla: cualquiera con `inventario-pt.mover`
-    // podía estampar el rótulo que Daniel se reservó, y quien leyera el kardex creería que esa
-    // salida la autorizó él. La venta de PT tiene su propia fila (0.130), con cliente y precio.
+    // ⛔ Ningún rótulo RESERVADO se estampa a mano (`tipos-reservados.ts`), por las DOS razones:
+    //  • 0.104 — «Devolución a Proveedor» / «Venta de Material» los escribe sólo la dirección por
+    //    su pantalla; quien leyera el kardex creería que esa salida la autorizó Daniel. La venta
+    //    de PT tiene su propia fila (0.130), con cliente y precio.
+    //  • 0.171 — los DOCE que escribe SÓLO el sistema (la lista y el porqué de cada uno están en
+    //    `tipos-reservados.ts`). Los dos peores tienen su reflejo aquí mismo: `error-entrada` /
+    //    `error-salida` son los que estampa la CANCELACIÓN de abajo —puestos a mano el kardex
+    //    afirmaría una cancelación que nunca ocurrió— y `transferencia-salida`/`-entrada` son las
+    //    dos patas que `registrarTraspasoPt` escribe JUNTAS: una sola, a mano, es media
+    //    transferencia (mercancía que sale de un almacén y no llega a ninguno).
     await rechazarTipoReservado(tx, datos.idTipoMov);
     const tipo = await tipoPorCodigoId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
@@ -447,6 +489,11 @@ export async function registrarTraspasoPt(
 ): Promise<TraspasoPtSalida> {
   verificarPermiso(sesion, 'inventario-pt.mover');
   const datos = validarEntrada(esquemaTraspasoPtCrear, entrada);
+  // Fila 0.171 — el traspaso escribe DOS movimientos de kardex con esta fecha, así que pasa por el
+  // mismo candado: el acceso #28 del viejo hablaba de «los movimientos de almacen de PT», no de una
+  // pantalla en particular. Dejar sólo el movimiento manual guardado sería cerrar una de dos
+  // puertas al mismo dato.
+  verificarFechaMovimientoPt(sesion, datos.fecha);
   const idEmpresa = sesion.idEmpresaActiva;
 
   if (datos.idAlmacenOrigen === datos.idAlmacenDestino) {
@@ -749,8 +796,20 @@ function hoyDelNegocio(ahora: Date): string {
  *    pedir el kardex no puede volver a traer diez años.
  *  • Si viene `hasta` sin `desde`, la ventana son los 12 meses que TERMINAN en `hasta` (no «todo
  *    hasta esa fecha»): la garantía de piso vale también ahí.
- *  • Si no viene `hasta`, no se pone techo — un movimiento con fecha futura (los hay: se capturan
- *    con la fecha del documento) sigue apareciendo, que es lo que uno espera al abrir el kardex.
+ *  • Si no viene `hasta`, no se pone techo — un movimiento con fecha futura sigue apareciendo, que
+ *    es lo que uno espera al abrir el kardex.
+ *
+ * ⚠️ **OJO con la frase «los hay: se capturan con la fecha del documento», que esta fila BORRÓ de
+ * aquí porque ya no es cierta sin matices.** Desde la 0.171 el movimiento manual y el traspaso
+ * RECHAZAN una fecha futura a quien no tenga `ipt.fecha-libre`. O sea que hoy sólo pueden nacer
+ * con fecha futura: (a) los que capture alguien CON esa llave —que hoy son todos los perfiles que
+ * mueven PT—, y (b) los que escriba el sistema o traiga el ETL, que no pasan por la guarda. La
+ * lectura sigue sin techo a propósito: si existen, se ven.
+ *
+ * ⏳ **Y queda una pregunta de negocio abierta, numerada aparte:** ¿el almacén de PT captura de
+ * verdad movimientos con fecha futura? Si la respuesta es que sí y es habitual, la guarda de la
+ * 0.171 le estorbaría a quien se quede sin la llave el día que se poden los perfiles. Va junto con
+ * la pregunta de cuántos días debe durar la ventana — las dos las contesta Daniel de una vez.
  */
 export function resolverVentanaKardexPt(
   filtros: { desde?: string | undefined; hasta?: string | undefined },

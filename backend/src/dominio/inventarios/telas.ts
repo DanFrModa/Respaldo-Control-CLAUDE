@@ -79,10 +79,8 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { exigirCancelableFueraDelCiclico } from './cancelacion-comun.js';
-import {
-  exigirPermisoParaCancelarSalidaSinOrden,
-  rechazarTipoReservado,
-} from './salida-sin-orden.js';
+import { exigirPermisoParaCancelarSalidaSinOrden } from './salida-sin-orden.js';
+import { rechazarTipoReservado } from './tipos-reservados.js';
 
 // ── Códigos estables de los tipos de movimiento que el dominio resuelve por nombre ───────────────
 
@@ -375,7 +373,8 @@ export async function ajustarInventarioTela(
     // ser de esta empresa, A9). Antes no se miraba nada de eso aquí.
     await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     // Fila 0.104 — un ajuste NO puede estampar «Devolución a Proveedor» ni «Venta de Material»:
-    // esos dos rótulos sólo los escribe la salida sin orden, que exige la llave del dueño.
+    // esos dos rótulos sólo los escribe la salida sin orden, que exige la llave del dueño. Y desde
+    // la 0.171 tampoco los que escribe SÓLO el sistema (`error-*`, recibo, entrega, merma).
     // ⚠️ Se puso aquí cuando esta vía LEGADA seguía EXPUESTA (`POST /inventarios/telas/ajustes`,
     // con el mismo `inventario-telas.mover`): cerrar sólo el flujo nuevo dejaba el rótulo
     // falsificable por la puerta de al lado. Esa ruta se retiró en la fila 0.170 y la guarda se

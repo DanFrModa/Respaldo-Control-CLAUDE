@@ -51,13 +51,17 @@
          que ningun `<SelectNativo>` se alimente del catalogo de proveedores.
        - `src/documentos.test.ts` ejecuta `herramientas/verificar-documentos.mjs`
          (fila 0.142) para cruzar el contador de filas de HOJA-DE-RUTA.md contra su
-         linea de resumen y el numero de version en sus cuatro sitios. */
+         linea de resumen y el numero de version en sus cuatro sitios.
+       - `src/ventana-fecha-pt.test.ts` lee frontend/openapi.json para exigir que la
+         ventana de fecha que acota el selector de PT (fila 0.171) sea la MISMA que
+         el backend anuncia — el numero vive en cuatro sitios y es provisional. */
   "exclude": [
     "src/documentos.test.ts",
     "src/version.test.ts",
     "src/limite-cuerpo-api.test.ts",
     "src/cabeceras-seguridad-nginx.test.ts",
     "src/abreviatura-e2e.test.ts",
-    "src/selector-proveedor-unico.test.ts"
+    "src/selector-proveedor-unico.test.ts",
+    "src/ventana-fecha-pt.test.ts"
   ]
 }
