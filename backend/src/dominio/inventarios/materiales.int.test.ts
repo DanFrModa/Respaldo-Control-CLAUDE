@@ -1225,6 +1225,38 @@ describe('El PERIODO del kardex de TELA por lote (fila 0.173)', () => {
     expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
     expect(kardex.renglones[0]?.saldo).toBe(37);
   });
+
+  /**
+   * ⭐⭐⭐ LA LLAVE DEL `GROUP BY` SON **DOS** COLUMNAS (lote × almacén), Y AÑADIRLE UNA TERCERA ES
+   * TAN LETAL COMO QUITAR UNA CONDICIÓN DEL `WHERE` — pero nadie lo medía.
+   *
+   * 🔑 Las demás pruebas de este bloque razonan sobre **QUITAR** guardas. Ésta fija la mutación
+   * simétrica, que es la más natural de todas («agrupo también por lo que estoy mirando»):
+   * `GROUP BY 1, 2, m."id_tipo_mov"` —o `, d."id"`— parte el cubo en una fila por dirección, el
+   * `new Map(...)` del llamador se queda con **la última** (y el orden entre empates de
+   * `ORDER BY a."nombre", l."clave"` **ni siquiera es estable**), y la columna «Saldo» arrancaría
+   * de +150 o de −30 en vez de 120.
+   */
+  it('⭐⭐⭐ el saldo anterior de lote×almacén es UNA fila con la SUMA (entradas menos salidas)', async () => {
+    const { idLote } = await crearLote('2026-01-10', 100);
+    await movimientoEn('2026-01-11', 'entrada', [{ idLote, cantidad: 50 }]);
+    await movimientoEn('2026-01-12', 'salida', [{ idLote, cantidad: 30 }]);
+    // Algo DENTRO del periodo, para que el lote tenga renglón que enseñar.
+    await movimientoEn('2026-06-20', 'entrada', [{ idLote, cantidad: 1 }]);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01' },
+      bd(),
+    );
+
+    // ⭐ UNA sola fila para el par (lote, almacén), con la suma neta.
+    expect(kardex.saldosIniciales).toHaveLength(1);
+    expect(kardex.saldosIniciales[0]?.idLote).toBe(idLote);
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(120); // 100 + 50 − 30
+    expect(kardex.renglones).toHaveLength(1);
+    expect(kardex.renglones[0]?.saldo).toBe(121);
+  });
 });
 
 describe('El PERIODO del kardex de AVÍO (fila 0.173)', () => {
@@ -1452,5 +1484,66 @@ describe('El PERIODO del kardex de AVÍO (fila 0.173)', () => {
     );
     expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
     expect(kardex.renglones[0]?.saldo).toBe(37);
+  });
+  /**
+   * ⭐⭐⭐ LA LLAVE DEL `GROUP BY` ES **UNA SOLA COLUMNA** (el almacén), Y AÑADIRLE OTRA ES TAN LETAL
+   * COMO QUITAR UNA CONDICIÓN DEL `WHERE` — pero nadie lo medía.
+   *
+   * 🔑 El lote del avío es la tentación exacta: está en el renglón y se pinta en la tabla, pero
+   * **NO entra en la dimensión de existencia** (R4 — la existencia de avíos es avío×almacén). Con
+   * `GROUP BY 1, d."id_lote"` el saldo anterior devuelve una fila por lote, el `new Map(...)` del
+   * llamador se queda con **la última** (y el orden entre empates de `ORDER BY a."nombre"` **ni
+   * siquiera es estable**), y la columna «Saldo» arranca del saldo de UN lote en vez del total del
+   * almacén. El montaje mete además las dos direcciones, así que muere igual con
+   * `GROUP BY 1, m."id_tipo_mov"` o con `GROUP BY 1, d."id"`.
+   */
+  it('⭐⭐⭐ el saldo anterior de un almacén es UNA fila con la SUMA (no una por lote)', async () => {
+    // Dos lotes del MISMO avío en el MISMO almacén, antes del periodo. El lote se guarda en el
+    // renglón (R4) pero no parte la existencia: los dos caen en el mismo cubo de saldo.
+    const loteX = await cliente.lote.create({
+      data: { clave: 'AVIO-LOTE-X', idColor: colorRojo.id },
+    });
+    const loteY = await cliente.lote.create({
+      data: { clave: 'AVIO-LOTE-Y', idColor: colorRojo.id },
+    });
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-01-10',
+        motivo: 'entrada del lote X',
+        lineas: [{ idAvio: avioCierre.id, idLote: loteX.id, cantidad: 100 }],
+      },
+      bd(),
+    );
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-01-11',
+        motivo: 'entrada del lote Y',
+        lineas: [{ idAvio: avioCierre.id, idLote: loteY.id, cantidad: 50 }],
+      },
+      bd(),
+    );
+    // Y una SALIDA (sin lote) antes del periodo: en el mismo cubo conviven las dos direcciones.
+    await ajusteEn('2026-01-12', 'salida', 30);
+    // Algo DENTRO del periodo, para que el almacén tenga renglón que enseñar.
+    await ajusteEn('2026-06-20', 'entrada', 1);
+
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01' },
+      bd(),
+    );
+
+    // ⭐ UNA sola fila para Avíos A —no tres— y con la suma neta de todo lo anterior.
+    expect(kardex.saldosIniciales).toHaveLength(1);
+    expect(kardex.saldosIniciales[0]?.almacen).toBe('Avíos A');
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(120); // 100 + 50 − 30
+    expect(kardex.renglones).toHaveLength(1);
+    expect(kardex.renglones[0]?.saldo).toBe(121);
   });
 });

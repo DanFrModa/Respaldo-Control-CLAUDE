@@ -1546,4 +1546,57 @@ describe('El PERIODO del kardex por color (fila 0.173)', () => {
     expect(kardex.saldosIniciales[0]?.saldoCuerpo).toBe(30);
     expect(kardex.renglones[0]?.saldoCuerpo).toBe(37);
   });
+  /**
+   * ⭐⭐⭐ LA LLAVE DEL `GROUP BY` ES **UNA SOLA COLUMNA**, Y AÑADIRLE OTRA ES TAN LETAL COMO QUITAR
+   * UNA DEL `WHERE` — pero nadie lo medía.
+   *
+   * 🔑 El resto de las pruebas de este bloque razonan sobre **QUITAR** condiciones (y esas guardas
+   * mueren con precisión: quitar `id_partida` mata sólo su prueba). Lo que faltaba es la mutación
+   * simétrica y **la más natural que existe aquí**: *«agrupo por lo mismo que filtro»*, o sea
+   * `GROUP BY 1, d."id_partida"`. No es teórica — con ella el saldo anterior devuelve **una fila por
+   * partida del mismo almacén**, el `new Map(...)` del llamador se queda con **la última** (y el
+   * orden entre empates de `ORDER BY a."nombre"` **ni siquiera es estable**), y la columna «Saldo»
+   * arranca del saldo de UNA partida en vez del total del almacén. El caso es el normal: cualquier
+   * color recibido en dos partidas, mirado con la ventana por omisión.
+   *
+   * El montaje deja DOS partidas y DOS direcciones (entrada y salida) en el MISMO almacén y ANTES
+   * del periodo, así que muere igual con `GROUP BY 1, m."id_tipo_mov"` o con `GROUP BY 1, d."id"`:
+   * lo que fija es que el saldo anterior de un almacén es **UNA fila con la suma neta**.
+   */
+  it('⭐⭐⭐ el saldo anterior de un almacén es UNA fila con la SUMA (no una por partida)', async () => {
+    // Dos partidas del mismo almacén, antes del periodo.
+    await entradaEn('2026-01-10', 100, 40);
+    await entradaEn('2026-01-11', 50, 20);
+    // Y una SALIDA antes del periodo (el traspaso reparte FIFO: sale de la partida más vieja), para
+    // que en el mismo cubo convivan las dos direcciones.
+    await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-01-12',
+        motivo: 'Se manda al cortador',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 30, cantidadComplemento: 10 }],
+      },
+      bd(),
+    );
+    // Algo DENTRO del periodo, para que el almacén tenga renglones que enseñar.
+    await entradaEn('2026-06-20', 1, 1);
+
+    const kardex = await kardexTelaColor(
+      sesion(),
+      { idTelaColor: colorMarino.id, desde: '2026-06-01' },
+      bd(),
+    );
+
+    // ⭐ UNA sola fila para Bodega A —no dos, ni tres— y con la suma neta de todo lo anterior.
+    expect(kardex.saldosIniciales).toHaveLength(1);
+    expect(kardex.saldosIniciales[0]?.almacen).toBe('Bodega A');
+    expect(kardex.saldosIniciales[0]?.saldoCuerpo).toBe(120); // 100 + 50 − 30
+    expect(kardex.saldosIniciales[0]?.saldoComplemento).toBe(50); // 40 + 20 − 10
+    // Y el saldo corrido arranca de ahí (si el Map se quedara con una partida, diría 71 u 81).
+    expect(kardex.renglones).toHaveLength(1);
+    expect(kardex.renglones[0]?.saldoCuerpo).toBe(121);
+    expect(kardex.renglones[0]?.saldoComplemento).toBe(51);
+  });
 });

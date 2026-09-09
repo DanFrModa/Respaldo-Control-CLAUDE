@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { KardexAvio, KardexTela } from '@/api/tipos';
@@ -54,18 +54,48 @@ const kardexTelaVacio: KardexTela = {
   renglones: [],
 };
 
-/** Kardex de avío mínimo (para la pestaña de avíos). */
+/**
+ * Kardex de AVÍO con un movimiento. Antes era una respuesta vacía y eso bastaba, porque de esta
+ * pestaña sólo se comprobaba que las fechas viajaran; desde la corrección de la 0.173 se le mide lo
+ * mismo que a la de telas (ver el bloque «la pestaña de AVÍOS…» de abajo).
+ */
 const kardexAvio: KardexAvio = {
   idAvio: 3,
   avio: 'CIERRE-1',
   descripcion: 'Cierre metálico',
   ...PERIODO,
   saldosIniciales: [],
-  renglones: [],
+  renglones: [
+    {
+      idMovimiento: 20,
+      folio: 2,
+      fecha: '2026-06-21',
+      idTipoMov: 14,
+      tipoMov: 'Ajuste (Entrada)',
+      direccion: 'entrada',
+      idAlmacen: 9,
+      almacen: 'Avíos A',
+      idLote: null,
+      entrada: 40,
+      salida: 0,
+      saldo: 40,
+      costoUnit: null,
+      importe: null,
+      origenTipo: 'movimiento-manual',
+      origenId: null,
+      cancelado: false,
+      observaciones: null,
+    },
+  ],
 };
+
+/** Kardex de avío SIN movimientos en el periodo (el vacío de esa pestaña). */
+const kardexAvioVacio: KardexAvio = { ...kardexAvio, renglones: [] };
 
 /** Lo que devuelve `useKardexTela` en cada prueba (por defecto, el kardex con un movimiento). */
 const datosKardexTela = vi.fn<() => KardexTela>(() => kardexTela);
+/** Lo mismo para AVÍOS: la pestaña se mide igual que la de telas, así que su doble también varía. */
+const datosKardexAvio = vi.fn<() => KardexAvio>(() => kardexAvio);
 /** La consulta con la que se llamó `useKardexTela` (para comprobar que las fechas VIAJAN). */
 const consultaKardexTela = vi.fn<(q: unknown) => void>();
 const consultaKardexAvio = vi.fn<(q: unknown) => void>();
@@ -78,7 +108,7 @@ vi.mock('@/api/inventario-materiales', () => ({
   },
   useKardexAvio: (q: unknown) => {
     consultaKardexAvio(q);
-    return { data: kardexAvio, isPending: false, isError: false, error: null };
+    return { data: datosKardexAvio(), isPending: false, isError: false, error: null };
   },
   useCancelarTela: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarAvio: () => ({ mutate: vi.fn(), isPending: false }),
@@ -119,9 +149,16 @@ vi.mock('./SelectorAvio', () => ({
 // prueba nueva insertada en medio no hereda el kardex vacío de la anterior.
 beforeEach(() => {
   datosKardexTela.mockReturnValue(kardexTela);
+  datosKardexAvio.mockReturnValue(kardexAvio);
   consultaKardexTela.mockClear();
   consultaKardexAvio.mockClear();
 });
+
+/** Abre la pestaña de avíos y elige uno (las dos pestañas son excluyentes: sólo una se pinta). */
+function abrirAvios(): void {
+  fireEvent.click(screen.getByTestId('kardex-mat-dim-avio'));
+  fireEvent.click(screen.getByTestId('sel-avio'));
+}
 
 describe('KardexMaterialesPagina (F4-E1)', () => {
   it('muestra el kardex de la tela elegida con tabla (escritorio) y tarjetas (móvil)', () => {
@@ -280,10 +317,19 @@ describe('KardexMaterialesPagina (F4-E1)', () => {
         sesion: estadoSesionDePrueba(['inventario-telas.ver']),
       });
       fireEvent.click(screen.getByTestId('sel-tela'));
-      const filas = screen.getAllByTestId('kardex-tela-saldo-inicial');
-      expect(filas.length).toBeGreaterThan(0);
-      expect(filas[0]).toHaveTextContent('300');
-      expect(filas[0]).toHaveTextContent('LOTE-A');
+      // ⚠️ Las DOS superficies, no «la primera que aparezca»: la pantalla pinta tarjetas en móvil y
+      // tabla en escritorio, y con un `getAllByTestId(...)[0]` borrar una de las dos seguía en
+      // verde porque la otra la tapaba.
+      const enTabla = within(screen.getByTestId('kardex-tela-tabla')).getByTestId(
+        'kardex-tela-saldo-inicial',
+      );
+      expect(enTabla).toHaveTextContent('300');
+      expect(enTabla).toHaveTextContent('LOTE-A');
+      const enTarjetas = within(screen.getByTestId('kardex-tela-tarjetas')).getByTestId(
+        'kardex-tela-saldo-inicial',
+      );
+      expect(enTarjetas).toHaveTextContent('300');
+      expect(enTarjetas).toHaveTextContent('LOTE-A');
     });
 
     /**
@@ -292,6 +338,85 @@ describe('KardexMaterialesPagina (F4-E1)', () => {
      * vacío más probable es «no hay nada en estos doce meses», no «esta tela no tiene nada». Decir
      * lo segundo mandaría a buscar a otra pantalla que tampoco lo tiene.
      */
+    /**
+     * 🔴 LA PESTAÑA DE AVÍOS ES UNA COPIA A MANO, Y HASTA AQUÍ ESTABA SIN GUARDAR.
+     *
+     * El JSX de avíos no es el de telas: tiene **otro número de columnas** (7+1 contra 8+1) y sus
+     * `data-testid` se escribieron uno por uno. De ella sólo se medía que las fechas viajaran ⇒
+     * borrar su línea del periodo, su aviso de corte o su fila de «Saldo anterior» dejaba las 13
+     * pruebas del archivo **en verde**, y ningún otro archivo del repo —unit o e2e— nombra
+     * `kardex-avio-periodo`, `-truncado`, `-saldo-inicial` ni `-vacio`. En una fila cuyo producto
+     * es justamente que la pantalla no mienta, eso salía a `prueba` sin que nadie lo notara.
+     *
+     * Estas cuatro aserciones son las mismas que las de telas, calcadas sobre la otra pestaña.
+     */
+    describe('la pestaña de AVÍOS se mide igual que la de telas (no es un adorno copiado)', () => {
+      it('⭐ dice QUÉ periodo está viendo, y avisa cuando es el de por omisión', () => {
+        renderConProveedores(<KardexMaterialesPagina />, {
+          sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+        });
+        abrirAvios();
+        const periodo = screen.getByTestId('kardex-avio-periodo');
+        expect(periodo).toHaveTextContent('2025-09-05');
+        expect(periodo).toHaveTextContent(/últimos 12 meses por omisión/);
+        // Sin techo NO se dice «a hoy»: el servidor lo deja abierto a propósito.
+        expect(periodo).not.toHaveTextContent(/hoy/);
+      });
+
+      it('⭐ si la lista vino CORTADA lo dice, y sin corte no hay aviso', () => {
+        datosKardexAvio.mockReturnValue({ ...kardexAvio, truncado: true, limite: 1000 });
+        const { unmount } = renderConProveedores(<KardexMaterialesPagina />, {
+          sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+        });
+        abrirAvios();
+        expect(screen.getByTestId('kardex-avio-truncado')).toHaveTextContent(/más\s+RECIENTES/);
+        unmount();
+
+        // El aviso tiene que significar algo: sin corte, no está.
+        datosKardexAvio.mockReturnValue(kardexAvio);
+        renderConProveedores(<KardexMaterialesPagina />, {
+          sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+        });
+        abrirAvios();
+        expect(screen.queryByTestId('kardex-avio-truncado')).not.toBeInTheDocument();
+      });
+
+      it('⭐⭐ pinta el SALDO ANTERIOR por almacén, de donde arranca la columna Saldo', () => {
+        datosKardexAvio.mockReturnValue({
+          ...kardexAvio,
+          saldosIniciales: [{ idAlmacen: 9, almacen: 'Avíos A', saldo: 250 }],
+        });
+        renderConProveedores(<KardexMaterialesPagina />, {
+          sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+        });
+        abrirAvios();
+        // Las DOS superficies (tarjetas en móvil, tabla en escritorio): con `getAllByTestId(...)[0]`
+        // borrar una de las dos se quedaba en verde porque la otra la tapaba.
+        const enTabla = within(screen.getByTestId('kardex-avio-tabla')).getByTestId(
+          'kardex-avio-saldo-inicial',
+        );
+        expect(enTabla).toHaveTextContent('Avíos A');
+        expect(enTabla).toHaveTextContent('250');
+        const enTarjetas = within(screen.getByTestId('kardex-avio-tarjetas')).getByTestId(
+          'kardex-avio-saldo-inicial',
+        );
+        expect(enTarjetas).toHaveTextContent('Avíos A');
+        expect(enTarjetas).toHaveTextContent('250');
+      });
+
+      it('🔴 y su vacío también dice que es DEL PERIODO (no «este avío no tiene nada»)', () => {
+        datosKardexAvio.mockReturnValue(kardexAvioVacio);
+        renderConProveedores(<KardexMaterialesPagina />, {
+          sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+        });
+        abrirAvios();
+        expect(screen.queryByTestId('kardex-avio-tabla')).not.toBeInTheDocument();
+        const vacio = screen.getByTestId('kardex-avio-vacio');
+        expect(vacio).toHaveTextContent(/en el periodo/);
+        expect(vacio).toHaveTextContent(/amplía las fechas/);
+      });
+    });
+
     it('🔴 el vacío del legado dice que es DEL PERIODO y que hay más atrás', () => {
       datosKardexTela.mockReturnValue(kardexTelaVacio);
       renderConProveedores(<KardexMaterialesPagina />, {

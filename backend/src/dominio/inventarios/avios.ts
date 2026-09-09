@@ -814,13 +814,27 @@ interface FiltrosSaldoAnteriorAvio {
  * prueba que muere al quitarlos y el tercero no puede tenerla — se dice aquí en vez de fingirla.
  *
  * ⚠️ **Y el desempate `d."id"` aquí NO puede tener prueba que muera, a diferencia de los kardex de
- * tela.** La captura de avíos prohíbe repetir el mismo avío en dos renglones
- * ({@link validarRenglonesAvioUnicos}), y este kardex filtra por UN avío ⇒ un movimiento aporta como
- * mucho UNA línea, así que la llave `(folio, id)` degenera en el folio y quitar el `id` no cambia
- * ningún resultado. Se conserva porque tiene que ser **exactamente** la llave del `ORDER BY` —el día
- * que un movimiento pueda traer dos renglones del mismo avío, el desempate ya está puesto—, y se
- * dice aquí en vez de fingir una prueba que no mediría nada. En tela por color sí muere (un traspaso
- * reparte FIFO entre partidas y escribe varios renglones del mismo color y almacén).
+ * tela.** Este kardex filtra por UN avío, y hoy **ningún** escritor puede meter dos renglones de ese
+ * avío en el MISMO movimiento ⇒ la llave `(folio, id)` degenera en el folio y quitar el `id` no
+ * cambia ningún resultado. Se conserva porque tiene que ser **exactamente** la llave del `ORDER BY`
+ * —el día que un movimiento sí traiga dos renglones del mismo avío, el desempate ya está puesto—, y
+ * se dice aquí en vez de fingir una prueba que no mediría nada. En tela por color sí muere (un
+ * traspaso reparte FIFO entre partidas y escribe varios renglones del mismo color y almacén).
+ *
+ * 🔑 **Y como aquí el COMENTARIO ES la garantía —no hay prueba detrás—, tiene que cubrir los SEIS
+ * caminos que escriben `movimiento_det_avio`, no sólo los que comparten razón.** Son tres razones
+ * distintas, y conviene saberlo porque cada una se puede romper por su lado:
+ *  1. **Ajuste, traspaso y salida sin orden** (`avios.ts`): lo impide
+ *     {@link validarRenglonesAvioUnicos} — rechaza el mismo avío repetido en la captura.
+ *  2. **Recepción de compra** (`compras/recepciones.ts`) y **nota de salida** (`notas/notas-salida.ts`):
+ *     emiten **un movimiento por renglón**, así que cada movimiento nace con UNA sola línea.
+ *  3. **Ajuste del inventario cíclico** (`indicadores/ciclico/avio.ts`): se apoya en el
+ *     `@@unique([idInventarioCiclico, idAvio])` de la BASE DE DATOS — el avío no se puede contar dos
+ *     veces en el mismo conteo, así que el movimiento no puede traerlo repetido.
+ *
+ * ⇒ **Si mañana aparece un séptimo escritor multi-línea que no pase por ninguna de las tres, esta
+ * afirmación se vuelve falsa y NADA suena.** Quien lo añada tiene que venir aquí: o le pone su
+ * guarda, o este párrafo deja de ser cierto y el desempate pasa a necesitar prueba propia.
  *
  * Va en SQL crudo a propósito: el signo lo da `tipos_movimiento_inventario.direccion`, que cuelga
  * del encabezado `movimientos`, y Prisma no sabe agrupar por columnas de una relación.
