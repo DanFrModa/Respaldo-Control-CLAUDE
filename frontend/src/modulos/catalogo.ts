@@ -707,24 +707,22 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['inventario-telas.ver'],
             subVista: true,
           },
-          {
-            clave: 'inventario-telas-salida-orden-lote',
-            titulo: 'Salida a orden por lote (legado)',
-            descripcion:
-              'Captura LEGADA de la salida a orden por lote (el flujo nuevo va por color)',
-            ruta: '/inventarios/telas/salida-orden-lote',
-            icono: 'paquete',
-            permisos: ['inventario-telas.mover'],
-            subVista: true,
-          },
+          // ⛔ «Salida a orden por lote (legado)» se RETIRÓ en la fila 0.170 (9-sep-2026). Era la
+          // ÚLTIMA de las tres pantallas del flujo viejo que todavía CAPTURABA: grababa renglones
+          // sin color y la pantalla de existencias que se mira hoy sólo lee lo que tiene color, así
+          // que sacar tela por ahí descontaba existencia que nadie veía moverse. Con ella se
+          // cerraron sus tres endpoints de escritura en el backend. Su ruta sobrevive como
+          // REDIRECCIÓN a la salida por color (`App.tsx`), para no dejar mudo un enlace guardado.
+          // El ajuste por lote se había retirado el 13-ago-2026 y el traspaso en la fila 0.098.
+          //
           // La ÚNICA vista de "materiales" que sigue colgando de «Telas»: el KARDEX. Sirve a las
-          // DOS dimensiones y su pata de tela SÍ SIGUE VIVA — es la única ventana que queda a los
-          // movimientos del flujo LEGADO por lote (el histórico migrado y lo que capture «Salida a
-          // orden por lote (legado)»), porque el kardex del inventario vigente va por COLOR y vive
-          // DENTRO de «Inventario de telas». Por eso NO se muda a «Avíos» como sus dos hermanas:
-          // esconderla de aquí sería quitarle la pantalla justo a quien la busca. Lo que sí se
-          // arregló (fila 0.098) es que MINTIERA: la pestaña dice «Telas (lote · legado)», explica
-          // de qué flujo habla y a dónde ir por el vigente, y el vacío ya no es mudo.
+          // DOS dimensiones y su pata de tela SÍ SIGUE VIVA — es la única ventana que queda al
+          // HISTÓRICO MIGRADO del sistema viejo (ya nada nuevo se captura con esa forma: la última
+          // captura por lote se retiró en la 0.170), porque el kardex del inventario vigente va por
+          // COLOR y vive DENTRO de «Inventario de telas». Por eso NO se muda a «Avíos» como sus dos
+          // hermanas: esconderla de aquí sería quitarle la pantalla justo a quien la busca. Lo que
+          // sí se arregló (fila 0.098) es que MINTIERA: la pestaña dice «Telas (lote · legado)»,
+          // explica de qué flujo habla y a dónde ir por el vigente, y el vacío ya no es mudo.
           //
           // Sus hermanas ya se fueron a «Avíos» al quedarse solo-avíos: el AJUSTE el 13-ago-2026 y
           // el TRASPASO en la fila 0.098 (mismo criterio, mismo defecto).
@@ -2070,6 +2068,9 @@ const EXIGENCIA_RUTA_EXTRA: readonly (readonly [ruta: `/${string}`, exige: Exige
   ['/produccion/corte', 'autenticado'],
   ['/produccion/envios', 'autenticado'],
   ['/produccion/recibos', 'autenticado'],
+  // Fila 0.170: «Salida a orden por lote (legado)» se retiró (capturaba sin color); su ruta redirige
+  // a la salida por COLOR, que es la que gatea con `inventario-telas.mover`.
+  ['/inventarios/telas/salida-orden-lote', 'autenticado'],
   ['/ruta-critica', 'autenticado'],
   ['/ruta-critica/bandeja', 'autenticado'],
   // ── Pantallas que nunca fueron hoja del menú ──

@@ -9,9 +9,24 @@ Construido en F4 (E1 = motor + pantallas; E6 = ETL del histórico + cuadre). Es 
 que escriben la recepción y las notas de [`compras-mrp.md`](compras-mrp.md).
 
 > ⚠️ **Desde A2 (6-ago-2026) el inventario de TELAS opera por PARTIDAS y COLOR** (sección A2 abajo).
-> El flujo por `Lote` de F4 quedó como **LEGADO en cuarentena**: sus pantallas siguen vivas
-> retituladas "(legado)", sus vistas/kardex **excluyen** los movimientos nuevos, y ningún flujo nuevo
-> escribe `Lote`. Los avíos NO cambian.
+> El flujo por `Lote` de F4 quedó como **LEGADO en cuarentena**: sus vistas/kardex **excluyen** los
+> movimientos nuevos, y ningún flujo nuevo escribe `Lote`. Los avíos NO cambian.
+>
+> 🔒 **Y desde la fila 0.170 (9-sep-2026) el flujo por lote YA NO ESCRIBE, por ninguna puerta.** Sus
+> tres capturas se fueron retirando —el ajuste el 13-ago-2026, el traspaso en la 0.098— pero **sus
+> endpoints seguían vivos**, y la tercera, «Salida a orden por lote (legado)», seguía capturando
+> desde ⌘K con el `inventario-telas.mover` que tienen seis perfiles. Escribían renglones **sin
+> color**, y la pantalla de existencias que se mira hoy (`existencia_tela_color`) los excluye: sacar
+> tela por ahí **descontaba existencia que nadie veía moverse**. Se retiraron la entrada de ⌘K, la
+> pantalla y los tres endpoints (`POST /inventarios/telas/ajustes`, `.../salidas-orden` y
+> `.../traspasos`); la ruta de la pantalla quedó como **redirección** a la salida por color.
+> **Lo que sobrevive del lote es SÓLO LECTURA + corrección:** las dos consultas
+> (`GET /inventarios/telas/existencias` y `.../kardex`) y
+> `POST /inventarios/telas/movimientos/:id/cancelar` —que además **no es sólo del legado**: es el
+> botón «cancelar» del kardex y acepta cualquier movimiento con renglones de tela, los del flujo por
+> color incluidos (por eso conserva las guardas de la 0.099/0.104)—. Las tres funciones de escritura
+> **siguen en el dominio, sin ruta**: son el andamio con el que las pruebas fabrican movimientos con
+> la forma legada para comprobar que el flujo por color los tolera.
 
 ## A2 — Inventario de telas por PARTIDAS y COLOR (2026-08-06)
 
@@ -128,8 +143,9 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - **Pantallas**: Existencias de telas (padre desplegable → colores con columnas cuerpo/complemento,
   pantone, unidad; **doble clic o botón** en el color → cajón con su kardex, cancelar-inverso y
   filtro por partida), Ajuste por color, Traspaso por color, **Salida a orden por color** (hereda el
-  deep-link "Descargar tela" de producción). Las de lote viven como "(legado)":
-  `/inventarios/telas/existencias-lote` y `/inventarios/telas/salida-orden-lote` (⌘K). El riel:
+  deep-link "Descargar tela" de producción). Del lote sobrevive **una sola** pantalla, "(legado)" y
+  de SÓLO CONSULTA: `/inventarios/telas/existencias-lote` (⌘K). `/inventarios/telas/salida-orden-lote`
+  se retiró en la fila 0.170 —capturaba sin color— y su ruta redirige a la salida por color. El riel:
   `Telas` es ahora nodo PADRE con 4 hijos visibles (existencias, **catálogo**, salida a orden,
   ajuste).
 - **El inventario arranca DESDE CERO** (conteo físico, decisión §Post-F9.11 punto 5): no se migran
@@ -166,7 +182,7 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - **Quién puede surtir tela: solo el rol `vende-telas`** (§Post-F9.12, 7-ago-2026). El selector de
   proveedor se acota **en servidor** (`GET /api/proveedores?rol=`) vía el hook compartido
   `useProveedoresPorRol` en: alta/edición de tela del catálogo (el proveedor DUEÑO de A1), entrada
-  por factura/remisión (B1) y el ajuste del flujo legado por lote. Mismo criterio que Producción
+  por factura/remisión (B1). Mismo criterio que Producción
   (Corte → `corte`). **El proveedor ya capturado se conserva** como opción aunque no traiga el rol
   (documentos viejos/migrados): el filtro es ayuda de captura, no candado retroactivo.
 

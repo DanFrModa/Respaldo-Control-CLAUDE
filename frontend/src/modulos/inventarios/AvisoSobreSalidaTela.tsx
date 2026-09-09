@@ -6,10 +6,11 @@ import type { PreviaSalidaTelaColor } from '@/api/tipos';
  * ⭐⭐ **AVISO (a) — LO QUE SE SACA CONTRA LO QUE LA ORDEN PIDE** (fila 0.101, Daniel §Post-F9.193
  * dec. 8).
  *
- * Lo comparten LAS DOS pantallas que sacan tela a una orden —la vigente por color y la LEGADA por
- * lote— porque es **el mismo aviso**: mismo veredicto, mismo servidor y mismas palabras. Vive aquí
- * para que arreglar la frase o el formato no haya que hacerlo dos veces (y para que no puedan
- * divergir sin que nadie lo note).
+ * Nació COMPARTIDO por las dos pantallas que sacaban tela a una orden —la vigente por color y la
+ * LEGADA por lote— porque era **el mismo aviso**: mismo veredicto, mismo servidor y mismas palabras.
+ * Desde la fila 0.170 la legada ya no existe (capturaba sin color), así que hoy lo usa **una sola**,
+ * `SalidaTelaColorOrdenPagina`. Se queda en su archivo aparte: sigue siendo una pieza de
+ * presentación con su propio contrato, y el vecindario no mejora metiéndola en la pantalla.
  *
  * 🔴 **No decide nada.** `sobreSalida`, `requerido`, `yaSalido` y `excedente` los calcula el dominio
  * (`inventarios/previa-salida-tela-orden.ts`) contra el snapshot de la explosión —la MISMA cifra que

@@ -69,7 +69,6 @@ import { InventariosPagina } from '@/modulos/inventarios/InventariosPagina';
 import { KardexMaterialesPagina } from '@/modulos/inventarios/KardexMaterialesPagina';
 import { KardexPtPagina } from '@/modulos/inventarios/KardexPtPagina';
 import { MovimientosPtPagina } from '@/modulos/inventarios/MovimientosPtPagina';
-import { SalidaTelaOrdenPagina } from '@/modulos/inventarios/SalidaTelaOrdenPagina';
 import { TraspasoMaterialesPagina } from '@/modulos/inventarios/TraspasoMaterialesPagina';
 import { TraspasosPtPagina } from '@/modulos/inventarios/TraspasosPtPagina';
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
@@ -277,7 +276,15 @@ const router = createBrowserRouter([
           // Inventario de telas y avíos (Módulo 4, F4-E1, D5/R4). Las vistas de telas por LOTE
           // quedan como LEGADO consultable (…-lote); con el arranque desde cero ya no operan.
           { path: 'inventarios/telas/existencias-lote', element: <ExistenciasTelasPagina /> },
-          { path: 'inventarios/telas/salida-orden-lote', element: <SalidaTelaOrdenPagina /> },
+          // ⛔ «Salida a orden por lote (legado)» se RETIRÓ en la fila 0.170: era la última captura
+          // del flujo viejo y grababa renglones SIN color, que la pantalla de existencias vigente
+          // no enseña (se descontaba tela que nadie veía moverse). Su ruta sobrevive como
+          // REDIRECCIÓN a la salida por color —el mismo criterio que las tres pantallas de
+          // producción retiradas en V1-E3a— para no romper marcadores ni enlaces guardados.
+          {
+            path: 'inventarios/telas/salida-orden-lote',
+            element: <Navigate to="/inventarios/telas/salida-orden" replace />,
+          },
           { path: 'inventarios/avios/existencias', element: <ExistenciasAviosPagina /> },
           { path: 'inventarios/materiales/kardex', element: <KardexMaterialesPagina /> },
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },

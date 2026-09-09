@@ -782,14 +782,18 @@ describe('riesgo de tono: los TRES estados contra la base', () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════
-// (d) LA PANTALLA LEGADA POR LOTE — la puerta trasera, medida por su punto de entrada
+// (d) LA QUE FUE LA PANTALLA LEGADA POR LOTE — la puerta trasera, medida por su punto de entrada
 // ═════════════════════════════════════════════════════════════════════════════════════════════════
 //
 // 🔴 Esta sección existe porque la rama de `lineasTela` se podía BORRAR ENTERA y todo el backend
 // seguía verde: la unit probaba el núcleo puro con una línea sin color hecha a mano —saltándose el
-// punto de entrada— y el frontend mockeaba el hook. Aquí se entra por donde entra la pantalla.
+// punto de entrada— y el frontend mockeaba el hook. Aquí se entra por donde entraba la pantalla.
+//
+// ⚠️ La pantalla y su endpoint se RETIRARON en la fila 0.170 (escribían tela SIN color, invisible
+// para la pantalla de existencias vigente). La sección se queda: la rama de `lineasTela` sigue viva
+// en el dominio y esto es lo único que la mide por su punto de entrada.
 
-describe('la pantalla LEGADA por lote entra al MISMO aviso', () => {
+describe('lo que entraba por la pantalla LEGADA por lote da el MISMO aviso', () => {
   /** Da de alta existencia por LOTE (flujo viejo, D5) y devuelve el id del lote creado. */
   async function entrarPorLote(cantidad: number): Promise<number> {
     const colorPrenda = await cliente.color.create({

@@ -94,8 +94,9 @@ export const CODIGO_TIPO_MOV_POR_CONCEPTO: Readonly<Record<ConceptoSalidaSinOrde
  * ## El defecto que esto cierra (hallazgo del reviewer, 2ª ronda)
  *
  * Los tipos de movimiento son un catálogo GLOBAL y activo, y los escritores GENÉRICOS de
- * inventario —el ajuste de tela por color, el ajuste LEGADO de tela por lote (`telas.ts`, que sigue
- * expuesto en `POST /inventarios/telas/ajustes`), el de avíos y el movimiento manual de producto
+ * inventario —el ajuste de tela por color, el ajuste LEGADO de tela por lote (`telas.ts`, que
+ * entonces seguía expuesto en `POST /inventarios/telas/ajustes`; esa ruta se retiró en la fila
+ * 0.170, la guarda se quedó), el de avíos y el movimiento manual de producto
  * terminado— aceptan **cualquier** `idTipoMov` que no sea de dirección `traspaso`. Así que, recién
  * sembrados, «Devolución a Proveedor» y «Venta de Material» quedaban al alcance de cualquiera con
  * `inventario-*.mover` —que son 8 de los 9 perfiles— y, de propina, aparecían en el desplegable de

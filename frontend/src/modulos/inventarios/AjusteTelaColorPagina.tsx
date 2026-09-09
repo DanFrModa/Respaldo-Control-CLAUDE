@@ -51,8 +51,10 @@ function hoy(): string {
  * Es la ÚNICA pantalla que ajusta tela: el ajuste del flujo viejo POR LOTE se quedó sin UI el
  * 13-ago-2026 (vivía como pestaña de «Ajuste de materiales», hoy «Ajuste de avíos» y solo-avíos) —
  * grababa `id_tela_color = NULL` y la vista `existencia_tela_color` lo excluye, así que ni movía
- * las existencias que se ven aquí. El endpoint legado sigue vivo en el backend; para tocarlo hay
- * que llamarlo a mano.
+ * las existencias que se ven aquí. Su endpoint sobrevivió año y medio sin pantalla, alcanzable a
+ * mano con el `inventario-telas.mover` que tienen seis perfiles: se RETIRÓ en la fila 0.170, junto
+ * con los del traspaso y la salida a orden por lote. Ya no hay puerta por la que entre tela sin
+ * color.
  */
 export function AjusteTelaColorPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();

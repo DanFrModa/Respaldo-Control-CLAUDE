@@ -39,9 +39,10 @@
  *   • Es **robusto**: hay órdenes cuyo color de tela todavía nadie amarró (el snapshot las guarda
  *     con `idTelaColor = NULL`) y hay histórico migrado de Access sin color ninguno. Comparando por
  *     color, ésas no casarían con nada y el aviso mentiría en las dos direcciones.
- *   • Recoge **las dos vías de salida**: la de color (esta pantalla) y la LEGADA por lote
- *     (`registrarSalidaTelaAOrden`), que no tiene color pero sí tela. Sumadas por tela, ninguna se
- *     escapa del conteo.
+ *   • Recoge **también lo que salió por la vía LEGADA por lote** (`registrarSalidaTelaAOrden`), que
+ *     no tiene color pero sí tela. Esa vía dejó de capturar en la fila 0.170 —se quedó sin ruta—,
+ *     pero sus movimientos siguen ahí (histórico migrado y lo que se alcanzó a capturar) y tienen
+ *     que contar. Sumando por tela, ninguno se escapa del conteo.
  * 🔻 **Lo que cuesta:** sacar de más en un color y de menos en otro, sin pasarse del total de la
  * tela, NO avisa. Es el precio de no inventar una segunda verdad; si algún día Daniel lo pide por
  * color, el sitio a cambiar es {@link evaluarSobreSalidaDeTela} y nada más.
@@ -171,13 +172,20 @@
  * sistema no lo puede saber.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
- * ## 🖥️ SIRVE A LAS DOS PANTALLAS QUE SACAN TELA A UNA ORDEN
+ * ## 🖥️ SIRVE A LA ÚNICA PANTALLA QUE SACA TELA A UNA ORDEN
  *
- * La vigente por COLOR (`lineas`) y la **LEGADA por lote** (`lineasTela`, tela sin color). La
- * segunda entra sólo al aviso (a) —la comparación es por tela de todos modos— y no dice nada del
- * tono, porque en ese flujo no hay ni color ni partida. Se incluye a propósito: sus salidas ya
- * contaban en `yaSalido` (comparten `origenTipo`), así que dejarla fuera del aviso la convertía en
- * la puerta trasera por la que se saca de más sin que nadie diga nada.
+ * La vigente por COLOR (`lineas`). Nació sirviendo a DOS: la otra era la **LEGADA por lote**
+ * (`lineasTela`, tela sin color), que entraba sólo al aviso (a) —la comparación es por tela de
+ * todos modos— y no decía nada del tono, porque en ese flujo no hay ni color ni partida. Se incluyó
+ * a propósito: sus salidas ya contaban en `yaSalido` (comparten `origenTipo`), así que dejarla
+ * fuera la convertía en la puerta trasera por la que se saca de más sin que nadie diga nada.
+ *
+ * 🔻 **Esa pantalla se retiró en la fila 0.170** (capturaba sin color) ⇒ **`lineasTela` se quedó SIN
+ * NINGÚN CLIENTE que lo mande**: el frontend sólo envía `lineas`, y la rama que lo procesa (abajo)
+ * ya **no se puede alcanzar desde el API**. Se conserva —campo, rama y su prueba— por la misma razón
+ * que las tres funciones de escritura de `inventarios/telas.ts`: es código correcto que documenta y
+ * mide la forma LEGADA, y borrarlo no arregla nada. Lo que **no** se hace es seguir describiéndolo
+ * como si la pantalla existiera.
  *
  * A9: todo se acota a la empresa activa. A4: reusa `inventario-telas.mover` (el permiso de la
  * captura que la previa acompaña) — **cero permisos nuevos, cero seed, cero migración**.

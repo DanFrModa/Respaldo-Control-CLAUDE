@@ -57,8 +57,14 @@ function leerIdDeepLink(state: unknown, clave: string): number | null {
  * producción / centro de órdenes) y, desde §Post-F9.13, también `state.idCortador`: con el corte
  * capturado a nombre de un cortador, la salida arranca en SU almacén (el que tiene ligado en el
  * catálogo) sin que haya que buscarlo. El servidor valida no-negativo de AMBOS componentes bajo lock
- * (D3). La salida vieja por lote sigue como "Salida a orden por lote (legado)".
- * `inventario-telas.mover` gobierna la captura.
+ * (D3). `inventario-telas.mover` gobierna la captura.
+ *
+ * ⭐ **Es la ÚNICA pantalla que saca tela a una orden, desde la fila 0.170.** Su antecesora,
+ * «Salida a orden por lote (legado)», se retiró ese día —con su entrada de ⌘K y su endpoint—: sacaba
+ * tela grabando renglones SIN color, y la vista `existencia_tela_color` los excluye, así que
+ * descontaba existencia que nadie veía moverse. La ruta vieja
+ * (`/inventarios/telas/salida-orden-lote`) REDIRIGE aquí, así que quien venga buscándola aterriza en
+ * esta pantalla: es la de siempre, sólo que por color.
  */
 export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -299,8 +305,9 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                   />
                 </div>
 
-                {/* ⭐⭐ AVISO (a) — SOBRE-SALIDA (fila 0.101, Daniel §Post-F9.193 dec. 8): el
-                    componente lo comparten las DOS pantallas que sacan tela a una orden. */}
+                {/* ⭐⭐ AVISO (a) — SOBRE-SALIDA (fila 0.101, Daniel §Post-F9.193 dec. 8). El
+                    componente vive aparte porque lo compartía con la pantalla LEGADA por lote,
+                    retirada en la fila 0.170; hoy esta es su única consumidora. */}
                 <AvisoSobreSalidaTela datos={avisos} testId="salida-color-aviso-sobre-salida" />
 
                 {/* ⭐⭐ AVISO (b1) — VARIAS PARTIDAS: la ALARMA (Daniel, DECISIONES §Post-F9.11

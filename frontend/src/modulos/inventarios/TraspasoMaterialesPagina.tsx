@@ -48,8 +48,9 @@ function hoy(): string {
  *
  * El traspaso de TELA se hace por COLOR en «Traspaso de telas por color»
  * (`/inventarios/telas/traspaso`) — lo dictó Daniel: «El traspaso se hace por color. No siempre hay
- * un lote completo para traspasar» (`DECISIONES.md §Post-F9.32`). El endpoint legado por lote sigue
- * vivo en el backend; para tocarlo hay que llamarlo a mano.
+ * un lote completo para traspasar» (`DECISIONES.md §Post-F9.32`). El endpoint legado por lote
+ * (`POST /inventarios/telas/traspasos`) **se RETIRÓ en la fila 0.170**, junto con las otras dos
+ * puertas que escribían tela sin color: ya no se puede llamar ni a mano.
  */
 export function TraspasoMaterialesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();

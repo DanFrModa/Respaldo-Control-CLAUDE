@@ -764,10 +764,14 @@ describe('(g) ⛔ los dos rótulos están RESERVADOS a la salida sin orden', () 
 
   it('🔴 la CUARTA puerta: el ajuste LEGADO por lote tampoco puede estamparlos', async () => {
     // ⚠️ Esta puerta NO estaba en la lista de tres del reviewer, y es la misma de siempre: además
-    // del ajuste de tela POR COLOR (`partidas-telas.ts`), sigue viva la vista LEGADA por lote
-    // (`telas.ts` → `POST /inventarios/telas/ajustes`), también con `inventario-telas.mover` y
-    // también aceptando cualquier `idTipoMov` que no sea traspaso. Cerrar tres de cuatro puertas
-    // deja el rótulo igual de falsificable: basta con entrar por la que quedó abierta.
+    // del ajuste de tela POR COLOR (`partidas-telas.ts`), estaba viva la vista LEGADA por lote
+    // (`telas.ts`, entonces expuesta en `POST /inventarios/telas/ajustes`), también con
+    // `inventario-telas.mover` y también aceptando cualquier `idTipoMov` que no fuera traspaso.
+    // Cerrar tres de cuatro puertas dejaba el rótulo igual de falsificable.
+    //
+    // 🔒 La fila 0.170 le quitó la RUTA a esta función (ya no la alcanza ningún cliente), pero el
+    // caso se QUEDA a propósito: la guarda sigue en el dominio y esta prueba es lo que impide que
+    // se caiga si alguien vuelve a exponerla.
     //
     // Es exactamente la simetría que esta fila ya reconoció para la CANCELACIÓN — el caso (e)
     // cierra «la puerta de atrás» por esta misma función legada—, sólo que del lado de la ESCRITURA

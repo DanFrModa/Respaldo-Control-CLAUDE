@@ -1225,20 +1225,15 @@ export type KardexPtQuery = NonNullable<
   paths['/api/inventarios/pt/kardex']['get']['parameters']['query']
 >;
 
-// ── Inventario de TELAS por kardex (Módulo 4, F4-E1; tela×lote, D5) ───────────
+// ── Inventario de TELAS por LOTE — LEGADO, ya sólo de lectura (Módulo 4, F4-E1; D5) ───────────
+// Fila 0.170: las tres capturas por lote (ajuste, salida a orden, traspaso) perdieron su endpoint,
+// y con él los tipos que se derivaban de ellos (`SalidaTelaCrear`, `TraspasoTelaCrear`,
+// `TraspasoTela`, que ya no tenía ni consumidor). Lo que queda es la cancelación —que NO es sólo
+// del legado— y las dos consultas del histórico migrado.
 
 /** Un movimiento de inventario de tela tal como lo devuelve el API. */
 export type MovimientoTela =
-  paths['/api/inventarios/telas/ajustes']['post']['responses']['201']['content']['application/json'];
-/** Cuerpo de una salida de tela a orden (`POST /api/inventarios/telas/salidas-orden`). */
-export type SalidaTelaCrear =
-  paths['/api/inventarios/telas/salidas-orden']['post']['requestBody']['content']['application/json'];
-/** Cuerpo de un traspaso de tela (`POST /api/inventarios/telas/traspasos`). */
-export type TraspasoTelaCrear =
-  paths['/api/inventarios/telas/traspasos']['post']['requestBody']['content']['application/json'];
-/** Resultado de un traspaso de tela: las dos patas. */
-export type TraspasoTela =
-  paths['/api/inventarios/telas/traspasos']['post']['responses']['201']['content']['application/json'];
+  paths['/api/inventarios/telas/movimientos/{id}/cancelar']['post']['responses']['200']['content']['application/json'];
 /** Cuerpo de cancelación de un movimiento de material (compartido tela/avío). */
 export type MovimientoMaterialCancelar =
   paths['/api/inventarios/telas/movimientos/{id}/cancelar']['post']['requestBody']['content']['application/json'];

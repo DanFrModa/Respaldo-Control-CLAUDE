@@ -51,8 +51,9 @@ type Dimension = 'tela' | 'avio';
  * —el ajuste (13-ago-2026), el traspaso (fila 0.098) y este kardex— operan la MISMA dimensión
  * legada por lote, así que «muerta» no las distinguiría. Lo que las separa es si **tienen a dónde
  * mandar al usuario**: aquéllas tienen reemplazo vigente dictado por Daniel (§Post-F9.32, por
- * COLOR) y este kardex **no tiene ninguno** — es la única ventana a los movimientos por lote (el
- * histórico migrado de Access y lo que capture «Salida a orden por lote (legado)»). Retirarlo no
+ * COLOR) y este kardex **no tiene ninguno** — es la única ventana a los movimientos por lote, que
+ * desde la fila 0.170 son SÓLO el histórico migrado de Access: ese día se retiró «Salida a orden por
+ * lote (legado)», la última captura que todavía escribía con esa forma. Retirarlo no
  * habría movido a nadie a otra pantalla: habría borrado la única. El criterio completo está escrito
  * una sola vez, en `TraspasoMaterialesPagina.tsx`. Lo que aquí se arregló es que MINTIERA.
  */
@@ -99,9 +100,11 @@ function efectoRenglon(entrada: number, salida: number): string {
  * Kardex por TELA del flujo LEGADO POR LOTE (card estándar: toolbar con combobox + tabla densa).
  *
  * 🔴 Sólo ve los movimientos con `id_tela_color = NULL` (`kardexTela` los filtra en el servidor,
- * reviewer A2 #1): el histórico migrado y lo que capture «Salida a orden por lote (legado)». Los
- * del inventario VIGENTE por color no salen aquí — su kardex se abre dentro de «Inventario de
- * telas». El aviso y los vacíos de abajo lo dicen: antes callaban (fila 0.098).
+ * reviewer A2 #1): desde la fila 0.170, el histórico migrado de Access y NADA MÁS — ese día se
+ * retiró «Salida a orden por lote (legado)», la última captura que seguía escribiendo así, de modo
+ * que este kardex ya no crece. Los del inventario VIGENTE por color no salen aquí — su kardex se
+ * abre dentro de «Inventario de telas». El aviso y los vacíos de abajo lo dicen: antes callaban
+ * (fila 0.098).
  */
 function KardexTela(): React.JSX.Element {
   const { tienePermiso } = useSesion();
