@@ -10,6 +10,7 @@ import {
   registrarConteoTelaColor,
   repartirPorPartidaFifo,
   saldosTelaColorParaConteo,
+  traspasarTelaColor,
   type ColorConTela,
   type LineaColorBase,
   type LineaConteoBase,
@@ -295,6 +296,56 @@ describe('conteo de tela por color — permisos (A4, deny-by-default)', () => {
         idTelaColor: '11',
       }),
     ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+});
+
+/**
+ * ⭐ FILA 0.172 — el MOTIVO también en el TRASPASO de tela por color. Hasta esta fila el ajuste y el
+ * conteo lo exigían y el traspaso no (llevaba unas `observaciones` opcionales), así que mandarle
+ * tela a un cortador —que es sacarla de un almacén— no pedía una palabra. La forma es la del ajuste,
+ * calcada: mínimo 3 caracteres ya recortados.
+ *
+ * El motivo lo exige el DOMINIO (`validarEntrada` corre AQUÍ, no sólo en el Zod de la ruta — A1),
+ * así que estas pruebas revientan ANTES de tocar la base (no hay `bd`).
+ */
+describe('Motivo OBLIGATORIO al traspasar tela por color (fila 0.172)', () => {
+  const sesionMover = () =>
+    sesionDePrueba({ permisos: ['inventario-telas.ver', 'inventario-telas.mover'] });
+  const traspaso = {
+    idAlmacenOrigen: 1,
+    idAlmacenDestino: 2,
+    fecha: '2026-09-09',
+    lineas: [{ idTelaColor: 11, cantidad: 50 }],
+  };
+
+  /** Captura el error de una promesa para poder inspeccionar sus `detalles` (patrón de telas). */
+  async function errorDe(promesa: Promise<unknown>): Promise<unknown> {
+    return promesa.then(
+      () => null,
+      (e: unknown) => e,
+    );
+  }
+
+  it('un traspaso SIN motivo se rechaza', async () => {
+    await expect(traspasarTelaColor(sesionMover(), traspaso as never)).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+  });
+
+  it('un traspaso con motivo DEMASIADO CORTO se rechaza (mínimo 3, como en el ajuste)', async () => {
+    // El mensaje LEGIBLE por campo viaja en `detalles.fieldErrors` (formato de `validarEntrada`):
+    // el `message` del error es siempre el genérico, así que afirmar sobre él no probaría nada.
+    const error = await errorDe(traspasarTelaColor(sesionMover(), { ...traspaso, motivo: 'ab' }));
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { motivo: ['Explica el motivo (mínimo 3 caracteres)'] },
+    });
+  });
+
+  it('un motivo de PUROS ESPACIOS se rechaza (se recorta antes de medir)', async () => {
+    await expect(
+      traspasarTelaColor(sesionMover(), { ...traspaso, motivo: '     ' }),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });
 

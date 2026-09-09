@@ -1420,6 +1420,10 @@ export async function registrarSalidaTelaColorSinOrden(
  * **que ya se consumió** —porque las salidas a orden no lo descuentan— y mandar al cortador, y al
  * papel, un nombre falso. El porqué completo y lo que el tope NO cura, en
  * {@link repartirPorPartidaFifo}.
+ *
+ * ⭐ Fila 0.172 — MOTIVO obligatorio (3–500), como en {@link ajustarInventarioTelaColor}: se guarda
+ * en las `observaciones` de las DOS patas y sale impreso en la hoja del traspaso. Antes eran unas
+ * observaciones opcionales, así que mandarle tela a un cortador no exigía decir por qué.
  */
 export async function traspasarTelaColor(
   sesion: SesionUsuario,
@@ -1480,7 +1484,10 @@ export async function traspasarTelaColor(
         // un traspaso de un color que salga de dos lotes queda registrado con 2. Es lo honesto:
         // son los renglones que de verdad se escribieron en el kardex.
         lineas: aLineasMotor(reparto.lineas, colores, reparto.idPartidaPorLinea),
-        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        // Fila 0.172 — MOTIVO obligatorio, guardado en `observaciones` de LAS DOS PATAS (el motor
+        // pasa el mismo encabezado a las dos). Mismo camino que el ajuste de aquí arriba, que ya
+        // escribía `observaciones: datos.motivo`: no hay columna nueva.
+        observaciones: datos.motivo,
       },
       { tx },
     );

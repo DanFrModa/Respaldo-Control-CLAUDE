@@ -10,6 +10,9 @@ import { TraspasoTelaColorPagina } from './TraspasoTelaColorPagina';
  * (§Post-F9.13): recibir la tela en el almacén principal y mandarla al del cortador antes de
  * descargarla. Cubre lo que se le agregó: solo almacenes de TELA, la etiqueta que dice de qué
  * cortador es cada bodega, y el deep-link que llega con el destino puesto.
+ *
+ * ⭐ Fila 0.172 — y el MOTIVO obligatorio: sin él la pantalla no deja guardar (antes eran unas
+ * observaciones opcionales, así que mandar tela al cortador no exigía una palabra).
  */
 
 const mutate = vi.fn();
@@ -91,6 +94,9 @@ describe('TraspasoTelaColorPagina (§Post-F9.13)', () => {
     fireEvent.change(screen.getByTestId('traspaso-color-origen'), { target: { value: '5' } });
     fireEvent.change(screen.getByTestId('traspaso-color-destino'), { target: { value: '5' } });
     fireEvent.click(screen.getByTestId('captura-color-simulada'));
+    fireEvent.change(screen.getByTestId('traspaso-color-motivo'), {
+      target: { value: 'Va al cortador Pérez' },
+    });
     expect(screen.getByTestId('traspaso-color-iguales')).toBeInTheDocument();
     expect(screen.getByTestId('traspaso-color-guardar')).toBeDisabled();
 
@@ -101,10 +107,44 @@ describe('TraspasoTelaColorPagina (§Post-F9.13)', () => {
       expect.objectContaining({
         idAlmacenOrigen: 5,
         idAlmacenDestino: 8,
+        motivo: 'Va al cortador Pérez',
         lineas: [{ idTelaColor: 11, cantidad: 60, cantidadComplemento: 25 }],
       }),
       expect.anything(),
     );
+  });
+
+  /**
+   * ⭐ Fila 0.172 — LA GUARDA. Con todo lo demás listo (almacenes distintos y renglón capturado) el
+   * botón sigue muerto hasta que hay motivo, y el campo se marca en rojo. Si alguien quitara el
+   * `motivoOk` del gate, esta prueba muere en el primer `toBeDisabled`.
+   */
+  it('sin MOTIVO no deja guardar, aunque todo lo demás esté listo (fila 0.172)', () => {
+    mutate.mockReset();
+    renderConProveedores(<TraspasoTelaColorPagina />, { sesion: SESION() });
+
+    fireEvent.change(screen.getByTestId('traspaso-color-origen'), { target: { value: '5' } });
+    fireEvent.change(screen.getByTestId('traspaso-color-destino'), { target: { value: '8' } });
+    fireEvent.click(screen.getByTestId('captura-color-simulada'));
+
+    const motivo = screen.getByTestId('traspaso-color-motivo');
+    const guardar = screen.getByTestId('traspaso-color-guardar');
+    expect(guardar).toBeDisabled();
+    expect(motivo.closest('[data-invalid="true"]')).not.toBeNull();
+
+    // Dos caracteres NO bastan: el mínimo es el mismo que exige el contrato (3, ya recortado).
+    fireEvent.change(motivo, { target: { value: ' ab ' } });
+    expect(guardar).toBeDisabled();
+
+    fireEvent.change(motivo, { target: { value: 'Reacomodo' } });
+    expect(guardar).toBeEnabled();
+    expect(motivo.closest('[data-invalid="true"]')).toBeNull();
+    fireEvent.click(guardar);
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ motivo: 'Reacomodo' }),
+      expect.anything(),
+    );
+    mutate.mockReset();
   });
 
   // §Post-F9.38 — el papel que va con la tela: se imprime el folio QUE YA EXISTE (el de la pata de
@@ -122,6 +162,9 @@ describe('TraspasoTelaColorPagina (§Post-F9.13)', () => {
     fireEvent.change(screen.getByTestId('traspaso-color-origen'), { target: { value: '5' } });
     fireEvent.change(screen.getByTestId('traspaso-color-destino'), { target: { value: '8' } });
     fireEvent.click(screen.getByTestId('captura-color-simulada'));
+    fireEvent.change(screen.getByTestId('traspaso-color-motivo'), {
+      target: { value: 'Va con el chofer' },
+    });
     fireEvent.click(screen.getByTestId('traspaso-color-guardar'));
 
     expect(screen.getByTestId('traspaso-color-guardado')).toHaveTextContent('4321');

@@ -92,6 +92,11 @@ export interface DatosImpresoTraspasoTela {
   almacenDestino: string;
   /** Cortador/tercero dueño del almacén destino (§Post-F9.13), o null si el almacén no tiene. */
   tercero: string | null;
+  /**
+   * MOTIVO del traspaso (fila 0.172: obligatorio en la captura; se lee de `Movimiento.observaciones`
+   * de la pata de salida). NULL en los traspasos VIEJOS, de cuando el campo era opcional — la hoja
+   * sale igual, sin el bloque (REGLA 0-B).
+   */
   observaciones: string | null;
   renglones: RenglonImpresoTraspasoTela[];
   totalCuerpo: number;
@@ -381,12 +386,16 @@ function paginaTraspaso(datos: DatosImpresoTraspasoTela): ReactElement {
       campo('Cortador / tercero', datos.tercero),
       campo('Fecha', datos.fecha),
     ),
+    // Fila 0.172 — lo que va aquí ya NO son unas observaciones opcionales: es el MOTIVO, que la
+    // captura exige. La etiqueta lo dice, igual que en la hoja del traspaso de PT. Sigue siendo
+    // nullable y se omite en los traspasos VIEJOS, capturados antes de que el motivo existiera
+    // (REGLA 0-B: la hoja sale igual, no se rellena nada).
     datos.observaciones === null
       ? null
       : h(
           View,
           { style: estilosDoc.campoDosTercios, key: 'obs' },
-          h(Text, { style: estilosDoc.etiquetaCampo }, 'Observaciones'),
+          h(Text, { style: estilosDoc.etiquetaCampo }, 'Motivo del traspaso'),
           h(Text, { style: estilosDoc.valorCampoTexto }, datos.observaciones),
         ),
     tablaRenglones(datos),

@@ -28,6 +28,37 @@ const idPositivo = (campo: string) =>
 
 const idPositivoOpcionalCoerce = z.coerce.number().int().positive().optional();
 
+// ── ⭐ MOTIVO OBLIGATORIO DE LOS TRASPASOS DE MATERIAL (fila 0.172) ──────────────────────────────
+//
+// DANIEL pidió el motivo al mover producto terminado *«igual que telas y avíos»* (§Post-F9.193
+// decisión 3, que la fila 0.100 construyó en PT). **La premisa era falsa**: telas y avíos lo exigían
+// en los AJUSTES, en el conteo cíclico y en la salida sin orden, pero NO en los traspasos — los
+// llevaban con `observaciones` OPCIONAL, que no es lo mismo. O sea que mover mil metros de tela al
+// cortador no exigía una palabra y mover mil piezas de ropa sí. Esta fila empareja lo que la
+// decisión ya daba por hecho.
+//
+// La forma NO se inventa, se copia: es la de {@link esquemaAjusteTelaCrear}`.motivo` — mismos
+// límites (3–500) y los dos mensajes VERBATIM, **`.max(500)` sin mensaje incluido**, para que las
+// capturas de material se sientan todas iguales. Es el mismo criterio que la 0.100 dejó escrito en
+// `movimiento-pt.ts` (allá el `.max` sí lleva mensaje en español, mejora que materiales aún no
+// adopta; copiar el tope pelón es lo que mantiene esta familia consistente consigo misma).
+//
+// ⚠️ Se guarda en `Movimiento.observaciones` de LAS DOS PATAS (columna que YA existe y es nullable):
+// no hay columna nueva ni migración. Por eso el campo de ENTRADA se llama `motivo` y el de SALIDA
+// sigue llamándose `observaciones` — igual que en el ajuste y en PT: es la misma columna leída.
+//
+// REGLA 0-B — los traspasos ya capturados sin motivo se quedan con `observaciones` NULL y se leen e
+// imprimen tal cual (la hoja del traspaso de tela simplemente OMITE el bloque del motivo, medido en
+// `impresos/impreso-traspaso-tela.ts`); no se rellenan ni se reparan.
+const motivoTraspasoMaterial = z
+  .string({ error: 'El motivo es obligatorio' })
+  .trim()
+  .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+  .max(500)
+  .describe(
+    'Por qué se mueve el material (obligatorio; se guarda en las observaciones de las dos patas).',
+  );
+
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // TELAS
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -144,7 +175,21 @@ export type DatosSalidaTelaCrear = z.infer<typeof esquemaSalidaTelaCrear>;
 
 // ── Traspaso de TELA entre almacenes ─────────────────────────────────────────────────────────────
 
-/** Alta de un TRASPASO de TELA entre dos almacenes (salida del origen + entrada al destino). */
+/**
+ * Alta de un TRASPASO de TELA entre dos almacenes (salida del origen + entrada al destino).
+ *
+ * 🔴 **ESTE ESQUEMA YA NO LO ALCANZA NINGÚN CLIENTE — fila 0.170 (9-sep-2026).** Su endpoint
+ * (`POST /inventarios/telas/traspasos`) se RETIRÓ junto con las otras dos puertas que escribían tela
+ * sin `idTelaColor`, y su pantalla se había retirado antes (fila 0.098). Lo único que lo construye
+ * hoy es `traspasarTela`, el ANDAMIO con el que las pruebas de integración fabrican movimientos con
+ * la forma LEGADA (la del ETL de Access) para comprobar que el flujo por color los tolera. El
+ * traspaso que se opera es {@link esquemaTraspasoTelaColorCrear}.
+ *
+ * ⚠️ Por eso NO se le puso motivo obligatorio en la fila 0.172, que sí se lo puso a los dos
+ * traspasos vivos: exigírselo a un esquema sin ruta no protegería ninguna captura —nadie captura por
+ * aquí— y le pediría un motivo al andamio de las pruebas. Si alguien vuelve a exponerlo, reabre el
+ * defecto de la 0.170 **y** este hueco: entonces sí, {@link motivoTraspasoMaterial} va aquí.
+ */
 export const esquemaTraspasoTelaCrear = z
   .object({
     idAlmacenOrigen: idPositivo('el almacén de origen'),
@@ -511,18 +556,22 @@ export const esquemaSalidaTelaColorSinOrdenCrear = z
 /** Datos validados de una salida de tela por color sin orden. */
 export type DatosSalidaTelaColorSinOrdenCrear = z.infer<typeof esquemaSalidaTelaColorSinOrdenCrear>;
 
-/** Alta de un TRASPASO de tela POR COLOR entre dos almacenes (ambas cantidades juntas). */
+/**
+ * Alta de un TRASPASO de tela POR COLOR entre dos almacenes (ambas cantidades juntas). El MOTIVO es
+ * obligatorio desde la fila 0.172 (ver {@link motivoTraspasoMaterial}): antes llevaba unas
+ * `observaciones` opcionales, así que mandarle tela a un cortador no exigía decir por qué.
+ */
 export const esquemaTraspasoTelaColorCrear = z
   .object({
     idAlmacenOrigen: idPositivo('el almacén de origen'),
     idAlmacenDestino: idPositivo('el almacén de destino'),
     fecha: z.iso.date({ error: 'La fecha del traspaso es obligatoria (YYYY-MM-DD)' }),
-    observaciones: z.string().trim().max(1000).optional(),
+    motivo: motivoTraspasoMaterial,
     lineas: z
       .array(esquemaTelaColorLineaSalida)
       .min(1, { error: 'Captura al menos un renglón de tela y color' }),
   })
-  .describe('Traspaso de tela por color entre almacenes (dos patas atómicas).');
+  .describe('Traspaso de tela por color entre almacenes (dos patas atómicas). Motivo obligatorio.');
 
 /** Datos validados de un traspaso de tela por color. */
 export type DatosTraspasoTelaColorCrear = z.infer<typeof esquemaTraspasoTelaColorCrear>;
@@ -1180,18 +1229,22 @@ export const esquemaAjusteAvioCrear = z
 /** Datos validados de un ajuste de avío. */
 export type DatosAjusteAvioCrear = z.infer<typeof esquemaAjusteAvioCrear>;
 
-/** Alta de un TRASPASO de AVÍO entre almacenes. */
+/**
+ * Alta de un TRASPASO de AVÍO entre almacenes. El MOTIVO es obligatorio desde la fila 0.172 (ver
+ * {@link motivoTraspasoMaterial}): antes llevaba unas `observaciones` opcionales, mientras que el
+ * ajuste de avío de aquí al lado sí lo exigía.
+ */
 export const esquemaTraspasoAvioCrear = z
   .object({
     idAlmacenOrigen: idPositivo('el almacén de origen'),
     idAlmacenDestino: idPositivo('el almacén de destino'),
     fecha: z.iso.date({ error: 'La fecha del traspaso es obligatoria (YYYY-MM-DD)' }),
-    observaciones: z.string().trim().max(1000).optional(),
+    motivo: motivoTraspasoMaterial,
     lineas: z
       .array(esquemaAjusteAvioLinea)
       .min(1, { error: 'Captura al menos un renglón de avío' }),
   })
-  .describe('Traspaso de avío entre almacenes (R4).');
+  .describe('Traspaso de avío entre almacenes (R4). Motivo obligatorio.');
 
 /** Datos validados de un traspaso de avío. */
 export type DatosTraspasoAvioCrear = z.infer<typeof esquemaTraspasoAvioCrear>;

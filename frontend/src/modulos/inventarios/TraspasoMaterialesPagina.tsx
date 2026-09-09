@@ -6,7 +6,7 @@ import { useAlmacenes } from '@/api/almacenes';
 import { useTraspasarAvio } from '@/api/inventario-materiales';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
@@ -22,6 +22,11 @@ function hoy(): string {
  * almacenes). Mueve avío de un almacén ORIGEN a uno DESTINO (distintos) en UNA operación (el
  * backend la materializa como salida + entrada atómicas, A2). El servidor valida que el origen no
  * quede negativo (D3, bajo lock). Captura PC. Permiso `inventario-avios.mover`.
+ *
+ * ⭐ Fila 0.172 — el MOTIVO es OBLIGATORIO (antes eran unas «observaciones» opcionales). Es la
+ * misma exigencia que el ajuste de avíos ya tenía y que la fila 0.100 le puso al producto terminado:
+ * mover material de un almacén a otro tiene que decir por qué. Se guarda en las observaciones de
+ * las DOS patas.
  *
  * 🔴 SOLO AVÍOS desde v0.098 (fila 0.098). Esta pantalla tenía además una pestaña de TELAS atada al
  * motor LEGADO por lote —y ARRANCABA EN ELLA—, así que quien traspasaba tela desde aquí NO veía
@@ -63,7 +68,9 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
   const [idAlmacenOrigen, setIdAlmacenOrigen] = useState<string>('');
   const [idAlmacenDestino, setIdAlmacenDestino] = useState<string>('');
   const [fecha, setFecha] = useState(hoy());
-  const [observaciones, setObservaciones] = useState('');
+  // Fila 0.172 — MOTIVO obligatorio del traspaso: por qué se mueve el avío. Se guarda en las
+  // observaciones de las DOS patas.
+  const [motivo, setMotivo] = useState('');
   const [renglonesAvio, setRenglonesAvio] = useState<RenglonAvio[]>([]);
 
   // Solo almacenes de AVIO: los DOS extremos del traspaso de avíos tienen que serlo (fila 0.137).
@@ -79,11 +86,15 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
   const mismoAlmacen = idAlmacenOrigen !== '' && idAlmacenOrigen === idAlmacenDestino;
   const totalAvio = renglonesAvio.reduce((s, r) => s + r.cantidad, 0);
   const cargando = traspasarAvio.isPending;
+  // El mínimo es el MISMO que exige el contrato (3 caracteres, ya recortado): así el botón no
+  // promete un guardado que el servidor va a rechazar.
+  const motivoOk = motivo.trim().length >= 3;
   const puedeGuardar =
     puedeMover &&
     idAlmacenOrigen !== '' &&
     idAlmacenDestino !== '' &&
     !mismoAlmacen &&
+    motivoOk &&
     renglonesAvio.length > 0 &&
     !cargando;
 
@@ -94,7 +105,7 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
         idAlmacenOrigen: Number(idAlmacenOrigen),
         idAlmacenDestino: Number(idAlmacenDestino),
         fecha,
-        ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
+        motivo: motivo.trim(),
         lineas: renglonesAvio.map((r) => ({ idAvio: r.idAvio, cantidad: r.cantidad })),
       },
       {
@@ -103,6 +114,7 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
             `Traspaso de avío guardado (salida #${t.salida.folio} → entrada #${t.entrada.folio}).`,
           );
           setRenglonesAvio([]);
+          setMotivo('');
         },
         onError: (error) => toast.error(error.message),
       },
@@ -117,7 +129,7 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
             Traspaso de avíos
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Mueve avío de un almacén a otro, en una sola operación
+            Mueve avío de un almacén a otro, en una sola operación · el motivo es obligatorio
           </p>
         </div>
       </header>
@@ -194,15 +206,19 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
             </p>
           ) : null}
 
-          <Field>
-            <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
+          <Field data-invalid={!motivoOk}>
+            <FieldLabel htmlFor="traspaso-avio-motivo">Motivo (obligatorio)</FieldLabel>
             <Input
-              id="obs"
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              placeholder="Opcional"
+              id="traspaso-avio-motivo"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Por qué se mueve el avío (surtido a taller, reacomodo, devolución…)"
               disabled={!puedeMover}
+              data-testid="traspaso-avio-motivo"
             />
+            <FieldDescription>
+              Queda en el kardex de las dos patas del traspaso. Mínimo 3 caracteres.
+            </FieldDescription>
           </Field>
 
           <div>

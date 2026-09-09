@@ -362,6 +362,7 @@ describe('traspaso por color (dos patas atómicas, A2)', () => {
         idAlmacenOrigen: almA.id,
         idAlmacenDestino: almB.id,
         fecha: '2026-08-06',
+        motivo: 'Se manda al cortador',
         lineas: [{ idTelaColor: colorMarino.id, cantidad: 50, cantidadComplemento: 30 }],
       },
       bd(),
@@ -389,11 +390,50 @@ describe('traspaso por color (dos patas atómicas, A2)', () => {
           idAlmacenOrigen: almA.id,
           idAlmacenDestino: almB.id,
           fecha: '2026-08-06',
+          motivo: 'Se manda al cortador',
           lineas: [{ idTelaColor: colorMarino.id, cantidad: 31 }],
         },
         bd(),
       ),
     ).rejects.toThrow(ErrorConflicto);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ FILA 0.172 — EL MOTIVO DEL TRASPASO QUEDA EN LAS DOS PATAS
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 Es la promesa de la fila, y sólo se puede medir contra Postgres: el motor
+// (`comun/kardex.ts` → `registrarTraspasoTela`, patas en `:976` y `:991`) pasa el MISMO encabezado a
+// las dos, así que basta con que alguien deje de pasarlo a la pata de ENTRADA para que el kardex del
+// almacén que RECIBE la tela no diga por qué llegó — y nada más se rompería: la hoja impresa lee la
+// SALIDA y seguiría bien. Es exactamente la prueba que la fila 0.100 sí escribió para PT
+// (`movimientos-pt.int.test.ts`, «el motivo del traspaso queda en LAS DOS patas») y que esta fila
+// copió todo menos eso.
+
+describe('el MOTIVO del traspaso queda en LAS DOS patas (fila 0.172)', () => {
+  it('⭐ salida Y entrada guardan el motivo, recortado, en `Movimiento.observaciones`', async () => {
+    await entrarColor(colorMarino.id, 100, 40);
+    const t = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        // Con espacios de sobra a propósito: el contrato lo recorta (`.trim()`), así que lo que
+        // llega a la columna no es lo que se tecleó.
+        motivo: '   Reacomodo de bodega   ',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 50, cantidadComplemento: 20 }],
+      },
+      bd(),
+    );
+
+    // 🔴 LAS DOS, leídas de la BASE (no del objeto que devuelve el dominio): es la columna que va a
+    // mirar el kardex de cada almacén.
+    const salida = await cliente.movimiento.findUniqueOrThrow({ where: { id: t.salida.id } });
+    const entrada = await cliente.movimiento.findUniqueOrThrow({ where: { id: t.entrada.id } });
+    expect(salida.observaciones).toBe('Reacomodo de bodega');
+    expect(entrada.observaciones).toBe('Reacomodo de bodega');
   });
 });
 
@@ -436,6 +476,7 @@ describe('el traspaso NOMBRA el lote en las dos patas (fila 0.142)', () => {
         idAlmacenOrigen: almA.id,
         idAlmacenDestino: almB.id,
         fecha: '2026-08-06',
+        motivo: 'Se manda al cortador',
         lineas: [{ idTelaColor: colorMarino.id, cantidad: 700 }],
       },
       bd(),
@@ -464,6 +505,7 @@ describe('el traspaso NOMBRA el lote en las dos patas (fila 0.142)', () => {
         idAlmacenOrigen: almA.id,
         idAlmacenDestino: almB.id,
         fecha: '2026-08-06',
+        motivo: 'Se manda al cortador',
         lineas: [{ idTelaColor: colorMarino.id, cantidad: 400, cantidadComplemento: 150 }],
       },
       bd(),
@@ -486,6 +528,7 @@ describe('el traspaso NOMBRA el lote en las dos patas (fila 0.142)', () => {
         idAlmacenOrigen: almA.id,
         idAlmacenDestino: almB.id,
         fecha: '2026-08-06',
+        motivo: 'Se manda al cortador',
         lineas: [{ idTelaColor: colorMarino.id, cantidad: 500 }],
       },
       bd(),
@@ -496,6 +539,7 @@ describe('el traspaso NOMBRA el lote en las dos patas (fila 0.142)', () => {
         idAlmacenOrigen: almA.id,
         idAlmacenDestino: almB.id,
         fecha: '2026-08-07',
+        motivo: 'Se manda al cortador',
         lineas: [{ idTelaColor: colorMarino.id, cantidad: 500 }],
       },
       bd(),
@@ -542,6 +586,7 @@ describe('el traspaso NOMBRA el lote en las dos patas (fila 0.142)', () => {
         idAlmacenOrigen: almA.id,
         idAlmacenDestino: almB.id,
         fecha: '2026-08-06',
+        motivo: 'Se manda al cortador',
         lineas: [{ idTelaColor: colorMarino.id, cantidad: 500 }],
       },
       bd(),
@@ -563,6 +608,7 @@ describe('el traspaso NOMBRA el lote en las dos patas (fila 0.142)', () => {
         idAlmacenOrigen: almA.id,
         idAlmacenDestino: almB.id,
         fecha: '2026-08-06',
+        motivo: 'Se manda al cortador',
         lineas: [{ idTelaColor: colorMarino.id, cantidad: 500 }],
       },
       bd(),
@@ -994,6 +1040,7 @@ describe('conteo por color: el servidor calcula y aplica la diferencia (D3)', ()
         idAlmacenOrigen: almA.id,
         idAlmacenDestino: almB.id,
         fecha: '2026-09-02',
+        motivo: 'Se manda al cortador',
         lineas: [{ idTelaColor: colorMarino.id, cantidad: 30, cantidadComplemento: 10 }],
       },
       bd(),

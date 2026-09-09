@@ -392,6 +392,9 @@ export async function registrarSalidaAvioSinOrden(
  * patas (salida del origen + entrada al destino) en UNA transacción (A2); valida que el ORIGEN
  * tenga existencia suficiente (D3, bajo lock). Origen y destino DISTINTOS. Permiso
  * `inventario-avios.mover`.
+ *
+ * ⭐ Fila 0.172 — MOTIVO obligatorio (3–500), como en {@link ajustarInventarioAvio}: se guarda en
+ * las `observaciones` de las DOS patas. Antes eran unas observaciones opcionales.
  */
 export async function traspasarAvio(
   sesion: SesionUsuario,
@@ -444,7 +447,10 @@ export async function traspasarAvio(
         idAlmacenDestino: datos.idAlmacenDestino,
         fecha: aDateColumna(datos.fecha),
         lineas,
-        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        // Fila 0.172 — MOTIVO obligatorio, guardado en `observaciones` de LAS DOS PATAS (el motor
+        // pasa el mismo encabezado a las dos). Mismo camino que `ajustarInventarioAvio`, que ya
+        // escribía `observaciones: datos.motivo`: no hay columna nueva.
+        observaciones: datos.motivo,
       },
       { tx },
     );
