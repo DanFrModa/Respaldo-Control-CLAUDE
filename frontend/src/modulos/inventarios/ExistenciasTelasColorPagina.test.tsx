@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ExistenciasTelaColor, KardexTelaColor } from '@/api/tipos';
@@ -114,6 +114,56 @@ const kardex: KardexTelaColor = {
   ],
 };
 
+const [renglonBase] = kardex.renglones;
+if (renglonBase === undefined) {
+  throw new Error('El fixture `kardex` debe traer al menos un renglón.');
+}
+
+/**
+ * FILA 0.177 — el kardex de un color en el que un TRASPASO se repartió FIFO entre dos partidas.
+ *
+ * No es un caso rebuscado: es el que el propio sistema documenta. `repartirPorPartidaFifo` devuelve
+ * UNA LÍNEA POR LOTE, `traspasarTelaColor` las escribe como detalles del MISMO `Movimiento` y
+ * `kardexTelaColor` emite un renglón por detalle ⇒ dos renglones con el mismo movimiento, el mismo
+ * almacén y el mismo folio, distinguidos sólo por la partida.
+ */
+const kardexFifo: KardexTelaColor = {
+  ...kardex,
+  saldosIniciales: [],
+  renglones: [
+    // Las DOS patas del mismo traspaso: idMovimiento/idAlmacen/folio IDÉNTICOS.
+    {
+      ...renglonBase,
+      idMovimiento: 7,
+      folio: 70,
+      tipoMov: 'Traspaso (Salida)',
+      origenTipo: 'traspaso',
+      idPartida: 1,
+      partidaFolio: 1,
+      loteProveedor: 'L-778',
+    },
+    {
+      ...renglonBase,
+      idMovimiento: 7,
+      folio: 70,
+      tipoMov: 'Traspaso (Salida)',
+      origenTipo: 'traspaso',
+      idPartida: 2,
+      partidaFolio: 2,
+      loteProveedor: 'L-779',
+    },
+    // Un movimiento distinto, sobre una tercera partida.
+    {
+      ...renglonBase,
+      idMovimiento: 8,
+      folio: 80,
+      idPartida: 3,
+      partidaFolio: 3,
+      loteProveedor: 'L-780',
+    },
+  ],
+};
+
 const useKardexTelaColor = vi.fn<(q: unknown) => unknown>();
 const cancelarMutate = vi.fn();
 
@@ -140,6 +190,32 @@ vi.mock('@/api/inventario-materiales', () => ({
           factura: null,
           fecha: '2026-08-06',
           creadoEn: '2026-08-06T12:00:00.000Z',
+        },
+        // Fila 0.177: hacen falta DOS partidas más para poder reproducir el reparto FIFO (un
+        // traspaso que sale de dos partidas) y luego filtrar a la partida de OTRO movimiento.
+        {
+          id: 2,
+          folio: 2,
+          idTelaColor: 11,
+          telaColor: 'Marino Alsa 3040',
+          idTela: 1,
+          tela: 'Felpa Suiza',
+          loteProveedor: 'L-779',
+          factura: null,
+          fecha: '2026-08-07',
+          creadoEn: '2026-08-07T12:00:00.000Z',
+        },
+        {
+          id: 3,
+          folio: 3,
+          idTelaColor: 11,
+          telaColor: 'Marino Alsa 3040',
+          idTela: 1,
+          tela: 'Felpa Suiza',
+          loteProveedor: 'L-780',
+          factura: null,
+          fecha: '2026-08-08',
+          creadoEn: '2026-08-08T12:00:00.000Z',
         },
       ],
     },
@@ -343,10 +419,11 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
       sesion: estadoSesionDePrueba(['inventario-telas.ver']),
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
-    // 11 columnas de datos (5 + 3 del cuerpo + 3 del complemento), sin la vacía de acciones.
+    // 12 columnas de datos (5 + 3 del cuerpo + 3 del complemento + «Observaciones», fila 0.176),
+    // sin la vacía de acciones.
     const encabezados = () =>
       screen.getByTestId('kardex-color-tabla').querySelectorAll('thead th').length;
-    expect(encabezados()).toBe(11);
+    expect(encabezados()).toBe(12);
     unmount();
 
     // Con `.mover` sí hay algo que ofrecer (cancelar) → la columna vuelve.
@@ -354,7 +431,7 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
-    expect(encabezados()).toBe(12);
+    expect(encabezados()).toBe(13);
   });
 
   it('sin permiso de mover, el kardex NO ofrece cancelar', () => {
@@ -439,6 +516,117 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
     expect(screen.getByText('Kardex · Felpa Suiza · Marino Alsa 3040')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ FILA 0.176 — EL MOTIVO DEL TRASPASO SE PUEDE LEER.
+   *
+   * Éste es EL kardex donde importa: la 0.172 volvió OBLIGATORIO el motivo del traspaso de tela por
+   * color, y `traspasarTelaColor` lo guarda en las `observaciones` de las dos patas. El backend ya
+   * lo devolvía (`kardexTelaColor`) y hasta el fixture de este archivo ya lo traía — lo que faltaba
+   * era la columna. Sin ella se exigía una explicación que después no salía en ninguna pantalla.
+   *
+   * ⚠️ A diferencia del kardex de materiales, este cajón tiene UNA SOLA superficie (una tabla con
+   * scroll horizontal): no hay tarjetas de móvil dentro del cajón, así que no hay una segunda
+   * superficie que pueda tapar el hueco. Se ancla igual con `within` para que la aserción no pueda
+   * cumplirse con texto de la pantalla de existencias que está debajo.
+   */
+  it('⭐⭐ el kardex enseña el MOTIVO del movimiento (fila 0.176)', () => {
+    const conMotivo: KardexTelaColor = {
+      ...kardexFifo,
+      renglones: [
+        { ...renglonBase, idMovimiento: 9, folio: 90, observaciones: null },
+        {
+          ...renglonBase,
+          idMovimiento: 7,
+          folio: 70,
+          tipoMov: 'Traspaso (Salida)',
+          origenTipo: 'traspaso',
+          observaciones: 'Al cortador Ríos para la OP 4471',
+        },
+      ],
+    };
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : { data: conMotivo, isPending: false, isError: false },
+    );
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+
+    const celdas = within(screen.getByTestId('kardex-color-tabla')).getAllByTestId(
+      'kardex-color-obs',
+    );
+    expect(celdas).toHaveLength(2);
+    // Sin motivo, la celda dice «—»: la tabla no puede descuadrarse por un renglón sin nota.
+    expect(celdas[0]).toHaveTextContent('—');
+    // Y el motivo del traspaso —el que la 0.172 volvió obligatorio— se LEE.
+    expect(celdas[1]).toHaveTextContent('Al cortador Ríos para la OP 4471');
+    // Completo en el `title`, porque la celda trunca: un motivo largo no puede quedar ilegible.
+    expect(celdas[1]).toHaveAttribute('title', 'Al cortador Ríos para la OP 4471');
+  });
+
+  /**
+   * ⭐⭐ FILA 0.177 — LA LLAVE DEL RENGLÓN LLEVA EL ÍNDICE, O EL CAJÓN ENSEÑA UN FANTASMA.
+   *
+   * La llave era `idMovimiento-idAlmacen-folio`, y esos tres campos COLISIONAN justo en el caso que
+   * el sistema ya documenta: un traspaso que se reparte FIFO entre partidas escribe varios detalles
+   * del MISMO `Movimiento`, y `kardexTelaColor` emite un renglón por detalle.
+   *
+   * ⚠️ Lo que NO se mide aquí es el aviso de React («Encountered two children with the same key»):
+   * la configuración de pruebas del frontend no convierte `console.error` en fallo, así que una
+   * prueba apoyada en el warning no mediría NADA. Y medir el número de renglones del PRIMER pintado
+   * tampoco sirve: se comprobó que React 19 pinta los 3 renglones igual, con llave repetida o sin
+   * ella. Lo que sí rompe —y es lo que esta prueba fija— es la RECONCILIACIÓN: al filtrar por una
+   * partida, React reusa el fiber equivocado y deja en pantalla un renglón de un movimiento que el
+   * servidor ya no mandó. Un movimiento fantasma en un kardex.
+   */
+  it('⭐⭐ al filtrar por partida no queda ningún renglón FANTASMA (llave con índice)', () => {
+    useKardexTelaColor.mockImplementation((q) => {
+      if (q === undefined) {
+        return { data: undefined, isPending: true, isError: false };
+      }
+      // El SERVIDOR filtra por partida (la pantalla no recorta lo que ya llegó): el doble hace lo
+      // mismo, para que lo que se mide sea el re-pintado con la lista nueva.
+      const { idPartida } = q as { idPartida?: number };
+      return {
+        data:
+          idPartida === undefined
+            ? kardexFifo
+            : {
+                ...kardexFifo,
+                renglones: kardexFifo.renglones.filter((r) => r.idPartida === idPartida),
+              },
+        isPending: false,
+        isError: false,
+      };
+    });
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+
+    // Sin filtro: los 3 renglones (las dos patas FIFO del traspaso #70 + el movimiento #80).
+    const cuerpo = (): Element[] => [
+      ...screen.getByTestId('kardex-color-tabla').querySelectorAll('tbody tr'),
+    ];
+    expect(cuerpo()).toHaveLength(3);
+
+    // Se filtra a la partida #3, que SOLO toca el movimiento #80: el servidor manda UN renglón.
+    fireEvent.change(screen.getByTestId('kardex-color-partida'), { target: { value: '3' } });
+    expect(useKardexTelaColor).toHaveBeenLastCalledWith(
+      expect.objectContaining({ idTelaColor: 11, idPartida: 3 }),
+    );
+
+    // …y la pantalla enseña UNO, no dos. Con la llave colisionada aquí sobrevivía la pata FIFO
+    // «#1 · L-778» del traspaso, que ya no está en la respuesta.
+    const tabla = screen.getByTestId('kardex-color-tabla');
+    expect(cuerpo()).toHaveLength(1);
+    expect(within(tabla).getByText('#3 · L-780')).toBeInTheDocument();
+    expect(within(tabla).queryByText('#1 · L-778')).not.toBeInTheDocument();
+    expect(within(tabla).queryByText('#2 · L-779')).not.toBeInTheDocument();
   });
 
   // 🔴 fila 0.098 — el botón «Imprimir PDF» del inventario de telas colgaba de la vista LEGADA por

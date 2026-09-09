@@ -428,4 +428,86 @@ describe('KardexMaterialesPagina (F4-E1)', () => {
       expect(vacio).toHaveTextContent(/amplía las fechas/);
     });
   });
+
+  /**
+   * ⭐⭐ FILA 0.176 — EL MOTIVO SE PUEDE LEER, EN LAS CUATRO SUPERFICIES.
+   *
+   * La 0.172 volvió OBLIGATORIO escribir un motivo al mover material (el traspaso de avíos que
+   * opera esta misma dimensión, entre otros) y lo guarda en las `observaciones` del movimiento…
+   * que no salía en NINGUNA pantalla. Pedir una explicación obligatoria que después nadie consulta
+   * es la forma más rápida de que se degrade a «.», «x» o «traspaso» — y entonces el campo
+   * obligatorio deja de servir para lo que se puso.
+   *
+   * ⚠️ Esta pantalla pinta CUATRO superficies (tarjetas en móvil + tabla en escritorio, por cada
+   * una de las dos pestañas) y las dos de una pestaña están montadas A LA VEZ: la visibilidad la
+   * decide Tailwind, no el DOM. Por eso cada aserción va anclada con `within(<esa superficie>)`
+   * — un `getAllByTestId(...)[0]` dejaba en verde borrar una de las dos porque la otra tapaba el
+   * hueco (la misma cicatriz que ya cobró el «Saldo anterior» de arriba).
+   */
+  describe('el motivo del movimiento se LEE (fila 0.176)', () => {
+    it('⭐⭐ TELAS: el motivo sale en la tabla Y en las tarjetas', () => {
+      datosKardexTela.mockReturnValue({
+        ...kardexTela,
+        renglones: kardexTela.renglones.map((r) => ({
+          ...r,
+          observaciones: 'Se lo llevó el cortador Ríos',
+        })),
+      });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+
+      const enTabla = within(screen.getByTestId('kardex-tela-tabla')).getByTestId(
+        'kardex-tela-obs',
+      );
+      expect(enTabla).toHaveTextContent('Se lo llevó el cortador Ríos');
+      const enTarjetas = within(screen.getByTestId('kardex-tela-tarjetas')).getByTestId(
+        'kardex-tela-obs',
+      );
+      expect(enTarjetas).toHaveTextContent('Se lo llevó el cortador Ríos');
+    });
+
+    it('⭐⭐ AVÍOS: el motivo sale en la tabla Y en las tarjetas', () => {
+      datosKardexAvio.mockReturnValue({
+        ...kardexAvio,
+        renglones: kardexAvio.renglones.map((r) => ({
+          ...r,
+          observaciones: 'Se mandaron al taller para la OP 4471',
+        })),
+      });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      });
+      abrirAvios();
+
+      const enTabla = within(screen.getByTestId('kardex-avio-tabla')).getByTestId(
+        'kardex-avio-obs',
+      );
+      expect(enTabla).toHaveTextContent('Se mandaron al taller para la OP 4471');
+      const enTarjetas = within(screen.getByTestId('kardex-avio-tarjetas')).getByTestId(
+        'kardex-avio-obs',
+      );
+      expect(enTarjetas).toHaveTextContent('Se mandaron al taller para la OP 4471');
+    });
+
+    /**
+     * Sin motivo, la COLUMNA sigue estando (con su «—»): el histórico migrado de Access no trae
+     * observaciones y la tabla no puede descuadrarse por eso. En las TARJETAS, en cambio, la línea
+     * NO se pinta — una línea vacía en una tarjeta es ruido, no información.
+     */
+    it('sin motivo la columna dice «—», y la tarjeta no pinta una línea vacía', () => {
+      // El renglón de avíos de la base ya trae `observaciones: null`.
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      });
+      abrirAvios();
+      expect(
+        within(screen.getByTestId('kardex-avio-tabla')).getByTestId('kardex-avio-obs'),
+      ).toHaveTextContent('—');
+      expect(
+        within(screen.getByTestId('kardex-avio-tarjetas')).queryByTestId('kardex-avio-obs'),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

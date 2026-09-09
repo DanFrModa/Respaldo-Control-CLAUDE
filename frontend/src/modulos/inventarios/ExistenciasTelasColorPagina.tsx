@@ -668,6 +668,14 @@ function CajonKardexTelaColor({
                     <TablaDensaHead numerica>Saldo</TablaDensaHead>
                   </>
                 ) : null}
+                {/* ⭐ Fila 0.176 — el MOTIVO se LEE, y ÉSTE es el kardex donde de verdad importa:
+                    el traspaso de tela por color es la captura a la que la 0.172 le puso el motivo
+                    OBLIGATORIO (`traspasarTelaColor` lo guarda en las `observaciones` de las DOS
+                    patas). Sin esta columna se seguía exigiendo una explicación que después no
+                    salía en ninguna pantalla — y una explicación que nadie consulta se degrada a
+                    «.» en dos semanas. Mismo patrón que el estado de cuenta de proveedores
+                    (`cxp/EstadoCuentaProveedorPagina.tsx`) y que el kardex de materiales. */}
+                <TablaDensaHead>Observaciones</TablaDensaHead>
                 {/* Acciones: imprimir la hoja del traspaso (§Post-F9.38, con `inventario-telas.ver`)
                     y cancelar (con `.mover`). Solo si hay alguna que ofrecer. */}
                 {hayAcciones ? <TablaDensaHead className="w-16" /> : null}
@@ -711,12 +719,23 @@ function CajonKardexTelaColor({
                       </TablaDensaCelda>
                     </>
                   ) : null}
+                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
                   {hayAcciones ? <TablaDensaCelda /> : null}
                 </TablaDensaFila>
               ))}
-              {kardex.renglones.map((r) => (
+              {/* Fila 0.177 — la llave lleva el ÍNDICE, como en los otros cinco kardex de la
+                  familia (`KardexMaterialesPagina` ×4, `KardexPtPagina`). Sin él colisionaba justo
+                  en el caso que el sistema ya documenta: un traspaso que se reparte FIFO entre
+                  partidas escribe VARIOS detalles del MISMO `Movimiento`
+                  (`repartirPorPartidaFifo` → `traspasarTelaColor`), y `kardexTelaColor` emite un
+                  renglón por detalle ⇒ varios renglones con el mismo movimiento, almacén y folio.
+                  Con la llave repetida, React reusa el fiber equivocado al re-conciliar y el
+                  cajón se queda con un renglón FANTASMA de otro movimiento al filtrar por
+                  partida (medido: filtrar a la partida de otro movimiento dejaba 2 renglones
+                  donde el servidor mandó 1). */}
+              {kardex.renglones.map((r, i) => (
                 <TablaDensaFila
-                  key={`${r.idMovimiento}-${r.idAlmacen}-${r.folio}`}
+                  key={`${r.idMovimiento}-${r.idAlmacen}-${r.folio}-${i}`}
                   className={r.cancelado ? 'opacity-50' : undefined}
                 >
                   <TablaDensaCelda className="num">#{r.folio}</TablaDensaCelda>
@@ -755,6 +774,13 @@ function CajonKardexTelaColor({
                       </TablaDensaCelda>
                     </>
                   ) : null}
+                  <TablaDensaCelda
+                    className="max-w-xs truncate"
+                    title={r.observaciones ?? undefined}
+                    data-testid="kardex-color-obs"
+                  >
+                    {r.observaciones ?? '—'}
+                  </TablaDensaCelda>
                   {hayAcciones ? (
                     <TablaDensaCelda className="p-0 pr-1 text-right">
                       <span className="flex items-center justify-end">

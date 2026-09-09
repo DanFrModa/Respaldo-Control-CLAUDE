@@ -236,6 +236,14 @@ function KardexTela(): React.JSX.Element {
                   <p className="text-xs text-muted-foreground">
                     {r.fecha} · {r.almacen} · Lote {r.loteClave ?? '(sin lote)'}
                   </p>
+                  {/* Fila 0.176 — el motivo también en MÓVIL: la tabla de escritorio no existe
+                      aquí, y sin esta línea el almacenista que consulta desde el teléfono sigue
+                      sin poder leer lo que a él mismo se le exigió escribir. */}
+                  {r.observaciones !== null ? (
+                    <p className="text-xs text-muted-foreground" data-testid="kardex-tela-obs">
+                      Observaciones: {r.observaciones}
+                    </p>
+                  ) : null}
                   <div className="flex items-center justify-between">
                     <span className="num">{efectoRenglon(r.entrada, r.salida)}</span>
                     <span className="num font-semibold">
@@ -259,6 +267,13 @@ function KardexTela(): React.JSX.Element {
                     <TablaDensaHead numerica>Entrada</TablaDensaHead>
                     <TablaDensaHead numerica>Salida</TablaDensaHead>
                     <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                    {/* Fila 0.176 — el MOTIVO se LEE. La 0.172 lo volvió OBLIGATORIO al mover
+                        material, pero no salía en ninguna pantalla: una explicación que nadie
+                        consulta se degrada a «.» en dos semanas, y el campo obligatorio deja de
+                        servir para lo que se puso. Mismo patrón que el estado de cuenta de
+                        proveedores (`cxp/EstadoCuentaProveedorPagina.tsx`), el otro libro de
+                        movimientos con saldo corrido del sistema. */}
+                    <TablaDensaHead>Observaciones</TablaDensaHead>
                     {puedeMover ? <TablaDensaHead /> : null}
                   </TablaDensaFila>
                 </TablaDensaEncabezado>
@@ -287,6 +302,7 @@ function KardexTela(): React.JSX.Element {
                       <TablaDensaCelda numerica className="font-semibold">
                         {si.saldo.toLocaleString('es-MX')}
                       </TablaDensaCelda>
+                      <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
                       {puedeMover ? <TablaDensaCelda /> : null}
                     </TablaDensaFila>
                   ))}
@@ -313,6 +329,13 @@ function KardexTela(): React.JSX.Element {
                       </TablaDensaCelda>
                       <TablaDensaCelda numerica className="font-semibold">
                         {r.saldo.toLocaleString('es-MX')}
+                      </TablaDensaCelda>
+                      <TablaDensaCelda
+                        className="max-w-xs truncate"
+                        title={r.observaciones ?? undefined}
+                        data-testid="kardex-tela-obs"
+                      >
+                        {r.observaciones ?? '—'}
                       </TablaDensaCelda>
                       {puedeMover ? (
                         <TablaDensaCelda className="text-right">
@@ -466,6 +489,12 @@ function KardexAvio(): React.JSX.Element {
                 <p className="text-xs text-muted-foreground">
                   {r.fecha} · {r.almacen}
                 </p>
+                {/* Fila 0.176 — el motivo también en MÓVIL (ver la nota gemela en telas). */}
+                {r.observaciones !== null ? (
+                  <p className="text-xs text-muted-foreground" data-testid="kardex-avio-obs">
+                    Observaciones: {r.observaciones}
+                  </p>
+                ) : null}
                 <div className="flex items-center justify-between">
                   <span className="num">{efectoRenglon(r.entrada, r.salida)}</span>
                   <span className="num font-semibold">
@@ -488,6 +517,11 @@ function KardexAvio(): React.JSX.Element {
                   <TablaDensaHead numerica>Entrada</TablaDensaHead>
                   <TablaDensaHead numerica>Salida</TablaDensaHead>
                   <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                  {/* Fila 0.176 — el MOTIVO se LEE (ver la nota gemela en la tabla de telas). Esta
+                      es la superficie que MÁS lo necesita: el traspaso de avíos es justo la
+                      captura a la que la 0.172 le puso el motivo obligatorio, y su motivo aterriza
+                      en las `observaciones` de este movimiento. */}
+                  <TablaDensaHead>Observaciones</TablaDensaHead>
                   {puedeMover ? <TablaDensaHead /> : null}
                 </TablaDensaFila>
               </TablaDensaEncabezado>
@@ -514,6 +548,7 @@ function KardexAvio(): React.JSX.Element {
                     <TablaDensaCelda numerica className="font-semibold">
                       {si.saldo.toLocaleString('es-MX')}
                     </TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
                     {puedeMover ? <TablaDensaCelda /> : null}
                   </TablaDensaFila>
                 ))}
@@ -539,6 +574,13 @@ function KardexAvio(): React.JSX.Element {
                     </TablaDensaCelda>
                     <TablaDensaCelda numerica className="font-semibold">
                       {r.saldo.toLocaleString('es-MX')}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda
+                      className="max-w-xs truncate"
+                      title={r.observaciones ?? undefined}
+                      data-testid="kardex-avio-obs"
+                    >
+                      {r.observaciones ?? '—'}
                     </TablaDensaCelda>
                     {puedeMover ? (
                       <TablaDensaCelda className="text-right">
