@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { KardexAvio, KardexTela } from '@/api/tipos';
+import type { ClavePermiso, KardexAvio, KardexTela } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { KardexMaterialesPagina } from './KardexMaterialesPagina';
@@ -158,6 +158,37 @@ beforeEach(() => {
 function abrirAvios(): void {
   fireEvent.click(screen.getByTestId('kardex-mat-dim-avio'));
   fireEvent.click(screen.getByTestId('sel-avio'));
+}
+
+/**
+ * 🔴 GUARDA DE CUADRE DE COLUMNAS: cuántos `th` tiene el encabezado y cuántos `td` tiene CADA `tr`
+ * del cuerpo. Devuelve las dos cifras para que la prueba las compare.
+ *
+ * ⚠️ Por qué existe (hueco cazado por el reviewer de la 0.176/0.177, MUTANDO — leyendo el código
+ * él mismo había dado por hecho que la guarda de columnas ya cubría el cuerpo): esta pantalla y la
+ * del inventario por color tienen TRES tablas que reciben la misma edición cuando se agrega una
+ * columna —el encabezado, el renglón de datos y el renglón de «Saldo anterior»—, y sólo una de las
+ * tres tenía alguna verificación. Se comprobó que borrar el encabezado de telas, el de avíos, o
+ * cualquiera de las tres celdas de «Saldo anterior» dejaba la suite ENTERA en verde. El día que
+ * alguien meta una columna en medio y olvide una de esas filas, los números salen bajo el
+ * encabezado equivocado y nadie se entera.
+ *
+ * Contar sólo el encabezado NO basta: es justo lo que ya se hacía y es lo que dejó pasar el hueco.
+ */
+function cuadreColumnas(tabla: HTMLElement): { encabezados: number; porFila: number[] } {
+  return {
+    encabezados: tabla.querySelectorAll('thead th').length,
+    porFila: [...tabla.querySelectorAll('tbody tr')].map((tr) => tr.querySelectorAll('td').length),
+  };
+}
+
+/** Afirma que TODAS las filas del cuerpo tienen tantas celdas como columnas el encabezado. */
+function esperarColumnasCuadradas(tabla: HTMLElement, filasEsperadas: number): void {
+  const { encabezados, porFila } = cuadreColumnas(tabla);
+  // Sin filas la comprobación sería vacua (verde sin medir nada): se exige que las haya.
+  expect(porFila).toHaveLength(filasEsperadas);
+  expect(encabezados).toBeGreaterThan(0);
+  expect(porFila).toEqual(porFila.map(() => encabezados));
 }
 
 describe('KardexMaterialesPagina (F4-E1)', () => {
@@ -426,6 +457,58 @@ describe('KardexMaterialesPagina (F4-E1)', () => {
       const vacio = screen.getByTestId('kardex-tela-vacio');
       expect(vacio).toHaveTextContent(/en el periodo/);
       expect(vacio).toHaveTextContent(/amplía las fechas/);
+    });
+  });
+
+  /**
+   * 🔴 LAS COLUMNAS CUADRAN — la guarda que faltaba (ver `cuadreColumnas` arriba).
+   *
+   * Las dos tablas de esta pantalla reciben la MISMA edición cada vez que se agrega una columna, en
+   * TRES sitios cada una: el encabezado, el renglón de datos y el de «Saldo anterior». Hasta la
+   * 0.176 sólo se contaba el encabezado de una de ellas ⇒ borrar el encabezado de telas, el de
+   * avíos, o cualquiera de las dos celdas de «Saldo anterior» dejaba la suite entera EN VERDE.
+   *
+   * Se mide con `saldosIniciales` POBLADO (si no, la fila de «Saldo anterior» no se pinta y no se
+   * mide) y en las DOS variantes de permiso, porque la columna de acciones es condicional: sin
+   * `.mover` no se pinta ni su `th` ni sus `td`, y ése es justo el tipo de par que se descuadra.
+   */
+  describe('las columnas del cuerpo cuadran con el encabezado', () => {
+    const saldoTela = [
+      { idLote: 7, loteClave: 'LOTE-A', idAlmacen: 5, almacen: 'Bodega A', saldo: 300 },
+    ];
+    const saldoAvio = [{ idAlmacen: 9, almacen: 'Avíos A', saldo: 250 }];
+
+    const casosTela: [string, ClavePermiso[]][] = [
+      ['sólo ver', ['inventario-telas.ver']],
+      [
+        'ver + mover (aparece la columna de acciones)',
+        ['inventario-telas.ver', 'inventario-telas.mover'],
+      ],
+    ];
+    it.each(casosTela)('TELAS · %s', (_caso, permisos) => {
+      datosKardexTela.mockReturnValue({ ...kardexTela, saldosIniciales: saldoTela });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(permisos),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+      // 2 filas: el «Saldo anterior» + el único renglón del fixture.
+      esperarColumnasCuadradas(screen.getByTestId('kardex-tela-tabla'), 2);
+    });
+
+    const casosAvio: [string, ClavePermiso[]][] = [
+      ['sólo ver', ['inventario-avios.ver']],
+      [
+        'ver + mover (aparece la columna de acciones)',
+        ['inventario-avios.ver', 'inventario-avios.mover'],
+      ],
+    ];
+    it.each(casosAvio)('AVÍOS · %s', (_caso, permisos) => {
+      datosKardexAvio.mockReturnValue({ ...kardexAvio, saldosIniciales: saldoAvio });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(permisos),
+      });
+      abrirAvios();
+      esperarColumnasCuadradas(screen.getByTestId('kardex-avio-tabla'), 2);
     });
   });
 

@@ -730,9 +730,14 @@ function CajonKardexTelaColor({
                   (`repartirPorPartidaFifo` → `traspasarTelaColor`), y `kardexTelaColor` emite un
                   renglón por detalle ⇒ varios renglones con el mismo movimiento, almacén y folio.
                   Con la llave repetida, React reusa el fiber equivocado al re-conciliar y el
-                  cajón se queda con un renglón FANTASMA de otro movimiento al filtrar por
-                  partida (medido: filtrar a la partida de otro movimiento dejaba 2 renglones
-                  donde el servidor mandó 1). */}
+                  cajón se corrompe al filtrar por partida. MEDIDO sobre las 12 transiciones del
+                  filtro: la que corrompe DE ENTRADA es una sola —de «todas» a la partida que sólo
+                  toca OTRO movimiento: quedaban 2 renglones donde el servidor mandó 1—, pero una
+                  vez corrompido, el estado PERSISTE y EMPEORA en cada paso: al volver a «todas»
+                  el mismo movimiento sale DOS veces, y repitiendo el vaivén sale tres y cuatro.
+                  ⚠️ Es lo que la pantalla PINTA, no lo que vale la existencia (el saldo es Σ de
+                  movimientos en el servidor, D3) — pero un kardex que repite un renglón se lee
+                  como doble conteo, y eso nadie debería tener que descartarlo a ojo. */}
               {kardex.renglones.map((r, i) => (
                 <TablaDensaFila
                   key={`${r.idMovimiento}-${r.idAlmacen}-${r.folio}-${i}`}
