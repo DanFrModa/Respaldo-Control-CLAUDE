@@ -125755,6 +125755,39 @@
             "name": "idAlmacen",
             "required": false,
             "description": "Filtra por un almacén."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Primer día del periodo (YYYY-MM-DD), INCLUSIVE."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Último día del periodo (YYYY-MM-DD), INCLUSIVE."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "description": "Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`)."
           }
         ],
         "security": [
@@ -125764,7 +125797,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Kardex de una tela (movimientos con saldo corrido).",
+            "description": "Kardex de una tela en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo.",
             "content": {
               "application/json": {
                 "schema": {
@@ -125777,6 +125810,90 @@
                     },
                     "tela": {
                       "type": "string"
+                    },
+                    "desde": {
+                      "type": "string",
+                      "description": "Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive)."
+                    },
+                    "hasta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope."
+                    },
+                    "ventanaPorOmision": {
+                      "type": "boolean",
+                      "description": "true cuando `desde` lo puso el dominio porque nadie pidió periodo."
+                    },
+                    "limite": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tope de renglones que se aplicó."
+                    },
+                    "truncado": {
+                      "type": "boolean",
+                      "description": "true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde)."
+                    },
+                    "saldosIniciales": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idLote": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Lote del artículo, o null (bucket sin lote)."
+                          },
+                          "loteClave": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Clave del lote, o null."
+                          },
+                          "idAlmacen": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Almacén del artículo."
+                          },
+                          "almacen": {
+                            "type": "string",
+                            "description": "Nombre del almacén."
+                          },
+                          "saldo": {
+                            "type": "number",
+                            "description": "Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false)."
+                          }
+                        },
+                        "required": [
+                          "idLote",
+                          "loteClave",
+                          "idAlmacen",
+                          "almacen",
+                          "saldo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Saldo de los artículos del periodo justo ANTES del primer renglón devuelto."
                     },
                     "renglones": {
                       "type": "array",
@@ -125939,10 +126056,16 @@
                   "required": [
                     "idTela",
                     "tela",
+                    "desde",
+                    "hasta",
+                    "ventanaPorOmision",
+                    "limite",
+                    "truncado",
+                    "saldosIniciales",
                     "renglones"
                   ],
                   "additionalProperties": false,
-                  "description": "Kardex de una tela (movimientos con saldo corrido)."
+                  "description": "Kardex de una tela en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo."
                 }
               }
             }
@@ -131176,6 +131299,39 @@
             "name": "idPartida",
             "required": false,
             "description": "Filtra por una partida (traza de entrada)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Primer día del periodo (YYYY-MM-DD), INCLUSIVE."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Último día del periodo (YYYY-MM-DD), INCLUSIVE."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "description": "Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`)."
           }
         ],
         "security": [
@@ -131185,7 +131341,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Kardex de un color de tela (movimientos con saldo corrido de ambos componentes).",
+            "description": "Kardex de un color de tela en un PERIODO: saldo anterior + movimientos con saldo corrido de ambos componentes. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo.",
             "content": {
               "application/json": {
                 "schema": {
@@ -131244,6 +131400,69 @@
                         }
                       ],
                       "description": "null = la tela no lleva complemento."
+                    },
+                    "desde": {
+                      "type": "string",
+                      "description": "Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive)."
+                    },
+                    "hasta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope."
+                    },
+                    "ventanaPorOmision": {
+                      "type": "boolean",
+                      "description": "true cuando `desde` lo puso el dominio porque nadie pidió periodo."
+                    },
+                    "limite": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tope de renglones que se aplicó."
+                    },
+                    "truncado": {
+                      "type": "boolean",
+                      "description": "true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde)."
+                    },
+                    "saldosIniciales": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAlmacen": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Almacén del saldo."
+                          },
+                          "almacen": {
+                            "type": "string",
+                            "description": "Nombre del almacén."
+                          },
+                          "saldoCuerpo": {
+                            "type": "number",
+                            "description": "Cuerpo. Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false)."
+                          },
+                          "saldoComplemento": {
+                            "type": "number",
+                            "description": "Complemento. Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false)."
+                          }
+                        },
+                        "required": [
+                          "idAlmacen",
+                          "almacen",
+                          "saldoCuerpo",
+                          "saldoComplemento"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Saldo de los almacenes del periodo justo ANTES del primer renglón devuelto."
                     },
                     "renglones": {
                       "type": "array",
@@ -131451,10 +131670,16 @@
                     "unidadMedida",
                     "nombreCuerpo",
                     "nombreComplemento",
+                    "desde",
+                    "hasta",
+                    "ventanaPorOmision",
+                    "limite",
+                    "truncado",
+                    "saldosIniciales",
                     "renglones"
                   ],
                   "additionalProperties": false,
-                  "description": "Kardex de un color de tela (movimientos con saldo corrido de ambos componentes)."
+                  "description": "Kardex de un color de tela en un PERIODO: saldo anterior + movimientos con saldo corrido de ambos componentes. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo."
                 }
               }
             }
@@ -139954,6 +140179,39 @@
             "name": "idAlmacen",
             "required": false,
             "description": "Filtra por un almacén."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Primer día del periodo (YYYY-MM-DD), INCLUSIVE."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Último día del periodo (YYYY-MM-DD), INCLUSIVE."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "description": "Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`)."
           }
         ],
         "security": [
@@ -139963,7 +140221,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Kardex de un avío (movimientos con saldo corrido).",
+            "description": "Kardex de un avío en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo.",
             "content": {
               "application/json": {
                 "schema": {
@@ -139979,6 +140237,64 @@
                     },
                     "descripcion": {
                       "type": "string"
+                    },
+                    "desde": {
+                      "type": "string",
+                      "description": "Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive)."
+                    },
+                    "hasta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope."
+                    },
+                    "ventanaPorOmision": {
+                      "type": "boolean",
+                      "description": "true cuando `desde` lo puso el dominio porque nadie pidió periodo."
+                    },
+                    "limite": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tope de renglones que se aplicó."
+                    },
+                    "truncado": {
+                      "type": "boolean",
+                      "description": "true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde)."
+                    },
+                    "saldosIniciales": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAlmacen": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Almacén del saldo."
+                          },
+                          "almacen": {
+                            "type": "string",
+                            "description": "Nombre del almacén."
+                          },
+                          "saldo": {
+                            "type": "number",
+                            "description": "Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo sólo cuando `truncado` es false)."
+                          }
+                        },
+                        "required": [
+                          "idAlmacen",
+                          "almacen",
+                          "saldo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Saldo de los almacenes del periodo justo ANTES del primer renglón devuelto."
                     },
                     "renglones": {
                       "type": "array",
@@ -140125,10 +140441,16 @@
                     "idAvio",
                     "avio",
                     "descripcion",
+                    "desde",
+                    "hasta",
+                    "ventanaPorOmision",
+                    "limite",
+                    "truncado",
+                    "saldosIniciales",
                     "renglones"
                   ],
                   "additionalProperties": false,
-                  "description": "Kardex de un avío (movimientos con saldo corrido)."
+                  "description": "Kardex de un avío en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo."
                 }
               }
             }

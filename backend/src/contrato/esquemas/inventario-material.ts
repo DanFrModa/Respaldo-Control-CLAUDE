@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+import {
+  camposPeriodoKardexQuery,
+  camposPeriodoKardexRespuesta,
+  DESCRIPCION_FILTROS_PERIODO,
+  DESCRIPCION_SALDO_ANTERIOR,
+} from './periodo-kardex.js';
+
 /**
  * Esquemas Zod del INVENTARIO de TELAS y AVÍOS por kardex (F4-E1; doc 04-Inventarios §B; D5/R4).
  * UNA sola definición de reglas para UI y servidor (alimenta el OpenAPI). La existencia es SIEMPRE
@@ -347,8 +354,9 @@ export const esquemaKardexTelaQuery = z
       .describe('Tela del kardex (obligatorio).'),
     idLote: idPositivoOpcionalCoerce.describe('Filtra por un lote.'),
     idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
+    ...camposPeriodoKardexQuery,
   })
-  .describe('Filtros del kardex de una tela.');
+  .describe(`Filtros del kardex de una tela. ${DESCRIPCION_FILTROS_PERIODO}`);
 
 /** Parámetros del kardex de tela ya coaccionados. */
 export type KardexTelaQuery = z.infer<typeof esquemaKardexTelaQuery>;
@@ -379,14 +387,36 @@ const esquemaKardexTelaRenglon = z.object({
 /** Un renglón del kardex de tela tal como lo devuelve la API. */
 export type KardexTelaRenglon = z.infer<typeof esquemaKardexTelaRenglon>;
 
+/**
+ * SALDO ANTERIOR de un artículo del kardex por lote (lote×almacén, la misma llave del saldo
+ * corrido). Sólo vienen los artículos que APARECEN en los renglones devueltos y sólo si no es cero.
+ */
+const esquemaKardexTelaSaldoInicial = z.object({
+  idLote: z.number().int().nullable().describe('Lote del artículo, o null (bucket sin lote).'),
+  loteClave: z.string().nullable().describe('Clave del lote, o null.'),
+  idAlmacen: z.number().int().describe('Almacén del artículo.'),
+  almacen: z.string().describe('Nombre del almacén.'),
+  saldo: z.number().describe(DESCRIPCION_SALDO_ANTERIOR),
+});
+
+/** Un saldo anterior del kardex de tela tal como lo devuelve la API. */
+export type KardexTelaSaldoInicial = z.infer<typeof esquemaKardexTelaSaldoInicial>;
+
 /** Respuesta del kardex de tela (movimientos cronológicos con saldo corrido). */
 export const esquemaKardexTelaLista = z
   .object({
     idTela: z.number().int(),
     tela: z.string(),
+    ...camposPeriodoKardexRespuesta,
+    saldosIniciales: z
+      .array(esquemaKardexTelaSaldoInicial)
+      .describe('Saldo de los artículos del periodo justo ANTES del primer renglón devuelto.'),
     renglones: z.array(esquemaKardexTelaRenglon),
   })
-  .describe('Kardex de una tela (movimientos con saldo corrido).');
+  .describe(
+    'Kardex de una tela en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es ' +
+      'todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo.',
+  );
 
 /** Forma de la respuesta del kardex de tela. */
 export type KardexTelaLista = z.infer<typeof esquemaKardexTelaLista>;
@@ -920,8 +950,9 @@ export const esquemaKardexTelaColorQuery = z
       .describe('Color de tela del kardex (obligatorio).'),
     idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
     idPartida: idPositivoOpcionalCoerce.describe('Filtra por una partida (traza de entrada).'),
+    ...camposPeriodoKardexQuery,
   })
-  .describe('Filtros del kardex de un color de tela.');
+  .describe(`Filtros del kardex de un color de tela. ${DESCRIPCION_FILTROS_PERIODO}`);
 
 /** Parámetros del kardex por color ya coaccionados. */
 export type KardexTelaColorQuery = z.infer<typeof esquemaKardexTelaColorQuery>;
@@ -966,6 +997,20 @@ const esquemaKardexTelaColorRenglon = z.object({
 /** Un renglón del kardex por color tal como lo devuelve la API. */
 export type KardexTelaColorRenglon = z.infer<typeof esquemaKardexTelaColorRenglon>;
 
+/**
+ * SALDO ANTERIOR de un almacén en el kardex por color. La llave es el ALMACÉN —la misma con la que
+ * corre el saldo de esta pantalla— y trae los DOS componentes, porque los dos tienen columna.
+ */
+const esquemaKardexTelaColorSaldoInicial = z.object({
+  idAlmacen: z.number().int().describe('Almacén del saldo.'),
+  almacen: z.string().describe('Nombre del almacén.'),
+  saldoCuerpo: z.number().describe(`Cuerpo. ${DESCRIPCION_SALDO_ANTERIOR}`),
+  saldoComplemento: z.number().describe(`Complemento. ${DESCRIPCION_SALDO_ANTERIOR}`),
+});
+
+/** Un saldo anterior del kardex por color tal como lo devuelve la API. */
+export type KardexTelaColorSaldoInicial = z.infer<typeof esquemaKardexTelaColorSaldoInicial>;
+
 /** Respuesta del kardex por color (encabezado de la tela/color + renglones cronológicos). */
 export const esquemaKardexTelaColorLista = z
   .object({
@@ -977,9 +1022,17 @@ export const esquemaKardexTelaColorLista = z
     unidadMedida: z.enum(['KG', 'M']),
     nombreCuerpo: z.string().nullable(),
     nombreComplemento: z.string().nullable().describe('null = la tela no lleva complemento.'),
+    ...camposPeriodoKardexRespuesta,
+    saldosIniciales: z
+      .array(esquemaKardexTelaColorSaldoInicial)
+      .describe('Saldo de los almacenes del periodo justo ANTES del primer renglón devuelto.'),
     renglones: z.array(esquemaKardexTelaColorRenglon),
   })
-  .describe('Kardex de un color de tela (movimientos con saldo corrido de ambos componentes).');
+  .describe(
+    'Kardex de un color de tela en un PERIODO: saldo anterior + movimientos con saldo corrido de ' +
+      'ambos componentes. Nunca es todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo ' +
+      'se está viendo.',
+  );
 
 /** Forma de la respuesta del kardex por color. */
 export type KardexTelaColorLista = z.infer<typeof esquemaKardexTelaColorLista>;
@@ -1368,8 +1421,9 @@ export const esquemaKardexAvioQuery = z
       .positive()
       .describe('Avío del kardex (obligatorio).'),
     idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
+    ...camposPeriodoKardexQuery,
   })
-  .describe('Filtros del kardex de un avío.');
+  .describe(`Filtros del kardex de un avío. ${DESCRIPCION_FILTROS_PERIODO}`);
 
 /** Parámetros del kardex de avío ya coaccionados. */
 export type KardexAvioQuery = z.infer<typeof esquemaKardexAvioQuery>;
@@ -1399,15 +1453,35 @@ const esquemaKardexAvioRenglon = z.object({
 /** Un renglón del kardex de avío tal como lo devuelve la API. */
 export type KardexAvioRenglon = z.infer<typeof esquemaKardexAvioRenglon>;
 
+/**
+ * SALDO ANTERIOR de un almacén en el kardex de avío (la llave del saldo corrido de avíos es el
+ * ALMACÉN — el lote del avío no entra en la dimensión de existencia, R4).
+ */
+const esquemaKardexAvioSaldoInicial = z.object({
+  idAlmacen: z.number().int().describe('Almacén del saldo.'),
+  almacen: z.string().describe('Nombre del almacén.'),
+  saldo: z.number().describe(DESCRIPCION_SALDO_ANTERIOR),
+});
+
+/** Un saldo anterior del kardex de avío tal como lo devuelve la API. */
+export type KardexAvioSaldoInicial = z.infer<typeof esquemaKardexAvioSaldoInicial>;
+
 /** Respuesta del kardex de avío. */
 export const esquemaKardexAvioLista = z
   .object({
     idAvio: z.number().int(),
     avio: z.string(),
     descripcion: z.string(),
+    ...camposPeriodoKardexRespuesta,
+    saldosIniciales: z
+      .array(esquemaKardexAvioSaldoInicial)
+      .describe('Saldo de los almacenes del periodo justo ANTES del primer renglón devuelto.'),
     renglones: z.array(esquemaKardexAvioRenglon),
   })
-  .describe('Kardex de un avío (movimientos con saldo corrido).');
+  .describe(
+    'Kardex de un avío en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es ' +
+      'todo el histórico — `desde`/`hasta`/`limite` dicen qué pedazo se está viendo.',
+  );
 
 /** Forma de la respuesta del kardex de avío. */
 export type KardexAvioLista = z.infer<typeof esquemaKardexAvioLista>;

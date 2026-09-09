@@ -91,6 +91,14 @@ del detalle, NUNCA la vista — ADR-0010 §3). `costoUnit` queda NULL en toda F3
 
 ## El kardex por modelo es de un PERIODO (fila 0.138)
 
+> 🔁 **Desde la fila 0.173 este mecanismo NO es sólo de producto terminado.** Sus piezas —ventana por
+> omisión, tope, corte por la cola, el rechazo del rango al revés y los cinco campos que la respuesta
+> declara— viven una sola vez en `backend/src/dominio/inventarios/periodo-kardex.ts` y
+> `backend/src/contrato/esquemas/periodo-kardex.ts`, y de ahí las toman también los kardex de tela por
+> color, tela por lote y avíos (ver `docs/modulos/inventario-telas-avios.md`). Mover el número de meses o
+> el tope los cambia **a los cuatro**: es una sola perilla, a propósito.
+
+
 Antes, pedir el kardex de un modelo traía **todo su histórico**. Medido contra una base sintética de diez
 años (100 000 movimientos / 500 000 renglones de detalle): **25 000 renglones y 8.3 MB de JSON en una sola
 respuesta**. Daniel lo dijo en el repaso de inventarios: *«con diez años cargados, pedirlo trae todo»*.

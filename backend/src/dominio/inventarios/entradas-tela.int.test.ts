@@ -52,6 +52,15 @@ import {
   obtenerEntradaTela,
 } from './entradas-tela.js';
 
+/**
+ * ⭐ FILA 0.173 — POR QUÉ ESTAS PRUEBAS PIDEN UN `desde` EXPLÍCITO. Desde esta fila, un kardex sin
+ * periodo se lee con la VENTANA POR OMISIÓN (12 meses hacia atrás desde HOY), y las fixturas de
+ * este archivo están fechadas en 2026: hoy caen dentro, pero llegado 2027 dejarían de caer y estas
+ * pruebas fallarían por el CALENDARIO, no por el código. Fijar el piso las vuelve deterministas.
+ * El periodo tiene sus propias pruebas, que sí lo ejercitan a propósito.
+ */
+const PERIODO_COMPLETO = '2000-01-01';
+
 let cliente: PrismaClient;
 let empresa: Empresa;
 let proveedor: Proveedor;
@@ -515,7 +524,11 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
     expect(Number(det.costoUnitComplemento)).toBe(130);
 
     // El KARDEX por color expone ambos costos y su importe suma los dos componentes.
-    const kardex = await kardexTelaColor(sesion(), { idTelaColor: colorMarino.id }, bd());
+    const kardex = await kardexTelaColor(
+      sesion(),
+      { idTelaColor: colorMarino.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
     expect(kardex.renglones[0]!.costoUnit).toBe(90);
     expect(kardex.renglones[0]!.costoUnitComplemento).toBe(130);
     expect(kardex.renglones[0]!.importe).toBe(100 * 90 + 20 * 130);

@@ -77,6 +77,13 @@ const kardex: KardexTelaColor = {
   unidadMedida: 'KG',
   nombreCuerpo: 'Felpa',
   nombreComplemento: 'Cardigan',
+  // Encabezado del PERIODO (fila 0.173): qué pedazo se está viendo y si se quedó algo fuera.
+  desde: '2025-09-05',
+  hasta: null,
+  ventanaPorOmision: true,
+  limite: 1000,
+  truncado: false,
+  saldosIniciales: [],
   renglones: [
     {
       idMovimiento: 1,
@@ -250,6 +257,79 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
       { id: 1, cuerpo: { motivo: 'Captura equivocada' } },
       expect.anything(),
     );
+  });
+
+  // ── fila 0.173: el cajón del kardex también tiene PERIODO, y tiene que decirlo ─────────────
+  //
+  // ⭐ Este kardex pedía el histórico entero del color. Ahora el servidor recorta con una ventana
+  // por omisión; si el cajón no dijera el periodo, esa ventana se leería como «este color no tiene
+  // más movimientos» — que es la mentira que la fila 0.138 ya había cerrado en producto terminado.
+  it('⭐ el cajón dice qué PERIODO está viendo y manda las fechas al servidor', () => {
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : { data: kardex, isPending: false, isError: false },
+    );
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+
+    const periodo = screen.getByTestId('kardex-color-periodo');
+    expect(periodo).toHaveTextContent('2025-09-05');
+    expect(periodo).toHaveTextContent(/últimos 12 meses por omisión/);
+    // Sin techo NO se dice «a hoy» (el servidor lo deja abierto a propósito).
+    expect(periodo).not.toHaveTextContent(/hoy/);
+
+    // Y las fechas VIAJAN: la pantalla no recorta lo que ya llegó.
+    fireEvent.change(screen.getByTestId('kardex-color-desde'), {
+      target: { value: '2026-06-01' },
+    });
+    expect(useKardexTelaColor).toHaveBeenLastCalledWith(
+      expect.objectContaining({ idTelaColor: 11, desde: '2026-06-01' }),
+    );
+  });
+
+  /**
+   * ⭐⭐ EL SALDO ANTERIOR SE PINTA, o las DOS columnas «Saldo» mienten. Con periodo, el primer
+   * renglón visible no arranca de cero: arranca de lo que el almacén ya traía.
+   */
+  it('⭐⭐ el cajón pinta el SALDO ANTERIOR (cuerpo y complemento) de donde arranca la columna', () => {
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : {
+            data: {
+              ...kardex,
+              saldosIniciales: [
+                { idAlmacen: 5, almacen: 'Bodega A', saldoCuerpo: 300, saldoComplemento: 120 },
+              ],
+            },
+            isPending: false,
+            isError: false,
+          },
+    );
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+    const fila = screen.getByTestId('kardex-color-saldo-inicial');
+    expect(fila).toHaveTextContent('Bodega A');
+    expect(fila).toHaveTextContent('300');
+    expect(fila).toHaveTextContent('120');
+  });
+
+  it('y si el cajón vino CORTADO lo dice (nadie debe creer que está viendo todo)', () => {
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : { data: { ...kardex, truncado: true, limite: 1000 }, isPending: false, isError: false },
+    );
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+    expect(screen.getByTestId('kardex-color-truncado')).toHaveTextContent(/más\s+RECIENTES/);
   });
 
   it('sin acciones que ofrecer, el kardex NO pinta la columna de acciones (a quien solo consulta)', () => {

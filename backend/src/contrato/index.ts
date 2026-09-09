@@ -1391,6 +1391,7 @@ export {
   type ExistenciasTelaLista,
   type KardexTelaQuery,
   type KardexTelaRenglon,
+  type KardexTelaSaldoInicial,
   type KardexTelaLista,
   type DatosTelaColorLinea,
   type DatosTelaColorLineaSalida,
@@ -1414,6 +1415,7 @@ export {
   type ExistenciasTelaColorLista,
   type KardexTelaColorQuery,
   type KardexTelaColorRenglon,
+  type KardexTelaColorSaldoInicial,
   type KardexTelaColorLista,
   type DatosPreviaSalidaTelaColor,
   type PreviaSalidaTelaRenglon,
@@ -1433,6 +1435,7 @@ export {
   type ExistenciasAvioLista,
   type KardexAvioQuery,
   type KardexAvioRenglon,
+  type KardexAvioSaldoInicial,
   type KardexAvioLista,
 } from './esquemas/inventario-material.js';
 

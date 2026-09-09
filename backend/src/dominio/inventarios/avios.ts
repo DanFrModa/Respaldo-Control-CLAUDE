@@ -52,6 +52,13 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import {
+  camposPeriodoKardex,
+  diaDelPeriodo,
+  periodoAlDerecho,
+  recortarPorLaCola,
+  resolverVentanaKardex,
+} from './periodo-kardex.js';
 import { exigirCancelableFueraDelCiclico } from './cancelacion-comun.js';
 import {
   CODIGO_TIPO_MOV_POR_CONCEPTO,
@@ -530,10 +537,18 @@ const esquemaConsultaExistenciasAvio = z.object({
   incluirCeros: z.boolean().default(false),
 });
 
-const esquemaConsultaKardexAvio = z.object({
-  idAvio: z.number().int().positive(),
-  idAlmacen: z.number().int().positive().optional(),
-});
+/**
+ * Filtros del kardex de avío + el PERIODO (fila 0.173, mecanismo de la 0.138). **Se EXPORTA** para
+ * que `contrato/esquemas/tope-kardex-honesto.test.ts` cruce el tope contra el que publica el
+ * querystring: es el objeto que de verdad valida, no uno «equivalente».
+ */
+export const esquemaConsultaKardexAvio = z
+  .object({
+    idAvio: z.number().int().positive(),
+    idAlmacen: z.number().int().positive().optional(),
+    ...camposPeriodoKardex,
+  })
+  .refine(periodoAlDerecho.predicado, periodoAlDerecho.opciones);
 
 export type ParametrosExistenciasAvio = z.input<typeof esquemaConsultaExistenciasAvio>;
 
@@ -611,10 +626,18 @@ export async function consultarExistenciasAvio(
 export type ParametrosKardexAvio = z.input<typeof esquemaConsultaKardexAvio>;
 
 /**
- * KARDEX por AVÍO: lista CRONOLÓGICA de los movimientos del avío con SALDO CORRIDO por avío×almacén
- * (la dimensión de existencia de avíos, R4). Lee `MovimientoDetAvio` DIRECTO (sin la vista). Costos/
- * importes OMITIDOS (null) sin `telas.ver-totales` (ex-acceso #7 — se reutiliza para los importes de
- * materiales). Permiso `inventario-avios.ver`; empresa activa (A9).
+ * KARDEX por AVÍO: lista CRONOLÓGICA de los movimientos del avío EN UN PERIODO, con SALDO CORRIDO
+ * por avío×almacén (la dimensión de existencia de avíos, R4). Lee `MovimientoDetAvio` DIRECTO (sin
+ * la vista). Costos/importes OMITIDOS (null) sin `telas.ver-totales` (ex-acceso #7 — se reutiliza
+ * para los importes de materiales). Permiso `inventario-avios.ver`; empresa activa (A9).
+ *
+ * ⭐ FILA 0.173 — EL PERIODO, con el mecanismo que la 0.138 construyó para producto terminado
+ * (`periodo-kardex.ts`, léelo: ahí está el porqué completo). En una línea: el filtro de fechas se
+ * aplica en el `WHERE` (servidor, nunca recortando en el cliente); si nadie pide periodo se aplica
+ * la ventana por omisión de 12 meses; hay un TOPE DURO de renglones que se lleva **el final** del
+ * periodo (`folio DESC`, no el pedazo más viejo); y el saldo corrido se SIEMBRA con lo que el
+ * almacén traía justo antes del primer renglón visible, porque si no la columna «Saldo» arrancaría
+ * en cero y todos los renglones mentirían.
  */
 export async function kardexAvio(
   sesion: SesionUsuario,
@@ -635,15 +658,25 @@ export async function kardexAvio(
     throw new ErrorNoEncontrado('Avio', filtros.idAvio);
   }
 
+  const ventana = resolverVentanaKardex(filtros);
+  const desdeDia = diaDelPeriodo(ventana.desde);
+  const hastaDia = ventana.hasta === null ? undefined : diaDelPeriodo(ventana.hasta);
+
   const detalles = await cliente.movimientoDetAvio.findMany({
     where: {
       idAvio: filtros.idAvio,
       movimiento: {
         idEmpresa,
         ...(filtros.idAlmacen === undefined ? {} : { idAlmacen: filtros.idAlmacen }),
+        // El PERIODO, resuelto en SERVIDOR. Los dos extremos inclusivos: `fecha` es `date`, así que
+        // `lte` del último día lo incluye entero (no hay medianoche que se coma el día).
+        fecha: { gte: desdeDia, ...(hastaDia === undefined ? {} : { lte: hastaDia }) },
       },
     },
     select: {
+      // El `id` del detalle NO es decorativo: junto con el folio forma la llave de orden, y con
+      // ella se ancla el saldo anterior en el punto exacto donde arranca la lista.
+      id: true,
       idLote: true,
       cantidad: true,
       costoUnit: true,
@@ -663,11 +696,36 @@ export async function kardexAvio(
         },
       },
     },
-    orderBy: [{ movimiento: { folio: 'asc' } }, { id: 'asc' }],
+    // ⭐ DESCENDENTE a propósito: cuando el periodo no cabe en `limite`, lo que se conserva es el
+    // FINAL. La llave es folio (secuencia atómica por empresa, A3) + id del detalle, recorrida al
+    // revés; `recortarPorLaCola` la invierte y la lista sale igual de cronológica.
+    orderBy: [{ movimiento: { folio: 'desc' } }, { id: 'desc' }],
+    // Uno de más: la forma barata de saber que hay más SIN pagar un `count` sobre diez años.
+    take: filtros.limite + 1,
   });
 
-  const saldoPorAlmacen = new Map<number, number>();
-  const renglones: KardexAvioRenglon[] = detalles.map((d) => {
+  const { enPeriodo, truncado } = recortarPorLaCola(detalles, filtros.limite);
+
+  // SALDO ANTERIOR por almacén: lo que cada uno traía JUSTO ANTES del primer renglón que se ve.
+  // Sin renglones no hay punto de anclaje NI nada que explicar: se ahorra la consulta.
+  const ancla = enPeriodo[0];
+  const saldosPrevios =
+    ancla === undefined
+      ? []
+      : await saldosAvioAntesDelPeriodo(cliente, {
+          idEmpresa,
+          idAvio: filtros.idAvio,
+          idAlmacen: filtros.idAlmacen,
+          desde: desdeDia,
+          hasta: hastaDia,
+          anclaFolio: ancla.movimiento.folio,
+          anclaIdDetalle: ancla.id,
+        });
+
+  const saldoPorAlmacen = new Map<number, number>(saldosPrevios.map((s) => [s.idAlmacen, s.saldo]));
+  const almacenesDelPeriodo = new Set<number>();
+
+  const renglones: KardexAvioRenglon[] = enPeriodo.map((d) => {
     const m = d.movimiento;
     const esEntrada = m.tipoMov.direccion === DireccionMovimiento.entrada;
     const esSalida = m.tipoMov.direccion === DireccionMovimiento.salida;
@@ -675,6 +733,7 @@ export async function kardexAvio(
     const entrada = esEntrada ? cantidad : 0;
     const salida = esSalida ? cantidad : 0;
 
+    almacenesDelPeriodo.add(m.idAlmacen);
     const saldoPrevio = saldoPorAlmacen.get(m.idAlmacen) ?? 0;
     const saldo = saldoPrevio + entrada - salida;
     saldoPorAlmacen.set(m.idAlmacen, saldo);
@@ -702,5 +761,123 @@ export async function kardexAvio(
     };
   });
 
-  return { idAvio: avio.id, avio: avio.clave, descripcion: avio.descripcion, renglones };
+  return {
+    idAvio: avio.id,
+    avio: avio.clave,
+    descripcion: avio.descripcion,
+    desde: ventana.desde,
+    hasta: ventana.hasta,
+    ventanaPorOmision: ventana.porOmision,
+    limite: filtros.limite,
+    truncado,
+    // Sólo los almacenes que SE MOVIERON en el periodo: son los que la tabla enseña y los únicos
+    // cuyo saldo hay que poder explicar. Lo que no se movió no es kardex del periodo — es
+    // existencia, y para eso está la pantalla de Existencias.
+    saldosIniciales: saldosPrevios.filter((s) => almacenesDelPeriodo.has(s.idAlmacen)),
+    renglones,
+  };
+}
+
+/** Filtros con los que se calcula el saldo anterior de un avío (los MISMOS del kardex + el ancla). */
+interface FiltrosSaldoAnteriorAvio {
+  idEmpresa: number;
+  idAvio: number;
+  idAlmacen?: number | undefined;
+  /** Primer día del periodo. Todo lo ESTRICTAMENTE anterior a este día es «antes del periodo». */
+  desde: Date;
+  /** Último día del periodo, o `undefined` si no hay techo. */
+  hasta?: Date | undefined;
+  /** Folio del PRIMER renglón que se va a enseñar (el punto donde arranca el saldo corrido). */
+  anclaFolio: bigint;
+  /** Id del detalle de ese mismo renglón: desempata los renglones del mismo movimiento. */
+  anclaIdDetalle: number;
+}
+
+/**
+ * SALDO ANTERIOR por almacén: Σ(cantidad·signo) de todo lo que el avío movió ANTES del punto donde
+ * arranca la lista (D3 — la existencia siempre es suma de movimientos, nunca un saldo guardado). Ese
+ * punto son dos cosas a la vez, y por eso la condición tiene dos ramas:
+ *
+ *  1. **Todo lo anterior al periodo** (`fecha < desde`) — el saldo de apertura de siempre.
+ *  2. **Lo del periodo que el TOPE dejó fuera por arriba** (dentro del periodo, pero con
+ *     `(folio, id)` anterior al primer renglón visible). Sin corte esta rama está vacía.
+ *
+ * Las dos ramas son excluyentes (una mira `fecha <`, la otra `fecha >=`), así que nada se cuenta dos
+ * veces. Y la segunda usa **la misma llave con la que la lista se ordena y se corta**, no la fecha:
+ * es lo que evita que dos movimientos del mismo día a ambos lados del límite se dupliquen o se
+ * pierdan.
+ *
+ * ⚠️ **`id_empresa` (A9) y `id_avio` son de CORRECCIÓN; `id_almacen` es de RENDIMIENTO.** La llave
+ * de agrupación es el almacén, así que un renglón de otro almacén cae en OTRO grupo y el llamador lo
+ * descarta; pero empresa y avío **no** están en esa llave: quitarlos sumaría movimientos ajenos
+ * DENTRO del mismo grupo y toda la columna «Saldo» mentiría a la vez. Por eso esos dos tienen
+ * prueba que muere al quitarlos y el tercero no puede tenerla — se dice aquí en vez de fingirla.
+ *
+ * ⚠️ **Y el desempate `d."id"` aquí NO puede tener prueba que muera, a diferencia de los kardex de
+ * tela.** La captura de avíos prohíbe repetir el mismo avío en dos renglones
+ * ({@link validarRenglonesAvioUnicos}), y este kardex filtra por UN avío ⇒ un movimiento aporta como
+ * mucho UNA línea, así que la llave `(folio, id)` degenera en el folio y quitar el `id` no cambia
+ * ningún resultado. Se conserva porque tiene que ser **exactamente** la llave del `ORDER BY` —el día
+ * que un movimiento pueda traer dos renglones del mismo avío, el desempate ya está puesto—, y se
+ * dice aquí en vez de fingir una prueba que no mediría nada. En tela por color sí muere (un traspaso
+ * reparte FIFO entre partidas y escribe varios renglones del mismo color y almacén).
+ *
+ * Va en SQL crudo a propósito: el signo lo da `tipos_movimiento_inventario.direccion`, que cuelga
+ * del encabezado `movimientos`, y Prisma no sabe agrupar por columnas de una relación.
+ */
+async function saldosAvioAntesDelPeriodo(
+  cliente: ReturnType<typeof clienteLectura>,
+  filtros: FiltrosSaldoAnteriorAvio,
+): Promise<KardexAvioLista['saldosIniciales']> {
+  const dentroDelPeriodo =
+    filtros.hasta === undefined
+      ? Prisma.sql`m."fecha" >= ${filtros.desde}::date`
+      : Prisma.sql`m."fecha" >= ${filtros.desde}::date AND m."fecha" <= ${filtros.hasta}::date`;
+
+  const condiciones: Prisma.Sql[] = [
+    Prisma.sql`d."id_avio" = ${filtros.idAvio}`,
+    Prisma.sql`m."id_empresa" = ${filtros.idEmpresa}`,
+    Prisma.sql`(
+      m."fecha" < ${filtros.desde}::date
+      OR (
+        ${dentroDelPeriodo}
+        AND (m."folio", d."id") < (${filtros.anclaFolio}::bigint, ${filtros.anclaIdDetalle}::int)
+      )
+    )`,
+  ];
+  if (filtros.idAlmacen !== undefined)
+    condiciones.push(Prisma.sql`m."id_almacen" = ${filtros.idAlmacen}`);
+  const where = Prisma.join(condiciones, ' AND ');
+
+  const filas = await cliente.$queryRaw<
+    { idAlmacen: number; almacen: string; saldo: Prisma.Decimal }[]
+  >(Prisma.sql`
+    WITH previos AS (
+      SELECT
+        m."id_almacen" AS "idAlmacen",
+        SUM(
+          CASE
+            WHEN t."direccion" = 'entrada' THEN d."cantidad"
+            WHEN t."direccion" = 'salida'  THEN -d."cantidad"
+            ELSE 0
+          END
+        ) AS "saldo"
+      FROM "movimiento_det_avio" d
+      JOIN "movimientos" m ON m."id" = d."id_movimiento"
+      JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+      WHERE ${where}
+      GROUP BY 1
+    )
+    SELECT p."idAlmacen", a."nombre" AS "almacen", p."saldo"
+    FROM previos p
+    JOIN "almacenes" a ON a."id" = p."idAlmacen"
+    WHERE p."saldo" <> 0
+    ORDER BY a."nombre" ASC
+  `);
+
+  return filas.map((f) => ({
+    idAlmacen: f.idAlmacen,
+    almacen: f.almacen,
+    saldo: Number(f.saldo),
+  }));
 }

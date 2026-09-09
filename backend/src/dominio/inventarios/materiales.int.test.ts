@@ -39,6 +39,7 @@ import {
   kardexAvio,
   traspasarAvio,
 } from './avios.js';
+import { ajustarInventarioTelaColor } from './partidas-telas.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -61,6 +62,16 @@ const PERM_TELAS: ClavePermiso[] = [
   'telas.ver-totales',
 ];
 const PERM_AVIOS: ClavePermiso[] = ['inventario-avios.ver', 'inventario-avios.mover'];
+
+/**
+ * ⭐ FILA 0.173 — POR QUÉ ESTAS PRUEBAS PIDEN UN `desde` EXPLÍCITO. Desde esta fila, un kardex sin
+ * periodo se lee con la VENTANA POR OMISIÓN (12 meses hacia atrás desde HOY). Las fixturas de este
+ * archivo están fechadas en junio de 2026: hoy caen dentro de la ventana, pero pasado junio de 2027
+ * dejarían de caer y estas pruebas empezarían a fallar por el CALENDARIO, no por el código. Fijar el
+ * piso las vuelve deterministas y deja claro que lo que miden es el saldo, no el periodo. El periodo
+ * tiene sus propias pruebas, más abajo, y ésas SÍ lo ejercitan a propósito.
+ */
+const PERIODO_COMPLETO = '2000-01-01';
 const sesion = (permisos: ClavePermiso[]) =>
   sesionDePrueba({ idEmpresaActiva: empresa.id, permisos });
 const bd = () => ({ cliente });
@@ -178,7 +189,11 @@ describe('Telas — ajuste con lote multi-componente (D5)', () => {
       },
       bd(),
     );
-    const kardex = await kardexTela(sesion(PERM_TELAS), { idTela: telaFelpa.id }, bd());
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
     const sumaKardex = kardex.renglones.reduce((s, r) => s + r.entrada - r.salida, 0);
     const existencias = await consultarExistenciasTela(
       sesion(PERM_TELAS),
@@ -407,7 +422,11 @@ describe('Telas — ex-acceso #7 (importes)', () => {
       bd(),
     );
     const sinImportes: ClavePermiso[] = ['inventario-telas.ver', 'inventario-telas.mover'];
-    const kardex = await kardexTela(sesion(sinImportes), { idTela: telaFelpa.id }, bd());
+    const kardex = await kardexTela(
+      sesion(sinImportes),
+      { idTela: telaFelpa.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
     // Las cantidades sí se ven; los costos/importes vienen null.
     expect(kardex.renglones.every((r) => r.costoUnit === null && r.importe === null)).toBe(true);
     expect(kardex.renglones.length).toBeGreaterThan(0);
@@ -514,7 +533,11 @@ describe('Avíos — multi-almacén (R4)', () => {
       },
       bd(),
     );
-    const kardex = await kardexAvio(sesion(PERM_AVIOS), { idAvio: avioCierre.id }, bd());
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
     const suma = kardex.renglones.reduce((s, r) => s + r.entrada - r.salida, 0);
     const exis = await consultarExistenciasAvio(
       sesion(PERM_AVIOS),
@@ -675,7 +698,11 @@ describe('Telas — ajuste con lote NULL (clave del kardex 0, IS NOT DISTINCT FR
     expect(sinLote?.existencia).toBe(25);
     expect(sinLote?.loteClave).toBeNull();
     // El kardex de la tela también cuenta el renglón sin lote.
-    const kardex = await kardexTela(sesion(PERM_TELAS), { idTela: telaFelpa.id }, bd());
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
     const renSinLote = kardex.renglones.find((r) => r.idLote === null);
     expect(renSinLote?.entrada).toBe(25);
     expect(renSinLote?.saldo).toBe(25);
@@ -805,5 +832,625 @@ describe('El almacén tiene que ser DEL TIPO del artículo (fila 0.137)', () => 
       bd(),
     );
     expect(exisAvio.filas[0]?.existencia).toBe(500);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// EL PERIODO de los kardex de MATERIALES — fila 0.173 (mecanismo de la 0.138)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// ⭐ Hasta esta fila, `kardexTela` (flujo LEGADO por lote) y `kardexAvio` pedían TODOS los
+// movimientos, sin filtro de fechas y sin `LIMIT`. Ahora los dos tienen periodo, ventana por
+// omisión de 12 meses y tope duro; y como los dos llevan columna de SALDO CORRIDO, recortar sin
+// sembrar el saldo anterior las habría dejado mintiendo desde el primer renglón.
+
+/** `AAAA-MM-DD` de hoy en el huso del negocio, corrido `meses` hacia atrás. */
+function haceMeses(meses: number): string {
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  const [a, m, d] = hoy.split('-').map(Number);
+  return new Date(Date.UTC(a as number, (m as number) - 1 - meses, d)).toISOString().slice(0, 10);
+}
+
+describe('El PERIODO del kardex de TELA por lote (fila 0.173)', () => {
+  /** Crea un lote de Felpa con una entrada en la fecha dada. Devuelve `{ idLote, folio }`. */
+  async function crearLote(
+    fecha: string,
+    cantidad: number,
+  ): Promise<{ idLote: number; folio: number }> {
+    const mov = await ajustarInventarioTela(
+      sesion(PERM_TELAS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almA.id,
+        fecha,
+        motivo: 'entrada de la prueba',
+        lote: {
+          idColor: colorRojo.id,
+          idProveedor: proveedor.id,
+          componentes: [{ idTela: telaFelpa.id, cantidad }],
+        },
+      },
+      bd(),
+    );
+    const idLote = mov.renglones[0]?.idLote;
+    if (idLote == null) throw new Error('el lote no se creó');
+    return { idLote, folio: mov.folio };
+  }
+
+  /** Movimiento sobre lotes YA existentes, en la fecha dada. Devuelve el folio. */
+  async function movimientoEn(
+    fecha: string,
+    direccion: 'entrada' | 'salida',
+    lineas: { idLote: number; cantidad: number }[],
+  ): Promise<number> {
+    const mov = await ajustarInventarioTela(
+      sesion(PERM_TELAS),
+      {
+        idTipoMov: direccion === 'entrada' ? idTipoAjusteEntrada : idTipoAjusteSalida,
+        idAlmacen: almA.id,
+        fecha,
+        motivo: 'ajuste de la prueba',
+        lineas: lineas.map((l) => ({
+          idTela: telaFelpa.id,
+          idLote: l.idLote,
+          cantidad: l.cantidad,
+        })),
+      },
+      bd(),
+    );
+    return mov.folio;
+  }
+
+  it('⭐ un movimiento FUERA del periodo NO llega: el recorte lo hace el servidor', async () => {
+    const { idLote } = await crearLote('2026-01-15', 30); // fuera
+    const dentro = await movimientoEn('2026-06-20', 'entrada', [{ idLote, cantidad: 7 }]);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([dentro]);
+    expect(kardex.desde).toBe('2026-06-01');
+    expect(kardex.hasta).toBe('2026-06-30');
+    expect(kardex.ventanaPorOmision).toBe(false);
+    expect(kardex.truncado).toBe(false);
+  });
+
+  /**
+   * ⭐⭐ LA PRUEBA DE QUE EL FILTRO ESTÁ EN EL `WHERE` Y NO EN JAVASCRIPT. Filtrando en el servidor,
+   * la base sólo ve el de enero, el tope de 2 no lo alcanza y llega 1 renglón. Filtrando DESPUÉS de
+   * traer, el tope se habría llevado los tres de junio (los más nuevos, `folio DESC`), el recorte
+   * por fecha los tiraría y llegarían 0.
+   */
+  it('⭐⭐ el filtro va en la CONSULTA, no en memoria (el tope no se come el periodo)', async () => {
+    const { idLote, folio: folioEnero } = await crearLote('2026-01-15', 1);
+    await movimientoEn('2026-06-01', 'entrada', [{ idLote, cantidad: 1 }]);
+    await movimientoEn('2026-06-02', 'entrada', [{ idLote, cantidad: 1 }]);
+    await movimientoEn('2026-06-03', 'entrada', [{ idLote, cantidad: 1 }]);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-01-01', hasta: '2026-01-31', limite: 2 },
+      bd(),
+    );
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([folioEnero]);
+    expect(kardex.truncado).toBe(false);
+  });
+
+  it('⭐ los DOS bordes son INCLUSIVOS, y un día más allá deja el movimiento fuera', async () => {
+    const { idLote, folio: primero } = await crearLote('2026-06-01', 5);
+    const ultimo = await movimientoEn('2026-06-30', 'entrada', [{ idLote, cantidad: 5 }]);
+
+    const dentro = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(dentro.renglones.map((r) => r.folio)).toEqual([primero, ultimo]);
+
+    const sinPrimero = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-02', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(sinPrimero.renglones.map((r) => r.folio)).toEqual([ultimo]);
+
+    const sinUltimo = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01', hasta: '2026-06-29' },
+      bd(),
+    );
+    expect(sinUltimo.renglones.map((r) => r.folio)).toEqual([primero]);
+  });
+
+  /**
+   * ⭐ LA VENTANA POR OMISIÓN, Y POR QUÉ ES LA MISMA QUE EN PRODUCTO TERMINADO AUNQUE ESTE KARDEX
+   * SEA UN ARCHIVO CONGELADO. Desde la fila 0.170 nadie escribe por lote: aquí sólo vive el
+   * histórico migrado de Access. Se midió antes de decidir: con la ventana de migración vigente
+   * (`ETL_DESDE=2025`) entran 259 renglones en 51 telas, con un máximo de 48 en la más movida — o
+   * sea que NO hay un problema de volumen que justifique una regla propia. Lo que sí hay es una
+   * pantalla que puede quedarse en blanco, y eso se cura diciéndolo (el vacío de
+   * `KardexMaterialesPagina` dice «en el periodo» y manda a ampliar las fechas), no doblando el
+   * diseño para que le cuadre al histórico (REGLA 0-B).
+   */
+  it('⭐ SIN periodo, la ventana por omisión deja fuera lo viejo (y lo dice)', async () => {
+    const { idLote } = await crearLote(haceMeses(24), 40); // dos años atrás: fuera
+    const reciente = await movimientoEn(haceMeses(1), 'entrada', [{ idLote, cantidad: 6 }]);
+
+    const porOmision = await kardexTela(sesion(PERM_TELAS), { idTela: telaFelpa.id }, bd());
+    expect(porOmision.renglones.map((r) => r.folio)).toEqual([reciente]);
+    expect(porOmision.ventanaPorOmision).toBe(true);
+    expect(porOmision.desde).toBe(haceMeses(12));
+    expect(porOmision.hasta).toBeNull();
+
+    // Y el histórico NO se perdió: pedirlo a mano lo trae. La ventana es un default, no un candado.
+    const completo = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
+    expect(completo.renglones).toHaveLength(2);
+    expect(completo.ventanaPorOmision).toBe(false);
+  });
+
+  it('⭐ el SALDO del periodo arranca del saldo anterior, no de cero', async () => {
+    const { idLote } = await crearLote('2026-01-15', 30);
+    await movimientoEn('2026-06-20', 'entrada', [{ idLote, cantidad: 7 }]);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01' },
+      bd(),
+    );
+    // Si el saldo anterior se ignorara, este renglón diría 7 — y el kardex mentiría.
+    expect(kardex.renglones).toHaveLength(1);
+    expect(kardex.renglones[0]?.saldo).toBe(37);
+    expect(kardex.saldosIniciales).toHaveLength(1);
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
+    expect(kardex.saldosIniciales[0]?.idLote).toBe(idLote);
+    expect(kardex.saldosIniciales[0]?.almacen).toBe('Bodega A');
+  });
+
+  it('el saldo anterior RESTA las salidas anteriores (no es un total de entradas)', async () => {
+    const { idLote } = await crearLote('2026-01-15', 30);
+    await movimientoEn('2026-02-10', 'salida', [{ idLote, cantidad: 12 }]);
+    await movimientoEn('2026-06-20', 'entrada', [{ idLote, cantidad: 1 }]);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01' },
+      bd(),
+    );
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(18);
+    expect(kardex.renglones[0]?.saldo).toBe(19);
+  });
+
+  it('sólo trae el saldo anterior de los LOTES que se movieron en el periodo', async () => {
+    const { idLote: loteA } = await crearLote('2026-01-15', 30); // se moverá en el periodo
+    await crearLote('2026-01-16', 50); // quieto durante el periodo
+    await movimientoEn('2026-06-20', 'entrada', [{ idLote: loteA, cantidad: 7 }]);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01' },
+      bd(),
+    );
+    expect(kardex.saldosIniciales.map((s) => s.idLote)).toEqual([loteA]);
+  });
+
+  /**
+   * ⭐⭐ EL CORTE SE LLEVA LO VIEJO, NO LO NUEVO. El folio es la secuencia atómica por empresa (A3),
+   * o sea que crece con el tiempo: `ORDER BY folio ASC LIMIT n` devolvería los n MÁS VIEJOS de la
+   * ventana. En producto terminado eso escondió siete meses recientes con la pantalla diciendo «en
+   * adelante» — un kardex se abre para ver el final.
+   */
+  it('⭐⭐ el TOPE conserva el FINAL del periodo, y el saldo sigue cuadrando', async () => {
+    const { idLote, folio: f1 } = await crearLote('2026-06-01', 1);
+    const f2 = await movimientoEn('2026-06-02', 'entrada', [{ idLote, cantidad: 1 }]);
+    const f3 = await movimientoEn('2026-06-03', 'entrada', [{ idLote, cantidad: 1 }]);
+
+    const cortado = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-01-01', limite: 2 },
+      bd(),
+    );
+    expect(cortado.renglones).toHaveLength(2);
+    expect(cortado.truncado).toBe(true);
+    expect(cortado.limite).toBe(2);
+    // Los DOS ÚLTIMOS, en orden cronológico. Con el corte al revés esto sería [f1, f2].
+    expect(cortado.renglones.map((r) => r.folio)).toEqual([f2, f3]);
+    expect(cortado.saldosIniciales[0]?.saldo).toBe(1);
+    expect(cortado.renglones.map((r) => r.saldo)).toEqual([2, 3]);
+
+    const completo = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-01-01', limite: 3 },
+      bd(),
+    );
+    expect(completo.renglones.map((r) => r.folio)).toEqual([f1, f2, f3]);
+    expect(completo.truncado).toBe(false);
+    expect(completo.saldosIniciales).toHaveLength(0);
+    expect(completo.renglones.map((r) => r.saldo)).toEqual([1, 2, 3]);
+  });
+
+  it('⭐ tres movimientos del MISMO día con tope 2: el que se cae cuenta en el saldo anterior', async () => {
+    const { idLote, folio: f1 } = await crearLote('2026-06-10', 5);
+    const f2 = await movimientoEn('2026-06-10', 'entrada', [{ idLote, cantidad: 7 }]);
+    const f3 = await movimientoEn('2026-06-10', 'entrada', [{ idLote, cantidad: 9 }]);
+    expect(f1).toBeLessThan(f2);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01', limite: 2 },
+      bd(),
+    );
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([f2, f3]);
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(5);
+    expect(kardex.renglones.map((r) => r.saldo)).toEqual([12, 21]);
+  });
+
+  /**
+   * ⭐⭐⭐ EL DESEMPATE POR `id` DEL DETALLE — la línea de la que cuelga todo el invariante, y la que
+   * en producto terminado sobrevivía a 56 pruebas EN VERDE (fila 0.138) porque todas las fixturas
+   * creaban movimientos de un solo renglón y la llave `(folio, id)` degeneraba en el folio.
+   *
+   * 🔑 Aquí el caso es el normal de esta pantalla: UN ajuste puede tocar VARIOS lotes de la misma
+   * tela, así que un movimiento escribe varios renglones. Si el tope corta en medio de ese
+   * movimiento, el renglón que queda fuera tiene el MISMO folio que el ancla y sólo el `id` los
+   * separa. El montaje pone ese renglón en un lote que SÍ se ve (por otro movimiento posterior),
+   * que es lo que hace visible el error: sin el `id`, el saldo anterior del lote A dice 100 en vez
+   * de 107 y el último renglón cierra en 95 en vez de en 102 — la existencia real.
+   */
+  it('⭐⭐⭐ con el tope cortando DENTRO de un movimiento, el desempate es (folio, id) — no el folio', async () => {
+    const { idLote: loteA } = await crearLote('2026-06-01', 100);
+    const { idLote: loteB } = await crearLote('2026-06-01', 50);
+    // UN movimiento con DOS renglones: lote A (+7) y lote B (+3), en ese orden de captura.
+    const fMixto = await movimientoEn('2026-06-02', 'entrada', [
+      { idLote: loteA, cantidad: 7 },
+      { idLote: loteB, cantidad: 3 },
+    ]);
+    const fSalida = await movimientoEn('2026-06-03', 'salida', [{ idLote: loteA, cantidad: 5 }]);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01', limite: 2 },
+      bd(),
+    );
+    expect(kardex.truncado).toBe(true);
+    // Se ven el SEGUNDO renglón del movimiento mixto y la salida; el primero (+7 al lote A) queda
+    // fuera por el tope, con el MISMO folio que el ancla.
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([fMixto, fSalida]);
+    expect(kardex.renglones.map((r) => r.idLote)).toEqual([loteB, loteA]);
+
+    // ⭐ El número que mata la mutación: 107, no 100.
+    const previoA = kardex.saldosIniciales.find((s) => s.idLote === loteA);
+    expect(previoA?.saldo).toBe(107);
+    expect(kardex.renglones[1]?.saldo).toBe(102);
+
+    // Y 102 es la existencia REAL del lote A (100 + 7 − 5): el invariante que el tope no puede romper.
+    const existencias = await consultarExistenciasTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, idLote: loteA },
+      bd(),
+    );
+    expect(existencias.filas[0]?.existencia).toBe(102);
+  });
+
+  /**
+   * ⭐⭐ EL FILTRO DEL FLUJO LEGADO (`id_tela_color IS NULL`) ES DE CORRECCIÓN EN EL SALDO ANTERIOR.
+   * La llave de agrupación es lote×almacén, y los renglones del inventario VIGENTE por color llevan
+   * `id_lote` NULL: sin ese filtro caerían en el cubo «sin lote» del saldo anterior. Es el mismo
+   * descuadre que el reviewer de la etapa A2 cazó en la LISTA — el saldo anterior tiene que mirar
+   * exactamente el mismo universo que los renglones, o la columna «Saldo» miente entera.
+   */
+  it('⭐⭐ el saldo anterior tampoco ve el inventario VIGENTE por color', async () => {
+    // Un color de la misma tela, con existencia ANTES del periodo por el flujo NUEVO.
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Marino' },
+    });
+    await ajustarInventarioTelaColor(
+      sesion(PERM_TELAS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almA.id,
+        fecha: '2026-01-10',
+        motivo: 'Conteo físico inicial',
+        lineas: [{ idTelaColor: color.id, cantidad: 999 }],
+      },
+      bd(),
+    );
+    // Y el flujo LEGADO, con dos entradas SIN lote (una antes del periodo y otra dentro): caen en el
+    // MISMO cubo «sin lote» que ocuparían los renglones por color si el filtro no estuviera. El
+    // dominio del ajuste exige lote en la entrada, así que se usa el motor —igual que la prueba de
+    // la rama NULL de más arriba—.
+    const { registrarMovimientoTela } = await import('../../comun/kardex.js');
+    const { ORIGEN } = await import('../../comun/origenes.js');
+    for (const [fecha, cantidad] of [
+      ['2026-01-15', 25],
+      ['2026-06-20', 5],
+    ] as const) {
+      await registrarMovimientoTela(
+        sesion(PERM_TELAS),
+        {
+          idEmpresa: empresa.id,
+          idTipoMov: idTipoAjusteEntrada,
+          idAlmacen: almA.id,
+          fecha: new Date(`${fecha}T00:00:00.000Z`),
+          origenTipo: ORIGEN.movimientoManual,
+          lineas: [{ idTela: telaFelpa.id, idLote: null, cantidad }],
+        },
+        bd(),
+      );
+    }
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01' },
+      bd(),
+    );
+    // 25, no 1024: los 999 del flujo por color no son de este kardex ni de su saldo anterior.
+    expect(kardex.saldosIniciales).toHaveLength(1);
+    expect(kardex.saldosIniciales[0]?.idLote).toBeNull();
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(25);
+    expect(kardex.renglones[0]?.saldo).toBe(30);
+  });
+
+  /**
+   * ⭐ A9 — la EMPRESA es de corrección en el saldo anterior: no está en la llave de agrupación
+   * (lote×almacén), así que un movimiento de otra empresa sobre el mismo lote caería DENTRO del
+   * mismo grupo y todos los saldos mentirían a la vez.
+   */
+  it('⭐ un movimiento de OTRA empresa no entra en el saldo anterior (A9)', async () => {
+    const { idLote } = await crearLote('2026-01-15', 30);
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    await ajustarInventarioTela(
+      sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM_TELAS }),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almA.id,
+        fecha: '2026-01-20',
+        motivo: 'entrada de otra empresa',
+        lineas: [{ idTela: telaFelpa.id, idLote, cantidad: 999 }],
+      },
+      bd(),
+    );
+    await movimientoEn('2026-06-20', 'entrada', [{ idLote, cantidad: 7 }]);
+
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: '2026-06-01' },
+      bd(),
+    );
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
+    expect(kardex.renglones[0]?.saldo).toBe(37);
+  });
+});
+
+describe('El PERIODO del kardex de AVÍO (fila 0.173)', () => {
+  /** Ajuste de avío en la fecha dada. Devuelve el folio. */
+  async function ajusteEn(
+    fecha: string,
+    direccion: 'entrada' | 'salida',
+    cantidad: number,
+    idAlmacen: number = almAvioA.id,
+  ): Promise<number> {
+    const mov = await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: direccion === 'entrada' ? idTipoAjusteEntrada : idTipoAjusteSalida,
+        idAlmacen,
+        fecha,
+        motivo: 'ajuste de la prueba',
+        lineas: [{ idAvio: avioCierre.id, cantidad }],
+      },
+      bd(),
+    );
+    return mov.folio;
+  }
+
+  it('⭐ un movimiento FUERA del periodo NO llega: el recorte lo hace el servidor', async () => {
+    await ajusteEn('2026-01-15', 'entrada', 30);
+    const dentro = await ajusteEn('2026-06-20', 'entrada', 7);
+
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([dentro]);
+    expect(kardex.desde).toBe('2026-06-01');
+    expect(kardex.hasta).toBe('2026-06-30');
+    expect(kardex.ventanaPorOmision).toBe(false);
+    expect(kardex.truncado).toBe(false);
+  });
+
+  it('⭐⭐ el filtro va en la CONSULTA, no en memoria (el tope no se come el periodo)', async () => {
+    const folioEnero = await ajusteEn('2026-01-15', 'entrada', 1);
+    await ajusteEn('2026-06-01', 'entrada', 1);
+    await ajusteEn('2026-06-02', 'entrada', 1);
+    await ajusteEn('2026-06-03', 'entrada', 1);
+
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-01-01', hasta: '2026-01-31', limite: 2 },
+      bd(),
+    );
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([folioEnero]);
+    expect(kardex.truncado).toBe(false);
+  });
+
+  it('⭐ los DOS bordes son INCLUSIVOS, y un día más allá deja el movimiento fuera', async () => {
+    const primero = await ajusteEn('2026-06-01', 'entrada', 5);
+    const ultimo = await ajusteEn('2026-06-30', 'entrada', 5);
+
+    const dentro = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(dentro.renglones.map((r) => r.folio)).toEqual([primero, ultimo]);
+
+    const sinPrimero = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-02', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(sinPrimero.renglones.map((r) => r.folio)).toEqual([ultimo]);
+
+    const sinUltimo = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01', hasta: '2026-06-29' },
+      bd(),
+    );
+    expect(sinUltimo.renglones.map((r) => r.folio)).toEqual([primero]);
+  });
+
+  it('⭐ SIN periodo, la ventana por omisión deja fuera lo viejo (y lo dice)', async () => {
+    await ajusteEn(haceMeses(24), 'entrada', 40);
+    const reciente = await ajusteEn(haceMeses(1), 'entrada', 6);
+
+    const porOmision = await kardexAvio(sesion(PERM_AVIOS), { idAvio: avioCierre.id }, bd());
+    expect(porOmision.renglones.map((r) => r.folio)).toEqual([reciente]);
+    expect(porOmision.ventanaPorOmision).toBe(true);
+    expect(porOmision.desde).toBe(haceMeses(12));
+    expect(porOmision.hasta).toBeNull();
+
+    const completo = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
+    expect(completo.renglones).toHaveLength(2);
+    expect(completo.ventanaPorOmision).toBe(false);
+  });
+
+  it('⭐ el SALDO del periodo arranca del saldo anterior, y RESTA las salidas anteriores', async () => {
+    await ajusteEn('2026-01-15', 'entrada', 30);
+    await ajusteEn('2026-02-10', 'salida', 12);
+    await ajusteEn('2026-06-20', 'entrada', 1);
+
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01' },
+      bd(),
+    );
+    expect(kardex.renglones).toHaveLength(1);
+    expect(kardex.saldosIniciales).toHaveLength(1);
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(18);
+    expect(kardex.saldosIniciales[0]?.almacen).toBe('Avíos A');
+    expect(kardex.renglones[0]?.saldo).toBe(19);
+  });
+
+  it('sólo trae el saldo anterior de los ALMACENES que se movieron en el periodo', async () => {
+    await ajusteEn('2026-01-15', 'entrada', 30, almAvioA.id); // se moverá en el periodo
+    await ajusteEn('2026-01-16', 'entrada', 50, almAvioB.id); // quieto durante el periodo
+    await ajusteEn('2026-06-20', 'entrada', 7, almAvioA.id);
+
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01' },
+      bd(),
+    );
+    expect(kardex.saldosIniciales.map((s) => s.almacen)).toEqual(['Avíos A']);
+  });
+
+  it('⭐⭐ el TOPE conserva el FINAL del periodo, y el saldo sigue cuadrando', async () => {
+    const f1 = await ajusteEn('2026-06-01', 'entrada', 1);
+    const f2 = await ajusteEn('2026-06-02', 'entrada', 1);
+    const f3 = await ajusteEn('2026-06-03', 'entrada', 1);
+
+    const cortado = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-01-01', limite: 2 },
+      bd(),
+    );
+    expect(cortado.renglones.map((r) => r.folio)).toEqual([f2, f3]);
+    expect(cortado.truncado).toBe(true);
+    expect(cortado.saldosIniciales[0]?.saldo).toBe(1);
+    expect(cortado.renglones.map((r) => r.saldo)).toEqual([2, 3]);
+
+    const completo = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-01-01', limite: 3 },
+      bd(),
+    );
+    expect(completo.renglones.map((r) => r.folio)).toEqual([f1, f2, f3]);
+    expect(completo.truncado).toBe(false);
+    expect(completo.saldosIniciales).toHaveLength(0);
+  });
+
+  it('⭐ tres movimientos del MISMO día con tope 2: el que se cae cuenta en el saldo anterior', async () => {
+    const f1 = await ajusteEn('2026-06-10', 'entrada', 5);
+    const f2 = await ajusteEn('2026-06-10', 'entrada', 7);
+    const f3 = await ajusteEn('2026-06-10', 'entrada', 9);
+    expect(f1).toBeLessThan(f2);
+
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01', limite: 2 },
+      bd(),
+    );
+    expect(kardex.renglones.map((r) => r.folio)).toEqual([f2, f3]);
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(5);
+    expect(kardex.renglones.map((r) => r.saldo)).toEqual([12, 21]);
+  });
+
+  /**
+   * ⭐⭐ EL AVÍO es de corrección en el saldo anterior: la llave de agrupación es SÓLO el almacén,
+   * así que otro avío del mismo almacén caería DENTRO del mismo grupo. (La EMPRESA, A9, tiene su
+   * propia prueba en el bloque de telas: la condición es idéntica y el modo de falla, el mismo.)
+   */
+  it('⭐⭐ otro AVÍO del mismo almacén no entra en el saldo anterior', async () => {
+    await ajusteEn('2026-01-15', 'entrada', 30);
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-01-20',
+        motivo: 'otro avío',
+        lineas: [{ idAvio: avioGenerico.id, cantidad: 999 }],
+      },
+      bd(),
+    );
+    await ajusteEn('2026-06-20', 'entrada', 7);
+
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01' },
+      bd(),
+    );
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
+    expect(kardex.renglones[0]?.saldo).toBe(37);
+  });
+
+  /**
+   * ⭐ A9 — un movimiento de OTRA empresa no entra en el saldo anterior. `id_empresa` no está en la
+   * llave de agrupación (el almacén), así que sin la condición sumaría dentro del mismo grupo.
+   */
+  it('⭐ un movimiento de OTRA empresa no entra en el saldo anterior (A9)', async () => {
+    await ajusteEn('2026-01-15', 'entrada', 30);
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    await ajustarInventarioAvio(
+      sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM_AVIOS }),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-01-20',
+        motivo: 'entrada de otra empresa',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 999 }],
+      },
+      bd(),
+    );
+    await ajusteEn('2026-06-20', 'entrada', 7);
+
+    const kardex = await kardexAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id, desde: '2026-06-01' },
+      bd(),
+    );
+    expect(kardex.saldosIniciales[0]?.saldo).toBe(30);
+    expect(kardex.renglones[0]?.saldo).toBe(37);
   });
 });

@@ -1,14 +1,25 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { KardexTela } from '@/api/tipos';
+import type { KardexAvio, KardexTela } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { KardexMaterialesPagina } from './KardexMaterialesPagina';
 
+/** Encabezado del periodo que TODO kardex devuelve desde la fila 0.173 (ventana + tope + corte). */
+const PERIODO = {
+  desde: '2025-09-05',
+  hasta: null,
+  ventanaPorOmision: true,
+  limite: 1000,
+  truncado: false,
+} as const;
+
 const kardexTela: KardexTela = {
   idTela: 1,
   tela: 'Felpa',
+  ...PERIODO,
+  saldosIniciales: [],
   renglones: [
     {
       idMovimiento: 10,
@@ -35,20 +46,40 @@ const kardexTela: KardexTela = {
 };
 
 /** Kardex de tela SIN movimientos legados: el caso que producía la pantalla vacía y muda. */
-const kardexTelaVacio: KardexTela = { idTela: 1, tela: 'Felpa', renglones: [] };
+const kardexTelaVacio: KardexTela = {
+  idTela: 1,
+  tela: 'Felpa',
+  ...PERIODO,
+  saldosIniciales: [],
+  renglones: [],
+};
+
+/** Kardex de avío mínimo (para la pestaña de avíos). */
+const kardexAvio: KardexAvio = {
+  idAvio: 3,
+  avio: 'CIERRE-1',
+  descripcion: 'Cierre metálico',
+  ...PERIODO,
+  saldosIniciales: [],
+  renglones: [],
+};
 
 /** Lo que devuelve `useKardexTela` en cada prueba (por defecto, el kardex con un movimiento). */
 const datosKardexTela = vi.fn<() => KardexTela>(() => kardexTela);
+/** La consulta con la que se llamó `useKardexTela` (para comprobar que las fechas VIAJAN). */
+const consultaKardexTela = vi.fn<(q: unknown) => void>();
+const consultaKardexAvio = vi.fn<(q: unknown) => void>();
 
 // La tela seleccionada se fija al elegir en el SelectorTela (mockeado abajo).
 vi.mock('@/api/inventario-materiales', () => ({
-  useKardexTela: () => ({
-    data: datosKardexTela(),
-    isPending: false,
-    isError: false,
-    error: null,
-  }),
-  useKardexAvio: () => ({ data: undefined, isPending: false, isError: false, error: null }),
+  useKardexTela: (q: unknown) => {
+    consultaKardexTela(q);
+    return { data: datosKardexTela(), isPending: false, isError: false, error: null };
+  },
+  useKardexAvio: (q: unknown) => {
+    consultaKardexAvio(q);
+    return { data: kardexAvio, isPending: false, isError: false, error: null };
+  },
   useCancelarTela: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarAvio: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -69,13 +100,27 @@ vi.mock('./SelectorTela', () => ({
   ),
 }));
 vi.mock('./SelectorAvio', () => ({
-  SelectorAvio: () => <div data-testid="sel-avio" />,
+  SelectorAvio: ({
+    alSeleccionar,
+  }: {
+    alSeleccionar: (a: { id: number; clave: string; descripcion: string }) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="sel-avio"
+      onClick={() => alSeleccionar({ id: 3, clave: 'CIERRE-1', descripcion: 'Cierre metálico' })}
+    >
+      elegir avío
+    </button>
+  ),
 }));
 
 // El doble se restaura ANTES de cada prueba, no a mano al final de la que lo cambió: así una
 // prueba nueva insertada en medio no hereda el kardex vacío de la anterior.
 beforeEach(() => {
   datosKardexTela.mockReturnValue(kardexTela);
+  consultaKardexTela.mockClear();
+  consultaKardexAvio.mockClear();
 });
 
 describe('KardexMaterialesPagina (F4-E1)', () => {
@@ -146,5 +191,116 @@ describe('KardexMaterialesPagina (F4-E1)', () => {
     expect(vacio.querySelector('a')).toHaveAttribute('href', '/inventarios/telas/existencias');
     // El texto mudo de antes ("Esta tela no tiene movimientos." a secas) no vuelve.
     expect(screen.queryByText('Esta tela no tiene movimientos.')).not.toBeInTheDocument();
+  });
+
+  // ── fila 0.173: el PERIODO (mecanismo de la 0.138, ahora también en materiales) ─────────────
+  //
+  // ⭐ Los dos kardex de esta pantalla pedían el histórico ENTERO: ni fechas ni tope. Ahora el
+  // servidor recorta, y lo que se prueba aquí es lo que la PANTALLA tiene que hacer con eso:
+  // mandar las fechas (no filtrar ella) y decir sin adornos qué pedazo está enseñando.
+  describe('el periodo del kardex (fila 0.173)', () => {
+    it('⭐ las fechas VIAJAN al servidor (la pantalla no recorta lo que ya llegó)', () => {
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+      // Sin fechas escritas no se mandan: el servidor pone su ventana por omisión.
+      expect(consultaKardexTela).toHaveBeenLastCalledWith({ idTela: 1 });
+
+      fireEvent.change(screen.getByTestId('kardex-tela-desde'), {
+        target: { value: '2026-06-01' },
+      });
+      fireEvent.change(screen.getByTestId('kardex-tela-hasta'), {
+        target: { value: '2026-06-30' },
+      });
+      expect(consultaKardexTela).toHaveBeenLastCalledWith({
+        idTela: 1,
+        desde: '2026-06-01',
+        hasta: '2026-06-30',
+      });
+    });
+
+    it('y en AVÍOS igual (las dos pestañas, no sólo la primera)', () => {
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      });
+      fireEvent.click(screen.getByTestId('kardex-mat-dim-avio'));
+      fireEvent.click(screen.getByTestId('sel-avio'));
+      expect(consultaKardexAvio).toHaveBeenLastCalledWith({ idAvio: 3 });
+
+      fireEvent.change(screen.getByTestId('kardex-avio-desde'), {
+        target: { value: '2026-01-01' },
+      });
+      expect(consultaKardexAvio).toHaveBeenLastCalledWith({ idAvio: 3, desde: '2026-01-01' });
+    });
+
+    it('⭐ dice QUÉ periodo está viendo, y avisa cuando es el de por omisión', () => {
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+      const periodo = screen.getByTestId('kardex-tela-periodo');
+      expect(periodo).toHaveTextContent('2025-09-05');
+      expect(periodo).toHaveTextContent(/últimos 12 meses por omisión/);
+      // Sin techo NO se dice «a hoy»: el servidor deja el techo abierto a propósito y el histórico
+      // migrado trae fechas capturadas mal (hasta 2029) que sí salen.
+      expect(periodo).not.toHaveTextContent(/hoy/);
+    });
+
+    it('⭐ si la lista vino CORTADA lo dice — nadie debe creer que está viendo todo', () => {
+      datosKardexTela.mockReturnValue({ ...kardexTela, truncado: true, limite: 1000 });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+      expect(screen.getByTestId('kardex-tela-truncado')).toHaveTextContent(/más\s+RECIENTES/);
+    });
+
+    it('sin corte, no hay aviso (el aviso tiene que significar algo)', () => {
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+      expect(screen.queryByTestId('kardex-tela-truncado')).not.toBeInTheDocument();
+    });
+
+    /**
+     * ⭐⭐ EL SALDO ANTERIOR SE PINTA, o la columna «Saldo» miente. Con periodo, el primer renglón
+     * visible NO arranca de cero: arranca de lo que el lote×almacén ya traía. Si esta fila no
+     * estuviera, el usuario leería 100 donde el saldo real es 400 — y sin nada raro a la vista.
+     */
+    it('⭐⭐ pinta el SALDO ANTERIOR de donde arranca la columna Saldo', () => {
+      datosKardexTela.mockReturnValue({
+        ...kardexTela,
+        saldosIniciales: [
+          { idLote: 7, loteClave: 'LOTE-A', idAlmacen: 5, almacen: 'Bodega A', saldo: 300 },
+        ],
+      });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+      const filas = screen.getAllByTestId('kardex-tela-saldo-inicial');
+      expect(filas.length).toBeGreaterThan(0);
+      expect(filas[0]).toHaveTextContent('300');
+      expect(filas[0]).toHaveTextContent('LOTE-A');
+    });
+
+    /**
+     * 🔴 EL VACÍO DEL KARDEX LEGADO TIENE QUE DECIR QUE ES DEL PERIODO. Esta pestaña es un archivo
+     * CONGELADO (sólo histórico migrado, fila 0.170): con una ventana por omisión de 12 meses, su
+     * vacío más probable es «no hay nada en estos doce meses», no «esta tela no tiene nada». Decir
+     * lo segundo mandaría a buscar a otra pantalla que tampoco lo tiene.
+     */
+    it('🔴 el vacío del legado dice que es DEL PERIODO y que hay más atrás', () => {
+      datosKardexTela.mockReturnValue(kardexTelaVacio);
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+      const vacio = screen.getByTestId('kardex-tela-vacio');
+      expect(vacio).toHaveTextContent(/en el periodo/);
+      expect(vacio).toHaveTextContent(/amplía las fechas/);
+    });
   });
 });
