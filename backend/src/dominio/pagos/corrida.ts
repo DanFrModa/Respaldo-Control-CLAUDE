@@ -65,7 +65,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { tieneSaldo } from '../esma/formula-saldo.js';
 import { crearPagoACuentaMaquilero } from '../esma/pagos.js';
-import { carteraCombinadaPorProveedor, type FilaNeta } from '../terceros/cxp/cxp.js';
+import { carteraCombinadaConDiasVencidos, type FilaNetaConDias } from '../terceros/cxp/cxp.js';
 import { leerLimitesAging } from '../terceros/config-aging.js';
 import { registrarMovimientoCxp } from '../terceros/cxp/cxp.js';
 
@@ -361,8 +361,9 @@ export async function listarCorridas(
  * semana. Y en esa misma pantalla cargar por default estos conceptos que te comento, también con el
  * campo a un lado. Y tener la posibilidad de cargar el concepto que necesito del catálogo.»*
  *
- * El universo de proveedores **no se calcula aquí**: se lo pide a `carteraCombinadaPorProveedor`
- * —el mismo agregado que alimenta la bandeja de CxP—, segmentado por el `conFactura` de la corrida.
+ * El universo de proveedores **no se calcula aquí**: se lo pide a `carteraCombinadaConDiasVencidos`
+ * —el mismo agregado que alimenta la bandeja de CxP, más la antigüedad que sólo esta pantalla
+ * enseña (fila 0.166)—, segmentado por el `conFactura` de la corrida.
  * Si tuviera su propia versión, un proveedor podría salir en la bandeja y no en la corrida, y el que
  * no sale en la corrida no cobra.
  *
@@ -401,7 +402,7 @@ export async function obtenerCorridaDetalle(
 
   // El universo de proveedores del segmento (el MISMO agregado de la bandeja de CxP).
   const limites = await leerLimitesAging(cliente, idEmpresa);
-  const cartera = await carteraCombinadaPorProveedor(cliente, idEmpresa, limites, segmento);
+  const cartera = await carteraCombinadaConDiasVencidos(cliente, idEmpresa, limites, segmento);
 
   // Proveedores que hay que traer: los de la cartera + los que ya tienen renglón (aunque su saldo
   // se haya quedado en cero: lo capturado no se esconde).
@@ -421,7 +422,7 @@ export async function obtenerCorridaDetalle(
     recibosDeLaSemanaPorMaquilero(cliente, idEmpresa, ...rangoSemanaArgs(semana)),
   ]);
 
-  const carteraPorId = new Map<number, FilaNeta>(cartera.map((f) => [f.idProveedor, f]));
+  const carteraPorId = new Map<number, FilaNetaConDias>(cartera.map((f) => [f.idProveedor, f]));
   const renglonesPorProveedor = agrupar(corrida.renglones, (r) => r.idProveedor);
   const renglonesPorConcepto = agrupar(corrida.renglones, (r) => r.idConcepto);
 
