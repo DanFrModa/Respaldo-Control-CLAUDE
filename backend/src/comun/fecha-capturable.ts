@@ -24,6 +24,7 @@
 import type { ClavePermiso } from '../contrato/index.js';
 
 import { ErrorPermiso } from './errores.js';
+import { hoyDelNegocio } from './fecha-negocio.js';
 import { tienePermiso, type SesionUsuario } from './permisos.js';
 
 /**
@@ -41,24 +42,26 @@ export const DIAS_VENTANA_CAPTURA = 7;
 const MS_POR_DIA = 86_400_000;
 
 /**
- * Hoy a medianoche UTC — la base contra la que se mide la ventana.
+ * El día de HOY **del negocio**, a medianoche UTC — la base contra la que se mide la ventana.
  *
- * ⚠️ **SESGO CONOCIDO, heredado de F7-E4 y NO arreglado en la 0.171 (a propósito).** El ancla es el
- * día **UTC**, no el día del NEGOCIO (`ZONA_DEL_NEGOCIO`, `comun/fecha-negocio.ts`). Como México
- * va en −06:00, entre las 18:00 y las 23:59 de allá el día UTC ya avanzó, así que en esa franja:
- *  • la promesa *«nunca una fecha futura»* deja pasar el día siguiente del calendario mexicano, y
- *  • la ventana son {@link DIAS_VENTANA_CAPTURA} − 1 días de negocio completos, no N.
+ * ⭐ **EL HUSO, ARREGLADO EN LA FILA 0.174.** Hasta entonces el ancla era el día **UTC**
+ * (`new Date()` a medianoche UTC), heredado de F7-E4. El servidor corre en UTC y la gente captura
+ * en México (−06:00, sin horario de verano desde 2022), así que **entre las 18:00 y las 23:59 de
+ * allá el día UTC ya había avanzado**, y en esa franja —el turno de la tarde entero— la pieza
+ * rompía sus dos promesas:
+ *  • *«nunca una fecha futura»* dejaba pasar el día SIGUIENTE del calendario mexicano, y
+ *  • la ventana valía {@link DIAS_VENTANA_CAPTURA} − 1 días de negocio completos, no N.
  *
- * Se deja como está para NO mover el comportamiento de Indicadores, que usa esta misma función
- * desde F7-E4 y no es de esta fila. Está numerado aparte. Quien lo arregle: el ancla correcta es
- * `ahora.toLocaleDateString('en-CA', { timeZone: ZONA_DEL_NEGOCIO })`, que es exactamente lo que ya
- * hace `hoyDelNegocio` en `dominio/inventarios/movimientos-pt.ts` para la ventana de LECTURA del
- * kardex — y por eso hoy ese archivo tiene dos husos, que es justo lo que aquel comentario decía
- * querer evitar.
+ * Ahora el ancla es {@link hoyDelNegocio} —la MISMA que usa el periodo de LECTURA del kardex
+ * (`dominio/inventarios/periodo-kardex.ts`)—, así que el sistema tiene **un solo «hoy»**: el que
+ * decide qué se puede capturar y el que decide qué se puede leer son el mismo día. Se mide en
+ * `fecha-capturable.test.ts`, con el reloj anclado en las dos franjas.
+ *
+ * Se devuelve a **medianoche UTC** porque así es como se guardan las columnas `@db.Date` y así
+ * llegan las fechas que hay que comparar: el huso decide QUÉ día es hoy, no cómo se representa.
  */
-export function hoyUtc(): Date {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
+export function hoyDelNegocioUtc(): Date {
+  return new Date(`${hoyDelNegocio()}T00:00:00.000Z`);
 }
 
 /** Opciones de la ventana: qué llave la abre y de cuántos días es. */
@@ -81,7 +84,7 @@ export function verificarFechaCapturable(
 ): void {
   const { permiso, dias: ventana = DIAS_VENTANA_CAPTURA } = opciones;
   if (tienePermiso(sesion, permiso)) return;
-  const dias = (hoyUtc().getTime() - fecha.getTime()) / MS_POR_DIA;
+  const dias = (hoyDelNegocioUtc().getTime() - fecha.getTime()) / MS_POR_DIA;
   if (dias < 0 || dias > ventana) {
     throw new ErrorPermiso(
       `Solo puedes capturar fechas de los últimos ${String(ventana)} días; para otra fecha necesitas el permiso de fecha libre.`,

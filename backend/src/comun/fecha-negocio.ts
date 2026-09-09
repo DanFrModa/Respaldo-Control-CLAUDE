@@ -20,3 +20,22 @@ export const ZONA_DEL_NEGOCIO = 'America/Mexico_City';
 export function fechaDelActo(fecha: Date): string {
   return fecha.toLocaleDateString('es-MX', { timeZone: ZONA_DEL_NEGOCIO });
 }
+
+/**
+ * EL DÍA DE HOY tal como lo vive el negocio (México), en `YYYY-MM-DD`.
+ *
+ * El ancla de todo lo que se mide «contra hoy» en el servidor. `en-CA` da exactamente
+ * `YYYY-MM-DD`, y la zona va escrita porque el servidor no la hereda de nadie: corre en UTC, así
+ * que `new Date().toISOString()` a las 18:00 de México devuelve **el día siguiente**.
+ *
+ * Nació dentro de `dominio/inventarios/movimientos-pt.ts` (fila 0.138) para el periodo de LECTURA
+ * del kardex, pasó a `periodo-kardex.ts` al generalizarse (0.173) y subió aquí en la 0.174, cuando
+ * la ventana de CAPTURA de fecha —que hasta entonces se anclaba en el día UTC— tuvo que medirse
+ * contra el mismo día. Tener dos anclas era tener dos «hoy»: el que decide qué se puede capturar y
+ * el que decide qué se puede leer, separados seis horas cada tarde.
+ *
+ * `ahora` se puede inyectar para probar sin depender de la hora a la que corra la prueba.
+ */
+export function hoyDelNegocio(ahora: Date = new Date()): string {
+  return ahora.toLocaleDateString('en-CA', { timeZone: ZONA_DEL_NEGOCIO });
+}

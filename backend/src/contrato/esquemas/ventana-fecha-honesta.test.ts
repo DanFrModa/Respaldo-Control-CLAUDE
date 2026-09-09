@@ -6,6 +6,7 @@ import {
   registrarTraspasoPt,
 } from '../../dominio/inventarios/movimientos-pt.js';
 import { ErrorPermiso } from '../../comun/errores.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { esquemaMovimientoPtCrear, esquemaTraspasoPtCrear } from './movimiento-pt.js';
 
@@ -33,10 +34,13 @@ import { esquemaMovimientoPtCrear, esquemaTraspasoPtCrear } from './movimiento-p
 /** Sesión que SÍ pasa por el candado: tiene `.mover` pero no la llave de fecha libre. */
 const sinLlave = () => sesionDePrueba({ permisos: ['inventario-pt.ver', 'inventario-pt.mover'] });
 
-/** `YYYY-MM-DD` de hace `dias` días, medido en UTC igual que la guarda. */
+/**
+ * `YYYY-MM-DD` de hace `dias` días, contado sobre el calendario **del negocio**, igual que la
+ * guarda desde la fila 0.174. Contarlo en UTC ataba la sonda a la hora a la que corriera el CI: en
+ * la franja de la tarde de México el día UTC va uno adelante y la ventana medida salía corrida.
+ */
 function fechaHaceDias(dias: number): string {
-  const hoy = new Date();
-  const base = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
+  const base = Date.parse(`${hoyDelNegocio()}T00:00:00.000Z`);
   return new Date(base - dias * 86_400_000).toISOString().slice(0, 10);
 }
 

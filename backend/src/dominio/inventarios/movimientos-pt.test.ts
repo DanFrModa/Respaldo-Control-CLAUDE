@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
@@ -457,10 +458,17 @@ describe('dominio Inventario PT — el PERIODO del kardex (fila 0.138)', () => {
 // se pusiera roja sola el día que la ventana la deje atrás — y sobre todo, una prueba de «hace 30
 // días» tiene que seguir significando «hace 30 días» dentro de un año.
 
-/** `YYYY-MM-DD` de hace `dias` días (negativo = futuro), medido en UTC como la guarda. */
+/**
+ * `YYYY-MM-DD` de hace `dias` días (negativo = futuro), contado sobre el calendario **del negocio**
+ * —el mismo con el que mide la guarda desde la fila 0.174—.
+ *
+ * ⚠️ Antes se contaba sobre el día **UTC**, y eso volvía estas pruebas dependientes de LA HORA A LA
+ * QUE CORRIERAN: entre las 18:00 y las 23:59 de México el día UTC va uno adelante, así que
+ * `fechaHaceDias(0)` devolvía «mañana» y la gemela positiva se ponía roja sin que nada cambiara en
+ * el código. Medido: con el reloj anclado a las 19:00 de México, tres pruebas de PT caían.
+ */
 function fechaHaceDias(dias: number): string {
-  const hoy = new Date();
-  const base = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
+  const base = Date.parse(`${hoyDelNegocio()}T00:00:00.000Z`);
   return new Date(base - dias * 86_400_000).toISOString().slice(0, 10);
 }
 
