@@ -1282,8 +1282,9 @@ export async function registrarConteoTelaColor(
  * Registra una SALIDA de tela POR COLOR hacia una orden de producción. El consumo empareja por
  * TELA+COLOR (NO pide partida — Daniel §Post-F9.9). Valida que la orden exista en la empresa
  * activa (A9) y que NINGUNO de los dos componentes quede negativo (D3, bajo lock). Conserva la
- * traza `origenTipo = salida-tela-orden` + `origenId = idOrden`. La función vieja
- * `registrarSalidaTelaAOrden` (flujo Lote) queda intacta. Permiso `inventario-telas.mover`.
+ * traza `origenTipo = salida-tela-orden` + `origenId = idOrden`. Desde la fila 0.170 es la ÚNICA
+ * salida de tela a orden que se puede capturar: su gemela vieja `registrarSalidaTelaAOrden` (flujo
+ * Lote) se quedó SIN RUTA REST. Permiso `inventario-telas.mover`.
  */
 export async function registrarSalidaTelaColorAOrden(
   sesion: SesionUsuario,

@@ -5,16 +5,31 @@
  * cancelación, existencia por suma directa, ocultamiento de importes del ex-acceso #7) viven en el
  * dominio.
  *
- * Endpoints (todos por la empresa activa = A9):
- *  • `POST /inventarios/telas/ajustes`               (`inventario-telas.mover`) → ajuste (puede crear lote).
- *  • `POST /inventarios/telas/salidas-orden`         (`inventario-telas.mover`) → salida ligada a orden.
- *  • `POST /inventarios/telas/traspasos`             (`inventario-telas.mover`) → traspaso (2 patas).
- *  • `POST /inventarios/telas/movimientos/:id/cancelar` (`inventario-telas.mover`) → inverso auditado.
- *  • `GET  /inventarios/telas/existencias`           (`inventario-telas.ver`)   → existencias (vista).
- *  • `GET  /inventarios/telas/kardex`                (`inventario-telas.ver`)   → kardex por tela.
+ * 🔴 EL FLUJO POR LOTE YA NO ESCRIBE — fila 0.170 (9-sep-2026). Los tres endpoints que CAPTURABAN
+ * por lote se RETIRARON: `POST /inventarios/telas/ajustes`, `POST /inventarios/telas/salidas-orden`
+ * y `POST /inventarios/telas/traspasos`. Grababan renglones SIN `idTelaColor`, y la pantalla de
+ * existencias que hoy se mira (`/inventarios/telas/existencias`, vista `existencia_tela_color`)
+ * EXCLUYE esas filas: sacar tela por ahí descontaba existencia que nadie veía moverse. Sus dos
+ * primeras pantallas ya se habían retirado (el ajuste el 13-ago-2026, el traspaso en la 0.098) pero
+ * los endpoints seguían vivos y alcanzables con el `inventario-telas.mover` que tienen seis
+ * perfiles; la tercera, «Salida a orden por lote (legado)», seguía capturando desde ⌘K. Lo que se
+ * captura hoy va SIEMPRE por los `/color/*` de abajo. El dominio (`ajustarInventarioTela`,
+ * `registrarSalidaTelaAOrden`, `traspasarTela`) NO se borró: sigue siendo el andamio con el que las
+ * pruebas fabrican movimientos con la forma LEGADA para comprobar que el flujo por color los
+ * tolera; sin ruta, ningún cliente lo alcanza.
  *
- * INVENTARIO NUEVO POR COLOR (etapa A2 — partidas + tela×color; el flujo por Lote de arriba queda
- * como legado consultable; dominio `dominio/inventarios/partidas-telas`):
+ * Endpoints (todos por la empresa activa = A9):
+ *  • `POST /inventarios/telas/movimientos/:id/cancelar` (`inventario-telas.mover`) → inverso auditado.
+ *  • `GET  /inventarios/telas/existencias`           (`inventario-telas.ver`)   → existencias LEGADAS (vista).
+ *  • `GET  /inventarios/telas/kardex`                (`inventario-telas.ver`)   → kardex LEGADO por tela.
+ *
+ * Los tres que quedan son la ventana al HISTÓRICO MIGRADO de Access (lo único que ya vive con esa
+ * forma): dos consultas y la cancelación por inverso que el kardex necesita para corregir (D3). Y
+ * OJO — la cancelación NO es sólo del legado: acepta cualquier movimiento con renglones de tela, los
+ * del flujo por color incluidos, por eso conserva sus guardas de la 0.099/0.104.
+ *
+ * INVENTARIO VIGENTE POR COLOR (etapa A2 — partidas + tela×color; es el ÚNICO que captura;
+ * dominio `dominio/inventarios/partidas-telas`):
  *  • `POST /inventarios/telas/color/ajustes`         (`inventario-telas.mover`) → ajuste (entrada crea partidas).
  *  • `POST /inventarios/telas/color/conteos`         (`inventario-telas.mover`) → conteo físico (lo contado → diferencia).
  *  • `GET  /inventarios/telas/color/saldos`          (`inventario-telas.ver`)   → saldos (Σ directa) para el conteo.
@@ -38,12 +53,8 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
-  esquemaAjusteTelaCrear,
-  esquemaSalidaTelaCrear,
-  esquemaTraspasoTelaCrear,
   esquemaMovimientoMaterialCancelarCuerpo,
   esquemaMovimientoTelaSalida,
-  esquemaTraspasoTelaSalida,
   esquemaExistenciasTelaQuery,
   esquemaExistenciasTelaLista,
   esquemaKardexTelaQuery,
@@ -74,12 +85,9 @@ import { SEGURIDAD_SESION } from '../../openapi.js';
 import { impresoInventarioTelas } from '../../dominio/inventarios/impresos/impreso-inventario-telas.js';
 import { impresoTraspasoTela } from '../../dominio/inventarios/impresos/impreso-traspaso-tela.js';
 import {
-  ajustarInventarioTela,
   cancelarMovimientoTela,
   consultarExistenciasTela,
   kardexTela,
-  registrarSalidaTelaAOrden,
-  traspasarTela,
 } from '../../dominio/inventarios/telas.js';
 import {
   ajustarInventarioTelaColor,
@@ -115,66 +123,10 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
     return sesion;
   };
 
-  // ── Ajuste (conteo físico / corrección; puede crear lote en una entrada) ─────
-  app.route({
-    method: 'POST',
-    url: '/inventarios/telas/ajustes',
-    preHandler: app.conPermiso('inventario-telas.mover'),
-    schema: {
-      tags: ['inventario-telas'],
-      summary:
-        'Registrar un ajuste de inventario de tela (entrada con lote nuevo o salida/corrección)',
-      security: SEGURIDAD_SESION,
-      body: esquemaAjusteTelaCrear,
-      response: { 201: esquemaMovimientoTelaSalida, ...respuestasError },
-    },
-    handler: async (request, reply) => {
-      const sesion = await exigirSesion(() => request.obtenerSesion());
-      const movimiento = await ajustarInventarioTela(sesion, request.body);
-      return reply.code(201).send(movimiento);
-    },
-  });
-
-  // ── Salida de tela a una orden de producción ─────────────────────────────────
-  app.route({
-    method: 'POST',
-    url: '/inventarios/telas/salidas-orden',
-    preHandler: app.conPermiso('inventario-telas.mover'),
-    schema: {
-      tags: ['inventario-telas'],
-      summary:
-        'Registrar una salida de tela ligada a una orden de producción (única vía que descuenta)',
-      security: SEGURIDAD_SESION,
-      body: esquemaSalidaTelaCrear,
-      response: { 201: esquemaMovimientoTelaSalida, ...respuestasError },
-    },
-    handler: async (request, reply) => {
-      const sesion = await exigirSesion(() => request.obtenerSesion());
-      const movimiento = await registrarSalidaTelaAOrden(sesion, request.body);
-      return reply.code(201).send(movimiento);
-    },
-  });
-
-  // ── Traspaso entre almacenes (dos patas) ─────────────────────────────────────
-  app.route({
-    method: 'POST',
-    url: '/inventarios/telas/traspasos',
-    preHandler: app.conPermiso('inventario-telas.mover'),
-    schema: {
-      tags: ['inventario-telas'],
-      summary: 'Traspasar tela entre almacenes (salida del origen + entrada al destino)',
-      security: SEGURIDAD_SESION,
-      body: esquemaTraspasoTelaCrear,
-      response: { 201: esquemaTraspasoTelaSalida, ...respuestasError },
-    },
-    handler: async (request, reply) => {
-      const sesion = await exigirSesion(() => request.obtenerSesion());
-      const traspaso = await traspasarTela(sesion, request.body);
-      return reply.code(201).send(traspaso);
-    },
-  });
-
   // ── Cancelar un movimiento (inverso auditado, D3) ────────────────────────────
+  // ⚠️ NO es sólo del legado: acepta cualquier movimiento con renglones de tela — los del flujo por
+  // COLOR también lo son — y es el botón «cancelar» del kardex por lote, que sigue vivo para el
+  // histórico migrado. Por eso sobrevivió al retiro de las tres capturas por lote (fila 0.170).
   app.route({
     method: 'POST',
     url: '/inventarios/telas/movimientos/:id/cancelar',
@@ -321,9 +273,10 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
   // Daniel §Post-F9.193 (dec. 8 y 9): avisar la sobre-salida contra lo que la orden pide, y sacar
   // el aviso de tono SÓLO cuando hay más de una partida del color —con la lista a la vista—. Va
   // por POST porque el cuerpo es la CAPTURA EN CURSO (N renglones), no un filtro de URL; es SOLO
-  // LECTURA (no registra ningún movimiento) y su respuesta AVISA, nunca bloquea. Sirve a las DOS
-  // pantallas que sacan tela a una orden: la vigente por color (`lineas`) y la LEGADA por lote
-  // (`lineasTela`, tela sin color — sólo el aviso de sobre-salida).
+  // LECTURA (no registra ningún movimiento) y su respuesta AVISA, nunca bloquea. Sirve a la ÚNICA
+  // pantalla que saca tela a una orden: la vigente por color (`lineas`). Su cuerpo admite además
+  // `lineasTela` (tela sin color, sólo el aviso de sobre-salida), que era de la pantalla LEGADA por
+  // lote: retirada en la fila 0.170, ese campo **ya no lo manda ningún cliente**.
   app.route({
     method: 'POST',
     url: '/inventarios/telas/color/salidas-orden/previa',

@@ -71,6 +71,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.133 · 9-sep-2026 · **en prueba** — **Se cierra la última puerta vieja que descontaba tela donde nadie la veía**
+
+### Qué se puede hacer ahora que antes no
+
+- Nada nuevo: **esta versión quita una puerta, no agrega una función.** Y era una puerta que podía
+  hacer que el inventario de telas dijera algo distinto de lo que pasó.
+
+### Qué cambió y puede sorprender
+
+- **Se retiró «Salida a orden por lote (legado)».** Ya no estaba en el menú, pero seguía apareciendo en
+  el buscador (⌘K) y **seguía capturando**. Lo que se sacaba por ahí descontaba tela que la pantalla
+  buena de existencias **no puede ver moverse nunca**, porque una trabaja por color y la otra no.
+  ⇒ Si tenías esa dirección guardada, ahora **te lleva sola** a «Salida de tela a orden», que es la buena.
+- **Se cerraron tres puertas del sistema, no una.** Además de esa pantalla, quedaban dos accesos del
+  flujo viejo —el ajuste y el traspaso por lote— **sin pantalla desde hace semanas pero todavía
+  abiertos**, y un tercero que era justo el que usaba la pantalla retirada. Los tres cerrados.
+- ⚠️ **«Existencias por lote (legado)» SIGUE ahí, a propósito.** Sólo consulta, no mueve nada. Retirarla
+  **es decisión de Daniel y está pendiente**: confunde, porque nunca puede cuadrar con la pantalla
+  vigente, pero no hace daño.
+- **El kardex por lote tampoco se toca**: es la única ventana que queda al histórico que se trajo del
+  sistema viejo.
+
+### Qué sigue pendiente o roto
+
+- **Lo capturado por esa puerta antes de hoy sigue como está.** No se reescribe nada: lo que se movió,
+  se movió. De aquí en adelante ya no se puede capturar más por ahí.
+- ⭐ **Y lo más importante de esta versión no se ve: ahora hay una prueba que impide que esto vuelva.**
+  Este mismo defecto iba por su **tercera** aparición —el ajuste en agosto, el traspaso después, la
+  salida ahora—, y nada impedía una cuarta. Ya hay un guardián que se pone rojo si alguien vuelve a
+  abrir cualquiera de esas puertas, **o si abre una nueva con otro nombre**.
+- **Un aviso que llevaba meses mintiendo, corregido en siete sitios.** Varias pantallas y documentos
+  seguían diciendo *«el acceso viejo sigue vivo; para usarlo hay que llamarlo a mano»*. Ya no es cierto,
+  y una de esas frases era **la que hizo nacer este arreglo**.
+
+---
+
 ## 0.132 · 9-sep-2026 · **en prueba** — **Cuentas por pagar deja de hacer dos consultas pesadas que nadie miraba**
 
 ### Qué se puede hacer ahora que antes no

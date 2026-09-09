@@ -39,7 +39,6 @@ import type {
   SalidaAvioSinOrdenCrear,
   SalidaTelaColorCrear,
   SalidaTelaColorSinOrdenCrear,
-  SalidaTelaCrear,
   TraspasoAvio,
   TraspasoAvioCrear,
   TraspasoTelaColor,
@@ -60,11 +59,10 @@ export const CLAVE_INVENTARIO_MATERIALES = ['inventario-materiales'] as const;
 
 // ── Llamadas: TELAS ────────────────────────────────────────────────────────────
 
-async function salidaTelaAOrden(cuerpo: SalidaTelaCrear): Promise<MovimientoTela> {
-  const { data, error } = await api.POST('/api/inventarios/telas/salidas-orden', { body: cuerpo });
-  if (!data) throw new ErrorDeApi(error);
-  return data;
-}
+// ⛔ La salida a orden POR LOTE se retiró en la fila 0.170 (con su pantalla y su endpoint): escribía
+// renglones sin color, que la pantalla de existencias vigente no enseña. Lo único que queda vivo del
+// flujo por lote son las DOS consultas (existencias/kardex del histórico migrado) y la cancelación
+// —que no es sólo del legado: el kardex la usa para corregir cualquier movimiento de tela (D3)—.
 
 async function cancelarTela(
   id: number,
@@ -415,19 +413,6 @@ export function useKardexAvio(
 }
 
 // ── Hooks de mutación: TELAS ───────────────────────────────────────────────────
-
-/** Registra una salida de tela a orden e invalida existencias/kardex. */
-export function useSalidaTelaAOrden(): UseMutationResult<
-  MovimientoTela,
-  ErrorDeApi,
-  SalidaTelaCrear
-> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: salidaTelaAOrden,
-    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
-  });
-}
 
 /** Argumentos de una cancelación de movimiento de material. */
 export interface ArgsCancelarMaterial {

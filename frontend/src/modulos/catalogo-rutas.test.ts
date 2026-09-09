@@ -209,6 +209,8 @@ describe('deriva: toda ruta de App.tsx declara su permiso', () => {
         'catalogos/telas',
         'catalogos/temporadas',
         'inventarios',
+        // Redirección de la fila 0.170 → la salida de tela por COLOR (ella gatea).
+        'inventarios/telas/salida-orden-lote',
         'produccion',
         'produccion/corte',
         'produccion/envios',

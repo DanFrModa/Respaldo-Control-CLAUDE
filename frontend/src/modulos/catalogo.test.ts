@@ -58,7 +58,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 110 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 109 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
     // (106 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
@@ -71,8 +71,11 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // la cola de la revisión de receta (§Post-F9.140); +1 en V1-E9p: «Promesas incumplidas», la
     // lista del DUEÑO con lo que se vendió y no se consiguió (§Post-F9.144(b)); +1 en la fila
     // 0.104: «Salida de material sin orden» (la devolución / venta de telas y avíos que no pasa
-    // por ninguna OP, §Post-F9.193 resp. 12). Lo que cambia es SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(110);
+    // por ninguna OP, §Post-F9.193 resp. 12); −1 en la fila 0.170: se RETIRÓ «Salida a orden por
+    // lote (legado)», la última captura del flujo viejo —grababa renglones SIN color y la pantalla
+    // de existencias vigente no los enseña, así que descontaba tela que nadie veía moverse; su
+    // ruta quedó como redirección a la salida por color. Lo que cambia es SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(109);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -192,8 +195,9 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // +4 en A2: ajuste/traspaso de telas por color y las vistas legadas por lote (existencias y
     // salida a orden); +1 en B1: entradas de tela por factura/remisión; +1 en la fila 0.104: la
     // salida de material sin orden (cuelga del grupo, no de «Telas» ni de «Avíos», porque sirve a
-    // las dos dimensiones).
-    expect(inventarios).toHaveLength(16);
+    // las dos dimensiones); −1 en la fila 0.170: la salida a orden por lote se retiró (capturaba
+    // sin color), y de las dos legadas por lote sólo queda la de existencias, que es consulta.
+    expect(inventarios).toHaveLength(15);
   });
 
   it('busca por clave: hojas, padres (ruta legada /compras) e inexistentes', () => {
@@ -549,7 +553,7 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     ]);
 
     // El KARDEX de «materiales» sigue colgando del padre «Telas» —su pata de tela por LOTE sigue
-    // viva: es la única ventana al histórico migrado y a «Salida a orden por lote (legado)»—, y el
+    // viva: desde la fila 0.170 es la única ventana al histórico migrado de Access—, y el
     // riel solo admite hijos del MISMO padre. El AJUSTE y el TRASPASO ya no están entre ellas: al
     // quedarse solo-avíos se mudaron a «Avíos».
     const telas = entradaRiel('telas');
@@ -766,9 +770,10 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       // padre «Inventario PT» (junto con traspasos y kardex). Tampoco 'inventario-telas-traspaso':
       // ese mismo día entró como hijo de «Telas», porque es el flujo VIGENTE (por color) y el riel
       // no puede ofrecer únicamente el de lote, que ya no mueve existencias. Lo que SÍ sigue fuera
-      // del riel en Inventarios son las dos vistas LEGADAS de telas por lote:
+      // del riel en Inventarios es la vista LEGADA de existencias por lote (sólo consulta). Su
+      // hermana 'inventario-telas-salida-orden-lote' ya NO está aquí: se retiró del catálogo en la
+      // fila 0.170 por CAPTURAR sin color, y su ruta quedó como redirección a la salida por color.
       'inventario-telas-existencias-lote',
-      'inventario-telas-salida-orden-lote',
       // 'catalogo-telas' ya NO está aquí: en A2 entró al riel como hijo del padre «Telas»
       // (pedido de Daniel, 6-ago-2026 — el catálogo tenía que verse en el menú).
       // 'catalogo-avios' tampoco: el 12-ago-2026 entró como hijo del padre «Avíos».

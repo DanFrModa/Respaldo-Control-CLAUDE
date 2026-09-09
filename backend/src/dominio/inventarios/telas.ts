@@ -25,9 +25,21 @@
  * se OMITEN (null) server-side para quien no tenga el permiso (A4, deny-by-default). Las cantidades
  * sí se ven con `inventario-telas.ver`. La UI los oculta cuando vienen null.
  *
- * SEMÁNTICA salida-vs-nota (fija para la fase, doc §"Cómo conecta"): `registrarSalidaTelaAOrden` es
- * LA única vía que descuenta tela hacia una orden (conserva la traza `origenId = idOrden`); la nota
- * de salida de E5 será un documento de envío que REFERENCIA esta salida SIN generar otro movimiento.
+ * SEMÁNTICA salida-vs-nota (doc §"Cómo conecta"): una salida a orden conserva la traza
+ * `origenId = idOrden`; la nota de salida de E5 es un documento de envío que REFERENCIA esa salida
+ * SIN generar otro movimiento.
+ *
+ * 🔴 ESTE MÓDULO YA NO CAPTURA — fila 0.170 (9-sep-2026). Sus tres funciones de ESCRITURA
+ * (`ajustarInventarioTela`, `registrarSalidaTelaAOrden`, `traspasarTela`) se quedaron SIN RUTA REST:
+ * escribían renglones sin `idTelaColor` y la pantalla de existencias que hoy se mira los EXCLUYE, o
+ * sea que descontaban existencia que nadie veía moverse. Lo que captura tela es
+ * `inventarios/partidas-telas.ts` (flujo por COLOR), y punto.
+ * ⚠️ **No están borradas a propósito**: son el andamio con el que las pruebas de integración
+ * fabrican movimientos con la FORMA LEGADA —la misma que dejó el ETL de Access— para comprobar que
+ * el flujo por color los tolera sin contaminarse (REGLA 0-B). Sin ruta que las llame, ningún cliente
+ * las alcanza; si alguien vuelve a exponerlas, reabre el defecto.
+ * Lo que SÍ sigue expuesto de aquí: las dos CONSULTAS legadas (existencias/kardex por lote, la
+ * ventana al histórico migrado) y `cancelarMovimientoTela`, que además NO es sólo del legado.
  */
 import {
   esquemaAjusteTelaCrear,
@@ -338,6 +350,9 @@ async function crearLoteAjuste(
  * (D5); una salida (o un ajuste sobre lo existente) usa `lineas` tela×lote. Exactamente UNO de
  * `lote`/`lineas`. Si la dirección es salida, valida no-negativo bajo lock (D3). El motivo es
  * OBLIGATORIO (A7, va en la bitácora). Permiso `inventario-telas.mover` (A4). RECHAZA `traspaso`.
+ *
+ * 🚫 SIN RUTA REST desde la fila 0.170 (ver la cabecera del módulo): sólo la llaman las pruebas,
+ * para fabricar movimientos con la forma LEGADA. El ajuste que opera es `ajustarInventarioTelaColor`.
  */
 export async function ajustarInventarioTela(
   sesion: SesionUsuario,
@@ -361,10 +376,10 @@ export async function ajustarInventarioTela(
     await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     // Fila 0.104 — un ajuste NO puede estampar «Devolución a Proveedor» ni «Venta de Material»:
     // esos dos rótulos sólo los escribe la salida sin orden, que exige la llave del dueño.
-    // ⚠️ Va TAMBIÉN aquí, y no sólo en el ajuste por color: esta vista LEGADA por lote sigue viva
-    // y expuesta (`POST /inventarios/telas/ajustes`, con el mismo `inventario-telas.mover`), así
-    // que cerrar sólo el flujo nuevo dejaba el rótulo igual de falsificable por la puerta de al
-    // lado. Es la misma simetría que ya se aplicó a la CANCELACIÓN unas líneas más abajo.
+    // ⚠️ Se puso aquí cuando esta vía LEGADA seguía EXPUESTA (`POST /inventarios/telas/ajustes`,
+    // con el mismo `inventario-telas.mover`): cerrar sólo el flujo nuevo dejaba el rótulo
+    // falsificable por la puerta de al lado. Esa ruta se retiró en la fila 0.170 y la guarda se
+    // QUEDA: si alguien vuelve a exponer esta función, la protección ya está puesta.
     await rechazarTipoReservado(tx, datos.idTipoMov);
     const tipo = await tipoPorId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
@@ -425,11 +440,14 @@ function validarRenglonesTelaUnicos(renglones: DatosAjusteTelaLinea[]): void {
 
 /**
  * Registra una SALIDA de TELA hacia una orden de producción (`Salidas.IdOrdenes` del viejo —
- * 04-Inventarios §"Cómo conecta"). Es LA única vía que descuenta tela hacia una orden; conserva la
- * traza en `origenTipo = salida-a-orden` + `origenId = idOrden` (la nota de E5 la referenciará SIN
- * generar otro movimiento). Valida que la orden exista en la empresa activa (A9), que no deje
- * existencia negativa (D3, bajo lock) y usa el tipo `salida-a-orden`. Permiso
- * `inventario-telas.mover`.
+ * 04-Inventarios §"Cómo conecta"); conserva la traza en `origenTipo = salida-a-orden` +
+ * `origenId = idOrden` (la nota de E5 la referencia SIN generar otro movimiento). Valida que la
+ * orden exista en la empresa activa (A9), que no deje existencia negativa (D3, bajo lock) y usa el
+ * tipo `salida-a-orden`. Permiso `inventario-telas.mover`.
+ *
+ * 🚫 SIN RUTA REST desde la fila 0.170 (ver la cabecera del módulo): era la ÚLTIMA captura por lote
+ * que quedaba en pie —«Salida a orden por lote (legado)», alcanzable por ⌘K— y descontaba existencia
+ * que la pantalla vigente no enseña. La salida que opera es `registrarSalidaTelaColorAOrden`.
  */
 export async function registrarSalidaTelaAOrden(
   sesion: SesionUsuario,
@@ -490,6 +508,9 @@ export async function registrarSalidaTelaAOrden(
  * (salida del origen + entrada al destino) en UNA transacción (A2); valida que el ORIGEN tenga
  * existencia suficiente (D3, bajo lock). Origen y destino DISTINTOS. Patas por
  * `transferencia-salida`/`transferencia-entrada`. Permiso `inventario-telas.mover`.
+ *
+ * 🚫 SIN RUTA REST desde la fila 0.170 (ver la cabecera del módulo): sólo la llaman las pruebas. El
+ * traspaso que opera es `traspasarTelaColor`.
  */
 export async function traspasarTela(
   sesion: SesionUsuario,

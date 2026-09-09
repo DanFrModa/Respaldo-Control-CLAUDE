@@ -181,10 +181,12 @@ test.describe('Inicio de sesión', () => {
     for (const mudada of ['Ajuste de avíos', 'Traspaso de avíos']) {
       await expect(navegacion.getByRole('link', { name: mudada })).toHaveCount(0);
     }
-    // Lo único de Telas que sigue FUERA del riel: las dos vistas por lote LEGADAS (ya no operan).
-    for (const legada of ['Existencias por lote (legado)', 'Salida a orden por lote (legado)']) {
-      await expect(navegacion.getByRole('link', { name: legada, exact: true })).toHaveCount(0);
-    }
+    // Lo único de Telas que sigue FUERA del riel: la vista por lote LEGADA de existencias (sólo
+    // consulta). Su hermana «Salida a orden por lote (legado)» ya no está en NINGÚN sitio —ni riel
+    // ni ⌘K—: se retiró en la fila 0.170 por capturar renglones sin color.
+    await expect(
+      navegacion.getByRole('link', { name: 'Existencias por lote (legado)', exact: true }),
+    ).toHaveCount(0);
     // «Avíos» (12-ago-2026) arranca CERRADA: al desplegarla se ven sus 4 hijos. Antes era hoja
     // plana a Existencias y el «Catálogo de avíos» no tenía ENTRADA EN EL MENÚ — su único enlace
     // era la tarjeta del hub /catalogos, que tampoco es entrada del riel. El tercero, «Ajuste de

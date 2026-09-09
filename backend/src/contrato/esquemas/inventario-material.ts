@@ -988,9 +988,10 @@ export type PartidasTelaLista = z.infer<typeof esquemaPartidasTelaLista>;
 // BLOQUEA: esta previa no registra nada y su respuesta jamás apaga el botón de guardar.
 
 /**
- * Un renglón capturado en la pantalla LEGADA por lote (`Salida a orden por lote`): tela SIN color.
- * Sólo alimenta el aviso (a) —la comparación es por TELA de todos modos—; del riesgo de tono no
- * tiene nada que decir, porque en ese flujo no hay ni color ni partida.
+ * Un renglón de tela SIN color. Era el de la pantalla LEGADA por lote (`Salida a orden por lote`),
+ * **retirada en la fila 0.170** por capturar sin color: hoy **ningún cliente manda estos
+ * renglones**. Sólo alimenta el aviso (a) —la comparación es por TELA de todos modos—; del riesgo
+ * de tono no tiene nada que decir, porque en ese flujo no había ni color ni partida.
  */
 const esquemaPreviaSalidaLineaTela = z.object({
   idTela: idPositivo('la tela'),
@@ -1011,7 +1012,9 @@ export const esquemaPreviaSalidaTelaColorCrear = z
     lineasTela: z
       .array(esquemaPreviaSalidaLineaTela)
       .default([])
-      .describe('Renglones por TELA sin color (pantalla LEGADA por lote).'),
+      .describe(
+        'Renglones por TELA sin color. Sin cliente desde la fila 0.170: su pantalla (LEGADA por lote) se retiró.',
+      ),
   })
   .refine((c) => c.lineas.length + c.lineasTela.length > 0, {
     error: 'Captura al menos un renglón',
