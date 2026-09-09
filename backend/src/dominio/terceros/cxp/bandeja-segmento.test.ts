@@ -11,6 +11,8 @@
  *  3. **Que el segmento LLEGA A LAS DOS FUENTES y el RESUMEN es el del segmento** — que es la mitad
  *     que de verdad importa: si los KPIs siguieran siendo los de la cartera completa, el listado
  *     "Sin factura" enseñaría un total que no es el suyo, y ese total es justo lo que se va a pagar.
+ *  4. **Que la bandeja NO pide los DÍAS VENCIDOS** (fila 0.166): esa columna sólo la enseña la
+ *     corrida semanal, y pedirla aquí eran dos `GROUP BY` por carga cuyo resultado se tiraba.
  *
  * ⚠️ Qué se dobla y qué NO (mismo criterio que `salida-produccion.test.ts`): se doblan las dos
  * FUENTES —el agregado SQL del motor y el aporte EsMa— y el resto corre de verdad: el netting del
@@ -138,8 +140,8 @@ const CARGOS_FECHADOS: Record<Segmento, Record<string, unknown>[]> = {
  * Cliente de lectura de mentiras: sólo las lecturas que la bandeja hace. `configuracionEmpresa`
  * devuelve `null` → los límites de aging caen en el default 30/60 (código real, no mockeado).
  *
- * ⚠️ Desde la fila 0.121 la cartera emite TRES consultas crudas y no una: la del aging por cubetas
- * y las dos de los días vencidos (cargos fechados y créditos). El doble las distingue por lo que
+ * ⚠️ La cartera emite UNA consulta cruda —el aging por cubetas— y, sólo cuando le piden la
+ * antigüedad (fila 0.166), DOS más: cargos fechados y créditos. El doble las distingue por lo que
  * cada una PIDE —`"diasAtraso"` y `pago_maquilero`—, no por el orden en que llegan: atarlo al orden
  * lo volvería una prueba de la implementación.
  */
@@ -278,24 +280,86 @@ describe('bandejaPorPagar por segmento', () => {
 // ── (4) Fila 0.121: el segmento también parte los DÍAS VENCIDOS ──────────────────────────────────
 describe('⭐ los DÍAS VENCIDOS se piden por el MISMO segmento que la cartera', () => {
   /**
+   * La cartera CON antigüedad: la que pide la corrida semanal (fila 0.166), sobre el mismo doble de
+   * Postgres que usa la bandeja. Antes esto se medía a través de `bandejaPorPagar` — y por eso no se
+   * veía que la bandeja estaba pagando un agregado cuyo resultado tiraba.
+   */
+  async function carteraConDias(
+    segmento?: 'con' | 'sin',
+  ): Promise<{ idProveedor: number; diasVencidos: number | null }[]> {
+    const { carteraCombinadaConDiasVencidos } = await import('./cxp.js');
+    const { cliente } = clienteFalso();
+    return carteraCombinadaConDiasVencidos(
+      cliente as Parameters<typeof carteraCombinadaConDiasVencidos>[0],
+      1,
+      { d30: 30, d60: 60 },
+      segmento,
+    );
+  }
+
+  /**
    * Si el segmento no llegara a este agregado, la relación «sin factura» enseñaría la edad de una
    * deuda que se paga en la OTRA relación —y Daniel decide a quién pagar mirando justo ese número—.
    */
   it('sin segmento, el agregado de días tampoco filtra', async () => {
-    await bandejaPorPagar(SESION, {}, clienteFalso());
+    await carteraConDias();
     expect(ultimoSqlDias?.sql).not.toContain('es_fiscal');
   });
 
   it('`con` y `sin` viajan hasta el SQL de los días', async () => {
-    await bandejaPorPagar(SESION, { segmento: 'con' }, clienteFalso());
+    await carteraConDias('con');
     expect(ultimoSqlDias?.sql).toContain('es_fiscal');
     expect(ultimoSqlDias?.values).toContain(true);
 
-    await bandejaPorPagar(SESION, { segmento: 'sin' }, clienteFalso());
+    await carteraConDias('sin');
     expect(ultimoSqlDias?.values).toContain(false);
   });
 
   it('⭐ cada proveedor recibe SU edad, y el que no tiene cargos fechados se queda sin ella', async () => {
+    const dias = new Map((await carteraConDias()).map((f) => [f.idProveedor, f.diasVencidos]));
+
+    expect(dias.get(7)).toBe(40);
+    expect(dias.get(8)).toBe(5);
+    // Maquilas del Sur (9) sólo existe por su aporte EsMa; en este doble no tiene cargos fechados.
+    expect(dias.get(9)).toBeNull();
+  });
+});
+
+// ── (5) Fila 0.166: la BANDEJA no paga lo que no enseña ───────────────────────────────────────────
+describe('⭐ la bandeja NO pide el agregado de días vencidos (fila 0.166)', () => {
+  /**
+   * `BandejaCxpFila` no lleva `diasVencidos` por ningún lado —esa columna vive en la CORRIDA—, así
+   * que hasta esta fila la bandeja corría DOS `GROUP BY` de más en cada carga para tirar el
+   * resultado. El doble de Postgres apunta en `ultimoSqlDias` la consulta de antigüedad: si vuelve a
+   * emitirse desde aquí, esta prueba se cae.
+   *
+   * Que quitar ese trabajo NO movió una sola cifra lo siguen midiendo los tres casos del bloque (3)
+   * —filas, cartera, maquila y proveedores con saldo, segmento por segmento—: repetir aquí esas
+   * mismas aserciones no añadiría cobertura, sólo otro sitio que mantener.
+   */
+  it('EN NEGATIVO: ninguno de los tres segmentos emite el SQL de antigüedad', async () => {
+    for (const parametros of [{}, { segmento: 'con' as const }, { segmento: 'sin' as const }]) {
+      ultimoSqlDias = null;
+      await bandejaPorPagar(SESION, parametros, clienteFalso());
+      expect(ultimoSqlDias).toBeNull();
+    }
+  });
+});
+
+// ── (6) La barrera de COMPILACIÓN que impide el `null` que miente ─────────────────────────────────
+describe('los días de una fila que NO los pidió no se pueden ni leer', () => {
+  /**
+   * 🔴 La mitad delicada de la fila 0.166. `diasVencidos` usa `null` para decir «este proveedor no
+   * tiene nada que envejecer»; si la cartera SIN antigüedad devolviera también `null` —por no
+   * haberlo calculado—, los dos `null` serían indistinguibles y quien pintara la columna diría «al
+   * corriente» de alguien a quien NADIE midió. Por eso el campo no existe en `FilaNeta`: existe sólo
+   * en `FilaNetaConDias`, el tipo que devuelve la función que sí paga los dos agregados.
+   *
+   * `@ts-expect-error` vuelve esa barrera verificable: si alguien devolviera el campo a `FilaNeta`,
+   * la línea DEJARÍA de dar error y `tsc` fallaría por una directiva sin uso. Así el guardarraíl no
+   * se puede quitar callado (mismo patrón que `comun/jobs/index.test.ts`).
+   */
+  it('EN NEGATIVO: `FilaNeta` no tiene `diasVencidos` (barrera de COMPILACIÓN)', async () => {
     const { carteraCombinadaPorProveedor } = await import('./cxp.js');
     const { cliente } = clienteFalso();
     const cartera = await carteraCombinadaPorProveedor(
@@ -303,11 +367,22 @@ describe('⭐ los DÍAS VENCIDOS se piden por el MISMO segmento que la cartera',
       1,
       { d30: 30, d60: 60 },
     );
-    const dias = new Map(cartera.map((f) => [f.idProveedor, f.diasVencidos]));
 
-    expect(dias.get(7)).toBe(40);
-    expect(dias.get(8)).toBe(5);
-    // Maquilas del Sur (9) sólo existe por su aporte EsMa; en este doble no tiene cargos fechados.
-    expect(dias.get(9)).toBeNull();
+    const hilaturas = cartera.find((f) => f.idProveedor === 7);
+
+    // 🔴 PRIMERO, que la fila EXISTA. Sin esta línea, el día que `find` no encontrara nada la
+    // aserción de abajo pasaría en verde **sin haber mirado una sola fila** — el modo de fallo que
+    // este proyecto tiene fichado (una prueba que pasa por la razón equivocada), y encima dentro del
+    // guardarraíl que esta fila presenta como su garantía.
+    expect(hilaturas).toBeDefined();
+
+    // @ts-expect-error nadie midió la antigüedad de estas filas: el campo NO existe en `FilaNeta`.
+    void hilaturas?.diasVencidos;
+
+    // Lo de arriba es la barrera de COMPILACIÓN; ésta es su otra mitad, la de EJECUCIÓN: la llave ni
+    // siquiera viaja, así que no hay `null` que nadie pueda confundir con «al corriente». La
+    // condición va escrita para morir por LOS DOS lados —si la fila falta **o** si la llave está—,
+    // no sólo por el segundo.
+    expect(hilaturas === undefined || 'diasVencidos' in hilaturas).toBe(false);
   });
 });

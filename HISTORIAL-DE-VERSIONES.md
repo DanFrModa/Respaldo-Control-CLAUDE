@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.132 · 9-sep-2026 · **en prueba** — **Cuentas por pagar deja de hacer dos consultas pesadas que nadie miraba**
+
+### Qué se puede hacer ahora que antes no
+
+- Nada nuevo que se vea: **esta versión no agrega funciones, quita trabajo inútil.** La pantalla de
+  **Cuentas por pagar** hacía, cada vez que se abría, **dos consultas pesadas** que recorren todos los
+  movimientos de proveedores, la maquila y sus abonos **sin ningún tope** — para calcular la antigüedad
+  de cada proveedor y **tirar el resultado a la basura**, porque esa pantalla nunca ha enseñado ese dato.
+  Ahora sólo lo pide quien lo usa de verdad: la **corrida semanal de pagos**.
+- **El número que ves no cambia en ninguna pantalla.** La corrida sigue diciendo exactamente los mismos
+  días vencidos, maquileros incluidos.
+
+### Qué cambió y puede sorprender
+
+- **Cuentas por pagar debería abrir más rápido**, y la diferencia se notará más conforme se carguen los
+  saldos reales: eran dos recorridos completos sin límite, así que crecían con el histórico.
+- ⚠️ **La antigüedad de la maquila sigue sin repartirse** en las cuatro cubetas de esa pantalla, como
+  antes: va en su columna aparte, y el recuadro «Vencido» de arriba es sólo de los proveedores normales.
+  Esto no lo cambia esta versión — se menciona porque es lo que más sorprende al sumar las columnas.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Está por decidirse si ese dato se enseña.** Hay una propuesta sobre la mesa: poner una columna
+  **«Días venc.»** en Cuentas por pagar, igual que la tiene la corrida — es el único dato de antigüedad
+  que **sí cubre la maquila**, y el cálculo ya está pagado. Si se aprueba, la pantalla vuelve a pedirlo,
+  pero **a propósito y para enseñarlo**, que es distinto de calcularlo para tirarlo.
+- **Había pruebas en verde que sostenían el desperdicio.** Medían esas consultas *a través de* la
+  pantalla de Cuentas por pagar, así que el sistema tenía pruebas confirmando una necesidad que no
+  existía — por eso llevaba ahí sin que nadie lo viera. Ahora miden a quien lo usa, y **hay una prueba
+  nueva que se pone roja si la pantalla vuelve a pedirlo sin quererlo**.
+- **Y la documentación interna mentía** desde antes: afirmaba que esa pantalla enseñaba los días
+  vencidos. Nunca los enseñó. Corregido.
+
+---
+
 ## 0.131 · 8-sep-2026 · **en prueba** — **La máquina para meter los saldos de SINUBE queda lista (y se cazó un error que habría fechado todas las facturas en 1905)**
 
 ### Qué se puede hacer ahora que antes no
