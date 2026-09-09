@@ -45,6 +45,24 @@ inventario cíclico, E6 = ETL de cierre). Es el **módulo 11** del plan.
     telas y avíos), si su conteo es ciego y qué permiso EXTRA exige su ajuste. Sumar una cuarta
     dimensión es escribir su adaptador y añadirlo al registro.
   - `kpis.ts` / `fechas.ts` — los tableros sobre vistas materializadas y el gate de "fecha libre".
+    **La ventana de captura**: sin `indicadores.fecha-libre`, los **cuatro** llamadores (alta de ficha,
+    alta y entrega de muestrario, y registro de productividad) sólo aceptan los **últimos 7 días** y
+    nunca una fecha futura; con el permiso, cualquiera. La guarda es `comun/fecha-capturable.ts` —
+    **la misma pieza que usa el almacén de PT** con su propio permiso, y el número vive ahí y en
+    ningún otro sitio.
+    ⏱️ **Y «hoy» es el día del NEGOCIO, no el del servidor (fila 0.174).** Se ancla en `hoyDelNegocio`
+    (`comun/fecha-negocio.ts`). Antes se anclaba en el día **UTC**: como México va en −06:00, de 18:00
+    a 23:59 —el turno de la tarde entero— se colaba **el día siguiente** del calendario mexicano y la
+    ventana valía 6 días completos en vez de 7.
+    ⚠️ **Efecto que se nota aunque no toques ningún permiso:** cuando el alta de ficha
+    (`fichas.ts:282`) o la de muestrario (`muestrarios.ts:129`/`:222`) vienen **sin fecha**, el acto se
+    sella con el día del negocio **antes** de la guarda y con independencia de la llave ⇒ una ficha
+    capturada a las 19:00 se fecha **hoy**, no mañana, **para todos**. El compromiso a futuro tiene su
+    propio campo (`fechaRequerida` del muestrario, sin ventana): no hacía falta que la fecha del acto
+    se adelantara.
+    📌 **Los atajos de la pantalla (`frontend/.../indicadores/comun.ts`) cuentan con la zona del
+    NAVEGADOR**, no con la del negocio. En un navegador puesto en México coinciden; en uno adelantado
+    respecto de México, un atajo puede ofrecer una fecha que el servidor rebota.
   - `migracion.ts` (F7-E6) — `crearInventarioCiclicoMigrado`: modo migración del cíclico histórico
     (ver abajo).
 - **Migración** `backend/migracion/loaders/indicadores-*.ts` + `etl-indicadores.ts`.

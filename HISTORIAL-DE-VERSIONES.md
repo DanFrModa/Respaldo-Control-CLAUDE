@@ -71,6 +71,50 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.137 · 9-sep-2026 · **en prueba** — **El sistema ya sabe qué día es aquí, no en Londres**
+
+### Qué se puede hacer ahora que antes no
+
+- **Capturar de tarde o de noche sin que el sistema se adelante un día.** El candado que impide poner
+  fechas futuras —y que sólo deja retroceder unos días— contaba los días **con el reloj de Londres**.
+  México va seis horas atrás, así que **entre las 6 de la tarde y la medianoche** el sistema ya creía
+  que era el día siguiente: dejaba pasar una fecha de mañana y, al mismo tiempo, dejaba de aceptar el
+  día más viejo de la ventana. **El turno de la tarde entero funcionaba con otra regla.**
+- **Y el formulario ya no te ofrece una fecha que el servidor va a rechazar.** La pantalla proponía
+  por omisión una fecha calculada con el reloj de Londres; a partir de las 6 de la tarde eso era
+  mañana, y el servidor —bien— la rebotaba. Ahora las dos cuentan igual.
+
+### Qué cambió y puede sorprender
+
+- ⏳ **Una ficha capturada de noche ya se fecha HOY, no mañana** (y lo mismo los muestrarios). Antes,
+  a las 7 de la tarde el sistema le ponía por omisión la fecha del día siguiente. Ahora le pone la de
+  hoy, **para todos y sin que intervenga ningún permiso**. Es la fecha del acto, y el acto fue hoy.
+  **Si lo que querías era comprometer una fecha futura, para eso está el campo de fecha requerida del
+  muestrario**, que no tiene esta ventana y no cambió.
+- **Nadie gana ni pierde permisos.** Quien podía saltarse el candado sigue pudiendo, y quien no,
+  tampoco. Lo único que cambió es **qué día cree el sistema que es**.
+- **Un borde que estaba a un día de morder, y nadie lo había visto:** el atajo «Sábado» de
+  Indicadores caía, un viernes por la tarde, **justo en el último día que la ventana aceptaba**. Un
+  paso más y habría empezado a rebotar. Ahora cae con un día de margen.
+
+### Qué sigue pendiente o roto
+
+- 📌 **El mismo defecto sigue vivo en otros dos sitios, y se dice a propósito en vez de callarlo:**
+  en **Ruta Crítica** (cuatro cálculos de fecha) y en la **fecha de emisión de la orden de compra**,
+  que se sella con el reloj de Londres ⇒ **una orden levantada a las 7 de la tarde nace fechada
+  mañana**. No se tocaron aquí porque son otros módulos y ampliar el arreglo sin red es justo lo que
+  esta versión vino a evitar. **Para saber si eso importa hace falta un dato que sólo tiene Daniel:
+  con qué frecuencia se levantan órdenes de compra después de las 6 de la tarde.**
+- **La mitad que no tenía red ya la tiene:** los Indicadores compartían esta ventana y **no había una
+  sola prueba que la midiera**. Ahora hay 16, y se comprobó que **mueren** al romper a propósito lo
+  que vigilan.
+- ⭐ **Cómo se comprobó, porque es lo que sostiene todo lo demás:** se corrió el programa **con el
+  reloj puesto en varias horas distintas** —tres de ellas dentro de la franja del defecto, incluidas
+  las 23:55 de México— y el resultado fue **idéntico a la prueba**. Sin eso, cualquier verde habría
+  sido un verde de casualidad.
+
+---
+
 ## 0.136 · 9-sep-2026 · **en prueba** — **El kardex de telas y avíos deja de traer diez años de golpe**
 
 ### Qué se puede hacer ahora que antes no

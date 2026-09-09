@@ -191,7 +191,10 @@ export type ActividadPagina = z.infer<typeof esquemaActividadPagina>;
 /**
  * Alta de un registro de productividad. El `area` la determina la actividad (el dominio la sella).
  * IP: exige `idPersona`. Almacén: usa `personas` (cuadrilla) y opcionalmente `idCliente`.
- * La `fecha` fuera de los últimos 7 días (atajos Hoy/Ayer/Sábado) exige `indicadores.fecha-libre`.
+ * La `fecha` fuera de la ventana de captura (atajos Hoy/Ayer/Sábado) exige `indicadores.fecha-libre`.
+ * ⚠️ El número de días NO se repite aquí a propósito: vive sólo en `comun/fecha-capturable.ts`
+ * (`DIAS_VENTANA_CAPTURA`). Esta copia era la quinta y **nada la cruzaba** — subir la constante a 10
+ * dejaba este comentario diciendo 7 sin que ninguna prueba sonara (medido, fila 0.174).
  */
 export const esquemaRegistroProductividadCrear = z.object({
   fecha: z.iso.date({ error: 'La fecha es obligatoria (AAAA-MM-DD)' }),
