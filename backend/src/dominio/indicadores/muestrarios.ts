@@ -40,7 +40,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { fechaAUtc, hoyUtc, verificarFechaCapturable } from './fechas.js';
+import { fechaAUtc, hoyDelNegocioUtc, verificarFechaCapturable } from './fechas.js';
 
 /** Muestrario con cliente/temporada incluidos (para proyectar sus nombres). */
 type MuestrarioConRelaciones = Prisma.MuestrarioGetPayload<{
@@ -126,7 +126,7 @@ export async function crearMuestrario(
   const datos = validarEntrada(esquemaMuestrarioCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
   const fechaSolicitado =
-    datos.fechaSolicitado === undefined ? hoyUtc() : fechaAUtc(datos.fechaSolicitado);
+    datos.fechaSolicitado === undefined ? hoyDelNegocioUtc() : fechaAUtc(datos.fechaSolicitado);
   verificarFechaCapturable(sesion, fechaSolicitado);
   const fechaRequerida = fechaAUtc(datos.fechaRequerida);
 
@@ -219,7 +219,7 @@ export async function entregarMuestrario(
   const datos = validarEntrada(esquemaMuestrarioEntregar, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
   const fechaEntregado =
-    datos.fechaEntregado === undefined ? hoyUtc() : fechaAUtc(datos.fechaEntregado);
+    datos.fechaEntregado === undefined ? hoyDelNegocioUtc() : fechaAUtc(datos.fechaEntregado);
   verificarFechaCapturable(sesion, fechaEntregado);
 
   return enTransaccion(async (tx) => {
