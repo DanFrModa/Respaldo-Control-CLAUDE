@@ -822,7 +822,7 @@ interface FiltrosSaldoAnteriorAvio {
  * traspaso reparte FIFO entre partidas y escribe varios renglones del mismo color y almacén).
  *
  * 🔑 **Y como aquí el COMENTARIO ES la garantía —no hay prueba detrás—, tiene que cubrir los SEIS
- * caminos que escriben `movimiento_det_avio`, no sólo los que comparten razón.** Son tres razones
+ * caminos DIRECTOS (más el derivado de abajo) que escriben `movimiento_det_avio`, no sólo los que comparten razón.** Son tres razones
  * distintas, y conviene saberlo porque cada una se puede romper por su lado:
  *  1. **Ajuste, traspaso y salida sin orden** (`avios.ts`): lo impide
  *     {@link validarRenglonesAvioUnicos} — rechaza el mismo avío repetido en la captura.
@@ -832,7 +832,13 @@ interface FiltrosSaldoAnteriorAvio {
  *     `@@unique([idInventarioCiclico, idAvio])` de la BASE DE DATOS — el avío no se puede contar dos
  *     veces en el mismo conteo, así que el movimiento no puede traerlo repetido.
  *
- * ⇒ **Si mañana aparece un séptimo escritor multi-línea que no pase por ninguna de las tres, esta
+ * 📌 **Hay un séptimo sitio que escribe la tabla, y es DERIVADO: la cancelación** (`comun/kardex.ts`
+ * copia `original.detallesAvio` 1:1 en el movimiento inverso). No abre camino nuevo —no puede
+ * duplicar lo que el original no traía—, pero se nombra porque en una enumeración cuyo valor ES la
+ * completitud, quien la audite se topa con él y cree haber encontrado el fallo. Lo cazó el reviewer
+ * de la 0.173 haciendo justo esa auditoría.
+ *
+ * ⇒ **Si mañana aparece un octavo escritor multi-línea que no pase por ninguna de las tres, esta
  * afirmación se vuelve falsa y NADA suena.** Quien lo añada tiene que venir aquí: o le pone su
  * guarda, o este párrafo deja de ser cierto y el desempate pasa a necesitar prueba propia.
  *
