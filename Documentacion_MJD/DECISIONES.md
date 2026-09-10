@@ -12241,6 +12241,80 @@ después). El proveedor se identifica por **RFC**, no por razón social.
 
 ---
 
+#### (Post-F9.225) — LA VENTANA DE CAPTURA DE LA FECHA REAL DE RUTA CRÍTICA (fila 0.175, 10-sep-2026): lo que dijo el Access, y la pregunta que queda
+
+⏳ **ESTA SECCIÓN TIENE UNA PREGUNTA ABIERTA PARA DANIEL.** Lo demás ya está medido y construido; lo
+que falta es **un número**, y cambiarlo es una línea.
+
+**De dónde nace.** La **fecha real de cumplimiento** de un proceso de Ruta Crítica —la que alimenta el
+KPI de puntualidad (D11)— llegaba del cliente **sin ninguna validación**: ni ventana de días, ni la
+regla «nunca una fecha futura», ni permiso. Existían **dos** permisos para gobernarla
+(`rc.fecha-libre-cumplimiento` y `rc.fechas-retraso`) y **ninguno de los dos gobernaba nada**.
+
+⭐ **LO QUE DECIDIÓ EL DISEÑO NO FUE EL CRITERIO DE NADIE: FUE EL ACCESS.** Se prohibió expresamente
+elegir un esquema de «dos niveles de permiso» por el hecho de que los nombres lo sugirieran —eso es
+suponer intención—. La evidencia se buscó y se encontró en la rama `origin/fuente-sistema-viejo` (la
+carpeta `Respaldo CLAUDE/` ya no está en el árbol; se lee con `git show`, encoding **CP850**).
+
+`RC_MeterDatosDet.txt:392`, procedimiento `FechaReal_AfterUpdate`:
+
+```vba
+If PrP(10) = True Then            ' con la llave: cualquier fecha, sin límite
+   Me.IdUsuario = IdUsuarioACT
+Else
+  If WeekDay(Date) = vbMonday Then   QueFechaHoy = Date - 2
+  ElseIf WeekDay(Date) = vbTuesday Then QueFechaHoy = Date - 2
+  Else QueFechaHoy = Date
+  End If
+  If FechaReal + 2 < QueFechaHoy Then
+   MsgBox "No puedes meter una fecha con mas de dos dias de retrazo. Para poder meterla, pidele al Administrador."
+```
+
+**Las cuatro medidas que salen de ahí, verificadas por dos agentes por separado:**
+1. **Era UNA puerta, no dos.** Un solo `If`, un solo permiso ⇒ el esquema de dos niveles queda
+   descartado **por medición**.
+2. **El acceso #35 ya estaba muerto en Access.** Censo de **todos** los `PrP(n)` en los 594 archivos
+   del volcado: `PrP(35)` **no aparece ni una vez**; `PrP(10)` aparece **sólo** en ese sitio. El
+   `.mdb` binario tampoco lo contiene. Se le concedía a tres personas y **no lo leía nada**.
+   *(`Constantes.txt:16` declara `PrP(50)`: el índice existía y nunca se preguntaba.)*
+3. **El número 2 es literal** (`FechaReal + 2 < QueFechaHoy`).
+4. **No había regla de fecha futura**: aquel `If` sólo miraba el retraso.
+
+**Qué se construyó** (v0.139): ventana de **2 días** en la constante `DIAS_VENTANA_CAPTURA_RC`
+(un solo sitio) + `rc.fecha-libre-cumplimiento` como la llave que la levanta, reusando el molde
+compartido `comun/fecha-capturable.ts` que ya usan el inventario de PT e Indicadores.
+`rc.fechas-retraso` **se conserva** —retirarla haría desaparecer su casilla dejando 8 concesiones
+vivas que nadie podría quitar— y **su descripción dice que no gobierna nada**, ahí donde alguien la
+palomea.
+
+---
+
+### ⏳ LA PREGUNTA PARA DANIEL
+
+> **¿Cuántos días hacia atrás puede fecharse el cumplimiento de un proceso de Ruta Crítica sin el
+> permiso de fecha libre?**
+
+**Default propuesto: 2 días** — lo que hacía el sistema viejo y lo que dice el nombre del permiso.
+
+⚠️ **Con un matiz medido que puede cambiar la respuesta: el Access contaba 2 días HÁBILES, no de
+calendario.** Los lunes y martes estiraba la referencia para que el fin de semana no se comiera la
+ventana. En números: **en lunes, el más viejo que entraba era el JUEVES** —así que el viernes cabía de
+sobra—. Con **2 días de calendario, un lunes sólo alcanza el sábado y el viernes queda fuera.**
+
+- Si basta con la regla simple: **2**.
+- Si se quiere que en el peor caso funcione como el viejo (poder capturar en lunes el trabajo del
+  viernes, y del jueves): **4**.
+
+**Es una línea** (`DIAS_VENTANA_CAPTURA_RC`). Implementar días hábiles de verdad **no** lo es: el
+calendario laboral de RC es una lectura asíncrona y la guarda corre antes de la transacción.
+
+📌 **Y el contexto que hace que el número no corra prisa:** medido, **los 8 perfiles de 9 que pueden
+capturar llevan también la llave para saltarse la ventana** (todos menos `Basico`) ⇒ **hoy el candado
+no le cierra a nadie**. El número empieza a morder el día que se recorten los perfiles, que es
+decisión de Daniel (precedente: fila 0.128).
+
+---
+
 #### (Post-F9.224) — LA CARGA DE APERTURA DESDE SINUBE (fila 0.131, 8-sep-2026): cómo se lee el archivo, qué se carga y qué ABORTA
 
 **De dónde nace.** Daniel quiere **apagar SINUBE**, y para eso hay que meter al sistema los **saldos

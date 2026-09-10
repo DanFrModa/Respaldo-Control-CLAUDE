@@ -60,6 +60,8 @@ const PERM_TODOS: ClavePermiso[] = [
   'inventario-pt.ver',
   'esma.cargo-validar',
   'rc.capturar',
+  // Fila 0.175: la captura manual de más abajo fecha un día concreto de 2026, fuera de la ventana.
+  'rc.fecha-libre-cumplimiento',
   'rc.ruta-ver',
   'roles.administrar',
 ];

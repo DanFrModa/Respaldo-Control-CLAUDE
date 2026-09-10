@@ -79480,7 +79480,7 @@ export interface paths {
             cumplido: boolean;
             /**
              * Format: date
-             * @description Fecha real de cumplimiento (YYYY-MM-DD); por defecto hoy. Ignorada al revertir.
+             * @description Fecha real de cumplimiento (YYYY-MM-DD); por defecto hoy. Ignorada al revertir. Sólo se admiten los últimos días de la ventana de captura y nunca una fecha futura; para cualquier otra hace falta el permiso rc.fecha-libre-cumplimiento.
              */
             fechaReal?: string;
           };

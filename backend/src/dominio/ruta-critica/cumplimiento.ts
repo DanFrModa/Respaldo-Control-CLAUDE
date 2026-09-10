@@ -17,19 +17,77 @@
  * VALIDACIÓN de captura (server-side, A4): además del permiso `rc.capturar`, quien captura debe tener
  * ALGUNO de sus roles entre los roles RESPONSABLES del proceso (`ProcesoDefRol`, N:M). El admin
  * (`roles.administrar`) puede capturar cualquier proceso (mismo criterio de "marcador admin" que
- * `generaEntradaPt` en tipos-proceso / la edición de OC autorizada en compras).
+ * `generaEntradaPt` en tipos-proceso / la edición de OC autorizada en compras). Y desde la fila
+ * 0.175, la FECHA que se captura pasa además por su propia ventana — ver
+ * {@link DIAS_VENTANA_CAPTURA_RC}: hasta entonces `fechaReal` entraba del cliente sin filtro alguno,
+ * siendo la base del KPI de puntualidad (D11).
  *
  * Innegociables: A1 (lógica aquí), A2 (transacción), A7 (bitácora + `datosModificacion`).
  */
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocioUtc, verificarFechaCapturable } from '../../comun/fecha-capturable.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
-/** Fecha de hoy a medianoche UTC (sin hora). */
-function hoyUtc(): Date {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
+/**
+ * Días hacia atrás que puede fechar un cumplimiento quien NO tiene
+ * `rc.fecha-libre-cumplimiento`. **Cambiar la ventana es cambiar este número, y sólo éste.**
+ *
+ * ⏳ **2 sale del sistema viejo, no de una suposición.** Es literal el umbral que gobernaba la
+ * captura en Access —`RC_MeterDatosDet`, `FechaReal_AfterUpdate`, línea 392 del volcado—:
+ *
+ * ```vba
+ * If PrP(10) = True Then          ' con la llave: cualquier fecha, sin límite
+ * Else
+ *   If FechaReal + 2 < QueFechaHoy Then
+ *     MsgBox "No puedes meter una fecha con mas de dos dias de retrazo..."
+ * ```
+ *
+ * y es el mismo 2 que lleva escrito en su nombre el acceso #10 del catálogo viejo (*«Se puede meter
+ * las fechas con mas de 2 dias de retrazo»*), hoy `rc.fechas-retraso`.
+ *
+ * 🔴 **PERO OJO — el viejo contaba 2 días HÁBILES, no 2 de calendario, y esto no.** El mismo
+ * `AfterUpdate` corría la referencia hacia atrás los lunes y martes (`QueFechaHoy = Date - 2`) para
+ * que el fin de semana no se comiera la ventana: **en lunes se podía fechar hasta el jueves**. Con
+ * los 2 días de calendario de aquí, un lunes sólo alcanza al sábado y **el trabajo del viernes ya
+ * no se puede capturar sin la llave**. Es el único caso que el viejo se molestó en tratar aparte,
+ * así que alguien lo vivió. **La ventana definitiva la contesta Daniel**; si la quiere igual que el
+ * viejo en su peor caso, el número es **4** y es esta línea.
+ */
+export const DIAS_VENTANA_CAPTURA_RC = 2;
+
+/**
+ * LA VENTANA DE CAPTURA de la fecha real de cumplimiento — la guarda que faltaba (fila 0.175).
+ *
+ * `fechaReal` es la **base del KPI de puntualidad (D11)** y hasta esta fila entraba del cliente sin
+ * un solo filtro: ni ventana, ni la regla «nunca el futuro», ni permiso. `rc.fecha-libre-cumplimiento`
+ * llevaba sembrado desde F5 en ocho perfiles **sin un solo llamador** —una llave repartida con
+ * cuidado, de una puerta que no existía—. Aquí nace la puerta.
+ *
+ * Es el MISMO molde que el inventario de PT (`movimientos-pt.ts`) e Indicadores
+ * (`indicadores/fechas.ts`): una sola frase —*sin la llave, sólo los últimos N días y nunca el
+ * futuro*— escrita una vez en `comun/fecha-capturable.ts`. Lo único propio de la RC es el N.
+ *
+ * ⚠️ **Lo del futuro es NUEVO respecto al viejo, y a propósito:** aquel `AfterUpdate` sólo miraba el
+ * retraso, así que aceptaba una fecha futura sin chistar. Un proceso «cumplido» mañana envenena el
+ * KPI de D11 —sale a tiempo algo que no ha pasado—, y el molde compartido ya lo rechaza.
+ *
+ * 🔴 **Y hay que decirlo aquí, pegado a la guarda: con el seed de HOY esta puerta no le cierra a
+ * nadie.** Medido importando `definirRoles()` (no leyendo el archivo): de los 9 perfiles, **OCHO**
+ * llevan `rc.capturar` —`Administrador` y `AdministracionDireccion`, que reciben el catálogo
+ * ENTERO (`seed.ts:879-890`), más `Directivo`, `Gerencial`, `Ventas`, `Logística`, `Asistente` y
+ * `Secretarial`—, y **los OCHO llevan también `rc.fecha-libre-cumplimiento`**: los que capturan sin
+ * la llave son **CERO**. Es herencia de la cascada del sistema viejo, el mismo defecto que las
+ * filas 0.105/0.128 vienen podando de a uno, y calcado del gemelo de PT. El MECANISMO ya existe
+ * (que es lo que faltaba); a QUIÉN se le quita la llave es una decisión de perfiles que le toca a
+ * Daniel, no a esta fila.
+ */
+function verificarFechaCumplimientoRc(sesion: SesionUsuario, fecha: Date): void {
+  verificarFechaCapturable(sesion, fecha, {
+    permiso: 'rc.fecha-libre-cumplimiento',
+    dias: DIAS_VENTANA_CAPTURA_RC,
+  });
 }
 
 /**
@@ -167,9 +225,16 @@ async function activarSucesoresListos(tx: Tx, idRutaCompletado: number): Promise
  * proceso, cierra la RC de la orden. Transaccional (A2), auditado (A7). Exige `rc.capturar` + rol
  * responsable (o admin).
  *
+ * La fecha pasa por {@link verificarFechaCumplimientoRc} ANTES de abrir la transacción — mismo
+ * orden que el inventario de PT (`registrarMovimientoPt`): una fecha fuera de la ventana se rechaza
+ * sin gastar un viaje a la base. `rc.capturar` y el rol responsable los sigue exigiendo
+ * {@link exigirCapturaProceso} dentro (y el `preHandler` de la ruta antes que nadie); los dos
+ * rechazos son `ErrorPermiso`, así que por HTTP se ven igual (403).
+ *
  * @param sesion       quién captura.
  * @param idRutaOrden  renglón de ruta (proceso×orden) a completar.
- * @param fechaReal    fecha de cumplimiento (default: hoy UTC).
+ * @param fechaReal    fecha de cumplimiento (default: hoy del NEGOCIO). Sujeta a la ventana de
+ *                     captura salvo con `rc.fecha-libre-cumplimiento`.
  * @param bd           contexto de BD opcional.
  */
 export async function completarProceso(
@@ -178,11 +243,13 @@ export async function completarProceso(
   fechaReal?: Date,
   bd?: ContextoBd,
 ): Promise<number> {
+  const fecha = fechaReal ?? hoyDelNegocioUtc();
+  verificarFechaCumplimientoRc(sesion, fecha);
+
   return enTransaccion(async (tx) => {
     const renglon = await exigirCapturaProceso(tx, sesion, idRutaOrden);
     // Serializa todas las capturas de ESTA orden (race de activación de sucesores).
     await bloquearCapturasDeOrden(tx, renglon.idEmpresa, renglon.idOrden);
-    const fecha = fechaReal ?? hoyUtc();
 
     await tx.rutaOrden.update({
       where: { id: renglon.id },
@@ -381,7 +448,12 @@ export async function marcarChecklistItem(
     const todoHecho = items.length > 0 && items.every((i) => i.hecho);
 
     if (todoHecho && renglon.estado !== 'completado') {
-      const fecha = hoyUtc();
+      // Fecha del SERVIDOR (nadie la teclea) → no pasa por la ventana de captura; pero es la MISMA
+      // columna `fechaReal` que alimenta el KPI de D11, así que se ancla en el día del NEGOCIO y no
+      // en el UTC (fila 0.174): el servidor corre en UTC y quien captura está en México (−06:00),
+      // de modo que entre las 18:00 y las 23:59 de allá el día UTC ya iba adelantado y el
+      // cumplimiento quedaba fechado MAÑANA.
+      const fecha = hoyDelNegocioUtc();
       // Lo completó el SISTEMA (todos los ítems hechos), no una captura manual de fecha → 'evento'
       // (igual que la duración-0 de E3). Así, al desmarcar un ítem, la reversión SOLO toca procesos
       // auto-completados (origenCaptura !== 'manual') y NUNCA pisa una completación manual.

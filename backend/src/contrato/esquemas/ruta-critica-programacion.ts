@@ -120,7 +120,11 @@ export const esquemaCapturarProceso = z
     fechaReal: z.iso
       .date({ error: 'La fecha real debe ser YYYY-MM-DD' })
       .optional()
-      .describe('Fecha real de cumplimiento (YYYY-MM-DD); por defecto hoy. Ignorada al revertir.'),
+      .describe(
+        'Fecha real de cumplimiento (YYYY-MM-DD); por defecto hoy. Ignorada al revertir. Sólo se ' +
+          'admiten los últimos días de la ventana de captura y nunca una fecha futura; para ' +
+          'cualquier otra hace falta el permiso rc.fecha-libre-cumplimiento.',
+      ),
   })
   .describe('Captura o reversión del cumplimiento de un proceso de la ruta viva.');
 /** Datos validados de captura de cumplimiento. */
