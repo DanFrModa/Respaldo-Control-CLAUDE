@@ -64271,6 +64271,8 @@ export interface paths {
                 mas60: number | null;
                 /** @description Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte). */
                 maquila: number | null;
+                /** @description Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. NO es importe: no se oculta con ver-importes. */
+                diasVencidos: number | null;
                 /** @description Maquila (EsMa) que aún espera una decisión: lo capturado sin revisar MÁS los cargos propuestos (los que esperan que alguien fije cantidad y precio). No suma al saldo, pero se ve. Es la razón por la que un maquilero con saldo 0 puede seguir en la bandeja (§Post-F9.188a) — incluido el que sólo tiene cargos por validar (V1, fila 0.111). */
                 maquilaPorRevisar: {
                   /** @description Σ abonos capturados sin revisar (o null). */

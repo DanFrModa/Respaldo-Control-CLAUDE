@@ -160,6 +160,10 @@ export type BandejaCxpQuery = z.infer<typeof esquemaBandejaCxpQuery>;
  * que NO tiene antigüedad por ítem y por eso va en cubeta aparte (no en "corriente" en silencio). Se
  * cumple `saldo = corriente + d1a30 + d31a60 + mas60 + maquila` (los abonos/pagos del motor netean, de
  * más viejo a más nuevo). Todos los importes viajan en null si se ocultan (`consultas.ver-importes`).
+ *
+ * ⭐ Y `diasVencidos` (fila 0.186), que NO es un importe y por eso NO se oculta: es la única columna
+ * de antigüedad que cubre TAMBIÉN la maquila, así que un maquilero puro —cuyas cuatro cubetas son 0
+ * porque sus tablas no tienen vencimiento— sí trae edad.
  */
 export const esquemaBandejaCxpFila = z
   .object({
@@ -176,6 +180,31 @@ export const esquemaBandejaCxpFila = z
       .number()
       .nullable()
       .describe('Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte).'),
+    /**
+     * ⭐ **DÍAS VENCIDOS** (fila 0.186, sobre el cálculo de la 0.121) — los días que lleva vencido el
+     * cargo MÁS VIEJO que sigue sin pagarse. **DANIEL (fila 0.186),** cuando se le preguntó si la
+     * bandeja debía enseñarlos o dejar de calcularlos: *«sí, un campo de días vencidos sí»*.
+     *
+     * `null` = no hay nada que envejecer (no debe, o los pagos ya lo cubrieron) · `0` = debe pero
+     * está dentro de su plazo · `n` = su cargo más viejo lleva `n` días vencido.
+     *
+     * ⚠️ A diferencia de las cuatro cubetas —que son del motor y por eso dejan fuera la maquila—
+     * este número **cubre las dos fuentes**: es el único dato de antigüedad que un maquilero tiene,
+     * y por eso la fila de un maquilero puro deja de venir sin edad.
+     *
+     * ⚠️ **NO es un importe: NO se oculta con `consultas.ver-importes`** — es el MISMO trato que ya
+     * le da la corrida semanal (`esquemaFilaCorridaSalida`), y la razón es que saber que algo lleva
+     * 30 días vencido no revela cuánto es. Si aquí se ocultara y allá no, el mismo proveedor
+     * contaría dos historias distintas a un usuario sin ese permiso.
+     */
+    diasVencidos: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del ' +
+          'plazo; null = nada que envejecer. NO es importe: no se oculta con ver-importes.',
+      ),
     maquilaPorRevisar: esquemaPendienteRevisionEsMa.describe(
       'Maquila (EsMa) que aún espera una decisión: lo capturado sin revisar MÁS los cargos ' +
         'propuestos (los que esperan que alguien fije cantidad y precio). No suma al saldo, pero ' +

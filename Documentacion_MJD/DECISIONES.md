@@ -12241,6 +12241,122 @@ después). El proveedor se identifica por **RFC**, no por razón social.
 
 ---
 
+#### (Post-F9.226) — LAS RESPUESTAS DE DANIEL DE LA MADRUGADA DEL 10-SEP-2026: Ruta Crítica sale de V1, y seis decisiones más
+
+**De dónde nace.** El lead le entregó a Daniel la lista de lo que faltaba de él para V1 y **siete
+preguntas cortas con su default**. Las contestó todas. Dos de las respuestas **cambian el alcance** y
+una **desmiente una versión que se acababa de entregar**.
+
+---
+
+### 🔴 (a) RUTA CRÍTICA COMPLETA SALE DE V1
+
+> **Daniel, textual:** *«La ruta crítica completa va después de V1. Ya quiero salir con la primera
+> versión. Eso puede ser para la segunda.»*
+
+**Qué mueve:** la fila **0.184** (el último `hoyUtc()` que escribe en `fechaReal`) y la **0.185** (la
+ventana en días hábiles) quedan **aparcadas a post-V1**.
+
+⚠️ **Y lo que hay que decir sin adornos:** la versión **0.139**, mergeada 40 minutos antes de esta
+decisión, **era de Ruta Crítica**. Con esto, **no hacía falta para arrancar**. Es el ejemplo más limpio
+de que se pueden producir versiones indefinidamente sin acercar el arranque un solo día.
+
+📌 **Lo que NO se movió, y se midió para no pasarse:** el primer barrido del lead marcó como Ruta
+Crítica la fila de la fecha de las órdenes de compra (**0.179**) y la de los permisos (**0.120**), y
+**ninguna lo es**. Siguen dentro de V1.
+
+---
+
+### (b) LA VENTANA DE CAPTURA: 2 DÍAS HÁBILES, NO DE CALENDARIO
+
+> *«De entrada yo fecharía 2 días hábiles máximo hacia atrás. No sé si 1.»*
+
+Coincide con lo que hacía el Access (§Post-F9.225). 🔴 **Pero la v0.139 entregó 2 días de CALENDARIO**,
+y un **lunes** eso llega al **sábado**: **el viernes queda fuera**. ⇒ fila **0.185**, post-V1 por (a).
+
+---
+
+### (c) LA FECHA DE LA ORDEN DE COMPRA: LA DEL DÍA EN QUE SE HACE
+
+> *«Lo de las órdenes de compra. Es irrelevante. Pon la fecha que sea. Yo dejaría la del día que se
+> hace. Aunque sea en la tarde.»*
+
+⇒ **Es exactamente lo que arregla la fila 0.179**: hoy `hoyColumna()` sella con el día **UTC**, así que
+una OC levantada después de las 18:00 de México **nace fechada mañana**. Comportamiento **confirmado
+por el dueño**; prioridad **baja**.
+
+⚠️ **Y una aclaración que hubo que darle porque la pregunta estaba mal hecha:** él respondió temiendo
+que se le fuera a **restringir** capturar de noche (*«no quisiera que fuera una restricción por que a
+veces se podría llevar trabajo a su casa»*). **No se propone bloquear nada.** ⭐ Y su frase aporta un
+dato de negocio que no estaba escrito: **sí se captura de noche y desde casa**, lo que refuerza que el
+arreglo del huso (v0.137) no era teórico.
+
+---
+
+### (d) DOS COMPRADORES SOBRE EL MISMO MATERIAL A LA VEZ: CASI IMPOSIBLE
+
+> *«No, casi imposible.»*
+
+⇒ La fila **0.183** (la colisión de llave en la explosión de materiales) **NO sube a bloquea**: se
+queda en *duele*. Era la única condición que la habría escalado, porque el caso medido —el precio
+tecleado para un color apareciendo en el campo de otro— sólo se dispara si la lista cambia de miembros
+entre dos repintados.
+
+---
+
+### (e) «DÍAS VENCIDOS» EN LA BANDEJA DE CxP: SÍ
+
+> *«Sí, un campo de días vencidos sí.»*
+
+⇒ fila **0.186**, entregada en la **v0.140**. El número es **la edad de la factura más vieja que sigue
+sin pagarse** (no un promedio), y cuesta ~2-3× la consulta de la bandeja — medido, y aceptado a cambio
+de enseñarlo.
+
+---
+
+### (f) «EXISTENCIAS POR LOTE (LEGADO)»: SE QUEDA
+
+Daniel no la contestó: **preguntó de vuelta** (*«no entiendo por qué él también… ¿qué más se
+retiró?»*), y con razón — la pregunta daba por supuesto un contexto que él no tenía. Se le explicó que
+lo retirado fueron las **tres puertas que ESCRIBÍAN** en el flujo viejo de tela (el ajuste en agosto,
+el traspaso en la 0.098, la salida a orden en la 0.170), y que esta cuarta **sólo lee**.
+
+⇒ **Se queda, y ya no hace falta que lo decida:** la medición de la 0.176 lo zanjó — es **la única
+ventana que queda al histórico migrado de Access**, y no tiene reemplazo.
+
+---
+
+### 🔴 (g) LA CARGA DE SINUBE: SE DEJA COMO ESTÁ, Y HAY QUE SABER QUE NADIE AVISARÁ SI ESTÁ MAL
+
+Preguntado por las dos dudas de dinero de §Post-F9.224:
+
+> *«1. Sí, ya viene con las notas de crédito descontadas. 2. Sí. Número.»*
+> Y después: *«Lo de sinube. Déjalo como lo tienes ahorita. Vamos usándolo y vemos si hay que ajustar
+> algo.»*
+
+✅ **La segunda cierra:** el `Saldo` sale siempre numérico ⇒ la guarda que **aborta** con texto se queda
+como red y **no se disparará nunca**. Sin cambios.
+
+⚠️ **La primera se le repreguntó con un ejemplo numérico y él decidió no afinarla.** Se respeta. Pero
+queda escrito **por qué importaba y qué la vigila**:
+- Si la factura **ya viene neta** y la nota **sigue apareciendo con saldo**, cargarla **resta dos
+  veces** ⇒ el saldo sale **más bajo** y **se paga de menos**.
+- Si se quitan y una nota **no estaba aplicada**, el saldo sale **más alto** y **se paga de más**.
+- 🔴 **Y no hay dato empírico: el archivo de muestra medido tenía 98 renglones y NINGUNA nota de
+  crédito.** El default se tomó sin un solo caso observado.
+
+🔴 **LO QUE HAY QUE SABER, Y ES LO IMPORTANTE DE ESTA ENTRADA: el reporte de cuadre NO puede cazarlo.**
+Está escrito en el propio cargador (`sinube-apertura.ts:574`): *«el listado de SINUBE **no declara un
+total por proveedor**: el cuadre lo deriva sumando»* ⇒ **el reporte suma lo que él mismo cargó y
+estaría de acuerdo consigo mismo.** Un doble descuento saldría «cuadrado».
+
+⇒ **El chequeo que SÍ funciona, y cuesta dos minutos:** el día que se corra la carga, **abrir SINUBE y
+comparar el saldo de tres o cuatro proveedores contra lo que diga el sistema**. Si cuadran, cerrado
+para siempre; si no, se ajusta antes de operar. ✅ **Hoy no hay daño posible: el ETL de apertura NO se
+ha corrido nunca** — se corre el día del arranque.
+
+---
+
 #### (Post-F9.225) — LA VENTANA DE CAPTURA DE LA FECHA REAL DE RUTA CRÍTICA (fila 0.175, 10-sep-2026): lo que dijo el Access, y la pregunta que queda
 
 ⏳ **ESTA SECCIÓN TIENE UNA PREGUNTA ABIERTA PARA DANIEL.** Lo demás ya está medido y construido; lo

@@ -165149,6 +165149,19 @@
                             ],
                             "description": "Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte)."
                           },
+                          "diasVencidos": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días que lleva vencido el cargo más viejo sin pagar (motor + maquila); 0 = dentro del plazo; null = nada que envejecer. NO es importe: no se oculta con ver-importes."
+                          },
                           "maquilaPorRevisar": {
                             "type": "object",
                             "properties": {
@@ -165251,6 +165264,7 @@
                           "d31a60",
                           "mas60",
                           "maquila",
+                          "diasVencidos",
                           "maquilaPorRevisar"
                         ],
                         "additionalProperties": false,

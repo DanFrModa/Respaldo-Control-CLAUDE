@@ -4,6 +4,7 @@
  * fast-refresh).
  */
 import type { CorridaResumen, FilaCorrida, RenglonCorrida, TotalesPago } from '@/api/tipos';
+import { textoDiasVencidos as redactarDiasVencidos } from '@/modulos/cxp/comun';
 
 /**
  * Formatea un importe en pesos (o "—" si es `null`). El servidor manda `null` cuando el usuario NO
@@ -115,32 +116,23 @@ export function textoReferencia(fila: FilaCorrida): string {
 }
 
 /**
- * ⭐ LOS DÍAS VENCIDOS de una fila, como TEXTO de su celda (fila 0.121).
+ * ⭐ LOS DÍAS VENCIDOS de una fila de la corrida, como TEXTO de su celda (fila 0.121).
  *
  * **DANIEL (§Post-F9.218(a)):** *«Es irrelevante [los tramos]. Ni siquiera veo eso. **Solo con que
  * pongas los días vencidos es suficiente**.»* Así que aquí no hay cubetas ni semáforo por rango:
  * hay un número.
  *
- * Los tres estados dicen cosas DISTINTAS y por eso no se colapsan en uno:
- *  • `null` → **«—»**: no hay nada que envejecer (no debe, o los pagos ya lo cubrieron);
- *  • `0` → **«al día»**: sí debe, pero está dentro de su plazo;
- *  • `n > 0` → **«n d»**: su cargo más viejo sin pagar lleva `n` días vencido.
- *
- * ⚠️ Un «0» a secas se leería como «no debe nada», que es justo lo contrario de lo que significa.
- * Y el número lo calcula el SERVIDOR (A1: nada de restar fechas en el cliente); aquí sólo se
- * redacta. Los conceptos del catálogo no tienen cuenta corriente: su celda va vacía.
+ * 🔑 **La redacción NO se escribe aquí** (fila 0.186): sale de `modulos/cxp/comun.ts`, que es la
+ * definición única desde que la BANDEJA de CxP enseña la misma columna. Lo único propio de la
+ * corrida es el caso que la bandeja no tiene: **los conceptos del catálogo no tienen cuenta
+ * corriente**, así que su celda va vacía (ni siquiera «—», que significaría «no debe nada»).
+ * Si mañana «al día» cambia de palabras, cambia en las dos pantallas a la vez o en ninguna.
  */
 export function textoDiasVencidos(fila: FilaCorrida): string {
   if (fila.origen === 'concepto') {
     return '';
   }
-  if (fila.diasVencidos === null) {
-    return '—';
-  }
-  if (fila.diasVencidos === 0) {
-    return 'al día';
-  }
-  return `${String(fila.diasVencidos)} d`;
+  return redactarDiasVencidos(fila.diasVencidos);
 }
 
 /**
