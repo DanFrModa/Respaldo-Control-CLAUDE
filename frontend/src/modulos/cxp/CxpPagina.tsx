@@ -22,7 +22,14 @@ import {
 } from '@/modulos/esma/comun';
 import { useSesion } from '@/sesion/useSesion';
 
-import { celdaAging, esSegmentoCxp, moneda, TITULOS_SEGMENTO_CXP, type SegmentoCxp } from './comun';
+import {
+  celdaAging,
+  esSegmentoCxp,
+  moneda,
+  textoDiasVencidos,
+  TITULOS_SEGMENTO_CXP,
+  type SegmentoCxp,
+} from './comun';
 
 /**
  * Celda «Por revisar» de una fila: vacía si no hay nada capturado sin revisar (el 99 % de las filas).
@@ -301,6 +308,24 @@ export function CxpPagina(): React.JSX.Element {
                       <span className="num shrink-0 font-semibold">{moneda(f.saldo)}</span>
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      {/*
+                        ⭐ Fila 0.186 — los días vencidos TAMBIÉN en la tarjeta: en teléfono ésta es
+                        la única superficie que existe, y una columna que sólo aparece en escritorio
+                        es una columna que no está.
+                      */}
+                      <span className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Días venc.</span>
+                        <span
+                          data-testid={`cxp-tarjeta-dias-vencidos-${f.idProveedor}`}
+                          className={
+                            f.diasVencidos !== null && f.diasVencidos > 0
+                              ? 'num font-medium text-destructive'
+                              : 'num text-muted-foreground'
+                          }
+                        >
+                          {textoDiasVencidos(f.diasVencidos)}
+                        </span>
+                      </span>
                       <span className="flex justify-between gap-2">
                         <span className="text-muted-foreground">Corriente</span>
                         <span className="num">{celdaAging(f.corriente)}</span>
@@ -342,6 +367,17 @@ export function CxpPagina(): React.JSX.Element {
                     <TablaDensaFila>
                       <TablaDensaHead>Proveedor</TablaDensaHead>
                       <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                      {/*
+                        ⭐ Fila 0.186 (DANIEL: «sí, un campo de días vencidos sí»). Va PEGADA al
+                        saldo —igual que en la corrida semanal— porque las dos se leen juntas:
+                        «debe tanto, desde hace tanto». Mismo encabezado y mismo title que allá.
+                      */}
+                      <TablaDensaHead
+                        numerica
+                        title="Días que lleva vencido el cargo más viejo sin pagar"
+                      >
+                        Días venc.
+                      </TablaDensaHead>
                       <TablaDensaHead numerica>Corriente</TablaDensaHead>
                       <TablaDensaHead numerica>1–{l1} d</TablaDensaHead>
                       <TablaDensaHead numerica>
@@ -377,6 +413,17 @@ export function CxpPagina(): React.JSX.Element {
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica className="font-semibold">
                           {moneda(f.saldo)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda
+                          numerica
+                          data-testid={`cxp-dias-vencidos-${f.idProveedor}`}
+                          className={
+                            f.diasVencidos !== null && f.diasVencidos > 0
+                              ? 'font-medium text-destructive'
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          {textoDiasVencidos(f.diasVencidos)}
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica>{celdaAging(f.corriente)}</TablaDensaCelda>
                         <TablaDensaCelda numerica className="text-warn">

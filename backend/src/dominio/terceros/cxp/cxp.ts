@@ -259,15 +259,18 @@ interface FilaAgregadoCxp {
  * Fila ya neteada: aging del MOTOR (4 cubetas) + la cubeta MAQUILA (aporte EsMa, que sigue SIN
  * repartirse en cubetas) + saldo combinado. Antes de ocultar importes.
  *
- * 🔴 **AQUÍ NO HAY `diasVencidos`, Y ES A PROPÓSITO (fila 0.166).** Esa columna cuesta DOS agregados
- * más (`diasVencidosPorProveedor`) y sólo la enseña la corrida semanal; la bandeja de CxP no la
- * expone en su contrato. Si el campo viviera en esta interfaz, la única forma de no pagar esos dos
- * `GROUP BY` sería dejarlo en `null`… y `null` **ya significa otra cosa**: «este proveedor no tiene
- * nada que envejecer». Un `null` de «no lo medí» y un `null` de «está al corriente» son
- * indistinguibles al leerlos, así que quien pintara la columna diría «al corriente» de alguien a
- * quien nadie midió. Por eso el número no es un campo opcional sino **otro tipo**
- * ({@link FilaNetaConDias}), que sólo devuelve la función que de verdad lo calcula: pedirlo sin
- * haberlo pedido no compila.
+ * 🔴 **AQUÍ SIGUE SIN HABER `diasVencidos`, Y SIGUE SIENDO A PROPÓSITO — aunque la bandeja ya lo
+ * enseñe (fila 0.186).** Lo que la 0.186 cambió es QUIÉN lo pide, no dónde vive: hoy lo piden la
+ * corrida semanal **y** la bandeja, las dos llamando a {@link carteraCombinadaConDiasVencidos} y
+ * pagando a sabiendas sus dos agregados. Esta interfaz es la de quien **no** los pagó, y sigue
+ * existiendo porque el argumento de la 0.166 no ha cambiado ni un ápice: si el campo viviera aquí,
+ * la única forma de no pagar esos dos `GROUP BY` sería dejarlo en `null`… y `null` **ya significa
+ * otra cosa**: «este proveedor no tiene nada que envejecer». Un `null` de «no lo medí» y un `null`
+ * de «está al corriente» son indistinguibles al leerlos, así que quien pintara la columna diría «al
+ * corriente» de alguien a quien nadie midió. Por eso el número no es un campo opcional sino **otro
+ * tipo** ({@link FilaNetaConDias}), que sólo devuelve la función que de verdad lo calcula: pedirlo
+ * sin haberlo pedido no compila. Quien mañana quiera una cartera sin días —un export, un KPI— la
+ * tiene aquí, y el compilador le impedirá enseñar una edad que nadie midió.
  */
 export interface FilaNeta extends CubetasAging {
   idProveedor: number;
@@ -525,8 +528,8 @@ export async function carteraCombinadaPorProveedor(
 }
 
 /**
- * ⭐ LA MISMA CARTERA, MÁS LOS DÍAS VENCIDOS — la que pide la corrida semanal de pagos, y **sólo
- * ella** (fila 0.166).
+ * ⭐ LA MISMA CARTERA, MÁS LOS DÍAS VENCIDOS — la que piden la corrida semanal de pagos **y la
+ * bandeja de CxP** (fila 0.186; hasta la 0.186 la pedía sólo la corrida).
  *
  * Es {@link carteraCombinadaPorProveedor} tal cual —mismo universo, mismos saldos, misma
  * segmentación— con una consulta más encima: el agregado de antigüedad
@@ -534,14 +537,26 @@ export async function carteraCombinadaPorProveedor(
  * cubetas a propósito**: las cubetas ya sumaron y perdieron la fecha de cada cargo, y este número
  * necesita saber CUÁL es el más viejo que sobrevive a los pagos. Cubre motor **y** maquila.
  *
- * 🔴 **Por qué es una función distinta y no una bandera.** La bandeja de CxP llamaba a la cartera y
- * pagaba estos dos agregados **en cada carga para tirar el resultado**: su contrato
- * (`esquemaBandejaCxpQuery`/`BandejaCxpFila`) no expone `diasVencidos` por ningún lado. Separarlas
- * quita ese trabajo de la bandeja sin tocar una sola cifra de las que enseña. Y se separan por el
- * TIPO —no por un parámetro con un campo que a veces viene— porque el `null` de este número **ya
- * está ocupado**: significa «no hay nada que envejecer». Un campo que unas veces se calcula y otras
- * llega en `null` convertiría «no lo medí» en «está al corriente», que es exactamente la mentira que
- * no se puede permitir en la columna con la que se decide a quién se le paga.
+ * 🔴 **Por qué sigue siendo una función distinta y no una bandera.** La 0.166 la separó porque la
+ * bandeja pagaba estos dos agregados **en cada carga para tirar el resultado** (su contrato no
+ * exponía `diasVencidos` por ningún lado). La 0.186 la volvió a juntar con la bandeja, pero al
+ * revés: ahora la bandeja **sí enseña** el número, así que lo paga a cambio de algo. Lo que NO
+ * cambió es que se separen por el TIPO y no por un parámetro con un campo que a veces viene, porque
+ * el `null` de este número **ya está ocupado**: significa «no hay nada que envejecer». Un campo que
+ * unas veces se calcula y otras llega en `null` convertiría «no lo medí» en «está al corriente», que
+ * es exactamente la mentira que no se puede permitir en la columna con la que se decide a quién se
+ * le paga.
+ *
+ * ⏱️ **LO QUE CUESTA, MEDIDO (fila 0.186)** — contra Postgres real, cartera completa sin segmentar:
+ * con 120 proveedores y 9.000 movimientos del motor la cartera pasa de **19 ms a 44 ms** (+26 ms);
+ * con 45.000, de **63 ms a 195 ms**; con 120.000, de **123 ms a 472 ms**. O sea: el sobrecosto es
+ * de ~2-3× y crece LINEAL con el histórico, porque el agregado de cargos agrupa por
+ * (proveedor × día de vencimiento) y ahí casi no hay nada que agrupar —cada cargo con fecha propia
+ * es su propio grupo—. A la escala de hoy son decenas de milisegundos y no se notan; el día que se
+ * noten, el arreglo NO es quitar la columna sino **pedir los días sólo para los proveedores de la
+ * PÁGINA** (se calculan después de ordenar y paginar, no entran en el orden ni en los KPIs), que
+ * baja el agregado de «toda la cartera» a ~25 proveedores. Está sin hacer a propósito: hoy sería
+ * complicar el código para ganar milisegundos que nadie percibe.
  *
  * Los días se reparten AL FINAL, sobre todas las filas ya armadas —las del motor y las que sólo
  * tienen maquila—: así el maquilero puro también los recibe, que es justo el caso de la fila 0.121.
@@ -574,11 +589,21 @@ export async function carteraCombinadaConDiasVencidos(
  * cubeta APARTE ("maquila"), que sigue **sin repartirse en las cuatro cubetas**: las tablas de EsMa
  * no tienen columna de vencimiento y las cubetas se agregan en SQL sobre una que sí existe.
  *
- * ⚠️ **Esta bandeja NO enseña los días vencidos, y por eso tampoco los calcula** (fila 0.166). La
- * columna de antigüedad que sí cubre la maquila (`diasVencidos`, fila 0.121) vive en la CORRIDA
- * semanal de pagos, que la pide con {@link carteraCombinadaConDiasVencidos}. Aquí no aparece en el
- * contrato (`BandejaCxpFila` no la lleva), así que pedirla sería pagar dos `GROUP BY` en cada carga
- * para tirar el resultado. Las cubetas se quedaron como estaban, a propósito.
+ * ⭐ **DÍAS VENCIDOS EN LA BANDEJA (fila 0.186).** Preguntado si la bandeja debía enseñar «Días
+ * venc.» o dejar de calcularlos, **DANIEL:** *«sí, un campo de días vencidos sí»*. Así que la
+ * bandeja pide la cartera CON días ({@link carteraCombinadaConDiasVencidos}) y paga sus dos
+ * agregados **a cambio de enseñarlos** — que es justo lo que la 0.166 no aceptaba, cuando se pagaban
+ * para tirar el resultado. Es la única columna de antigüedad que cubre TAMBIÉN la maquila: un
+ * maquilero puro tiene las cuatro cubetas en 0 (sus tablas no tienen vencimiento) y hasta hoy salía
+ * en la lista del viernes sin edad ninguna.
+ *
+ * ⚠️ **NO se oculta con `consultas.ver-importes`**: no es un importe, y es el mismo trato que le da
+ * la corrida semanal. Si aquí se ocultara y allá no, el mismo proveedor contaría dos historias
+ * distintas al mismo usuario.
+ *
+ * ⏱️ El sobrecosto está MEDIDO en {@link carteraCombinadaConDiasVencidos} (~2-3× la cartera, decenas
+ * de ms a la escala de hoy) junto con el arreglo que le tocaría el día que se note. Las cubetas se
+ * quedaron como estaban, a propósito: Daniel pidió un campo, no un rediseño del aging.
  *
  * ⭐ §Post-F9.188(a) (Daniel): un maquilero con TODO sin revisar NO desaparece de la bandeja. Su saldo
  * es 0 (al saldo sólo entra lo revisado, fila 0.115) pero la fila se queda, con su «por revisar»
@@ -619,7 +644,10 @@ export async function bandejaPorPagar(
   // gana el eco de `segmento`. Todo lo de abajo —los dos cortes, la búsqueda, el orden y la
   // paginación— es el MISMO código para los tres segmentos: lo único que cambia es el universo del
   // que parten.
-  const netas = await carteraCombinadaPorProveedor(
+  // ⭐ Fila 0.186 — CON días vencidos: la bandeja los enseña, así que los pide. El tipo cambia a
+  // `FilaNetaConDias`, que es el único donde `diasVencidos` existe; pedirlo sin haberlo pagado no
+  // compilaría (ver el doc de `FilaNeta`).
+  const netas = await carteraCombinadaConDiasVencidos(
     cliente,
     idEmpresa,
     limites,
@@ -663,6 +691,9 @@ export async function bandejaPorPagar(
     d31a60: oculto(f.d31a60),
     mas60: oculto(f.mas60),
     maquila: oculto(f.maquila),
+    // ⭐ Fila 0.186 — SIN `oculto`: los días NO son un importe (saber que algo lleva 30 días vencido
+    // no dice cuánto es), y es el mismo trato que ya le da la corrida semanal.
+    diasVencidos: f.diasVencidos,
     maquilaPorRevisar: pendienteParaSalida(f.maquilaPorRevisar, puedeVerImportes),
   }));
 

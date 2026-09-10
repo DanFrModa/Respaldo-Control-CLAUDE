@@ -11,8 +11,11 @@
  *  3. **Que el segmento LLEGA A LAS DOS FUENTES y el RESUMEN es el del segmento** — que es la mitad
  *     que de verdad importa: si los KPIs siguieran siendo los de la cartera completa, el listado
  *     "Sin factura" enseñaría un total que no es el suyo, y ese total es justo lo que se va a pagar.
- *  4. **Que la bandeja NO pide los DÍAS VENCIDOS** (fila 0.166): esa columna sólo la enseña la
- *     corrida semanal, y pedirla aquí eran dos `GROUP BY` por carga cuyo resultado se tiraba.
+ *  4. **Que la bandeja SÍ pide los DÍAS VENCIDOS y los ENSEÑA** (fila 0.186; **DANIEL:** *«sí, un
+ *     campo de días vencidos sí»*). Este punto medía lo contrario hasta la 0.186 —la 0.166 le había
+ *     quitado a la bandeja dos `GROUP BY` por carga cuyo resultado se tiraba— y se invirtió cuando
+ *     la columna entró al contrato. El criterio de la 0.166 no cambió: **no se paga por lo que no
+ *     se enseña**; lo que cambió es que ahora sí se enseña.
  *
  * ⚠️ Qué se dobla y qué NO (mismo criterio que `salida-produccion.test.ts`): se doblan las dos
  * FUENTES —el agregado SQL del motor y el aporte EsMa— y el resto corre de verdad: el netting del
@@ -325,24 +328,41 @@ describe('⭐ los DÍAS VENCIDOS se piden por el MISMO segmento que la cartera',
   });
 });
 
-// ── (5) Fila 0.166: la BANDEJA no paga lo que no enseña ───────────────────────────────────────────
-describe('⭐ la bandeja NO pide el agregado de días vencidos (fila 0.166)', () => {
+// ── (5) Fila 0.186: la BANDEJA sí paga la antigüedad, PORQUE AHORA LA ENSEÑA ─────────────────────
+describe('⭐ la bandeja PIDE el agregado de días vencidos y lo enseña (fila 0.186)', () => {
   /**
-   * `BandejaCxpFila` no lleva `diasVencidos` por ningún lado —esa columna vive en la CORRIDA—, así
-   * que hasta esta fila la bandeja corría DOS `GROUP BY` de más en cada carga para tirar el
-   * resultado. El doble de Postgres apunta en `ultimoSqlDias` la consulta de antigüedad: si vuelve a
-   * emitirse desde aquí, esta prueba se cae.
+   * 🔁 **ESTE BLOQUE ESTÁ INVERTIDO A PROPÓSITO.** Hasta la fila 0.186 medía lo contrario —«ninguno
+   * de los tres segmentos emite el SQL de antigüedad»—, y era correcto: `BandejaCxpFila` no llevaba
+   * `diasVencidos`, así que la bandeja corría DOS `GROUP BY` de más en cada carga **para tirar el
+   * resultado**, y la 0.166 se los quitó.
    *
-   * Que quitar ese trabajo NO movió una sola cifra lo siguen midiendo los tres casos del bloque (3)
-   * —filas, cartera, maquila y proveedores con saldo, segmento por segmento—: repetir aquí esas
-   * mismas aserciones no añadiría cobertura, sólo otro sitio que mantener.
+   * Lo que cambió no es el criterio sino el contrato: **DANIEL** (fila 0.186), preguntado si la
+   * bandeja debía enseñar «Días venc.» o dejar de calcularlos, contestó *«sí, un campo de días
+   * vencidos sí»*. El trabajo se paga igual que antes; la diferencia es que ahora se cobra en
+   * pantalla. El criterio de la 0.166 sigue vivo y sigue siendo el bueno: **no pagar por lo que no
+   * se enseña**.
+   *
+   * Por eso el guardarraíl no se borró: se dio la vuelta. Si alguien «optimizara» la bandeja
+   * devolviéndola a `carteraCombinadaPorProveedor`, dejaría de emitirse este SQL y la columna se
+   * quedaría muda — y eso es justo lo que estas dos pruebas no dejan pasar en silencio.
    */
-  it('EN NEGATIVO: ninguno de los tres segmentos emite el SQL de antigüedad', async () => {
+  it('los tres segmentos emiten el SQL de antigüedad (una vez por carga)', async () => {
     for (const parametros of [{}, { segmento: 'con' as const }, { segmento: 'sin' as const }]) {
       ultimoSqlDias = null;
       await bandejaPorPagar(SESION, parametros, clienteFalso());
-      expect(ultimoSqlDias).toBeNull();
+      expect(ultimoSqlDias).not.toBeNull();
     }
+  });
+
+  it('⭐ y el número LLEGA a la fila: no se pide para tirarlo', async () => {
+    // Emitir el SQL no basta —eso era exactamente el defecto que la 0.166 arregló—: lo que hace
+    // útil el gasto es que el dato aterrice en la fila que la pantalla pinta.
+    const bandeja = await bandejaPorPagar(SESION, {}, clienteFalso());
+    const hilaturas = bandeja.filas.find((f) => f.idProveedor === 7);
+    expect(hilaturas).toBeDefined();
+    expect(hilaturas?.diasVencidos).toBe(40);
+    // El maquilero sin cargos fechados se queda en `null` = «nada que envejecer», no en 0.
+    expect(bandeja.filas.find((f) => f.idProveedor === 9)?.diasVencidos).toBeNull();
   });
 });
 

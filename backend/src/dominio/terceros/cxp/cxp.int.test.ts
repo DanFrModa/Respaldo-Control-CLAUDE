@@ -1169,3 +1169,135 @@ describe('bandeja de CxP partida por segmento (con/sin factura)', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ (n) DÍAS VENCIDOS EN LA BANDEJA (fila 0.186)
+//
+// **DANIEL**, preguntado si la bandeja debía enseñar «Días venc.» o dejar de calcularlos:
+// *«sí, un campo de días vencidos sí»*. Hasta la 0.166 la bandeja pagaba los dos agregados de
+// `diasVencidosPorProveedor` **para tirar el resultado**, y por eso se los quitaron; ahora los paga
+// a cambio de enseñarlos.
+//
+// Lo que se mide aquí es lo que la 0.166 dejó fuera del contrato y esta fila mete: que el número
+// LLEGUE a la fila de la bandeja, con sus tres significados intactos y sin que el ocultamiento de
+// importes se lo lleve por delante.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('días vencidos en la bandeja de CxP (fila 0.186)', () => {
+  /** La fila de un proveedor en la bandeja (falla claro si no está, en vez de un `undefined` mudo). */
+  async function filaDe(idProveedor: number, permisos: ClavePermiso[] = PERM_TODOS) {
+    const bandeja = await bandejaPorPagar(sesion(permisos), { filtro: 'todos' }, bd());
+    const fila = bandeja.filas.find((f) => f.idProveedor === idProveedor);
+    if (fila === undefined) {
+      throw new Error(`El proveedor ${String(idProveedor)} no salió en la bandeja.`);
+    }
+    return fila;
+  }
+
+  it('el cargo vencido del MOTOR trae sus días (fecha + plazo del proveedor)', async () => {
+    // Cargo de hace 40 días con 5 días de crédito ⇒ venció hace 35.
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(40), origen: 'entrada_sin_factura', importe: 1000 },
+      bd(),
+    );
+    expect((await filaDe(proveedor.id)).diasVencidos).toBe(35);
+  });
+
+  it('⭐ el MAQUILERO PURO —cuatro cubetas en 0— sí trae edad: el hueco que la columna tapa', async () => {
+    // Sus cargos viven en EsMa, cuyas tablas NO tienen columna de vencimiento: las cubetas del motor
+    // no pueden clasificarlo y hasta hoy salía en la lista del viernes sin ninguna antigüedad.
+    const maquilero = await cliente.proveedor.create({
+      data: { modalidadFacturacion: 'ambos', nombre: 'Maquilas del Este', diasCredito: 0 },
+    });
+    const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Cliente Este' } });
+    const modelo = await cliente.modelo.create({ data: { codigo: 'MOD-E' } });
+    const pedido = await cliente.pedido.create({
+      data: { folio: 90n, idEmpresa: empresa.id, idCliente: clienteNegocio.id },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: 10, precio: 100 },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 90n,
+        idEmpresa: empresa.id,
+        idPedidoLinea: linea.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocio.id,
+      },
+    });
+    const tipoProceso = await cliente.tipoProceso.create({
+      data: { codigo: 'costura-e', nombre: 'Costura E', generaEntradaPt: true },
+    });
+    // Fechado hace 60 días: la fecha del renglón de EsMa es su `creadoEn` (la misma que enseña el
+    // estado de cuenta), y sin plazo capturado vence el mismo día.
+    await cliente.esMaCargo.create({
+      data: {
+        idEmpresa: empresa.id,
+        idMaquilero: maquilero.id,
+        idOrden: orden.id,
+        idTipoProceso: tipoProceso.id,
+        estado: 'validado',
+        cantidadReal: 10,
+        precioReal: 50,
+        conFactura: true,
+        creadoEn: new Date(`${hace(60)}T12:00:00.000Z`),
+      },
+    });
+
+    const fila = await filaDe(maquilero.id);
+    // Las cubetas del motor NO saben nada de él…
+    expect(fila).toMatchObject({ corriente: 0, d1a30: 0, d31a60: 0, mas60: 0, maquila: 500 });
+    // …y sin embargo la bandeja ya dice desde cuándo se le debe.
+    expect(fila.diasVencidos).toBe(60);
+  });
+
+  it('0 = debe pero está DENTRO de su plazo (no es lo mismo que no deber)', async () => {
+    // Cargo de hace 2 días con 5 de crédito: vence dentro de 3 ⇒ 0, nunca en negativo.
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(2), origen: 'entrada_sin_factura', importe: 1000 },
+      bd(),
+    );
+    expect((await filaDe(proveedor.id)).diasVencidos).toBe(0);
+  });
+
+  it('null = no queda nada que envejecer (el pago se lo comió todo)', async () => {
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(40), origen: 'entrada_sin_factura', importe: 1000 },
+      bd(),
+    );
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(1), origen: 'pago', importe: 1000, esFiscal: false },
+      bd(),
+    );
+    const fila = await filaDe(proveedor.id);
+    expect(fila.saldo).toBe(0);
+    // `null`, NO `0`: «no debe nada» y «debe, pero a tiempo» son cosas distintas.
+    expect(fila.diasVencidos).toBeNull();
+  });
+
+  it('⭐ NO se oculta con `consultas.ver-importes`: los días no son un importe', async () => {
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(40), origen: 'entrada_sin_factura', importe: 1000 },
+      bd(),
+    );
+    // La MISMA sesión de siempre, menos el permiso de ver importes.
+    const sinImportes: ClavePermiso[] = ['cxp.ver', 'cxp.administrar', 'terceros.ver'];
+    const fila = await filaDe(proveedor.id, sinImportes);
+    // Los importes SÍ se ocultan…
+    expect(fila.saldo).toBeNull();
+    expect(fila.corriente).toBeNull();
+    // …y los días NO: saber que algo lleva 35 días vencido no revela cuánto es. Es el mismo trato
+    // que le da la corrida semanal, y si divergieran el mismo proveedor contaría dos historias.
+    expect(fila.diasVencidos).toBe(35);
+  });
+});
