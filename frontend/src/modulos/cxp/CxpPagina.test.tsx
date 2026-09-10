@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ReactRouterDom from 'react-router-dom';
 
-import type { CxpBandeja, CxpBandejaQuery } from '@/api/tipos';
+import type { ClavePermiso, CxpBandeja, CxpBandejaQuery } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { CxpPagina } from './CxpPagina';
@@ -63,9 +63,12 @@ const conCartera: CxpBandeja = {
       d31a60: 0,
       mas60: 0,
       maquila: 0,
+      diasVencidos: 12,
       maquilaPorRevisar: sinPorRevisar,
     },
     // Maquilero con SOLO deuda EsMa (0 en el motor): su saldo vive en la cubeta "Maquila".
+    // ⭐ Fila 0.186: sus CUATRO cubetas son 0 (las tablas de EsMa no tienen vencimiento) y aun así
+    // trae edad — es exactamente el hueco que la columna de días vencidos viene a tapar.
     {
       idProveedor: 9,
       proveedor: 'Maquilas del Sur',
@@ -77,6 +80,7 @@ const conCartera: CxpBandeja = {
       d31a60: 0,
       mas60: 0,
       maquila: 15000,
+      diasVencidos: 45,
       maquilaPorRevisar: sinPorRevisar,
     },
   ],
@@ -188,6 +192,140 @@ describe('CxpPagina (F9-E2)', () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ DÍAS VENCIDOS EN LA BANDEJA (fila 0.186)
+//
+// **DANIEL**, preguntado si la bandeja debía enseñar «Días venc.» o dejar de calcularlos:
+// *«sí, un campo de días vencidos sí»*.
+//
+// ⚠️ Esta pantalla tiene DOS superficies —tarjetas en móvil (`cxp-tarjetas`, `lg:hidden`) y tabla en
+// escritorio (`cxp-tabla`)— y las dos se pintan SIEMPRE en el DOM de jsdom (el corte es CSS, que
+// aquí no se aplica). Por eso cada aserción va DENTRO de su superficie con `within(...)`: una
+// aserción global se cumpliría con la tarjeta aunque la tabla no tuviera la columna, y al revés.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('CxpPagina · días vencidos (fila 0.186)', () => {
+  beforeEach(() => {
+    consultas.length = 0;
+    estado.valor = { data: conCartera, isPending: false, isError: false, error: null };
+  });
+
+  /** Reemplaza los días vencidos de las dos filas del fixture, dejando lo demás igual. */
+  function conDias(delProveedor: number | null, delMaquilero: number | null): void {
+    estado.valor = {
+      data: {
+        ...conCartera,
+        filas: [
+          { ...conCartera.filas[0], diasVencidos: delProveedor },
+          { ...conCartera.filas[1], diasVencidos: delMaquilero },
+        ],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+  }
+
+  function pintar(permisos: ClavePermiso[] = ['cxp.ver', 'consultas.ver-importes']): void {
+    renderConProveedores(<CxpPagina />, { sesion: estadoSesionDePrueba(permisos) });
+  }
+
+  it('la TABLA trae la columna «Días venc.» con su ayuda', () => {
+    pintar();
+    const encabezado = within(screen.getByTestId('cxp-tabla')).getByRole('columnheader', {
+      name: 'Días venc.',
+    });
+    expect(encabezado).toBeInTheDocument();
+    expect(encabezado).toHaveAttribute(
+      'title',
+      'Días que lleva vencido el cargo más viejo sin pagar',
+    );
+  });
+
+  it('la TABLA pinta los días del proveedor, marcados por vencidos', () => {
+    pintar();
+    const celda = within(screen.getByTestId('cxp-tabla')).getByTestId('cxp-dias-vencidos-7');
+    expect(celda).toHaveTextContent('12 d');
+    expect(celda).toHaveClass('text-destructive');
+  });
+
+  it('⭐ la TARJETA (móvil) pinta los mismos días: en teléfono es la única superficie que hay', () => {
+    pintar();
+    // Dentro de SU tarjeta, no del contenedor: hay una tarjeta por proveedor y todas rotulan igual.
+    const tarjeta = within(screen.getByTestId('cxp-tarjetas')).getByTestId('cxp-tarjeta-7');
+    expect(within(tarjeta).getByText('Días venc.')).toBeInTheDocument();
+    const celda = within(tarjeta).getByTestId('cxp-tarjeta-dias-vencidos-7');
+    expect(celda).toHaveTextContent('12 d');
+    expect(celda).toHaveClass('text-destructive');
+  });
+
+  it('⭐ el MAQUILERO PURO —cubetas en 0— sí trae edad, en las dos superficies', () => {
+    pintar();
+    // Sus cuatro cubetas del motor están vacías: sin esta columna, la lista del viernes lo enseñaba
+    // sin ninguna antigüedad. Es la razón de ser de la fila.
+    expect(
+      within(screen.getByTestId('cxp-tabla')).getByTestId('cxp-dias-vencidos-9'),
+    ).toHaveTextContent('45 d');
+    expect(
+      within(screen.getByTestId('cxp-tarjetas')).getByTestId('cxp-tarjeta-dias-vencidos-9'),
+    ).toHaveTextContent('45 d');
+  });
+
+  it('«al día» cuando debe pero está dentro del plazo (0 NO se pinta como «0»)', () => {
+    conDias(0, 0);
+    pintar();
+    const celda = within(screen.getByTestId('cxp-tabla')).getByTestId('cxp-dias-vencidos-7');
+    // Un «0» a secas se leería como «no debe nada», que es lo contrario de lo que significa.
+    expect(celda).toHaveTextContent('al día');
+    expect(celda).not.toHaveClass('text-destructive');
+    expect(
+      within(screen.getByTestId('cxp-tarjetas')).getByTestId('cxp-tarjeta-dias-vencidos-7'),
+    ).toHaveTextContent('al día');
+  });
+
+  it('«—» cuando no hay nada que envejecer (null), sin marca de vencido', () => {
+    conDias(null, null);
+    pintar();
+    const celda = within(screen.getByTestId('cxp-tabla')).getByTestId('cxp-dias-vencidos-7');
+    expect(celda).toHaveTextContent('—');
+    expect(celda).not.toHaveClass('text-destructive');
+    expect(
+      within(screen.getByTestId('cxp-tarjetas')).getByTestId('cxp-tarjeta-dias-vencidos-7'),
+    ).toHaveTextContent('—');
+  });
+
+  it('⭐ NO se oculta con los importes: sin `consultas.ver-importes` los días siguen ahí', () => {
+    // El servidor manda los importes en `null` a quien no puede verlos, pero los días NO son un
+    // importe (saber que algo lleva 12 días vencido no dice cuánto es) y viajan igual.
+    estado.valor = {
+      data: {
+        ...conCartera,
+        filas: [
+          {
+            ...conCartera.filas[0],
+            saldo: null,
+            corriente: null,
+            d1a30: null,
+            d31a60: null,
+            mas60: null,
+            maquila: null,
+            diasVencidos: 12,
+          },
+          conCartera.filas[1],
+        ],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    pintar(['cxp.ver']);
+    const fila = within(screen.getByTestId('cxp-tabla')).getByTestId('cxp-fila-7');
+    // Los importes SÍ se ocultan…
+    expect(fila).not.toHaveTextContent('$88,000.00');
+    // …y los días NO.
+    expect(within(fila).getByTestId('cxp-dias-vencidos-7')).toHaveTextContent('12 d');
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
 // §Post-F9.188(a) — EL MAQUILERO CON TODO SIN REVISAR NO DESAPARECE DE LA BANDEJA
 // Al saldo sólo entra lo revisado (V1, fila 0.115). Sin esta columna, la fila con saldo 0 que el
 // servidor decide enseñar se vería "en ceros" sin explicación; y con el corte viejo ni siquiera se vería.
@@ -205,6 +343,8 @@ describe('CxpPagina · maquila por revisar', () => {
     d31a60: 0,
     mas60: 0,
     maquila: 0,
+    // Nada revisado todavía ⇒ nada que envejecer: `null`, que NO es lo mismo que 0.
+    diasVencidos: null,
     maquilaPorRevisar: {
       abonos: 400,
       pagos: 0,

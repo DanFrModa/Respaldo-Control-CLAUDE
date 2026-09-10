@@ -23,6 +23,34 @@ export function celdaAging(monto: number | null): string {
   return moneda(monto);
 }
 
+/**
+ * ⭐ LOS DÍAS VENCIDOS de un proveedor, como TEXTO de su celda.
+ *
+ * **La definición ÚNICA de esta redacción** (fila 0.186): la usan la BANDEJA de CxP y la CORRIDA
+ * semanal de pagos (`modulos/pagos/comun.ts` la envuelve para su fila, que además tiene el caso
+ * «concepto»). Vive aquí, del lado de CxP, porque el número lo calcula CxP
+ * (`dominio/terceros/dias-vencidos.ts`) y pagos lo consume — la misma dirección que ya tiene la
+ * dependencia en el backend. Copiarla en cada pantalla sería dejar que la lista del viernes y la
+ * corrida del jueves llamaran distinto al mismo proveedor.
+ *
+ * Los tres estados dicen cosas DISTINTAS y por eso no se colapsan en uno:
+ *  • `null` → **«—»**: no hay nada que envejecer (no debe, o los pagos ya lo cubrieron);
+ *  • `0` → **«al día»**: sí debe, pero está dentro de su plazo;
+ *  • `n > 0` → **«n d»**: su cargo más viejo sin pagar lleva `n` días vencido.
+ *
+ * ⚠️ Un «0» a secas se leería como «no debe nada», que es justo lo contrario de lo que significa.
+ * Y el número lo calcula el SERVIDOR (A1: nada de restar fechas en el cliente); aquí sólo se redacta.
+ */
+export function textoDiasVencidos(dias: number | null): string {
+  if (dias === null) {
+    return '—';
+  }
+  if (dias === 0) {
+    return 'al día';
+  }
+  return `${String(dias)} d`;
+}
+
 /** Fecha de hoy en formato YYYY-MM-DD (default de los campos fecha). */
 export function hoyISO(): string {
   return new Date().toISOString().slice(0, 10);

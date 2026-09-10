@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.140 · 10-sep-2026 · **en prueba** — **La lista del viernes ya dice cuántos días llevas debiendo**
+
+### Qué se puede hacer ahora que antes no
+
+- **Ver, en la bandeja de cuentas por pagar, cuántos días lleva vencido cada proveedor.** Lo pediste
+  tú. El número ya se calculaba —salía en la corrida semanal— pero la bandeja lo tiraba.
+- ⭐ **Y ahora los maquileros también tienen edad.** Un maquilero puro no tiene fecha de vencimiento en
+  sus tablas, así que **hasta hoy aparecía en esa lista sin antigüedad ninguna**. Ésta es la única
+  columna que lo cubre.
+
+### Qué cambió y puede sorprender
+
+- 🔑 **Qué es exactamente el número, porque se lee para decidir a quién se le paga: es la edad de la
+  factura más vieja que sigue sin pagarse.** No es un promedio. Si un proveedor tiene una factura
+  grande de hace tres días y una pequeña de hace doscientos, **manda la de doscientos** — que es lo
+  que uno quiere ver. Un promedio la habría tapado.
+- **Quien está al corriente sale con un guión, no con un cero.** Un cero significa «debe, pero
+  todavía está en plazo»; el guión significa «no hay nada que envejecer». Son cosas distintas y se
+  ven distintas a propósito.
+- **La bandeja tarda un poco más en cargar**, y está medido: la consulta pasa de unos 20 a unos 45
+  milisegundos con el volumen de hoy. No se nota. Si algún día se notara, el arreglo ya está pensado
+  y no es quitar la columna.
+
+### Qué sigue pendiente o roto
+
+- **La columna se paga con dos consultas más** que crecen con el histórico. Con muchos años cargados
+  el coste sube (medido: hasta unos 470 ms con 120 000 movimientos). El plan para ese día es pedir
+  los días **sólo de los proveedores que se están viendo en pantalla**, no de toda la cartera.
+- **Ruta Crítica sale de la primera versión**, por decisión de Daniel: *«ya quiero salir con la
+  primera versión, eso puede ser para la segunda»*. Lo que quedaba pendiente ahí se aparca.
+
+---
+
 ## 0.139 · 10-sep-2026 · **en prueba** — **La fecha de cumplimiento de Ruta Crítica ya tiene candado**
 
 ### Qué se puede hacer ahora que antes no
