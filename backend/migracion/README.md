@@ -33,9 +33,18 @@ Por eso `etl-ipt.ts` y `etl-telas.ts` **están fuera del orden de corrida de aba
 
 ### Regla 3 — orden de corrida del go-live, con `ETL_DESDE=2025` desde el PRIMER comando
 
+> 🔴 **ANTES DEL PRIMER COMANDO, LOS DATOS DE ORIGEN (medido el 10-sep-2026).** Los cargadores buscan
+> los CSV en `Respaldo CLAUDE/TABLAS/`, y **esa carpeta YA NO ESTÁ en la rama** (`ls "Respaldo CLAUDE"`
+> → no existe; se sacó por peso, ver `FUENTE-SISTEMA-VIEJO.md`). Vive en la rama
+> **`origin/fuente-sistema-viejo`**. ⇒ o se recupera ahí, o se apunta a donde estén con la variable
+> **`TABLAS_DIR`** (`migracion/comun/csv.ts:42`, ruta absoluta), que el código respeta **y hasta
+> documenta en su propia cabecera** — pero **este instructivo no la mencionaba ni una vez**. Es el tropiezo más
+> tonto posible el día del corte.
+
 ```bash
 cd backend
 export ETL_DESDE=2025            # ⚠️ ANTES del primer comando, y en la MISMA terminal para todos
+export TABLAS_DIR=/ruta/a/TABLAS # ⚠️ sólo si los CSV no están en «Respaldo CLAUDE/TABLAS/» (hoy NO lo están)
 
 # 1. Catálogos y modelos (la base de todos los mapeos).
 npx tsx --env-file=.env migracion/etl-catalogos.ts
@@ -62,16 +71,20 @@ npx tsx --env-file=.env migracion/reparar-secuencias.ts
 
 # 6. CUADRES (obligatorios: son lo ÚNICO que prueba que la migración cuadró — v1 CSV vs v2 BD).
 #    No escriben nada; se leen y se archivan junto con los reporte-etl-*.txt de la corrida.
+npx tsx --env-file=.env migracion/cuadre.ts      # catálogos + modelos ⚠️ FALTABA en esta lista
 npx tsx --env-file=.env migracion/cuadre-f2.ts   # pedidos + órdenes (dos niveles)
 npx tsx --env-file=.env migracion/cuadre-f3.ts   # producción + kardex PT (no-doble-conteo)
 npx tsx --env-file=.env migracion/cuadre-f4.ts   # compras/notas + telas
-npx tsx --env-file=.env migracion/cuadre-f5.ts   # ruta crítica
+npx tsx --env-file=.env migracion/cuadre-f5.ts   # ruta crítica ⏸️ ver aviso de abajo
 npx tsx --env-file=.env migracion/cuadre-f6.ts   # calidad + EsMa (saldo por maquilero)
 npx tsx --env-file=.env migracion/cuadre-f7.ts   # costos + indicadores
 #    ⚠️ En f3 y f4 el kardex de PT y el de telas saldrán en CERO contra el viejo: es lo ESPERADO
 #    (Regla 2 — arrancan del conteo físico, no del histórico). Lo demás sí debe cuadrar.
 
 # ❌ NO se corren: etl-ipt (PT) ni etl-telas (telas) — ver la Regla 2.
+# ⏸️ RUTA CRÍTICA SALE DE V1 (Daniel, 10-sep, §Post-F9.226(a): «la ruta crítica completa va después de
+#    V1»). ⇒ `etl-ruta-critica.ts` y `cuadre-f5.ts` NO hacen falta el día uno. Se dejan escritos aquí
+#    porque el día que entre RC se corren en este mismo sitio del orden. Medido: nadie más los usa.
 # F9 (etl-terceros-saldos / etl-apertura-sinube / etl-cfdi-masivo) NO sale de Access: va cuando llegue
 #    el corte de SINUBE, que Daniel saca EL DÍA DEL ARRANQUE (§Post-F9.201·2). Ver la sección
 #    «Apertura de saldos desde SINUBE (fila 0.131)» más abajo.

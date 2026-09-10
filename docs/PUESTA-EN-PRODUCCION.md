@@ -1,5 +1,18 @@
 # CONTROL v2 — Puesta en producción (de `prueba` a real)
 
+> ## 🔴 DOCUMENTO VIEJO (7-jul-2026) — NO LO USES COMO LISTA. Ve a [`ARRANQUE.md`](ARRANQUE.md)
+>
+> **Medido el 10-sep-2026: varias cosas que este documento da por PENDIENTES ya están hechas** —las
+> cabeceras de seguridad del sitio (`frontend/nginx.conf.template:99-220`), el candado que impide
+> quedarse sin administrador (`backend/src/dominio/admin/roles.ts:251`, con prueba en
+> `usuarios.int.test.ts:289`), el respaldo cifrado automático **y su script de restauración**
+> (`backend/src/comun/jobs/respaldo-bd.ts`, `backend/scripts/restaurar-respaldo.ts`), y el reparto de
+> permisos en cascada, que dejó de serlo el 3-sep (`backend/prisma/seed.ts:105-127`) y era el defecto
+> más feo del pentest.
+>
+> ⚠️ **Seguirlo hoy significa rehacer trabajo ya hecho.** Se conserva porque **los hallazgos del
+> pentest y su razonamiento siguen valiendo** como historia; la lista operativa vive en `ARRANQUE.md`.
+
 > Qué hay que hacer para usar el sistema "de verdad" una vez que sale de `prueba`, entra a `main` y se pone en el ambiente real. La **fase F10 (Migración + Go-live)** del plan es el hogar formal de esto; este documento es la checklist práctica + los hallazgos del pentest de seguridad (2026-07-07).
 
 ## 0. Antes de todo: ¿qué ambiente es "real"?
