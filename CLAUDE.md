@@ -19,7 +19,13 @@ Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Mo
 > nueva**: es el empujón de cierre nacido del repaso del 13-ago-2026
 > (`docs/DIAGNOSTICO-FLUJO-COMPLETO.md`) y las nueve decisiones de Daniel (§Post-F9.36/.37).
 > `V1-E1` ✅ · `V1-E2` ✅ · `V1-E3d pieza A` ✅ · `V1-E3c` ✅ (15-ago). Falta `V1-E3`, `E3d pieza B`,
-> `E4`–`E7` y la separación desarrollo/producción (§Post-F9.34 + §Post-F9.46).
+> `E4`–`E7`. ⚠️ **CORREGIDO el 10-sep-2026:** esta línea listaba *«la separación desarrollo/producción
+> (§Post-F9.34 + §Post-F9.46)»* como pendiente de V1, y **es un error de lectura de sus propias citas**:
+> esas dos secciones hablan de la **nomenclatura del catálogo de modelos** (número de desarrollo vs.
+> número de producción) y **están construidas** (`V1-E3n`). La separación de **AMBIENTES** —una base y
+> unas claves propias para lo real, separadas de `prueba`— **sí es un pendiente real**, y vive como
+> paso manual en **[`docs/ARRANQUE.md`](docs/ARRANQUE.md)**, que desde la v0.142 es **el documento vivo
+> del arranque** y sustituye a `docs/PUESTA-EN-PRODUCCION.md` y `docs/PLAN-DE-ARRANQUE.md`.
 >
 > **El estado vivo y el "qué sigue" mandan desde `HOJA-DE-RUTA.md` §1 (*¿Dónde vamos?*)** y la ficha
 > de la fase activa. Este archivo manda en **las REGLAS** (§6, §7 y las trampas de §8), que sí están
@@ -61,7 +67,7 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 ├── docs/                          ← arquitectura/ (ADR-0001..0006 + README) · GUIA-RAILWAY-R2.md ·
 │                                     modulos/patron-crud.md (patrón CRUD de referencia)
 ├── .github/                       ← workflows/ci.yml (CI bloqueante: backend, frontend, imágenes Docker, e2e) + renovate.json
-├── Respaldo CLAUDE/               ← VOLCADO del sistema viejo en texto
+├── Respaldo CLAUDE/               ← ⚠️ YA NO ESTÁ EN LA RAMA (ver aviso abajo) · VOLCADO del sistema viejo
 │   ├── Respaldo CLAUDEFormularios/   292 formularios (.txt, diseño + código VBA)
 │   ├── Respaldo CLAUDEConsultas/     161 consultas
 │   ├── Respaldo CLAUDEModulos/       13 módulos VBA
@@ -70,7 +76,20 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 └── Documentacion_MJD/             ← LA DOCUMENTACIÓN funcional (fuente de verdad del negocio)
 ```
 
-> Los `.mdb` de Access ya **no** viven en el repo. Para datos reales usa `Respaldo CLAUDE/TABLAS/*.csv`.
+> 🔴 **AVISO MEDIDO EL 10-SEP-2026: la carpeta `Respaldo CLAUDE/` YA NO ESTÁ EN ESTA RAMA.** Se sacó por
+> peso (`FUENTE-SISTEMA-VIEJO.md`). El árbol de arriba la sigue dibujando porque **el volcado sigue
+> siendo la fuente del negocio**, pero un `ls` no la encuentra.
+> ⚠️ **Y eso ya engañó a un agente esta noche**, que concluyó que no había evidencia del sistema viejo
+> que consultar — cuando la evidencia decidió el diseño entero de la fila 0.175.
+>
+> **Dónde está y cómo se lee, sin tocar el árbol:**
+> ```bash
+> git show "origin/fuente-sistema-viejo:Respaldo CLAUDE/Respaldo CLAUDEFormularios/<archivo>.txt"
+> ```
+> **Encoding CP850** (ver §4). Para correr un ETL con los CSV en otro sitio: la variable **`TABLAS_DIR`**
+> (ruta absoluta) los redirige — `backend/migracion/comun/csv.ts:42`.
+>
+> Los `.mdb` de Access tampoco viven en el repo.
 
 ---
 

@@ -174,6 +174,12 @@ npx tsx --env-file=.env migracion/etl-historico-ordenes.ts # §Post-F9.26/27/29:
 npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts            # pone al día el estado completa/incompleta
 npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts --dry-run  # (opcional) simula: reporta sin escribir
 npx tsx --env-file=.env migracion/reparar-secuencias.ts                  # adelanta TODA secuencia de folio al máximo migrado
+
+# ⭐ SÓLO EN EL ARRANQUE (una vez, IRREVERSIBLE): que las OP/OC nuevas empiecen en número redondo.
+# ⚠️ Los números REALES los da Daniel el día del arranque: por eso la línea de --aplicar lleva un
+#    MARCADOR y no una cifra (si se copia tal cual, el parser la rechaza en vez de aplicarla).
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000  # ENSAYO: no escribe
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=EL-NUMERO-QUE-DIGA-DANIEL --escalon-orden-compra=EL-NUMERO-QUE-DIGA-DANIEL --aplicar
 ```
 
 ## ⚠️ PASO OBLIGATORIO AL TERMINAR CUALQUIER CARGA: reparar las secuencias de folio
@@ -195,6 +201,45 @@ Recalcula las 7 series con histórico (`pedido`, `orden`, `etapa-mov`, `auditori
 avanzó), así que se corre cuantas veces se quiera y **conviene correrlo después de CUALQUIER ETL**.
 Los ETL siembran además sus propias series al cerrar, pero este script es la red que no depende de que
 nadie se acuerde. **Al agregar un ETL que migre folios explícitos, agrega su serie aquí.**
+
+### ⭐ SÓLO EN EL ARRANQUE: el salto al ESCALÓN redondo (§Post-F9.36 punto 5, fila 0.187)
+
+Daniel decidió que al arrancar, la numeración **no siga en el siguiente disponible** sino que **salte
+a un número redondo**, para que se vea de un vistazo qué es nuevo y qué es histórico: _"Para saber que
+las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP y OC también."_
+El número exacto **se fija en el ensayo**, cuando se conozca el máximo real migrado (si la última OP
+fuera 5,847 → arrancar en 6,000; si la última OC fuera 7,920 → 8,000: son **dos números distintos**).
+
+🔴 **Los números de abajo (6000 / 8000) son un EJEMPLO, no la decisión.** El del arranque lo da
+Daniel cuando se vea el máximo real migrado. Por eso **el comando del paso 2 lleva un MARCADOR en vez
+de una cifra**: es la línea que escribe de verdad y es irreversible, así que si alguien la copia tal
+cual, el parser la rechaza (`EL-NUMERO-QUE-DIGA-DANIEL` no es un entero) en lugar de aplicar en
+silencio un número que nadie eligió. El paso 1 sí lleva cifras: **ese comando no escribe nada**.
+
+```bash
+# 1) ENSAYO — no escribe nada; imprime el cuadro de lo que pasaría. Aquí SÍ va el número a probar.
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000
+
+# 2) Si el cuadro está bien, el MISMO comando con --aplicar — sustituyendo el marcador por el número
+#    que Daniel haya dado (tiene que ser EL MISMO que se ensayó en el paso 1).
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=EL-NUMERO-QUE-DIGA-DANIEL --escalon-orden-compra=EL-NUMERO-QUE-DIGA-DANIEL --aplicar
+```
+
+⚠️ **Es IRREVERSIBLE en cuanto alguien captura con la numeración nueva** (el folio 6,000 ya existe y
+la secuencia no puede volver atrás sin repetir números). Por eso el script trae tres cinturones:
+
+- **Sólo OP y OC** tienen bandera de escalón. Las otras cinco series no se pueden saltar ni por error
+  de dedo, y **cualquier bandera desconocida aborta** (un `--escalon-orden 6000` con espacio en vez de
+  `=` no se ignora en silencio: se cae y te dice cómo se escribe).
+- **Ensayo en seco por omisión**: con escalón y sin `--aplicar` **no se escribe nada**.
+- **Aborta si el escalón va POR LO BAJO** — si pides 6,000 y la última OP ya es 6,120, se cae
+  nombrando los dos números, **sin escribir nada de nada** (ni las otras series). No se aplica "por lo
+  que se pueda": repetiría folios.
+
+Otras banderas: `--empresa=<id>` acota el escalón a una empresa (la reparación normal siempre corre
+para todas, que es inocua) · `--simular` (alias `--dry-run`) fuerza el ensayo · `--ayuda` lista todo.
+**Después del escalón, el paso obligatorio de arriba se sigue corriendo tal cual**: es monótono y no
+baja lo que el escalón dejó puesto.
 
 > Ojo al tocarlo: el campo del folio **no se llama igual** en todas las tablas — es `folio` en
 > pedidos/órdenes/etapas/terceros, pero **`numCompra`** en OC, **`numNota`** en notas y
@@ -414,7 +459,7 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/cuadre-fase.ts`              | Cuadre por fase                                                                                                                                                                                                                      |
 | `migracion/cuadre-f2.ts`                | Cuadre F2 en dos niveles (filas/sumas + columnas) + incidencias                                                                                                                                                                      |
 | `migracion/cuadre-f3.ts`                | **Cuadre F3 en tres niveles** (conteos + existencias Σ kardex vs `IPT_Mod_Alm` + no-doble-conteo)                                                                                                                                    |
-| `migracion/reparar-secuencias.ts`       | **Repara TODAS las secuencias de folio** contra el máximo real por empresa (idempotente + monótono; correr al final de cualquier carga — §Post-F9.17)                                                                                |
+| `migracion/reparar-secuencias.ts`       | **Repara TODAS las secuencias de folio** contra el máximo real por empresa (idempotente + monótono; correr al final de cualquier carga — §Post-F9.17). En el arranque, además, **el salto al escalón redondo** de OP/OC: `--escalon-orden=<n> --escalon-orden-compra=<n>` (ensayo) + `--aplicar` — §Post-F9.36 punto 5, IRREVERSIBLE |
 | `migracion/analisis/catalogo-tallas.ts` | Análisis (read-only): catálogo de cadenas `Ordenes.Tallas` con frecuencia                                                                                                                                                            |
 
 Todos: `npx tsx --env-file=.env migracion/<script>.ts`.
