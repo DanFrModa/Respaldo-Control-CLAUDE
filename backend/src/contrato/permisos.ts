@@ -507,16 +507,58 @@ export const CATALOGO_PERMISOS = [
     descripcion: 'Ver todos los botones de la Ruta Crítica',
     origen: { idAcceso: 1, formulario: 'OrdenVer', descripcion: 'Ver todos los botones de la RC' },
   },
+  /**
+   * ⚠️ **NO GOBIERNA NADA, Y ESTÁ DICHO A PROPÓSITO (fila 0.175).**
+   *
+   * Éste y `rc.fecha-libre-cumplimiento` son **la misma capacidad descrita dos veces**: el catálogo
+   * viejo (`Accesos.csv`) traía los accesos #10 y #35 apuntando a las dos mitades de una sola
+   * pantalla —`RC_MeterFechas` y su detalle `RC_MeterDatosDet`—, y v2 los transcribió 1:1 sin
+   * notarlo. Medido en el volcado del Access: **`PrP(35)` no aparece en NINGÚN sitio** (292
+   * formularios, 161 consultas, 13 módulos) y **`PrP(10)` aparece en uno solo**, que es justo la
+   * guarda de `FechaReal` en `RC_MeterDatosDet` — o sea, el #35 ya estaba muerto allá.
+   *
+   * La ventana la implementa hoy `dominio/ruta-critica/cumplimiento.ts`, con
+   * `rc.fecha-libre-cumplimiento` de llave: es el nombre que sigue el patrón establecido de v2
+   * (`ipt.fecha-libre`, `indicadores.fecha-libre`) y el que nombra el mensaje de error del molde
+   * compartido (*«necesitas el permiso de fecha libre»*).
+   *
+   * **Por qué la clave sigue aquí en vez de retirarse.** Primero, porque la ficha de la fila lo
+   * prescribe: *«el que sobrevive sin gobernar nada dice en su descripción por qué»*. Y segundo,
+   * porque retirarla del catálogo **no la quita de las bases ya sembradas, sólo la vuelve
+   * invisible** — medido, no supuesto:
+   *
+   *  • El seed **avisa de los huérfanos pero nunca borra** (`prisma/seed.ts:95-100`, sólo un
+   *    `console.warn`), y la FK es `onDelete: Restrict` (`schema.prisma:405`), así que la fila de
+   *    `permisos` y sus **8 filas de `roles_permisos`** sobreviven, concedidas.
+   *  • La pantalla Administración › Roles pinta el catálogo de **CÓDIGO**, no la BD
+   *    (`GET /api/permisos` → `dominio/admin/permisos.ts:31`, síncrona y sin `tx`) ⇒ al quitarla
+   *    del catálogo **la casilla DESAPARECE**, y esas 8 concesiones quedan vivas **sin forma de
+   *    quitarlas desde la pantalla**, más un `console.warn` en cada arranque.
+   *  • Y limpiarlas sería justo el gasto en datos viejos que prohíbe la **REGLA 0-B**.
+   *
+   * *(Actualizar la foto de 122 claves de `reparto-de-permisos.test.ts` también haría falta, pero
+   * eso NO es un impedimento: la aserción de `:479` lo pide por su nombre —«Actualiza
+   * CATALOGO_AL_3_SEP»— y su comentario aclara que fallar ahí es la señal de actualizarla a mano.
+   * Lo que la cabecera del archivo prohíbe es DERIVARLA de `CLAVES_PERMISO`, no editarla.)*
+   *
+   * Se queda, entonces, diciendo la verdad: la descripción es lo que se lee al palomearla.
+   */
   {
     clave: 'rc.fechas-retraso',
     modulo: 'rc',
-    descripcion: 'Capturar fechas con más de 2 días de retraso en la RC',
+    descripcion: 'Sin efecto: la ventana de captura de la RC la abre rc.fecha-libre-cumplimiento',
     origen: {
       idAcceso: 10,
       formulario: 'RC_MeterFechas',
       descripcion: 'Se puede meter las fechas con mas de 2 dias de retrazo',
     },
   },
+  /**
+   * 🔑 **La llave de la ventana de captura de la RC** — la abre `completarProceso`
+   * (`dominio/ruta-critica/cumplimiento.ts`, fila 0.175). Sin ella: sólo los últimos
+   * `DIAS_VENTANA_CAPTURA_RC` días y nunca el futuro. Ver la nota de `rc.fechas-retraso`, arriba,
+   * para por qué son dos claves y sólo ésta gobierna.
+   */
   {
     clave: 'rc.fecha-libre-cumplimiento',
     modulo: 'rc',

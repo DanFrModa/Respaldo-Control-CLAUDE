@@ -683,7 +683,15 @@ describe('⭐⭐ 0.150 — el caso mixto: se cancela la limpia y la producida se
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 describe('⭐⭐ 0.150 — la RUTA CRÍTICA generada de verdad (rechazo, defecto 1)', () => {
-  const PERM_RC: ClavePermiso[] = [...PERM, 'rc.programar', 'rc.capturar', 'roles.administrar'];
+  // `rc.fecha-libre-cumplimiento` (fila 0.175): las capturas de abajo fechan un día concreto de
+  // 2026, fuera de la ventana; lo que se mide aquí es la cancelación, no la ventana de captura.
+  const PERM_RC: ClavePermiso[] = [
+    ...PERM,
+    'rc.programar',
+    'rc.capturar',
+    'rc.fecha-libre-cumplimiento',
+    'roles.administrar',
+  ];
   const sesionRc = (): SesionUsuario =>
     sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_RC });
 

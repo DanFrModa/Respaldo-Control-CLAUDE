@@ -71,6 +71,46 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.139 · 10-sep-2026 · **en prueba** — **La fecha de cumplimiento de Ruta Crítica ya tiene candado**
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo que se vea en pantalla — y eso es a propósito.** Lo que cambia es que **la fecha en que
+  se da por cumplido un proceso ya no se puede poner libremente**. Antes se aceptaba cualquiera: de
+  hace un año, o de la semana que viene. Y esa fecha es **la que alimenta el indicador de si se
+  entrega a tiempo**, así que una fecha inventada no sólo queda fea: **cambia el número por el que se
+  juzga a la fábrica**.
+- Ahora sólo se aceptan **los últimos 2 días**, y **nunca una fecha futura**. Quien necesite otra cosa,
+  necesita el permiso de «fecha libre».
+
+### Qué cambió y puede sorprender
+
+- ⭐ **El número 2 no es un invento: es el que tenía el sistema de Access.** Se fue a buscar el código
+  viejo y ahí está, con su aviso y todo: *«No puedes meter una fecha con mas de dos dias de retrazo.
+  Para poder meterla, pidele al Administrador.»* También se descubrió que **uno de los dos permisos
+  que existían para esto ya estaba muerto en el sistema viejo**: se le daba a tres personas y no lo
+  leía nada.
+- 🔴 **Pero hoy el candado no le cierra la puerta a nadie**, y conviene saberlo: **los ocho perfiles
+  que pueden capturar llevan también la llave para saltárselo** (todos menos el perfil «Básico»). Es
+  el mecanismo lo que faltaba; **a quién se le quita la llave es decisión de Daniel**.
+- **Un permiso que no sirve para nada ahora lo dice.** En la pantalla de perfiles, junto a la casilla
+  de «fechas con retraso», aparece escrito que no gobierna nada. Se dejó a propósito en vez de
+  borrarlo: quitarlo habría hecho desaparecer la casilla dejando ocho permisos concedidos en la base
+  que ya nadie podría retirar.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Falta que Daniel diga el número, y hay un motivo real para pensarlo.** El sistema viejo contaba
+  **2 días hábiles**, no de calendario: los lunes estiraba la ventana para que el fin de semana no se
+  la comiera. Con la regla de ahora, **un lunes ya no se alcanza el viernes**. Si se quiere que en el
+  peor caso funcione como el viejo, el número es **4**. Cambiarlo es una línea.
+- **Queda un sitio más que fecha con el reloj equivocado** — el avance automático por eventos, que
+  escribe en esa misma columna. No se tocó aquí porque es otro camino, y está anotado. ⚠️ Se dice
+  porque **la razón por la que quedó fuera hace unas versiones acaba de dejar de ser cierta**, y una
+  razón caducada es peor que ninguna: parece que alguien ya lo pensó.
+
+---
+
 ## 0.138 · 10-sep-2026 · **en prueba** — **El motivo de un traspaso por fin se puede leer**
 
 ### Qué se puede hacer ahora que antes no

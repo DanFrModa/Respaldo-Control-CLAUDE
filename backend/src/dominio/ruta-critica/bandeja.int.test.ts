@@ -329,11 +329,14 @@ describe('capturadoPorNombre en GET ruta (aditivo, F5-E5)', () => {
     await cliente.procesoDefRol.create({ data: { idProcesoDef: proc, idRol } });
     const usuario = await cliente.usuario.findFirstOrThrow({ where: { id: idUsuario } });
 
+    // Lleva `rc.fecha-libre-cumplimiento` a propósito (fila 0.175): esta prueba fecha a mano un
+    // día concreto de 2026 para medir OTRA cosa, y sin la llave la ventana de captura la cortaría
+    // antes de llegar a lo que mide. La ventana se mide aparte, en `cumplimiento.test.ts`.
     const sesionCaptura = sesionDePrueba({
       id: idUsuario,
       nombre: usuario.nombre,
       idEmpresaActiva: idEmpresa,
-      permisos: ['rc.capturar'],
+      permisos: ['rc.capturar', 'rc.fecha-libre-cumplimiento'],
     });
     await completarProceso(sesionCaptura, idRuta, new Date('2026-06-20T00:00:00Z'), bd());
 

@@ -10,7 +10,7 @@
  *  • checklist: completar todos los ítems auto-completa el proceso; desmarcar lo revierte.
  *  • barrido de riesgo: actualiza Orden.enRiesgo (incl. orden sin ruta con fechaEntregaRC).
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaClient } from '../../datos/index.js';
 import { ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
@@ -199,7 +199,12 @@ describe('completarProceso + roles N:M (ProcesoDefRol)', () => {
       ErrorPermiso,
     );
 
-    const sesionConRol = sesionDePrueba({ id: conRol.id, permisos: ['rc.capturar'] });
+    // `rc.fecha-libre-cumplimiento` a propósito (fila 0.175): abajo se fecha un día concreto de
+    // 2026 y sin la llave la ventana de captura cortaría antes de medir los roles responsables.
+    const sesionConRol = sesionDePrueba({
+      id: conRol.id,
+      permisos: ['rc.capturar', 'rc.fecha-libre-cumplimiento'],
+    });
     await completarProceso(sesionConRol, idRuta, new Date('2026-06-20T00:00:00Z'), bd());
     const fila = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
     expect(fila.estado).toBe('completado');
@@ -312,10 +317,25 @@ describe('checklist', () => {
       'activo',
     );
 
-    await marcarChecklistItem(admin, i2.id, true, bd());
+    // ⭐ FILA 0.175 — el auto-completado fecha el día del NEGOCIO, no el día UTC.
+    // El reloj va anclado a las 19:00 de México, la franja donde el día UTC YA es el siguiente:
+    // hasta esta fila `marcarChecklistItem` usaba un `hoyUtc()` local y ahí dejaba el cumplimiento
+    // fechado MAÑANA —seis horas de cada día—, envenenando el KPI de puntualidad (D11). Sin el
+    // reloj anclado esta prueba pasaría por la mañana y fallaría por la tarde, que es peor que no
+    // tenerla. Se falsea sólo `Date` para no congelar los temporizadores del cliente de Postgres.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-10T01:00:00.000Z')); // = 9-sep 19:00 en México
+    try {
+      await marcarChecklistItem(admin, i2.id, true, bd());
+    } finally {
+      vi.useRealTimers();
+    }
     const fila = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
     expect(fila.estado).toBe('completado');
-    expect(fila.fechaReal).not.toBeNull();
+    expect(
+      fila.fechaReal?.toISOString().slice(0, 10),
+      'el cumplimiento se fecha el día de México (9-sep), no el día UTC (10-sep)',
+    ).toBe('2026-09-09');
     expect(fila.origenCaptura).toBe('evento'); // lo completó el sistema, no captura manual.
 
     // Desmarcar un ítem revierte el cumplimiento (porque fue AUTO-completado).
@@ -336,7 +356,11 @@ describe('checklist', () => {
     const i1 = await cliente.rutaOrdenChecklist.create({
       data: { idRutaOrden: idRuta, descripcion: 'punto 1', orden: 0 },
     });
-    const admin = sesionDePrueba({ permisos: ['rc.capturar', 'roles.administrar'] });
+    // `rc.fecha-libre-cumplimiento` a propósito (fila 0.175): la fecha concreta de abajo está
+    // fuera de la ventana de captura, y aquí lo que se mide es el `origenCaptura`, no la ventana.
+    const admin = sesionDePrueba({
+      permisos: ['rc.capturar', 'roles.administrar', 'rc.fecha-libre-cumplimiento'],
+    });
 
     // Completa MANUALMENTE el proceso con una fecha concreta.
     await completarProceso(admin, idRuta, new Date('2026-06-15T00:00:00Z'), bd());
