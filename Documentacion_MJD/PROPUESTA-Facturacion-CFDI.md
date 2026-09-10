@@ -36,36 +36,38 @@ que hay que tener las siete o no se puede operar:
 6. Guardar el **XML** (es el original fiscal; el PDF no vale) y la **representación impresa**.
 7. No perder ninguna: bandeja de lo que quedó **sin timbrar** y vigilancia de estatus.
 
-**Lo que no es código y toma calendario** (se puede empezar HOY, es gratis o casi):
-el **CSD** (sello digital, gratis, 24–72 h con la e.firma), el **contrato con un PAC** (días), las
-**constancias de situación fiscal de los clientes** (semanas, depende de ellos), y **preguntarle a
-cada cliente si exige addenda o portal** (semanas, es lo que más tarda y lo que nadie ve venir).
+Y aparte, dos que **no aplican siempre pero a FR Moda sí**: la **addenda** de las cadenas que la
+exijan *(hoy ninguna activa, pero va a hacer falta)* y la **Carta Porte** cuando se mueva mercancía
+propia *(Daniel: «a veces»)*. Ésas van **aparte y después** — son las dos más pesadas.
 
-**Costo de operación:** ridículo. El timbre cuesta **$0.80–$1.00 MXN**; con 300 facturas y 300 REP al
-mes son ~**$600 MXN/mes**. Comparado con SINUBE (~$9,450/año por usuario) el ahorro es real, aunque
+**Lo que no es código y toma calendario** (se puede empezar HOY, es gratis o casi):
+el **CSD** (sello digital, gratis, 24–72 h con la e.firma), el **contrato con un PAC** (días) y las
+**constancias de situación fiscal de los clientes** (semanas, depende de ellos).
+
+**Costo de operación:** irrelevante. Con **30–50 facturas al mes** (dato de Daniel) más sus
+complementos de pago son ~**100 timbres/mes ≈ 1,200 al año** ⇒ del orden de **$1,000–$3,000 MXN al
+año**, según el PAC (§6). Comparado con SINUBE (~$9,450/año por usuario) el ahorro es real, aunque
 **SINUBE probablemente no se apague del todo**: el contador sigue necesitando la contabilidad, que
 CONTROL no lleva (D12) — lo honesto es decir *«CONTROL factura; el contador contabiliza»*.
+🔑 **Y el volumen bajo simplifica el diseño:** no hace falta timbrado masivo, ni colas, ni
+reintentos sofisticados. Son unas pocas facturas al día.
 
 **Costo de desarrollo:** ~**8 filas** del tamaño con el que venimos trabajando (unas 6–9 filas de las
-que se cierran hoy en 1–3 días cada una), de las cuales **3 son grandes** (el documento factura, el
-timbrado, y el complemento de pago). No hay ninguna pieza imposible; hay **una pieza delicada** (el
-timbrado, por el riesgo de timbrar dos veces o de timbrar desde `prueba`).
+que se cierran hoy en 1–3 días cada una), de las cuales **4 son grandes** (el documento factura, el
+timbrado, el complemento de pago y —si se mete— la Carta Porte). No hay ninguna pieza imposible; hay
+**una pieza delicada** (el timbrado, por el riesgo de timbrar dos veces o de timbrar desde `prueba`).
 
-### 🔴 Mi recomendación, y por qué (regla de `CLAUDE.md` §7.5)
+### ✅ CONFIRMADO POR DANIEL (10-sep-2026) — va DESPUÉS de arrancar
 
-| | Recomendación |
+> **Textual, respuesta 11:** *«Después de arrancar. Empezamos facturando en SINUBE y subimos acá las
+> facturas.»*
+
+| | Queda así |
 |---|---|
-| **¿Bloquea la V1?** | **NO.** Hoy se factura en SINUBE y CONTROL ya importa el XML: **nada de la operación se detiene**. Meter facturación ahora es exactamente lo que Daniel mandó no hacer el 4-sep (*«ya no quiero entorpecer más la primera versión de salida»*, §Post-F9.190). |
-| **¿Entonces cuándo?** | **El primer bloque grande después de arrancar.** Es el candidato natural a abrir la fase 2, y con ventaja: para entonces las entregas y la CxC ya llevarán meses cargándose bien, que es justo de donde nace la factura. |
-| **¿Qué sí empieza YA?** | **El papeleo**, porque es calendario y no cuesta desarrollo: (a) tramitar el **CSD**; (b) elegir y contratar **PAC**; (c) juntar **constancias de situación fiscal** de todos los clientes; (d) **preguntarle a cada cliente cómo quiere recibir la factura y si exige addenda**. Si esto se arranca hoy, el día que se abra el desarrollo no habrá que esperar a nadie. |
-
-⚠️ **Y una advertencia que prefiero dar antes que después:** si la decisión es *«facturamos desde
-CONTROL desde el arranque»*, entonces la V1 **crece varias semanas** y arranca cargando la parte más
-regulada del sistema el mismo día que todo lo demás es nuevo. **No lo recomiendo** — pero si Daniel lo
-decide así, se hace completo, no a medias: facturar «un poquito» (sin REP, sin cancelación) **no
-existe** como opción legal.
-
----
+| **¿Bloquea la V1?** | **NO.** Confirmado por Daniel. En el arranque se factura en SINUBE y CONTROL **importa el XML** — camino que **ya existe y está en el menú**: `/cxc/importar-cfdi` (permiso `cxc.administrar`, `ImportarCfdiVentaPagina.tsx`) |
+| **¿Cuándo?** | **El primer bloque grande después del arranque.** Para entonces las entregas y la CxC ya llevarán meses cargándose bien, que es justo de donde nace la factura |
+| **¿Qué empieza ya?** | El **papeleo**, que es calendario y no cuesta desarrollo: **CSD** · **PAC** · **constancias de situación fiscal de los clientes** |
+| ⚠️ **Y una prueba que conviene hacer ANTES del arranque** | Importar en `prueba` **una factura real de SINUBE** por esa pantalla. Si algo no cuadra (RFC, formato, conciliación con el pedido), es mucho mejor enterarse ahora que el primer día de operación |
 
 ## 1. Cómo funciona facturar en México, en cristiano
 
@@ -112,8 +114,27 @@ Aquí CONTROL tiene una ventaja que casi ningún sistema tiene: **ya sabe qué s
 pedido, y de ahí sale el *vendido* del EDR (`edr.ts`: ventas = Σ entregas × precio del renglón de
 pedido). El precio pactado ya vive en `PedidoLinea.precio` (y las listas de precios de F8).
 
-⇒ **La factura nace de una o varias entregas**, con un botón. No se recaptura nada. Eso es
-exactamente lo que hoy alguien hace a mano en SINUBE mirando la remisión.
+⇒ **La factura nace de lo entregado**, con un botón. No se recaptura nada. Eso es exactamente lo que
+hoy alguien hace a mano en SINUBE mirando la remisión.
+
+> ⚠️ **PERO NO es «una entrega = una factura»** — así lo había supuesto yo y **Daniel lo corrigió**
+> (respuestas 4 y 5, 10-sep-2026):
+>
+> - *«Depende del cliente… pero comúnmente **una por modelo** (a veces **más de una por modelo**).»*
+> - *«**C&A es una por pedido** (sin detalle de talla y color).»*
+>
+> **Dos cosas distintas, y las dos son preferencia DEL CLIENTE:**
+>
+> | | Qué se decide | Valores |
+> |---|---|---|
+> | **Cómo se agrupa** | Qué entra en una factura | por pedido · **por modelo** (lo común) · por entrega · a mano |
+> | **Qué detalle lleva el renglón** | Cuántos renglones y qué dicen | un renglón total (**C&A**) · por modelo · por modelo+color · por modelo+color+talla |
+>
+> 🔑 **Y la consecuencia técnica, que no es menor:** si de un mismo modelo pueden salir **varias
+> facturas**, el sistema tiene que llevar **cuánto de lo entregado ya se facturó** — un *saldo por
+> facturar* por renglón entregado. No es capricho: sin eso se factura dos veces lo mismo, o se queda
+> algo sin facturar y nadie se entera. Es la pieza que hace crecer la fila **F-3**… y de paso entrega
+> algo que hoy no existe en ningún lado: **«qué entregué y todavía no cobro»**.
 
 ### Paso 2 — Se arma el XML
 
@@ -225,11 +246,11 @@ cuánto, en qué parcialidad y qué saldo queda.
 
 | Caso | Qué implica | ¿Aplica? |
 |---|---|---|
-| **Traslado de mercancía propia — Carta Porte 3.1** | Si la mercancía se mueve **en vehículo propio** por carretera **federal**, hay que emitir un CFDI de **traslado con complemento Carta Porte**. Multas de hasta ~$97,330 por documento. **Excepción:** vehículo ligero (menor a un C2) y **menos de 30 km de tramo federal**, o cuando se tiene la certeza de no pisar carretera federal → basta el CFDI de traslado **sin** complemento | **PREGUNTAR.** Si el cliente recoge o va por transportista, el problema es de ellos |
-| **Exportación** | Si se factura al extranjero: `Exportacion = 02` + **Complemento de Comercio Exterior** + pedimento. Es un mundo aparte | **PREGUNTAR.** Default: no |
-| **Facturar en dólares** | Se puede (`Moneda = USD` + `TipoCambio`), pero obliga a decidir el tipo de cambio y complica la CxC | **PREGUNTAR.** Default: solo MXN |
-| **Anticipos** | Si el cliente adelanta dinero, hay un procedimiento propio del SAT (factura de anticipo + egreso al facturar el total) | **PREGUNTAR.** Default: no se usan |
-| **Venta de retazo, avíos, segundas, maquila a terceros** | Son ventas que **no nacen de una entrega de orden** ⇒ hace falta una **factura libre** (capturada a mano) además de la que nace de la entrega | Default: **sí se necesita** |
+| 🔴 **Traslado de mercancía propia — Carta Porte 3.1** | Si la mercancía se mueve **en vehículo propio** por carretera **federal**, hay que emitir un CFDI de **traslado con complemento Carta Porte**. Multas de hasta ~$97,330 por documento. **Excepción:** vehículo ligero (menor a un C2) y **menos de 30 km de tramo federal**, o cuando se tiene la certeza de no pisar carretera federal → basta el CFDI de traslado **sin** complemento | ✅ **SÍ APLICA** — Daniel (respuesta 7): *«sí necesito a veces hacer carta porte»*. **Es el complemento más pesado de todos** (ubicaciones origen/destino con fechas, distancia, mercancías con su clave y peso, datos del vehículo, permiso SCT, seguro, y el operador con su licencia) ⇒ **fila propia y NO en la primera entrega**: mientras tanto se sigue haciendo donde se hace hoy |
+| **Exportación** | Si se factura al extranjero: `Exportacion = 02` + **Complemento de Comercio Exterior** + pedimento. Es un mundo aparte | ❌ **NO** (Daniel, respuesta 6) ⇒ `Exportacion = 01` siempre |
+| **Facturar en dólares** | Se puede (`Moneda = USD` + `TipoCambio`), pero obliga a decidir el tipo de cambio y complica la CxC | ❌ **NO** (respuesta 6). **Solo MXN** ⇒ el módulo se simplifica bastante |
+| **Anticipos** | Si el cliente adelanta dinero, hay un procedimiento propio del SAT (factura de anticipo + egreso al facturar el total) | ❌ **No se usan** (no se preguntó de nuevo; se mantiene fuera hasta que Daniel lo pida) |
+| **Venta de retazo, avíos, segundas, maquila a terceros** | Son ventas que **no nacen de una entrega de orden** ⇒ hace falta una **factura libre** (capturada a mano) además de la que nace de la entrega | ✅ **SÍ** — Daniel (respuesta 8): *«muy pocas veces pero sí puede pasar»*. Al ser raro, basta la captura a mano: **no** se le construye automatismo |
 | **Retenciones** | Vendiendo mercancía de empresa a empresa **no hay retención**. (Las retenciones aparecen al *recibir* servicios de personas físicas, y eso ya lo lee el parser de CxP) | No aplica |
 
 ---
@@ -303,6 +324,31 @@ razones. Lo que falta es lo específicamente fiscal.
 no debe estar persiguiendo eso; para eso se paga un PAC. Lo que sí debe ser nuestro es **el proceso
 del negocio** — de qué entrega nace la factura, quién la autoriza, cómo se cobra.
 
+### Las opciones concretas (Daniel, respuesta 12: *«no tengo idea… danos opciones»*)
+
+**Con el volumen real — 30-50 facturas/mes + sus complementos de pago ≈ 100 timbres/mes ≈ 1,200 al
+año — el costo del timbre es simbólico y NO debe decidir.** Lo que decide es: (1) que tenga
+**addenda** resuelta *(Daniel: eventualmente la va a necesitar)*, (2) que tenga **Carta Porte 3.1**
+*(Daniel: a veces la necesita)*, (3) que tenga **ambiente de pruebas** de verdad, y (4) que la API sea
+sensata para integrar.
+
+| PAC | Costo *(publicado; hay que cotizar)* | Addenda | Carta Porte | Nota |
+|---|---|---|---|---|
+| **Facturama** ⭐ | API **$1,650 MXN/año** con 100 folios; folios extra **desde $0.50** | **Sí, producto aparte (~$600 único, ilimitadas)** | **Sí (~$1,400 único, +25 folios)** | Es el que cubre **las cuatro** necesidades sin sorpresas y con el costo más bajo a este volumen. Sandbox público. Mexicana, 15 años |
+| **Facturapi** | Suscripción **desde $299 MXN/mes** + consumo | Sí | Sí | La API más agradable para desarrollar. A 100 timbres/mes la mensualidad pesa más que el consumo |
+| **FiscalAPI** | **$199 MXN/mes** + paquetes | Sí | Sí | Multi-RFC nativo, SDKs en varios lenguajes |
+| **Finkok** | **~$0.30 + IVA por timbre**, sin mensualidad | — | Sí | El más barato, pero es de **bajo nivel**: *nosotros* tendríamos que sellar el XML ⇒ el problema del XSLT (§6, opción B) |
+| **Facty** | **desde $0.80/timbre**, sin mensualidad, 10 gratis | — | — | Sencillo; se queda corto para addenda |
+
+**Recomendación: Facturama**, por costo a este volumen y porque **addenda y Carta Porte ya son
+productos suyos** — las dos cosas que Daniel dijo que va a necesitar. Con el adaptador de §6 detrás,
+cambiar de PAC después sigue siendo barato.
+
+⚠️ **Los precios son los publicados en sus sitios y cambian.** Antes de firmar hay que cotizar los
+tres puntos: precio real del timbre a 1,200/año, **si la addenda que necesitemos ya la tienen hecha**
+(no todas las cadenas están en el catálogo de todos los PAC), y **si el sandbox permite probar
+cancelación y complemento de pago**, no sólo emisión.
+
 ---
 
 ## 7. Riesgos, y cómo se protege cada uno
@@ -320,56 +366,57 @@ del negocio** — de qué entrega nace la factura, quién la autoriza, cómo se 
 
 ---
 
-## 8. Plan por etapas (propuesta de filas)
+## 8. Plan por etapas (ajustado con las respuestas de Daniel, 10-sep-2026)
 
 > Numeración tentativa a partir de la última fila del programa (0.163). Cada fila = 1 coder + 1
-> reviewer, como todo lo demás.
+> reviewer, como todo lo demás. **Todo esto arranca DESPUÉS del go-live** (respuesta 11).
 
 | # | Fila | Tamaño | Depende de |
 |---|---|---|---|
-| **F-1** | **Los datos fiscales del cliente** — nombre fiscal, CP, régimen, uso de CFDI, método de pago, correos, cómo recibe la factura. Reusa el lector de constancias (0.119) | mediana | 0.119 |
-| **F-2** | **Catálogos del SAT + clave de producto/unidad por modelo** (semilla + captura + defaults para ropa) | chica | — |
-| **F-3** | ⭐ **El documento Factura** — nace de una o varias entregas, borrador editable, serie/folio, IVA, totales; **todavía sin timbrar** | **grande** | F-1, F-2 |
+| **F-1** | **Los datos fiscales del cliente** — nombre fiscal, CP, régimen, uso de CFDI, método de pago, correos, **cómo se agrupa su factura y con qué detalle** (respuestas 4 y 5), y la casilla *«pide addenda»* apagada por ahora. Reusa el lector de constancias (0.119) | mediana | 0.119 |
+| **F-2** | **Catálogos del SAT + clave de producto/unidad por modelo** (semilla + captura + default para ropa) | chica | — |
+| **F-3** | ⭐⭐ **El documento Factura** — se arma escogiendo **qué se factura de lo entregado**, con **saldo por facturar** por renglón, agrupación y detalle **según el cliente**, serie/folio, IVA, totales; **todavía sin timbrar**. Incluye la **factura libre** (respuesta 8) | **grande** ⬆ *(creció: era «nace de la entrega», y no lo es)* | F-1, F-2 |
 | **F-4** | ⭐⭐ **Timbrado** — adaptador del PAC, bóveda del CSD, candado de ambiente, idempotencia, XML a R2, cargo automático en CxC | **grande** | F-3 + PAC contratado + CSD |
 | **F-5** | **Representación impresa + envío** — PDF fiscal con QR y sellos, correo al cliente con XML+PDF | mediana | F-4 |
-| **F-6** | **Cancelación y sustitución** — motivos, relación 04, estatus, consulta al SAT, inverso en CxC | mediana | F-4 |
+| **F-6** | **Cancelación y sustitución** — motivos, relación 04, estatus, consulta al SAT, inverso en CxC. El permiso `facturas.cancelar` nace **suelto**, para que Daniel lo prenda y apague desde `/administracion/roles` **en el celular** (respuesta 10) | mediana | F-4 |
 | **F-7** | ⭐ **Cobros aplicados a facturas + complemento de pago (REP)** con la bandeja del día 5 | **grande** | F-4 |
 | **F-8** | **Nota de crédito** (devoluciones y descuentos) | chica | F-4 |
-| **F-9** | **Addendas** — una por cliente que la exija | ? | Que el cliente mande su especificación |
-| **F-10** | *(opcional)* **Descarga masiva del SAT** — bajar automáticamente los CFDI emitidos y recibidos para conciliar y detectar cancelaciones de proveedores | mediana | — |
+| **F-9** | ⏸️ **Addendas** — *aparcada*: hoy **ningún cliente activo la pide**, pero Daniel la va a necesitar (respuesta 2). El diseño le deja el hueco desde F-1; se construye **cuando aparezca el cliente que la exija**, con su especificación en la mano | ? | Que el cliente mande su especificación |
+| **F-10** | ⏸️ **Carta Porte 3.1** — *aparcada, fila propia*: Daniel la necesita **a veces** (respuesta 7). Es el complemento más pesado del SAT y el de multa más alta ⇒ **no se mete junto con el resto**; mientras tanto se sigue haciendo donde se hace hoy | **grande** | F-4 + decidir vehículo propio vs. transportista |
+| **F-11** | *(opcional)* **Descarga masiva del SAT** — bajar automáticamente los CFDI emitidos y recibidos para conciliar y detectar cancelaciones | mediana | — |
 
-**El mínimo legal para poder dejar de facturar en SINUBE es F-1 → F-8.** Menos que eso no es
-«facturación básica»: es facturación incompleta, y las piezas que faltarían (REP, cancelación) son
-justo las que tienen fecha límite y multa.
+**El mínimo para dejar de facturar en SINUBE es F-1 → F-8.** F-9 y F-10 son **posteriores y con
+disparador propio** (que un cliente pida addenda; que se decida meter Carta Porte).
 
-**En paralelo, sin código:** CSD · contrato con el PAC · constancias de los clientes · addendas ·
-avisarle al contador · decidir la serie de folios.
-
----
-
-## 9. Decisiones que necesito de Daniel (con default propuesto)
-
-> Regla de `CLAUDE.md` §6: **todas de una vez**, cada una con un default para que solo haya que
-> confirmar o corregir. Nada de esto frena el trabajo actual (REGLA 0): la V1 sigue su curso.
-
-| # | Pregunta | Default que propongo |
-|---|---|---|
-| 1 | **¿Cuántas facturas al mes** emites hoy, más o menos? | (necesario para dimensionar; no tiene default) |
-| 2 | **¿Algún cliente te exige ADDENDA o subir la factura a su PORTAL?** ¿C&A? ¿Cómo les llega hoy la factura? | Asumo **correo** para todos y **addenda solo si tú dices** — si alguno la exige, cambia el plan |
-| 3 | **¿Vendes a crédito?** (30/60 días) | **Sí ⇒ PPD ⇒ complemento de pago obligatorio.** Si alguien paga de contado, PUE |
-| 4 | **¿Una factura por entrega, o juntas varias entregas en una factura?** | **Una factura por entrega** (es lo que las cadenas concilian contra su recibo) |
-| 5 | **¿Cómo quieres que se vea el renglón de la factura?** ¿Por modelo? ¿Por modelo y color? ¿Con el SKU del cliente? | **Un renglón por modelo+color**, con la descripción y la referencia del cliente |
-| 6 | **¿Exportas o facturas en dólares?** | **No.** Solo MXN, mercado nacional |
-| 7 | **¿Mueves tú la mercancía a la bodega del cliente, con camioneta propia?** (define si hace falta Carta Porte) | **No** — el cliente recoge o va por transportista, que emite lo suyo |
-| 8 | **¿Se factura algo que no sea prenda de una orden?** (retazo, avíos, segundas, maquila a terceros) | **Sí** ⇒ se incluye una «factura libre» capturada a mano |
-| 9 | **¿Se usan anticipos del cliente?** | **No** |
-| 10 | **¿Serie de folios?** | **Serie nueva propia** (p. ej. `A`, desde 1) para no chocar jamás con lo emitido en SINUBE |
-| 11 | **¿Quién factura y quién cancela?** | **Factura:** administración. **Cancela:** solo Daniel (permiso aparte) |
-| 12 | **¿SINUBE se apaga del todo?** | **No del todo:** CONTROL emite; el contador sigue con la contabilidad. Lo que se apaga es la captura doble |
-| 13 | 🔴 **¿Esto entra en la V1 o después de arrancar?** | **DESPUÉS** (ver §0). Pero **el papeleo empieza ya** |
-| 14 | **¿Con qué PAC?** | Recomiendo uno de los de API moderna (§6, opción A); si tu contador o SINUBE ya usa uno con el que estés a gusto, **ese gana** — dímelo |
+**En paralelo, sin código:** CSD · contrato con el PAC · constancias de los clientes · avisarle al
+contador · confirmar la serie.
 
 ---
+
+## 9. Las respuestas de Daniel (10-sep-2026) y lo que cambió
+
+| # | Pregunta | ✅ Respuesta de Daniel | Efecto en el plan |
+|---|---|---|---|
+| 1 | ¿Cuántas facturas al mes? | **30–50** | El costo del timbre es **simbólico** (~$100/mes). **No hace falta** timbrado masivo ni colas: el diseño se simplifica |
+| 2 | ¿Addenda o portal? | *«Sí, hay clientes que sí. Pero ahorita no tengo ninguno activo, pero eventualmente lo voy a necesitar»* | **Addenda NO entra** en la primera entrega ⇒ fila **F-9** aparcada. Pero **sí pesa en la elección de PAC** (§6) y el hueco se deja desde F-1 |
+| 3 | ¿A crédito? | **Sí** | **PPD ⇒ complemento de pago obligatorio.** F-7 es parte del mínimo, no un extra |
+| 4 | ¿Cómo se agrupa la factura? | *«Depende del cliente… comúnmente **una por modelo** (a veces más de una por modelo)»* | 🔴 **Mi default estaba mal.** Agrupación **configurable por cliente** + **saldo por facturar** ⇒ **F-3 crece** |
+| 5 | ¿Qué detalle lleva el renglón? | *«Depende del cliente. **C&A es una por pedido** (sin detalle de talla y color)»* | Nivel de detalle del renglón **configurable por cliente** (4 valores) |
+| 6 | ¿Exporta / dólares? | **No** | `Exportacion = 01`, **solo MXN**. Fuera comercio exterior y tipo de cambio |
+| 7 | ¿Carta Porte? | *«Sí necesito a veces hacer carta porte»* | 🔴 **Nuevo:** fila **F-10**, propia y aparcada. Es el complemento más pesado y el de multa más alta |
+| 8 | ¿Ventas fuera de orden? | *«Muy pocas veces pero sí puede pasar»* | **Factura libre** dentro de F-3. Al ser raro, **sin automatismo** |
+| 9 | ¿Serie? | *«Sí, podemos hacer una nueva serie. Ejemplo **C1000** (ahí empezamos)»* | Se propone **Serie `C` + folio inicial `1000`** ⇒ se lee `C1000`, `C1001`… (en el CFDI son dos campos). Mismo patrón que el «salto de escalón» de OP/OC. **A confirmar** |
+| 10 | ¿Quién factura y cancela? | *«Administración hace facturas y sí le he dado permiso de cancelar… pero estaría bien yo poder dar ese permiso desde mi cel»* | ✅ **Sale gratis:** ya existe `/administracion/roles` (permiso `roles.administrar`). `facturas.cancelar` nace **suelto** y se prende/apaga desde ahí. Sólo hay que **revisar esa pantalla en celular** |
+| 11 | ¿V1 o después? | *«Después de arrancar. Empezamos facturando en SINUBE y subimos acá las facturas»* | ✅ **Confirma la recomendación.** El camino del arranque **ya existe**: `/cxc/importar-cfdi` |
+| 12 | ¿Qué PAC? | *«No tengo idea… danos opciones»* | Opciones y recomendación en **§6** (recomendado: **Facturama**, por addenda + carta porte + costo a este volumen) |
+
+### 🔴 Lo que estas respuestas dejaron abierto (3 preguntas nuevas)
+
+| # | Pregunta | Por qué importa | Default que propongo |
+|---|---|---|---|
+| **N1** | **Carta Porte: ¿la mercancía la mueves en camioneta/camión TUYO, o contratas transportista?** ¿Cuántas al mes? ¿Dónde la haces hoy? | Decide **quién** emite: si es tuyo, tú emites un CFDI de **traslado**; si contratas, **el transportista** emite el suyo y tú puede que no necesites nada. Y si el recorrido no pisa carretera federal (o son <30 km de tramo federal en vehículo ligero), **hay excepción** | Que sea **vehículo propio en trayectos cortos** ⇒ F-10 se construye, pero **al final** |
+| **N2** | **Serie `C` + folio desde `1000`** (se lee `C1000`) — ¿así? | Es lo único del arranque que **no se puede cambiar después** sin ensuciar la numeración | **Sí** |
+| **N3** | ⭐ **¿Me puedes mandar 2 o 3 XML de facturas reales de SINUBE?** Una de **C&A** y una de otro cliente | **Es lo que más tiempo ahorra de todo.** Con el XML real se ve exactamente cómo están armados hoy los renglones de C&A, qué clave de producto usan, qué uso de CFDI, cómo viene el pedido referenciado… **se calca en vez de adivinarse** | — (lo pido cuando puedas) |
 
 ## 10. Lo que este documento NO propone
 
