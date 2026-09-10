@@ -73,6 +73,13 @@ del detalle, NUNCA la vista — ADR-0010 §3). `costoUnit` queda NULL en toda F3
   ventana probando el dominio y la cruza contra lo que el OpenAPI anuncia, y
   `frontend/src/ventana-fecha-pt.test.ts` (en la RAÍZ de `src/`, no junto al módulo: necesita `node:fs`) cruza el espejo contra ese mismo OpenAPI. Cambiar el 7 en un
   solo lado pone rojo el CI.
+  ⏱️ **Y «hoy» es el día del NEGOCIO, no el del servidor (fila 0.174).** La ventana se ancla en
+  `hoyDelNegocio` (`comun/fecha-negocio.ts`), la MISMA función con la que el kardex resuelve su periodo
+  de lectura: un solo «hoy» para lo que se puede capturar y para lo que se puede leer. Antes se anclaba
+  en el día **UTC**, y como México va en −06:00 eso abría un agujero de 18:00 a 23:59 —el turno de la
+  tarde entero—: en esa franja se colaba **el día siguiente** del calendario mexicano y la ventana valía
+  6 días completos en vez de 7. El espejo de la pantalla cuenta en el mismo huso, para no ofrecer una
+  fecha que el servidor rebota.
   🔴 Y con el seed de HOY el candado no le cierra a nadie: los SEIS perfiles que pueden mover PT llevan
   también `ipt.fecha-libre` (herencia de la cascada del viejo — el mismo defecto que documenta el perfil
   `Secretarial` en `prisma/seed.ts` y que las filas 0.105/0.128 vienen podando). El gemelo de Indicadores

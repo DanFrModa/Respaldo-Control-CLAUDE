@@ -47,7 +47,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { fechaAUtc, hoyUtc, verificarFechaCapturable } from './fechas.js';
+import { fechaAUtc, hoyDelNegocioUtc, verificarFechaCapturable } from './fechas.js';
 
 /** Frac. redondeada a 4 decimales, o null si el denominador es 0. */
 function frac(numerador: number, denominador: number): number | null {
@@ -279,7 +279,7 @@ export async function verificarFichaOrden(
   verificarPermiso(sesion, 'indicadores.ip-confiabilidad');
   const datos = validarEntrada(esquemaVerificarFichaOrden, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
-  const fecha = datos.fecha === undefined ? hoyUtc() : fechaAUtc(datos.fecha);
+  const fecha = datos.fecha === undefined ? hoyDelNegocioUtc() : fechaAUtc(datos.fecha);
   verificarFechaCapturable(sesion, fecha);
 
   // Un reactivo no puede repetirse en la misma captura.

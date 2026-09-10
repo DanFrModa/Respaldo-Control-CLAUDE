@@ -296,11 +296,13 @@ describe('TraspasosPtPagina (F3-E3)', () => {
       // ⚠️ El `min` se calcula APARTE, no con la misma función que lo produce: si se afirmara con
       // `inicioVentanaCapturaPt()` la prueba diría «el helper es igual a sí mismo» y un error de
       // aritmética pasaría en verde. Aquí se mide lo que importa: son 7 días completos hacia atrás.
-      const hoyUtc = new Date();
-      const sieteAtras = new Date(
-        Date.UTC(hoyUtc.getUTCFullYear(), hoyUtc.getUTCMonth(), hoyUtc.getUTCDate()) -
-          7 * 86_400_000,
-      )
+      // ⏳ Fila 0.174: se cuenta sobre el día DEL NEGOCIO (México), no sobre el día UTC. Contarlo
+      // en UTC ataba esta prueba a la hora a la que corriera: de 18:00 a 23:59 de México el día
+      // UTC va uno adelante y el `min` esperado salía corrido un día.
+      const hoyDelNegocio = new Date().toLocaleDateString('en-CA', {
+        timeZone: 'America/Mexico_City',
+      });
+      const sieteAtras = new Date(Date.parse(`${hoyDelNegocio}T00:00:00.000Z`) - 7 * 86_400_000)
         .toISOString()
         .slice(0, 10);
       expect(campo).toHaveAttribute('max', hoy());

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   DIAS_VENTANA_CAPTURA_PT,
@@ -83,12 +83,47 @@ describe('la ventana del selector de fecha es la MISMA que anuncia el contrato (
   it('`inicioVentanaCapturaPt` son exactamente esos días hacia atrás desde hoy', () => {
     // Se calcula aparte, no con la función que se está midiendo: si se afirmara con ella misma, la
     // prueba diría «el helper es igual a sí mismo» y un error de aritmética pasaría en verde.
-    const ahora = new Date();
-    const base = Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate());
+    const base = Date.parse(`${diaDelNegocio()}T00:00:00.000Z`);
     const esperado = new Date(base - DIAS_VENTANA_CAPTURA_PT * 86_400_000)
       .toISOString()
       .slice(0, 10);
     expect(inicioVentanaCapturaPt()).toBe(esperado);
     expect(hoy()).toBe(new Date(base).toISOString().slice(0, 10));
   });
+
+  /**
+   * ⭐ FILA 0.174 — EL HUSO. El servidor mide la ventana contra el día DEL NEGOCIO (México), no
+   * contra el día UTC. Si el espejo se quedara en UTC, entre las 18:00 y las 23:59 de allá el
+   * selector ofrecería MAÑANA como tope y toda su ventana iría un día adelante de la que aplica la
+   * guarda. Se ancla el reloj en esa franja a propósito: es la única hora en la que las dos
+   * cuentas se separan, así que una prueba sin anclar sólo lo vería de casualidad.
+   */
+  describe('el espejo cuenta en el huso del negocio, no en UTC (fila 0.174)', () => {
+    /** 19:00 del 9 de septiembre en México; en UTC ya es el día 10. */
+    const ATARDECER_EN_MEXICO = '2026-09-10T01:00:00.000Z';
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(ATARDECER_EN_MEXICO));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('⭐ el tope del selector es HOY en México, no el día UTC (que ya es mañana)', () => {
+      expect(hoy()).toBe('2026-09-09');
+    });
+
+    it('⭐ y el piso son los días de la ventana contados desde ese mismo día', () => {
+      // 9 de septiembre menos 7 días. Escrito como literal: si se recalculara con la misma
+      // aritmética del helper, la prueba diría otra vez «es igual a sí mismo».
+      expect(inicioVentanaCapturaPt()).toBe('2026-09-02');
+    });
+  });
 });
+
+/** El día de hoy en el huso del negocio, calculado aparte del helper que se mide. */
+function diaDelNegocio(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+}

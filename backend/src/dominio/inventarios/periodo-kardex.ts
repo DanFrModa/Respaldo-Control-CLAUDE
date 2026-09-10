@@ -41,7 +41,7 @@
  */
 import { z } from 'zod';
 
-import { ZONA_DEL_NEGOCIO } from '../../comun/fecha-negocio.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 
 /**
  * Meses de la ventana por omisión cuando NADIE pide `desde`.
@@ -102,13 +102,6 @@ export interface VentanaKardex {
   hasta: string | null;
   /** `true` cuando el `desde` lo puso esta función porque nadie pidió periodo. */
   porOmision: boolean;
-}
-
-/** El día de HOY tal como lo vive el negocio (México), en YYYY-MM-DD. */
-function hoyDelNegocio(ahora: Date): string {
-  // `en-CA` da exactamente `YYYY-MM-DD`; la zona se toma de `comun/fecha-negocio` para no tener
-  // dos husos distintos en el sistema (el servidor corre en UTC y la gente captura en -06:00).
-  return ahora.toLocaleDateString('en-CA', { timeZone: ZONA_DEL_NEGOCIO });
 }
 
 /**
