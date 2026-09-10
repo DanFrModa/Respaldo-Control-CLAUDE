@@ -1,7 +1,7 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ExistenciasTelaColor, KardexTelaColor } from '@/api/tipos';
+import type { ClavePermiso, ExistenciasTelaColor, KardexTelaColor } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ExistenciasTelasColorPagina } from './ExistenciasTelasColorPagina';
@@ -114,6 +114,59 @@ const kardex: KardexTelaColor = {
   ],
 };
 
+/** El valor «Todas las partidas» del selector del cajón (el `TODOS` privado de la pantalla). */
+const TODOS_PARTIDAS = 'TODOS';
+
+const [renglonBase] = kardex.renglones;
+if (renglonBase === undefined) {
+  throw new Error('El fixture `kardex` debe traer al menos un renglón.');
+}
+
+/**
+ * FILA 0.177 — el kardex de un color en el que un TRASPASO se repartió FIFO entre dos partidas.
+ *
+ * No es un caso rebuscado: es el que el propio sistema documenta. `repartirPorPartidaFifo` devuelve
+ * UNA LÍNEA POR LOTE, `traspasarTelaColor` las escribe como detalles del MISMO `Movimiento` y
+ * `kardexTelaColor` emite un renglón por detalle ⇒ dos renglones con el mismo movimiento, el mismo
+ * almacén y el mismo folio, distinguidos sólo por la partida.
+ */
+const kardexFifo: KardexTelaColor = {
+  ...kardex,
+  saldosIniciales: [],
+  renglones: [
+    // Las DOS patas del mismo traspaso: idMovimiento/idAlmacen/folio IDÉNTICOS.
+    {
+      ...renglonBase,
+      idMovimiento: 7,
+      folio: 70,
+      tipoMov: 'Traspaso (Salida)',
+      origenTipo: 'traspaso',
+      idPartida: 1,
+      partidaFolio: 1,
+      loteProveedor: 'L-778',
+    },
+    {
+      ...renglonBase,
+      idMovimiento: 7,
+      folio: 70,
+      tipoMov: 'Traspaso (Salida)',
+      origenTipo: 'traspaso',
+      idPartida: 2,
+      partidaFolio: 2,
+      loteProveedor: 'L-779',
+    },
+    // Un movimiento distinto, sobre una tercera partida.
+    {
+      ...renglonBase,
+      idMovimiento: 8,
+      folio: 80,
+      idPartida: 3,
+      partidaFolio: 3,
+      loteProveedor: 'L-780',
+    },
+  ],
+};
+
 const useKardexTelaColor = vi.fn<(q: unknown) => unknown>();
 const cancelarMutate = vi.fn();
 
@@ -140,6 +193,32 @@ vi.mock('@/api/inventario-materiales', () => ({
           factura: null,
           fecha: '2026-08-06',
           creadoEn: '2026-08-06T12:00:00.000Z',
+        },
+        // Fila 0.177: hacen falta DOS partidas más para poder reproducir el reparto FIFO (un
+        // traspaso que sale de dos partidas) y luego filtrar a la partida de OTRO movimiento.
+        {
+          id: 2,
+          folio: 2,
+          idTelaColor: 11,
+          telaColor: 'Marino Alsa 3040',
+          idTela: 1,
+          tela: 'Felpa Suiza',
+          loteProveedor: 'L-779',
+          factura: null,
+          fecha: '2026-08-07',
+          creadoEn: '2026-08-07T12:00:00.000Z',
+        },
+        {
+          id: 3,
+          folio: 3,
+          idTelaColor: 11,
+          telaColor: 'Marino Alsa 3040',
+          idTela: 1,
+          tela: 'Felpa Suiza',
+          loteProveedor: 'L-780',
+          factura: null,
+          fecha: '2026-08-08',
+          creadoEn: '2026-08-08T12:00:00.000Z',
         },
       ],
     },
@@ -343,10 +422,11 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
       sesion: estadoSesionDePrueba(['inventario-telas.ver']),
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
-    // 11 columnas de datos (5 + 3 del cuerpo + 3 del complemento), sin la vacía de acciones.
+    // 12 columnas de datos (5 + 3 del cuerpo + 3 del complemento + «Observaciones», fila 0.176),
+    // sin la vacía de acciones.
     const encabezados = () =>
       screen.getByTestId('kardex-color-tabla').querySelectorAll('thead th').length;
-    expect(encabezados()).toBe(11);
+    expect(encabezados()).toBe(12);
     unmount();
 
     // Con `.mover` sí hay algo que ofrecer (cancelar) → la columna vuelve.
@@ -354,7 +434,7 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
-    expect(encabezados()).toBe(12);
+    expect(encabezados()).toBe(13);
   });
 
   it('sin permiso de mover, el kardex NO ofrece cancelar', () => {
@@ -439,6 +519,231 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
     expect(screen.getByText('Kardex · Felpa Suiza · Marino Alsa 3040')).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 LAS COLUMNAS DEL CUERPO CUADRAN CON EL ENCABEZADO.
+   *
+   * El test de arriba cuenta los `th` y sólo los `th`: eso deja sin medir las DOS filas del cuerpo
+   * —el renglón de datos y el de «Saldo anterior»—, que reciben la misma edición cada vez que se
+   * agrega una columna. Se comprobó mutando: quitarle a esta tabla la celda de «Saldo anterior»
+   * dejaba la suite ENTERA en verde. Si un día alguien mete una columna en medio y olvida una de
+   * las filas, los números salen bajo el encabezado equivocado y nadie se entera.
+   *
+   * Se mide con `saldosIniciales` POBLADO (si no, esa fila no se pinta) y en las variantes que
+   * cambian el NÚMERO de columnas: con y sin la de acciones (condicional a `.mover`), y con y sin
+   * el bloque de COMPLEMENTO (tres columnas que el encabezado y las dos filas pintan cada uno por
+   * su cuenta — el color 21 es de una tela que no lo lleva).
+   */
+  describe('las columnas del cuerpo cuadran con el encabezado', () => {
+    /** `th` del encabezado y `td` de cada `tr` del cuerpo. Contar sólo el encabezado no basta. */
+    function esperarColumnasCuadradas(tabla: HTMLElement, filasEsperadas: number): void {
+      const encabezados = tabla.querySelectorAll('thead th').length;
+      const porFila = [...tabla.querySelectorAll('tbody tr')].map(
+        (tr) => tr.querySelectorAll('td').length,
+      );
+      // Sin filas la comprobación sería vacua (verde sin medir nada): se exige que las haya.
+      expect(porFila).toHaveLength(filasEsperadas);
+      expect(encabezados).toBeGreaterThan(0);
+      expect(porFila).toEqual(porFila.map(() => encabezados));
+    }
+
+    function montar(permisos: ClavePermiso[], idFila: string): void {
+      useKardexTelaColor.mockImplementation((q) =>
+        q === undefined
+          ? { data: undefined, isPending: true, isError: false }
+          : {
+              data: {
+                ...kardex,
+                saldosIniciales: [
+                  { idAlmacen: 5, almacen: 'Bodega A', saldoCuerpo: 300, saldoComplemento: 120 },
+                ],
+              },
+              isPending: false,
+              isError: false,
+            },
+      );
+      renderConProveedores(<ExistenciasTelasColorPagina />, {
+        sesion: estadoSesionDePrueba(permisos),
+      });
+      fireEvent.doubleClick(screen.getByTestId(idFila));
+    }
+
+    it('sólo ver (sin columna de acciones), tela CON complemento', () => {
+      montar(['inventario-telas.ver'], 'telas-color-fila-11');
+      // 2 filas: el «Saldo anterior» + el único renglón del fixture.
+      esperarColumnasCuadradas(screen.getByTestId('kardex-color-tabla'), 2);
+    });
+
+    it('ver + mover (aparece la columna de acciones), tela CON complemento', () => {
+      montar(['inventario-telas.ver', 'inventario-telas.mover'], 'telas-color-fila-11');
+      esperarColumnasCuadradas(screen.getByTestId('kardex-color-tabla'), 2);
+    });
+
+    /**
+     * La tela 2 («Lisa Algodón») NO lleva complemento ⇒ el encabezado y las dos filas se saltan
+     * las tres columnas de ese bloque, cada uno por su cuenta. Es la otra forma de esta misma
+     * tabla, y descuadrarla es igual de fácil.
+     */
+    it('tela SIN complemento (el bloque de tres columnas no se pinta en ninguna de las filas)', () => {
+      montar(['inventario-telas.ver', 'inventario-telas.mover'], 'telas-color-fila-21');
+      esperarColumnasCuadradas(screen.getByTestId('kardex-color-tabla'), 2);
+    });
+  });
+
+  /**
+   * ⭐⭐ FILA 0.176 — EL MOTIVO DEL TRASPASO SE PUEDE LEER.
+   *
+   * Éste es EL kardex donde importa: la 0.172 volvió OBLIGATORIO el motivo del traspaso de tela por
+   * color, y `traspasarTelaColor` lo guarda en las `observaciones` de las dos patas. El backend ya
+   * lo devolvía (`kardexTelaColor`) y hasta el fixture de este archivo ya lo traía — lo que faltaba
+   * era la columna. Sin ella se exigía una explicación que después no salía en ninguna pantalla.
+   *
+   * ⚠️ A diferencia del kardex de materiales, este cajón tiene UNA SOLA superficie (una tabla con
+   * scroll horizontal): no hay tarjetas de móvil dentro del cajón, así que no hay una segunda
+   * superficie que pueda tapar el hueco. Se ancla igual con `within` para que la aserción no pueda
+   * cumplirse con texto de la pantalla de existencias que está debajo.
+   */
+  it('⭐⭐ el kardex enseña el MOTIVO del movimiento (fila 0.176)', () => {
+    const conMotivo: KardexTelaColor = {
+      ...kardexFifo,
+      renglones: [
+        { ...renglonBase, idMovimiento: 9, folio: 90, observaciones: null },
+        {
+          ...renglonBase,
+          idMovimiento: 7,
+          folio: 70,
+          tipoMov: 'Traspaso (Salida)',
+          origenTipo: 'traspaso',
+          observaciones: 'Al cortador Ríos para la OP 4471',
+        },
+      ],
+    };
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : { data: conMotivo, isPending: false, isError: false },
+    );
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+
+    const celdas = within(screen.getByTestId('kardex-color-tabla')).getAllByTestId(
+      'kardex-color-obs',
+    );
+    expect(celdas).toHaveLength(2);
+    // Sin motivo, la celda dice «—»: la tabla no puede descuadrarse por un renglón sin nota.
+    expect(celdas[0]).toHaveTextContent('—');
+    // Y el motivo del traspaso —el que la 0.172 volvió obligatorio— se LEE.
+    expect(celdas[1]).toHaveTextContent('Al cortador Ríos para la OP 4471');
+    // Completo en el `title`, porque la celda trunca: un motivo largo no puede quedar ilegible.
+    expect(celdas[1]).toHaveAttribute('title', 'Al cortador Ríos para la OP 4471');
+  });
+
+  /**
+   * ⭐⭐ FILA 0.177 — LA LLAVE DEL RENGLÓN LLEVA EL ÍNDICE, O EL CAJÓN ENSEÑA UN FANTASMA.
+   *
+   * La llave era `idMovimiento-idAlmacen-folio`, y esos tres campos COLISIONAN justo en el caso que
+   * el sistema ya documenta: un traspaso que se reparte FIFO entre partidas escribe varios detalles
+   * del MISMO `Movimiento`, y `kardexTelaColor` emite un renglón por detalle.
+   *
+   * ⚠️ Lo que NO se mide aquí es el aviso de React («Encountered two children with the same key»):
+   * la configuración de pruebas del frontend no convierte `console.error` en fallo, así que una
+   * prueba apoyada en el warning no mediría NADA. Y medir el número de renglones del PRIMER pintado
+   * tampoco sirve: se comprobó que React 19 pinta los 3 renglones igual, con llave repetida o sin
+   * ella. Lo que sí rompe es la RECONCILIACIÓN.
+   *
+   * 📐 MEDIDO sobre LAS 12 transiciones del filtro de partida, no sobre una muestra: **una sola
+   * corrompe de entrada** —de «todas» a la partida que sólo toca OTRO movimiento (la que fija esta
+   * prueba)—, pero **el estado corrupto persiste y empeora**, y por eso las siguientes también
+   * salen mal. Las dos pruebas de abajo fijan los dos síntomas, que NO son la misma frase:
+   *   1. el FANTASMA — sobrevive un renglón que el servidor ya no mandó;
+   *   2. el DUPLICADO — al volver a «todas», el mismo movimiento sale DOS veces (y con cada
+   *      vaivén, una más: se midió llegar a tres y cuatro copias).
+   *
+   * ⚠️ El duplicado es lo que la pantalla PINTA, no lo que vale la existencia: el saldo es Σ de
+   * movimientos en el servidor (D3) y no cambia. Pero un kardex que repite un renglón se lee como
+   * doble conteo, y nadie debería tener que descartarlo a ojo.
+   */
+  /** Abre el cajón del color 11 con el kardex FIFO, filtrable por partida COMO LO HACE EL SERVIDOR. */
+  function abrirKardexFifo(): { cuerpo: () => Element[]; filtrar: (valor: string) => void } {
+    useKardexTelaColor.mockImplementation((q) => {
+      if (q === undefined) {
+        return { data: undefined, isPending: true, isError: false };
+      }
+      // El SERVIDOR filtra por partida (la pantalla no recorta lo que ya llegó): el doble hace lo
+      // mismo, para que lo que se mide sea el re-pintado con la lista nueva.
+      const { idPartida } = q as { idPartida?: number };
+      return {
+        data:
+          idPartida === undefined
+            ? kardexFifo
+            : {
+                ...kardexFifo,
+                renglones: kardexFifo.renglones.filter((r) => r.idPartida === idPartida),
+              },
+        isPending: false,
+        isError: false,
+      };
+    });
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+    return {
+      cuerpo: () => [...screen.getByTestId('kardex-color-tabla').querySelectorAll('tbody tr')],
+      filtrar: (valor) =>
+        fireEvent.change(screen.getByTestId('kardex-color-partida'), { target: { value: valor } }),
+    };
+  }
+
+  it('⭐⭐ al filtrar por partida no queda ningún renglón FANTASMA (llave con índice)', () => {
+    const { cuerpo, filtrar } = abrirKardexFifo();
+
+    // Sin filtro: los 3 renglones (las dos patas FIFO del traspaso #70 + el movimiento #80).
+    expect(cuerpo()).toHaveLength(3);
+
+    // Se filtra a la partida #3, que SOLO toca el movimiento #80: el servidor manda UN renglón.
+    filtrar('3');
+    expect(useKardexTelaColor).toHaveBeenLastCalledWith(
+      expect.objectContaining({ idTelaColor: 11, idPartida: 3 }),
+    );
+
+    // …y la pantalla enseña UNO, no dos. Con la llave colisionada aquí sobrevivía la pata FIFO
+    // «#1 · L-778» del traspaso, que ya no está en la respuesta.
+    const tabla = screen.getByTestId('kardex-color-tabla');
+    expect(cuerpo()).toHaveLength(1);
+    expect(within(tabla).getByText('#3 · L-780')).toBeInTheDocument();
+    expect(within(tabla).queryByText('#1 · L-778')).not.toBeInTheDocument();
+    expect(within(tabla).queryByText('#2 · L-779')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ …y al QUITAR el filtro, el mismo movimiento NO puede salir dos veces.
+   *
+   * Éste es el síntoma que asusta de verdad, y por eso va aparte: no es un renglón de más que
+   * sobra, es **el mismo movimiento repetido**, que en un kardex se lee como doble conteo. Nace del
+   * estado ya corrompido por el paso anterior —de ahí que la secuencia tenga que ser ENCADENADA
+   * («todas» → partida #3 → «todas») y no un montaje limpio: medido, desde un montaje limpio
+   * `partida #3 → todas` sale bien—. Con la llave colisionada la pantalla pintaba
+   * `["#1","#1","#1b","#2"]` donde el servidor mandó tres renglones, y con cada vaivén añadía otra
+   * copia (se midió llegar a cuatro).
+   */
+  it('⭐⭐ …y al quitar el filtro NO se DUPLICA un movimiento (el síntoma que parece doble conteo)', () => {
+    const { cuerpo, filtrar } = abrirKardexFifo();
+    expect(cuerpo()).toHaveLength(3);
+
+    filtrar('3'); // el paso que corrompe
+    filtrar(TODOS_PARTIDAS); // y aquí se vería el duplicado
+
+    const tabla = screen.getByTestId('kardex-color-tabla');
+    expect(cuerpo()).toHaveLength(3);
+    // Cada pata del traspaso aparece UNA vez, no dos: `getAllByText` es lo que lo distingue —un
+    // `getByText` reventaría por «found multiple», que también es rojo pero por el motivo confuso.
+    expect(within(tabla).getAllByText('#1 · L-778')).toHaveLength(1);
+    expect(within(tabla).getAllByText('#2 · L-779')).toHaveLength(1);
+    expect(within(tabla).getAllByText('#3 · L-780')).toHaveLength(1);
   });
 
   // 🔴 fila 0.098 — el botón «Imprimir PDF» del inventario de telas colgaba de la vista LEGADA por

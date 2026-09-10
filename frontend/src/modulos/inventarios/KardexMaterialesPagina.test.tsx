@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { KardexAvio, KardexTela } from '@/api/tipos';
+import type { ClavePermiso, KardexAvio, KardexTela } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { KardexMaterialesPagina } from './KardexMaterialesPagina';
@@ -158,6 +158,37 @@ beforeEach(() => {
 function abrirAvios(): void {
   fireEvent.click(screen.getByTestId('kardex-mat-dim-avio'));
   fireEvent.click(screen.getByTestId('sel-avio'));
+}
+
+/**
+ * 🔴 GUARDA DE CUADRE DE COLUMNAS: cuántos `th` tiene el encabezado y cuántos `td` tiene CADA `tr`
+ * del cuerpo. Devuelve las dos cifras para que la prueba las compare.
+ *
+ * ⚠️ Por qué existe (hueco cazado por el reviewer de la 0.176/0.177, MUTANDO — leyendo el código
+ * él mismo había dado por hecho que la guarda de columnas ya cubría el cuerpo): esta pantalla y la
+ * del inventario por color tienen TRES tablas que reciben la misma edición cuando se agrega una
+ * columna —el encabezado, el renglón de datos y el renglón de «Saldo anterior»—, y sólo una de las
+ * tres tenía alguna verificación. Se comprobó que borrar el encabezado de telas, el de avíos, o
+ * cualquiera de las tres celdas de «Saldo anterior» dejaba la suite ENTERA en verde. El día que
+ * alguien meta una columna en medio y olvide una de esas filas, los números salen bajo el
+ * encabezado equivocado y nadie se entera.
+ *
+ * Contar sólo el encabezado NO basta: es justo lo que ya se hacía y es lo que dejó pasar el hueco.
+ */
+function cuadreColumnas(tabla: HTMLElement): { encabezados: number; porFila: number[] } {
+  return {
+    encabezados: tabla.querySelectorAll('thead th').length,
+    porFila: [...tabla.querySelectorAll('tbody tr')].map((tr) => tr.querySelectorAll('td').length),
+  };
+}
+
+/** Afirma que TODAS las filas del cuerpo tienen tantas celdas como columnas el encabezado. */
+function esperarColumnasCuadradas(tabla: HTMLElement, filasEsperadas: number): void {
+  const { encabezados, porFila } = cuadreColumnas(tabla);
+  // Sin filas la comprobación sería vacua (verde sin medir nada): se exige que las haya.
+  expect(porFila).toHaveLength(filasEsperadas);
+  expect(encabezados).toBeGreaterThan(0);
+  expect(porFila).toEqual(porFila.map(() => encabezados));
 }
 
 describe('KardexMaterialesPagina (F4-E1)', () => {
@@ -426,6 +457,140 @@ describe('KardexMaterialesPagina (F4-E1)', () => {
       const vacio = screen.getByTestId('kardex-tela-vacio');
       expect(vacio).toHaveTextContent(/en el periodo/);
       expect(vacio).toHaveTextContent(/amplía las fechas/);
+    });
+  });
+
+  /**
+   * 🔴 LAS COLUMNAS CUADRAN — la guarda que faltaba (ver `cuadreColumnas` arriba).
+   *
+   * Las dos tablas de esta pantalla reciben la MISMA edición cada vez que se agrega una columna, en
+   * TRES sitios cada una: el encabezado, el renglón de datos y el de «Saldo anterior». Hasta la
+   * 0.176 sólo se contaba el encabezado de una de ellas ⇒ borrar el encabezado de telas, el de
+   * avíos, o cualquiera de las dos celdas de «Saldo anterior» dejaba la suite entera EN VERDE.
+   *
+   * Se mide con `saldosIniciales` POBLADO (si no, la fila de «Saldo anterior» no se pinta y no se
+   * mide) y en las DOS variantes de permiso, porque la columna de acciones es condicional: sin
+   * `.mover` no se pinta ni su `th` ni sus `td`, y ése es justo el tipo de par que se descuadra.
+   */
+  describe('las columnas del cuerpo cuadran con el encabezado', () => {
+    const saldoTela = [
+      { idLote: 7, loteClave: 'LOTE-A', idAlmacen: 5, almacen: 'Bodega A', saldo: 300 },
+    ];
+    const saldoAvio = [{ idAlmacen: 9, almacen: 'Avíos A', saldo: 250 }];
+
+    const casosTela: [string, ClavePermiso[]][] = [
+      ['sólo ver', ['inventario-telas.ver']],
+      [
+        'ver + mover (aparece la columna de acciones)',
+        ['inventario-telas.ver', 'inventario-telas.mover'],
+      ],
+    ];
+    it.each(casosTela)('TELAS · %s', (_caso, permisos) => {
+      datosKardexTela.mockReturnValue({ ...kardexTela, saldosIniciales: saldoTela });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(permisos),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+      // 2 filas: el «Saldo anterior» + el único renglón del fixture.
+      esperarColumnasCuadradas(screen.getByTestId('kardex-tela-tabla'), 2);
+    });
+
+    const casosAvio: [string, ClavePermiso[]][] = [
+      ['sólo ver', ['inventario-avios.ver']],
+      [
+        'ver + mover (aparece la columna de acciones)',
+        ['inventario-avios.ver', 'inventario-avios.mover'],
+      ],
+    ];
+    it.each(casosAvio)('AVÍOS · %s', (_caso, permisos) => {
+      datosKardexAvio.mockReturnValue({ ...kardexAvio, saldosIniciales: saldoAvio });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(permisos),
+      });
+      abrirAvios();
+      esperarColumnasCuadradas(screen.getByTestId('kardex-avio-tabla'), 2);
+    });
+  });
+
+  /**
+   * ⭐⭐ FILA 0.176 — EL MOTIVO SE PUEDE LEER, EN LAS CUATRO SUPERFICIES.
+   *
+   * La 0.172 volvió OBLIGATORIO escribir un motivo al mover material (el traspaso de avíos que
+   * opera esta misma dimensión, entre otros) y lo guarda en las `observaciones` del movimiento…
+   * que no salía en NINGUNA pantalla. Pedir una explicación obligatoria que después nadie consulta
+   * es la forma más rápida de que se degrade a «.», «x» o «traspaso» — y entonces el campo
+   * obligatorio deja de servir para lo que se puso.
+   *
+   * ⚠️ Esta pantalla pinta CUATRO superficies (tarjetas en móvil + tabla en escritorio, por cada
+   * una de las dos pestañas) y las dos de una pestaña están montadas A LA VEZ: la visibilidad la
+   * decide Tailwind, no el DOM. Por eso cada aserción va anclada con `within(<esa superficie>)`
+   * — un `getAllByTestId(...)[0]` dejaba en verde borrar una de las dos porque la otra tapaba el
+   * hueco (la misma cicatriz que ya cobró el «Saldo anterior» de arriba).
+   */
+  describe('el motivo del movimiento se LEE (fila 0.176)', () => {
+    it('⭐⭐ TELAS: el motivo sale en la tabla Y en las tarjetas', () => {
+      datosKardexTela.mockReturnValue({
+        ...kardexTela,
+        renglones: kardexTela.renglones.map((r) => ({
+          ...r,
+          observaciones: 'Se lo llevó el cortador Ríos',
+        })),
+      });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+      });
+      fireEvent.click(screen.getByTestId('sel-tela'));
+
+      const enTabla = within(screen.getByTestId('kardex-tela-tabla')).getByTestId(
+        'kardex-tela-obs',
+      );
+      expect(enTabla).toHaveTextContent('Se lo llevó el cortador Ríos');
+      const enTarjetas = within(screen.getByTestId('kardex-tela-tarjetas')).getByTestId(
+        'kardex-tela-obs',
+      );
+      expect(enTarjetas).toHaveTextContent('Se lo llevó el cortador Ríos');
+    });
+
+    it('⭐⭐ AVÍOS: el motivo sale en la tabla Y en las tarjetas', () => {
+      datosKardexAvio.mockReturnValue({
+        ...kardexAvio,
+        renglones: kardexAvio.renglones.map((r) => ({
+          ...r,
+          observaciones: 'Se mandaron al taller para la OP 4471',
+        })),
+      });
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      });
+      abrirAvios();
+
+      const enTabla = within(screen.getByTestId('kardex-avio-tabla')).getByTestId(
+        'kardex-avio-obs',
+      );
+      expect(enTabla).toHaveTextContent('Se mandaron al taller para la OP 4471');
+      const enTarjetas = within(screen.getByTestId('kardex-avio-tarjetas')).getByTestId(
+        'kardex-avio-obs',
+      );
+      expect(enTarjetas).toHaveTextContent('Se mandaron al taller para la OP 4471');
+    });
+
+    /**
+     * Sin motivo, la COLUMNA sigue estando (con su «—»): el histórico migrado de Access no trae
+     * observaciones y la tabla no puede descuadrarse por eso. En las TARJETAS, en cambio, la línea
+     * NO se pinta — una línea vacía en una tarjeta es ruido, no información.
+     */
+    it('sin motivo la columna dice «—», y la tarjeta no pinta una línea vacía', () => {
+      // El renglón de avíos de la base ya trae `observaciones: null`.
+      renderConProveedores(<KardexMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      });
+      abrirAvios();
+      expect(
+        within(screen.getByTestId('kardex-avio-tabla')).getByTestId('kardex-avio-obs'),
+      ).toHaveTextContent('—');
+      expect(
+        within(screen.getByTestId('kardex-avio-tarjetas')).queryByTestId('kardex-avio-obs'),
+      ).not.toBeInTheDocument();
     });
   });
 });

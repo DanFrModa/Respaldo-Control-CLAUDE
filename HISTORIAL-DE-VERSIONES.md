@@ -71,6 +71,48 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.138 · 10-sep-2026 · **en prueba** — **El motivo de un traspaso por fin se puede leer**
+
+### Qué se puede hacer ahora que antes no
+
+- **Ver POR QUÉ se movió un material.** Desde hace unas versiones, mover tela o avíos **obliga** a
+  escribir un motivo. Pero ese motivo **no se podía leer en ninguna pantalla**: se pedía, se guardaba,
+  y ahí se quedaba. Ahora aparece como una columna en el kardex de materiales —las dos pestañas, en
+  la tabla y en las tarjetas del móvil— **y en el kardex por color**, que es donde de verdad aterriza
+  el motivo de un traspaso de tela.
+- **Y un motivo largo se puede leer entero** pasando el ratón por encima: la columna lo recorta para
+  que la tabla quepa, pero el texto completo sigue ahí. *Un motivo ilegible por truncado sería el
+  mismo defecto con otra ropa.*
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Un renglón que a veces sobraba en el kardex por color, ya no — y era peor de lo que parecía.**
+  Al filtrar los movimientos de un color por partida, podía quedarse en pantalla **un movimiento que
+  el servidor no había mandado**; y cada vez que se quitaba y se ponía el filtro, **se sumaba otra
+  copia**. Es decir: quien jugueteara con el filtro veía el kardex **engordar solo**.
+  🔑 **Que quede claro, porque la frase asusta más de lo que debe: NO había ni hay doble conteo.** Las
+  existencias y los saldos se calculan sumando movimientos **en el servidor**, y ahí todo estaba
+  bien. Era lo que la pantalla pintaba. Pero un kardex que repite un renglón se lee como un error de
+  cantidades, y nadie debería tener que descartarlo a ojo.
+- **La pestaña de telas «por lote» también gana la columna, y ahí no dirá casi nunca vacío**: sus
+  movimientos vienen todos de la carga del sistema viejo, y esa carga dejó en **cada** renglón **la
+  traza del documento original de Access** —y su factura y su referencia **cuando las tenía**—. Es la
+  única ventana que queda a ese histórico, así que la columna es lo que se va a mirar ahí. ⚠️ Aviso
+  honesto: en los renglones que no traían factura ni referencia, lo que se verá es **un identificador
+  interno del sistema viejo**, no una explicación en palabras.
+
+### Qué sigue pendiente o roto
+
+- **Al CANCELAR un movimiento también se pide un motivo obligatorio, y ése sigue sin poder leerse.**
+  El movimiento inverso no se lo copia: queda sólo en la bitácora. ⇒ la columna nueva dirá vacío justo
+  en el renglón donde alguien escribió una explicación. Es el mismo defecto que esta versión vino a
+  cerrar, aplicado al acto que **más** necesita explicarse. Ya tiene su línea en el programa.
+- **El motivo del ajuste de tela por color, del conteo y de la salida sin orden tampoco se lee**, y
+  la lista del kardex de ropa lo enseña sólo al abrir el detalle de un folio. Mismo caso, y también
+  numerado en vez de arreglado a escondidas.
+
+---
+
 ## 0.137 · 9-sep-2026 · **en prueba** — **El sistema ya sabe qué día es aquí, no en Londres**
 
 ### Qué se puede hacer ahora que antes no
