@@ -2916,7 +2916,11 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
             ...(conBoton ? [boton] : []),
             cierre('Rojo', 9),
             cierre('Azul', 10),
-            cierre('Verde', 11),
+            // ⚠️ El color del Verde es 12 y NO 11 a propósito: el proveedor del fixture también
+            // es 11, así que con `idColor: 11` estas dos pruebas no distinguían el eje COLOR del
+            // eje PROVEEDOR — lo midió el reviewer cambiando la clave por `p.idProveedor` y
+            // viéndolas seguir VERDES. Con 12, el eje que vienen a medir queda discriminado.
+            cierre('Verde', 12),
           ],
         },
       ],
@@ -2985,7 +2989,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(colores[precios.findIndex((p) => p.value === '77')]).toBe('Verde');
 
     // 🔴 Y lo que de verdad cuesta dinero: al salir del campo, el ajuste viaja al servidor. Tiene
-    // que ir con el color del VERDE (`idColor: 11`). Con la llave repetida viajaba con el del
+    // que ir con el color del VERDE (`idColor: 12`). Con la llave repetida viajaba con el del
     // ROJO (`idColor: 9`) — el precio de un color aplicado a otro, en la OC que se va a firmar.
     previoMutateMock.mockClear();
     previoMutateMock.mockImplementation(() => undefined);
@@ -2994,7 +2998,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(cuerpo.ajustes).toContainEqual({
       tipo: 'avio',
       idMaterial: 21,
-      idColor: 11,
+      idColor: 12,
       idProveedor: 11,
       precioUnitario: 77,
     });
