@@ -175,8 +175,34 @@ const entradas = [...historial.matchAll(/^## (\d+\.\d+)/gm)].map((m) => m[1]);
  * tablero usa DOS redacciones y las dos valen: `CERRADA (2-sep, v0.085)` y `CERRADA — v0.122`— y se
  * toma la del número MÁS ALTO, que es por definición la última que entró a `prueba` (las versiones
  * sólo suben; `HISTORIAL-DE-VERSIONES.md` lo exige en su propio orden y este script lo comprueba más
- * abajo). Se dice de qué fila salió. Si DOS filas declararan ese mismo número, es un problema y se
- * grita: no un empate que se resuelve solo.
+ * abajo). Se dice de qué fila salió — y si son VARIAS, se nombran TODAS.
+ *
+ * ⚠️ **Esto último cambió el 10-sep-2026 (v0.138) y conviene saber por qué.** Antes, dos filas con el
+ * mismo número se trataban como un PROBLEMA. La premisa era que una versión entrega una fila, y dejó
+ * de ser cierta: la v0.138 entregó **la 0.176 y la 0.177 juntas a propósito**, porque una corrida de
+ * CI cuesta 40-50 min y las dos eran de la misma pantalla. Juntarlas es buena economía, no un error.
+ * 🔑 **El miedo del autor original NO se tira:** lo peligroso no es el empate, es **elegir una en
+ * silencio**. Por eso ahora se listan todas.
+ *
+ * ⚠️⚠️ **PERO ESTO PIERDE DETECCIÓN, Y SE DICE EN VEZ DE CALLARLO (medido por el reviewer, 10-sep):**
+ * una **errata** que escriba en otra fila el número de la versión máxima —p. ej. la 0.145, que entrega
+ * la v0.121, tecleada como `v0.138`— **antes gritaba y ahora sale en verde**. El cruce de los cuatro
+ * sitios mide *«¿coinciden?»*; el candado del empate medía *«¿es verdad lo que declara cada fila?»*,
+ * que es OTRA invariante, y este cambio funde la segunda en la primera. Confiar en que alguien note el
+ * `+ 0.145` impreso es apoyarse en el ojo, que es justo lo que este script vino a sustituir.
+ *
+ * **Por qué aun así se quita, y no es pereza — los tres sustitutos se midieron y ninguno vale:**
+ * «toda versión del historial debe tener fila que la reclame» daría **97 falsas alarmas de 134**;
+ * «toda versión declarada debe existir en el historial» es viable pero **no caza la errata** (la
+ * v0.138 sí existe); y cruzar la fila contra la entrada que la nombra es imposible porque **sólo 4 de
+ * 134** entradas nombran su fila. **B8 no es cazable barato con los datos que hoy existen.**
+ *
+ * 📌 **Y el candado que se quita tampoco cumplía:** sólo miraba el empate en la versión **máxima**, así
+ * que las filas **0.089 y 0.090** —que entregan las dos la v0.086— llevaban años empatadas **sin que
+ * gritara nunca**. Era una regla que sonaba el día del estreno y enmudecía para siempre.
+ * 🔴 **El agujero mayor, preexistente y también medido:** de las ~37 versiones que declaran filas, este
+ * cruce comprueba **UNA**, la del máximo. Una errata en cualquier fila no-máxima ya era invisible.
+ * Vive como fila **0.182**.
  *
  * ⚠️ **Y por qué NO se exige «una sola línea con `CERRADA — v`», que es lo que hacía la primera
  * versión de este bloque:** esa redacción es la que estrenó la fila 0.142, y en `prueba` no aparece
@@ -204,14 +230,10 @@ if (filasQueEntregan.length === 0) {
 } else {
   const mayor = filasQueEntregan.reduce((a, b) => (Number(b.version) > Number(a.version) ? b : a));
   const empatadas = filasQueEntregan.filter((f) => f.version === mayor.version);
-  if (empatadas.length > 1) {
-    problemas.push(
-      `Hay ${empatadas.length} filas que dicen entregar la v${mayor.version} ` +
-        `(${empatadas.map((f) => f.fila).join(', ')}). Con dos, este cruce compararía la equivocada ` +
-        'sin avisar.',
-    );
-  }
-  filaQueEntrega = mayor.fila;
+  // Varias filas pueden entregar la MISMA versión (la v0.138 entregó dos). No es un fallo: todas
+  // dicen el mismo número, así que comparar cualquiera es correcto. Lo que no puede pasar es que el
+  // cruce elija una calladamente ⇒ se nombran todas en la salida.
+  filaQueEntrega = empatadas.map((f) => f.fila).join(' + ');
   versionDeLaFila = mayor.version;
 }
 
