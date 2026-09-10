@@ -1,5 +1,15 @@
 # Plan de arranque a producción — CONTROL v2
 
+> ## ⏳ SU CALENDARIO VENCIÓ; SU CRITERIO SIGUE VIGENTE (revisado el 10-sep-2026)
+>
+> Este plan apuntaba al **27-ago-2026** y ese arranque no ocurrió, así que **las fechas de aquí no
+> valen**. ✅ **Pero lo que sí vale, y es la parte importante, es su criterio: arrancar con TRES
+> usuarios y SIN Finanzas.** Sigue siendo la decisión más sensata del expediente y `ARRANQUE.md` la
+> hereda.
+>
+> **Para la lista operativa y el estado real, ve a [`ARRANQUE.md`](ARRANQUE.md)**, que está medido
+> contra el código de hoy.
+
 > **Acordado con Daniel el 24-ago-2026, de madrugada.** Nació de su decisión: *"Ya quiero lanzar la
 > primera versión de producción. **En dos días**"* — y de la respuesta honesta a su repregunta
 > (*"¿crees que estamos listos en dos días, o necesitamos más tiempo?"*), que fue: **el software sí; el
