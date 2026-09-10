@@ -67,6 +67,7 @@ import {
   type EventoRcOrden,
 } from '../../comun/eventos-dominio.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-capturable.js';
 import {
   armarPagina,
   esquemaPaginacion,
@@ -250,19 +251,6 @@ async function exigirComplementosCapturados(tx: Tx, idOrdenCompra: number): Prom
         `: esa tela se compra junto con su ${complemento}. Captúrala antes de autorizar.`,
     );
   }
-}
-
-/**
- * El día de HOY como `DateTime @db.Date` (medianoche UTC), para la fecha de EMISIÓN que pone el
- * servidor (§Post-F9.18). Se normaliza a día para que la columna `@db.Date` no arrastre la hora.
- */
-function hoyColumna(): Date {
-  const ahora = new Date();
-  return new Date(
-    `${String(ahora.getUTCFullYear())}-${String(ahora.getUTCMonth() + 1).padStart(2, '0')}-${String(
-      ahora.getUTCDate(),
-    ).padStart(2, '0')}T00:00:00.000Z`,
-  );
 }
 
 /** Exige que el proveedor exista (las FK las protege la BD, pero damos un error claro). */
@@ -1009,7 +997,15 @@ export async function crearOC(
         // §Post-F9.18: la fecha de emisión la pone el SERVIDOR (el día en que se captura). No
         // viaja en el cuerpo: *"la fecha de creación de la OC es la del día que se hace, sin
         // opción a cambiarla"*. El histórico migrado conserva la suya (entra por `crearOCMigrada`).
-        fecha: hoyColumna(),
+        //
+        // ⭐ **0.179 — EL DÍA ES EL DE MÉXICO, NO EL DE UTC.** Daniel, 10-sep-2026: *"yo dejaría
+        // la del día que se hace. **Aunque sea en la tarde**"*. Hasta la 0.179 el día lo sacaba un
+        // `hoyColumna()` local que leía `getUTC*`, y el servidor corre en UTC: **una OC levantada
+        // después de las 18:00 de México nacía fechada MAÑANA** — todas las tardes, y sin manera de
+        // corregirla porque la fecha no se puede editar. Se usa `hoyDelNegocioUtc` (fila 0.174), el
+        // mismo «hoy» con el que se mide la ventana de captura y el periodo del kardex: tener dos
+        // anclas es tener dos días distintos separados seis horas cada tarde.
+        fecha: hoyDelNegocioUtc(),
         fechaEntrega: aDateColumna(datos.fechaEntrega) ?? null,
         idDireccionEntrega: direccion.id,
         // El texto se COPIA del catálogo: impresos y consultas viejas siguen leyendo un solo campo.
@@ -1515,7 +1511,11 @@ export async function duplicarOC(
         // La copia es una OC NUEVA: se emite HOY (§Post-F9.18), no el día de la original. La fecha
         // de entrega y la dirección sí se arrastran (es el mismo pedido, capturado de nuevo) — y la
         // fecha ya no puede ser nula: se verificó arriba (§Post-F9.103).
-        fecha: hoyColumna(),
+        //
+        // ⭐ 0.179: y ese «hoy» es el de MÉXICO, igual que el del alta. Duplicar es capturar una OC
+        // nueva, así que le toca exactamente la misma regla — si aquí quedara el día UTC, duplicar
+        // por la tarde seguiría emitiendo con fecha de mañana.
+        fecha: hoyDelNegocioUtc(),
         fechaEntrega: origen.fechaEntrega,
         idDireccionEntrega: origen.idDireccionEntrega,
         entregaEn: origen.entregaEn,

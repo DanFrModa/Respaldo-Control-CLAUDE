@@ -71,6 +71,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.141 · 10-sep-2026 · **en prueba** — **El precio que tecleas en una compra ya no se va al material equivocado**
+
+### Qué se puede hacer ahora que antes no
+
+- 🔴 **Teclear precios en la revisión previa de una orden de compra sin que se crucen.** Esto es lo
+  importante de esta versión, y conviene decirlo entero: en la última pantalla antes de firmar,
+  **el precio que escribías para un color podía guardarse en otro**. Medido: se tecleó el precio del
+  cierre **verde** y viajó al servidor bajo la clave del **rojo**. Y la lista llegaba a pintar
+  **cuatro renglones donde el servidor había mandado tres**.
+- **La causa, en una frase:** la pantalla identificaba cada renglón por el color de la *tela*, y un
+  avío no tiene color de tela — tiene color de prenda. Así que **los cuatro cierres de colores
+  distintos eran, para la pantalla, el mismo renglón.**
+- ⭐ **Y el arreglo ya estaba escrito en ese mismo archivo**: la forma correcta de identificar un
+  renglón se calculaba ya cinco veces a dos líneas de distancia. Ahora la pantalla y el servidor usan
+  **exactamente la misma**, letra por letra — que es lo que impide de raíz que uno diga «rojo» y el
+  otro entienda «verde».
+
+### Qué cambió y puede sorprender
+
+- **Una orden de compra levantada por la tarde ya se fecha hoy, no mañana.** Antes se fechaba con el
+  reloj de Londres, así que a partir de las seis de la tarde nacía con la fecha del día siguiente.
+  Es lo que pediste: *«la del día que se hace, aunque sea en la tarde»*. Aplica también al **duplicar**
+  una orden.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **El salto de folios a número redondo NO está programado, y hace falta decidirlo antes de
+  arrancar.** Decidiste que las órdenes nuevas empezaran en un número redondo —6000, por ejemplo— en
+  vez de seguir en el siguiente. El programa que acomoda los folios sólo sabe hacer «último más uno».
+  ⚠️ **Es irreversible una vez arrancado**: o se hace antes, o se arranca con la numeración corrida
+  para siempre. **Sólo falta que digas el número.**
+- **El mismo defecto de fechas sigue en tres sitios de Ruta Crítica**, que salió de esta primera
+  versión por decisión tuya. Queda anotado para la segunda.
+
+---
+
 ## 0.140 · 10-sep-2026 · **en prueba** — **La lista del viernes ya dice cuántos días llevas debiendo**
 
 ### Qué se puede hacer ahora que antes no
