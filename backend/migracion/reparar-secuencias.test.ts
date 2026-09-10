@@ -70,6 +70,26 @@ describe('leerOpciones', () => {
     expect(() => leerOpciones(['--escalon-orden=0'])).toThrow(/≥ 1/);
   });
 
+  it('la MISMA bandera dos veces ABORTA: no se queda con la última en silencio', () => {
+    // `valores.set` sobrescribía: `--escalon-orden=6000 --escalon-orden=7000` salía con 7000 y sin
+    // una palabra. En una operación irreversible, "la última gana" es adivinar.
+    expect(() => leerOpciones(['--escalon-orden=6000', '--escalon-orden=7000'])).toThrow(
+      /viene dos veces/,
+    );
+    // Y el mensaje canta LOS DOS valores, para que se vea cuál sobraba.
+    expect(() => leerOpciones(['--escalon-orden=6000', '--escalon-orden=7000'])).toThrow(/7000/);
+    expect(() => leerOpciones(['--escalon-orden=6000', '--escalon-orden=6000'])).toThrow(
+      /viene dos veces/,
+    );
+    expect(() => leerOpciones(['--escalon-orden=6000', '--empresa=1', '--empresa=2'])).toThrow(
+      /--empresa viene dos veces/,
+    );
+    // Dos banderas DISTINTAS siguen conviviendo (es el uso normal: OP y OC a la vez).
+    expect(
+      leerOpciones(['--escalon-orden=6000', '--escalon-orden-compra=8000']).escalones.size,
+    ).toBe(2);
+  });
+
   it('--aplicar y --simular se contradicen', () => {
     expect(() => leerOpciones(['--escalon-orden=6000', '--aplicar', '--simular'])).toThrow(
       /se contradicen/,
@@ -84,6 +104,17 @@ describe('leerOpciones', () => {
     expect(() => leerOpciones(['--empresa=1'])).toThrow(/sólo acota el ESCALÓN/);
     expect(leerOpciones(['--escalon-orden=6000', '--empresa=2']).idEmpresa).toBe(2);
     expect(() => leerOpciones(['--escalon-orden=6000', '--empresa=0'])).toThrow(/--empresa/);
+  });
+
+  it('--empresa se lee TAN estricto como el escalón: "4abc" no es la empresa 4', () => {
+    // `Number.parseInt` a secas devolvía 4 para "4abc" y 2 para "2.9" — o sea, un dedazo aplicaba
+    // el salto irreversible a OTRA empresa sin decir nada.
+    for (const malo of ['4abc', '2.9', ' 2', '2 ', '+2', '2e1', '']) {
+      expect(() => leerOpciones(['--escalon-orden=6000', `--empresa=${malo}`])).toThrow(
+        /--empresa/,
+      );
+    }
+    expect(leerOpciones(['--escalon-orden=6000', '--empresa=12']).idEmpresa).toBe(12);
   });
 
   it('--simular y --dry-run son la misma cosa (el repo usa las dos palabras)', () => {
@@ -158,6 +189,44 @@ describe('formatearEscalon', () => {
   it('avisa de la irreversibilidad siempre, ensayo o no', () => {
     expect(formatearEscalon(plan, false)).toContain('IRREVERSIBLE');
     expect(formatearEscalon(plan, true)).toContain('IRREVERSIBLE');
+  });
+
+  /**
+   * ⭐ EL GUARDIÁN DE LA PROPIEDAD MÁS CARA DE LA FILA: el cuadro que el operador LEE en el ensayo
+   * tiene que ser EXACTAMENTE el que se imprime al aplicar. Si no, confirma una operación
+   * IRREVERSIBLE mirando unos números y el sistema escribe otros.
+   *
+   * Lo único que puede cambiar entre las dos ramas es el ESTADO: el rótulo del encabezado y la
+   * línea final que dice cómo seguir. Todo lo demás —los cuatro números, la empresa, el aviso de
+   * irreversibilidad— va calcado.
+   *
+   * POR QUÉ EXISTE: hasta la revisión de la 0.187 la propiedad se cumplía pero NADIE la sostenía.
+   * `formatearEscalon` recibe `escrito` y sólo se comprobaba que cambiara el rótulo. El reviewer
+   * envolvió el `push` del "último folio ya comprometido" en un `if (!escrito)` y la suite entera
+   * se quedó VERDE mientras ese número desaparecía de la pantalla de confirmación.
+   */
+  const ESTADO = /APLICADO|ENSAYO EN SECO|^ Aplicado\.|^ NO se escribió nada/;
+  const cuerpo = (texto: string): string[] =>
+    texto.split('\n').filter((linea) => !ESTADO.test(linea));
+
+  it('el cuadro es IDÉNTICO en el ensayo y al aplicar (salvo las líneas de estado)', () => {
+    const ensayo = formatearEscalon(plan, false);
+    const aplicado = formatearEscalon(plan, true);
+    expect(cuerpo(aplicado)).toEqual(cuerpo(ensayo));
+    // Y que el filtro no se haya comido medio cuadro: cada rama quita EXACTAMENTE 2 líneas de
+    // estado (encabezado + cierre). Si mañana se agrega otra, hay que sumarla al regex Y a este
+    // número — a propósito, para que ninguna línea nueva se cuele disfrazada de "estado".
+    expect(ensayo.split('\n').length - cuerpo(ensayo).length).toBe(2);
+    expect(aplicado.split('\n').length - cuerpo(aplicado).length).toBe(2);
+  });
+
+  it('los cuatro números salen TAMBIÉN al aplicar, no sólo en el ensayo', () => {
+    const aplicado = formatearEscalon(plan, true);
+    expect(aplicado).toContain('FR Moda SA de CV');
+    expect(aplicado).toContain('5,847'); // último comprometido
+    expect(aplicado).toContain('5,848'); // lo que sería sin escalón
+    expect(aplicado).toContain('6,000'); // lo que será con escalón
+    expect(aplicado).toContain('152'); // folios que quedan sin usar
   });
 
   it('distingue el ENSAYO del APLICADO y dice cómo seguir', () => {

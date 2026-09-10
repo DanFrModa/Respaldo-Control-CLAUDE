@@ -26,8 +26,13 @@
  * Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP
  * y OC también."* El número exacto se fija EN EL ENSAYO, cuando se conozca el máximo real migrado.
  *
- *   npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000            # ensayo
- *   npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --aplicar  # de veras
+ *   npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000                     # ensayo
+ *   npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=EL-NUMERO-QUE-DIGA-DANIEL --aplicar
+ *
+ * ⚠️ En la línea de `--aplicar` el número va como MARCADOR a propósito (`EL-NUMERO-QUE-DIGA-DANIEL`), no
+ * como cifra: el número del arranque todavía no está decidido y esta línea es copiable. Como no es
+ * un entero, el parser la rechaza sola en vez de aplicar irreversiblemente un número que nadie
+ * eligió. En el ENSAYO sí va una cifra: esa línea no escribe nada.
  *
  * Tres cinturones, porque **es irreversible en cuanto alguien captura con la numeración nueva**:
  *  1. **Sólo OP y OC** admiten escalón (las otras cinco series no tienen bandera: no se pueden
@@ -493,6 +498,15 @@ export function leerOpciones(argv: readonly string[]): OpcionesCli {
       if (!conValor.has(nombreConValor)) {
         throw new Error(`Opción desconocida: "${arg}".\n\n${modoDeUso()}`);
       }
+      // Repetida = ABORTA. Quedarse con la última (o con la primera) sería ADIVINAR, y este
+      // parser existe justo para lo contrario: en una operación irreversible que se teclea con
+      // prisa, `--escalon-orden=6000 --escalon-orden=7000` no puede resolverse en silencio.
+      if (valores.has(nombreConValor)) {
+        throw new Error(
+          `--${nombreConValor} viene dos veces (con "${valores.get(nombreConValor) ?? ''}" y con ` +
+            `"${conIgual?.[2] ?? ''}"). No adivino cuál querías: déjala UNA sola vez.\n\n${modoDeUso()}`,
+        );
+      }
       valores.set(nombreConValor, conIgual?.[2] ?? '');
       continue;
     }
@@ -530,8 +544,14 @@ export function leerOpciones(argv: readonly string[]): OpcionesCli {
   const empresaCruda = valores.get('empresa');
   let idEmpresa: number | undefined;
   if (empresaCruda !== undefined) {
+    // ESTRICTO igual que el escalón: `parseInt` a secas se traga "4abc" (→ 4) y "2.9" (→ 2), o sea
+    // que un dedazo aplicaría el salto a OTRA empresa sin decir nada. En una corrida irreversible
+    // vale mil veces más un aborto que una empresa adivinada.
+    if (!/^\d+$/.test(empresaCruda)) {
+      throw new Error(`--empresa debe ser un id entero ≥ 1 (llegó "${empresaCruda}").`);
+    }
     idEmpresa = Number.parseInt(empresaCruda, 10);
-    if (Number.isNaN(idEmpresa) || idEmpresa < 1) {
+    if (idEmpresa < 1) {
       throw new Error(`--empresa debe ser un id entero ≥ 1 (llegó "${empresaCruda}").`);
     }
   }
@@ -580,7 +600,15 @@ async function principal(): Promise<void> {
     console.error('Falta DATABASE_URL (corre con --env-file=.env — ver migracion/README.md)');
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url);
+  // Mismos tiempos HOLGADOS que los 16 ETL de `migracion/` (los defaults de Prisma son maxWait
+  // 2 s / timeout 5 s). Esto se corre desde una laptop contra la BD REMOTA de Railway y
+  // `aplicarPlan` mete TODAS las series en UNA sola transacción, así que 5 s no dan margen. El
+  // código viejo escribía FUERA de transacción: el riesgo de agotar el tiempo nació con esta fila.
+  // (Si aun así se agotara: P2028 → rollback → no escribe NADA y se vuelve a correr, porque es
+  // idempotente. Pero ésta es la corrida que no debe fallar.)
+  const cliente = crearClientePrisma(url, {
+    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
+  });
   try {
     const plan = await planificar(cliente, {
       escalones: opciones.escalones,

@@ -176,8 +176,10 @@ npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts --dry-run  # (opci
 npx tsx --env-file=.env migracion/reparar-secuencias.ts                  # adelanta TODA secuencia de folio al máximo migrado
 
 # ⭐ SÓLO EN EL ARRANQUE (una vez, IRREVERSIBLE): que las OP/OC nuevas empiecen en número redondo.
-npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000            # ENSAYO: no escribe
-npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000 --aplicar  # de veras
+# ⚠️ Los números REALES los da Daniel el día del arranque: por eso la línea de --aplicar lleva un
+#    MARCADOR y no una cifra (si se copia tal cual, el parser la rechaza en vez de aplicarla).
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000  # ENSAYO: no escribe
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=EL-NUMERO-QUE-DIGA-DANIEL --escalon-orden-compra=EL-NUMERO-QUE-DIGA-DANIEL --aplicar
 ```
 
 ## ⚠️ PASO OBLIGATORIO AL TERMINAR CUALQUIER CARGA: reparar las secuencias de folio
@@ -208,12 +210,19 @@ las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto par
 El número exacto **se fija en el ensayo**, cuando se conozca el máximo real migrado (si la última OP
 fuera 5,847 → arrancar en 6,000; si la última OC fuera 7,920 → 8,000: son **dos números distintos**).
 
+🔴 **Los números de abajo (6000 / 8000) son un EJEMPLO, no la decisión.** El del arranque lo da
+Daniel cuando se vea el máximo real migrado. Por eso **el comando del paso 2 lleva un MARCADOR en vez
+de una cifra**: es la línea que escribe de verdad y es irreversible, así que si alguien la copia tal
+cual, el parser la rechaza (`EL-NUMERO-QUE-DIGA-DANIEL` no es un entero) en lugar de aplicar en
+silencio un número que nadie eligió. El paso 1 sí lleva cifras: **ese comando no escribe nada**.
+
 ```bash
-# 1) ENSAYO — no escribe nada; imprime el cuadro de lo que pasaría.
+# 1) ENSAYO — no escribe nada; imprime el cuadro de lo que pasaría. Aquí SÍ va el número a probar.
 npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000
 
-# 2) Si el cuadro está bien, el MISMO comando con --aplicar.
-npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000 --aplicar
+# 2) Si el cuadro está bien, el MISMO comando con --aplicar — sustituyendo el marcador por el número
+#    que Daniel haya dado (tiene que ser EL MISMO que se ensayó en el paso 1).
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=EL-NUMERO-QUE-DIGA-DANIEL --escalon-orden-compra=EL-NUMERO-QUE-DIGA-DANIEL --aplicar
 ```
 
 ⚠️ **Es IRREVERSIBLE en cuanto alguien captura con la numeración nueva** (el folio 6,000 ya existe y

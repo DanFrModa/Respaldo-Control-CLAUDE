@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.143 · 10-sep-2026 · **en prueba** — **El día que arranques, los folios pueden empezar en el número que tú digas**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Arrancar las órdenes en un número redondo.** Tú decidiste que al empezar de verdad las órdenes
+  de producción y las de compra no continuaran donde las dejó el sistema viejo, sino en una cifra
+  limpia. **Esa decisión nunca se había convertido en programa.** Ahora existe el comando que lo hace,
+  para las dos numeraciones por separado — porque hoy van muy distintas y un solo número sería
+  incorrecto para una de las dos por unos dos mil folios.
+- **Y se puede ver antes de hacerlo.** El comando **ensaya en seco por defecto**: enseña un cuadro con
+  el último folio ya usado, en cuál caería sin el salto y en cuál caerá con él, **sin escribir nada**.
+  Sólo escribe si se le añade la palabra que lo pide expresamente.
+
+### Qué cambió y puede sorprender
+
+- **Si pides un número más bajo del que ya se usó, no lo hace y te lo dice.** No lo hace a medias:
+  si pides el salto para las dos numeraciones y una de las dos está mal, **no escribe ninguna** y te
+  lista todos los problemas de una vez, para que no haya que descubrirlos de uno en uno.
+- **El instructivo ya no trae un número de ejemplo que se pueda aplicar sin querer.** La línea que
+  escribe de verdad lleva un hueco donde va **tu** número; copiarla tal cual da un error claro en vez
+  de arrancar la numeración en una cifra que nadie decidió.
+- **Un reporte que llevaba tiempo pudiendo mentir ya no puede.** Al terminar de cargar los datos
+  viejos, el sistema anunciaba cuál sería el siguiente folio mirando sólo la última fila de la tabla.
+  Si una captura se había ido atrás por un error, ese número **se quedaba quemado** y el anuncio decía
+  uno que no era. Ahora dice el verdadero.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Falta tu número, y es lo único que falta.** El día del arranque es correr el ensayo, mirar el
+  cuadro y repetirlo pidiendo que se aplique. **Sigue siendo irreversible una vez hecho.**
+- **Esta versión no cambia ninguna pantalla.** Es una herramienta del día del arranque: mientras no
+  se corra, el sistema se comporta exactamente igual que antes.
+
+---
+
 ## 0.142 · 10-sep-2026 · **en prueba** — **Ya existe una lista de qué hacer el día del arranque**
 
 ### Qué se puede hacer ahora que antes no
