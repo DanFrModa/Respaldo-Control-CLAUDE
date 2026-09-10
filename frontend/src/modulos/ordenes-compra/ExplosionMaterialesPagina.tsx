@@ -2224,8 +2224,21 @@ function RevisionPrevia({
           <ul>
             {p.renglones.map((r) => (
               <li
-                // ⭐⭐ V1-E3u: idem — dos colores de la misma tela son dos renglones.
-                key={`${r.tipo}-${String(r.idMaterial)}-${r.idTelaColor == null ? 'sin' : String(r.idTelaColor)}`}
+                /* ⭐⭐ 0.183 — LA `key` ES LA MISMA IDENTIDAD QUE EL AJUSTE, y no una parecida.
+                   Se armaba a mano con `idTelaColor` a secas: un avío no tiene color de TELA
+                   (lleva `idColorPrenda`, §Post-F9.126), así que **los cuatro cierres de colores
+                   distintos del ejemplo de Daniel compartían `key`**. Y una `key` repetida no es
+                   un aviso de consola: medido en pruebas, cuando el servidor devuelve un plan con
+                   un renglón menos, React deja fibras huérfanas y la pantalla pinta **5 renglones
+                   donde el servidor mandó 3** (dos colores duplicados) — y el precio tecleado en
+                   el campo del VERDE se queda en un renglón que dice ROJO y **viaja al servidor
+                   bajo la clave del rojo**. Eso es dinero, en la última pantalla antes de firmar.
+
+                   Se usa `claveDeAjuste` —la MISMA función y los MISMOS argumentos con los que los
+                   cinco `onAjustar` de este renglón nombran lo que se corrige— para que la
+                   identidad de React y la del ajuste no puedan separarse: si se separan, el DOM
+                   dice un color y el manejador manda otro, que es exactamente lo que pasaba. */
+                key={claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor)}
                 className="border-t px-3 py-2 first:border-t-0"
                 data-testid="exp-previa-renglon"
               >

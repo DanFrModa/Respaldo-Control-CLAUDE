@@ -2855,6 +2855,150 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [Record<string, unknown>];
     expect(cuerpo).not.toHaveProperty('ajustes');
   });
+
+  // ── 🔴 0.183 — LA `key` DE REACT DE LOS RENGLONES DE LA PREVIA ──────────────────────────────
+  //
+  // Daniel: *"Ese modelo nos lo piden en 4 variantes de color… **cada color es diferente**"*. Los
+  // cuatro cierres son cuatro renglones del MISMO avío, y hasta la 0.183 la `key` de este `<li>`
+  // se armaba a mano con `idTelaColor` a secas — que en un avío es SIEMPRE `null` (su color es de
+  // prenda, §Post-F9.126) ⇒ **los cuatro compartían `key`**.
+  //
+  // ⚠️ Estas dos pruebas NO se apoyan en el aviso de consola de React (`configuracion.ts` no lo
+  // atrapa: no pondría roja ninguna prueba) ni en contar renglones de una pintada quieta (con las
+  // llaves colisionadas React pinta los mismos N). Lo que rompe es la **reconciliación**: hay que
+  // montar, dejar que el servidor devuelva un plan con un renglón MENOS —cosa que pasa de verdad:
+  // entre dos previas otro comprador pudo meter ese material en una OC y el renglón se va a
+  // `omitidos`— y mirar qué queda en pantalla.
+
+  /**
+   * Un plan con los 4 renglones de Daniel: el botón (sin color) y el MISMO cierre en tres colores.
+   * Cada color lleva un precio distinto para poder seguirlo a simple vista.
+   */
+  function planDeCuatroColores(conBoton: boolean) {
+    const base = planDePrueba();
+    type RenglonPlan = (typeof base.proveedores)[number]['renglones'][number];
+    const boton = base.proveedores[0]?.renglones[0] as RenglonPlan;
+    const linea = boton.porOrden[0] as RenglonPlan['porOrden'][number];
+    const cierre = (color: string, idColor: number): RenglonPlan => ({
+      ...boton,
+      idMaterial: 21,
+      material: 'CIE-53 — Cierre',
+      idColorPrenda: idColor,
+      colorPrenda: color,
+      colorTexto: color,
+      colorAjustado: false,
+      cantidadTotal: 30,
+      cantidadPropuesta: 30,
+      // El precio ES el id del color: así se lee de un vistazo si un número se cambió de renglón.
+      precioUnitario: idColor,
+      precioPropuesto: idColor,
+      importe: 30 * idColor,
+      porOrden: [
+        {
+          ...linea,
+          idRequerimiento: 900 + idColor,
+          cantidad: 30,
+          cantidadPropuesta: 30,
+          precio: idColor,
+          importe: 30 * idColor,
+        },
+      ],
+    });
+    const proveedor = base.proveedores[0] as (typeof base.proveedores)[number];
+    return {
+      ...base,
+      proveedores: [
+        {
+          ...proveedor,
+          renglones: [
+            // El botón va PRIMERO y con otra `key`: es lo que obliga a React a reconciliar por
+            // mapa cuando desaparece, que es donde la llave repetida hace el destrozo.
+            ...(conBoton ? [boton] : []),
+            cierre('Rojo', 9),
+            cierre('Azul', 10),
+            cierre('Verde', 11),
+          ],
+        },
+      ],
+    };
+  }
+
+  /** Abre la previa con el plan de 4 renglones y deja una petición del previo EN VUELO. */
+  async function previaConPeticionEnVuelo(): Promise<(plan: unknown) => void> {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia(planDeCuatroColores(true));
+    let resolver: ((plan: unknown) => void) | undefined;
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (plan: unknown) => void }) => {
+        resolver = opciones.onSuccess;
+      },
+    );
+    // Se corrige la cantidad del BOTÓN: sale la petición y su respuesta queda en el aire (como en
+    // la vida real, donde el servidor tarda).
+    const cantidad = screen.getAllByTestId('exp-previa-cantidad')[0] as HTMLElement;
+    await usuario.clear(cantidad);
+    await usuario.type(cantidad, '299');
+    await usuario.tab();
+    const llegar = resolver;
+    if (llegar === undefined) throw new Error('no salió la petición del previo');
+    return llegar;
+  }
+
+  it('🔴 0.183: un plan con un renglón MENOS no deja renglones FANTASMA en pantalla', async () => {
+    const llegaLaRespuesta = await previaConPeticionEnVuelo();
+    expect(screen.getAllByTestId('exp-previa-renglon')).toHaveLength(4);
+
+    // El botón ya no está (otro comprador lo metió en una OC): el servidor manda TRES renglones.
+    act(() => {
+      llegaLaRespuesta(planDeCuatroColores(false));
+    });
+
+    // 🔴 El valor que la pone roja con la llave repetida: **5** renglones —Rojo y Azul pintados
+    // dos veces— donde el servidor mandó 3. Los de más son fibras que React ya no puede alcanzar:
+    // se quedan con los números del plan viejo para siempre, en la pantalla donde se firma.
+    expect(screen.getAllByTestId('exp-previa-renglon')).toHaveLength(3);
+    expect(screen.getAllByTestId('exp-previa-color-avio').map((c) => c.textContent)).toEqual([
+      'Rojo',
+      'Azul',
+      'Verde',
+    ]);
+  });
+
+  it('🔴 0.183: el PRECIO tecleado en un color NO viaja bajo la clave de otro (dinero)', async () => {
+    const usuario = userEvent.setup();
+    const llegaLaRespuesta = await previaConPeticionEnVuelo();
+
+    // Mientras la respuesta viaja, el comprador teclea el precio del cierre VERDE (el último).
+    const precioVerde = screen.getAllByTestId<HTMLInputElement>('exp-previa-precio')[3];
+    if (precioVerde === undefined) throw new Error('faltó el campo Precio del cierre verde');
+    await usuario.clear(precioVerde);
+    await usuario.type(precioVerde, '77');
+
+    act(() => {
+      llegaLaRespuesta(planDeCuatroColores(false));
+    });
+
+    // El 77 tiene que seguir estando en el renglón que dice VERDE. Con la llave repetida acababa
+    // —medido— en un renglón rotulado **Rojo**.
+    const colores = screen.getAllByTestId('exp-previa-color-avio').map((c) => c.textContent);
+    const precios = screen.getAllByTestId<HTMLInputElement>('exp-previa-precio');
+    expect(colores[precios.findIndex((p) => p.value === '77')]).toBe('Verde');
+
+    // 🔴 Y lo que de verdad cuesta dinero: al salir del campo, el ajuste viaja al servidor. Tiene
+    // que ir con el color del VERDE (`idColor: 11`). Con la llave repetida viajaba con el del
+    // ROJO (`idColor: 9`) — el precio de un color aplicado a otro, en la OC que se va a firmar.
+    previoMutateMock.mockClear();
+    previoMutateMock.mockImplementation(() => undefined);
+    await usuario.tab();
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toContainEqual({
+      tipo: 'avio',
+      idMaterial: 21,
+      idColor: 11,
+      idProveedor: 11,
+      precioUnitario: 77,
+    });
+  });
 });
 
 /**

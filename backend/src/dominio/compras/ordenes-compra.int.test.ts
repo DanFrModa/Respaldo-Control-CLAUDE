@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -13,6 +13,7 @@ import type {
   Talla,
   Tela,
 } from '../../datos/index.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -718,7 +719,10 @@ describe('OC (§Post-F9.18) — reglas de captura que pidió Daniel', () => {
       { ...encabezadoOc(), idProveedor: proveedor.id, lineas: [] },
       bd(),
     );
-    const hoy = new Date().toISOString().slice(0, 10);
+    // ⭐ 0.179: el «hoy» es el del NEGOCIO (México), no el de UTC. Medirlo con
+    // `new Date().toISOString()` dejaba esta prueba dependiendo de la hora a la que corriera el
+    // CI: de las 18:00 en adelante el día UTC ya es otro y la aserción se caía sola.
+    const hoy = hoyDelNegocio();
     expect(oc.fecha).toBe(hoy);
 
     // Aunque alguien mande `fecha` por el API (fuera del contrato), NO se toca al editar.
@@ -729,6 +733,89 @@ describe('OC (§Post-F9.18) — reglas de captura que pidió Daniel', () => {
       bd(),
     );
     expect((await obtenerOC(sesion(PERM_ADMIN_OC), oc.id, bd())).fecha).toBe(hoy);
+  });
+
+  /**
+   * ⭐⭐ **0.179 — LA OC SE FECHA EL DÍA QUE SE HACE, EN EL HUSO DEL NEGOCIO.**
+   *
+   * Daniel, 10-sep-2026: *"Lo de las órdenes de compra… yo dejaría **la del día que se hace.
+   * Aunque sea en la tarde**"*.
+   *
+   * Hasta la 0.179 el día lo sacaba un `hoyColumna()` local de `ordenes-compra.ts` que leía
+   * `getUTCFullYear/Month/Date`. El servidor corre en UTC y aquí se compra en México (−06:00, sin
+   * horario de verano desde 2022), así que **de las 18:00 a las 23:59 el día UTC ya era el
+   * siguiente**: toda OC levantada en la tarde nacía fechada MAÑANA — y como §Post-F9.18 prohíbe
+   * capturar y editar esa fecha, no había forma de corregirla. Ahora usa `hoyDelNegocioUtc` (fila
+   * 0.174), el mismo «hoy» de la ventana de captura y del periodo del kardex.
+   *
+   * ⚠️ **El reloj va ANCLADO, y por eso hay tres anclajes y no uno.** Una prueba de husos que tome
+   * la hora real pasaría por la mañana y fallaría por la tarde, que es peor que no tenerla. Los
+   * tres dicen cosas distintas y los tres hacen falta:
+   *  1. **19:00 de México** — la franja del defecto (en UTC ya es el día 10). Es el que se pone
+   *     rojo si alguien devuelve el día UTC.
+   *  2. **Mediodía de México** — el control: ahí el día UTC y el del negocio COINCIDEN, así que
+   *     este anclaje pasa igual con el código roto. Su trabajo es demostrar que el rojo del
+   *     primero lo produce el huso y no el anclaje en sí.
+   *  3. **20:30 de México de OTRO día (marzo)** — la prueba de vida del arnés: la fecha escrita
+   *     **cambia cuando se mueve el reloj falso**, o sea que la aserción sigue al ancla y no a la
+   *     fecha real de la máquina que corre las pruebas.
+   */
+  const ANCLAJES_DE_MEXICO = [
+    {
+      nombre: '19:00 de México (en UTC ya es el día siguiente)',
+      instante: '2026-09-10T01:00:00.000Z',
+      dia: '2026-09-09',
+    },
+    {
+      nombre: 'mediodía de México (el día UTC coincide)',
+      instante: '2026-09-09T18:00:00.000Z',
+      dia: '2026-09-09',
+    },
+    {
+      nombre: '20:30 de México de otro día',
+      instante: '2026-03-15T02:30:00.000Z',
+      dia: '2026-03-14',
+    },
+  ] as const;
+
+  /** Corre `accion` con el reloj anclado a ese instante (sólo `Date`, para no congelar Postgres). */
+  async function conElRelojEn<T>(instante: string, accion: () => Promise<T>): Promise<T> {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(instante));
+    try {
+      return await accion();
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it.each(ANCLAJES_DE_MEXICO)(
+    '⭐ 0.179: la OC nace fechada el día de MÉXICO — $nombre',
+    async ({ instante, dia }) => {
+      const oc = await conElRelojEn(instante, () =>
+        crearOC(
+          sesion(PERM_ADMIN_OC),
+          { ...encabezadoOc(), idProveedor: proveedor.id, lineas: [] },
+          bd(),
+        ),
+      );
+      expect(oc.fecha, 'la fecha de emisión es el día del negocio, no el día UTC').toBe(dia);
+    },
+  );
+
+  it('⭐ 0.179: DUPLICAR también emite con el día de México (es una OC nueva)', async () => {
+    const original = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      { ...encabezadoOc(), idProveedor: proveedor.id, lineas: [] },
+      bd(),
+    );
+    // 19:00 del 9 de septiembre en México = 10 de septiembre en UTC. La copia se emite HOY
+    // (§Post-F9.18), y ese «hoy» es el del negocio: si aquí quedara el día UTC, duplicar por la
+    // tarde seguiría pariendo OC fechadas mañana.
+    const copia = await conElRelojEn('2026-09-10T01:00:00.000Z', () =>
+      duplicarOC(sesion(PERM_ADMIN_OC), original.id, bd()),
+    );
+    expect(copia.fecha).toBe('2026-09-09');
   });
 
   it('la FECHA DE ENTREGA es obligatoria al crear y no se puede vaciar al editar', async () => {
